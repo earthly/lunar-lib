@@ -387,7 +387,7 @@ set -e
 # This runs after "go test" via ci-after-command hook
 if [ -f coverage.out ]; then
   COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
-  lunar collect -j ".coverage.go.percentage" "$COVERAGE"
+  lunar collect -j ".testing.coverage.percentage" "$COVERAGE"
 fi
 ```
 
@@ -530,13 +530,15 @@ fi
 Prefer structured objects over flat values.
 
 ```bash
-# Good
-lunar collect -j ".dockerfile" '{"exists": true, "base_images": ["node:18"]}'
+# Good - structured object with related data grouped together
+lunar collect -j ".containers.definitions[0]" '{"path": "Dockerfile", "valid": true, "base_images": [{"reference": "node:18-alpine"}]}'
 
-# Less good
+# Less good - flat values scattered at different paths
 lunar collect -j ".dockerfile_exists" true
 lunar collect -j ".dockerfile_base_images" '["node:18"]'
 ```
+
+See more info about component JSON conventions in [component-json-conventions.md](component-json-conventions.md).
 
 ### 4. Include Context in Collected Data
 

@@ -62,29 +62,62 @@ This allows policies to:
 
 ---
 
-## Presence Detection Naming
+## Presence Detection: Object Existence vs Explicit Booleans
 
-Different naming conventions signal different assertion patterns to policy authors.
+There are two patterns for detecting whether something happened or exists:
 
-### `exists` — Collector writes both `true` and `false`
+### Pattern 1: Object Presence = The Signal
 
-Use `exists` when the collector **always runs** and explicitly records presence or absence:
+When a collector **only runs under certain conditions** (CI hook, cron, etc.), the **presence of the object itself** signals that the thing happened:
+
+```json
+// SCA scanner ran — .sca object exists with data:
+{
+  "sca": {
+    "source": { "tool": "snyk" },
+    "vulnerabilities": { "critical": 0, "high": 1 }
+  }
+}
+
+// SCA scanner didn't run — .sca object is missing entirely
+// (no .sca key in the component JSON)
+```
+
+**Policy pattern:** Use `assert_exists(...)`:
+```python
+c.assert_exists(".sca", "SCA scanner must be configured to run")
+```
+
+**For "ran but nothing to report" cases**, write an empty object or minimal structure:
+```bash
+# Minimal: empty object is valid — presence alone signals the tool ran
+lunar collect -j ".sca" '{}'
+
+# Better: include source metadata for traceability
+lunar collect -j ".sca" '{"source": {"tool": "snyk"}}'
+```
+
+This is the idiomatic way to record that a tool executed without needing a boolean field.
+
+### Pattern 2: Explicit Booleans
+
+When a collector **always runs** (e.g., code collector that checks file existence), use explicit `true`/`false` values:
 
 ```json
 {
   "repo": {
     "readme": {
-      "exists": true,    // Collector writes true
+      "exists": true,    // Collector always writes true OR false
       "path": "README.md"
     }
   }
 }
 
-// Or when file is missing:
+// When file is missing:
 {
   "repo": {
     "readme": {
-      "exists": false    // Collector explicitly writes false
+      "exists": false    // Explicitly false, not missing
     }
   }
 }
@@ -95,53 +128,65 @@ Use `exists` when the collector **always runs** and explicitly records presence 
 c.assert_true(c.get_value(".repo.readme.exists"), "README.md not found")
 ```
 
-### `ran` — Collector only writes on execution
+### Anti-Pattern: Boolean Fields Without a Failure Writer
 
-Use `ran` when data is only present if something executed (CI step, scanner, etc.):
+**Avoid** using boolean fields like `.sca.ran` when the collector cannot write `false` for the failure case:
 
 ```json
-// When scanner ran:
+// BAD: .sca.ran is always true when present, never false
 {
   "sca": {
-    "ran": true,
+    "ran": true,  // ❌ Misleading — this field can only ever be true
     "vulnerabilities": { ... }
   }
 }
-
-// When scanner didn't run: the entire .sca object may be missing
 ```
 
-**Policy pattern:** Use `assert_exists(...)`:
-```python
-c.assert_exists(".sca.ran", "SCA scanner must be configured to run")
-```
+**Why it's problematic:**
+- If the SCA scanner doesn't run, there's no collector to write `"ran": false`
+- The field only ever contains `true`, making it redundant
+- Policy authors might incorrectly use `assert_true(get_value(".sca.ran"))`, which fails with "no data" instead of a meaningful message
 
-### `configured` — External integration status
-
-Use `configured` for external system integrations where absence means not set up:
+**Correct approach:** Let the object's presence be the signal:
 
 ```json
+// GOOD: Object exists = scanner ran
 {
-  "oncall": {
-    "configured": true,  // Only present if PagerDuty/etc is set up
-    "service": { ... }
+  "sca": {
+    "source": { "tool": "snyk" },
+    "vulnerabilities": { ... }
   }
 }
 ```
 
-**Policy pattern:** Use `assert_exists(...)`:
-```python
-c.assert_exists(".oncall.configured", "On-call must be configured")
+**When IS a boolean appropriate?** When the same collector can write both `true` and `false`:
+
+```json
+// GOOD: Code collector always runs and checks file existence
+{
+  "repo": {
+    "readme": {
+      "exists": true   // Same collector writes false when file missing
+    }
+  }
+}
 ```
 
 ### Summary Table
 
-| Field Name | Collector Behavior | Policy Assertion |
-|------------|-------------------|------------------|
-| `exists` | Always writes `true` or `false` | `assert_true(get_value(...))` |
-| `ran` | Only writes when executed | `assert_exists(...)` |
-| `configured` | Only writes when set up | `assert_exists(...)` |
-| `found` | Only writes when detected | `assert_exists(...)` |
+| Scenario | Collector Behavior | Policy Assertion |
+|----------|-------------------|------------------|
+| Conditional execution (CI hook, scanner) | Object exists when ran, missing when didn't | `assert_exists(".sca")` |
+| Always-checked property | Writes explicit `true` or `false` | `assert_true(get_value(".repo.readme.exists"))` |
+
+### Optional Fields in Nested Data
+
+For optional fields **within** already-collected data (like optional K8s manifest fields), use `get_value_or_default()`:
+
+```python
+# K8s namespace is optional, defaults to "default"
+ns = desc.get_value_or_default(".contents.metadata.namespace", "default")
+```
 
 ---
 
@@ -156,16 +201,17 @@ Within any category, use a `.pr` sub-key for PR-specific data:
 ```json
 {
   "sca": {
-    "ran": true,
+    "source": { "tool": "snyk" },
     "vulnerabilities": { "critical": 0, "high": 1 },
     "pr": {
-      "scan_ran": true,
       "new_vulnerabilities": { "critical": 0, "high": 0 },
       "fixed_vulnerabilities": { "high": 1 }
     }
   }
 }
 ```
+
+**Note:** The `.sca` object's presence signals the scanner ran (see [Presence Detection](#presence-detection-object-existence-vs-explicit-booleans)).
 
 ### The `.vcs.pr` Object
 
@@ -241,7 +287,6 @@ Place normalized data at the category level, raw data under `.native.<format>` o
 ```json
 {
   "sbom": {
-    "generated": true,
     "source": {
       "tool": "syft",
       "format": "spdx-json"
@@ -268,7 +313,6 @@ When multiple tools contribute to the same category:
 ```json
 {
   "sbom": {
-    "generated": true,
     "summary": {
       "packages": 156
     },
@@ -828,7 +872,6 @@ Test execution results and code coverage. Normalized across frameworks and tools
 ```json
 {
   "testing": {
-    "ran": true,
     "source": {
       "framework": "go test",
       "integration": "ci"
@@ -849,7 +892,6 @@ Test execution results and code coverage. Normalized across frameworks and tools
     ],
     "all_passing": false,
     "coverage": {
-      "ran": true,
       "source": {
         "tool": "go cover",
         "integration": "ci"
@@ -873,10 +915,10 @@ Test execution results and code coverage. Normalized across frameworks and tools
 ```
 
 **Key policy paths:**
-- `.testing.ran` — Tests executed
+- `.testing` — Tests executed (use `assert_exists(".testing")`)
 - `.testing.results.failed` — Failure count
 - `.testing.all_passing` — Clean test run
-- `.testing.coverage.ran` — Coverage collected
+- `.testing.coverage` — Coverage collected (use `assert_exists(".testing.coverage")`)
 - `.testing.coverage.percentage` — Overall coverage
 - `.testing.coverage.meets_threshold` — Above minimum
 
@@ -889,7 +931,6 @@ Software Composition Analysis (dependency vulnerabilities). **Normalized across 
 ```json
 {
   "sca": {
-    "ran": true,
     "source": {
       "tool": "snyk",
       "version": "1.1200.0",
@@ -924,12 +965,12 @@ Software Composition Analysis (dependency vulnerabilities). **Normalized across 
 ```
 
 **Key policy paths:**
-- `.sca.ran` — SCA scan executed
+- `.sca` — SCA scan executed (use `assert_exists(".sca")`)
 - `.sca.vulnerabilities.critical` — Critical count
 - `.sca.summary.has_critical` — Any criticals
 - `.sca.source.tool` — Which tool (if compliance requires specific tool)
 
-**Note:** Policies should check `.sca.ran` and `.sca.vulnerabilities`, NOT `.sca.source.tool` (unless compliance mandates a specific scanner).
+**Note:** Policies should use `assert_exists(".sca")` to verify the scanner ran, then check `.sca.vulnerabilities`. Don't check `.sca.source.tool` unless compliance mandates a specific scanner.
 
 ---
 
@@ -940,7 +981,6 @@ Static Application Security Testing. **Normalized across Semgrep, SonarQube, Cod
 ```json
 {
   "sast": {
-    "ran": true,
     "source": {
       "tool": "semgrep",
       "version": "1.50.0",
@@ -972,7 +1012,7 @@ Static Application Security Testing. **Normalized across Semgrep, SonarQube, Cod
 ```
 
 **Key policy paths:**
-- `.sast.ran` — SAST scan executed
+- `.sast` — SAST scan executed (use `assert_exists(".sast")`)
 - `.sast.findings.critical` — Critical findings
 - `.sast.summary.has_critical` — Any criticals
 
@@ -985,7 +1025,6 @@ Secret/credential scanning. **Normalized across Gitleaks, TruffleHog, detect-sec
 ```json
 {
   "secrets": {
-    "ran": true,
     "source": {
       "tool": "gitleaks",
       "version": "8.18.0",
@@ -1001,7 +1040,7 @@ Secret/credential scanning. **Normalized across Gitleaks, TruffleHog, detect-sec
 ```
 
 **Key policy paths:**
-- `.secrets.ran` — Secret scan executed
+- `.secrets` — Secret scan executed (use `assert_exists(".secrets")`)
 - `.secrets.findings.total` — Secrets found
 - `.secrets.clean` — No secrets detected
 
@@ -1014,7 +1053,6 @@ Container image vulnerability scanning. **Normalized across Trivy, Grype, Clair,
 ```json
 {
   "container_scan": {
-    "ran": true,
     "source": {
       "tool": "trivy",
       "version": "0.48.0",
@@ -1041,7 +1079,7 @@ Container image vulnerability scanning. **Normalized across Trivy, Grype, Clair,
 ```
 
 **Key policy paths:**
-- `.container_scan.ran` — Scan executed
+- `.container_scan` — Scan executed (use `assert_exists(".container_scan")`)
 - `.container_scan.vulnerabilities.critical` — Critical vulns
 - `.container_scan.summary.has_critical` — Any criticals
 
@@ -1106,7 +1144,6 @@ On-call, incident management, runbooks. **Normalized across PagerDuty, OpsGenie,
 ```json
 {
   "oncall": {
-    "configured": true,
     "source": {
       "tool": "pagerduty",
       "integration": "api"
@@ -1146,7 +1183,7 @@ On-call, incident management, runbooks. **Normalized across PagerDuty, OpsGenie,
 ```
 
 **Key policy paths:**
-- `.oncall.configured` — On-call set up
+- `.oncall` — On-call configured (use `assert_exists(".oncall")`)
 - `.oncall.schedule.participants` — Rotation size
 - `.oncall.runbook.exists` — Runbook present
 - `.oncall.sla.defined` — SLA documented
@@ -1253,7 +1290,7 @@ API specifications.
 
 ```python
 with Check("sca-no-critical", "No critical SCA vulnerabilities") as c:
-    c.assert_exists(".sca.ran", "SCA scanner must be configured")
+    c.assert_exists(".sca", "SCA scanner must be configured")
     c.assert_equals(c.get_value(".sca.vulnerabilities.critical"), 0,
         "Critical vulnerabilities found")
 ```

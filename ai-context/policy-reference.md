@@ -472,9 +472,9 @@ When a collector only fires in certain conditions (e.g., CI hook that triggers o
 from lunar_policy import Check
 
 # The SCA collector only writes data when a scanner runs.
-# If no scanner runs, .sca.run won't exist at all.
+# If no scanner runs, .sca won't exist at all.
 with Check("sca-scanner-ran", "SCA scanner should run in CI") as c:
-    c.assert_exists(".sca.run", 
+    c.assert_exists(".sca", 
         "No SCA scanner detected. Configure Snyk or Semgrep in your CI pipeline.")
 ```
 
@@ -486,8 +486,8 @@ with Check("sca-scanner-ran", "SCA scanner should run in CI") as c:
 
 ```python
 # BAD - masks missing data, reports false negative initially, but then later it might pass
-has_sca = c.get_value_or_default(".sca.run", False)
-c.assert_true(has_sca, "SCA not run")
+sca_data = c.get_value_or_default(".sca", None)
+c.assert_true(sca_data is not None, "SCA not run")
 ```
 
 The problem: this reports FAIL while CI is still running (before SCA triggers), then flips to PASS later. The correct behavior is PENDING initially, then the real result. Use `assert_exists` instead.
@@ -510,14 +510,14 @@ if cpu_limit is None:
 from lunar_policy import Check
 
 with Check("k8s-valid", "All K8s manifests should be valid") as c:
-    descriptors = c.get_node(".k8s.descriptors")
-    if not descriptors.exists():
+    manifests = c.get_node(".k8s.manifests")
+    if not manifests.exists():
         return
     
-    for desc in descriptors:
-        path = desc.get_value_or_default(".k8s_file_location", "<unknown>")
-        valid = desc.get_value_or_default(".valid", False)
-        error = desc.get_value_or_default(".validation_error", "Unknown error")
+    for manifest in manifests:
+        path = manifest.get_value_or_default(".path", "<unknown>")
+        valid = manifest.get_value_or_default(".valid", False)
+        error = manifest.get_value_or_default(".error", "Unknown error")
         
         c.assert_true(valid, f"{path}: {error}")
 ```
@@ -553,25 +553,18 @@ from lunar_policy import Check, variable_or_default
 
 def check_replicas():
     with Check("k8s-min-replicas", "HPAs should have minimum replicas") as c:
-        min_replicas = int(variable_or_default("minReplicas", "3"))
+        min_required = int(variable_or_default("minReplicas", "3"))
         
-        descriptors = c.get_node(".k8s.descriptors")
-        if not descriptors.exists():
+        hpas = c.get_node(".k8s.hpas")
+        if not hpas.exists():
             return
         
-        for desc in descriptors:
-            if not desc.get_value_or_default(".valid", False):
-                continue
+        for hpa in hpas:
+            name = hpa.get_value_or_default(".name", "<unknown>")
+            min_replicas = hpa.get_value_or_default(".min_replicas", 0)
             
-            contents = desc.get_node(".contents")
-            if contents.get_value(".kind") != "HorizontalPodAutoscaler":
-                continue
-            
-            replicas = contents.get_value_or_default(".spec.minReplicas", 0)
-            name = contents.get_value_or_default(".metadata.name", "<unknown>")
-            
-            c.assert_greater_or_equal(replicas, min_replicas,
-                f"HPA {name} has minReplicas={replicas}, need at least {min_replicas}")
+            c.assert_greater_or_equal(min_replicas, min_required,
+                f"HPA {name} has min_replicas={min_replicas}, need at least {min_required}")
 ```
 
 ### Pattern 5: Cross-Referencing Data
@@ -582,40 +575,31 @@ from lunar_policy import Check
 def check_pdb_coverage():
     """Ensure each Deployment has a PodDisruptionBudget."""
     with Check("k8s-pdb-coverage", "Deployments should have PDBs") as c:
-        descriptors = c.get_node(".k8s.descriptors")
-        if not descriptors.exists():
+        workloads = c.get_node(".k8s.workloads")
+        pdbs = c.get_node(".k8s.pdbs")
+        
+        if not workloads.exists():
             return
         
-        # Collect all PDBs and Deployments
-        pdbs = []
-        deployments = []
+        # Get list of workloads that have PDBs (by target_workload reference)
+        pdb_targets = set()
+        if pdbs.exists():
+            for pdb in pdbs:
+                target = pdb.get_value_or_default(".target_workload", "")
+                if target:
+                    pdb_targets.add(target)
         
-        for desc in descriptors:
-            if not desc.get_value_or_default(".valid", False):
+        # Check each Deployment has a matching PDB
+        for workload in workloads:
+            kind = workload.get_value_or_default(".kind", "")
+            if kind != "Deployment":
                 continue
             
-            contents = desc.get_node(".contents")
-            kind = contents.get_value(".kind")
+            name = workload.get_value_or_default(".name", "<unknown>")
+            path = workload.get_value_or_default(".path", "")
             
-            if kind == "PodDisruptionBudget":
-                pdbs.append({
-                    "name": contents.get_value_or_default(".metadata.name", ""),
-                    "selector": contents.get_value_or_default(".spec.selector.matchLabels", {})
-                })
-            elif kind == "Deployment":
-                deployments.append({
-                    "name": contents.get_value_or_default(".metadata.name", ""),
-                    "labels": contents.get_value_or_default(".spec.template.metadata.labels", {}),
-                    "file": desc.get_value_or_default(".k8s_file_location", "")
-                })
-        
-        # Check each deployment has a matching PDB
-        for dep in deployments:
-            has_pdb = any(
-                all(dep["labels"].get(k) == v for k, v in pdb["selector"].items())
-                for pdb in pdbs if pdb["selector"]
-            )
-            c.assert_true(has_pdb, f"Deployment {dep['name']} ({dep['file']}) has no matching PDB")
+            has_pdb = name in pdb_targets
+            c.assert_true(has_pdb, f"Deployment {name} ({path}) has no matching PDB")
 ```
 
 ### Pattern 6: Using Component Metadata
