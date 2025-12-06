@@ -56,6 +56,15 @@ Guardrails define the practices your organization wants to enforce. Lunar evalua
 
 ## Key Concepts
 
+### The Component JSON (Technical)
+
+At the heart of Lunar is the **Component JSON**—a JSON document that accumulates all metadata about a component (service/library). This is the data contract between collectors and policies:
+
+1. **Collectors** write data to the Component JSON (e.g., `{"repo": {"readme_exists": true}}`)
+2. **Policies** read from the Component JSON to evaluate compliance
+
+The structure is arbitrary—collectors define what they write, and policies know what to read. This decoupling allows collectors and policies to be developed independently.
+
 ### Guardrails
 
 Guardrails are your engineering standards expressed as code. They verify that applications comply with organizational requirements—things like:
