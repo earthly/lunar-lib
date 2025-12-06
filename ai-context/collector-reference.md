@@ -538,7 +538,7 @@ lunar collect -j ".dockerfile_exists" true
 lunar collect -j ".dockerfile_base_images" '["node:18"]'
 ```
 
-See more info about component JSON conventions in [component-json-conventions.md](component-json-conventions.md).
+See [component-json-conventions.md](component-json-conventions.md) for design principles and conventions, and [component-json-structure.md](component-json-structure.md) for the standard category structures.
 
 ### 4. Include Context in Collected Data
 

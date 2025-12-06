@@ -401,4 +401,4 @@ Components also get automatic tags:
 
 - **Collectors**: See [collector-reference.md](./collector-reference.md) for detailed collector documentation
 - **Policies**: See [policy-reference.md](./policy-reference.md) for detailed policy documentation
-- **Component JSON**: See [component-json-conventions.md](./component-json-conventions.md) for structure conventions
+- **Component JSON**: See [component-json-conventions.md](./component-json-conventions.md) for design principles and [component-json-structure.md](./component-json-structure.md) for category structures
