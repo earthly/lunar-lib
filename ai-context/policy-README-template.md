@@ -86,8 +86,9 @@ policies:
 
 ## Related Collectors
 
-This policy requires data from:
+This policy works with any collector that populates the required data paths. Common options include:
 - `{collector-name}` - {brief description}
+- `{alternative-collector}` - {brief description}
 
 ## Remediation
 
