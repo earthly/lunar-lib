@@ -16,6 +16,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.source.integration` - How the scan was triggered (e.g., "ci", "github_app")
   * Policy: Assert that SAST scan data exists
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sast-approved-tool` **SAST scan uses approved tool**: Organization must use a specific approved SAST tool for compliance requirements.
   * Collector(s): Detect which SAST tool was used and record tool name and version
@@ -24,6 +25,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.source.version` - Version of the tool
   * Policy: Assert that the SAST tool matches an approved list
   * Configuration: List of approved SAST tools (e.g., ["semgrep", "sonarqube", "codeql"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ### Finding Thresholds
 
@@ -34,6 +36,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.summary.has_critical` - Boolean indicating presence of critical findings
   * Policy: Assert that critical finding count is zero
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-high-sast-findings` **No high-severity SAST findings**: Source code should not have high-severity security findings that could lead to exploits.
   * Collector(s): Parse SAST scan results and count high-severity findings
@@ -42,6 +45,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.summary.has_high` - Boolean indicating presence of high findings
   * Policy: Assert that high-severity finding count is zero or below threshold
   * Configuration: Maximum allowed high-severity findings (default: 0)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sast-findings-threshold` **SAST findings within acceptable threshold**: Total SAST findings across all severities must not exceed organizational limits.
   * Collector(s): Aggregate all SAST findings by severity level
@@ -53,6 +57,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.findings.low` - Low count
   * Policy: Assert that total findings or weighted score is within threshold
   * Configuration: Maximum total findings, or weighted scoring formula
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sast-no-new-findings-pr` **New SAST findings not introduced in PR**: Pull requests must not introduce new security findings compared to the base branch.
   * Collector(s): Compare SAST scan results between PR and base branch to identify delta
@@ -61,6 +66,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.pr_delta.new_issues` - Array of new issues with details
   * Policy: Assert that no new findings are introduced
   * Configuration: Severity levels to check (e.g., critical and high only)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ### SLA Compliance
 
@@ -74,6 +80,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.sla.critical_overdue` - Count of critical findings past SLA
   * Policy: Assert that no critical findings exceed SLA age
   * Configuration: SLA period in days for critical findings (default: 7)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sast-high-sla` **High-severity SAST findings addressed within SLA**: High-severity findings must be remediated within the defined SLA period.
   * Collector(s): Track finding age for high-severity issues
@@ -82,6 +89,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.sla.high_overdue` - Count of high findings past SLA
   * Policy: Assert that no high-severity findings exceed SLA age
   * Configuration: SLA period in days for high-severity findings (default: 30)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ---
 
@@ -97,6 +105,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.source.integration` - How the scan was triggered
   * Policy: Assert that SCA scan data exists
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sca-approved-tool` **SCA scan uses approved tool**: Organization must use a specific approved SCA tool for compliance requirements.
   * Collector(s): Detect which SCA tool was used and record tool name
@@ -105,6 +114,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.source.version` - Version of the tool
   * Policy: Assert that the SCA tool matches an approved list
   * Configuration: List of approved SCA tools (e.g., ["snyk", "dependabot", "grype"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ### Vulnerability Thresholds
 
@@ -115,6 +125,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.summary.has_critical` - Boolean indicating presence of critical vulnerabilities
   * Policy: Assert that critical vulnerability count is zero
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-high-sca-vulns` **No high-severity SCA vulnerabilities**: Dependencies should not have high-severity known vulnerabilities.
   * Collector(s): Parse SCA scan results and count high-severity vulnerabilities
@@ -123,6 +134,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.summary.has_high` - Boolean indicating presence of high vulnerabilities
   * Policy: Assert that high-severity vulnerability count is zero or below threshold
   * Configuration: Maximum allowed high-severity vulnerabilities (default: 0)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sca-vulns-threshold` **SCA vulnerabilities within acceptable threshold**: Total vulnerability count must not exceed organizational limits.
   * Collector(s): Aggregate all vulnerabilities by severity
@@ -134,6 +146,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.vulnerabilities.low` - Low count
   * Policy: Assert that total or weighted score is within threshold
   * Configuration: Maximum totals per severity or weighted scoring
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sca-vulns-fixable` **All SCA vulnerabilities have available fixes**: Detected vulnerabilities should have remediation paths available.
   * Collector(s): Parse SCA results for fix availability information
@@ -143,6 +156,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.findings[].fix_version` - Recommended fix version if available
   * Policy: Assert that all or a threshold of vulnerabilities have fixes available
   * Configuration: Minimum fixable percentage (default: 100%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ### SLA Compliance
 
@@ -155,6 +169,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.sla.critical_overdue` - Count of critical vulnerabilities past SLA
   * Policy: Assert that no critical vulnerabilities exceed SLA age
   * Configuration: SLA period in days for critical vulnerabilities (default: 7)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-sca-high-sla` **High-severity SCA vulnerabilities addressed within SLA**: High-severity vulnerabilities must be remediated within the defined SLA period.
   * Collector(s): Track vulnerability age for high-severity issues
@@ -163,6 +178,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sca.sla.high_overdue` - Count of high vulnerabilities past SLA
   * Policy: Assert that no high-severity vulnerabilities exceed SLA age
   * Configuration: SLA period in days for high-severity vulnerabilities (default: 30)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ### Dependency Restrictions
 
@@ -174,6 +190,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.has_restricted` - Boolean indicating restricted packages present
   * Policy: Assert that no restricted packages are in use
   * Configuration: List of restricted package names or patterns
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-eol-dependencies` **No end-of-life dependencies**: Dependencies must not be past their end-of-life date.
   * Collector(s): Cross-reference dependencies against endoflife.date API or internal EOL database
@@ -184,6 +201,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.has_eol` - Boolean indicating EOL packages present
   * Policy: Assert that no EOL dependencies are in use
   * Configuration: Grace period after EOL (default: 0 days)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 2 (GitHub App Status Check Integration) or Strategy 5 (Auto-Running Scanners)
 
 ---
 
@@ -199,6 +217,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.container_scan.image` - Image reference that was scanned
   * Policy: Assert that container scan data exists for components that build images
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-container-scan-approved-tool` **Container scan uses approved tool**: Organization must use a specific approved container scanning tool.
   * Collector(s): Detect which scanning tool was used
@@ -207,6 +226,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.container_scan.source.version` - Version of the tool
   * Policy: Assert that the scanning tool matches an approved list
   * Configuration: List of approved container scanning tools
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 ### Vulnerability Thresholds
 
@@ -217,6 +237,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.container_scan.summary.has_critical` - Boolean indicating critical vulnerabilities present
   * Policy: Assert that critical vulnerability count is zero
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-high-container-vulns` **No high-severity container vulnerabilities**: Container images should not have high-severity vulnerabilities.
   * Collector(s): Parse container scan results for high-severity issues
@@ -225,6 +246,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.container_scan.summary.has_high` - Boolean indicating high vulnerabilities present
   * Policy: Assert that high-severity count is zero or below threshold
   * Configuration: Maximum allowed high-severity vulnerabilities (default: 0)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-container-base-image-current` **Container base image is current**: Base images should be recently updated and not stale.
   * Collector(s): Check base image age or version against latest available
@@ -235,6 +257,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.definitions[].base_images[].days_since_release` - Age of base image version
   * Policy: Assert that base image is current or within acceptable age
   * Configuration: Maximum base image age in days (default: 90)
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 ---
 
@@ -250,6 +273,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.source.integration` - How the scan was triggered (e.g., "ci", "pre-commit")
   * Policy: Assert that secret scan data exists
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-secret-scan-approved-tool` **Secret scan uses approved tool**: Organization must use a specific approved secret scanning tool.
   * Collector(s): Detect which secret scanning tool was used
@@ -257,6 +281,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.source.tool` - Name of the scanning tool
   * Policy: Assert that the scanning tool matches an approved list
   * Configuration: List of approved secret scanning tools
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 ### Finding Requirements
 
@@ -268,6 +293,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.issues[]` - Array of detected secrets with file locations
   * Policy: Assert that no secrets are detected
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-secrets-in-history` **No secrets in commit history**: Git history must not contain previously committed secrets.
   * Collector(s): Run secret scanner against full git history, not just current state
@@ -277,6 +303,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.history_scan.clean` - Boolean indicating no historical secrets
   * Policy: Assert that no secrets exist in commit history
   * Configuration: Whether to enforce history scanning
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 * `sec-no-secrets-in-containers` **No secrets in container images**: Built container images must not contain embedded secrets.
   * Collector(s): Run secret scanner against container image layers after build
@@ -286,6 +313,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.container_scan.clean` - Boolean indicating no secrets in image
   * Policy: Assert that no secrets are embedded in container images
   * Configuration: Whether to enforce container secret scanning
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 5 (Auto-Running Scanners)
 
 ---
 
@@ -302,6 +330,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.ci.artifacts.sbom_generated` - CI step confirmation
   * Policy: Assert that SBOM was generated
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `sec-sbom-standard-format` **SBOM follows standard format**: SBOM must use an industry-standard format (SPDX or CycloneDX).
   * Collector(s): Parse SBOM file and validate format compliance
@@ -311,6 +340,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sbom.valid` - Boolean indicating format is valid
   * Policy: Assert that SBOM uses an approved standard format
   * Configuration: List of approved formats (default: ["spdx", "cyclonedx"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `sec-sbom-required-fields` **SBOM includes required fields**: SBOM must contain all fields required by compliance frameworks.
   * Collector(s): Parse SBOM and validate presence of required fields
@@ -321,6 +351,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sbom.completeness_score` - Percentage of required fields present
   * Policy: Assert that all required fields are present
   * Configuration: List of required fields per compliance regime
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Publishing and Storage
 
@@ -332,6 +363,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sbom.location_approved` - Boolean indicating location is on approved list
   * Policy: Assert that SBOM is published to approved location
   * Configuration: List of approved SBOM storage locations
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `sec-sbom-signed` **SBOM is signed**: SBOM must be cryptographically signed for integrity verification.
   * Collector(s): Check for signature file or embedded signature in SBOM
@@ -341,6 +373,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sbom.signature.verified` - Boolean indicating signature is valid
   * Policy: Assert that SBOM has a valid signature
   * Configuration: Approved signing methods
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `sec-sbom-current` **SBOM is kept current with releases**: SBOM must be regenerated and published with each release.
   * Collector(s): Compare SBOM generation timestamp with latest release timestamp
@@ -350,6 +383,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sbom.matches_latest_release` - Boolean indicating SBOM is for current release
   * Policy: Assert that SBOM corresponds to latest release
   * Configuration: Maximum age of SBOM relative to release
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -365,6 +399,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.vault_usage.approved` - Boolean indicating all providers are approved
   * Policy: Assert that secrets are sourced from approved vault systems
   * Configuration: List of approved vault providers
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-no-plaintext-secrets-config` **No plaintext secrets in configuration files**: Configuration files must not contain plaintext passwords, API keys, or tokens.
   * Collector(s): Scan configuration files (yaml, json, env, properties) for secret patterns
@@ -374,6 +409,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.config_scan.clean` - Boolean indicating no plaintext secrets
   * Policy: Assert that no plaintext secrets exist in configuration
   * Configuration: File patterns to scan
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-env-secrets-approved-sources` **Environment variables for secrets use approved sources**: Environment variables containing secrets must be injected from approved secret stores.
   * Collector(s): Parse Kubernetes manifests and deployment configs for env var secret sources
@@ -382,6 +418,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.k8s.workloads[].containers[].env_secrets.all_approved` - Boolean for approved sources
   * Policy: Assert that all secret env vars use approved sources
   * Configuration: Approved secret source types (e.g., "secretRef", "external-secrets")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Secret Rotation
 
@@ -393,6 +430,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.rotation.all_have_rotation` - Boolean indicating all secrets have rotation
   * Policy: Assert that rotation is configured for all secrets
   * Configuration: Whether to require rotation for all secret types
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `sec-secrets-within-age` **Secrets have not exceeded maximum age**: Secrets must be rotated within the defined maximum lifetime.
   * Collector(s): Query vault system for secret creation/rotation timestamps
@@ -402,6 +440,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.rotation.all_within_age` - Boolean indicating all secrets are current
   * Policy: Assert that no secrets exceed maximum age
   * Configuration: Maximum secret age in days (default: 90)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -418,6 +457,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.summary.all_signed` - Boolean indicating all images are signed
   * Policy: Assert that all published images are signed
   * Configuration: Approved signing methods
+  * Strategy: Strategy 13 (Container Registry Policies)
 
 * `sec-container-signatures-verified` **Container image signatures are verified before deployment**: Deployment pipelines must verify image signatures before allowing deployment.
   * Collector(s): Detect signature verification step in CD pipeline or admission controller configuration
@@ -426,6 +466,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.builds[].signature.verification_enforced` - Boolean for enforcement
   * Policy: Assert that signature verification is performed
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Build Provenance
 
@@ -437,6 +478,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.builds[].provenance.level` - SLSA level achieved
   * Policy: Assert that build provenance is generated
   * Configuration: Minimum SLSA level required (default: 1)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `sec-build-provenance-published` **Build provenance is published**: Provenance attestations must be published alongside artifacts.
   * Collector(s): Verify provenance is attached to container images or published to transparency log
@@ -445,6 +487,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.builds[].provenance.location` - Where provenance is stored
   * Policy: Assert that provenance is published with artifacts
   * Configuration: Required publication locations
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Dependency Integrity
 
@@ -456,6 +499,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.all_have_lock_files` - Boolean indicating all package managers have lock files
   * Policy: Assert that lock files exist for all detected package managers
   * Configuration: None
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `sec-deps-pinned` **Dependencies are pinned to specific versions**: Dependencies must not use floating versions or ranges.
   * Collector(s): Parse dependency manifests and check for version pinning
@@ -464,6 +508,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.all_pinned` - Boolean indicating all dependencies are pinned
   * Policy: Assert that all dependencies are pinned to specific versions
   * Configuration: Whether to allow minor/patch version ranges
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `sec-deps-approved-registries` **Dependencies come from approved registries only**: Packages must only be pulled from organization-approved registries.
   * Collector(s): Parse dependency manifests and package manager configs for registry URLs
@@ -473,6 +518,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.all_approved_registries` - Boolean indicating all registries approved
   * Policy: Assert that only approved registries are used
   * Configuration: List of approved registry URLs per ecosystem
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `sec-artifact-signatures-verified` **Artifact signatures are verified during build**: Build processes must verify signatures of downloaded dependencies.
   * Collector(s): Detect signature verification configuration in build tools (e.g., Maven, npm, pip)
@@ -481,6 +527,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.dependencies.signature_verification.tool` - Tool performing verification
   * Policy: Assert that dependency signature verification is enabled
   * Configuration: Whether to require for all ecosystems or specific ones
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -495,6 +542,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.branch` - Protected branch name
   * Policy: Assert that branch protection is enabled
   * Configuration: None
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-pr-min-approvals` **Pull requests require minimum approvals**: Merging to protected branches must require a minimum number of approvals.
   * Collector(s): Query VCS provider API for required approvals setting
@@ -503,6 +551,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.required_approvals` - Number of required approvals
   * Policy: Assert that required approvals meet or exceed minimum
   * Configuration: Minimum required approvals (default: 1, recommended: 2)
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-codeowner-review-required` **Codeowner review is required**: PRs must be approved by designated code owners.
   * Collector(s): Query VCS provider API for codeowner review requirement
@@ -510,6 +559,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.require_codeowner_review` - Boolean indicating codeowner review required
   * Policy: Assert that codeowner review is required
   * Configuration: None
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-status-checks-required` **Status checks are required before merge**: PRs must pass all required status checks before merging.
   * Collector(s): Query VCS provider API for required status checks configuration
@@ -518,6 +568,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.required_checks` - Array of required check names
   * Policy: Assert that status checks are required
   * Configuration: List of mandatory status checks
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-no-force-push` **Force pushes are disabled**: Force pushing to protected branches must be disabled.
   * Collector(s): Query VCS provider API for force push settings
@@ -525,6 +576,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.allow_force_push` - Boolean indicating if force push allowed
   * Policy: Assert that force push is disabled
   * Configuration: None
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-branch-deletion-restricted` **Branch deletion is restricted**: Protected branches must not be deletable without special permissions.
   * Collector(s): Query VCS provider API for branch deletion settings
@@ -532,6 +584,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.branch_protection.allow_deletion` - Boolean indicating if deletion allowed
   * Policy: Assert that branch deletion is restricted
   * Configuration: None
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 ### Commit Security
 
@@ -542,6 +595,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.commit_signing.enforcement` - Enforcement level
   * Policy: Assert that commit signing is required
   * Configuration: None
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 * `vcs-commits-reference-ticket` **Commits reference approved ticket/issue**: All commits or PRs must reference a valid ticket from the issue tracker.
   * Collector(s): Parse commit messages and PR titles for ticket references, validate against issue tracker API
@@ -551,6 +605,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.vcs.pr.ticket.source` - Issue tracker system (e.g., "jira", "github")
   * Policy: Assert that a valid ticket reference exists
   * Configuration: Ticket pattern regex, issue tracker integration
+  * Strategy: Strategy 11 (VCS Provider API Queries)
 
 ---
 
@@ -566,6 +621,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.k8s.services[].tls_required` - Boolean per Service
   * Policy: Assert that TLS is required for all endpoints
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-tls-version-enforced` **Secure TLS versions are enforced**: Only TLS 1.2 or higher must be accepted.
   * Collector(s): Parse load balancer, ingress, and API gateway configurations for TLS version settings
@@ -575,6 +631,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.tls_config.min_version` - Application TLS configuration
   * Policy: Assert that minimum TLS version meets requirements
   * Configuration: Minimum TLS version (default: "1.2")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-cipher-suites-configured` **Secure cipher suites are configured**: Only approved cipher suites must be enabled.
   * Collector(s): Parse TLS configuration for cipher suite settings
@@ -584,6 +641,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.containers.tls_config.has_weak_ciphers` - Boolean indicating weak ciphers present
   * Policy: Assert that only approved cipher suites are enabled
   * Configuration: List of approved cipher suites, list of forbidden ciphers
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Data at Rest
 
@@ -594,6 +652,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.iac.datastores.all_encrypted` - Boolean indicating all datastores encrypted
   * Policy: Assert that all databases have encryption enabled
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-storage-encryption` **Storage buckets have encryption enabled**: Object storage (S3, GCS, Azure Blob) must have encryption configured.
   * Collector(s): Parse IaC files for storage bucket encryption settings
@@ -602,6 +661,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.iac.resources[type="storage"].encryption_type` - Type of encryption (SSE, KMS, etc.)
   * Policy: Assert that all storage has encryption enabled
   * Configuration: Required encryption type (e.g., KMS-managed keys)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-approved-key-management` **Encryption uses approved key management**: Encryption keys must be managed by approved KMS systems.
   * Collector(s): Parse encryption configurations for key source
@@ -611,6 +671,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.iac.encryption.all_kms_managed` - Boolean indicating all keys are KMS-managed
   * Policy: Assert that encryption uses approved key management
   * Configuration: Required key management approach (e.g., "kms", "hsm")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -625,6 +686,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.observability.logging.audit_enabled` - Boolean for audit log configuration
   * Policy: Assert that audit logging is properly configured
   * Configuration: Required audit log retention period
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `comply-soc2-access-controls` **SOC 2 access controls are documented**: Access control policies must be documented and enforced.
   * Collector(s): Check for access control documentation in catalog annotations or repository files
@@ -633,6 +695,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.catalog.annotations.access_control_doc` - Link to access control documentation
   * Policy: Assert that access control documentation exists
   * Configuration: Required documentation location
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `comply-soc2-change-management` **SOC 2 change management process is followed**: All changes must follow the documented change management process.
   * Collector(s): Verify PR requirements, approvals, and CI/CD gates are in place
@@ -642,6 +705,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.ci.steps_executed.approval_gate` - Boolean for deployment approval gate
   * Policy: Assert that change management controls are enforced
   * Configuration: Required change management controls
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ### PCI-DSS Requirements
 
@@ -653,6 +717,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.pci.controls_implemented` - Array of implemented PCI controls
   * Policy: Assert that PCI-tagged components implement required controls
   * Configuration: List of required PCI controls per service tier
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `comply-pci-network-segmentation` **PCI-DSS network segmentation is verified**: Systems handling PCI data must be in segmented networks.
   * Collector(s): Parse IaC and Kubernetes network policies for segmentation
@@ -662,6 +727,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.pci.network_segmented` - Boolean for PCI network compliance
   * Policy: Assert that PCI components have network segmentation
   * Configuration: Required segmentation approach
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ### GDPR/Privacy Controls
 
@@ -673,6 +739,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.data_classification.pii_types` - Array of PII types handled
   * Policy: Assert that data classification is documented
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `comply-gdpr-data-retention` **GDPR data retention policies are defined**: Services handling personal data must have documented retention policies.
   * Collector(s): Check catalog annotations and documentation for retention policy
@@ -682,6 +749,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.catalog.annotations.data_retention_policy` - Link to retention policy
   * Policy: Assert that retention policy is documented for PII-handling services
   * Configuration: Maximum retention period for different data types
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `comply-gdpr-region-compliance` **GDPR region compliance is documented**: Services must document which regions data is stored and processed.
   * Collector(s): Check catalog annotations and IaC for region configuration
@@ -691,6 +759,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.iac.resources[].region` - Region per resource
   * Policy: Assert that data processing regions are documented
   * Configuration: List of approved regions
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ### HIPAA Requirements
 
@@ -702,6 +771,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.hipaa.controls_implemented` - Array of implemented HIPAA controls
   * Policy: Assert that HIPAA-tagged components implement required controls
   * Configuration: List of required HIPAA controls
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ### NIST/SSDF Controls
 
@@ -712,6 +782,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.ssdf.compliance_score` - Percentage of SSDF practices met
   * Policy: Assert that minimum SSDF practices are implemented
   * Configuration: List of required SSDF practices
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ### ISO 27001 Requirements
 
@@ -723,6 +794,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.catalog.annotations.iso27001_controls` - Link to control documentation
   * Policy: Assert that ISO 27001 control documentation exists
   * Configuration: Required control documentation format
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -737,6 +809,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.catalog.annotations.data_classification` - Classification from catalog
   * Policy: Assert that data classification is assigned
   * Configuration: Valid classification levels
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-pii-handling-documented` **PII handling is documented**: Services processing PII must document what PII they handle and how.
   * Collector(s): Check for PII documentation in catalog annotations or repository documentation
@@ -746,6 +819,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.compliance.data_classification.pii_types` - Array of PII types
   * Policy: Assert that PII-handling services have documentation
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-sensitive-data-logging` **Sensitive data is logged appropriately**: PII and other sensitive data must not appear in logs without proper redaction.
   * Collector(s): Check logging configuration for PII redaction settings, or use SAST rules for log statement analysis
@@ -754,6 +828,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.findings[category="logging-pii"]` - SAST findings related to PII in logs
   * Policy: Assert that PII redaction is enabled for services handling sensitive data
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -769,6 +844,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.security.misconfig.debug_enabled` - Boolean indicating debug mode detected
   * Policy: Assert that debug mode is not enabled for production components
   * Configuration: Environment variable patterns to check
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-no-error-details-exposed` **Error details are not exposed to users**: Applications must not return stack traces or internal error details to end users.
   * Collector(s): Check application configuration for error handling settings, or verify through SAST rules
@@ -777,6 +853,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.sast.findings[category="error-exposure"]` - Findings related to error exposure
   * Policy: Assert that verbose error mode is disabled
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `sec-no-default-credentials` **Default credentials are not in use**: Applications and infrastructure must not use default credentials.
   * Collector(s): Scan configuration files and IaC for known default credential patterns
@@ -785,6 +862,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.secrets.default_credential_findings` - Array of default credential instances found
   * Policy: Assert that no default credentials are detected
   * Configuration: Patterns for default credentials to detect
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Security Headers
 
@@ -797,6 +875,7 @@ This document specifies possible policies for the **Security and Compliance** ca
     * `.security.headers.all_required_present` - Boolean indicating all required headers set
   * Policy: Assert that required security headers are configured
   * Configuration: List of required security headers
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 

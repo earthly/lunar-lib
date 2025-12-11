@@ -17,6 +17,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.runbook.source` - Where runbook was discovered (file, catalog, readme)
   * Policy: Assert that a runbook exists either in the repository or is linked from the service catalog
   * Configuration: Expected runbook locations, acceptable external wiki patterns
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `ops-runbook-required-sections` **Runbook contains required sections**: Runbooks must include standard sections covering common operational scenarios.
   * Collector(s): Parse runbook file (Markdown) and extract section headings for comparison against required sections
@@ -26,6 +27,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.runbook.missing_sections` - Array of missing required sections
   * Policy: Assert that all required sections are present in the runbook
   * Configuration: Required section names (default: ["Overview", "Architecture", "Dependencies", "Common Issues", "Troubleshooting", "Escalation", "Recovery Procedures"])
+  * Strategy: Strategy 7 (LLM-Assisted Analysis) or Strategy 8 (File Parsing and Schema Extraction)
 
 * `ops-runbook-recent-update` **Runbook was updated recently**: Runbooks must be kept up-to-date to remain useful during incidents.
   * Collector(s): Check file modification timestamp for runbook, or query wiki API for last update time
@@ -35,6 +37,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.runbook.is_stale` - Boolean indicating runbook is stale
   * Policy: Assert that runbook was updated within the configured threshold
   * Configuration: Maximum days since update (default: 90)
+  * Strategy: Strategy 14 (Historical Trend Analysis via Component JSON History)
 
 * `ops-runbook-catalog-linked` **Runbook is linked from service catalog**: The runbook URL should be registered in the service catalog for discoverability during incidents.
   * Collector(s): Parse service catalog entry (Backstage catalog-info.yaml) for runbook annotation
@@ -43,6 +46,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.annotations.runbook_exists` - Boolean for runbook annotation presence
   * Policy: Assert that runbook annotation is present in service catalog
   * Configuration: Expected annotation key (default: "runbook" or "docs/runbook")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### SLA/SLO Documentation
 
@@ -55,6 +59,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.sla.source` - Where SLA was discovered (catalog, file, readme)
   * Policy: Assert that SLA is defined for production services
   * Configuration: Tags requiring SLA (default: ["production", "tier1", "tier2"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `ops-slos-defined` **SLOs are defined with error budgets**: Services should have Service Level Objectives with measurable targets and error budgets.
   * Collector(s): Check for SLO definitions in catalog, dedicated SLO files, or monitoring configuration (Prometheus SLO rules, Datadog SLO monitors)
@@ -65,6 +70,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.slo.error_budget_percentage` - Error budget percentage
   * Policy: Assert that SLOs are defined with error budgets for production services
   * Configuration: Required SLO types (default: ["availability", "latency"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 10 (External Vendor API Integration)
 
 * `ops-slo-dashboard` **SLO dashboard exists**: SLO progress and error budget consumption should be visualized in a dashboard.
   * Collector(s): Check catalog annotations for SLO dashboard link, or query monitoring system API for SLO dashboard existence
@@ -73,6 +79,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.slo.dashboard_url` - URL to SLO dashboard
   * Policy: Assert that SLO dashboard exists and is linked
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Architecture Documentation
 
@@ -84,6 +91,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.repo.documentation.architecture_diagram_format` - Diagram format (image, mermaid, drawio)
   * Policy: Assert that architecture diagram exists
   * Configuration: Accepted diagram file patterns, accepted formats
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `ops-dependency-docs` **Dependency documentation is current**: Service dependencies (upstream and downstream) must be documented and kept current.
   * Collector(s): Parse catalog-info.yaml for dependency declarations, or extract from architecture documentation
@@ -94,6 +102,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.dependencies_documented` - Boolean for dependency documentation presence
   * Policy: Assert that service dependencies are documented in the catalog
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -110,6 +119,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.source.tool` - Incident management tool (pagerduty, opsgenie, victorops)
   * Policy: Assert that on-call schedule is configured for production services
   * Configuration: Tags requiring on-call (default: ["production"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-min-participants` **On-call schedule has minimum participants**: On-call rotations must have a minimum number of participants to avoid burnout and ensure coverage.
   * Collector(s): Query incident management API to get schedule participant count
@@ -119,6 +129,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.summary.min_participants` - Minimum participant count found
   * Policy: Assert that on-call rotation has at least the minimum required participants
   * Configuration: Minimum participants (default: 4)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-24x7-coverage` **On-call schedule covers 24/7**: Production services must have continuous on-call coverage without gaps.
   * Collector(s): Query incident management API to analyze schedule coverage
@@ -128,6 +139,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.schedule.gap_hours` - Total hours of gaps in coverage
   * Policy: Assert that schedule provides 100% coverage (24/7)
   * Configuration: Minimum coverage percentage (default: 100)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-rotation-length` **On-call rotation length is appropriate**: Rotation shifts should not be too long to prevent fatigue, nor too short to prevent disruption.
   * Collector(s): Query incident management API to get rotation configuration
@@ -137,6 +149,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.schedule.rotation_length_days` - Length of rotation cycle in days
   * Policy: Assert that shift and rotation lengths are within acceptable bounds
   * Configuration: Min/max shift length (default: 12-168 hours), min/max rotation length (default: 7-14 days)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-backup-coverage` **On-call schedule has backup/secondary coverage**: Critical services should have secondary on-call coverage for escalation.
   * Collector(s): Query incident management API to check for secondary/backup schedule
@@ -146,6 +159,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.schedule.secondary_participants` - Participants in secondary rotation
   * Policy: Assert that secondary on-call coverage exists for critical services
   * Configuration: Tags requiring secondary coverage (default: ["tier1", "critical"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Escalation Policies
 
@@ -157,6 +171,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.escalation.name` - Escalation policy name
   * Policy: Assert that escalation policy is configured for production services
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-escalation-levels` **Escalation policy has multiple levels**: Escalation policies must have multiple levels to ensure incidents are handled even if primary responders are unavailable.
   * Collector(s): Query incident management API to get escalation policy details
@@ -166,6 +181,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.escalation.final_level_is_management` - Boolean for management in final level
   * Policy: Assert that escalation policy has at least the minimum required levels
   * Configuration: Minimum escalation levels (default: 3)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-escalation-timeouts` **Escalation timeouts are appropriate**: Escalation timeouts should be short enough to ensure timely response but not so short as to cause alert fatigue.
   * Collector(s): Query incident management API for escalation timeout configuration
@@ -174,6 +190,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.escalation.total_escalation_time` - Total time before reaching final level
   * Policy: Assert that escalation timeouts are within acceptable ranges
   * Configuration: Min/max timeout per level (default: 5-30 minutes), max total escalation time (default: 60 minutes)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-escalation-management` **Escalation policy includes management for critical incidents**: Critical incident escalation paths should include management notification.
   * Collector(s): Query incident management API and verify management targets in escalation levels
@@ -182,6 +199,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.escalation.management_level` - Level at which management is engaged
   * Policy: Assert that management is included in escalation for critical services
   * Configuration: Tags requiring management escalation (default: ["tier1", "critical"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Team & HRIS Integration
 
@@ -193,6 +211,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.schedule.all_participants_active` - Boolean for all participants validated
   * Policy: Assert that all on-call participants are active employees
   * Configuration: HRIS system to validate against
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-matches-ownership` **On-call team matches service ownership**: The on-call team should align with the team that owns the service in the catalog.
   * Collector(s): Compare service owner from catalog with on-call schedule team assignment
@@ -202,6 +221,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.ownership_aligned` - Boolean for ownership alignment
   * Policy: Assert that on-call team aligns with service ownership
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-hris-correlation` **Catalog team correlates with HRIS**: Service ownership teams in the catalog should exist in the HRIS/HR system.
   * Collector(s): Query HRIS API to validate team names/IDs from catalog
@@ -211,6 +231,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.hris_team_id` - Corresponding HRIS team ID
   * Policy: Assert that catalog team exists in HRIS
   * Configuration: HRIS integration details
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Incident Management Integration
 
@@ -222,6 +243,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.service.integration_key` - Integration key for alerting
   * Policy: Assert that service is registered in incident management system
   * Configuration: Expected service naming pattern
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-catalog-linked` **Incident management service is linked from catalog**: The incident management service ID should be documented in the service catalog for quick access.
   * Collector(s): Parse catalog annotations for PagerDuty/OpsGenie service reference
@@ -231,6 +253,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.annotations.incident_service_linked` - Boolean for any incident service annotation
   * Policy: Assert that incident management service is linked in catalog
   * Configuration: Expected annotation keys
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `oncall-communication-channel` **Service has incident communication channel**: Services should have a designated communication channel (Slack, Teams) for incident coordination.
   * Collector(s): Parse catalog annotations for Slack channel reference
@@ -240,6 +263,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.annotations.has_incident_channel` - Boolean for incident channel presence
   * Policy: Assert that incident communication channel is documented
   * Configuration: Expected annotation keys
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -256,6 +280,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.framework` - Logging framework used
   * Policy: Assert that structured logging is configured
   * Configuration: Acceptable log formats (default: ["json", "logfmt"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-approved-library` **Logging uses approved library**: Applications should use organization-approved logging libraries for consistency.
   * Collector(s): Parse dependency files for logging library dependencies, or check configuration for logging framework
@@ -264,6 +289,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.is_approved_library` - Boolean for approved library usage
   * Policy: Assert that logging uses an approved library
   * Configuration: Approved logging libraries per language (e.g., Go: ["zap", "zerolog"], Python: ["structlog", "python-json-logger"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-levels-configured` **Log levels are appropriately configured**: Production logging should use appropriate log levels (not DEBUG in production).
   * Collector(s): Parse application configuration for log level settings
@@ -272,6 +298,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.level_configurable` - Boolean for runtime configurability
   * Policy: Assert that log level is not too verbose for production (not DEBUG)
   * Configuration: Minimum log level for production (default: INFO)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-correlation-ids` **Logs include correlation IDs**: Logs must include request/trace correlation IDs for distributed tracing integration.
   * Collector(s): Analyze logging configuration or sample logs for correlation ID fields
@@ -280,6 +307,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.correlation_id_field` - Field name for correlation ID
   * Policy: Assert that logs include correlation/trace IDs
   * Configuration: Expected correlation ID field names (default: ["trace_id", "request_id", "correlation_id"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-context-fields` **Logs include required context fields**: Logs should include standard context fields for consistent querying and analysis.
   * Collector(s): Analyze logging configuration for included context fields
@@ -289,6 +317,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.missing_fields` - Array of missing required fields
   * Policy: Assert that logs include all required context fields
   * Configuration: Required context fields (default: ["service", "environment", "version", "timestamp", "level"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-no-sensitive-data` **Sensitive data is excluded from logs**: Logs must not contain PII, credentials, or other sensitive information.
   * Collector(s): Analyze logging configuration for field filtering/masking, or scan log samples for sensitive patterns
@@ -298,6 +327,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.has_sensitive_data_risk` - Boolean for potential sensitive data in logs
   * Policy: Assert that sensitive data masking is configured
   * Configuration: Fields that should be masked (default: ["password", "token", "secret", "authorization", "credit_card"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Log Aggregation
 
@@ -309,6 +339,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.log_shipper` - Log shipper used (fluentd, filebeat, vector)
   * Policy: Assert that log aggregation is configured
   * Configuration: Required aggregation destination
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `logging-retention` **Log retention meets compliance requirements**: Log retention periods must meet organizational and compliance requirements.
   * Collector(s): Query log aggregation system API for retention settings, or check IaC for log retention configuration
@@ -317,6 +348,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.logging.meets_retention_requirement` - Boolean for compliance
   * Policy: Assert that log retention meets minimum requirements
   * Configuration: Minimum retention days (default: 90), per-tag overrides for compliance
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -332,6 +364,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.metrics.format` - Metrics format (prometheus, statsd, otlp)
   * Policy: Assert that metrics endpoint is configured
   * Configuration: Expected endpoint paths, accepted formats
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 15 (Runtime and Deployed State Verification)
 
 * `metrics-k8s-declared` **Metrics endpoint is declared in Kubernetes**: Kubernetes workloads should have metrics annotations/labels for service discovery.
   * Collector(s): Parse Kubernetes manifests for Prometheus scrape annotations or ServiceMonitor resources
@@ -342,6 +375,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.k8s.has_service_monitor` - Boolean for ServiceMonitor resource
   * Policy: Assert that metrics scraping is configured in Kubernetes
   * Configuration: Whether annotations or ServiceMonitor is required
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `metrics-golden-signals` **Golden signals are monitored**: Services must monitor the four golden signals (latency, traffic, errors, saturation).
   * Collector(s): Query monitoring system for metrics matching golden signal patterns, or analyze metrics configuration
@@ -353,6 +387,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.summary.golden_signals_complete` - Boolean for all four signals monitored
   * Policy: Assert that all four golden signals are monitored
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-latency-histogram` **Request latency histogram is tracked**: Services must track request latency using histograms for percentile calculations.
   * Collector(s): Query monitoring system or analyze metrics configuration for histogram metrics
@@ -362,6 +397,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.metrics.latency_buckets` - Configured histogram buckets
   * Policy: Assert that request latency histogram is configured
   * Configuration: Required histogram bucket ranges
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-error-rate` **Error rate metrics are tracked**: Services must track error rates for reliability monitoring.
   * Collector(s): Query monitoring system or analyze metrics configuration for error metrics
@@ -370,6 +406,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.metrics.error_metric_name` - Name of error rate metric
   * Policy: Assert that error rate metrics are tracked
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-resource-utilization` **Resource utilization metrics are exposed**: Services should expose resource utilization metrics (CPU, memory, connections).
   * Collector(s): Query monitoring system for resource metrics, or check for standard runtime metrics
@@ -378,6 +415,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.metrics.resource_metrics` - Array of resource metric names
   * Policy: Assert that resource utilization metrics are exposed
   * Configuration: Required resource metrics (default: ["cpu", "memory", "connections"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-business` **Business metrics are tracked**: Services should track business-relevant metrics beyond technical health.
   * Collector(s): Query monitoring system for custom business metrics, or analyze metrics configuration
@@ -386,6 +424,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.metrics.business_metrics` - Array of business metric names
   * Policy: Assert that business metrics are defined for production services
   * Configuration: Tags requiring business metrics, minimum business metric count
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Dashboards
 
@@ -397,6 +436,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.dashboard.source` - Dashboard system (grafana, datadog, newrelic)
   * Policy: Assert that service dashboard exists
   * Configuration: Dashboard system to check, expected dashboard naming pattern
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-dashboard-linked` **Dashboard is linked from service catalog**: The dashboard URL should be registered in the service catalog for easy access.
   * Collector(s): Parse catalog annotations for dashboard link
@@ -406,6 +446,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.catalog.annotations.dashboard_linked` - Boolean for any dashboard annotation
   * Policy: Assert that dashboard is linked in service catalog
   * Configuration: Expected annotation keys
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-dashboard-golden-signals` **Dashboard includes golden signals**: Service dashboards should visualize all four golden signals.
   * Collector(s): Query dashboard API to analyze dashboard panels and metrics
@@ -415,6 +456,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.dashboard.missing_signals` - Array of missing golden signals
   * Policy: Assert that dashboard includes all golden signals
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `metrics-dashboard-slo` **Dashboard includes SLO progress**: Dashboards should show SLO status and error budget consumption.
   * Collector(s): Query dashboard API to check for SLO-related panels
@@ -423,6 +465,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.dashboard.has_error_budget_panel` - Boolean for error budget visualization
   * Policy: Assert that dashboard includes SLO information for services with defined SLOs
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -438,6 +481,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.tracing.exporter` - Trace exporter destination
   * Policy: Assert that distributed tracing is configured
   * Configuration: Acceptable tracing libraries
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `tracing-opentelemetry` **Tracing uses OpenTelemetry standard**: Services should use OpenTelemetry for vendor-neutral tracing instrumentation.
   * Collector(s): Check dependencies for OpenTelemetry SDK, or analyze tracing configuration
@@ -446,6 +490,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.tracing.library` - Tracing library used
   * Policy: Assert that OpenTelemetry is used for tracing
   * Configuration: Whether OpenTelemetry is required or just preferred
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `tracing-sampling-rate` **Trace sampling rate is appropriate**: Trace sampling should balance visibility with cost and performance.
   * Collector(s): Parse tracing configuration for sampling settings
@@ -454,6 +499,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.tracing.sampling_type` - Sampling strategy (probabilistic, rate-limiting, adaptive)
   * Policy: Assert that sampling rate is within acceptable bounds
   * Configuration: Min/max sampling rate (default: 0.01-1.0)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `tracing-required-attributes` **Traces include required attributes**: Traces should include standard attributes for consistent analysis.
   * Collector(s): Analyze tracing configuration for resource attributes
@@ -462,6 +508,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.tracing.has_required_attributes` - Boolean for required attributes presence
   * Policy: Assert that traces include required attributes
   * Configuration: Required trace attributes (default: ["service.name", "service.version", "deployment.environment"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `tracing-context-propagation` **Trace context is propagated**: Services must propagate trace context to downstream services for end-to-end tracing.
   * Collector(s): Check tracing configuration for context propagation settings
@@ -470,6 +517,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.tracing.propagation_format` - Propagation format (w3c, b3, jaeger)
   * Policy: Assert that trace context propagation is configured
   * Configuration: Required propagation format (default: "w3c")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -484,6 +532,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.health.endpoint_path` - Health endpoint path (e.g., /health, /healthz)
   * Policy: Assert that health check endpoint is configured
   * Configuration: Expected health endpoint paths (default: ["/health", "/healthz", "/ready"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) or Strategy 15 (Runtime and Deployed State Verification)
 
 * `health-endpoint-accurate` **Health check endpoint reflects true service health**: Health checks should verify actual service functionality, not just process liveness.
   * Collector(s): Analyze health endpoint implementation or configuration for dependency checks
@@ -493,6 +542,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.health.is_deep_health_check` - Boolean for comprehensive health check
   * Policy: Assert that health check verifies critical dependencies
   * Configuration: Required dependency types to check (default: ["database", "cache"])
+  * Strategy: Strategy 15 (Runtime and Deployed State Verification)
 
 * `health-probes-distinct` **Liveness and readiness probes are distinct**: Services should have separate liveness (is process alive) and readiness (can accept traffic) probes.
   * Collector(s): Parse Kubernetes manifests for probe configurations, or check application for separate endpoints
@@ -502,6 +552,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.health.probes_are_distinct` - Boolean for distinct probe endpoints
   * Policy: Assert that liveness and readiness probes are configured separately
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `health-readiness-checks-deps` **Readiness probe checks dependency availability**: Readiness probes should verify that critical dependencies are accessible.
   * Collector(s): Analyze readiness probe endpoint implementation or configuration
@@ -510,6 +561,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.health.readiness_dependencies` - Array of dependencies checked
   * Policy: Assert that readiness probe verifies dependencies
   * Configuration: Required dependencies for readiness check
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `health-response-time-monitored` **Health check response time is monitored**: Health check latency should be monitored to detect degradation.
   * Collector(s): Query monitoring system for health check latency metrics
@@ -518,6 +570,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.health.latency_metric_name` - Name of health check latency metric
   * Policy: Assert that health check latency is tracked
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -533,6 +586,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.list` - Array of configured alert definitions
   * Policy: Assert that alerts are configured for production services
   * Configuration: Minimum number of alerts (default: 3)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-routes-oncall` **Critical alerts route to on-call**: High-severity alerts must route to the on-call responder via incident management integration.
   * Collector(s): Query monitoring system for alert routing configuration, verify integration with PagerDuty/OpsGenie
@@ -541,6 +595,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.oncall_integration` - Incident management integration details
   * Policy: Assert that critical alerts route to on-call
   * Configuration: Alert severity levels requiring on-call routing
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-runbook-links` **Alerts include runbook links**: Alert definitions should include links to relevant runbook sections for responders.
   * Collector(s): Query monitoring system for alert annotations/descriptions
@@ -549,6 +604,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.alerts_without_runbooks` - Array of alerts missing runbook links
   * Policy: Assert that alerts include runbook links
   * Configuration: Required runbook link format
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-slo-based` **SLO-based alerts are configured**: Services should have alerts triggered by SLO error budget consumption.
   * Collector(s): Query monitoring system for SLO burn rate or error budget alerts
@@ -557,6 +613,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.slo_burn_rate_alerts` - Array of burn rate alert definitions
   * Policy: Assert that SLO-based alerts are configured for services with defined SLOs
   * Configuration: Required burn rate thresholds (default: [2%, 5%, 10% per hour])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-thresholds-tuned` **Alert thresholds are tuned appropriately**: Alert thresholds should be based on historical data and SLOs to minimize false positives.
   * Collector(s): Query monitoring system for alert trigger history and false positive rates
@@ -565,6 +622,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.alert_fatigue_risk` - Boolean for high alert volume
   * Policy: Assert that alert false positive rate is below threshold
   * Configuration: Maximum false positive rate (default: 10%)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-severity-levels` **Alerts have appropriate severity levels**: Alerts should be classified by severity to enable appropriate response.
   * Collector(s): Query monitoring system for alert severity configurations
@@ -573,6 +631,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.has_severity_classification` - Boolean for severity on all alerts
   * Policy: Assert that all alerts have severity classification
   * Configuration: Required severity levels (default: ["critical", "warning", "info"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ### Alert Fatigue Prevention
 
@@ -584,6 +643,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.alert_volume.is_excessive` - Boolean for excessive alert volume
   * Policy: Assert that alert volume is below fatigue threshold
   * Configuration: Maximum weekly alerts (default: 50)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-deduplicated` **Alerts are deduplicated**: Multiple related alerts should be deduplicated to reduce noise.
   * Collector(s): Check monitoring/incident system configuration for deduplication rules
@@ -592,6 +652,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.deduplication_rules` - Array of deduplication rules
   * Policy: Assert that alert deduplication is configured
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `alerting-grouped` **Alert grouping is configured**: Related alerts should be grouped into incidents to reduce cognitive load.
   * Collector(s): Check incident management system for alert grouping/correlation rules
@@ -600,6 +661,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.alerts.grouping_rules` - Array of grouping rules
   * Policy: Assert that alert grouping is configured
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -615,6 +677,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.disaster_recovery.plan_url` - URL to external DR documentation
   * Policy: Assert that DR plan is documented for production services
   * Configuration: Expected DR documentation locations
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-plan-reviewed` **DR plan was reviewed recently**: Disaster recovery plans must be reviewed and updated periodically.
   * Collector(s): Parse DR documentation for review date, or check file modification timestamp
@@ -624,6 +687,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.disaster_recovery.review_is_current` - Boolean for current review
   * Policy: Assert that DR plan was reviewed within threshold
   * Configuration: Maximum days since review (default: 180)
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-rto-defined` **Recovery time objective (RTO) is defined**: Services must have a defined RTO indicating acceptable downtime.
   * Collector(s): Parse DR documentation or catalog annotations for RTO
@@ -632,6 +696,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.disaster_recovery.rto_minutes` - RTO in minutes
   * Policy: Assert that RTO is defined for production services
   * Configuration: Tags requiring RTO definition
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-rpo-defined` **Recovery point objective (RPO) is defined**: Services with data persistence must have a defined RPO indicating acceptable data loss.
   * Collector(s): Parse DR documentation or catalog annotations for RPO
@@ -640,6 +705,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.disaster_recovery.rpo_minutes` - RPO in minutes
   * Policy: Assert that RPO is defined for services with persistent data
   * Configuration: Tags requiring RPO definition (e.g., ["database", "stateful"])
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 ### Backup & Recovery Testing
 
@@ -651,6 +717,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.backup.days_since_verification` - Days since last backup test
   * Policy: Assert that backup verification was performed within threshold
   * Configuration: Maximum days between verifications (default: 90)
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-recovery-tested` **Recovery procedures are tested regularly**: Disaster recovery procedures must be tested periodically through drills.
   * Collector(s): Check for recovery drill documentation with timestamps
@@ -660,6 +727,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.disaster_recovery.days_since_drill` - Days since last DR drill
   * Policy: Assert that DR drill was conducted within threshold
   * Configuration: Maximum days between drills (default: 180)
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-gameday-exercises` **Game day exercises are conducted**: Teams should conduct game day exercises to practice incident response.
   * Collector(s): Check for game day documentation with timestamps
@@ -669,6 +737,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.game_day.days_since_exercise` - Days since last game day
   * Policy: Assert that game day was conducted within threshold
   * Configuration: Maximum days between game days (default: 365)
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 ### Resilience Patterns
 
@@ -680,6 +749,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.resilience.protected_dependencies` - Array of dependencies with circuit breakers
   * Policy: Assert that circuit breakers are configured for services with external dependencies
   * Configuration: Required circuit breaker library per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `resilience-retry-backoff` **Retry logic with backoff is implemented**: Services should implement retries with exponential backoff for transient failures.
   * Collector(s): Check code or configuration for retry patterns
@@ -688,6 +758,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.resilience.uses_exponential_backoff` - Boolean for backoff pattern
   * Policy: Assert that retry logic is configured for services with external calls
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `resilience-timeouts-configured` **Timeouts are configured for external calls**: All external service calls must have appropriate timeouts configured.
   * Collector(s): Check application configuration for timeout settings
@@ -696,6 +767,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.resilience.default_timeout_ms` - Default timeout value
   * Policy: Assert that timeouts are configured for external calls
   * Configuration: Maximum allowed timeout (default: 30000ms)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `resilience-graceful-degradation` **Graceful degradation is implemented**: Services should degrade gracefully when dependencies are unavailable.
   * Collector(s): Check for fallback configurations or degradation documentation
@@ -704,6 +776,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.resilience.fallback_behaviors` - Array of documented fallback behaviors
   * Policy: Assert that graceful degradation is documented for critical services
   * Configuration: Tags requiring graceful degradation
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -718,6 +791,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.capacity.documentation_path` - Path to capacity documentation
   * Policy: Assert that capacity requirements are documented for production services
   * Configuration: Expected documentation locations
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `capacity-traffic-projections` **Traffic projections are maintained**: Services should have traffic projections for capacity planning.
   * Collector(s): Check for traffic projection documentation or capacity planning artifacts
@@ -726,6 +800,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.capacity.projected_growth_percentage` - Projected traffic growth percentage
   * Policy: Assert that traffic projections are documented
   * Configuration: Tags requiring traffic projections
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `capacity-scaling-thresholds` **Scaling thresholds are defined**: Auto-scaling configurations should have appropriate thresholds based on capacity planning.
   * Collector(s): Parse HPA or auto-scaling configurations for threshold values
@@ -735,6 +810,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.capacity.scale_down_threshold` - Threshold for scaling down
   * Policy: Assert that scaling thresholds are explicitly defined
   * Configuration: Required threshold types (cpu, memory, custom metrics)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Resource Monitoring
 
@@ -745,6 +821,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.capacity.utilization_metrics` - Array of monitored resource types
   * Policy: Assert that resource utilization is monitored
   * Configuration: Required resource types (default: ["cpu", "memory", "disk", "network"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `capacity-utilization-alerts` **Resource utilization alerts are configured**: Alerts should fire when resource utilization approaches capacity limits.
   * Collector(s): Query monitoring system for resource-based alerts
@@ -753,6 +830,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.capacity.alert_thresholds` - Configured alert thresholds
   * Policy: Assert that resource utilization alerts are configured
   * Configuration: Required alert thresholds (default: 70%, 85%, 95%)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -768,6 +846,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.anomaly_detection.tool` - Anomaly detection tool used
   * Policy: Assert that anomaly detection is configured for production services
   * Configuration: Required metrics for anomaly detection (default: ["latency", "error_rate", "traffic"])
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `anomaly-baseline-established` **Baseline metrics are established**: Anomaly detection requires established baselines for comparison.
   * Collector(s): Query monitoring system for baseline/historical data availability
@@ -776,6 +855,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.anomaly_detection.baseline_duration_days` - Duration of baseline data
   * Policy: Assert that metrics have sufficient baseline data for anomaly detection
   * Configuration: Minimum baseline duration (default: 14 days)
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 * `anomaly-deployment-detection` **Deployment anomaly detection is enabled**: Services should have detection for deployment-related anomalies.
   * Collector(s): Check for deployment markers in monitoring and associated anomaly detection
@@ -784,6 +864,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.anomaly_detection.deployment_anomaly_detection` - Boolean for deployment-specific detection
   * Policy: Assert that deployment anomaly detection is configured
   * Configuration: None
+  * Strategy: Strategy 10 (External Vendor API Integration)
 
 ---
 
@@ -799,6 +880,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.oncall.summary.oncall_ready` - Boolean for aggregate on-call readiness
   * Policy: Assert that aggregate on-call readiness is achieved
   * Configuration: Which on-call components are required
+  * Strategy: other strategy (meta-policy aggregating other checks)
 
 * `summary-observability-complete` **Observability is complete**: Aggregate check that all observability requirements are met.
   * Collector(s): Aggregate observability configuration checks
@@ -812,6 +894,7 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.summary.fully_observable` - Boolean for full observability
   * Policy: Assert that aggregate observability requirements are met
   * Configuration: Which observability components are required per tier
+  * Strategy: other strategy (meta-policy aggregating other checks)
 
 * `summary-resilience-adequate` **Resilience posture is adequate**: Aggregate check that resilience patterns are implemented.
   * Collector(s): Aggregate resilience configuration checks
@@ -822,3 +905,4 @@ This document specifies possible policies for the **Operational Readiness** cate
     * `.observability.resilience.resilience_score` - Numeric resilience score
   * Policy: Assert that resilience score meets threshold
   * Configuration: Minimum resilience score, required resilience patterns per tier
+  * Strategy: other strategy (meta-policy aggregating other checks)

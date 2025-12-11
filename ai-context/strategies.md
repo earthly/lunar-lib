@@ -21,7 +21,7 @@ Detect when a binary or tool runs in CI and optionally extract additional inform
 * The tool version meets requirements
 * The results meet thresholds (e.g., no critical vulnerabilities, coverage above minimum)
 
-**Example guardrails:** SAST/SCA scanner execution, test coverage collection, SBOM generation detection.
+**Example guardrails:** `sec-sast-executed`, `sec-sca-executed`, `sec-container-scan-executed`, `sec-secret-scan-executed`, `sec-sbom-generated`, `test-executed-in-ci`, `test-coverage-measured`, `ci-lint-step`, `ci-build-step`, `ci-test-step`, `ci-security-scan`.
 
 ---
 
@@ -41,7 +41,7 @@ Detect when a GitHub App has run on PRs and optionally query the vendor's API fo
 
 **Important consideration:** Some GitHub Apps only run on PRs, not the main branch. For main-branch enforcement, create a meta-policy that queries recent PR data to verify the app runs consistently. See Strategy 3.
 
-**Example guardrails:** Snyk GitHub App, Semgrep GitHub App, Dependabot, CodeQL.
+**Example guardrails:** `sec-sast-executed` (via GitHub App), `sec-sca-executed` (via Snyk/Dependabot GitHub App), `sec-sast-approved-tool`, `sec-sca-approved-tool`.
 
 ---
 
@@ -59,7 +59,7 @@ Query Lunar's SQL API to make assertions based on data from other contexts (othe
 * **Dependency compliance:** Verify that upstream dependencies meet requirements
 * **Trend analysis:** Ensure metrics haven't regressed compared to previous measurements
 
-**Example guardrails:** Ensuring scanners run on all PRs, deployment recency checks, cross-component security posture.
+**Example guardrails:** `deploy-recent-deployment`, `deploy-not-stale`, `deploy-version-current`, `test-coverage-no-decrease`, `docs-readme-recent-update`, `ops-runbook-recent-update`, `sec-sast-no-new-findings-pr`.
 
 ---
 
@@ -78,7 +78,7 @@ Intercept and modify CI commands before execution to add instrumentation or enfo
 * Modified behavior was applied (via data collected post-execution)
 * Required labels or tags are present on artifacts
 
-**Example guardrails:** Auto-tagging container images with Git SHA, ensuring coverage output format.
+**Example guardrails:** `container-git-sha-label`, `container-oci-labels`, `container-build-timestamp`, `test-results-captured`.
 
 ---
 
@@ -97,7 +97,7 @@ Automatically run security or quality scanners as part of Lunar's collection pro
 
 **Advantages:** Works even if the team hasn't configured the scanner themselves. Provides consistent scanning across all components.
 
-**Example guardrails:** SCA scanning, secret detection, container image scanning.
+**Example guardrails:** `sec-sast-executed`, `sec-sca-executed`, `sec-container-scan-executed`, `sec-secret-scan-executed`, `sec-no-secrets-in-code`.
 
 ---
 
@@ -116,7 +116,7 @@ Provide actionable guidance when a policy cannot pass because required data does
 * Missing data: `.sca` object doesn't exist
 * Message: "No SCA scanner detected. Configure Snyk or run `npm audit` in your CI pipeline. See: [docs link]"
 
-**Example guardrails:** Any policy that depends on optional tools that require manual repo-by-repo integration (e.g. scanner that needs to be added to the CI).
+**Example guardrails:** `sec-sast-executed`, `sec-sca-executed`, `sec-container-scan-executed`, `sec-secret-scan-executed`, `sec-sbom-generated`, `test-coverage-measured`.
 
 ---
 
@@ -143,6 +143,8 @@ Use Claude for analysis tasks that are difficult to automate with traditional pa
 
 **When to use:** When pattern-based detection is insufficient or would require complex language-specific parsing.
 
+**Example guardrails:** `docs-readme-required-sections`, `ops-runbook-required-sections`, `resilience-graceful-degradation`, `docs-readme-description`, `docs-readme-architecture`.
+
 ---
 
 ## Strategy 8: File Parsing and Schema Extraction
@@ -167,7 +169,7 @@ Parse files of specific types, convert to JSON, validate, and extract structured
 * File syntax is valid
 * Semantic requirements are met (e.g., K8s manifests have resource limits, Dockerfiles don't use `latest` tag)
 
-**Example guardrails:** Kubernetes manifest validation, Terraform security checks, Dockerfile best practices, CODEOWNERS validation, Helm chart linting.
+**Example guardrails:** `k8s-container-has-cpu-memory-requests`, `k8s-container-has-cpu-memory-limits`, `k8s-container-non-root`, `k8s-pdb-exists`, `iac-datastore-deletion-protection`, `iac-datastore-encryption-at-rest`, `dockerfile-pinned-versions`, `dockerfile-approved-base-images`, `ownership-codeowners-valid`, `ownership-codeowners-catchall`, `helm-lint-passed`, `helm-dependencies-pinned`.
 
 ---
 
@@ -189,7 +191,7 @@ Verify that required manual processes (DR drills, security reviews, etc.) are do
 * Required sections are present
 * Approver is from authorized list (if required)
 
-**Example guardrails:** DR drill verification, backup testing documentation, security review sign-off, tabletop exercises.
+**Example guardrails:** `dr-recovery-tested`, `dr-backup-verified`, `dr-gameday-exercises`, `dr-plan-reviewed`, `ops-runbook-recent-update`.
 
 ---
 
@@ -214,6 +216,8 @@ Query external vendor APIs to collect operational data not available in the repo
 * Referenced tickets exist and are valid
 * Required dashboards and alerts are configured
 * Team members are active employees
+
+**Example guardrails:** `oncall-schedule-configured`, `oncall-min-participants`, `oncall-escalation-policy`, `oncall-escalation-levels`, `oncall-active-employees`, `ownership-codeowners-active`, `deps-no-eol`, `metrics-dashboard-exists`, `alerting-configured`.
 
 ---
 
@@ -243,7 +247,7 @@ Query the VCS provider (GitHub, GitLab, Bitbucket) API for repository configurat
 * Repository visibility matches requirements
 * Correlation of access list with other systems like HRIS
 
-**Example guardrails:** Branch protection policies, commit signing enforcement, access control validation.
+**Example guardrails:** `vcs-branch-protection-enabled`, `vcs-pr-min-approvals`, `vcs-codeowner-review-required`, `vcs-status-checks-required`, `vcs-no-force-push`, `vcs-branch-deletion-restricted`, `vcs-signed-commits-required`, `vcs-repo-topics`, `vcs-visibility`.
 
 ---
 
@@ -294,7 +298,7 @@ Generate or consume a Software Bill of Materials (SBOM) and analyze its contents
 * Dependencies come from approved registries
 * SBOM was generated and is valid (Approach B only)
 
-**Example guardrails:** EOL dependency detection, license compliance, restricted library blocking, SBOM generation verification.
+**Example guardrails:** `deps-no-eol`, `deps-no-deprecated`, `deps-license-compatible`, `deps-no-restricted-libs`, `deps-lockfile-exists`, `deps-exact-versions`, `deps-approved-registries`, `artifact-sbom-generated`.
 
 ---
 
@@ -317,7 +321,7 @@ React to container registry events to verify image metadata, signatures, and pro
 * Required labels are present (Git SHA, build timestamp, source URL)
 * Base images are current and approved
 
-**Example guardrails:** Supply chain security, image signing enforcement, provenance verification.
+**Example guardrails:** `sec-container-images-signed`, `sec-container-signatures-verified`, `sec-build-provenance-attested`, `sec-build-provenance-published`, `container-provenance-attestation`, `artifact-cosign-signed`.
 
 ---
 
@@ -345,7 +349,7 @@ Analyze trends over time by querying historical Component JSONs rather than pars
 * Git parsing: Collector runs `git log` and parses output → fragile, slow, inconsistent
 * Lunar approach: Collectors record data per-commit → SQL API queries historical records → reliable, fast, leverages existing data
 
-**Example guardrails:** Documentation freshness, repository staleness detection, metric regression detection, continuous compliance verification.
+**Example guardrails:** `docs-readme-recent-update`, `ops-runbook-recent-update`, `repo-not-stale`, `test-coverage-no-decrease`, `deploy-not-stale`, `dr-plan-reviewed`.
 
 ---
 
@@ -367,6 +371,6 @@ Verify the actual deployed/running state of services rather than just configurat
 * Deployed version is not too far behind source
 * Service is responsive and healthy
 
-**Example guardrails:** Health check completeness, metrics exposure verification, deployment version drift detection.
+**Example guardrails:** `health-endpoint-exists`, `health-endpoint-accurate`, `metrics-endpoint-exposed`, `deploy-version-current`, `metrics-golden-signals`.
 
 **Note:** This strategy requires network access to production/staging environments and should be used carefully with appropriate security controls.

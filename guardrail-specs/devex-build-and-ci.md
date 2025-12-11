@@ -17,6 +17,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.is_eol` - Boolean indicating version is end-of-life
   * Policy: Assert that language version is at or above the configured minimum and not EOL
   * Configuration: Minimum version per language (e.g., Go: 1.21, Python: 3.10, Node: 18), EOL version list
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `lang-version-specified` **Runtime version is explicitly specified**: Projects must explicitly declare their runtime version for reproducibility, not rely on system defaults.
   * Collector(s): Check for presence of version specification files (.go-version, .python-version, .nvmrc, .tool-versions, etc.)
@@ -25,6 +26,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.version_file` - Path to version specification file
   * Policy: Assert that language version is explicitly specified
   * Configuration: Required version file patterns per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `lang-version-approved-format` **Language version file is in approved format**: Version specification should use approved file formats (e.g., .tool-versions for asdf, or language-specific files).
   * Collector(s): Detect version file format and validate against approved formats
@@ -33,6 +35,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.uses_approved_format` - Boolean for approved format
   * Policy: Assert that version is specified using approved file format
   * Configuration: Approved version file formats (e.g., [".tool-versions", ".go-version"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Framework and Library Compliance
 
@@ -44,6 +47,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.uses_approved_framework` - Boolean for approved framework
   * Policy: Assert that detected framework is from approved list
   * Configuration: Approved frameworks per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `lang-approved-db-library` **Project uses approved ORM or database library**: Database access should use standard libraries for consistent patterns and security.
   * Collector(s): Detect database libraries from dependencies (GORM, SQLAlchemy, Prisma, Hibernate, etc.)
@@ -52,6 +56,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.uses_approved_db_library` - Boolean for approved library
   * Policy: Assert that database library is from approved list
   * Configuration: Approved database libraries per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `lang-approved-http-client` **Project uses approved HTTP client library**: HTTP clients should use vetted libraries with proper timeout and retry handling.
   * Collector(s): Detect HTTP client libraries from dependencies and imports
@@ -60,6 +65,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.uses_approved_http_client` - Boolean for approved library
   * Policy: Assert that HTTP client is from approved list
   * Configuration: Approved HTTP client libraries per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `lang-approved-logging-library` **Project uses approved logging library**: Logging should use organizational standard libraries for consistent format and integration.
   * Collector(s): Detect logging library from dependencies and imports
@@ -68,6 +74,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.uses_approved_logging` - Boolean for approved library
   * Policy: Assert that logging library is from approved list
   * Configuration: Approved logging libraries per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Project Templates and Structure
 
@@ -79,6 +86,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.template.version` - Template version if applicable
   * Policy: Assert that project was created from an approved template (may be advisory for legacy projects)
   * Configuration: Approved template names, grace period for legacy projects
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `repo-standard-layout` **Project structure follows standard layout**: Project directory structure must follow language-specific conventions (Go: cmd/, pkg/, internal/; Python: src/ layout; Node: src/, lib/).
   * Collector(s): Analyze directory structure and compare against language-specific standard layouts
@@ -88,6 +96,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.structure.deviations` - Array of deviations from standard
   * Policy: Assert that project structure follows standard layout
   * Configuration: Standard layouts per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `repo-build-script-targets` **Makefile or build script exists with standard targets**: Projects must have a Makefile or equivalent with standard targets (build, test, lint, clean).
   * Collector(s): Check for Makefile, justfile, or package.json scripts; extract available targets
@@ -98,6 +107,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.build_system.has_required_targets` - Boolean for required targets present
   * Policy: Assert that standard build targets are available
   * Configuration: Required targets (default: ["build", "test", "lint"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Configuration Files and Standards
 
@@ -108,6 +118,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.editorconfig.valid` - Boolean for valid configuration
   * Policy: Assert that .editorconfig exists
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `repo-linter-configured` **Linter configuration exists and is valid**: Projects must have linter configuration using organizational standards.
   * Collector(s): Check for linter configuration files (language-specific: .golangci.yml, .eslintrc.*, .flake8, .pylintrc, checkstyle.xml)
@@ -117,6 +128,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.linter.extends_org_config` - Boolean indicating org config is extended
   * Policy: Assert that linter is configured with organizational standards
   * Configuration: Required linter per language, org config package names
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `repo-formatter-configured` **Formatter configuration exists and is valid**: Projects must have code formatter configuration using organizational standards.
   * Collector(s): Check for formatter configuration files (prettier, black, gofmt, google-java-format)
@@ -126,6 +138,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.lang.<language>.formatter.tool` - Formatter tool name
   * Policy: Assert that formatter is configured
   * Configuration: Required formatter per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `quality-pre-commit-hooks` **Pre-commit hooks are configured**: Projects should have pre-commit hooks for automated quality checks before commit.
   * Collector(s): Check for pre-commit configuration (.pre-commit-config.yaml, .husky/, lefthook.yml)
@@ -135,6 +148,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.pre_commit.hooks` - Array of configured hooks
   * Policy: Assert that pre-commit hooks are configured
   * Configuration: Required hooks (e.g., ["lint", "format", "test"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -150,6 +164,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.lock_file.type` - Lock file type
   * Policy: Assert that appropriate lock file exists for the project's package manager
   * Configuration: None
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-lockfile-committed` **Lock file is committed and up-to-date**: Lock file must be committed to version control and in sync with dependency manifest.
   * Collector(s): Check lock file is tracked in git and compare timestamps/hashes with manifest
@@ -159,6 +174,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.lock_file.stale` - Boolean for outdated lock file
   * Policy: Assert that lock file is committed and in sync with manifest
   * Configuration: None
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-exact-versions` **Dependencies use exact versions, not ranges**: Direct dependencies should specify exact versions, not version ranges, for reproducibility.
   * Collector(s): Parse dependency manifest and check version specifications (npm: no ^/~, Python: ==, Go: exact versions)
@@ -168,6 +184,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.range_version_count` - Count of range-versioned dependencies
   * Policy: Assert that all direct dependencies use exact versions
   * Configuration: Allowed exceptions (e.g., peer dependencies)
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-no-floating-versions` **Dependency manifest does not contain floating versions**: Dependencies must not use "latest", "*", or other floating version specifiers.
   * Collector(s): Parse dependency manifest for floating version patterns
@@ -176,6 +193,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_floating_versions` - Boolean for floating version presence
   * Policy: Assert that no floating versions are used
   * Configuration: None
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 ### End-of-Life and Deprecated Dependencies
 
@@ -187,6 +205,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_eol` - Boolean for EOL dependency presence
   * Policy: Assert that no dependencies are end-of-life
   * Configuration: EOL data source, grace period after EOL date
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-no-deprecated` **No deprecated dependencies**: Dependencies that are marked deprecated by maintainers should be replaced.
   * Collector(s): Check package registries for deprecation flags (npm deprecation, PyPI classifiers, Maven deprecation)
@@ -196,6 +215,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_deprecated` - Boolean for deprecated presence
   * Policy: Assert that no dependencies are deprecated
   * Configuration: Allow specific deprecated packages with justification
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-within-support-window` **Dependencies are within support window**: Dependencies should be on versions still receiving security updates from maintainers.
   * Collector(s): Check version against known support windows for major dependencies
@@ -205,6 +225,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_unsupported` - Boolean for unsupported presence
   * Policy: Assert that dependencies are within support windows
   * Configuration: Support window definitions for key packages
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 ### Restricted and Forbidden Libraries
 
@@ -216,6 +237,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_restricted` - Boolean for restricted presence
   * Policy: Assert that no restricted libraries are present
   * Configuration: Restricted package list with reasons (e.g., {"lodash": "use lodash-es instead"})
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-license-compatible` **License compatibility is verified**: All dependencies must have licenses compatible with organizational policy.
   * Collector(s): Extract license information from dependencies and SBOM; validate against approved list
@@ -226,6 +248,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.licenses.compliant` - Boolean for all licenses compliant
   * Policy: Assert that all dependency licenses are approved
   * Configuration: Approved license list (e.g., ["MIT", "Apache-2.0", "BSD-3-Clause"])
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-no-duplicates` **No duplicate/redundant dependencies**: Projects should not have multiple libraries serving the same purpose (e.g., multiple date libraries).
   * Collector(s): Analyze dependencies for functional overlap
@@ -234,6 +257,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_duplicates` - Boolean for duplicate presence
   * Policy: Assert that no redundant dependencies exist
   * Configuration: Duplicate detection rules (e.g., date libraries, HTTP clients)
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 ### Dependency Sources
 
@@ -245,6 +269,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.uses_approved_registries` - Boolean for approved registries only
   * Policy: Assert that all dependencies come from approved registries
   * Configuration: Approved registry URLs per ecosystem
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-internal-registry` **Private dependencies reference internal registry**: Internal/private packages must be resolved from internal registries, not public mirrors.
   * Collector(s): Check package manager configuration for internal package routing
@@ -254,6 +279,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.internal.correctly_sourced` - Boolean for correct sourcing
   * Policy: Assert that internal packages use internal registry
   * Configuration: Internal package patterns, internal registry URL
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `deps-no-git-production` **No git dependencies in production**: Production code should not depend on git URLs; use published packages.
   * Collector(s): Parse dependency manifest for git:// or github: dependencies
@@ -262,6 +288,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.dependencies.has_git_dependencies` - Boolean for git dependency presence
   * Policy: Assert that no git dependencies are used in production
   * Configuration: Allowed exceptions for internal packages in transition
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 ---
 
@@ -277,6 +304,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.uses_approved_base_images` - Boolean for all approved
   * Policy: Assert that all base images are from approved list
   * Configuration: Approved base image patterns (e.g., ["gcr.io/distroless/*", "*-alpine", "internal.registry/*"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `container-specific-tag` **Base image uses specific tag, not latest**: Base images must specify version tags, not :latest or implicit latest.
   * Collector(s): Parse Dockerfile FROM instructions for tag presence
@@ -286,6 +314,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.summary.uses_latest_tag` - Boolean for any latest usage
   * Policy: Assert that no base images use :latest tag
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `container-digest-pinned` **Base image uses digest for immutability**: Production images should pin base images by digest for complete reproducibility.
   * Collector(s): Parse Dockerfile FROM instructions for digest references (@sha256:...)
@@ -295,6 +324,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.summary.all_pinned_by_digest` - Boolean for all pinned
   * Policy: Assert that base images are pinned by digest (may be advisory or required for production)
   * Configuration: Tags requiring digest pinning (e.g., ["production", "tier1"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `container-minimal-final-stage` **Final stage uses minimal base image**: Multi-stage builds should use minimal images (distroless, scratch, alpine) for the final stage.
   * Collector(s): Parse Dockerfile for multi-stage builds and analyze final stage base image
@@ -303,6 +333,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.definitions[].final_stage.is_minimal` - Boolean for minimal image
   * Policy: Assert that final stage uses minimal base image
   * Configuration: Minimal image patterns
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Registry and Publishing Standards
 
@@ -314,6 +345,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.uses_approved_registries` - Boolean for approved registries only
   * Policy: Assert that images are pushed only to approved registries
   * Configuration: Approved registry patterns
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `container-no-public-registry` **Images are not pushed to public registries**: Production images must not be pushed to public registries like Docker Hub.
   * Collector(s): Detect pushes to known public registries
@@ -322,6 +354,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.pushed_to_public` - Boolean for any public push
   * Policy: Assert that no images are pushed to public registries
   * Configuration: Public registry patterns to block
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `container-naming-convention` **Image repository naming follows conventions**: Image names should follow organization naming conventions (e.g., org/team/service).
   * Collector(s): Extract image names from CI push operations and validate format
@@ -330,6 +363,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].follows_naming_convention` - Boolean for convention compliance
   * Policy: Assert that image names follow naming conventions
   * Configuration: Naming convention pattern
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Image Labels and Metadata
 
@@ -341,6 +375,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.definitions[].missing_labels` - Array of missing required labels
   * Policy: Assert that all required OCI labels are present
   * Configuration: Required labels (default: ["org.opencontainers.image.source", "org.opencontainers.image.version", "org.opencontainers.image.revision"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `container-git-sha-label` **Container image includes git SHA label**: Images must include the git commit SHA that produced them for traceability.
   * Collector(s): Check for git SHA in image labels (org.opencontainers.image.revision or custom)
@@ -349,6 +384,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].git_sha` - Git SHA value in label
   * Policy: Assert that images include git SHA label
   * Configuration: Label key for git SHA
+  * Strategy: Strategy 13 (Container Registry Policies)
 
 * `container-build-timestamp` **Container image includes build timestamp**: Images should include build timestamp for age verification.
   * Collector(s): Check for creation timestamp in image metadata
@@ -357,6 +393,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].created_at` - Image creation timestamp
   * Policy: Assert that images include build timestamp
   * Configuration: None
+  * Strategy: Strategy 13 (Container Registry Policies)
 
 ### Image Tagging Practices
 
@@ -367,6 +404,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].is_semver` - Boolean for semver format
   * Policy: Assert that production images use semantic versioning
   * Configuration: Tags requiring semver (e.g., ["production", "release"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `container-git-sha-traceable` **Git SHA is included in image tag or label**: Every image should be traceable to source via git SHA in tag or label.
   * Collector(s): Check image tag for git SHA component or verify label presence
@@ -375,6 +413,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].traceable_to_source` - Boolean for any traceability method
   * Policy: Assert that images are traceable to source
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `container-immutable-tags` **Mutable tags are not overwritten**: Tags like :latest or :main should follow immutability practices (tag once, never overwrite).
   * Collector(s): Check registry for tag overwrites or enforce digest-based references
@@ -383,6 +422,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.tag_policy` - Tag policy in use (immutable, mutable-allowed)
   * Policy: Assert that mutable tags follow immutability policy
   * Configuration: Enforce immutable tags (boolean)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -398,6 +438,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.artifact_hash` - Hash of produced artifact
   * Policy: Assert that builds are reproducible
   * Configuration: Tags requiring reproducibility verification
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-pinned-tool-versions` **Build uses pinned tool versions**: Build tools (compilers, bundlers) should use pinned versions, not floating.
   * Collector(s): Analyze CI configuration and build scripts for tool version specifications
@@ -407,6 +448,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.tools.floating` - Array of tools with floating versions
   * Policy: Assert that build tools use pinned versions
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-no-ambient-env` **Build does not depend on ambient environment**: Builds should not rely on environment variables or system state not explicitly declared.
   * Collector(s): Analyze build configuration for undeclared environment dependencies
@@ -416,6 +458,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.environment.fully_declared` - Boolean for full declaration
   * Policy: Assert that build environment is fully declared
   * Configuration: Allowed implicit variables (e.g., ["CI", "HOME"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Build Caching and Performance
 
@@ -426,6 +469,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.definitions[].cache_issues` - Array of caching anti-patterns
   * Policy: Assert that Dockerfiles follow caching best practices
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-time-limits` **Build time is within acceptable limits**: Build time should not exceed configured thresholds for fast feedback.
   * Collector(s): Capture build duration from CI pipeline metrics
@@ -434,6 +478,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.duration_exceeded` - Boolean for exceeded threshold
   * Policy: Assert that build time is within limits
   * Configuration: Maximum build duration in seconds (default: 600)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-ci-caching` **Build uses CI caching**: CI pipelines should use caching for dependencies and build artifacts.
   * Collector(s): Analyze CI configuration for cache directives
@@ -443,6 +488,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.caching.hit_rate` - Cache hit rate if available
   * Policy: Assert that CI caching is configured
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Build Security
 
@@ -453,6 +499,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.isolation_method` - Isolation method (container, vm, ephemeral)
   * Policy: Assert that builds run in isolated environments
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-deps-verified` **Build dependencies are verified**: Downloaded dependencies should be verified via checksums or signatures.
   * Collector(s): Check package manager configuration for integrity verification settings
@@ -461,6 +508,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.verification_method` - Verification method (checksum, signature)
   * Policy: Assert that dependency integrity is verified during build
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `build-hermetic` **No network access during build (hermetic build)**: Builds should not access the network after dependency resolution for reproducibility.
   * Collector(s): Analyze build configuration for network isolation; detect network calls during build phase
@@ -470,6 +518,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.network_access.hosts` - Array of hosts accessed during build
   * Policy: Assert that builds are hermetic (no network access)
   * Configuration: Tags requiring hermetic builds, allowed hosts
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -486,6 +535,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.platform` - CI platform name
   * Policy: Assert that CI configuration exists and is valid
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-reusable-workflows` **CI configuration uses reusable workflows**: CI should use organization shared/reusable workflows where available.
   * Collector(s): Parse CI configuration for references to shared workflows or templates
@@ -494,6 +544,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.config.shared_workflows` - Array of shared workflows referenced
   * Policy: Assert that CI uses organization shared workflows
   * Configuration: Required shared workflow patterns
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-env-vars-approved` **CI environment variables are from approved sources**: CI secrets and environment variables should come from approved secret management.
   * Collector(s): Analyze CI configuration for secret/variable sources
@@ -502,6 +553,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.secrets.uses_approved_sources` - Boolean for approved sources
   * Policy: Assert that secrets come from approved sources
   * Configuration: Approved secret sources (e.g., ["vault", "github-secrets", "aws-secrets-manager"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Required Pipeline Steps
 
@@ -513,6 +565,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.lint.passed` - Boolean for lint passing
   * Policy: Assert that linting runs in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-format-check` **Format check runs in CI**: CI pipeline should verify code formatting.
   * Collector(s): Detect format check step execution in CI
@@ -522,6 +575,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.format.passed` - Boolean for format check passing
   * Policy: Assert that format checking runs in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-build-step` **Build step runs in CI**: CI pipeline must include a build step for compiled languages.
   * Collector(s): Detect build step execution in CI configuration or pipeline run
@@ -530,6 +584,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.build.passed` - Boolean for build success
   * Policy: Assert that build step runs in CI for applicable projects
   * Configuration: Tags requiring build step (compiled languages)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-test-step` **Test step runs in CI**: CI pipeline must include test execution.
   * Collector(s): Detect test step execution in CI configuration or pipeline run
@@ -538,6 +593,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.testing.all_passing` - Boolean for all tests passing
   * Policy: Assert that tests run in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-security-scan` **Security scan runs in CI**: CI pipeline must include security scanning (SAST, SCA, or equivalent).
   * Collector(s): Detect security scanning step execution in CI
@@ -547,6 +603,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.sca` - SCA scan data (presence indicates execution)
   * Policy: Assert that security scanning runs in CI
   * Configuration: Required scan types (default: ["sast", "sca"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Pipeline Performance and Quality
 
@@ -557,6 +614,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.run.duration_exceeded` - Boolean for exceeded threshold
   * Policy: Assert that CI pipeline completes within time limit
   * Configuration: Maximum pipeline duration in seconds (default: 900)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-success-rate` **CI pipeline has consistent success rate**: Pipeline should not have high failure rates indicating flaky tests or infrastructure issues.
   * Collector(s): Query CI platform for recent pipeline success/failure rates
@@ -566,6 +624,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.performance.is_stable` - Boolean for stable pipeline
   * Policy: Assert that CI success rate meets threshold
   * Configuration: Minimum success rate (default: 90%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-parallelization` **CI uses parallelization effectively**: Long-running steps should be parallelized to reduce total duration.
   * Collector(s): Analyze CI configuration for parallel job definitions
@@ -574,6 +633,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.parallelization.max_parallel` - Maximum parallel jobs
   * Policy: Assert that CI uses parallelization where beneficial
   * Configuration: None (advisory)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Pipeline Security
 
@@ -584,6 +644,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.security.potential_exposures` - Array of potential secret exposures
   * Policy: Assert that secrets are masked in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-minimal-permissions` **CI runs with minimal permissions**: CI jobs should use least-privilege principles for permissions.
   * Collector(s): Analyze CI configuration for permission declarations
@@ -592,6 +653,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.security.uses_minimal_permissions` - Boolean for minimal permissions
   * Policy: Assert that CI uses minimal permissions
   * Configuration: Maximum allowed permissions
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `ci-approved-runner-images` **CI uses approved runner images**: CI jobs should run on approved runner images/environments.
   * Collector(s): Extract runner image/environment from CI configuration
@@ -600,6 +662,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.ci.runner.uses_approved_image` - Boolean for approved image
   * Policy: Assert that CI uses approved runner images
   * Configuration: Approved runner image patterns
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -615,6 +678,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.artifacts.signature_verified` - Boolean for verified signature
   * Policy: Assert that artifacts are signed
   * Configuration: Required signing method, tags requiring signing
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-cosign-signed` **Container images are signed with cosign/sigstore**: Container images must be signed using cosign or sigstore for supply chain security.
   * Collector(s): Detect cosign signing step in CI; verify signature in registry
@@ -624,6 +688,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.summary.all_signed` - Boolean for all images signed
   * Policy: Assert that container images are signed
   * Configuration: Required signature type (default: "cosign")
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-transparency-log` **Artifact signatures are published to transparency log**: Signatures should be recorded in a transparency log (Rekor) for auditability.
   * Collector(s): Check for transparency log publication in signing process
@@ -632,6 +697,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.artifacts.transparency_log.entry_id` - Log entry identifier
   * Policy: Assert that signatures are published to transparency log
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Artifact Publication
 
@@ -643,6 +709,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.artifacts.uses_approved_repositories` - Boolean for approved repos only
   * Policy: Assert that artifacts are published to approved repositories
   * Configuration: Approved artifact repository patterns
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-semver` **Package version follows semantic versioning**: Published packages must use semantic versioning for proper dependency resolution.
   * Collector(s): Extract package version from manifest and publication metadata
@@ -651,6 +718,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.artifacts.is_semver` - Boolean for semver format
   * Policy: Assert that published packages use semantic versioning
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-provenance` **Artifact includes provenance attestation**: Artifacts should include SLSA provenance attestation for supply chain security.
   * Collector(s): Check for provenance generation in CI (SLSA generator, cosign attest)
@@ -660,6 +728,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.artifacts.provenance.verified` - Boolean for verified provenance
   * Policy: Assert that artifacts include provenance attestation
   * Configuration: Minimum SLSA level (default: l2)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### SBOM Generation
 
@@ -671,6 +740,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.sbom.tool` - Tool used to generate SBOM
   * Policy: Assert that SBOM is generated
   * Configuration: Required SBOM format
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-sbom-published` **SBOM is published alongside artifacts**: Generated SBOM must be published to artifact repository alongside the build artifacts.
   * Collector(s): Verify SBOM publication in artifact repository
@@ -679,6 +749,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.sbom.location` - Location of published SBOM
   * Policy: Assert that SBOM is published
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `artifact-sbom-attached` **SBOM is attached to container images**: Container images should have SBOM attached as attestation or alongside in registry.
   * Collector(s): Check for SBOM attestation on container images in registry
@@ -687,6 +758,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.containers.builds[].sbom_location` - Location of attached SBOM
   * Policy: Assert that container images have SBOM attached
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -702,6 +774,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.build_docs.location` - Location of build documentation
   * Policy: Assert that local build instructions exist
   * Configuration: Expected section headings (e.g., ["Building", "Build", "Development"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `devex-local-run-docs` **Local run instructions exist**: Documentation must explain how to run the service locally.
   * Collector(s): Check README for run/start instructions; verify make run or equivalent exists
@@ -710,6 +783,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.run_docs.location` - Location of run documentation
   * Policy: Assert that local run instructions exist
   * Configuration: Expected section headings (e.g., ["Running", "Run", "Getting Started"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `devex-standard-commands` **Standard local development commands work**: make build, make test, make run (or equivalents) should succeed.
   * Collector(s): Execute standard commands in clean environment and verify success (may be periodic/scheduled)
@@ -720,6 +794,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.local_dev.verified_at` - Timestamp of last verification
   * Policy: Assert that standard development commands work
   * Configuration: Commands to verify, verification frequency
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Development Environment Configuration
 
@@ -731,6 +806,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.devcontainer.valid` - Boolean for valid configuration
   * Policy: Assert that dev container configuration exists
   * Configuration: None (may be advisory)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `devex-docker-compose` **Docker Compose configuration exists for local development**: Projects with service dependencies should provide docker-compose for local development.
   * Collector(s): Check for docker-compose.yml, docker-compose.dev.yml, or compose.yml
@@ -740,6 +816,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.compose.services` - Array of defined services
   * Policy: Assert that compose configuration exists for services with dependencies
   * Configuration: Tags requiring compose (e.g., ["has-dependencies", "service"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `devex-env-template` **Environment variable template exists**: Projects should provide .env.example or .env.template documenting required variables.
   * Collector(s): Check for environment template files
@@ -749,6 +826,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.env_template.variables` - Array of documented variables
   * Policy: Assert that environment template exists
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -761,6 +839,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.compliance_factors` - Array of contributing factors
   * Policy: Assert that build compliance score meets minimum threshold
   * Configuration: Minimum score (default: 70), factor weights
+  * Strategy: other strategy (meta-policy aggregating other checks)
 
 * `summary-build-steps-complete` **All required build steps are configured**: Meta-check that all applicable build guardrails are satisfied.
   * Collector(s): Aggregate results from build-related policy checks
@@ -770,6 +849,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.build.compliance.percentage` - Compliance percentage
   * Policy: Assert that build compliance percentage meets threshold
   * Configuration: Minimum compliance percentage (default: 90%)
+  * Strategy: other strategy (meta-policy aggregating other checks)
 
 * `summary-golden-path-score` **Golden path alignment score**: Measure of how closely project follows organizational golden paths.
   * Collector(s): Aggregate golden path policy results
@@ -778,3 +858,4 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
     * `.repo.golden_path.deviations` - Array of deviations from golden path
   * Policy: Assert that golden path alignment meets threshold
   * Configuration: Minimum alignment score, critical deviations that fail regardless
+  * Strategy: other strategy (meta-policy aggregating other checks)

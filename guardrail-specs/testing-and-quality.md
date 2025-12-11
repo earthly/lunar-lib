@@ -16,6 +16,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.ci.steps_executed.unit_test` - Boolean indicating unit tests step ran
   * Policy: Assert that tests were executed in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-pass-default-branch` **Tests pass on the default branch**: The default branch must have passing tests at all times.
   * Collector(s): Query CI system for latest test results on default branch, or capture test results from CI pipeline runs
@@ -25,6 +26,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.branch` - Branch where tests were run
   * Policy: Assert that all tests pass on the default branch
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-results-captured` **Test results are captured and reported**: Test execution must produce machine-readable results (JUnit XML, JSON) that are collected and stored.
   * Collector(s): Detect test result artifacts in CI pipeline outputs or configured artifact locations
@@ -34,6 +36,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.results_path` - Path or URL to test results
   * Policy: Assert that test results are captured in a standard format
   * Configuration: Accepted result formats (default: ["junit", "json"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-run-on-pr` **Tests run on pull requests**: Tests must be executed on every pull request before merge.
   * Collector(s): Check CI configuration for PR triggers and verify test execution in PR context
@@ -42,6 +45,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.vcs.branch_protection.required_checks` - Required status checks including tests
   * Policy: Assert that test execution is required for PRs
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-post-deployment` **Tests run against deployed version**: After deployment, tests should run against the deployed service to verify successful rollout.
   * Collector(s): Detect post-deployment test execution in CD pipeline or deployment hooks
@@ -51,6 +55,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.post_deployment.passed` - Boolean for test success
   * Policy: Assert that post-deployment tests are executed for production deployments
   * Configuration: Tags requiring post-deployment tests (e.g., ["production", "tier1"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Test Execution Performance
 
@@ -61,6 +66,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.duration_exceeded` - Boolean indicating duration exceeded threshold
   * Policy: Assert that test execution time is within the configured limit
   * Configuration: Maximum test duration in seconds (default: 600 for unit tests, 1800 for integration tests)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-individual-fast` **Individual test execution is fast**: Each individual test case should complete quickly to prevent slow test suites.
   * Collector(s): Parse test results for individual test execution times
@@ -70,6 +76,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.max_test_duration_seconds` - Duration of slowest test
   * Policy: Assert that no individual test exceeds the configured time limit
   * Configuration: Maximum individual test duration (default: 30 seconds for unit tests)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-parallelization-enabled` **Test parallelization is enabled**: Test suites should run in parallel where possible to minimize execution time.
   * Collector(s): Analyze test runner configuration and CI pipeline for parallelization settings
@@ -79,6 +86,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.parallelization.split_method` - How tests are split (file, class, method)
   * Policy: Assert that test parallelization is enabled for large test suites
   * Configuration: Minimum test count requiring parallelization (default: 100)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -94,6 +102,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.unit_tests.test_count` - Number of test cases found
   * Policy: Assert that unit tests exist
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-to-source-ratio` **Test-to-source ratio is adequate**: The number of test files should be proportional to source files.
   * Collector(s): Count test files and source files, calculate ratio
@@ -103,6 +112,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.unit_tests.test_to_source_ratio` - Ratio of test files to source files
   * Policy: Assert that test-to-source ratio meets minimum threshold
   * Configuration: Minimum ratio (default: 0.5, meaning at least 1 test file per 2 source files)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Code Coverage
 
@@ -114,6 +124,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.source.integration` - How coverage was collected (ci)
   * Policy: Assert that code coverage is collected
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-coverage-minimum-threshold` **Overall code coverage meets minimum threshold**: The codebase must achieve a minimum percentage of code coverage.
   * Collector(s): Parse coverage reports and extract overall coverage percentage (language-specific collectors)
@@ -123,6 +134,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.threshold` - Configured threshold
   * Policy: Assert that coverage percentage meets or exceeds the threshold
   * Configuration: Minimum coverage percentage (default: 80%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-line-coverage-threshold` **Line coverage meets minimum threshold**: Specifically, line coverage must meet organizational standards.
   * Collector(s): Extract line coverage from coverage reports
@@ -132,6 +144,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.lines.percentage` - Line coverage percentage
   * Policy: Assert that line coverage meets minimum threshold
   * Configuration: Minimum line coverage percentage (default: 80%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-branch-coverage-threshold` **Branch coverage meets minimum threshold**: Branch/decision coverage should meet organizational standards for thorough testing.
   * Collector(s): Extract branch coverage from coverage reports (not all tools support this)
@@ -141,6 +154,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.branches.percentage` - Branch coverage percentage
   * Policy: Assert that branch coverage meets minimum threshold
   * Configuration: Minimum branch coverage percentage (default: 70%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-coverage-no-decrease` **Coverage does not decrease**: Code coverage should not regress between commits or releases.
   * Collector(s): Compare current coverage with previous coverage from stored history or baseline
@@ -150,6 +164,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.delta` - Change in coverage (can be negative)
   * Policy: Assert that coverage delta is not negative (or within acceptable margin)
   * Configuration: Allowed coverage decrease margin (default: 0, no decrease allowed)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-critical-path-coverage` **Critical paths have higher coverage**: Core business logic modules must have higher coverage than the overall threshold.
   * Collector(s): Parse coverage reports with per-file/package breakdown, filter by critical path patterns
@@ -159,6 +174,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.critical_path_percentage` - Average coverage for critical paths
   * Policy: Assert that critical path modules meet elevated coverage threshold
   * Configuration: Critical path patterns (e.g., ["src/core/", "lib/payments/"]), elevated threshold (default: 90%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-no-zero-coverage-files` **No files with zero coverage**: All source files should have at least some test coverage.
   * Collector(s): Parse coverage reports and identify files with 0% coverage
@@ -168,6 +184,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.has_zero_coverage_files` - Boolean for presence of uncovered files
   * Policy: Assert that no source files have zero coverage
   * Configuration: Excluded file patterns (e.g., generated files, migrations)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-new-code-coverage` **New code has coverage**: Code added in a PR should have test coverage, not just the overall codebase.
   * Collector(s): Compare coverage report with PR diff to calculate coverage of changed lines
@@ -177,6 +194,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.new_lines_total` - Total new lines in PR
   * Policy: Assert that new code coverage meets threshold
   * Configuration: Minimum new code coverage (default: 80%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Test Organization
 
@@ -188,6 +206,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.unit_tests.naming_compliant` - Boolean for all files compliant
   * Policy: Assert that all test files follow naming conventions
   * Configuration: Naming patterns per language (e.g., Python: "test_*.py", Go: "*_test.go")
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-organization` **Tests are co-located or in standard directories**: Tests should be organized in predictable locations (co-located with source or in test directories).
   * Collector(s): Analyze test file locations and compare to source structure
@@ -196,6 +215,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.unit_tests.test_directories` - Array of test directory paths
   * Policy: Assert that tests follow approved organization pattern
   * Configuration: Allowed organization patterns (default: ["colocated", "tests/", "test/", "__tests__/"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-no-production-code` **Test files do not contain production code**: Test files should only contain test code, not business logic that gets imported by production code.
   * Collector(s): Analyze imports in source code to detect imports from test files
@@ -204,6 +224,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.unit_tests.clean_separation` - Boolean indicating proper separation
   * Policy: Assert that no test files are imported by production code
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -219,6 +240,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.integration_tests.test_count` - Number of integration test cases
   * Policy: Assert that integration tests exist for service-type components
   * Configuration: Tags requiring integration tests (e.g., ["service", "api", "backend"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-integration-in-ci` **Integration tests run in CI**: Integration tests must be executed as part of the CI pipeline.
   * Collector(s): Detect integration test execution in CI configuration or pipeline runs
@@ -227,6 +249,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.ci.steps_executed.integration_test` - Boolean for integration test step
   * Policy: Assert that integration tests are executed in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) or Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-api-endpoint-coverage` **API endpoints have integration test coverage**: All API endpoints should have at least one integration test.
   * Collector(s): Extract API endpoints from OpenAPI spec or route definitions, cross-reference with integration tests
@@ -236,6 +259,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.integration_tests.endpoint_coverage_percentage` - Percentage of endpoints tested
   * Policy: Assert that endpoint coverage meets threshold
   * Configuration: Minimum endpoint coverage percentage (default: 100%)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Contract Testing
 
@@ -247,6 +271,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.contract_tests.consumers` - Array of tested consumer contracts
   * Policy: Assert that contract tests exist for services with declared dependencies
   * Configuration: Tags requiring contract tests
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-contract-provider-verified` **Provider contract verification runs**: API providers must verify contracts from consumers.
   * Collector(s): Detect contract verification step in CI or contract broker integration
@@ -256,6 +281,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.contract_tests.verification_passed` - Boolean for all contracts passing
   * Policy: Assert that provider verification is enabled and passing
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-contract-published` **Contract tests are published to broker**: Contract test results should be published to a central broker for visibility.
   * Collector(s): Check for contract broker publishing step in CI or broker API query
@@ -264,6 +290,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.contract_tests.broker_url` - Contract broker URL
   * Policy: Assert that contracts are published to the central broker
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### End-to-End Testing
 
@@ -275,6 +302,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.e2e_tests.test_count` - Number of E2E tests
   * Policy: Assert that E2E tests exist for user-facing services
   * Configuration: Tags requiring E2E tests (e.g., ["frontend", "user-facing", "web"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-e2e-journey-coverage` **E2E tests cover critical user journeys**: E2E tests should cover documented critical paths.
   * Collector(s): Cross-reference E2E test names/descriptions with documented user journeys
@@ -284,6 +312,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.e2e_tests.journey_coverage_percentage` - Percentage of journeys tested
   * Policy: Assert that all documented critical journeys have E2E tests
   * Configuration: Journey documentation location
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-e2e-staging-gate` **E2E tests run in staging before production deployment**: E2E tests must pass against staging before production release.
   * Collector(s): Check deployment pipeline for E2E test gate on staging
@@ -293,6 +322,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.deployment.gates.e2e_staging` - Boolean for E2E gate configured
   * Policy: Assert that E2E tests are a deployment gate for production
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -308,6 +338,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.performance_tests.test_count` - Number of performance test scenarios
   * Policy: Assert that performance tests exist for production services
   * Configuration: Tags requiring performance tests (e.g., ["production", "tier1", "tier2"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-performance-scheduled` **Performance tests run regularly**: Performance tests should run on a schedule, not just ad-hoc.
   * Collector(s): Check CI configuration for scheduled performance test jobs
@@ -317,6 +348,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.performance_tests.last_run` - Timestamp of last execution
   * Policy: Assert that performance tests are scheduled to run regularly
   * Configuration: Minimum frequency (default: weekly)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-performance-results-stored` **Performance test results are stored**: Performance test results should be stored for trend analysis.
   * Collector(s): Check for performance result storage (Grafana, dedicated performance platform)
@@ -325,6 +357,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.performance_tests.results_url` - URL to performance dashboard
   * Policy: Assert that performance results are stored
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Load Testing
 
@@ -336,6 +369,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.load_tests.scenarios` - Array of load test scenarios
   * Policy: Assert that load tests use realistic traffic patterns
   * Configuration: Tags requiring realistic traffic models
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-load-thresholds-defined` **Load test thresholds are defined**: Load tests must have pass/fail thresholds for key metrics.
   * Collector(s): Parse load test configuration for threshold definitions
@@ -344,6 +378,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.load_tests.thresholds` - Array of defined thresholds (response_time, error_rate, throughput)
   * Policy: Assert that load test thresholds are defined
   * Configuration: Required threshold metrics (default: ["response_time_p95", "error_rate"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-load-meets-slos` **Load tests achieve performance SLOs**: Load test results should demonstrate the service meets its SLOs.
   * Collector(s): Parse load test results and compare against SLO definitions
@@ -353,6 +388,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.load_tests.slos_met` - Boolean for all SLOs passing
   * Policy: Assert that load tests validate and meet SLOs
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Benchmark Testing
 
@@ -364,6 +400,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.benchmarks.benchmark_count` - Number of benchmarks
   * Policy: Assert that benchmarks exist for performance-critical components
   * Configuration: Tags requiring benchmarks (e.g., ["performance-critical", "core-library"])
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-benchmarks-tracked` **Benchmark results are tracked over time**: Benchmark results should be stored for regression detection.
   * Collector(s): Check for benchmark result storage and tracking configuration
@@ -372,6 +409,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.benchmarks.history_url` - URL to benchmark history
   * Policy: Assert that benchmark results are tracked
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-no-benchmark-regressions` **No performance regressions in benchmarks**: Benchmark results should not show significant regressions.
   * Collector(s): Compare current benchmark results with historical baseline
@@ -381,6 +419,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.benchmarks.regression_percentage` - Worst regression percentage
   * Policy: Assert that no benchmark shows regression beyond threshold
   * Configuration: Maximum allowed regression percentage (default: 10%)
+  * Strategy: Strategy 14 (Historical Trend Analysis via Component JSON History) or Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -396,6 +435,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.flaky_tests.tests` - Array of flaky test identifiers
   * Policy: Assert that flaky test tracking is enabled
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-flaky-within-limits` **Flaky test count is within limits**: The number of known flaky tests should not exceed acceptable thresholds.
   * Collector(s): Query test tracking system for current flaky test count
@@ -404,6 +444,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.flaky_tests.percentage` - Percentage of total tests that are flaky
   * Policy: Assert that flaky test count/percentage is within limits
   * Configuration: Maximum flaky tests (default: 5), maximum flaky percentage (default: 1%)
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-no-new-flaky` **No new flaky tests introduced**: PRs should not introduce new flaky tests.
   * Collector(s): Compare flaky test list before and after PR changes
@@ -412,6 +453,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.flaky_tests.introduced_count` - Count of new flaky tests
   * Policy: Assert that no new flaky tests are introduced
   * Configuration: None
+  * Strategy: Strategy 14 (Historical Trend Analysis via Component JSON History) or Strategy 1 (CI Tool Execution Detection)
 
 * `test-flaky-quarantined` **Flaky tests are quarantined**: Known flaky tests should be quarantined and tracked separately.
   * Collector(s): Check test configuration for quarantine annotations or skip markers
@@ -420,6 +462,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.flaky_tests.quarantine_percentage` - Percentage quarantined vs total flaky
   * Policy: Assert that identified flaky tests are properly quarantined
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Test Independence
 
@@ -431,6 +474,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.is_order_independent` - Boolean for order independence
   * Policy: Assert that tests pass when run in random order
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 * `test-no-shared-state` **Tests do not share mutable state**: Tests should not rely on or modify shared mutable state.
   * Collector(s): Static analysis for shared state patterns, or detection via parallel test failures
@@ -439,6 +483,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.shared_state_violations` - Array of tests with shared state
   * Policy: Assert that no shared mutable state is detected in tests
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-cleanup` **Tests clean up after themselves**: Tests that create resources should clean them up after execution.
   * Collector(s): Static analysis for cleanup patterns, or runtime detection of resource leaks
@@ -447,6 +492,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.resource_leaks` - Array of tests with potential resource leaks
   * Policy: Assert that tests properly clean up resources
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Test Assertions
 
@@ -458,6 +504,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.assertions_per_test` - Average assertions per test
   * Policy: Assert that all tests have at least one assertion
   * Configuration: Minimum assertions per test (default: 1)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-error-path-tested` **Tests verify expected failures**: Error paths should be tested with expected exception assertions.
   * Collector(s): Analyze test code for exception/error testing patterns
@@ -466,6 +513,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.error_assertion_count` - Number of error/exception assertions
   * Policy: Assert that error path testing exists
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-no-exception-suppression` **Tests do not suppress exceptions**: Tests should not catch and ignore exceptions that could hide failures.
   * Collector(s): Static analysis to detect try-catch blocks in tests without assertions
@@ -474,6 +522,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.quality.has_exception_suppression` - Boolean for suppression presence
   * Policy: Assert that no tests suppress exceptions
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -489,6 +538,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.uses_approved_framework` - Boolean for approved framework usage
   * Policy: Assert that the testing framework is from the approved list
   * Configuration: Approved frameworks per language (e.g., Python: ["pytest"], Go: ["testing"], JS: ["jest", "vitest"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-approved-mocking-library` **Mock/stub library is from approved list**: Mocking libraries should be standardized across the organization.
   * Collector(s): Detect mocking library from imports and configuration
@@ -497,6 +547,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.uses_approved_mocking` - Boolean for approved library
   * Policy: Assert that mocking library is from approved list
   * Configuration: Approved mocking libraries per language
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-coverage-tool-configured` **Coverage tool is configured correctly**: Coverage collection should use the standard tool with proper configuration.
   * Collector(s): Parse coverage tool configuration files
@@ -506,6 +557,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.coverage.excludes` - Array of excluded paths
   * Policy: Assert that coverage tool is properly configured
   * Configuration: Required coverage tool settings, mandatory excludes
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ### Test Configuration
 
@@ -516,6 +568,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.config_file_path` - Path to test configuration
   * Policy: Assert that test configuration file exists
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-timeouts-configured` **Test timeouts are configured**: Global test timeout should be configured to prevent hanging tests.
   * Collector(s): Parse test configuration for timeout settings
@@ -524,6 +577,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.timeout_seconds` - Configured timeout value
   * Policy: Assert that test timeout is configured
   * Configuration: Maximum allowed timeout (default: 60 seconds)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 * `test-retries-limited` **Test retries are limited**: Automatic test retries should be limited to prevent masking flaky tests.
   * Collector(s): Parse test configuration for retry settings
@@ -532,6 +586,7 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.retry_count` - Number of retries configured
   * Policy: Assert that retries are limited to acceptable count
   * Configuration: Maximum allowed retries (default: 2)
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
