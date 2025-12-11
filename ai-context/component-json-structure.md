@@ -6,31 +6,101 @@ This document defines the standard structure for each top-level category in the 
 
 ---
 
-## Top-Level Categories
+## Key Paths Quick Reference
 
-| Key | Description |
-|-----|-------------|
-| `.repo` | Repository structure, README, standard files |
-| `.ownership` | Code ownership, maintainers, team info |
-| `.catalog` | Service catalog entries (Backstage, etc.) |
-| `.vcs` | Version control settings (branch protection, etc.) |
-| `.dependencies` | Package dependencies from lock files |
-| `.sbom` | Software Bill of Materials |
-| `.containers` | Container images, Dockerfiles, registries |
-| `.k8s` | Kubernetes manifests and configuration |
-| `.iac` | Infrastructure as Code (Terraform, Pulumi, etc.) |
-| `.ci` | CI/CD pipeline execution and configuration |
-| `.testing` | Test execution results and code coverage |
-| `.sca` | Software Composition Analysis (dependency vulnerabilities) |
-| `.sast` | Static Application Security Testing |
-| `.secrets` | Secret/credential scanning |
-| `.container_scan` | Container image vulnerability scanning |
-| `.observability` | Monitoring, logging, tracing configuration |
-| `.oncall` | On-call, incident management, runbooks |
-| `.compliance` | Compliance regime data |
-| `.api` | API specifications and documentation |
-| `.runtime` | Production/runtime data from cron collectors |
-| `.lang` | Language-specific data (Go, Rust, Java, etc.) — see [Language-Specific Data](component-json-conventions.md#language-specific-data) |
+This table lists important sub-objects within each category. For full details, see the category sections below.
+
+| Path | Description |
+|------|-------------|
+| **`.repo`** | **Repository structure, README, standard files** |
+| `.repo.readme` | README file info (`exists`, `path`, `lines`, `sections`) |
+| `.repo.files` | Standard file presence booleans (`gitignore`, `license`, `makefile`, etc.) |
+| `.repo.license` | License info (`type`, `path`) |
+| `.repo.languages` | Detected languages (`primary`, `all`) |
+| **`.ownership`** | **Code ownership, maintainers, team info** |
+| `.ownership.codeowners` | CODEOWNERS info (`exists`, `valid`, `has_default_rule`, `owners`) |
+| `.ownership.maintainers` | List of maintainer emails |
+| **`.catalog`** | **Service catalog entries (Backstage, etc.)** |
+| `.catalog.entity` | Entity metadata (`name`, `type`, `owner`, `lifecycle`, `tags`) |
+| `.catalog.annotations` | Service annotations (`pagerduty_service`, `grafana_dashboard`, `runbook`) |
+| `.catalog.apis` | API relationships (`provides`, `consumes`) |
+| **`.vcs`** | **Version control settings (branch protection, etc.)** |
+| `.vcs.branch_protection` | Protection settings (`enabled`, `required_approvals`, `require_codeowner_review`) |
+| `.vcs.pr` | PR-specific data (only in PR context) — see [PR-Specific Data](component-json-conventions.md#pr-specific-data) |
+| `.vcs.pr.ticket` | Extracted ticket reference (`id`, `source`, `url`) |
+| **`.containers`** | **Container images, Dockerfiles, registries** |
+| `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`) |
+| `.containers.definitions[].base_images[]` | Base image info (`reference`, `tag`, `is_latest`, `is_pinned`) |
+| `.containers.definitions[].final_stage` | Final stage info (`runs_as_root`, `user`, `has_healthcheck`) |
+| `.containers.builds[]` | Built images (`image`, `tag`, `signed`, `has_git_sha_label`) |
+| `.containers.summary` | Aggregated checks (`uses_latest_tag`, `all_non_root`) |
+| **`.k8s`** | **Kubernetes manifests and configuration** |
+| `.k8s.manifests[]` | Manifest files (`path`, `valid`, `resources`) |
+| `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `containers`) |
+| `.k8s.workloads[].containers[]` | Container specs (`has_resources`, `has_liveness_probe`, `runs_as_non_root`) |
+| `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `target_workload`, `min_available`) |
+| `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`) |
+| `.k8s.summary` | Aggregated checks (`all_have_resources`, `all_have_probes`, `all_have_pdb`) |
+| **`.iac`** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |
+| `.iac.files[]` | IaC files (`path`, `valid`) |
+| `.iac.resources[]` | Resources (`type`, `provider`, `resource_type`, `encrypted`, `deletion_protected`) |
+| `.iac.analysis` | Analysis results (`has_backend`, `internet_accessible`, `has_waf`) |
+| `.iac.datastores` | Datastore summary (`count`, `all_deletion_protected`, `all_encrypted`) |
+| `.iac.summary` | Aggregated checks (`all_valid`, `resource_count`) |
+| **`.ci`** | **CI/CD pipeline execution and configuration** |
+| `.ci.run` | Current run info (`id`, `status`, `duration_seconds`) |
+| `.ci.jobs[]` | Job details (`name`, `status`, `duration_seconds`) |
+| `.ci.steps_executed` | Step booleans (`lint`, `build`, `unit_test`, `security_scan`) |
+| `.ci.artifacts` | Build artifacts (`images_pushed`, `sbom_generated`) |
+| **`.testing`** | **Test execution results and code coverage** |
+| `.testing.results` | Test results (`total`, `passed`, `failed`, `skipped`) |
+| `.testing.failures[]` | Failure details (`name`, `file`, `line`, `message`) |
+| `.testing.coverage` | Coverage data (`percentage`, `meets_threshold`, `threshold`) |
+| `.testing.coverage.lines` | Line coverage (`covered`, `total`) |
+| **`.sca`** | **Software Composition Analysis (dependency vulnerabilities)** |
+| `.sca.source` | Tool source (`tool`, `version`, `integration`) |
+| `.sca.vulnerabilities` | Vuln counts (`critical`, `high`, `medium`, `low`, `total`) |
+| `.sca.findings[]` | Detailed findings (`severity`, `package`, `cve`, `fix_version`, `fixable`) |
+| `.sca.summary` | Summary booleans (`has_critical`, `has_high`, `all_fixable`) |
+| **`.sast`** | **Static Application Security Testing** |
+| `.sast.findings` | Finding counts by severity |
+| `.sast.issues[]` | Issue details (`severity`, `rule`, `file`, `line`, `message`) |
+| **`.secrets`** | **Secret/credential scanning** |
+| `.secrets.findings` | Finding counts (`total`) |
+| `.secrets.clean` | Boolean — no secrets detected |
+| **`.container_scan`** | **Container image vulnerability scanning** |
+| `.container_scan.vulnerabilities` | Vuln counts by severity |
+| `.container_scan.summary` | Summary booleans (`has_critical`, `has_high`) |
+| **`.observability`** | **Monitoring, logging, tracing configuration** |
+| `.observability.logging` | Logging config (`configured`, `structured`) |
+| `.observability.metrics` | Metrics config (`configured`, `endpoint`, `golden_signals`) |
+| `.observability.metrics.golden_signals` | Four signals (`latency`, `traffic`, `errors`, `saturation`) |
+| `.observability.dashboard` | Dashboard info (`exists`, `url`) |
+| `.observability.alerts` | Alert config (`configured`, `count`) |
+| `.observability.summary` | Aggregated checks (`golden_signals_complete`, `has_dashboard`) |
+| **`.oncall`** | **On-call, incident management, runbooks** |
+| `.oncall.schedule` | Schedule info (`exists`, `participants`, `rotation`) |
+| `.oncall.escalation` | Escalation info (`exists`, `levels`) |
+| `.oncall.runbook` | Runbook info (`exists`, `path`, `url`) |
+| `.oncall.sla` | SLA info (`defined`, `response_minutes`, `uptime_percentage`) |
+| **`.compliance`** | **Compliance regime data** |
+| `.compliance.regimes` | List of applicable regimes (e.g., `["soc2", "pci-dss"]`) |
+| `.compliance.data_classification` | Data classification (`level`, `contains_pii`, `contains_pci`) |
+| `.compliance.controls` | Control status (`access_reviews`, `audit_logging`, `encryption_at_rest`) |
+| **`.api`** | **API specifications and documentation** |
+| `.api.specs[]` | API spec files (`type`, `path`, `valid`, `version`) |
+| **`.lang.<language>`** | **Language-specific data (Go, Rust, Java, etc.)** — see [Language-Specific Data](component-json-conventions.md#language-specific-data) |
+| `.lang.<language>.version` | Language/runtime version (e.g., `"17"` for Java, `"1.21"` for Go) |
+| `.lang.<language>.build_system` | Build tool name (`maven`, `gradle`, `cargo`, etc.) |
+| `.lang.<language>.dependencies` | Dependency counts (`direct`, `transitive`) |
+| `.lang.<language>.native.<tool>` | Build-system specific data (e.g., `.lang.java.native.gradle`) |
+| `.lang.go.module` | Go module path |
+| `.lang.go.golangci_lint` | golangci-lint findings |
+| `.lang.java.group_id` | Maven/Gradle group ID |
+| `.lang.java.artifact_id` | Maven/Gradle artifact ID |
+| `.lang.java.spotbugs` | SpotBugs findings by severity |
+| `.lang.rust.unsafe_blocks` | Unsafe block count/locations |
+| `.lang.rust.edition` | Rust edition (`2021`, `2024`) |
 
 ---
 
