@@ -8,7 +8,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Tests Run in Pipeline
 
-* **Tests are executed in CI pipeline**: All components must have tests that run automatically in the CI/CD pipeline for every code change.
+* `test-executed-in-ci` **Tests are executed in CI pipeline**: All components must have tests that run automatically in the CI/CD pipeline for every code change.
   * Collector(s): Detect test execution in CI pipeline by parsing CI configuration files and/or instrumenting CI jobs to capture test runner invocations
   * Component JSON:
     * `.testing.executed` - Boolean indicating tests were run in CI
@@ -17,7 +17,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that tests were executed in CI
   * Configuration: None
 
-* **Tests pass on the default branch**: The default branch must have passing tests at all times.
+* `test-pass-default-branch` **Tests pass on the default branch**: The default branch must have passing tests at all times.
   * Collector(s): Query CI system for latest test results on default branch, or capture test results from CI pipeline runs
   * Component JSON:
     * `.testing.all_passing` - Boolean indicating all tests pass
@@ -26,7 +26,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that all tests pass on the default branch
   * Configuration: None
 
-* **Test results are captured and reported**: Test execution must produce machine-readable results (JUnit XML, JSON) that are collected and stored.
+* `test-results-captured` **Test results are captured and reported**: Test execution must produce machine-readable results (JUnit XML, JSON) that are collected and stored.
   * Collector(s): Detect test result artifacts in CI pipeline outputs or configured artifact locations
   * Component JSON:
     * `.testing.results_captured` - Boolean indicating results were captured
@@ -35,7 +35,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that test results are captured in a standard format
   * Configuration: Accepted result formats (default: ["junit", "json"])
 
-* **Tests run on pull requests**: Tests must be executed on every pull request before merge.
+* `test-run-on-pr` **Tests run on pull requests**: Tests must be executed on every pull request before merge.
   * Collector(s): Check CI configuration for PR triggers and verify test execution in PR context
   * Component JSON:
     * `.ci.pr_tests_enabled` - Boolean indicating tests run on PRs
@@ -43,7 +43,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that test execution is required for PRs
   * Configuration: None
 
-* **Tests run against deployed version**: After deployment, tests should run against the deployed service to verify successful rollout.
+* `test-post-deployment` **Tests run against deployed version**: After deployment, tests should run against the deployed service to verify successful rollout.
   * Collector(s): Detect post-deployment test execution in CD pipeline or deployment hooks
   * Component JSON:
     * `.testing.post_deployment.executed` - Boolean for post-deploy tests
@@ -54,7 +54,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Execution Performance
 
-* **Test suite completes within time limit**: The full test suite should complete within a reasonable time to maintain fast feedback loops.
+* `test-suite-time-limit` **Test suite completes within time limit**: The full test suite should complete within a reasonable time to maintain fast feedback loops.
   * Collector(s): Capture test execution duration from CI pipeline or test runner output
   * Component JSON:
     * `.testing.duration_seconds` - Total test execution time in seconds
@@ -62,7 +62,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that test execution time is within the configured limit
   * Configuration: Maximum test duration in seconds (default: 600 for unit tests, 1800 for integration tests)
 
-* **Individual test execution is fast**: Each individual test case should complete quickly to prevent slow test suites.
+* `test-individual-fast` **Individual test execution is fast**: Each individual test case should complete quickly to prevent slow test suites.
   * Collector(s): Parse test results for individual test execution times
   * Component JSON:
     * `.testing.slow_tests` - Array of tests exceeding time threshold
@@ -71,7 +71,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that no individual test exceeds the configured time limit
   * Configuration: Maximum individual test duration (default: 30 seconds for unit tests)
 
-* **Test parallelization is enabled**: Test suites should run in parallel where possible to minimize execution time.
+* `test-parallelization-enabled` **Test parallelization is enabled**: Test suites should run in parallel where possible to minimize execution time.
   * Collector(s): Analyze test runner configuration and CI pipeline for parallelization settings
   * Component JSON:
     * `.testing.parallelization.enabled` - Boolean for parallel execution
@@ -86,7 +86,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Existence
 
-* **Unit tests exist for the codebase**: Every codebase must have unit tests covering business logic.
+* `test-unit-tests-exist` **Unit tests exist for the codebase**: Every codebase must have unit tests covering business logic.
   * Collector(s): Scan repository for test files matching language-specific patterns (test_*.py, *_test.go, *.test.js, *Test.java)
   * Component JSON:
     * `.testing.unit_tests.exist` - Boolean indicating unit tests are present
@@ -95,7 +95,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that unit tests exist
   * Configuration: None
 
-* **Test-to-source ratio is adequate**: The number of test files should be proportional to source files.
+* `test-to-source-ratio` **Test-to-source ratio is adequate**: The number of test files should be proportional to source files.
   * Collector(s): Count test files and source files, calculate ratio
   * Component JSON:
     * `.testing.unit_tests.file_count` - Number of test files
@@ -106,7 +106,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Code Coverage
 
-* **Code coverage is measured**: Test execution must produce code coverage metrics.
+* `test-coverage-measured` **Code coverage is measured**: Test execution must produce code coverage metrics.
   * Collector(s): Detect coverage tool execution in CI and collect coverage reports (language-specific: go tool cover, coverage.py, nyc/istanbul, jacoco)
   * Component JSON:
     * `.testing.coverage` - Coverage data object (presence indicates coverage is measured)
@@ -115,7 +115,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that code coverage is collected
   * Configuration: None
 
-* **Overall code coverage meets minimum threshold**: The codebase must achieve a minimum percentage of code coverage.
+* `test-coverage-minimum-threshold` **Overall code coverage meets minimum threshold**: The codebase must achieve a minimum percentage of code coverage.
   * Collector(s): Parse coverage reports and extract overall coverage percentage (language-specific collectors)
   * Component JSON:
     * `.testing.coverage.percentage` - Overall coverage percentage
@@ -124,7 +124,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that coverage percentage meets or exceeds the threshold
   * Configuration: Minimum coverage percentage (default: 80%)
 
-* **Line coverage meets minimum threshold**: Specifically, line coverage must meet organizational standards.
+* `test-line-coverage-threshold` **Line coverage meets minimum threshold**: Specifically, line coverage must meet organizational standards.
   * Collector(s): Extract line coverage from coverage reports
   * Component JSON:
     * `.testing.coverage.lines.covered` - Number of covered lines
@@ -133,7 +133,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that line coverage meets minimum threshold
   * Configuration: Minimum line coverage percentage (default: 80%)
 
-* **Branch coverage meets minimum threshold**: Branch/decision coverage should meet organizational standards for thorough testing.
+* `test-branch-coverage-threshold` **Branch coverage meets minimum threshold**: Branch/decision coverage should meet organizational standards for thorough testing.
   * Collector(s): Extract branch coverage from coverage reports (not all tools support this)
   * Component JSON:
     * `.testing.coverage.branches.covered` - Number of covered branches
@@ -142,7 +142,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that branch coverage meets minimum threshold
   * Configuration: Minimum branch coverage percentage (default: 70%)
 
-* **Coverage does not decrease**: Code coverage should not regress between commits or releases.
+* `test-coverage-no-decrease` **Coverage does not decrease**: Code coverage should not regress between commits or releases.
   * Collector(s): Compare current coverage with previous coverage from stored history or baseline
   * Component JSON:
     * `.testing.coverage.percentage` - Current coverage
@@ -151,7 +151,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that coverage delta is not negative (or within acceptable margin)
   * Configuration: Allowed coverage decrease margin (default: 0, no decrease allowed)
 
-* **Critical paths have higher coverage**: Core business logic modules must have higher coverage than the overall threshold.
+* `test-critical-path-coverage` **Critical paths have higher coverage**: Core business logic modules must have higher coverage than the overall threshold.
   * Collector(s): Parse coverage reports with per-file/package breakdown, filter by critical path patterns
   * Component JSON:
     * `.testing.coverage.files` - Array of per-file coverage data
@@ -160,7 +160,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that critical path modules meet elevated coverage threshold
   * Configuration: Critical path patterns (e.g., ["src/core/", "lib/payments/"]), elevated threshold (default: 90%)
 
-* **No files with zero coverage**: All source files should have at least some test coverage.
+* `test-no-zero-coverage-files` **No files with zero coverage**: All source files should have at least some test coverage.
   * Collector(s): Parse coverage reports and identify files with 0% coverage
   * Component JSON:
     * `.testing.coverage.files` - Array of per-file coverage
@@ -169,7 +169,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that no source files have zero coverage
   * Configuration: Excluded file patterns (e.g., generated files, migrations)
 
-* **New code has coverage**: Code added in a PR should have test coverage, not just the overall codebase.
+* `test-new-code-coverage` **New code has coverage**: Code added in a PR should have test coverage, not just the overall codebase.
   * Collector(s): Compare coverage report with PR diff to calculate coverage of changed lines
   * Component JSON:
     * `.testing.coverage.new_code_percentage` - Coverage of lines added in PR
@@ -180,7 +180,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Organization
 
-* **Test files follow naming conventions**: Test files must follow language-specific naming conventions for discoverability.
+* `test-file-naming-convention` **Test files follow naming conventions**: Test files must follow language-specific naming conventions for discoverability.
   * Collector(s): Scan for test files and validate naming against language conventions
   * Component JSON:
     * `.testing.unit_tests.files` - Array of test file paths
@@ -189,7 +189,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that all test files follow naming conventions
   * Configuration: Naming patterns per language (e.g., Python: "test_*.py", Go: "*_test.go")
 
-* **Tests are co-located or in standard directories**: Tests should be organized in predictable locations (co-located with source or in test directories).
+* `test-organization` **Tests are co-located or in standard directories**: Tests should be organized in predictable locations (co-located with source or in test directories).
   * Collector(s): Analyze test file locations and compare to source structure
   * Component JSON:
     * `.testing.unit_tests.organization` - Test organization pattern (colocated, separate, mixed)
@@ -197,7 +197,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that tests follow approved organization pattern
   * Configuration: Allowed organization patterns (default: ["colocated", "tests/", "test/", "__tests__/"])
 
-* **Test files do not contain production code**: Test files should only contain test code, not business logic that gets imported by production code.
+* `test-no-production-code` **Test files do not contain production code**: Test files should only contain test code, not business logic that gets imported by production code.
   * Collector(s): Analyze imports in source code to detect imports from test files
   * Component JSON:
     * `.testing.unit_tests.imported_by_source` - Array of test files imported by source
@@ -211,7 +211,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Integration Test Existence
 
-* **Integration tests exist for services**: Services (especially API services) must have integration tests.
+* `test-integration-exists` **Integration tests exist for services**: Services (especially API services) must have integration tests.
   * Collector(s): Scan for integration test files in standard locations (integration/, e2e/, or files matching *_integration_test.*, *_e2e_test.*)
   * Component JSON:
     * `.testing.integration_tests.exist` - Boolean indicating integration tests present
@@ -220,7 +220,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that integration tests exist for service-type components
   * Configuration: Tags requiring integration tests (e.g., ["service", "api", "backend"])
 
-* **Integration tests run in CI**: Integration tests must be executed as part of the CI pipeline.
+* `test-integration-in-ci` **Integration tests run in CI**: Integration tests must be executed as part of the CI pipeline.
   * Collector(s): Detect integration test execution in CI configuration or pipeline runs
   * Component JSON:
     * `.testing.integration_tests.executed_in_ci` - Boolean for CI execution
@@ -228,7 +228,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that integration tests are executed in CI
   * Configuration: None
 
-* **API endpoints have integration test coverage**: All API endpoints should have at least one integration test.
+* `test-api-endpoint-coverage` **API endpoints have integration test coverage**: All API endpoints should have at least one integration test.
   * Collector(s): Extract API endpoints from OpenAPI spec or route definitions, cross-reference with integration tests
   * Component JSON:
     * `.api.endpoints` - Array of API endpoints
@@ -239,7 +239,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Contract Testing
 
-* **Consumer contract tests exist**: Services consuming APIs should have contract tests to verify API compatibility.
+* `test-contract-tests-exist` **Consumer contract tests exist**: Services consuming APIs should have contract tests to verify API compatibility.
   * Collector(s): Scan for contract test files (Pact, Spring Cloud Contract, etc.)
   * Component JSON:
     * `.testing.contract_tests.exist` - Boolean for contract tests presence
@@ -248,7 +248,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that contract tests exist for services with declared dependencies
   * Configuration: Tags requiring contract tests
 
-* **Provider contract verification runs**: API providers must verify contracts from consumers.
+* `test-contract-provider-verified` **Provider contract verification runs**: API providers must verify contracts from consumers.
   * Collector(s): Detect contract verification step in CI or contract broker integration
   * Component JSON:
     * `.testing.contract_tests.provider_verified` - Boolean for provider verification
@@ -257,7 +257,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that provider verification is enabled and passing
   * Configuration: None
 
-* **Contract tests are published to broker**: Contract test results should be published to a central broker for visibility.
+* `test-contract-published` **Contract tests are published to broker**: Contract test results should be published to a central broker for visibility.
   * Collector(s): Check for contract broker publishing step in CI or broker API query
   * Component JSON:
     * `.testing.contract_tests.published` - Boolean for publication to broker
@@ -267,7 +267,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### End-to-End Testing
 
-* **End-to-end tests exist for critical user journeys**: Critical user-facing services must have E2E tests covering key user journeys.
+* `test-e2e-exists` **End-to-end tests exist for critical user journeys**: Critical user-facing services must have E2E tests covering key user journeys.
   * Collector(s): Scan for E2E test files (Cypress, Playwright, Selenium patterns)
   * Component JSON:
     * `.testing.e2e_tests.exist` - Boolean for E2E tests presence
@@ -276,7 +276,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that E2E tests exist for user-facing services
   * Configuration: Tags requiring E2E tests (e.g., ["frontend", "user-facing", "web"])
 
-* **E2E tests cover critical user journeys**: E2E tests should cover documented critical paths.
+* `test-e2e-journey-coverage` **E2E tests cover critical user journeys**: E2E tests should cover documented critical paths.
   * Collector(s): Cross-reference E2E test names/descriptions with documented user journeys
   * Component JSON:
     * `.testing.e2e_tests.journeys_documented` - Array of documented critical journeys
@@ -285,7 +285,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that all documented critical journeys have E2E tests
   * Configuration: Journey documentation location
 
-* **E2E tests run in staging before production deployment**: E2E tests must pass against staging before production release.
+* `test-e2e-staging-gate` **E2E tests run in staging before production deployment**: E2E tests must pass against staging before production release.
   * Collector(s): Check deployment pipeline for E2E test gate on staging
   * Component JSON:
     * `.testing.e2e_tests.staging_execution` - Boolean for staging test execution
@@ -300,7 +300,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Performance Test Existence
 
-* **Performance tests exist**: Production services must have performance tests to validate behavior under load.
+* `test-performance-exists` **Performance tests exist**: Production services must have performance tests to validate behavior under load.
   * Collector(s): Scan for performance test files (k6, Gatling, JMeter, Locust patterns)
   * Component JSON:
     * `.testing.performance_tests.exist` - Boolean for performance tests presence
@@ -309,7 +309,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that performance tests exist for production services
   * Configuration: Tags requiring performance tests (e.g., ["production", "tier1", "tier2"])
 
-* **Performance tests run regularly**: Performance tests should run on a schedule, not just ad-hoc.
+* `test-performance-scheduled` **Performance tests run regularly**: Performance tests should run on a schedule, not just ad-hoc.
   * Collector(s): Check CI configuration for scheduled performance test jobs
   * Component JSON:
     * `.testing.performance_tests.scheduled` - Boolean for scheduled execution
@@ -318,7 +318,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that performance tests are scheduled to run regularly
   * Configuration: Minimum frequency (default: weekly)
 
-* **Performance test results are stored**: Performance test results should be stored for trend analysis.
+* `test-performance-results-stored` **Performance test results are stored**: Performance test results should be stored for trend analysis.
   * Collector(s): Check for performance result storage (Grafana, dedicated performance platform)
   * Component JSON:
     * `.testing.performance_tests.results_stored` - Boolean for result storage
@@ -328,7 +328,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Load Testing
 
-* **Load tests simulate production traffic patterns**: Load tests should use realistic traffic patterns based on production data.
+* `test-load-realistic-traffic` **Load tests simulate production traffic patterns**: Load tests should use realistic traffic patterns based on production data.
   * Collector(s): Analyze load test configuration for traffic modeling
   * Component JSON:
     * `.testing.load_tests.exist` - Boolean for load tests presence
@@ -337,7 +337,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that load tests use realistic traffic patterns
   * Configuration: Tags requiring realistic traffic models
 
-* **Load test thresholds are defined**: Load tests must have pass/fail thresholds for key metrics.
+* `test-load-thresholds-defined` **Load test thresholds are defined**: Load tests must have pass/fail thresholds for key metrics.
   * Collector(s): Parse load test configuration for threshold definitions
   * Component JSON:
     * `.testing.load_tests.thresholds_defined` - Boolean for threshold presence
@@ -345,7 +345,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that load test thresholds are defined
   * Configuration: Required threshold metrics (default: ["response_time_p95", "error_rate"])
 
-* **Load tests achieve performance SLOs**: Load test results should demonstrate the service meets its SLOs.
+* `test-load-meets-slos` **Load tests achieve performance SLOs**: Load test results should demonstrate the service meets its SLOs.
   * Collector(s): Parse load test results and compare against SLO definitions
   * Component JSON:
     * `.testing.load_tests.slo_validation` - Boolean for SLO validation
@@ -356,7 +356,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Benchmark Testing
 
-* **Benchmark tests exist for critical operations**: Performance-critical code should have micro-benchmarks.
+* `test-benchmarks-exist` **Benchmark tests exist for critical operations**: Performance-critical code should have micro-benchmarks.
   * Collector(s): Scan for benchmark test files (language-specific: go test -bench, pytest-benchmark, JMH)
   * Component JSON:
     * `.testing.benchmarks.exist` - Boolean for benchmark presence
@@ -365,7 +365,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that benchmarks exist for performance-critical components
   * Configuration: Tags requiring benchmarks (e.g., ["performance-critical", "core-library"])
 
-* **Benchmark results are tracked over time**: Benchmark results should be stored for regression detection.
+* `test-benchmarks-tracked` **Benchmark results are tracked over time**: Benchmark results should be stored for regression detection.
   * Collector(s): Check for benchmark result storage and tracking configuration
   * Component JSON:
     * `.testing.benchmarks.tracked` - Boolean for tracking enabled
@@ -373,7 +373,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that benchmark results are tracked
   * Configuration: None
 
-* **No performance regressions in benchmarks**: Benchmark results should not show significant regressions.
+* `test-no-benchmark-regressions` **No performance regressions in benchmarks**: Benchmark results should not show significant regressions.
   * Collector(s): Compare current benchmark results with historical baseline
   * Component JSON:
     * `.testing.benchmarks.regression_detected` - Boolean for regression presence
@@ -388,7 +388,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Flaky Test Detection
 
-* **Flaky tests are tracked**: The system must track and identify flaky tests that have inconsistent results.
+* `test-flaky-tracked` **Flaky tests are tracked**: The system must track and identify flaky tests that have inconsistent results.
   * Collector(s): Analyze test execution history to detect tests with intermittent failures
   * Component JSON:
     * `.testing.flaky_tests.tracking_enabled` - Boolean for flaky test tracking
@@ -397,7 +397,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that flaky test tracking is enabled
   * Configuration: None
 
-* **Flaky test count is within limits**: The number of known flaky tests should not exceed acceptable thresholds.
+* `test-flaky-within-limits` **Flaky test count is within limits**: The number of known flaky tests should not exceed acceptable thresholds.
   * Collector(s): Query test tracking system for current flaky test count
   * Component JSON:
     * `.testing.flaky_tests.count` - Number of flaky tests
@@ -405,7 +405,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that flaky test count/percentage is within limits
   * Configuration: Maximum flaky tests (default: 5), maximum flaky percentage (default: 1%)
 
-* **No new flaky tests introduced**: PRs should not introduce new flaky tests.
+* `test-no-new-flaky` **No new flaky tests introduced**: PRs should not introduce new flaky tests.
   * Collector(s): Compare flaky test list before and after PR changes
   * Component JSON:
     * `.testing.flaky_tests.new_in_pr` - Array of new flaky tests in PR
@@ -413,7 +413,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that no new flaky tests are introduced
   * Configuration: None
 
-* **Flaky tests are quarantined**: Known flaky tests should be quarantined and tracked separately.
+* `test-flaky-quarantined` **Flaky tests are quarantined**: Known flaky tests should be quarantined and tracked separately.
   * Collector(s): Check test configuration for quarantine annotations or skip markers
   * Component JSON:
     * `.testing.flaky_tests.quarantined` - Array of quarantined tests
@@ -423,7 +423,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Independence
 
-* **Tests do not depend on execution order**: Tests should be able to run in any order without failures.
+* `test-order-independent` **Tests do not depend on execution order**: Tests should be able to run in any order without failures.
   * Collector(s): Run tests in random order and detect order-dependent failures
   * Component JSON:
     * `.testing.quality.random_order_tested` - Boolean for random order testing
@@ -432,7 +432,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that tests pass when run in random order
   * Configuration: None
 
-* **Tests do not share mutable state**: Tests should not rely on or modify shared mutable state.
+* `test-no-shared-state` **Tests do not share mutable state**: Tests should not rely on or modify shared mutable state.
   * Collector(s): Static analysis for shared state patterns, or detection via parallel test failures
   * Component JSON:
     * `.testing.quality.shared_state_detected` - Boolean for shared state detection
@@ -440,7 +440,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that no shared mutable state is detected in tests
   * Configuration: None
 
-* **Tests clean up after themselves**: Tests that create resources should clean them up after execution.
+* `test-cleanup` **Tests clean up after themselves**: Tests that create resources should clean them up after execution.
   * Collector(s): Static analysis for cleanup patterns, or runtime detection of resource leaks
   * Component JSON:
     * `.testing.quality.cleanup_verified` - Boolean for cleanup verification
@@ -450,7 +450,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Assertions
 
-* **Tests have meaningful assertions**: Tests must contain actual assertions, not just run code without verification.
+* `test-meaningful-assertions` **Tests have meaningful assertions**: Tests must contain actual assertions, not just run code without verification.
   * Collector(s): Static analysis to detect tests without assertion statements
   * Component JSON:
     * `.testing.quality.tests_without_assertions` - Array of tests missing assertions
@@ -459,7 +459,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that all tests have at least one assertion
   * Configuration: Minimum assertions per test (default: 1)
 
-* **Tests verify expected failures**: Error paths should be tested with expected exception assertions.
+* `test-error-path-tested` **Tests verify expected failures**: Error paths should be tested with expected exception assertions.
   * Collector(s): Analyze test code for exception/error testing patterns
   * Component JSON:
     * `.testing.quality.error_tests_exist` - Boolean for error path testing
@@ -467,7 +467,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that error path testing exists
   * Configuration: None
 
-* **Tests do not suppress exceptions**: Tests should not catch and ignore exceptions that could hide failures.
+* `test-no-exception-suppression` **Tests do not suppress exceptions**: Tests should not catch and ignore exceptions that could hide failures.
   * Collector(s): Static analysis to detect try-catch blocks in tests without assertions
   * Component JSON:
     * `.testing.quality.exception_suppression` - Array of tests suppressing exceptions
@@ -481,7 +481,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Approved Frameworks
 
-* **Tests use approved testing framework**: Tests must use organization-approved testing frameworks.
+* `test-approved-framework` **Tests use approved testing framework**: Tests must use organization-approved testing frameworks.
   * Collector(s): Detect testing framework from configuration files and import statements (language-specific)
   * Component JSON:
     * `.testing.framework` - Primary testing framework detected
@@ -490,7 +490,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that the testing framework is from the approved list
   * Configuration: Approved frameworks per language (e.g., Python: ["pytest"], Go: ["testing"], JS: ["jest", "vitest"])
 
-* **Mock/stub library is from approved list**: Mocking libraries should be standardized across the organization.
+* `test-approved-mocking-library` **Mock/stub library is from approved list**: Mocking libraries should be standardized across the organization.
   * Collector(s): Detect mocking library from imports and configuration
   * Component JSON:
     * `.testing.mocking_library` - Mocking library detected
@@ -498,7 +498,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that mocking library is from approved list
   * Configuration: Approved mocking libraries per language
 
-* **Coverage tool is configured correctly**: Coverage collection should use the standard tool with proper configuration.
+* `test-coverage-tool-configured` **Coverage tool is configured correctly**: Coverage collection should use the standard tool with proper configuration.
   * Collector(s): Parse coverage tool configuration files
   * Component JSON:
     * `.testing.coverage.source.tool` - Coverage tool used
@@ -509,7 +509,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Configuration
 
-* **Test configuration exists**: A proper test configuration file should exist for the testing framework.
+* `test-config-exists` **Test configuration exists**: A proper test configuration file should exist for the testing framework.
   * Collector(s): Check for test configuration files (pytest.ini, jest.config.js, etc.)
   * Component JSON:
     * `.testing.config_file_exists` - Boolean for configuration presence
@@ -517,7 +517,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that test configuration file exists
   * Configuration: None
 
-* **Test timeouts are configured**: Global test timeout should be configured to prevent hanging tests.
+* `test-timeouts-configured` **Test timeouts are configured**: Global test timeout should be configured to prevent hanging tests.
   * Collector(s): Parse test configuration for timeout settings
   * Component JSON:
     * `.testing.timeout_configured` - Boolean for timeout configuration
@@ -525,7 +525,7 @@ This document specifies possible policies for the **Testing and Quality** catego
   * Policy: Assert that test timeout is configured
   * Configuration: Maximum allowed timeout (default: 60 seconds)
 
-* **Test retries are limited**: Automatic test retries should be limited to prevent masking flaky tests.
+* `test-retries-limited` **Test retries are limited**: Automatic test retries should be limited to prevent masking flaky tests.
   * Collector(s): Parse test configuration for retry settings
   * Component JSON:
     * `.testing.retry_configured` - Boolean for retry configuration

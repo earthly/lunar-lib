@@ -8,7 +8,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Resource Management
 
-* **Containers define CPU and memory requests**: All containers in Kubernetes workloads must specify CPU and memory resource requests for proper scheduling.
+* `k8s-container-has-cpu-memory-requests` **Containers define CPU and memory requests**: All containers in Kubernetes workloads must specify CPU and memory resource requests for proper scheduling.
   * Collector(s): Parse Kubernetes manifests (Deployments, StatefulSets, DaemonSets, Jobs) and extract container resource specifications
   * Component JSON:
     * `.k8s.workloads[].containers[].has_requests` - Boolean indicating resource requests are defined
@@ -18,7 +18,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers have CPU and memory requests defined
   * Configuration: None
 
-* **Containers define CPU and memory limits**: All containers must specify CPU and memory limits to prevent resource exhaustion.
+* `k8s-container-has-cpu-memory-limits` **Containers define CPU and memory limits**: All containers must specify CPU and memory limits to prevent resource exhaustion.
   * Collector(s): Parse Kubernetes manifests and extract container resource limits
   * Component JSON:
     * `.k8s.workloads[].containers[].has_limits` - Boolean indicating resource limits are defined
@@ -28,7 +28,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers have CPU and memory limits defined
   * Configuration: None
 
-* **Resource requests and limits are within acceptable range**: Resource specifications should not be excessively high or impractically low.
+* `k8s-resources-within-range` **Resource requests and limits are within acceptable range**: Resource specifications should not be excessively high or impractically low.
   * Collector(s): Parse resource values and convert to normalized units for comparison
   * Component JSON:
     * `.k8s.workloads[].containers[].cpu_request` - CPU request value
@@ -38,7 +38,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that resource values fall within configured minimum and maximum ranges
   * Configuration: Min/max CPU requests (default: 10m-4), min/max memory requests (default: 32Mi-8Gi)
 
-* **CPU limit-to-request ratio is reasonable**: The ratio between CPU limits and requests should not be excessive to prevent resource contention.
+* `k8s-cpu-limit-request-ratio` **CPU limit-to-request ratio is reasonable**: The ratio between CPU limits and requests should not be excessive to prevent resource contention.
   * Collector(s): Calculate ratio between CPU limit and request for each container
   * Component JSON:
     * `.k8s.workloads[].containers[].cpu_limit_request_ratio` - Ratio of limit to request
@@ -47,7 +47,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### High Availability
 
-* **Deployments have minimum replica count**: Production workloads must have a minimum number of replicas for high availability.
+* `k8s-minimum-replica-count` **Deployments have minimum replica count**: Production workloads must have a minimum number of replicas for high availability.
   * Collector(s): Parse Kubernetes Deployments and StatefulSets for replica count
   * Component JSON:
     * `.k8s.workloads[].replicas` - Configured replica count
@@ -56,7 +56,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that replica count meets or exceeds the configured minimum for production workloads
   * Configuration: Minimum replicas (default: 3), tags requiring minimum replicas (e.g., ["production", "tier1"])
 
-* **Pod Disruption Budget exists for workloads**: Production workloads must have a PodDisruptionBudget to ensure availability during node maintenance.
+* `k8s-pdb-exists` **Pod Disruption Budget exists for workloads**: Production workloads must have a PodDisruptionBudget to ensure availability during node maintenance.
   * Collector(s): Parse Kubernetes manifests for PDBs and correlate with workloads by label selectors
   * Component JSON:
     * `.k8s.pdbs[]` - Array of PodDisruptionBudget configurations
@@ -67,7 +67,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all production workloads have an associated PodDisruptionBudget
   * Configuration: Tags requiring PDB (e.g., ["production", "tier1", "tier2"])
 
-* **Pod Disruption Budget has appropriate settings**: PDB minimum availability should ensure at least one pod remains during disruptions.
+* `k8s-pdb-appropriate-settings` **Pod Disruption Budget has appropriate settings**: PDB minimum availability should ensure at least one pod remains during disruptions.
   * Collector(s): Parse PDB specifications and validate settings
   * Component JSON:
     * `.k8s.pdbs[].min_available` - Minimum available pods (absolute or percentage)
@@ -75,7 +75,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that PDB allows at least one pod to remain available
   * Configuration: Minimum availability threshold (default: 1 or 50%)
 
-* **Horizontal Pod Autoscaler is configured**: Production workloads should have HPA for automatic scaling based on load.
+* `k8s-hpa-configured` **Horizontal Pod Autoscaler is configured**: Production workloads should have HPA for automatic scaling based on load.
   * Collector(s): Parse Kubernetes manifests for HPAs and correlate with workloads
   * Component JSON:
     * `.k8s.hpas[]` - Array of HPA configurations
@@ -86,7 +86,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that production workloads have an associated HPA
   * Configuration: Tags requiring HPA (e.g., ["production", "auto-scaling"])
 
-* **HPA minimum replicas meet availability requirements**: HPA minReplicas should not be set below the high availability threshold.
+* `k8s-hpa-min-replicas` **HPA minimum replicas meet availability requirements**: HPA minReplicas should not be set below the high availability threshold.
   * Collector(s): Parse HPA specifications for minimum replica settings
   * Component JSON:
     * `.k8s.hpas[].min_replicas` - HPA minimum replicas
@@ -96,7 +96,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Health Probes
 
-* **Containers have liveness probes configured**: All containers must have liveness probes to detect and recover from stuck processes.
+* `k8s-container-has-liveness-probe` **Containers have liveness probes configured**: All containers must have liveness probes to detect and recover from stuck processes.
   * Collector(s): Parse Kubernetes manifests for container liveness probe configurations
   * Component JSON:
     * `.k8s.workloads[].containers[].has_liveness_probe` - Boolean indicating liveness probe is defined
@@ -105,7 +105,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers have liveness probes defined
   * Configuration: None
 
-* **Containers have readiness probes configured**: All containers must have readiness probes to ensure traffic is only sent to ready pods.
+* `k8s-container-has-readiness-probe` **Containers have readiness probes configured**: All containers must have readiness probes to ensure traffic is only sent to ready pods.
   * Collector(s): Parse Kubernetes manifests for container readiness probe configurations
   * Component JSON:
     * `.k8s.workloads[].containers[].has_readiness_probe` - Boolean indicating readiness probe is defined
@@ -114,7 +114,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers have readiness probes defined
   * Configuration: None
 
-* **Containers have startup probes for slow-starting applications**: Applications with long initialization times should use startup probes to prevent premature kills.
+* `k8s-container-has-startup-probe` **Containers have startup probes for slow-starting applications**: Applications with long initialization times should use startup probes to prevent premature kills.
   * Collector(s): Parse Kubernetes manifests for startup probe configurations
   * Component JSON:
     * `.k8s.workloads[].containers[].has_startup_probe` - Boolean indicating startup probe is defined
@@ -122,7 +122,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that containers tagged for slow startup have startup probes
   * Configuration: Tags requiring startup probes (e.g., ["slow-start", "jvm", "heavy-init"])
 
-* **Probe initial delay is appropriately configured**: Probe initialDelaySeconds should allow sufficient time for application startup.
+* `k8s-probe-initial-delay-configured` **Probe initial delay is appropriately configured**: Probe initialDelaySeconds should allow sufficient time for application startup.
   * Collector(s): Extract probe timing configuration from manifests
   * Component JSON:
     * `.k8s.workloads[].containers[].liveness_probe.initial_delay_seconds` - Liveness probe delay
@@ -132,7 +132,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Container Security
 
-* **Containers run as non-root user**: Containers must not run as the root user to minimize security risk.
+* `k8s-container-non-root` **Containers run as non-root user**: Containers must not run as the root user to minimize security risk.
   * Collector(s): Parse Kubernetes manifests for securityContext settings at pod and container level
   * Component JSON:
     * `.k8s.workloads[].containers[].runs_as_non_root` - Boolean indicating non-root execution
@@ -141,7 +141,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers run as non-root
   * Configuration: None
 
-* **Containers have read-only root filesystem**: Containers should use read-only root filesystem to prevent runtime modifications.
+* `k8s-container-read-only-root-fs` **Containers have read-only root filesystem**: Containers should use read-only root filesystem to prevent runtime modifications.
   * Collector(s): Parse securityContext for readOnlyRootFilesystem setting
   * Component JSON:
     * `.k8s.workloads[].containers[].read_only_root_fs` - Boolean indicating read-only filesystem
@@ -149,7 +149,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all containers have read-only root filesystem enabled
   * Configuration: Exclusion patterns for containers that legitimately need write access
 
-* **Containers do not run in privileged mode**: Containers must not be granted privileged mode as it provides full host access.
+* `k8s-container-no-privileged` **Containers do not run in privileged mode**: Containers must not be granted privileged mode as it provides full host access.
   * Collector(s): Parse securityContext for privileged setting
   * Component JSON:
     * `.k8s.workloads[].containers[].privileged` - Boolean indicating privileged mode
@@ -157,7 +157,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no containers run in privileged mode
   * Configuration: None
 
-* **Containers do not allow privilege escalation**: Containers must have allowPrivilegeEscalation set to false.
+* `k8s-container-no-privilege-escalation` **Containers do not allow privilege escalation**: Containers must have allowPrivilegeEscalation set to false.
   * Collector(s): Parse securityContext for allowPrivilegeEscalation setting
   * Component JSON:
     * `.k8s.workloads[].containers[].allow_privilege_escalation` - Boolean for privilege escalation
@@ -165,7 +165,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no containers allow privilege escalation
   * Configuration: None
 
-* **Containers drop all capabilities**: Containers should drop all Linux capabilities and add only required ones explicitly.
+* `k8s-container-drops-all-capabilities` **Containers drop all capabilities**: Containers should drop all Linux capabilities and add only required ones explicitly.
   * Collector(s): Parse securityContext for capabilities configuration
   * Component JSON:
     * `.k8s.workloads[].containers[].capabilities_dropped` - Array of dropped capabilities
@@ -174,7 +174,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that containers drop ALL capabilities
   * Configuration: Allowed capabilities to add back if needed
 
-* **Containers do not add dangerous capabilities**: Containers must not add dangerous Linux capabilities like NET_ADMIN, SYS_ADMIN.
+* `k8s-container-no-dangerous-capabilities` **Containers do not add dangerous capabilities**: Containers must not add dangerous Linux capabilities like NET_ADMIN, SYS_ADMIN.
   * Collector(s): Parse securityContext for added capabilities
   * Component JSON:
     * `.k8s.workloads[].containers[].capabilities_added` - Array of added capabilities
@@ -182,7 +182,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no dangerous capabilities are added
   * Configuration: List of forbidden capabilities (default: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE", "ALL"])
 
-* **Pod security context enforces security standards**: Pod-level securityContext should enforce runAsNonRoot and fsGroup settings.
+* `k8s-pod-security-context` **Pod security context enforces security standards**: Pod-level securityContext should enforce runAsNonRoot and fsGroup settings.
   * Collector(s): Parse pod-level securityContext from workload specifications
   * Component JSON:
     * `.k8s.workloads[].pod_security_context.run_as_non_root` - Pod-level non-root setting
@@ -191,7 +191,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that pod security context enforces expected security controls
   * Configuration: Required pod security context settings
 
-* **Containers use seccomp profiles**: Containers should use RuntimeDefault or custom seccomp profiles to restrict syscalls.
+* `k8s-container-seccomp-profile` **Containers use seccomp profiles**: Containers should use RuntimeDefault or custom seccomp profiles to restrict syscalls.
   * Collector(s): Parse securityContext for seccompProfile settings
   * Component JSON:
     * `.k8s.workloads[].containers[].seccomp_profile_type` - Seccomp profile type
@@ -201,7 +201,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Host Isolation (OPA/Gatekeeper PSP Policies)
 
-* **Pods do not share host PID namespace**: Pods must not use hostPID to prevent process visibility across the host.
+* `k8s-no-host-pid` **Pods do not share host PID namespace**: Pods must not use hostPID to prevent process visibility across the host.
   * Collector(s): Parse pod specifications for hostPID setting
   * Component JSON:
     * `.k8s.workloads[].host_pid` - Boolean indicating hostPID usage
@@ -209,7 +209,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no pods use hostPID
   * Configuration: None
 
-* **Pods do not share host IPC namespace**: Pods must not use hostIPC to prevent inter-process communication with host processes.
+* `k8s-no-host-ipc` **Pods do not share host IPC namespace**: Pods must not use hostIPC to prevent inter-process communication with host processes.
   * Collector(s): Parse pod specifications for hostIPC setting
   * Component JSON:
     * `.k8s.workloads[].host_ipc` - Boolean indicating hostIPC usage
@@ -217,7 +217,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no pods use hostIPC
   * Configuration: None
 
-* **Pods do not use host networking**: Pods must not use hostNetwork to prevent access to host network interfaces.
+* `k8s-no-host-network` **Pods do not use host networking**: Pods must not use hostNetwork to prevent access to host network interfaces.
   * Collector(s): Parse pod specifications for hostNetwork setting
   * Component JSON:
     * `.k8s.workloads[].host_network` - Boolean indicating hostNetwork usage
@@ -225,7 +225,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no pods use hostNetwork
   * Configuration: Exceptions for specific system components if needed
 
-* **Pods do not bind to host ports**: Containers should not bind directly to host ports, which bypasses network policies.
+* `k8s-no-host-ports` **Pods do not bind to host ports**: Containers should not bind directly to host ports, which bypasses network policies.
   * Collector(s): Parse container port specifications for hostPort usage
   * Component JSON:
     * `.k8s.workloads[].containers[].host_ports` - Array of host ports used
@@ -234,7 +234,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no containers use host ports (or only allowed ports)
   * Configuration: Allowed host port ranges if exceptions needed
 
-* **Pods use only allowed volume types**: Pods should only use approved volume types to limit attack surface.
+* `k8s-allowed-volume-types` **Pods use only allowed volume types**: Pods should only use approved volume types to limit attack surface.
   * Collector(s): Parse pod volume specifications and extract volume types
   * Component JSON:
     * `.k8s.workloads[].volume_types` - Array of volume types used (configMap, secret, emptyDir, persistentVolumeClaim, etc.)
@@ -243,7 +243,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that only allowed volume types are used
   * Configuration: Allowed volume types (default: ["configMap", "secret", "emptyDir", "persistentVolumeClaim", "downwardAPI", "projected"])
 
-* **HostPath volumes are restricted**: HostPath volumes must be limited to specific paths and mounted read-only.
+* `k8s-hostpath-restricted` **HostPath volumes are restricted**: HostPath volumes must be limited to specific paths and mounted read-only.
   * Collector(s): Parse pod volume specifications for hostPath volumes
   * Component JSON:
     * `.k8s.workloads[].hostpath_volumes[].path` - Host path being mounted
@@ -253,7 +253,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that hostPath volumes use allowed paths and are read-only
   * Configuration: Allowed hostPath prefixes (e.g., ["/var/log", "/tmp"]), require read-only
 
-* **FlexVolume drivers are from approved list**: FlexVolume drivers must be from organization-approved list.
+* `k8s-flexvolume-approved` **FlexVolume drivers are from approved list**: FlexVolume drivers must be from organization-approved list.
   * Collector(s): Parse pod volume specifications for flexVolume drivers
   * Component JSON:
     * `.k8s.workloads[].flexvolume_drivers` - Array of FlexVolume drivers used
@@ -261,7 +261,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that only approved FlexVolume drivers are used
   * Configuration: Approved FlexVolume driver list
 
-* **EmptyDir volumes have size limits**: EmptyDir volumes must specify sizeLimit to prevent disk exhaustion.
+* `k8s-emptydir-size-limit` **EmptyDir volumes have size limits**: EmptyDir volumes must specify sizeLimit to prevent disk exhaustion.
   * Collector(s): Parse pod volume specifications for emptyDir without sizeLimit
   * Component JSON:
     * `.k8s.workloads[].emptydir_volumes[].name` - Volume name
@@ -273,7 +273,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Linux Security Modules (OPA/Gatekeeper PSP Policies)
 
-* **Pods specify AppArmor profiles**: Pods should use AppArmor profiles to restrict container capabilities.
+* `k8s-apparmor-profile` **Pods specify AppArmor profiles**: Pods should use AppArmor profiles to restrict container capabilities.
   * Collector(s): Parse pod annotations for AppArmor profile specifications
   * Component JSON:
     * `.k8s.workloads[].containers[].apparmor_profile` - AppArmor profile name
@@ -282,7 +282,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that containers specify AppArmor profiles
   * Configuration: Allowed AppArmor profiles (default: ["runtime/default", "localhost/*"])
 
-* **Pods specify SELinux contexts**: Pods in SELinux-enabled clusters should specify SELinux contexts.
+* `k8s-selinux-context` **Pods specify SELinux contexts**: Pods in SELinux-enabled clusters should specify SELinux contexts.
   * Collector(s): Parse securityContext for SELinux options
   * Component JSON:
     * `.k8s.workloads[].containers[].selinux_options` - SELinux context settings
@@ -291,7 +291,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that SELinux options are specified where required
   * Configuration: Allowed SELinux levels, roles, types, and users
 
-* **Containers use allowed proc mount types**: Containers must use Default procMount type, not Unmasked.
+* `k8s-allowed-proc-mount` **Containers use allowed proc mount types**: Containers must use Default procMount type, not Unmasked.
   * Collector(s): Parse securityContext for procMount setting
   * Component JSON:
     * `.k8s.workloads[].containers[].proc_mount` - procMount type (Default or Unmasked)
@@ -302,7 +302,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Service Account Security (OPA/Gatekeeper Policies)
 
-* **Pods disable automatic service account token mounting**: Pods should set automountServiceAccountToken to false unless explicitly needed.
+* `k8s-disable-sa-token-automount` **Pods disable automatic service account token mounting**: Pods should set automountServiceAccountToken to false unless explicitly needed.
   * Collector(s): Parse pod specifications for automountServiceAccountToken setting
   * Component JSON:
     * `.k8s.workloads[].automount_service_account_token` - Boolean for token auto-mount
@@ -310,7 +310,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that automountServiceAccountToken is false
   * Configuration: Exceptions for workloads that need Kubernetes API access
 
-* **Pods use dedicated service accounts**: Pods should not use the default service account.
+* `k8s-dedicated-service-account` **Pods use dedicated service accounts**: Pods should not use the default service account.
   * Collector(s): Parse pod specifications for serviceAccountName
   * Component JSON:
     * `.k8s.workloads[].service_account` - Service account name
@@ -321,7 +321,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Resource Metadata (OPA/Gatekeeper Policies)
 
-* **Resources have required labels**: All Kubernetes resources must have organization-required labels.
+* `k8s-required-labels` **Resources have required labels**: All Kubernetes resources must have organization-required labels.
   * Collector(s): Parse resource metadata for label presence
   * Component JSON:
     * `.k8s.workloads[].labels` - Map of labels on the resource
@@ -330,7 +330,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all required labels are present on resources
   * Configuration: Required label keys (e.g., ["app", "team", "environment", "version"])
 
-* **Resources have required annotations**: Resources must have organization-required annotations for operational metadata.
+* `k8s-required-annotations` **Resources have required annotations**: Resources must have organization-required annotations for operational metadata.
   * Collector(s): Parse resource metadata for annotation presence
   * Component JSON:
     * `.k8s.workloads[].annotations` - Map of annotations on the resource
@@ -339,7 +339,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all required annotations are present
   * Configuration: Required annotation keys (e.g., ["description", "owner", "oncall"])
 
-* **Label values follow naming conventions**: Label values must follow approved naming patterns.
+* `k8s-label-naming-convention` **Label values follow naming conventions**: Label values must follow approved naming patterns.
   * Collector(s): Parse label values and validate against naming conventions
   * Component JSON:
     * `.k8s.workloads[].labels` - Map of labels
@@ -349,7 +349,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Service Type Restrictions (OPA/Gatekeeper Policies)
 
-* **Services do not use NodePort type**: NodePort services expose ports on all cluster nodes and should be avoided.
+* `k8s-no-nodeport` **Services do not use NodePort type**: NodePort services expose ports on all cluster nodes and should be avoided.
   * Collector(s): Parse Service resources for type field
   * Component JSON:
     * `.k8s.services[].type` - Service type (ClusterIP, NodePort, LoadBalancer)
@@ -358,7 +358,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no services use NodePort type
   * Configuration: Exceptions for specific use cases
 
-* **LoadBalancer services require annotations**: LoadBalancer services must have specific annotations for cloud provider configuration.
+* `k8s-loadbalancer-annotations` **LoadBalancer services require annotations**: LoadBalancer services must have specific annotations for cloud provider configuration.
   * Collector(s): Parse LoadBalancer Service resources for required annotations
   * Component JSON:
     * `.k8s.services[].type` - Service type
@@ -367,7 +367,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that LoadBalancer services have required annotations
   * Configuration: Required LoadBalancer annotations (e.g., cloud provider specific settings)
 
-* **Services do not specify external IPs**: Services with externalIPs can be a security risk and should be restricted.
+* `k8s-no-external-ips` **Services do not specify external IPs**: Services with externalIPs can be a security risk and should be restricted.
   * Collector(s): Parse Service resources for externalIPs field
   * Component JSON:
     * `.k8s.services[].external_ips` - Array of external IPs specified
@@ -378,7 +378,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Replica and Scaling Limits (OPA/Gatekeeper Policies)
 
-* **Deployments do not exceed maximum replica count**: Replicas should not exceed cluster capacity planning limits.
+* `k8s-max-replica-count` **Deployments do not exceed maximum replica count**: Replicas should not exceed cluster capacity planning limits.
   * Collector(s): Parse Deployment and HPA specifications for replica counts
   * Component JSON:
     * `.k8s.workloads[].replicas` - Configured replica count
@@ -387,7 +387,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that replica count does not exceed configured maximum
   * Configuration: Maximum replica count (default: 100)
 
-* **HPA scaling range is reasonable**: HPA min/max replica spread should be within reasonable bounds.
+* `k8s-hpa-scaling-range` **HPA scaling range is reasonable**: HPA min/max replica spread should be within reasonable bounds.
   * Collector(s): Parse HPA specifications for min and max replicas
   * Component JSON:
     * `.k8s.hpas[].min_replicas` - HPA minimum replicas
@@ -398,7 +398,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Container Runtime Policies (OPA/Gatekeeper Policies)
 
-* **Containers specify image pull policy**: Containers should explicitly set imagePullPolicy for predictable behavior.
+* `k8s-image-pull-policy` **Containers specify image pull policy**: Containers should explicitly set imagePullPolicy for predictable behavior.
   * Collector(s): Parse container specifications for imagePullPolicy
   * Component JSON:
     * `.k8s.workloads[].containers[].image_pull_policy` - Configured pull policy
@@ -406,7 +406,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that imagePullPolicy is explicitly set
   * Configuration: Required pull policy values (e.g., ["Always", "IfNotPresent"])
 
-* **Container images use SHA256 digests**: Container images should be referenced by digest for immutability.
+* `k8s-image-digest` **Container images use SHA256 digests**: Container images should be referenced by digest for immutability.
   * Collector(s): Parse container image references for digest format
   * Component JSON:
     * `.k8s.workloads[].containers[].image` - Full image reference
@@ -421,7 +421,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Image Registry and Tagging
 
-* **Container images use approved registries**: All container images must be pulled from organization-approved registries.
+* `k8s-approved-registries` **Container images use approved registries**: All container images must be pulled from organization-approved registries.
   * Collector(s): Parse Kubernetes manifests and Dockerfiles for image references, extract registry hostnames
   * Component JSON:
     * `.k8s.workloads[].containers[].image` - Full image reference
@@ -430,7 +430,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all image registries are in the approved list
   * Configuration: Approved registry list (e.g., ["gcr.io/company-name", "registry.internal.company.com"])
 
-* **Container images do not use latest tag**: Images must use explicit version tags, not "latest" which leads to unpredictable deployments.
+* `k8s-no-latest-tag` **Container images do not use latest tag**: Images must use explicit version tags, not "latest" which leads to unpredictable deployments.
   * Collector(s): Parse image references and extract tags
   * Component JSON:
     * `.k8s.workloads[].containers[].image_tag` - Extracted image tag
@@ -439,7 +439,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no images use the latest tag
   * Configuration: None
 
-* **Container images use immutable tags**: Images should use content-addressable tags (SHA digests) or semantic version tags, not mutable tags.
+* `k8s-immutable-image-tags` **Container images use immutable tags**: Images should use content-addressable tags (SHA digests) or semantic version tags, not mutable tags.
   * Collector(s): Parse image references and detect tag patterns
   * Component JSON:
     * `.k8s.workloads[].containers[].image_tag` - Image tag
@@ -448,7 +448,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that images use SHA digests or semantic version tags
   * Configuration: Acceptable tag patterns
 
-* **Container images are pinned to specific versions**: Base images in Dockerfiles should be pinned to specific versions, not floating tags.
+* `dockerfile-pinned-versions` **Container images are pinned to specific versions**: Base images in Dockerfiles should be pinned to specific versions, not floating tags.
   * Collector(s): Parse Dockerfiles for FROM statements and validate version pinning
   * Component JSON:
     * `.containers.definitions[].base_images[].is_pinned` - Boolean indicating version is pinned
@@ -456,7 +456,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all base images are version-pinned
   * Configuration: None
 
-* **Container images use approved base images**: Dockerfiles must use organization-approved base images.
+* `dockerfile-approved-base-images` **Container images use approved base images**: Dockerfiles must use organization-approved base images.
   * Collector(s): Parse Dockerfiles for FROM statements and extract base image names
   * Component JSON:
     * `.containers.definitions[].base_images[].reference` - Full base image reference
@@ -467,7 +467,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Image Security
 
-* **Container images are signed**: Deployed images must be cryptographically signed for supply chain security.
+* `container-images-signed` **Container images are signed**: Deployed images must be cryptographically signed for supply chain security.
   * Collector(s): Check image signatures via container registry API or signing verification tool (Cosign, Notary)
   * Component JSON:
     * `.containers.builds[].signed` - Boolean indicating image is signed
@@ -476,7 +476,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all deployed images are signed and verified
   * Configuration: Signing key references for verification
 
-* **Container images have provenance attestations**: Images should have SLSA provenance attestations for build verification.
+* `container-provenance-attestation` **Container images have provenance attestations**: Images should have SLSA provenance attestations for build verification.
   * Collector(s): Query container registry for attestation metadata
   * Component JSON:
     * `.containers.builds[].has_provenance` - Boolean for provenance attestation
@@ -484,7 +484,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that images have provenance attestations
   * Configuration: Minimum SLSA level required
 
-* **Container images have required labels**: Built images must include standard labels for traceability (source repo, git SHA, build time).
+* `container-required-labels` **Container images have required labels**: Built images must include standard labels for traceability (source repo, git SHA, build time).
   * Collector(s): Inspect container image metadata for OCI labels
   * Component JSON:
     * `.containers.builds[].labels` - Map of image labels
@@ -493,7 +493,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that required labels are present on built images
   * Configuration: Required label keys (e.g., ["org.opencontainers.image.source", "org.opencontainers.image.revision"])
 
-* **Dockerfiles define HEALTHCHECK**: Dockerfiles should define a HEALTHCHECK instruction for container health monitoring.
+* `dockerfile-healthcheck` **Dockerfiles define HEALTHCHECK**: Dockerfiles should define a HEALTHCHECK instruction for container health monitoring.
   * Collector(s): Parse Dockerfiles for HEALTHCHECK instruction
   * Component JSON:
     * `.containers.definitions[].final_stage.has_healthcheck` - Boolean for healthcheck presence
@@ -501,7 +501,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that Dockerfiles include HEALTHCHECK instructions
   * Configuration: Whether this is required or optional
 
-* **Dockerfiles use multi-stage builds**: Dockerfiles should use multi-stage builds to minimize final image size and attack surface.
+* `dockerfile-multi-stage` **Dockerfiles use multi-stage builds**: Dockerfiles should use multi-stage builds to minimize final image size and attack surface.
   * Collector(s): Parse Dockerfiles and count build stages
   * Component JSON:
     * `.containers.definitions[].stage_count` - Number of build stages
@@ -515,7 +515,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Configuration Validity
 
-* **Terraform files are syntactically valid**: All Terraform configuration files must parse without errors.
+* `iac-terraform-valid` **Terraform files are syntactically valid**: All Terraform configuration files must parse without errors.
   * Collector(s): Run terraform validate or parse HCL files to detect syntax errors
   * Component JSON:
     * `.iac.files[].path` - Path to Terraform file
@@ -525,7 +525,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all Terraform files are valid
   * Configuration: None
 
-* **Terraform provider versions are pinned**: Providers must specify version constraints to ensure reproducible deployments.
+* `iac-provider-versions-pinned` **Terraform provider versions are pinned**: Providers must specify version constraints to ensure reproducible deployments.
   * Collector(s): Parse Terraform required_providers blocks for version constraints
   * Component JSON:
     * `.iac.providers[].name` - Provider name
@@ -535,7 +535,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all providers have version constraints
   * Configuration: None
 
-* **Terraform module versions are pinned**: Module sources must specify version constraints or use commit SHAs.
+* `iac-module-versions-pinned` **Terraform module versions are pinned**: Module sources must specify version constraints or use commit SHAs.
   * Collector(s): Parse module blocks for source and version specifications
   * Component JSON:
     * `.iac.modules[].source` - Module source URL
@@ -544,7 +544,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all modules have pinned versions
   * Configuration: None
 
-* **Terraform uses remote backend**: Terraform must use a remote backend (S3, GCS, Terraform Cloud) for state management.
+* `iac-remote-backend` **Terraform uses remote backend**: Terraform must use a remote backend (S3, GCS, Terraform Cloud) for state management.
   * Collector(s): Parse Terraform backend configuration
   * Component JSON:
     * `.iac.backend.type` - Backend type (s3, gcs, remote, etc.)
@@ -553,7 +553,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that a remote backend is configured
   * Configuration: Approved backend types
 
-* **Terraform state is encrypted**: Remote backend must use encryption for state storage.
+* `iac-state-encrypted` **Terraform state is encrypted**: Remote backend must use encryption for state storage.
   * Collector(s): Parse backend configuration for encryption settings
   * Component JSON:
     * `.iac.backend.encrypted` - Boolean for encryption enabled
@@ -563,7 +563,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Data Protection
 
-* **Datastores have deletion protection enabled**: Databases, storage buckets, and other datastores must have deletion protection.
+* `iac-datastore-deletion-protection` **Datastores have deletion protection enabled**: Databases, storage buckets, and other datastores must have deletion protection.
   * Collector(s): Parse Terraform resources for deletion_protection or lifecycle prevent_destroy settings
   * Component JSON:
     * `.iac.datastores[].name` - Resource name
@@ -573,7 +573,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all datastores have deletion protection enabled
   * Configuration: Resource types considered datastores
 
-* **Datastores have encryption at rest enabled**: All data storage resources must encrypt data at rest.
+* `iac-datastore-encryption-at-rest` **Datastores have encryption at rest enabled**: All data storage resources must encrypt data at rest.
   * Collector(s): Parse Terraform resources for encryption configuration
   * Component JSON:
     * `.iac.datastores[].encrypted` - Boolean for encryption enabled
@@ -582,7 +582,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all datastores have encryption at rest enabled
   * Configuration: Whether customer-managed keys are required
 
-* **Datastores have backup enabled**: Critical datastores must have automated backups configured.
+* `iac-datastore-backup-enabled` **Datastores have backup enabled**: Critical datastores must have automated backups configured.
   * Collector(s): Parse Terraform resources for backup configuration
   * Component JSON:
     * `.iac.datastores[].backup_enabled` - Boolean for backup configuration
@@ -590,7 +590,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that datastores have backup enabled with minimum retention
   * Configuration: Minimum backup retention days (default: 7)
 
-* **Datastores use Multi-AZ or regional replication**: Critical datastores should be deployed across availability zones.
+* `iac-datastore-multi-az` **Datastores use Multi-AZ or regional replication**: Critical datastores should be deployed across availability zones.
   * Collector(s): Parse Terraform resources for multi-AZ configuration
   * Component JSON:
     * `.iac.datastores[].multi_az` - Boolean for multi-AZ deployment
@@ -600,7 +600,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Network Security
 
-* **Internet-facing services have WAF configured**: Publicly accessible HTTP services must have Web Application Firewall protection.
+* `iac-internet-facing-waf` **Internet-facing services have WAF configured**: Publicly accessible HTTP services must have Web Application Firewall protection.
   * Collector(s): Parse Terraform for load balancers, API gateways, and associated WAF resources
   * Component JSON:
     * `.iac.resources[].internet_facing` - Boolean for public accessibility
@@ -609,7 +609,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all internet-facing HTTP services have WAF configured
   * Configuration: None
 
-* **DDoS protection is enabled for public endpoints**: Public-facing infrastructure must have DDoS protection enabled.
+* `iac-ddos-protection` **DDoS protection is enabled for public endpoints**: Public-facing infrastructure must have DDoS protection enabled.
   * Collector(s): Check for DDoS protection resources (AWS Shield, CloudFlare, etc.)
   * Component JSON:
     * `.iac.resources[].ddos_protection_enabled` - Boolean for DDoS protection
@@ -617,7 +617,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that DDoS protection is enabled for public endpoints
   * Configuration: Required protection level (standard vs advanced)
 
-* **Load balancers use secure SSL policies**: Load balancers must use TLS 1.2+ and strong cipher suites.
+* `iac-lb-secure-ssl-policy` **Load balancers use secure SSL policies**: Load balancers must use TLS 1.2+ and strong cipher suites.
   * Collector(s): Parse load balancer Terraform resources for SSL/TLS policy configuration
   * Component JSON:
     * `.iac.resources[].ssl_policy` - SSL policy name or configuration
@@ -625,7 +625,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that load balancers use approved SSL policies
   * Configuration: Approved SSL policy names, minimum TLS version (default: 1.2)
 
-* **Security groups do not allow unrestricted ingress**: Security groups must not have 0.0.0.0/0 ingress rules except for specific ports.
+* `iac-no-unrestricted-ingress` **Security groups do not allow unrestricted ingress**: Security groups must not have 0.0.0.0/0 ingress rules except for specific ports.
   * Collector(s): Parse security group rules in Terraform
   * Component JSON:
     * `.iac.security_groups[].rules` - Array of security group rules
@@ -634,7 +634,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no unrestricted ingress rules exist except for allowed ports
   * Configuration: Allowed ports for public access (e.g., [80, 443])
 
-* **VPC flow logs are enabled**: VPCs must have flow logging enabled for network monitoring.
+* `iac-vpc-flow-logs` **VPC flow logs are enabled**: VPCs must have flow logging enabled for network monitoring.
   * Collector(s): Parse VPC and flow log Terraform resources
   * Component JSON:
     * `.iac.vpcs[].flow_logs_enabled` - Boolean for flow log configuration
@@ -644,7 +644,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Resource Tagging
 
-* **All resources have required tags**: Infrastructure resources must have organization-required tags for cost allocation and ownership.
+* `iac-required-tags` **All resources have required tags**: Infrastructure resources must have organization-required tags for cost allocation and ownership.
   * Collector(s): Parse Terraform resources for tag assignments
   * Component JSON:
     * `.iac.resources[].tags` - Map of resource tags
@@ -653,7 +653,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all resources have required tags
   * Configuration: Required tag keys (e.g., ["owner", "environment", "cost-center", "application"])
 
-* **Environment tag matches deployment environment**: The environment tag must accurately reflect the deployment environment.
+* `iac-environment-tag-valid` **Environment tag matches deployment environment**: The environment tag must accurately reflect the deployment environment.
   * Collector(s): Extract environment tags and validate against known environments
   * Component JSON:
     * `.iac.resources[].tags.environment` - Environment tag value
@@ -663,7 +663,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### AWS-Specific Policies (OPA/Conftest Inspired)
 
-* **S3 buckets block public access**: S3 buckets must have public access blocked at the bucket level.
+* `iac-s3-block-public-access` **S3 buckets block public access**: S3 buckets must have public access blocked at the bucket level.
   * Collector(s): Parse Terraform aws_s3_bucket and aws_s3_bucket_public_access_block resources
   * Component JSON:
     * `.iac.s3_buckets[].name` - Bucket name
@@ -675,14 +675,14 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all S3 buckets have public access fully blocked
   * Configuration: None
 
-* **S3 buckets have versioning enabled**: S3 buckets should have versioning enabled for data protection.
+* `iac-s3-versioning-enabled` **S3 buckets have versioning enabled**: S3 buckets should have versioning enabled for data protection.
   * Collector(s): Parse Terraform aws_s3_bucket_versioning resources
   * Component JSON:
     * `.iac.s3_buckets[].versioning_enabled` - Boolean for versioning status
   * Policy: Assert that S3 buckets have versioning enabled
   * Configuration: Exceptions for temporary/cache buckets
 
-* **S3 buckets have server-side encryption**: S3 buckets must use server-side encryption for data at rest.
+* `iac-s3-encryption` **S3 buckets have server-side encryption**: S3 buckets must use server-side encryption for data at rest.
   * Collector(s): Parse Terraform aws_s3_bucket_server_side_encryption_configuration resources
   * Component JSON:
     * `.iac.s3_buckets[].encryption_enabled` - Boolean for SSE configuration
@@ -691,7 +691,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that S3 buckets have encryption enabled
   * Configuration: Required encryption type (SSE-S3 or SSE-KMS)
 
-* **S3 buckets have access logging enabled**: S3 buckets should log access requests for audit purposes.
+* `iac-s3-access-logging` **S3 buckets have access logging enabled**: S3 buckets should log access requests for audit purposes.
   * Collector(s): Parse Terraform aws_s3_bucket_logging resources
   * Component JSON:
     * `.iac.s3_buckets[].logging_enabled` - Boolean for access logging
@@ -699,7 +699,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that S3 buckets have access logging enabled
   * Configuration: Tags requiring logging (e.g., ["production", "sensitive"])
 
-* **RDS instances have encryption enabled**: RDS database instances must encrypt storage at rest.
+* `iac-rds-encryption` **RDS instances have encryption enabled**: RDS database instances must encrypt storage at rest.
   * Collector(s): Parse Terraform aws_db_instance resources for storage_encrypted
   * Component JSON:
     * `.iac.rds_instances[].identifier` - RDS instance identifier
@@ -708,7 +708,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that RDS instances have storage encryption enabled
   * Configuration: Whether CMK is required vs AWS-managed key
 
-* **RDS instances have automated backups**: RDS instances must have automated backups with appropriate retention.
+* `iac-rds-automated-backups` **RDS instances have automated backups**: RDS instances must have automated backups with appropriate retention.
   * Collector(s): Parse Terraform aws_db_instance resources for backup settings
   * Component JSON:
     * `.iac.rds_instances[].backup_retention_period` - Backup retention in days
@@ -716,21 +716,21 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that backup retention period meets minimum requirement
   * Configuration: Minimum backup retention days (default: 7)
 
-* **RDS instances are not publicly accessible**: RDS instances should not be exposed to the public internet.
+* `iac-rds-not-public` **RDS instances are not publicly accessible**: RDS instances should not be exposed to the public internet.
   * Collector(s): Parse Terraform aws_db_instance resources for publicly_accessible
   * Component JSON:
     * `.iac.rds_instances[].publicly_accessible` - Boolean for public access
   * Policy: Assert that RDS instances are not publicly accessible
   * Configuration: None
 
-* **RDS instances have deletion protection**: Production RDS instances must have deletion protection enabled.
+* `iac-rds-deletion-protection` **RDS instances have deletion protection**: Production RDS instances must have deletion protection enabled.
   * Collector(s): Parse Terraform aws_db_instance resources for deletion_protection
   * Component JSON:
     * `.iac.rds_instances[].deletion_protection` - Boolean for delete protection
   * Policy: Assert that production RDS instances have deletion protection
   * Configuration: Tags requiring deletion protection
 
-* **EC2 instances use IMDSv2**: EC2 instances must require Instance Metadata Service v2 (IMDSv2) to prevent SSRF attacks.
+* `iac-ec2-imdsv2` **EC2 instances use IMDSv2**: EC2 instances must require Instance Metadata Service v2 (IMDSv2) to prevent SSRF attacks.
   * Collector(s): Parse Terraform aws_instance and aws_launch_template resources for metadata_options
   * Component JSON:
     * `.iac.ec2_instances[].http_tokens` - IMDS token requirement (optional or required)
@@ -739,7 +739,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that EC2 instances require IMDSv2 (http_tokens = "required")
   * Configuration: None
 
-* **EBS volumes are encrypted**: EBS volumes must be encrypted at rest.
+* `iac-ebs-encrypted` **EBS volumes are encrypted**: EBS volumes must be encrypted at rest.
   * Collector(s): Parse Terraform aws_ebs_volume and aws_instance resources for encryption
   * Component JSON:
     * `.iac.ebs_volumes[].encrypted` - Boolean for volume encryption
@@ -748,7 +748,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all EBS volumes are encrypted
   * Configuration: Whether CMK is required
 
-* **EC2 instances do not have public IPs by default**: EC2 instances should not automatically receive public IP addresses.
+* `iac-ec2-no-public-ip` **EC2 instances do not have public IPs by default**: EC2 instances should not automatically receive public IP addresses.
   * Collector(s): Parse Terraform aws_instance resources for associate_public_ip_address
   * Component JSON:
     * `.iac.ec2_instances[].associate_public_ip` - Boolean for public IP assignment
@@ -756,7 +756,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that EC2 instances do not auto-assign public IPs
   * Configuration: Exceptions for bastion hosts or public-facing instances
 
-* **CloudTrail logging is enabled**: AWS accounts must have CloudTrail enabled for API auditing.
+* `iac-cloudtrail-enabled` **CloudTrail logging is enabled**: AWS accounts must have CloudTrail enabled for API auditing.
   * Collector(s): Parse Terraform aws_cloudtrail resources
   * Component JSON:
     * `.iac.cloudtrail.enabled` - Boolean for CloudTrail presence
@@ -766,7 +766,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that CloudTrail is enabled with required settings
   * Configuration: Required CloudTrail settings (multi-region, validation, encryption)
 
-* **KMS keys have rotation enabled**: Customer-managed KMS keys must have automatic key rotation enabled.
+* `iac-kms-key-rotation` **KMS keys have rotation enabled**: Customer-managed KMS keys must have automatic key rotation enabled.
   * Collector(s): Parse Terraform aws_kms_key resources for enable_key_rotation
   * Component JSON:
     * `.iac.kms_keys[].key_id` - KMS key ID
@@ -775,7 +775,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that KMS keys have rotation enabled
   * Configuration: Minimum deletion window (default: 30 days)
 
-* **IAM policies do not use wildcard resources**: IAM policies should not grant access to all resources (*).
+* `iac-iam-no-wildcard-resource` **IAM policies do not use wildcard resources**: IAM policies should not grant access to all resources (*).
   * Collector(s): Parse Terraform aws_iam_policy documents for resource wildcards
   * Component JSON:
     * `.iac.iam_policies[].name` - Policy name
@@ -784,7 +784,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that IAM policies do not use wildcard resources
   * Configuration: Allowed wildcard patterns for specific use cases
 
-* **IAM policies do not use wildcard actions**: IAM policies should specify explicit actions, not wildcards.
+* `iac-iam-no-wildcard-action` **IAM policies do not use wildcard actions**: IAM policies should specify explicit actions, not wildcards.
   * Collector(s): Parse Terraform aws_iam_policy documents for action wildcards
   * Component JSON:
     * `.iac.iam_policies[].has_wildcard_action` - Boolean for wildcard actions
@@ -792,7 +792,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that IAM policies do not use wildcard actions
   * Configuration: Exceptions for admin policies if needed
 
-* **Security groups have descriptions**: Security groups should have meaningful descriptions for documentation.
+* `iac-sg-has-description` **Security groups have descriptions**: Security groups should have meaningful descriptions for documentation.
   * Collector(s): Parse Terraform aws_security_group resources for description field
   * Component JSON:
     * `.iac.security_groups[].name` - Security group name
@@ -801,7 +801,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that security groups have non-empty descriptions
   * Configuration: Minimum description length
 
-* **Security group rules have descriptions**: Individual security group rules should have descriptions explaining their purpose.
+* `iac-sg-rule-has-description` **Security group rules have descriptions**: Individual security group rules should have descriptions explaining their purpose.
   * Collector(s): Parse Terraform aws_security_group_rule resources for description
   * Component JSON:
     * `.iac.security_groups[].rules[].description` - Rule description
@@ -809,7 +809,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that security group rules have descriptions
   * Configuration: None
 
-* **Lambda functions are not publicly accessible**: Lambda functions should not have public URL configurations without authentication.
+* `iac-lambda-no-public-url` **Lambda functions are not publicly accessible**: Lambda functions should not have public URL configurations without authentication.
   * Collector(s): Parse Terraform aws_lambda_function_url resources for authorization settings
   * Component JSON:
     * `.iac.lambda_functions[].function_name` - Function name
@@ -820,7 +820,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Multi-Cloud Policies (OPA/Conftest Inspired)
 
-* **Compute instances use approved machine types**: VMs and instances should use cost-effective and approved machine types.
+* `iac-approved-instance-types` **Compute instances use approved machine types**: VMs and instances should use cost-effective and approved machine types.
   * Collector(s): Parse Terraform compute instance resources for instance types
   * Component JSON:
     * `.iac.compute_instances[].instance_type` - Instance/machine type
@@ -828,7 +828,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that instances use approved machine types
   * Configuration: Approved instance type patterns per environment
 
-* **Storage resources have lifecycle policies**: Object storage should have lifecycle policies for cost management.
+* `iac-storage-lifecycle-policy` **Storage resources have lifecycle policies**: Object storage should have lifecycle policies for cost management.
   * Collector(s): Parse Terraform storage resources for lifecycle configurations
   * Component JSON:
     * `.iac.storage[].has_lifecycle_policy` - Boolean for lifecycle policy
@@ -836,7 +836,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that storage resources have lifecycle policies
   * Configuration: Tags requiring lifecycle policies
 
-* **Resources are deployed in approved regions**: Infrastructure should only be deployed in organization-approved regions.
+* `iac-approved-regions` **Resources are deployed in approved regions**: Infrastructure should only be deployed in organization-approved regions.
   * Collector(s): Parse Terraform provider and resource configurations for region settings
   * Component JSON:
     * `.iac.resources[].region` - Resource deployment region
@@ -845,7 +845,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that resources are deployed in approved regions only
   * Configuration: Approved region list (e.g., ["us-east-1", "us-west-2", "eu-west-1"])
 
-* **Managed database services use private endpoints**: Database services should use private endpoints, not public access.
+* `iac-database-private-endpoint` **Managed database services use private endpoints**: Database services should use private endpoints, not public access.
   * Collector(s): Parse Terraform database resources for network configuration
   * Component JSON:
     * `.iac.databases[].uses_private_endpoint` - Boolean for private endpoint
@@ -854,7 +854,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that databases use private endpoints
   * Configuration: None
 
-* **Load balancers have access logs enabled**: Load balancers should log access requests for security monitoring.
+* `iac-lb-access-logs` **Load balancers have access logs enabled**: Load balancers should log access requests for security monitoring.
   * Collector(s): Parse Terraform load balancer resources for access logging configuration
   * Component JSON:
     * `.iac.load_balancers[].access_logs_enabled` - Boolean for access logging
@@ -862,7 +862,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that load balancers have access logging enabled
   * Configuration: None
 
-* **Container registries have vulnerability scanning**: Container registries should have automatic vulnerability scanning enabled.
+* `iac-registry-vulnerability-scanning` **Container registries have vulnerability scanning**: Container registries should have automatic vulnerability scanning enabled.
   * Collector(s): Parse Terraform container registry resources for scan configuration
   * Component JSON:
     * `.iac.container_registries[].scan_on_push` - Boolean for scan on push
@@ -870,7 +870,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that container registries have vulnerability scanning enabled
   * Configuration: None
 
-* **Secrets Manager secrets have rotation configured**: Secrets stored in managed secret services should have rotation.
+* `iac-secrets-rotation` **Secrets Manager secrets have rotation configured**: Secrets stored in managed secret services should have rotation.
   * Collector(s): Parse Terraform secrets manager resources for rotation configuration
   * Component JSON:
     * `.iac.secrets[].rotation_enabled` - Boolean for rotation configuration
@@ -885,7 +885,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Deployment Strategies
 
-* **Deployments use rolling update strategy**: Kubernetes Deployments should use RollingUpdate strategy for zero-downtime deploys.
+* `deploy-rolling-update-strategy` **Deployments use rolling update strategy**: Kubernetes Deployments should use RollingUpdate strategy for zero-downtime deploys.
   * Collector(s): Parse Deployment manifests for strategy configuration
   * Component JSON:
     * `.k8s.workloads[].strategy.type` - Deployment strategy type
@@ -894,14 +894,14 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that Deployments use RollingUpdate strategy
   * Configuration: None
 
-* **Rolling update allows zero unavailable pods**: Rolling update should be configured to maintain full availability during deploys.
+* `deploy-zero-unavailable` **Rolling update allows zero unavailable pods**: Rolling update should be configured to maintain full availability during deploys.
   * Collector(s): Parse RollingUpdate strategy configuration
   * Component JSON:
     * `.k8s.workloads[].strategy.max_unavailable` - Maximum unavailable pods
   * Policy: Assert that maxUnavailable is 0 or a small percentage
   * Configuration: Maximum unavailable threshold (default: 0 or 25%)
 
-* **Canary deployment capability is configured**: Production services should support canary deployments for safe rollouts.
+* `deploy-canary-configured` **Canary deployment capability is configured**: Production services should support canary deployments for safe rollouts.
   * Collector(s): Check for canary deployment configuration (Argo Rollouts, Flagger, or similar)
   * Component JSON:
     * `.deployment.canary.configured` - Boolean for canary support
@@ -910,7 +910,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that canary deployment is configured for production services
   * Configuration: Tags requiring canary support
 
-* **Blue-green deployment capability exists**: Critical services should support blue-green deployments for instant rollback.
+* `deploy-blue-green-configured` **Blue-green deployment capability exists**: Critical services should support blue-green deployments for instant rollback.
   * Collector(s): Check for blue-green deployment configuration
   * Component JSON:
     * `.deployment.blue_green.configured` - Boolean for blue-green support
@@ -920,7 +920,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Deployment Gates and Approvals
 
-* **Production deployments require manual approval**: Deployments to production must go through an approval gate.
+* `deploy-production-approval` **Production deployments require manual approval**: Deployments to production must go through an approval gate.
   * Collector(s): Parse CD pipeline configuration (ArgoCD, Spinnaker, GitHub Actions) for approval requirements
   * Component JSON:
     * `.deployment.approval_required` - Boolean for approval requirement
@@ -929,7 +929,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that production deployments require approval
   * Configuration: Environments requiring approval (default: ["production"])
 
-* **Deployment dry-run validation is performed**: Deployments should run validation or dry-run before actual application.
+* `deploy-dry-run-validation` **Deployment dry-run validation is performed**: Deployments should run validation or dry-run before actual application.
   * Collector(s): Check CD pipeline for dry-run or validation steps
   * Component JSON:
     * `.deployment.dry_run.enabled` - Boolean for dry-run validation
@@ -937,7 +937,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that dry-run validation is part of the deployment process
   * Configuration: None
 
-* **Deployment includes automated rollback capability**: Deployment pipelines should support automated rollback on failure.
+* `deploy-auto-rollback` **Deployment includes automated rollback capability**: Deployment pipelines should support automated rollback on failure.
   * Collector(s): Check CD configuration for rollback settings
   * Component JSON:
     * `.deployment.auto_rollback.enabled` - Boolean for auto-rollback
@@ -947,7 +947,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### GitOps and CD Configuration
 
-* **ArgoCD Application exists for the component**: Components using GitOps must have an ArgoCD Application or ApplicationSet.
+* `deploy-argocd-app-exists` **ArgoCD Application exists for the component**: Components using GitOps must have an ArgoCD Application or ApplicationSet.
   * Collector(s): Check for ArgoCD application manifests or query ArgoCD API
   * Component JSON:
     * `.deployment.argocd.application_exists` - Boolean for ArgoCD app
@@ -956,7 +956,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that ArgoCD Application exists for GitOps-managed components
   * Configuration: Tags requiring ArgoCD (e.g., ["gitops", "kubernetes"])
 
-* **ArgoCD sync policy is appropriately configured**: ArgoCD Applications should have proper sync policies (prune, self-heal).
+* `deploy-argocd-sync-policy` **ArgoCD sync policy is appropriately configured**: ArgoCD Applications should have proper sync policies (prune, self-heal).
   * Collector(s): Parse ArgoCD Application manifests for sync policy
   * Component JSON:
     * `.deployment.argocd.sync_policy.automated` - Boolean for automated sync
@@ -965,7 +965,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that sync policy meets requirements
   * Configuration: Required sync policy settings
 
-* **CD pipeline runs in appropriate environment**: Deployment pipelines should execute from secure, controlled environments.
+* `deploy-approved-runner` **CD pipeline runs in appropriate environment**: Deployment pipelines should execute from secure, controlled environments.
   * Collector(s): Extract CD execution environment from pipeline runs
   * Component JSON:
     * `.deployment.pipeline.runner_type` - Type of runner (self-hosted, cloud)
@@ -979,7 +979,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Deployment Freshness
 
-* **Component has recent successful deployment**: Production components should have been deployed recently to avoid drift.
+* `deploy-recent-deployment` **Component has recent successful deployment**: Production components should have been deployed recently to avoid drift.
   * Collector(s): Query deployment system or Kubernetes API for last deployment timestamp
   * Component JSON:
     * `.runtime.last_deployment.timestamp` - ISO 8601 timestamp of last deployment
@@ -988,7 +988,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that last successful deployment is within threshold
   * Configuration: Maximum days since deployment (default: 30)
 
-* **No stale deployments in production**: Deployments older than threshold should be flagged for review.
+* `deploy-not-stale` **No stale deployments in production**: Deployments older than threshold should be flagged for review.
   * Collector(s): Query Kubernetes or deployment system for deployment age
   * Component JSON:
     * `.runtime.deployment_age_days` - Age of current deployment in days
@@ -996,7 +996,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that deployment is not older than threshold
   * Configuration: Stale deployment threshold days (default: 90)
 
-* **Deployed version matches latest in default branch**: The deployed version should not be significantly behind the source.
+* `deploy-version-current` **Deployed version matches latest in default branch**: The deployed version should not be significantly behind the source.
   * Collector(s): Compare deployed git SHA or version with latest in repository
   * Component JSON:
     * `.runtime.deployed_version` - Git SHA or version of deployed code
@@ -1007,7 +1007,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Multi-Environment Configuration
 
-* **Environment-specific configuration is managed**: Different environments should have separate configuration management.
+* `deploy-env-specific-config` **Environment-specific configuration is managed**: Different environments should have separate configuration management.
   * Collector(s): Check for environment-specific config files or ConfigMaps
   * Component JSON:
     * `.deployment.environments` - Array of configured environments
@@ -1016,7 +1016,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that required environments have configuration
   * Configuration: Required environments (e.g., ["development", "staging", "production"])
 
-* **Secrets are environment-specific**: Secrets must be separated by environment to prevent cross-environment exposure.
+* `deploy-secrets-env-isolated` **Secrets are environment-specific**: Secrets must be separated by environment to prevent cross-environment exposure.
   * Collector(s): Check secret references in manifests for environment isolation
   * Component JSON:
     * `.deployment.secrets.environment_isolated` - Boolean for secret isolation
@@ -1024,7 +1024,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that secrets are environment-specific
   * Configuration: Allowed shared secret patterns
 
-* **Production and non-production use separate clusters**: Production workloads should run on dedicated clusters.
+* `deploy-production-cluster-isolated` **Production and non-production use separate clusters**: Production workloads should run on dedicated clusters.
   * Collector(s): Extract cluster information from deployment configuration
   * Component JSON:
     * `.deployment.clusters[].name` - Cluster name
@@ -1039,7 +1039,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Kubernetes Networking
 
-* **Network policies exist for workloads**: Production workloads should have NetworkPolicies restricting traffic.
+* `k8s-network-policy-exists` **Network policies exist for workloads**: Production workloads should have NetworkPolicies restricting traffic.
   * Collector(s): Parse Kubernetes manifests for NetworkPolicy resources
   * Component JSON:
     * `.k8s.network_policies[].name` - NetworkPolicy name
@@ -1048,7 +1048,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that production workloads have associated NetworkPolicies
   * Configuration: Tags requiring network policies
 
-* **Default deny network policy exists**: Namespaces should have a default deny policy with explicit allow rules.
+* `k8s-default-deny-policy` **Default deny network policy exists**: Namespaces should have a default deny policy with explicit allow rules.
   * Collector(s): Parse NetworkPolicies for default deny patterns
   * Component JSON:
     * `.k8s.network_policies[].is_default_deny` - Boolean for default deny policy
@@ -1056,7 +1056,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that default deny policy exists in production namespaces
   * Configuration: None
 
-* **Egress traffic is restricted**: Workloads should have egress NetworkPolicies limiting outbound traffic.
+* `k8s-egress-restricted` **Egress traffic is restricted**: Workloads should have egress NetworkPolicies limiting outbound traffic.
   * Collector(s): Parse NetworkPolicies for egress rules
   * Component JSON:
     * `.k8s.network_policies[].has_egress_rules` - Boolean for egress restrictions
@@ -1066,7 +1066,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Service Mesh
 
-* **Service mesh sidecar is injected**: Workloads in service mesh namespaces should have sidecar injection.
+* `k8s-mesh-sidecar-injected` **Service mesh sidecar is injected**: Workloads in service mesh namespaces should have sidecar injection.
   * Collector(s): Check for service mesh sidecar containers or injection annotations
   * Component JSON:
     * `.k8s.workloads[].has_mesh_sidecar` - Boolean for sidecar presence
@@ -1075,7 +1075,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that workloads in mesh namespaces have sidecars
   * Configuration: Namespaces requiring mesh
 
-* **mTLS is enabled between services**: Service mesh mTLS should be enabled for inter-service communication.
+* `k8s-mesh-mtls-enabled` **mTLS is enabled between services**: Service mesh mTLS should be enabled for inter-service communication.
   * Collector(s): Check service mesh configuration for mTLS settings
   * Component JSON:
     * `.k8s.mesh.mtls_enabled` - Boolean for mTLS configuration
@@ -1089,7 +1089,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Encryption in Transit
 
-* **Services use TLS for external communication**: All external-facing services must use TLS encryption.
+* `k8s-ingress-tls` **Services use TLS for external communication**: All external-facing services must use TLS encryption.
   * Collector(s): Check Ingress and Service configurations for TLS settings
   * Component JSON:
     * `.k8s.ingresses[].tls_configured` - Boolean for TLS configuration
@@ -1098,7 +1098,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all Ingresses have TLS configured
   * Configuration: None
 
-* **TLS certificates are managed properly**: TLS certificates should be managed by cert-manager or similar automation.
+* `k8s-certs-auto-managed` **TLS certificates are managed properly**: TLS certificates should be managed by cert-manager or similar automation.
   * Collector(s): Check for cert-manager Certificate resources or annotations
   * Component JSON:
     * `.k8s.certificates[].managed_by` - Certificate management tool
@@ -1109,7 +1109,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Secrets Management
 
-* **Secrets are not stored in plain text in manifests**: Kubernetes Secrets should not be committed as plain YAML.
+* `k8s-no-plain-text-secrets` **Secrets are not stored in plain text in manifests**: Kubernetes Secrets should not be committed as plain YAML.
   * Collector(s): Scan Kubernetes manifests for Secret resources with plain data
   * Component JSON:
     * `.k8s.secrets[].source` - How secret is managed (sealed, external, vault)
@@ -1118,7 +1118,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no plain text secrets exist in manifests
   * Configuration: None
 
-* **External secrets manager is used**: Secrets should be managed by an external secrets manager (Vault, AWS Secrets Manager).
+* `k8s-external-secrets-manager` **External secrets manager is used**: Secrets should be managed by an external secrets manager (Vault, AWS Secrets Manager).
   * Collector(s): Check for ExternalSecret resources or Vault annotations
   * Component JSON:
     * `.k8s.secrets[].external_source` - External secret manager type
@@ -1126,7 +1126,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that secrets use external secrets manager
   * Configuration: Approved secret managers (e.g., ["vault", "aws-secrets-manager", "external-secrets"])
 
-* **Secrets have appropriate rotation policy**: Secrets should be configured for regular rotation.
+* `k8s-secrets-rotation-policy` **Secrets have appropriate rotation policy**: Secrets should be configured for regular rotation.
   * Collector(s): Check secret management configuration for rotation settings
   * Component JSON:
     * `.secrets.rotation_enabled` - Boolean for rotation configuration
@@ -1140,7 +1140,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Chart Validation
 
-* **Helm charts pass linting**: Helm charts must pass helm lint validation.
+* `helm-lint-passed` **Helm charts pass linting**: Helm charts must pass helm lint validation.
   * Collector(s): Run helm lint on chart directories
   * Component JSON:
     * `.helm.charts[].path` - Chart directory path
@@ -1149,7 +1149,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all Helm charts pass linting
   * Configuration: Lint strictness level
 
-* **Helm chart version follows semantic versioning**: Chart versions must follow semver for proper version management.
+* `helm-version-semver` **Helm chart version follows semantic versioning**: Chart versions must follow semver for proper version management.
   * Collector(s): Parse Chart.yaml for version field
   * Component JSON:
     * `.helm.charts[].version` - Chart version
@@ -1157,7 +1157,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that chart versions follow semantic versioning
   * Configuration: None
 
-* **Helm chart has values schema**: Charts should include a values.schema.json for validation.
+* `helm-values-schema` **Helm chart has values schema**: Charts should include a values.schema.json for validation.
   * Collector(s): Check for values.schema.json in chart directory
   * Component JSON:
     * `.helm.charts[].has_values_schema` - Boolean for schema presence
@@ -1165,7 +1165,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that production charts have values schema
   * Configuration: Tags requiring values schema
 
-* **Helm dependencies are version-pinned**: Chart dependencies must specify version constraints.
+* `helm-dependencies-pinned` **Helm dependencies are version-pinned**: Chart dependencies must specify version constraints.
   * Collector(s): Parse Chart.yaml dependencies for version specifications
   * Component JSON:
     * `.helm.charts[].dependencies[].name` - Dependency name
@@ -1180,7 +1180,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Schema Naming Conventions
 
-* **Table names follow naming convention**: Database tables must follow organization naming standards (e.g., snake_case, plural).
+* `db-table-naming-convention` **Table names follow naming convention**: Database tables must follow organization naming standards (e.g., snake_case, plural).
   * Collector(s): Parse SQL migration files or connect to database to extract table names
   * Component JSON:
     * `.database.schema.tables[].name` - Table name
@@ -1190,7 +1190,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all table names follow the configured naming convention
   * Configuration: Naming pattern regex (e.g., "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"), plural vs singular preference
 
-* **Column names follow naming convention**: Database columns must follow organization naming standards (e.g., snake_case).
+* `db-column-naming-convention` **Column names follow naming convention**: Database columns must follow organization naming standards (e.g., snake_case).
   * Collector(s): Parse SQL migration files or introspect database schema for column names
   * Component JSON:
     * `.database.schema.tables[].columns[].name` - Column name
@@ -1199,7 +1199,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all column names follow the configured naming convention
   * Configuration: Naming pattern regex, reserved word blacklist
 
-* **Primary key columns follow convention**: Primary key columns should use consistent naming (e.g., "id" or "table_id").
+* `db-pk-naming-convention` **Primary key columns follow convention**: Primary key columns should use consistent naming (e.g., "id" or "table_id").
   * Collector(s): Parse schema for primary key column names
   * Component JSON:
     * `.database.schema.tables[].primary_key.columns` - Array of PK column names
@@ -1207,7 +1207,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that primary key columns follow naming convention
   * Configuration: Allowed PK column names (default: ["id"]), UUID vs integer preference
 
-* **Foreign key columns follow naming convention**: Foreign key columns should be named consistently (e.g., "referenced_table_id").
+* `db-fk-naming-convention` **Foreign key columns follow naming convention**: Foreign key columns should be named consistently (e.g., "referenced_table_id").
   * Collector(s): Parse schema for foreign key column names and their referenced tables
   * Component JSON:
     * `.database.schema.tables[].foreign_keys[].column` - FK column name
@@ -1216,7 +1216,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that FK columns follow pattern like "referenced_table_id"
   * Configuration: FK naming pattern (default: "{table}_id")
 
-* **Index names follow naming convention**: Index names should include table name, column(s), and index type.
+* `db-index-naming-convention` **Index names follow naming convention**: Index names should include table name, column(s), and index type.
   * Collector(s): Parse schema for index definitions and names
   * Component JSON:
     * `.database.schema.tables[].indexes[].name` - Index name
@@ -1226,7 +1226,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that index names follow convention (e.g., "idx_table_column")
   * Configuration: Index naming pattern (e.g., "idx_{table}_{columns}", "ix_{table}_{columns}")
 
-* **Constraint names follow naming convention**: Constraints should have meaningful names, not auto-generated ones.
+* `db-constraint-naming-convention` **Constraint names follow naming convention**: Constraints should have meaningful names, not auto-generated ones.
   * Collector(s): Parse schema for constraint names (unique, check, FK constraints)
   * Component JSON:
     * `.database.schema.tables[].constraints[].name` - Constraint name
@@ -1235,7 +1235,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that constraints have explicit meaningful names
   * Configuration: Constraint naming patterns per type
 
-* **Enum types follow naming convention**: Custom enum types should follow naming conventions.
+* `db-enum-naming-convention` **Enum types follow naming convention**: Custom enum types should follow naming conventions.
   * Collector(s): Parse schema for enum type definitions
   * Component JSON:
     * `.database.schema.enums[].name` - Enum type name
@@ -1246,7 +1246,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Required Schema Elements
 
-* **Tables have primary keys**: Every table must have a primary key defined.
+* `db-tables-have-pk` **Tables have primary keys**: Every table must have a primary key defined.
   * Collector(s): Parse schema to verify primary key presence on all tables
   * Component JSON:
     * `.database.schema.tables[].has_primary_key` - Boolean for PK presence
@@ -1255,7 +1255,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all tables have primary keys
   * Configuration: Exceptions for specific table patterns (e.g., join tables)
 
-* **Tables have timestamp columns**: Tables should include created_at and updated_at columns for auditing.
+* `db-tables-have-timestamps` **Tables have timestamp columns**: Tables should include created_at and updated_at columns for auditing.
   * Collector(s): Parse schema for standard timestamp columns
   * Component JSON:
     * `.database.schema.tables[].has_created_at` - Boolean for created_at presence
@@ -1264,7 +1264,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that tables include required timestamp columns
   * Configuration: Required timestamp columns (default: ["created_at", "updated_at"]), exceptions
 
-* **Tables use soft delete pattern**: Tables should use soft delete (deleted_at column) instead of hard delete.
+* `db-soft-delete-pattern` **Tables use soft delete pattern**: Tables should use soft delete (deleted_at column) instead of hard delete.
   * Collector(s): Parse schema for soft delete column presence
   * Component JSON:
     * `.database.schema.tables[].has_deleted_at` - Boolean for deleted_at/soft delete column
@@ -1272,7 +1272,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that tables tagged for soft delete have the pattern implemented
   * Configuration: Tags requiring soft delete, soft delete column name (default: "deleted_at")
 
-* **Foreign keys have indexes**: Columns used in foreign key relationships should have indexes for query performance.
+* `db-fk-indexed` **Foreign keys have indexes**: Columns used in foreign key relationships should have indexes for query performance.
   * Collector(s): Parse schema for FK columns and verify corresponding indexes exist
   * Component JSON:
     * `.database.schema.tables[].foreign_keys[].column` - FK column
@@ -1281,7 +1281,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all foreign key columns have indexes
   * Configuration: None
 
-* **Tables have appropriate indexes for common queries**: Tables should have indexes on frequently queried columns.
+* `db-adequate-indexes` **Tables have appropriate indexes for common queries**: Tables should have indexes on frequently queried columns.
   * Collector(s): Parse schema for index coverage, optionally analyze query patterns
   * Component JSON:
     * `.database.schema.tables[].indexes` - Array of index definitions
@@ -1290,7 +1290,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that tables have indexes on commonly queried columns
   * Configuration: Column patterns that should be indexed (e.g., "*_id", "status", "type")
 
-* **UUID columns use appropriate type**: UUID columns should use native UUID type, not VARCHAR.
+* `db-uuid-native-type` **UUID columns use appropriate type**: UUID columns should use native UUID type, not VARCHAR.
   * Collector(s): Parse schema for columns that appear to store UUIDs
   * Component JSON:
     * `.database.schema.tables[].columns[].appears_uuid` - Boolean for UUID-like column
@@ -1301,7 +1301,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Schema Security
 
-* **No plaintext password columns**: Schema should not have columns that appear to store plaintext passwords.
+* `db-no-plaintext-passwords` **No plaintext password columns**: Schema should not have columns that appear to store plaintext passwords.
   * Collector(s): Parse schema for column names suggesting password storage
   * Component JSON:
     * `.database.schema.tables[].columns[].is_password_column` - Boolean for password-like name
@@ -1310,7 +1310,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no columns suggest plaintext password storage
   * Configuration: Password column name patterns to detect
 
-* **Sensitive columns are identified**: Columns containing PII or sensitive data should be tagged/documented.
+* `db-sensitive-columns-tagged` **Sensitive columns are identified**: Columns containing PII or sensitive data should be tagged/documented.
   * Collector(s): Parse schema and column comments for sensitive data markers
   * Component JSON:
     * `.database.schema.tables[].columns[].is_sensitive` - Boolean for sensitive column
@@ -1319,7 +1319,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that columns matching sensitive patterns are tagged
   * Configuration: Sensitive column name patterns (e.g., "*_ssn", "*_email", "*_phone")
 
-* **PII columns have appropriate handling**: Columns containing PII should have encryption or masking configured.
+* `db-pii-columns-protected` **PII columns have appropriate handling**: Columns containing PII should have encryption or masking configured.
   * Collector(s): Parse schema and related encryption/masking configurations
   * Component JSON:
     * `.database.schema.tables[].columns[].contains_pii` - Boolean for PII column
@@ -1328,7 +1328,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that PII columns have appropriate protection configured
   * Configuration: PII protection requirements per data type
 
-* **Audit log tables exist for sensitive operations**: Sensitive tables should have corresponding audit log tables.
+* `db-audit-tables-exist` **Audit log tables exist for sensitive operations**: Sensitive tables should have corresponding audit log tables.
   * Collector(s): Parse schema for audit log table patterns
   * Component JSON:
     * `.database.schema.tables[].requires_audit` - Boolean for audit requirement
@@ -1339,7 +1339,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Migration Standards
 
-* **Migration files follow naming convention**: Migration files should have consistent naming with timestamps and descriptions.
+* `db-migration-naming-convention` **Migration files follow naming convention**: Migration files should have consistent naming with timestamps and descriptions.
   * Collector(s): Scan migration directory for file names and validate format
   * Component JSON:
     * `.database.migrations[].filename` - Migration file name
@@ -1349,7 +1349,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that migration files follow naming convention
   * Configuration: Migration naming pattern (e.g., "{timestamp}_{description}.sql", "V{version}__{description}.sql")
 
-* **Migrations are reversible**: Migration files should include rollback/down migrations.
+* `db-migration-reversible` **Migrations are reversible**: Migration files should include rollback/down migrations.
   * Collector(s): Parse migration files for up/down sections or corresponding rollback files
   * Component JSON:
     * `.database.migrations[].has_rollback` - Boolean for rollback presence
@@ -1358,7 +1358,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that migrations have corresponding rollback definitions
   * Configuration: Whether rollbacks are required for all or just production
 
-* **Migrations avoid destructive changes without approval**: DROP TABLE, DROP COLUMN, and similar should require explicit approval.
+* `db-migration-destructive-approved` **Migrations avoid destructive changes without approval**: DROP TABLE, DROP COLUMN, and similar should require explicit approval.
   * Collector(s): Parse migration SQL for destructive DDL statements
   * Component JSON:
     * `.database.migrations[].contains_destructive_ddl` - Boolean for destructive operations
@@ -1367,7 +1367,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that destructive migrations have approval markers or are blocked
   * Configuration: Destructive DDL patterns, approval annotation format
 
-* **Migrations do not modify data in DDL files**: Schema migrations should not mix DDL and DML statements.
+* `db-migration-no-mixed-ddl-dml` **Migrations do not modify data in DDL files**: Schema migrations should not mix DDL and DML statements.
   * Collector(s): Parse migration files for DML statements (INSERT, UPDATE, DELETE)
   * Component JSON:
     * `.database.migrations[].contains_dml` - Boolean for DML presence
@@ -1376,7 +1376,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that DDL migrations do not contain DML statements
   * Configuration: Whether to allow mixed migrations, DML-only migration patterns
 
-* **Large table migrations use online DDL**: Migrations on large tables should use non-blocking techniques.
+* `db-migration-online-ddl` **Large table migrations use online DDL**: Migrations on large tables should use non-blocking techniques.
   * Collector(s): Parse migration SQL and correlate with table size information
   * Component JSON:
     * `.database.migrations[].affected_tables` - Tables modified by migration
@@ -1385,7 +1385,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that migrations on large tables use online DDL patterns
   * Configuration: Table size threshold for online DDL requirement, online DDL patterns
 
-* **Migration files are idempotent where possible**: Migrations should use IF EXISTS/IF NOT EXISTS for safety.
+* `db-migration-idempotent` **Migration files are idempotent where possible**: Migrations should use IF EXISTS/IF NOT EXISTS for safety.
   * Collector(s): Parse migration SQL for idempotent patterns
   * Component JSON:
     * `.database.migrations[].is_idempotent` - Boolean for idempotent patterns
@@ -1396,7 +1396,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Database Performance Standards
 
-* **Tables do not exceed column limit**: Tables should not have too many columns, suggesting normalization issues.
+* `db-column-limit` **Tables do not exceed column limit**: Tables should not have too many columns, suggesting normalization issues.
   * Collector(s): Parse schema and count columns per table
   * Component JSON:
     * `.database.schema.tables[].column_count` - Number of columns
@@ -1404,7 +1404,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that tables do not exceed maximum column count
   * Configuration: Maximum columns per table (default: 50)
 
-* **VARCHAR columns have appropriate lengths**: VARCHAR columns should have explicit, reasonable length limits.
+* `db-varchar-length` **VARCHAR columns have appropriate lengths**: VARCHAR columns should have explicit, reasonable length limits.
   * Collector(s): Parse schema for VARCHAR column definitions
   * Component JSON:
     * `.database.schema.tables[].columns[].type` - Column type
@@ -1413,7 +1413,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that VARCHAR columns have explicit lengths and are not excessively large
   * Configuration: Maximum VARCHAR length (default: 1000), patterns requiring specific lengths
 
-* **TEXT/BLOB columns are justified**: Large object columns should only be used when necessary.
+* `db-lob-columns-justified` **TEXT/BLOB columns are justified**: Large object columns should only be used when necessary.
   * Collector(s): Parse schema for TEXT, BLOB, CLOB, BYTEA columns
   * Component JSON:
     * `.database.schema.tables[].columns[].is_lob_type` - Boolean for LOB type
@@ -1421,7 +1421,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that LOB columns are explicitly approved or limited
   * Configuration: Maximum LOB columns per table, approved LOB column patterns
 
-* **Indexes do not have too many columns**: Composite indexes should not include too many columns.
+* `db-index-column-limit` **Indexes do not have too many columns**: Composite indexes should not include too many columns.
   * Collector(s): Parse schema for index column counts
   * Component JSON:
     * `.database.schema.tables[].indexes[].column_count` - Number of columns in index
@@ -1429,7 +1429,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that indexes do not have excessive columns
   * Configuration: Maximum index columns (default: 5)
 
-* **No duplicate indexes exist**: Schema should not have redundant/duplicate indexes.
+* `db-no-duplicate-indexes` **No duplicate indexes exist**: Schema should not have redundant/duplicate indexes.
   * Collector(s): Parse schema and detect indexes with identical or subset column lists
   * Component JSON:
     * `.database.schema.tables[].duplicate_indexes` - Array of duplicate index pairs
@@ -1437,7 +1437,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that no duplicate or redundant indexes exist
   * Configuration: None
 
-* **Appropriate data types are used**: Columns should use appropriate types (not storing everything as VARCHAR).
+* `db-appropriate-data-types` **Appropriate data types are used**: Columns should use appropriate types (not storing everything as VARCHAR).
   * Collector(s): Parse schema and analyze column types vs naming patterns
   * Component JSON:
     * `.database.schema.tables[].columns[].type_appropriate` - Boolean for appropriate type
@@ -1447,7 +1447,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Database Documentation
 
-* **Tables have comments/descriptions**: All tables should have descriptive comments explaining their purpose.
+* `db-tables-have-comments` **Tables have comments/descriptions**: All tables should have descriptive comments explaining their purpose.
   * Collector(s): Parse schema for table comments/descriptions
   * Component JSON:
     * `.database.schema.tables[].comment` - Table comment/description
@@ -1456,7 +1456,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all tables have non-empty comments
   * Configuration: Minimum comment length, exceptions for specific tables
 
-* **Columns have comments/descriptions**: Important columns should have comments explaining their purpose and valid values.
+* `db-columns-have-comments` **Columns have comments/descriptions**: Important columns should have comments explaining their purpose and valid values.
   * Collector(s): Parse schema for column comments/descriptions
   * Component JSON:
     * `.database.schema.tables[].columns[].comment` - Column comment
@@ -1465,7 +1465,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that column documentation meets minimum percentage
   * Configuration: Minimum documentation percentage (default: 80%)
 
-* **Enum values are documented**: Enum types should have documentation for each value.
+* `db-enums-documented` **Enum values are documented**: Enum types should have documentation for each value.
   * Collector(s): Parse schema and documentation for enum value explanations
   * Component JSON:
     * `.database.schema.enums[].values` - Enum values
@@ -1474,7 +1474,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that enum values are documented
   * Configuration: None
 
-* **Schema diagram is up to date**: Database should have an ERD or schema diagram that reflects current state.
+* `db-schema-diagram-current` **Schema diagram is up to date**: Database should have an ERD or schema diagram that reflects current state.
   * Collector(s): Check for schema diagram files and compare timestamps with migrations
   * Component JSON:
     * `.database.documentation.schema_diagram_exists` - Boolean for diagram presence
@@ -1486,7 +1486,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ### Database Operational Standards
 
-* **Connection pooling is configured**: Applications should use connection pooling for database access.
+* `db-connection-pooling` **Connection pooling is configured**: Applications should use connection pooling for database access.
   * Collector(s): Parse application configuration for database connection pool settings
   * Component JSON:
     * `.database.connection.pool_enabled` - Boolean for connection pooling
@@ -1495,7 +1495,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that connection pooling is configured
   * Configuration: Minimum/maximum pool size
 
-* **Query timeout is configured**: Database queries should have timeout limits to prevent runaway queries.
+* `db-query-timeout` **Query timeout is configured**: Database queries should have timeout limits to prevent runaway queries.
   * Collector(s): Parse database and application configuration for timeout settings
   * Component JSON:
     * `.database.connection.query_timeout` - Query timeout value
@@ -1504,7 +1504,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that query timeout is configured
   * Configuration: Maximum timeout value (default: 30 seconds)
 
-* **Read replicas are used for read operations**: Applications should route read queries to read replicas where available.
+* `db-read-replicas-used` **Read replicas are used for read operations**: Applications should route read queries to read replicas where available.
   * Collector(s): Parse application and infrastructure configuration for read replica usage
   * Component JSON:
     * `.database.replicas.read_replicas_exist` - Boolean for read replica presence
@@ -1513,7 +1513,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that applications are configured to use read replicas
   * Configuration: Tags requiring read replica usage
 
-* **Database backup verification is documented**: Backup restoration should be periodically tested and documented.
+* `db-backup-verification` **Database backup verification is documented**: Backup restoration should be periodically tested and documented.
   * Collector(s): Check for backup verification documentation and timestamps
   * Component JSON:
     * `.database.backup.verification_documented` - Boolean for documentation
@@ -1522,7 +1522,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that backup verification was performed within threshold
   * Configuration: Maximum days between verifications (default: 90)
 
-* **Database has point-in-time recovery**: Production databases should support point-in-time recovery.
+* `db-pitr-enabled` **Database has point-in-time recovery**: Production databases should support point-in-time recovery.
   * Collector(s): Check database/IaC configuration for PITR settings
   * Component JSON:
     * `.database.backup.pitr_enabled` - Boolean for PITR configuration
@@ -1530,7 +1530,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that PITR is enabled for production databases
   * Configuration: Minimum retention period (default: 7 days)
 
-* **Slow query logging is enabled**: Database should log slow queries for performance analysis.
+* `db-slow-query-logging` **Slow query logging is enabled**: Database should log slow queries for performance analysis.
   * Collector(s): Check database configuration for slow query log settings
   * Component JSON:
     * `.database.logging.slow_query_log_enabled` - Boolean for slow query logging
@@ -1538,7 +1538,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that slow query logging is enabled
   * Configuration: Maximum slow query threshold (default: 1000ms)
 
-* **Database metrics are collected**: Database should have metrics collection configured for monitoring.
+* `db-metrics-collected` **Database metrics are collected**: Database should have metrics collection configured for monitoring.
   * Collector(s): Check for database metrics/monitoring configuration
   * Component JSON:
     * `.database.monitoring.metrics_enabled` - Boolean for metrics collection
@@ -1551,7 +1551,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
 
 ## Summary Policies
 
-* **Kubernetes manifests are all valid**: All Kubernetes manifest files must be syntactically valid.
+* `k8s-manifests-valid` **Kubernetes manifests are all valid**: All Kubernetes manifest files must be syntactically valid.
   * Collector(s): Parse all YAML files with Kubernetes manifest patterns
   * Component JSON:
     * `.k8s.manifests[].valid` - Boolean for manifest validity
@@ -1560,7 +1560,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that all Kubernetes manifests are valid
   * Configuration: None
 
-* **All security contexts are properly configured**: Aggregate check that all container security settings are correct.
+* `k8s-security-contexts-compliant` **All security contexts are properly configured**: Aggregate check that all container security settings are correct.
   * Collector(s): Aggregate security context checks from all containers
   * Component JSON:
     * `.k8s.summary.all_non_root` - All run as non-root
@@ -1570,7 +1570,7 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Policy: Assert that aggregate security compliance is true
   * Configuration: Which security checks to include in aggregate
 
-* **Infrastructure meets compliance requirements**: Aggregate check that IaC meets organizational compliance standards.
+* `iac-compliance-score` **Infrastructure meets compliance requirements**: Aggregate check that IaC meets organizational compliance standards.
   * Collector(s): Aggregate IaC compliance checks
   * Component JSON:
     * `.iac.datastores.all_deletion_protected` - All datastores protected
