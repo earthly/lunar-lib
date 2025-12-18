@@ -1,0 +1,68 @@
+version: 0
+
+name: ci-meta
+description: Collect CI/CD metadata
+
+collectors:
+  - name: ci-meta-before-cmd
+    description: Collect CI/CD command metadata
+    hook:
+      type: ci-before-command
+      pattern: .*
+    runBash: |
+      set -x
+      cmd_hash=$(echo -n "$LUNAR_HOOK_CMD" | sha256sum | awk '{print $1}')
+      timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      env_json=$(env | awk -F= '
+        {
+          # Escape special JSON characters in the value
+          val = substr($0, index($0, "=") + 1)
+          gsub(/\\/, "\\\\", val)
+          gsub(/"/, "\\\"", val)
+          gsub(/\t/, "\\t", val)
+          gsub(/\r/, "\\r", val)
+          gsub(/\n/, "\\n", val)
+          # Print as JSON key-value pair
+          printf "\"%s\":\"%s\",\n", $1, val
+        }
+      ' | sed '$ s/,$//' | awk 'BEGIN{print "{"} {print} END{print "}"}')
+      # Collect the following JSON object:
+      # {
+      #   "hash": "the SHA256 hash of the command",
+      #   "cmd": "the command that was run",
+      #   "start_time": "the UTC timestamp of when the command started",
+      #   "env": "a JSON object of the environment variables that were set"
+      # }
+      echo "{\"hash\":\"$cmd_hash\",\"cmd\":$LUNAR_HOOK_CMD,\"start_time\":\"$timestamp\",\"env\":$env_json}" | \
+        lunar collect -j ".ci.commands.$cmd_hash" -
+  - name: ci-meta-after-command
+    description: Collect CI/CD command metadata
+    hook:
+      type: ci-after-command
+      pattern: .*
+    runBash: |
+      set -x
+      cmd_hash=$(echo -n "$LUNAR_HOOK_CMD" | sha256sum | awk '{print $1}')
+      timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      lunar collect ".ci.commands.$cmd_hash.end_time" "$timestamp"
+  - name: ci-meta-job
+    description: Collect CI/CD job metadata
+    hook:
+      type: ci-before-job
+      pattern: .*
+    runBash: |
+      set -x
+      env | awk -F= '
+        {
+          # Escape special JSON characters in the value
+          val = substr($0, index($0, "=") + 1)
+          gsub(/\\/, "\\\\", val)
+          gsub(/"/, "\\\"", val)
+          gsub(/\t/, "\\t", val)
+          gsub(/\r/, "\\r", val)
+          gsub(/\n/, "\\n", val)
+          # Print as JSON key-value pair
+          printf "\"%s\":\"%s\",\n", $1, val
+        }
+      ' | sed '$ s/,$//' | awk 'BEGIN{print "{"} {print} END{print "}"}' | \
+        lunar collect -j ".ci.before-job-env" -

@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: snyk-github-app
+    description: Check if Snyk Github app is running in PRs 
+    mainBash: main.sh
+    hook:
+      type: code

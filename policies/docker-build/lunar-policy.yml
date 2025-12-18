@@ -1,0 +1,8 @@
+version: 0
+
+name: Docker Build
+description: Docker build best practices
+author: core-team@pantalasa.org
+
+policies:
+  - mainPython: ./main.py

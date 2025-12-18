@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: backstage
+    description: Collect and run validation on the Backstage catalog-info.yaml 
+    mainBash: main.sh 
+    hook:
+      type: code

@@ -1,0 +1,15 @@
+version: 0
+
+name: sbom
+description: Disallows specified licenses in SBOM components across all programming languages
+author: core-team@pantalasa.org
+
+policies:
+  - name: sbom-exists
+    mainPython: ./sbom-exists.py
+  - name: sbom-disallowed-licenses
+    mainPython: ./licenses.py
+
+inputs:
+  disallowed_licenses:
+    description: Comma-separated list of licenses that are not allowed

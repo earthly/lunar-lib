@@ -1,0 +1,14 @@
+version: 0
+
+name: Branch Naming
+description: Enforces branch naming convention (must start with approved prefix)
+author: core-team@pantalasa.org
+
+policies:
+  - mainPython: ./main.py
+
+inputs:
+  approvedPrefixes:
+    description: The list of approved branch prefixes as a comma-separated list.
+    default: "feature/,bugfix/,hotfix/,release/,f/,b/,h/"
+

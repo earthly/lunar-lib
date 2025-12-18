@@ -1,0 +1,9 @@
+version: 0
+
+collectors:
+  - name: github-pr
+    description: Collect GitHub PR details from the GitHub API
+    mainBash: main.sh
+    hook:
+      type: code
+

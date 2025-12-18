@@ -1,0 +1,8 @@
+version: 0
+
+name: README
+description: Readme best practices
+author: support@earthly.dev
+
+policies:
+  - mainPython: ./main.py

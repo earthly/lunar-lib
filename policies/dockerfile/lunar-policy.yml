@@ -1,0 +1,16 @@
+version: 0
+
+name: Dockerfile
+description: Dockerfile best practices
+author: core-team@pantalasa.org
+
+policies:
+  - mainPython: ./main.py
+
+inputs:
+  requiredLabels:
+    description: The list of required labels as a comma-separated list.
+    default: ""
+  allowedRegistries:
+    description: The list of allowed registries as a comma-separated list.
+    default: "docker.io"

@@ -1,0 +1,7 @@
+version: 0
+
+policies:
+  - name: jira
+    description: Verify Jira ticket is present in PR
+    mainPython: main.py
+

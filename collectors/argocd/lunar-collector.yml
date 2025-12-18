@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: argocd
+    description: Collect ArgoCD applications and projects
+    mainBash: main.sh
+    hook:
+      type: code

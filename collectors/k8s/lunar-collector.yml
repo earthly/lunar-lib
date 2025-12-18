@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: k8s
+    description: Collect and validate k8s config files
+    mainBash: main.sh 
+    hook:
+      type: code

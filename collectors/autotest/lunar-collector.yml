@@ -1,0 +1,9 @@
+version: 0
+
+collectors:
+  - name: autotest
+    description: Collect automated test results from autotest.value file
+    mainBash: main.sh
+    hook:
+      type: code
+

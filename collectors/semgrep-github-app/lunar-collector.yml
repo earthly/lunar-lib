@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: semgrep-github-app
+    description: Check if Semgrep Github app is running in PRs 
+    mainBash: main.sh
+    hook:
+      type: code

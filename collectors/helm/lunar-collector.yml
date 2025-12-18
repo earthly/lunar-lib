@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: helm
+    description: Collect and validate Helm charts
+    mainBash: main.sh 
+    hook:
+      type: code

@@ -1,0 +1,11 @@
+version: 0
+
+policies:
+  - mainPython: ./main.py
+
+inputs:
+  minReplicas:
+    description: Minimum replicas
+  maxLimitToRequestRatio:
+    description: Maximum limit to request ratio, integer/float as string, e.g. "4" (default "4")
+    default: 4

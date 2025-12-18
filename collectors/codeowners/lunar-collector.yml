@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: codeowners
+    description: Collect the CODEOWNERS file
+    mainBash: main.sh
+    hook:
+      type: code

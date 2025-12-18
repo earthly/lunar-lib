@@ -1,0 +1,44 @@
+version: 0
+
+name: golang
+description: Collect Go project information, CI/CD commands, test coverage, and linting
+
+collectors:
+  - name: go-cicd
+    description: Collects every Go command run in CI/CD along with the version of Go used.
+    mainBash: go-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b .*
+
+  - name: go-test-scope
+    description: Collect the scope of the tests run in Go
+    mainBash: go-test-scope.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b test.*
+
+  - name: go-test-coverage
+    description: Collect test coverage information for Go
+    mainBash: go-test-coverage.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\bgo\b test.*
+
+  - name: go-project
+    description: Collect Go project information and run linting checks
+    mainBash: go-project.sh
+    hook:
+      type: code
+
+  - name: golangci-lint
+    description: Run golangci-lint and collect results
+    mainBash: golangci-lint.sh
+    hook:
+      type: code
+
+  - name: go-dependencies
+    description: Collect Go module dependencies
+    mainBash: go-dependencies.sh
+    hook:
+      type: code

@@ -1,0 +1,12 @@
+version: 0
+collectors:
+  - name: claude
+    description: Run claude prompt and collect the results under the specified path
+    mainBash: main.sh
+    hook:
+      type: code
+inputs:
+  path:
+    description: JSON component path to write the results to.
+  prompt:
+    description: Prompt for claude to run on the component repository.

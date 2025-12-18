@@ -1,0 +1,222 @@
+version: 0
+hub:
+  host: my.company.com
+  grpcPort: 443
+  httpPort: 443
+
+domains:
+    engineering:
+        description: Root Engineering Org
+        owner: rob@pantalasa.org
+
+components:
+    github.com/org/repo:
+        owner: eng@example.com
+        domain: engineering
+        branch: "main"
+        tags: [backend, go, SOC2]
+
+###########################################
+# Collectors gather data from code and CI #
+###########################################
+collectors:
+  # Programming languages
+  - uses: ./collectors/golang
+    on: ["domain:engineering"]
+  - uses: ./collectors/python
+    on: ["domain:engineering"]
+  - uses: ./collectors/nodejs
+    on: ["domain:engineering"]
+  - uses: ./collectors/java
+    on: ["domain:engineering"]
+  # Infrastructure 
+  - uses: ./collectors/k8s
+    on: ["domain:engineering"]
+  - uses: ./collectors/helm
+    on: ["domain:engineering"]
+  - uses: ./collectors/dockerfile
+    on: ["domain:engineering"]
+  - uses: ./collectors/terraform
+    on: ["domain:engineering"]
+  - uses: ./collectors/docker-build
+    on: ["domain:engineering"]
+  # Repo standards, layout, and cataloging
+  - uses: ./collectors/backstage
+    on: ["domain:engineering"]
+  - uses: ./collectors/readme
+    on: ["domain:engineering"]
+  - uses: ./collectors/codeowners
+    on: ["domain:engineering"]
+  # CI/CD pipelines and build systems
+  - uses: ./collectors/argocd
+    on: ["domain:engineering"]
+  - uses: ./collectors/buildkite
+    on: ["domain:engineering"]
+  - uses: ./collectors/ci-otel
+    on: ["domain:engineering"]
+  # Source control and ticketing
+  - uses: ./collectors/github-pr
+    on: ["domain:engineering"]
+  - uses: ./collectors/jira
+    on: ["domain:engineering"]
+  # Security & Compliance
+  - uses: ./collectors/sbom
+    on: ["domain:engineering"]
+  - uses: ./collectors/snyk-github-app
+    on: ["domain:engineering"]
+  - uses: ./collectors/semgrep-github-app
+    on: ["domain:engineering"]
+  # AI
+  - uses: ./collectors/claude
+    on: ["domain:engineering"]
+    with:
+      path: "repo.summary"
+      prompt: "Summarize the repository in less than 1000 words. Output the summary in markdown format"
+
+##################################
+# Initiatives aggregate policies #
+##################################
+initiatives:
+  - name: code-quality
+    description: Improve code quality across all tech stacks
+    owner: engineering@pantalasa.org
+    on: ["domain:engineering"]
+
+  - name: standardization
+    description: Require all teams to describe and document their components following company standards
+    owner: cto@pantalasa.org
+    on: ["domain:engineering"]
+
+  - name: good-practices
+    description: Ensure all code follows best practices
+    owner: engineering@pantalasa.org
+    on: ["domain:engineering"]
+
+  - name: security
+    description: Ensure all code is secure
+    owner: security@pantalasa.org
+    on: ["domain:engineering"]
+
+  - name: sdlc-process
+    description: Ensure all code follows the SDLC process
+    owner: engineering@pantalasa.org
+    on: ["domain:engineering"]
+
+##################################################
+# Policies define checks over the collected data #
+##################################################
+policies:
+  - uses: ./policies/backstage
+    name: backstage
+    description: Checks if Backstage catalog file is present and valid
+    initiative: standardization
+    enforcement: score
+
+  - uses: ./policies/dockerfile
+    name: dockerfile
+    description: Dockerfile best practices
+    initiative: good-practices
+    enforcement: block-pr
+    with:
+      requiredLabels: "application_name,description,owner,source_uri"
+      allowedRegistries: "cgr.dev,reg.pantalasa.com"
+
+  - uses: ./policies/docker-build
+    name: docker-build
+    description: Docker build best practices
+    initiative: good-practices
+    enforcement: report-pr
+
+  - uses: ./policies/k8s
+    name: k8s
+    description: Checks if k8s descriptors are valid
+    initiative: standardization
+    enforcement: report-pr
+    with:
+      minReplicas: 3
+      maxLimitToRequestRatio: 4
+
+  - uses: ./policies/terraform
+    name: terraform
+    description: Terraform best practices
+    initiative: good-practices
+    enforcement: report-pr
+
+  - uses: ./policies/readme
+    name: readme
+    description: README best practices
+    initiative: standardization
+    enforcement: score
+
+  - uses: ./policies/branch-naming
+    name: branch-naming
+    description: Enforces branch naming convention (must start with approved prefix)
+    initiative: good-practices
+    enforcement: report-pr
+    with:
+      approvedPrefixes: "feature/,bugfix/,hotfix/,release/,f/,b/,h/"
+
+  - uses: ./policies/jira
+    name: jira
+    description: Verify Jira ticket is present in PR
+    initiative: sdlc-process
+    enforcement: report-pr
+
+  - uses: ./policies/sca
+    name: sca
+    initiative: security
+    description: Require SCA scanners are run on each code change
+    enforcement: report-pr
+
+  - uses: ./policies/golang
+    name: golang
+    description: Requires recent versions of Go in CI/CD
+    initiative: good-practices
+    enforcement: report-pr
+    on: ["domain:engineering"]
+    with:
+      min_version: "1.21.0"
+
+  - uses: ./policies/java
+    name: java
+    description: Requires recent versions of Java and Maven in CI/CD
+    initiative: good-practices
+    enforcement: report-pr
+    on: ["domain:engineering"]
+    with:
+      min_java_version: "17.0.0"
+      min_maven_version: "3.9.0"
+      min_gradle_version: "8.0.0"
+
+  - uses: ./policies/sbom
+    name: sbom
+    description: Ensure SBOMs are generated and contain approved licenses
+    initiative: security
+    enforcement: block-pr
+    on: ["domain:engineering"]
+    with:
+      disallowed_licenses: "GPL.*,BSL.*,AGPL.*"
+
+  - uses: ./policies/dependency-versions
+    name: dependency-versions-go
+    description: Checks for vulnerable Java dependencies
+    initiative: security
+    enforcement: report-pr
+    on: ["domain:engineering"]
+    with:
+      language: "go"
+      min_versions: '{"github.com/sirupsen/logrus": "1.9.0"}'
+
+  - uses: ./policies/dependency-versions
+    name: dependency-versions-java
+    description: Checks for vulnerable Java dependencies
+    initiative: security
+    enforcement: report-pr
+    on: ["domain:engineering"]
+    with:
+      language: "java"
+      min_versions: |-
+        {
+          "org.apache.commons:commons-text": "1.10.0", 
+          "com.aperture.internal:payments-core": "3.0.0"
+        }

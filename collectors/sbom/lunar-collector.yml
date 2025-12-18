@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: sbom
+    description: Generate a CycloneDX SBOM for the repository using syft
+    mainBash: main.sh
+    hook:
+      type: code

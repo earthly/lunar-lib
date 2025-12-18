@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: buildkite
+    description: Collect and validate Buildkite pipelines
+    mainBash: main.sh
+    hook:
+      type: code

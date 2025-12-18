@@ -1,0 +1,31 @@
+version: 0
+
+name: nodejs
+description: Collects Node.js project information, CI/CD commands, and dependencies.
+
+collectors:
+  - name: nodejs-cicd
+    description: Collects Node.js package manager commands run in CI/CD along with Node.js version.
+    mainBash: nodejs-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(npm|npx|yarn|pnpm)\b.*
+
+  - name: nodejs-project
+    description: Collect Node.js project metadata (build tool, key files, Node version).
+    mainBash: nodejs-project.sh
+    hook:
+      type: code
+
+  - name: nodejs-dependencies
+    description: Collect Node.js dependencies from package.json.
+    mainBash: nodejs-dependencies.sh
+    hook:
+      type: code
+
+  - name: nodejs-tests-coverage
+    description: Collect test coverage information for Node.js test runs (Jest).
+    mainBash: nodejs-tests-coverage.sh
+    hook:
+      type: ci-before-command
+      pattern: ^npm test.*

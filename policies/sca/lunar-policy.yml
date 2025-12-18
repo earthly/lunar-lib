@@ -1,0 +1,8 @@
+version: 0
+
+name: SCA Scan
+description: An approved SCA Scanner should be configured
+author: support@earthly.dev
+
+policies:
+  - mainPython: ./main.py

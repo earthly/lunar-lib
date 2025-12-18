@@ -1,0 +1,7 @@
+version: 0
+
+description: Checks if codeowners file is present
+author: core-team@pantalasa.org
+
+policies:
+  - mainPython: ./main.py

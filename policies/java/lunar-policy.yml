@@ -1,0 +1,25 @@
+version: 0
+
+name: java
+description: Requires recent versions of Java and Maven in CI/CD
+author: core-team@pantalasa.org
+
+policies:
+  - name: java-min-version
+    mainPython: ./min-version.py
+  - name: maven-min-version
+    mainPython: ./maven-min-version.py
+  - name: gradle-min-version
+    mainPython: ./gradle-min-version.py
+
+inputs:
+  min_java_version:
+    description: The minimum Java version
+    default: "17.0.0"
+  min_maven_version:
+    description: The minimum Maven version
+    default: "3.9.0"
+  min_gradle_version:
+    description: The minimum Gradle version
+    default: "8.0.0"
+

@@ -1,0 +1,8 @@
+version: 0
+
+collectors:
+  - name: terraform
+    description: Collect and validate Terraform configuration
+    mainBash: main.sh
+    hook:
+      type: code

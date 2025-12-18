@@ -1,0 +1,16 @@
+version: 0
+
+name: golang
+description: Requires recent versions of Go in CI/CD
+author: core-team@pantalasa.org
+
+policies:
+  - name: go-min-version
+    mainPython: ./min-version.py
+  # - name: go-allowed-licenses
+  #   mainPython: ./license-check.py
+
+inputs:
+  min_version:
+    description: The minimum Go version
+    default: 0.1

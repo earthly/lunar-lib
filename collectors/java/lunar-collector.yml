@@ -1,0 +1,53 @@
+version: 0
+
+name: java
+description: Collects Java project information, CI/CD commands, and dependencies.
+
+collectors:
+  - name: java-cicd
+    description: Collects Java commands (java, javac) run in CI/CD along with Java version.
+    mainBash: java-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(java|javac)\b.*
+
+  - name: maven-cicd
+    description: Collects Maven commands run in CI/CD along with Java version.
+    mainBash: maven-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(mvn|mvnw)\b.*
+
+  - name: gradle-cicd
+    description: Collects Gradle commands run in CI/CD along with Java version.
+    mainBash: gradle-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(gradle|gradlew)\b.*
+
+  - name: java-test-scope
+    description: Collect the scope of the tests run in Java (Maven/Gradle).
+    mainBash: java-test-scope.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(mvn|mvnw|gradle|gradlew)\b .*test.*
+
+  - name: java-test-coverage
+    description: Collect test coverage information for Java (Jacoco).
+    mainBash: java-test-coverage.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\b(mvn|mvnw|gradle|gradlew)\b .*test.*
+
+  - name: java-project
+    description: Collect Java project metadata (build tool, key files, Java version).
+    mainBash: java-project.sh
+    hook:
+      type: code
+
+  - name: java-dependencies
+    description: Collect Java dependencies from pom.xml or gradle.lockfile.
+    mainBash: java-dependencies.sh
+    hook:
+      type: code
+

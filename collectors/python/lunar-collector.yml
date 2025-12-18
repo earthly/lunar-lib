@@ -1,0 +1,31 @@
+version: 0
+
+name: python
+description: Collects Python project information, CI/CD commands, and dependencies.
+
+collectors:
+  - name: python-cicd
+    description: Collects every Python/pip command run in CI/CD along with the Python version.
+    mainBash: python-cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\b(python|python3|pip|pip3)\b.*
+
+  - name: python-project
+    description: Collect Python project metadata (build tool, key files, Python version).
+    mainBash: python-project.sh
+    hook:
+      type: code
+
+  - name: python-dependencies
+    description: Collect Python dependencies from requirements files.
+    mainBash: python-dependencies.sh
+    hook:
+      type: code
+
+  - name: python-tests-coverage
+    description: Collect test coverage information for Python test runs.
+    mainBash: python-tests-coverage.sh
+    hook:
+      type: ci-before-command
+      pattern: .*python .*test*

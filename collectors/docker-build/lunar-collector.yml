@@ -1,0 +1,10 @@
+version: 0
+
+collectors:
+  - name: docker-build
+    description: Collect docker build command information
+    hook:
+      type: ci-after-command
+      pattern: ^docker.*build.*
+    mainBash: main.sh
+

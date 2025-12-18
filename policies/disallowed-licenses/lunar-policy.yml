@@ -1,0 +1,15 @@
+version: 0
+
+name: disallowed-licenses
+description: Disallows specified licenses in dependencies across all programming languages
+author: core-team@pantalasa.org
+
+policies:
+  - name: disallowed-licenses
+    mainPython: ./main.py
+
+inputs:
+  licenses:
+    description: Comma-separated list of licenses that are not allowed
+    default: "ISC"
+

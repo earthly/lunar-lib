@@ -1,0 +1,17 @@
+version: 0
+
+name: dependency-versions
+description: Checks for dependencies with versions that exceed specified maximum versions
+author: core-team@pantalasa.org
+
+policies:
+  - name: dependency-versions
+    mainPython: ./main.py
+
+inputs:
+  language:
+    description: Programming language to check (e.g., "java", "python", "nodejs", "go")
+    default: "java"
+  min_versions:
+    description: 'JSON object mapping dependency paths to minimum safe versions (e.g., {"org.apache.commons:commons-text": "1.10.0"})'
+    default: "{}"

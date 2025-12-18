@@ -1,0 +1,7 @@
+version: 0
+
+description: Checks if backstage file exists and is valid
+author: core-team@pantalasa.org
+
+policies:
+  - mainPython: ./main.py

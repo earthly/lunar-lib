@@ -1,0 +1,56 @@
+version: 0
+
+name: ci-otel
+description: Emit OpenTelemetry traces for CI pipeline runs
+
+inputs:
+  otel_endpoint:
+    description: The OTLP HTTP endpoint for sending traces (e.g., http://tempo:4318)
+    default: http://tempo:4318
+  debug:
+    description: Enable debug mode to collect detailed debugging information in the Component JSON
+    default: false
+
+collectors:
+  - name: ci-otel-job-start
+    description: Start the root span for the CI job
+    hook:
+      type: ci-before-job
+      pattern: .*
+    mainBash: job-start.sh
+
+  - name: ci-otel-job-end
+    description: End the root span for the CI job
+    hook:
+      type: ci-after-job
+      pattern: .*
+    mainBash: job-end.sh
+
+  - name: ci-otel-step-start
+    description: Start a span for each CI step
+    hook:
+      type: ci-before-step
+      pattern: .*
+    mainBash: step-start.sh
+
+  - name: ci-otel-step-end
+    description: End the span for each CI step
+    hook:
+      type: ci-after-step
+      pattern: .*
+    mainBash: step-end.sh
+
+  - name: ci-otel-before-cmd
+    description: Start a span for each CI command
+    hook:
+      type: ci-before-command
+      pattern: .*
+    mainBash: cmd-start.sh
+
+  - name: ci-otel-after-cmd
+    description: End the span for each CI command
+    hook:
+      type: ci-after-command
+      pattern: .*
+    mainBash: cmd-end.sh
+

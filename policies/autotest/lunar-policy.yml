@@ -1,0 +1,7 @@
+version: 0
+
+policies:
+  - name: autotest
+    description: Verify autotest value matches filesystem
+    mainPython: main.py
+

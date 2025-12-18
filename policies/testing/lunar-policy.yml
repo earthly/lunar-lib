@@ -1,0 +1,14 @@
+version: 0
+
+name: testing
+description: Testing scope and coverage policies
+author: core-team@pantalasa.org
+
+policies:
+  - name: coverage
+    mainPython: ./main.py
+
+inputs:
+  min_coverage:
+    description: Minimum test coverage (%)
+    default: 40
