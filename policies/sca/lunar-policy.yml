@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: SCA Scan
 description: An approved SCA Scanner should be configured

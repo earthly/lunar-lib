@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: dependency-versions
 description: Checks for dependencies with versions that exceed specified maximum versions

@@ -11,11 +11,11 @@ hub:
 domains:
     engineering:
         description: Root Engineering Org
-        owner: rob@pantalasa.org
+        owner: vp-engineering@example.com
 
 components:
     github.com/org/repo:
-        owner: eng@example.com
+        owner: engineering@example.com
         domain: engineering
         branch: "main"
         tags: [backend, go, SOC2]
@@ -25,53 +25,53 @@ components:
 ###########################################
 collectors:
   # Programming languages
-  - uses: github.com://earthly/lunar-lib/collectors/golang
+  - uses: github.com://earthly/lunar-lib/collectors/golang@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/python
+  - uses: github.com://earthly/lunar-lib/collectors/python@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/nodejs
+  - uses: github.com://earthly/lunar-lib/collectors/nodejs@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/java
+  - uses: github.com://earthly/lunar-lib/collectors/java@v1.0.0
     on: ["domain:engineering"]
   # Infrastructure 
-  - uses: github.com://earthly/lunar-lib/collectors/k8s
+  - uses: github.com://earthly/lunar-lib/collectors/k8s@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/helm
+  - uses: github.com://earthly/lunar-lib/collectors/helm@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/dockerfile
+  - uses: github.com://earthly/lunar-lib/collectors/dockerfile@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/terraform
+  - uses: github.com://earthly/lunar-lib/collectors/terraform@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/docker-build
+  - uses: github.com://earthly/lunar-lib/collectors/docker-build@v1.0.0
     on: ["domain:engineering"]
   # Repo standards, layout, and cataloging
-  - uses: github.com://earthly/lunar-lib/collectors/backstage
+  - uses: github.com://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/readme
+  - uses: github.com://earthly/lunar-lib/collectors/readme@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/codeowners
+  - uses: github.com://earthly/lunar-lib/collectors/codeowners@v1.0.0
     on: ["domain:engineering"]
   # CI/CD pipelines and build systems
-  - uses: github.com://earthly/lunar-lib/collectors/argocd
+  - uses: github.com://earthly/lunar-lib/collectors/argocd@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/buildkite
+  - uses: github.com://earthly/lunar-lib/collectors/buildkite@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/ci-otel
+  - uses: github.com://earthly/lunar-lib/collectors/ci-otel@v1.0.0
     on: ["domain:engineering"]
   # Source control and ticketing
-  - uses: github.com://earthly/lunar-lib/collectors/github-pr
+  - uses: github.com://earthly/lunar-lib/collectors/github-pr@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/jira
+  - uses: github.com://earthly/lunar-lib/collectors/jira@v1.0.0
     on: ["domain:engineering"]
   # Security & Compliance
-  - uses: github.com://earthly/lunar-lib/collectors/sbom
+  - uses: github.com://earthly/lunar-lib/collectors/sbom@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/snyk-github-app
+  - uses: github.com://earthly/lunar-lib/collectors/snyk-github-app@v1.0.0
     on: ["domain:engineering"]
-  - uses: github.com://earthly/lunar-lib/collectors/semgrep-github-app
+  - uses: github.com://earthly/lunar-lib/collectors/semgrep-github-app@v1.0.0
     on: ["domain:engineering"]
   # AI
-  - uses: github.com://earthly/lunar-lib/collectors/claude
+  - uses: github.com://earthly/lunar-lib/collectors/claude@v1.0.0
     on: ["domain:engineering"]
     with:
       path: "repo.summary"
@@ -110,13 +110,13 @@ initiatives:
 # Policies define checks over the collected data #
 ##################################################
 policies:
-  - uses: github.com://earthly/lunar-lib/policies/backstage
+  - uses: github.com://earthly/lunar-lib/policies/backstage@v1.0.0
     name: backstage
     description: Checks if Backstage catalog file is present and valid
     initiative: standardization
     enforcement: score
 
-  - uses: github.com://earthly/lunar-lib/policies/dockerfile
+  - uses: github.com://earthly/lunar-lib/policies/dockerfile@v1.0.0
     name: dockerfile
     description: Dockerfile best practices
     initiative: good-practices
@@ -125,13 +125,13 @@ policies:
       requiredLabels: "application_name,description,owner,source_uri"
       allowedRegistries: "cgr.dev,reg.pantalasa.com"
 
-  - uses: github.com://earthly/lunar-lib/policies/docker-build
+  - uses: github.com://earthly/lunar-lib/policies/docker-build@v1.0.0
     name: docker-build
     description: Docker build best practices
     initiative: good-practices
     enforcement: report-pr
 
-  - uses: github.com://earthly/lunar-lib/policies/k8s
+  - uses: github.com://earthly/lunar-lib/policies/k8s@v1.0.0
     name: k8s
     description: Checks if k8s descriptors are valid
     initiative: standardization
@@ -140,19 +140,19 @@ policies:
       minReplicas: 3
       maxLimitToRequestRatio: 4
 
-  - uses: github.com://earthly/lunar-lib/policies/terraform
+  - uses: github.com://earthly/lunar-lib/policies/terraform@v1.0.0
     name: terraform
     description: Terraform best practices
     initiative: good-practices
     enforcement: report-pr
 
-  - uses: github.com://earthly/lunar-lib/policies/readme
+  - uses: github.com://earthly/lunar-lib/policies/readme@v1.0.0
     name: readme
     description: README best practices
     initiative: standardization
     enforcement: score
 
-  - uses: github.com://earthly/lunar-lib/policies/branch-naming
+  - uses: github.com://earthly/lunar-lib/policies/branch-naming@v1.0.0
     name: branch-naming
     description: Enforces branch naming convention (must start with approved prefix)
     initiative: good-practices
@@ -160,19 +160,19 @@ policies:
     with:
       approvedPrefixes: "feature/,bugfix/,hotfix/,release/,f/,b/,h/"
 
-  - uses: github.com://earthly/lunar-lib/policies/jira
+  - uses: github.com://earthly/lunar-lib/policies/jira@v1.0.0
     name: jira
     description: Verify Jira ticket is present in PR
     initiative: sdlc-process
     enforcement: report-pr
 
-  - uses: github.com://earthly/lunar-lib/policies/sca
+  - uses: github.com://earthly/lunar-lib/policies/sca@v1.0.0
     name: sca
     initiative: security
     description: Require SCA scanners are run on each code change
     enforcement: report-pr
 
-  - uses: github.com://earthly/lunar-lib/policies/golang
+  - uses: github.com://earthly/lunar-lib/policies/golang@v1.0.0
     name: golang
     description: Requires recent versions of Go in CI/CD
     initiative: good-practices
@@ -181,7 +181,7 @@ policies:
     with:
       min_version: "1.21.0"
 
-  - uses: github.com://earthly/lunar-lib/policies/java
+  - uses: github.com://earthly/lunar-lib/policies/java@v1.0.0
     name: java
     description: Requires recent versions of Java and Maven in CI/CD
     initiative: good-practices
@@ -192,7 +192,7 @@ policies:
       min_maven_version: "3.9.0"
       min_gradle_version: "8.0.0"
 
-  - uses: github.com://earthly/lunar-lib/policies/sbom
+  - uses: github.com://earthly/lunar-lib/policies/sbom@v1.0.0
     name: sbom
     description: Ensure SBOMs are generated and contain approved licenses
     initiative: security
@@ -201,7 +201,7 @@ policies:
     with:
       disallowed_licenses: "GPL.*,BSL.*,AGPL.*"
 
-  - uses: github.com://earthly/lunar-lib/policies/dependency-versions
+  - uses: github.com://earthly/lunar-lib/policies/dependency-versions@v1.0.0
     name: dependency-versions-go
     description: Checks for vulnerable Java dependencies
     initiative: security
@@ -211,7 +211,7 @@ policies:
       language: "go"
       min_versions: '{"github.com/sirupsen/logrus": "1.9.0"}'
 
-  - uses: github.com://earthly/lunar-lib/policies/dependency-versions
+  - uses: github.com://earthly/lunar-lib/policies/dependency-versions@v1.0.0
     name: dependency-versions-java
     description: Checks for vulnerable Java dependencies
     initiative: security

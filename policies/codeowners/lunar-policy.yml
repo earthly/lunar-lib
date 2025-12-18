@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 description: Checks if codeowners file is present
 author: core-team@pantalasa.org

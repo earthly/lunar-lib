@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: sbom
 description: Disallows specified licenses in SBOM components across all programming languages

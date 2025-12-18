@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: java
 description: Collects Java project information, CI/CD commands, and dependencies.

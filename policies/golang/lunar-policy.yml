@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: golang
 description: Requires recent versions of Go in CI/CD

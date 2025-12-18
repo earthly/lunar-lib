@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: golang
 description: Collect Go project information, CI/CD commands, test coverage, and linting

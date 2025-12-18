@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 collectors:
   - name: claude
     description: Run claude prompt and collect the results under the specified path

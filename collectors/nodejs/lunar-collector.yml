@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: nodejs
 description: Collects Node.js project information, CI/CD commands, and dependencies.

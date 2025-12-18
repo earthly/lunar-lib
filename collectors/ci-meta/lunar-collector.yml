@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: ci-meta
 description: Collect CI/CD metadata

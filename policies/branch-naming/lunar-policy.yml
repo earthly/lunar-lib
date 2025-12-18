@@ -1,4 +1,4 @@
-version: 0
+version: 1.0.0
 
 name: Branch Naming
 description: Enforces branch naming convention (must start with approved prefix)
