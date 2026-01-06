@@ -1,0 +1,23 @@
+version: 0
+
+name: dockerfile
+description: Parses Dockerfiles and collects container definition metadata
+author: earthly
+
+default_image: earthly/lunar-lib-dockerfile:latest
+
+collectors:
+  - name: dockerfile
+    description: |
+      Parses all Dockerfiles in the repository using dockerfile-json and collects:
+      - Container definitions with base images and metadata
+      - Final stage information (user, healthcheck)
+      - Labels from each stage
+    mainBash: main.sh
+    hook:
+      type: code
+
+inputs:
+  find_command:
+    description: Command to find Dockerfiles (must output one file path per line)
+    default: "find . -type f \\( -name Dockerfile -o -name '*.Dockerfile' -o -name 'Dockerfile.*' \\)"

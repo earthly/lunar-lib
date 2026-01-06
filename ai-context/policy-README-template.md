@@ -6,18 +6,18 @@ Use this template when creating the `README.md` for a new policy plugin.
 
 # {Policy Name}
 
-> {One-line description of what this policy enforces}
+{One-line description of what this policy enforces}
 
 ## Overview
 
 {2-3 sentences explaining what engineering standard this policy enforces, why it matters, and who should use it.}
 
-## Checks
+## Policies
 
-This policy produces the following checks:
+This plugin provides the following policies (use `include` to select a subset):
 
-| Check ID | Description | Failure Meaning |
-|----------|-------------|-----------------|
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
 | `example-check-1` | Validates X exists | X is missing or invalid |
 | `example-check-2` | Ensures Y meets threshold | Y is below required threshold |
 

@@ -6,7 +6,7 @@ Use this template when creating the `README.md` for a new collector plugin.
 
 # {Collector Name}
 
-> {One-line description of what this collector does}
+{One-line description of what this collector does}
 
 ## Overview
 
@@ -18,9 +18,10 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.example.field` | boolean | Whether X exists |
-| `.example.items` | array | List of Y found in the repository |
-| `.example.details.count` | number | Count of Z |
+| `.example.items[]` | array | List of Y found in the repository |
+| `.example.native.{tool}` | object | Raw tool output for advanced policy use |
+
+See the example below for the full structure.
 
 <details>
 <summary>Example Component JSON output</summary>
@@ -28,13 +29,12 @@ This collector writes to the following Component JSON paths:
 ```json
 {
   "example": {
-    "field": true,
     "items": [
-      {"name": "item1", "valid": true},
-      {"name": "item2", "valid": false, "error": "..."}
+      {"name": "item1", "path": "src/item1.yaml"},
+      {"name": "item2", "path": "src/item2.yaml", "error": "parse error"}
     ],
-    "details": {
-      "count": 2
+    "native": {
+      "tool_name": { "...": "raw tool output" }
     }
   }
 }
@@ -87,5 +87,5 @@ When using this template:
 1. Replace all `{placeholders}` with actual values
 2. Remove sections that don't apply (e.g., Inputs if there are none)
 3. Keep the "Example Component JSON output" in a collapsible `<details>` block
-4. Be specific about the Component JSON paths - this is the contract with policies
+4. Only list top-level paths in the table (e.g., `.example.items[]`, `.example.summary`) - let the JSON example document the full nested structure
 5. Remove this "Template Usage Notes" section from the final README
