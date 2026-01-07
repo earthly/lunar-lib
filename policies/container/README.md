@@ -130,7 +130,7 @@ policies:
 
 ## Related Collectors
 
-- `dockerfile` collector from `github.com/earthly/lunar-lib/collectors/dockerfile`
+- [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector
 
 ## Remediation
 
