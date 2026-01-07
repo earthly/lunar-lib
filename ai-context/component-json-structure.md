@@ -113,7 +113,6 @@ Repository structure, README, and standard files.
   "repo": {
     "readme": {
       "exists": true,
-      "path": "README.md",
       "lines": 150,
       "sections": ["Installation", "Usage", "API", "Contributing"]
     },

@@ -1,0 +1,11 @@
+version: 0
+
+name: readme
+description: Collect README information
+
+collectors:
+  - name: readme
+    description: Collect README information
+    mainBash: main.sh
+    hook:
+      type: code
