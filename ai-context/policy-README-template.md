@@ -6,18 +6,18 @@ Use this template when creating the `README.md` for a new policy plugin.
 
 # {Policy Name}
 
-> {One-line description of what this policy enforces}
+{One-line description of what this policy enforces}
 
 ## Overview
 
 {2-3 sentences explaining what engineering standard this policy enforces, why it matters, and who should use it.}
 
-## Checks
+## Policies
 
-This policy produces the following checks:
+This plugin provides the following policies (use `include` to select a subset):
 
-| Check ID | Description | Failure Meaning |
-|----------|-------------|-----------------|
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
 | `example-check-1` | Validates X exists | X is missing or invalid |
 | `example-check-2` | Ensures Y meets threshold | Y is below required threshold |
 
@@ -25,11 +25,10 @@ This policy produces the following checks:
 
 This policy reads from the following Component JSON paths:
 
-| Path | Type | Required | Provided By |
-|------|------|----------|-------------|
-| `.example.field` | boolean | Yes | `example-collector` |
-| `.example.items` | array | Yes | `example-collector` |
-| `.example.optional` | string | No | `example-collector` |
+| Path | Type | Provided By |
+|------|------|-------------|
+| `.example.field` | boolean | `example-collector` |
+| `.example.items` | array | `example-collector` |
 
 **Note:** Ensure the corresponding collector(s) are configured before enabling this policy.
 
@@ -51,7 +50,8 @@ policies:
   - uses: github.com/earthly/lunar-lib/policies/{path-to-policy}
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # with:                     # Uncomment if inputs are needed
+    # include: [example-check-1]  # Only run specific checks (omit to run all)
+    # with:                       # Uncomment if inputs are needed
     #   minThreshold: "90"
 ```
 
