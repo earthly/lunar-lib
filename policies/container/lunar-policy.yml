@@ -1,0 +1,40 @@
+version: 0
+
+name: container
+description: Container definition policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+policies:
+  - name: no-latest
+    description: Container definitions should not use the :latest tag
+    mainPython: checks/no_latest.py
+
+  - name: stable-tags
+    description: Container definitions should use stable tags (digests or full semver)
+    mainPython: checks/stable_tags.py
+
+  - name: allowed-registries
+    description: Container definitions should only use allowed registries
+    mainPython: checks/allowed_registries.py
+
+  - name: required-labels
+    description: Container definitions should have required labels
+    mainPython: checks/required_labels.py
+
+  - name: healthcheck
+    description: Container definitions should have HEALTHCHECK instruction
+    mainPython: checks/healthcheck.py
+
+  - name: user
+    description: Container definitions should specify USER instruction
+    mainPython: checks/user.py
+
+inputs:
+  allowed_registries:
+    description: Comma-separated list of allowed registries
+    default: "docker.io"
+  required_labels:
+    description: Comma-separated list of required labels (empty = no requirement)
+    default: ""
