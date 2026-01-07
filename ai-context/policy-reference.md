@@ -686,16 +686,17 @@ def test_my_policy():
 my-policy/
 ├── lunar-policy.yml       # Required: Plugin configuration
 ├── main.py                # Main policy script
+├── checks/                # Optional: Organize checks in subdirectory
 ├── helpers.py             # Optional: Helper modules
-├── requirements.txt       # Required: Must include lunar-policy
-├── Dockerfile             # Optional: For containerized execution
+├── requirements.txt       # Must include lunar-policy
+├── Dockerfile             # For policies with additional dependencies
 └── test_main.py           # Optional: Unit tests
 ```
 
 ### requirements.txt
 
 ```
-lunar-policy==0.1.6
+lunar-policy==0.2.2
 # Add other dependencies as needed
 ```
 
@@ -705,8 +706,10 @@ lunar-policy==0.1.6
 version: 0
 
 name: my-policy                       # Required
-description: What this policy checks  # Optional
+description: What this policy checks  # Should always specfiy
 author: team@example.com              # Required
+
+default_image: earthly/lunar-scripts:v1.0  # Should always specify: base image or custom image
 
 policies:
   - mainPython: main.py               # Or: runPython: "inline code"
@@ -716,6 +719,47 @@ inputs:                               # Optional
     description: Minimum threshold
     default: "80"
 ```
+
+## Container Images
+
+Policies must always specify a `default_image`. Use the base `earthly/lunar-scripts:v1.0` image (which includes `lunar-policy`) unless you need additional dependencies.
+
+### Creating a Custom Image
+
+Create a `Dockerfile` that inherits from the official base image and installs your dependencies:
+
+```dockerfile
+FROM earthly/lunar-scripts:v1.0
+
+# Copy and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+```
+
+### Wiring Images to the Earthfile
+
+Add a build target in `Earthfile` to build and publish your image:
+
+```earthfile
+my-policy-image:
+    FROM DOCKERFILE ./policies/my-policy
+    ARG VERSION=latest
+    SAVE IMAGE --push earthly/lunar-lib-my-policy:$VERSION
+```
+
+Then reference this image in your `lunar-policy.yml`:
+
+```yaml
+default_image: earthly/lunar-lib-my-policy:latest
+```
+
+If you don't need additional dependencies, use the base image:
+
+```yaml
+default_image: earthly/lunar-scripts:v1.0
+```
+
+**Important:** Always bake dependencies into the image rather than relying on runtime installation. This provides faster startup, reproducible builds, and eliminates network dependencies at runtime.
 
 ## Best Practices
 

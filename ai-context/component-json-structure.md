@@ -29,11 +29,10 @@ This table lists important sub-objects within each category. For full details, s
 | `.vcs.pr` | PR-specific data (only in PR context) — see [PR-Specific Data](component-json-conventions.md#pr-specific-data) |
 | `.vcs.pr.ticket` | Extracted ticket reference (`id`, `source`, `url`) |
 | **`.containers`** | **Container images, Dockerfiles, registries** |
-| `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`) |
-| `.containers.definitions[].base_images[]` | Base image info (`reference`, `tag`, `is_latest`, `is_pinned`) |
-| `.containers.definitions[].final_stage` | Final stage info (`runs_as_root`, `user`, `has_healthcheck`) |
+| `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`, `labels`) |
+| `.containers.definitions[].base_images[]` | Base image info (`reference`, `image`, `tag`) |
+| `.containers.definitions[].final_stage` | Final stage info (`base_name`, `base_image`, `user`, `has_healthcheck`) |
 | `.containers.builds[]` | Built images (`image`, `tag`, `signed`, `has_git_sha_label`) |
-| `.containers.summary` | Aggregated checks (`uses_latest_tag`, `all_non_root`) |
 | **`.k8s`** | **Kubernetes manifests and configuration** |
 | `.k8s.manifests[]` | Manifest files (`path`, `valid`, `resources`) |
 | `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `containers`) |
@@ -282,16 +281,19 @@ Container images and Dockerfiles. Tool-agnostic (works with Docker, Podman, Buil
         "base_images": [
           {
             "reference": "golang:1.21-alpine",
-            "registry": "docker.io",
-            "tag": "1.21-alpine",
-            "is_latest": false,
-            "is_pinned": true
+            "image": "golang",
+            "tag": "1.21-alpine"
+          },
+          {
+            "reference": "gcr.io/distroless/static-debian12:nonroot-amd64",
+            "image": "gcr.io/distroless/static-debian12",
+            "tag": "nonroot-amd64"
           }
         ],
         "final_stage": {
-          "base_image": "gcr.io/distroless/static:nonroot",
+          "base_name": "runtime",
+          "base_image": "gcr.io/distroless/static-debian12:nonroot-amd64",
           "user": "nonroot",
-          "runs_as_root": false,
           "has_healthcheck": false
         },
         "labels": {
@@ -308,23 +310,17 @@ Container images and Dockerfiles. Tool-agnostic (works with Docker, Podman, Buil
         "signed": true
       }
     ],
-    "registries_used": ["docker.io", "gcr.io"],
-    "summary": {
-      "uses_latest_tag": false,
-      "all_non_root": true,
-      "all_have_labels": true
-    }
+    "registries_used": ["docker.io", "gcr.io"]
   }
 }
 ```
 
 **Key policy paths:**
 - `.containers.definitions[].valid` — Dockerfile valid
-- `.containers.definitions[].final_stage.runs_as_root` — Root user check
-- `.containers.definitions[].base_images[].is_latest` — Latest tag used
+- `.containers.definitions[].final_stage.user` — User instruction value
+- `.containers.definitions[].base_images[].tag` — Tag value (check for `null` or `"latest"`)
 - `.containers.builds[].signed` — Image signed
 - `.containers.registries_used` — Registries for allowlist checking
-- `.containers.summary.uses_latest_tag` — Any latest tag
 
 ---
 

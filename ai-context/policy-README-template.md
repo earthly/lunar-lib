@@ -25,11 +25,10 @@ This plugin provides the following policies (use `include` to select a subset):
 
 This policy reads from the following Component JSON paths:
 
-| Path | Type | Required | Provided By |
-|------|------|----------|-------------|
-| `.example.field` | boolean | Yes | `example-collector` |
-| `.example.items` | array | Yes | `example-collector` |
-| `.example.optional` | string | No | `example-collector` |
+| Path | Type | Provided By |
+|------|------|-------------|
+| `.example.field` | boolean | `example-collector` |
+| `.example.items` | array | `example-collector` |
 
 **Note:** Ensure the corresponding collector(s) are configured before enabling this policy.
 

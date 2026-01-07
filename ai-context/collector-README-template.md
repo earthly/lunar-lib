@@ -42,14 +42,6 @@ See the example below for the full structure.
 
 </details>
 
-## Requirements
-
-{List any requirements, or write "None" if there are no special requirements.}
-
-- Requires `{tool}` to be available (installed via `install.sh`)
-- Requires `{file}` to exist in the repository
-- Requires secret `LUNAR_SECRET_{NAME}` to be configured
-
 ## Inputs
 
 {If the collector has configurable inputs, list them here. If not, write "This collector has no configurable inputs."}

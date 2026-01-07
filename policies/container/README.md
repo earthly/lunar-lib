@@ -10,14 +10,14 @@ This policy plugin validates container definitions (Dockerfiles, Containerfiles)
 
 This plugin provides the following policies (use `include` to select a subset):
 
-| Policy | Description | Default |
-|--------|-------------|---------|
-| `no-latest` | No `:latest` tags (explicit or implicit) | Always enabled |
-| `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Enabled |
-| `allowed-registries` | Images must come from allowed registries | Enabled (docker.io) |
-| `required-labels` | Required labels must be present | Disabled |
-| `healthcheck` | HEALTHCHECK instruction must be present | Disabled |
-| `user` | USER instruction must be present | Disabled |
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
+| `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
+| `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Image uses unstable tag (partial version, branch name, etc.) |
+| `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
+| `required-labels` | Required labels must be present | Dockerfile missing one or more required labels |
+| `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
+| `user` | USER instruction must be present | Final stage missing USER instruction |
 
 ## Required Data
 
@@ -25,17 +25,14 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.containers.definitions[]` | array | `dockerfile` collector |
+| `.containers.definitions[]` | array | [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector |
 
 ## Inputs
 
 | Input | Default | Description |
 |-------|---------|-------------|
 | `allowed_registries` | `docker.io` | Comma-separated list of allowed registries |
-| `required_labels` | `""` | Comma-separated list of required labels |
-| `require_stable_tags` | `true` | Require stable tags (digests or full semver) |
-| `require_healthcheck` | `false` | Require HEALTHCHECK instruction |
-| `require_user` | `false` | Require USER instruction |
+| `required_labels` | `""` | Comma-separated list of required labels (empty = no requirement) |
 
 ## Installation
 
@@ -46,10 +43,10 @@ policies:
   - uses: github.com/earthly/lunar-lib/policies/container
     on: ["domain:your-domain"]
     enforcement: report-pr
+    # include: [no-latest, stable-tags]  # Only include specific policies
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
     #   required_labels: "org.opencontainers.image.source"
-    #   require_healthcheck: "true"
 ```
 
 ## Examples

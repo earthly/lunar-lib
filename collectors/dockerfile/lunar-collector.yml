@@ -4,7 +4,7 @@ name: dockerfile
 description: Parses Dockerfiles and collects container definition metadata
 author: earthly
 
-default_image: earthly/lunar-lib-dockerfile:latest
+default_image_non_ci_collectors: earthly/lunar-lib-dockerfile:latest
 
 collectors:
   - name: dockerfile

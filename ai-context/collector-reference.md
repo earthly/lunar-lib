@@ -462,10 +462,9 @@ lunar collect -j ".config.exists" true
 my-collector/
 ├── lunar-collector.yml    # Required: Plugin configuration
 ├── main.sh                # Main collector script
-├── install.sh             # Optional: Dependency installation
+├── Dockerfile             # For non-CI collectors with additional dependencies
 ├── helper.sh              # Optional: Helper scripts
-├── Dockerfile             # Optional: For containerized execution
-└── requirements.txt       # Optional: Python dependencies
+└── requirements.txt       # Optional: Python dependencies (baked into image)
 ```
 
 ### lunar-collector.yml Reference
@@ -476,6 +475,8 @@ version: 0
 name: my-collector                    # Required: Unique name
 description: What this collector does # Optional
 author: team@example.com              # Required
+
+default_image_non_ci_collectors: earthly/lunar-lib-my-collector:latest
 
 collectors:
   - name: main-collector              # Can define multiple collectors
@@ -492,6 +493,45 @@ inputs:                               # Optional: Configurable inputs
     description: Minimum threshold
     # No default = required input
 ```
+
+## Container Images
+
+Non-CI collectors should specify a `default_image_non_ci_collectors` when they have dependencies beyond the base image. CI collectors (hooks: `ci-before-command`, `ci-after-command`, `ci-before-job`, `ci-after-job`) typically run natively to access the CI environment directly.
+
+### Creating a Custom Image
+
+When your collector requires additional dependencies (tools, binaries, Python packages), create a `Dockerfile` that inherits from the official base image:
+
+```dockerfile
+FROM earthly/lunar-scripts:v1.0
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y some-tool && rm -rf /var/lib/apt/lists/*
+
+# Or download binaries
+ARG TARGETARCH=amd64
+RUN curl -sSL "https://example.com/tool-${TARGETARCH}.tar.gz" | tar xz && \
+    mv tool /usr/local/bin/
+```
+
+### Wiring Images to the Earthfile
+
+Add a build target in `Earthfile` to build and publish your image:
+
+```earthfile
+my-collector-image:
+    FROM DOCKERFILE ./collectors/my-collector
+    ARG VERSION=latest
+    SAVE IMAGE --push earthly/lunar-lib-my-collector:$VERSION
+```
+
+Then reference this image in your `lunar-collector.yml`:
+
+```yaml
+default_image_non_ci_collectors: earthly/lunar-lib-my-collector:latest
+```
+
+**Important:** Always bake dependencies into the image rather than using `install.sh` for production. This provides faster startup, reproducible builds, and eliminates network dependencies at runtime.
 
 ### Accessing Inputs
 

@@ -1,15 +1,11 @@
 """Check that container definitions have HEALTHCHECK instruction."""
 
-from lunar_policy import Check, variable_or_default
+from lunar_policy import Check
 
 
 def main(node=None):
     c = Check("healthcheck", "Container definitions should have HEALTHCHECK", node=node)
     with c:
-        require = variable_or_default("require_healthcheck", "false").lower() == "true"
-        if not require:
-            return c
-        
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
             return c

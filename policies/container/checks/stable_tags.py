@@ -1,16 +1,12 @@
 """Check that container definitions use stable tags."""
 
 import re
-from lunar_policy import Check, variable_or_default
+from lunar_policy import Check
 
 
 def main(node=None):
     c = Check("stable-tags", "Container definitions should use stable tags", node=node)
     with c:
-        require_stable = variable_or_default("require_stable_tags", "true").lower() == "true"
-        if not require_stable:
-            return c
-        
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
             return c
