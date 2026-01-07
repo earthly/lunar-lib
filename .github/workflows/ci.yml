@@ -31,7 +31,7 @@ jobs:
           echo "BRANCH_NAME=$NORMALIZED_BRANCH" >> $GITHUB_ENV
       - name: Login
         run: |-
-          docker login -u "${{secrets.REGISTRY_USERNAME}}" -p "${{secrets.REGISTRY_TOKEN}}"
+          docker login -u "${{secrets.DOCKERHUB_USERNAME}}" -p "${{secrets.DOCKERHUB_TOKEN}}"
       - name: Build & Push
         run: |-
           earthly --ci --push +all --VERSION "$BRANCH_NAME"
