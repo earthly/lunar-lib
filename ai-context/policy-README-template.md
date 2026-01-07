@@ -50,7 +50,8 @@ policies:
   - uses: github.com/earthly/lunar-lib/policies/{path-to-policy}
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # with:                     # Uncomment if inputs are needed
+    # include: [example-check-1]  # Only run specific checks (omit to run all)
+    # with:                       # Uncomment if inputs are needed
     #   minThreshold: "90"
 ```
 

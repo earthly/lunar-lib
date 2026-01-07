@@ -522,28 +522,58 @@ with Check("k8s-valid", "All K8s manifests should be valid") as c:
         c.assert_true(valid, f"{path}: {error}")
 ```
 
-### Pattern 3: Multiple Checks in One Policy
+### Pattern 3: One Check Per File (Recommended)
 
+The recommended approach is to define each check as a separate policy entry in `lunar-policy.yml`, with each check in its own file. This allows users to selectively enable/disable checks via the `include` mechanism.
+
+**lunar-policy.yml:**
+```yaml
+policies:
+  - name: readme-exists
+    description: README should exist
+    mainPython: checks/readme_exists.py
+
+  - name: readme-length
+    description: README should be substantial
+    mainPython: checks/readme_length.py
+```
+
+**checks/readme_exists.py:**
 ```python
 from lunar_policy import Check
 
-def check_readme():
-    with Check("readme-exists", "README should exist") as c:
+def main(node=None):
+    c = Check("readme-exists", "README should exist", node=node)
+    with c:
         c.assert_true(c.get_value(".repo.readme_exists"), "README.md not found")
-
-def check_readme_length():
-    with Check("readme-length", "README should be substantial") as c:
-        if not c.exists(".repo.readme_num_lines"):
-            return
-        lines = c.get_value(".repo.readme_num_lines")
-        c.assert_greater_or_equal(lines, 50, f"README has only {lines} lines, need at least 50")
-
-def main():
-    check_readme()
-    check_readme_length()
+    return c
 
 if __name__ == "__main__":
     main()
+```
+
+**checks/readme_length.py:**
+```python
+from lunar_policy import Check
+
+def main(node=None):
+    c = Check("readme-length", "README should be substantial", node=node)
+    with c:
+        if not c.exists(".repo.readme_num_lines"):
+            return c
+        lines = c.get_value(".repo.readme_num_lines")
+        c.assert_greater_or_equal(lines, 50, f"README has only {lines} lines, need at least 50")
+    return c
+
+if __name__ == "__main__":
+    main()
+```
+
+Users can then selectively enable checks:
+```yaml
+policies:
+  - uses: ./policies/readme
+    include: [readme-exists]  # Only run readme-exists, skip readme-length
 ```
 
 ### Pattern 4: Configurable Thresholds
@@ -682,15 +712,19 @@ def test_my_policy():
 
 ## Plugin Structure
 
+The recommended structure is **one check per policy entry**, with each check in its own file under a `checks/` subdirectory. This allows users to selectively enable/disable individual checks via the `include` mechanism.
+
 ```
 my-policy/
 ├── lunar-policy.yml       # Required: Plugin configuration
-├── main.py                # Main policy script
-├── checks/                # Optional: Organize checks in subdirectory
-├── helpers.py             # Optional: Helper modules
+├── checks/                # Recommended: One file per check
+│   ├── check_one.py
+│   ├── check_two.py
+│   ├── check_three.py
+│   └── helpers.py         # Optional: Shared helpers
 ├── requirements.txt       # Must include lunar-policy
 ├── Dockerfile             # For policies with additional dependencies
-└── test_main.py           # Optional: Unit tests
+└── README.md              # Documentation
 ```
 
 ### requirements.txt
@@ -702,23 +736,41 @@ lunar-policy==0.2.2
 
 ### lunar-policy.yml Reference
 
+Each policy in the `policies:` array should have a unique `name` and point to its own check file. Users can then select which checks to run using `include: [check-one, check-two]` in their `lunar-config.yml`.
+
 ```yaml
 version: 0
 
 name: my-policy                       # Required
-description: What this policy checks  # Should always specfiy
+description: What this policy checks  # Should always specify
 author: team@example.com              # Required
 
 default_image: earthly/lunar-scripts:v1.0  # Should always specify: base image or custom image
 
 policies:
-  - mainPython: main.py               # Or: runPython: "inline code"
+  - name: check-one                   # Unique name for this check
+    description: Validates X          # Shown in UI and reports
+    mainPython: checks/check_one.py
 
-inputs:                               # Optional
+  - name: check-two
+    description: Ensures Y meets requirements
+    mainPython: checks/check_two.py
+
+  - name: check-three
+    description: Verifies Z is configured
+    mainPython: checks/check_three.py
+
+inputs:                               # Optional: Shared across all checks
   threshold:
     description: Minimum threshold
     default: "80"
 ```
+
+**Why one check per policy entry?**
+- Users can selectively enable checks: `include: [check-one, check-three]`
+- Each check appears as a separate item in the Lunar UI
+- Follows the "one concern per check" best practice
+- Easier to maintain and test individually
 
 ## Container Images
 
@@ -809,18 +861,21 @@ Policies are re-evaluated frequently. Avoid:
 - Heavy computation
 - File I/O
 
-### 5. One Concern Per Check
+### 5. One Concern Per Check, One Check Per Policy Entry
 
-```python
-# Good - separate checks for separate concerns
-def check_dockerfile_exists():
-    with Check("dockerfile-exists") as c:
-        c.assert_exists(".dockerfile", "No Dockerfile found")
+Each check should focus on a single concern and be defined as a separate policy entry in `lunar-policy.yml`. This allows users to selectively enable/disable individual checks.
 
-def check_dockerfile_no_latest():
-    with Check("dockerfile-no-latest") as c:
-        # Check for :latest tag usage
+```yaml
+# lunar-policy.yml - Good: separate policy entries
+policies:
+  - name: dockerfile-exists
+    mainPython: checks/dockerfile_exists.py
+
+  - name: dockerfile-no-latest  
+    mainPython: checks/no_latest.py
 ```
+
+See [Plugin Structure](#plugin-structure) for the recommended file organization.
 
 ### 6. Make Policies Configurable
 
