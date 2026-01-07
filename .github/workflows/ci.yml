@@ -29,6 +29,8 @@ jobs:
           fi
           NORMALIZED_BRANCH=$(echo "$RAW_BRANCH" | tr '/' '-')
           echo "BRANCH_NAME=$NORMALIZED_BRANCH" >> $GITHUB_ENV
+      - name: Setup Earthly
+        uses: earthly/actions-setup@v1
       - name: Login
         run: |-
           echo "${{secrets.DOCKERHUB_TOKEN}}" | docker login -u "${{secrets.DOCKERHUB_USERNAME}}" --password-stdin
