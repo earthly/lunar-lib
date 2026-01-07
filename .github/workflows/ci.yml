@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-push:
     name: +all
-    runs-on: [self-hosted, lunar]
+    runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
       EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
