@@ -4,7 +4,7 @@ name: container
 description: Container definition policies
 author: earthly
 
-default_image: earthly/lunar-scripts:v1.0
+default_image: earthly/lunar-lib:base-main
 
 policies:
   - name: no-latest

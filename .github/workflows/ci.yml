@@ -1,0 +1,42 @@
+name: GitHub Actions CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: +all
+    runs-on: [self-hosted, lunar]
+    env:
+      FORCE_COLOR: 1
+      EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
+      EARTHLY_INSTALL_ID: "earthly-lunar"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set branch name
+        run: |-
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            RAW_BRANCH="${{ github.head_ref }}"
+          else
+            RAW_BRANCH="${{ github.ref_name }}"
+          fi
+          NORMALIZED_BRANCH=$(echo "$RAW_BRANCH" | tr '/' '-')
+          echo "BRANCH_NAME=$NORMALIZED_BRANCH" >> $GITHUB_ENV
+      - name: Login
+        run: |-
+          docker login -u "${{secrets.REGISTRY_USERNAME}}" -p "${{secrets.REGISTRY_TOKEN}}"
+      - name: Build & Push
+        run: |-
+          earthly --ci --push +all --VERSION "$BRANCH_NAME"
+      - name: Build & Push (git sha as tag on main branch only)
+        if: github.ref == 'refs/heads/main'
+        run: |-
+          earthly --ci --push +all --VERSION "${GITHUB_SHA::8}"
+

@@ -1,9 +1,12 @@
 VERSION 0.8
 
 all:
-    BUILD +dockerfile-collector-image
+    BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/dockerfile+image
 
-dockerfile-collector-image:
-    FROM DOCKERFILE ./collectors/dockerfile
-    ARG VERSION=latest
-    SAVE IMAGE --push earthly/lunar-lib-dockerfile:$VERSION
+base-image:
+    ARG SCRIPTS_VERSION=main
+    FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+    RUN apt-get update && apt-get install -y curl jq parallel
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
