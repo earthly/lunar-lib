@@ -41,12 +41,12 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/readme
+  - uses: github.com/earthly/lunar-lib/policies/readme@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     # include: [readme-exists]  # Only run specific checks (omit to run all)
     # with:                     # Uncomment if inputs are needed
-    #   min_lines: "50"
+    #   min_lines: 50
     #   required_sections: "Installation,Usage,Contributing"
 ```
 
