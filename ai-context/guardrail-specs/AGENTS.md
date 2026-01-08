@@ -26,7 +26,7 @@ These specs define **what** guardrails to build—each entry includes:
 
 1. **Pick a guardrail** from any spec file
 2. **Read the ai-context docs** for implementation details:
-   - [collector-reference.md](../ai-context/collector-reference.md) — how to write collectors
-   - [policy-reference.md](../ai-context/policy-reference.md) — how to write policies
-   - [component-json-conventions.md](../ai-context/component-json-conventions.md) — schema design
+   - [collector-reference.md](../collector-reference.md) — how to write collectors
+   - [policy-reference.md](../policy-reference.md) — how to write policies
+   - [component-json-conventions.md](../component-json-conventions.md) — schema design
 3. **Implement** the collector(s) and policy following the spec
