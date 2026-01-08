@@ -1,24 +1,24 @@
 version: 0
 
 name: readme
-description: README.md best practices
+description: README file best practices
 author: support@earthly.dev
 
 policies:
   - name: readme-exists
-    description: Ensure README.md exists in root of repository
+    description: Ensure README file exists in root of repository (README.md or README)
     mainPython: ./readme-exists.py
   - name: readme-min-line-count
-    description: Ensure README.md has a minimum number of lines
+    description: Ensure README file has a minimum number of lines
     mainPython: ./min-line-count.py
   - name: readme-required-sections
-    description: Ensure README.md contains required sections
+    description: Ensure README file contains required sections
     mainPython: ./required-sections.py
 
 inputs:
   min_lines:
-    description: Minimum number of lines required in README.md
+    description: Minimum number of lines required in README file
     default: 0
   required_sections:
-    description: Comma-separated list of required sections in README.md
+    description: Comma-separated list of required sections in README file
     default: ""

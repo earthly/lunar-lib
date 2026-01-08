@@ -4,7 +4,7 @@ Enforces README best practices including file existence, minimum content length,
 
 ## Overview
 
-This policy plugin validates README.md files against common documentation standards. It ensures repositories have proper documentation by checking for file existence, minimum content length, and required section headings. These policies help maintain consistent documentation quality across your organization.
+This policy plugin validates README files (README.md or README) against common documentation standards. It ensures repositories have proper documentation by checking for file existence, minimum content length, and required section headings. These policies help maintain consistent documentation quality across your organization.
 
 ## Policies
 
@@ -12,9 +12,9 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `readme-exists` | Ensures README.md exists in the repository root | README.md file not found |
-| `readme-min-line-count` | Ensures README.md meets minimum line count | README.md has fewer lines than required |
-| `readme-required-sections` | Ensures README.md contains required section headings | README.md is missing one or more required sections |
+| `readme-exists` | Ensures README file exists in the repository root (README.md or README) | README file not found |
+| `readme-min-line-count` | Ensures README file meets minimum line count | README file has fewer lines than required |
+| `readme-required-sections` | Ensures README file contains required section headings | README file is missing one or more required sections |
 
 ## Required Data
 
@@ -32,7 +32,7 @@ This policy reads from the following Component JSON paths:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `min_lines` | No | `0` | Minimum number of lines required in README.md (0 = no requirement) |
+| `min_lines` | No | `0` | Minimum number of lines required in README file (0 = no requirement) |
 | `required_sections` | No | `""` | Comma-separated list of required section headings (empty = no requirement) |
 
 ## Installation
@@ -78,7 +78,7 @@ This example passes all three policies when configured with:
 
 ### Failing Examples
 
-#### README doesn't exist (fails `readme-exists`)
+#### README file doesn't exist (fails `readme-exists`)
 
 ```json
 {
@@ -90,9 +90,9 @@ This example passes all three policies when configured with:
 }
 ```
 
-**Failure message:** `"README.md file not found"`
+**Failure message:** `"README file not found (expected README.md or README)"`
 
-#### README has too few lines (fails `readme-min-line-count`)
+#### README file has too few lines (fails `readme-min-line-count`)
 
 ```json
 {
@@ -106,9 +106,9 @@ This example passes all three policies when configured with:
 }
 ```
 
-**Failure message:** `"README.md has 25 lines, but minimum required is 50"`
+**Failure message:** `"README file has 25 lines, but minimum required is 50"`
 
-#### README missing required sections (fails `readme-required-sections`)
+#### README file missing required sections (fails `readme-required-sections`)
 
 ```json
 {
@@ -125,7 +125,7 @@ This example passes all three policies when configured with:
 }
 ```
 
-**Failure message:** `"README.md is missing required sections: Contributing"`
+**Failure message:** `"README file is missing required sections: Contributing"`
 
 ## Related Collectors
 
@@ -135,7 +135,7 @@ This example passes all three policies when configured with:
 
 ### readme-exists
 
-Create a README.md file in the repository root:
+Create a README file (README.md or README) in the repository root:
 
 ```markdown
 # Project Name
@@ -153,7 +153,7 @@ Description of your project.
 
 ### readme-min-line-count
 
-Add more content to your README.md to meet the minimum line count requirement. Consider adding:
+Add more content to your README file to meet the minimum line count requirement. Consider adding:
 - Detailed installation instructions
 - Usage examples
 - Configuration options
@@ -163,7 +163,7 @@ Add more content to your README.md to meet the minimum line count requirement. C
 
 ### readme-required-sections
 
-Add the missing required section headings to your README.md. Section headings should use markdown header syntax (`#`, `##`, `###`, etc.). For example:
+Add the missing required section headings to your README file. Section headings should use markdown header syntax (`#`, `##`, `###`, etc.). For example:
 
 ```markdown
 # Project Name
