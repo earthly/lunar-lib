@@ -2,13 +2,8 @@
 
 set -e
 
-# Candidate README filenames in priority order
-README_CANDIDATES=(
-  "README.md"
-  "README"
-  "README.txt"
-  "README.rst"
-)
+# Convert comma-separated filenames input to array
+IFS=',' read -ra README_CANDIDATES <<< "$LUNAR_VAR_FILENAMES"
 
 # Find the first matching README file
 README_FILE=""

@@ -18,7 +18,7 @@ policies:
 inputs:
   min_lines:
     description: Minimum number of lines required in README file
-    default: 0
+    default: 25
   required_sections:
     description: Comma-separated list of required sections in README file
     default: ""

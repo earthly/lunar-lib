@@ -32,7 +32,7 @@ This policy reads from the following Component JSON paths:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `min_lines` | No | `0` | Minimum number of lines required in README file (0 = no requirement) |
+| `min_lines` | No | `25` | Minimum number of lines required in README file (0 = no requirement) |
 | `required_sections` | No | `""` | Comma-separated list of required section headings (empty = no requirement) |
 
 ## Installation

@@ -1,11 +1,16 @@
 version: 0
 
 name: readme
-description: Collect README file information (README.md or README)
+description: Collect README file information
 
 collectors:
   - name: readme
-    description: Collect README file information (checks for README.md or README)
+    description: Collect README file information
     mainBash: main.sh
     hook:
       type: code
+
+inputs:
+  filenames:
+    description: Comma-separated list of README filenames to check (first match wins)
+    default: "README.md,README,README.txt,README.rst"
