@@ -1,11 +1,11 @@
 version: 0
 
 name: readme
-description: Collect README information
+description: Collects information about the README.md file at the root of repository
 
 collectors:
   - name: readme
-    description: Collect README information
+    description: Collects information about the README.md file at the root of repository
     mainBash: main.sh
     hook:
       type: code

@@ -1,7 +1,7 @@
 version: 0
 
-name: README
-description: Readme best practices
+name: readme
+description: README.md best practices
 author: support@earthly.dev
 
 policies:
