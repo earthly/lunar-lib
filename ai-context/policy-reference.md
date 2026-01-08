@@ -444,6 +444,94 @@ policies:
       minCoverage: "90"  # Override default
 ```
 
+### Input Configuration Patterns
+
+Policy configuration should generally have reasonable defaults, but the right approach depends on the type of setting.
+
+#### Pattern: Sensible Universal Defaults
+
+For settings with a universally sensible default (e.g., thresholds, counts), use `variable_or_default` with a reasonable value:
+
+```python
+min_coverage = int(variable_or_default("minCoverage", "80"))  # 80% is sensible
+max_complexity = int(variable_or_default("maxComplexity", "15"))  # widely accepted
+```
+
+#### Pattern: No Default for User-Dependent Settings
+
+When the correct value depends on internal infrastructure or conventions (e.g., internal registry URLs, team-specific values), **do not provide a default**. The policy should raise an error when not configured:
+
+```python
+from lunar_policy import variable_or_default
+
+# No sensible default - depends on organization's infrastructure
+registry_url = variable_or_default("internal_registry", "")
+if not registry_url:
+    raise ValueError(
+        "Policy misconfiguration: 'internal_registry' must be configured. "
+        "Set this to your organization's container registry URL."
+    )
+```
+
+#### Pattern: Allow-Lists vs Block-Lists
+
+The behavior for empty lists depends on the semantic type:
+
+**Allow-list (empty = error):** An allow-list defines what IS permitted. An empty allow-list means "nothing is allowed", which is almost always a misconfiguration—not a valid policy state.
+
+```python
+# ALLOW-LIST: error if empty
+allowed_str = variable_or_default("allowed_registries", "docker.io")
+allowed = [r.strip() for r in allowed_str.split(",") if r.strip()]
+
+if not allowed:
+    raise ValueError(
+        "Policy misconfiguration: 'allowed_registries' is empty. "
+        "An allow-list must contain at least one entry. "
+        "Configure allowed registries or exclude this check."
+    )
+
+# Now check against the allow-list
+if registry not in allowed:
+    c.fail(f"Registry '{registry}' not in allowed list")
+```
+
+**Block-list (empty = pass early):** A block-list defines what is NOT permitted. An empty block-list means "nothing is blocked", which is a valid (lenient) configuration.
+
+```python
+# BLOCK-LIST: pass early if empty
+blocked_str = variable_or_default("blocked_licenses", "")
+blocked = [l.strip() for l in blocked_str.split(",") if l.strip()]
+
+if not blocked:
+    return  # No licenses blocked - policy passes
+
+# Now check against the block-list
+if license in blocked:
+    c.fail(f"License '{license}' is blocked")
+```
+
+**Requirement-list (empty = pass early):** Similar to block-lists, a requirement-list that's empty means "no additional requirements", which is valid:
+
+```python
+# REQUIREMENT-LIST: pass early if empty
+required_str = variable_or_default("required_labels", "")
+required = [l.strip() for l in required_str.split(",") if l.strip()]
+
+if not required:
+    return  # No labels required - policy passes
+
+# Now check for required items
+for label in required:
+    if label not in labels:
+        c.fail(f"Missing required label: {label}")
+```
+
+**Key distinction:**
+- **Allow-list empty → ERROR** (misconfiguration: nothing would be allowed)
+- **Block-list empty → PASS** (valid: nothing is blocked)
+- **Requirement-list empty → PASS** (valid: no extra requirements)
+
 ## Common Patterns
 
 ### Pattern 1: Boolean Value vs Data Existence
