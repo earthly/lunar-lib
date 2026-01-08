@@ -9,13 +9,7 @@ elif [ -f "./README" ]; then
   README_FILE="./README"
 else
   # README doesn't exist
-  JSON=$(jq -n \
-    --argjson exists false \
-    '{
-      exists: $exists
-    }')
-  
-  echo "$JSON" | lunar collect -j ".repo.readme" -
+  lunar collect -j ".repo.readme.exists" false
   exit 0
 fi
 
