@@ -4,12 +4,11 @@ import re
 from lunar_policy import Check
 
 
-def main(node=None):
-    c = Check("stable-tags", "Container definitions should use stable tags", node=node)
-    with c:
+def main():
+    with Check("stable-tags", "Container definitions should use stable tags") as c:
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         # Pattern for full semantic version (major.minor.patch with optional suffix)
         semver_pattern = r'^v?\d+\.\d+\.\d+(-[a-zA-Z0-9._-]+)?$'
@@ -51,8 +50,6 @@ def main(node=None):
                     f"'{path}' uses unstable tag '{tag}' in '{reference}'. "
                     f"Use a digest (@sha256:...) or full semantic version (e.g., :1.2.3)"
                 )
-    
-    return c
 
 
 if __name__ == "__main__":

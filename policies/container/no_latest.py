@@ -3,12 +3,11 @@
 from lunar_policy import Check
 
 
-def main(node=None):
-    c = Check("no-latest", "Container definitions should not use the :latest tag", node=node)
-    with c:
+def main():
+    with Check("no-latest", "Container definitions should not use the :latest tag") as c:
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -34,8 +33,6 @@ def main(node=None):
                     c.fail(f"'{path}' uses implicit :latest tag for image '{reference}'")
                 elif tag == "latest":
                     c.fail(f"'{path}' uses explicit :latest tag for image '{reference}'")
-    
-    return c
 
 
 if __name__ == "__main__":

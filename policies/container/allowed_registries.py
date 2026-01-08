@@ -4,18 +4,17 @@ from lunar_policy import Check, variable_or_default
 from helpers import parse_image_reference
 
 
-def main(node=None):
-    c = Check("allowed-registries", "Container definitions should use allowed registries", node=node)
-    with c:
+def main():
+    with Check("allowed-registries", "Container definitions should use allowed registries") as c:
         allowed_str = variable_or_default("allowed_registries", "docker.io")
         allowed = [r.strip() for r in allowed_str.split(",") if r.strip()]
         
         if not allowed:
-            return c
+            return
         
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -47,8 +46,6 @@ def main(node=None):
                         f"'{path}' uses image '{reference}' from registry '{registry}' "
                         f"which is not in allowed registries: {', '.join(allowed)}"
                     )
-    
-    return c
 
 
 if __name__ == "__main__":
