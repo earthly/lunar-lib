@@ -3,9 +3,6 @@ from lunar_policy import Check, variable_or_default
 with Check("readme-required-sections", "README file should contain required sections") as c:
     readme = c.get_node(".repo.readme")
     
-    if not readme.exists():
-        c.skip()
-    
     # Skip if no required sections are configured
     required_sections_str = variable_or_default("required_sections", "")
     if not required_sections_str:

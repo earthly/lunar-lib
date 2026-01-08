@@ -6,7 +6,7 @@ author: support@earthly.dev
 
 policies:
   - name: readme-exists
-    description: Ensure README file exists in root of repository (README.md or README)
+    description: Ensure README file exists in root of repository
     mainPython: ./readme-exists.py
   - name: readme-min-line-count
     description: Ensure README file has a minimum number of lines

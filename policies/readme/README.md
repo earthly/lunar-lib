@@ -4,7 +4,7 @@ Enforces README best practices including file existence, minimum content length,
 
 ## Overview
 
-This policy plugin validates README files (README.md or README) against common documentation standards. It ensures repositories have proper documentation by checking for file existence, minimum content length, and required section headings. These policies help maintain consistent documentation quality across your organization.
+This policy plugin validates README files against common documentation standards. It ensures repositories have proper documentation by checking for file existence, minimum content length, and required section headings. These policies help maintain consistent documentation quality across your organization.
 
 ## Policies
 
@@ -12,7 +12,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `readme-exists` | Ensures README file exists in the repository root (README.md or README) | README file not found |
+| `readme-exists` | Ensures README file exists in the repository root | README file not found |
 | `readme-min-line-count` | Ensures README file meets minimum line count | README file has fewer lines than required |
 | `readme-required-sections` | Ensures README file contains required section headings | README file is missing one or more required sections |
 
