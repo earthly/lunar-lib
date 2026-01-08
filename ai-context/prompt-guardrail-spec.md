@@ -1,4 +1,4 @@
-Please arm yourself with as much context as possible about Lunar from @lunar-lib/ai-context/AGENTS.md , @lunar-lib/ai-context/about-lunar.md , @lunar-lib/ai-context/core-concepts.md and @lunar-lib/ai-context/component-json-structure.md .
+Please arm yourself with as much context as possible about Lunar from @lunar-lib/AGENTS.md , @lunar-lib/ai-context/about-lunar.md , @lunar-lib/ai-context/core-concepts.md and @lunar-lib/ai-context/component-json-structure.md .
 
 Then, get inspired with ideas from @lunar-lib/ai-context/guardrails.md and the examples pasted below (from our website).
 
@@ -43,7 +43,7 @@ Resilience: DR procedures, backup validation, anomaly detection
 
 Then, please come up with a highly detailed list of possible policies for the first category: "Repository and Ownership". Aim for 30-50.
 
-This list should be in Markdown, placed in the folder @guardrail-specs .
+This list should be in Markdown, placed in the folder @lunar-lib/ai-context/guardrail-specs .
 
 Use the following format:
 

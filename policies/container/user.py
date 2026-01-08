@@ -3,12 +3,11 @@
 from lunar_policy import Check
 
 
-def main(node=None):
-    c = Check("user", "Container definitions should specify USER", node=node)
-    with c:
+def main():
+    with Check("user", "Container definitions should specify USER") as c:
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -19,8 +18,6 @@ def main(node=None):
             
             if user is None:
                 c.fail(f"'{path}' is missing USER instruction in final stage")
-    
-    return c
 
 
 if __name__ == "__main__":

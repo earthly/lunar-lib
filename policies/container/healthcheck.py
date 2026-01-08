@@ -3,12 +3,11 @@
 from lunar_policy import Check
 
 
-def main(node=None):
-    c = Check("healthcheck", "Container definitions should have HEALTHCHECK", node=node)
-    with c:
+def main():
+    with Check("healthcheck", "Container definitions should have HEALTHCHECK") as c:
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -19,8 +18,6 @@ def main(node=None):
             
             if not has_healthcheck:
                 c.fail(f"'{path}' is missing HEALTHCHECK instruction in final stage")
-    
-    return c
 
 
 if __name__ == "__main__":

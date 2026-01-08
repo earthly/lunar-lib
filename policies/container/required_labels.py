@@ -3,18 +3,17 @@
 from lunar_policy import Check, variable_or_default
 
 
-def main(node=None):
-    c = Check("required-labels", "Container definitions should have required labels", node=node)
-    with c:
+def main():
+    with Check("required-labels", "Container definitions should have required labels") as c:
         required_str = variable_or_default("required_labels", "")
         required = [l.strip() for l in required_str.split(",") if l.strip()]
         
         if not required:
-            return c
+            return
         
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
-            return c
+            return
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -27,8 +26,6 @@ def main(node=None):
             
             if missing:
                 c.fail(f"'{path}' is missing required labels: {', '.join(missing)}")
-    
-    return c
 
 
 if __name__ == "__main__":
