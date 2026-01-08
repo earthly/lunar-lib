@@ -13,7 +13,7 @@ This table lists important sub-objects within each category. For full details, s
 | Path | Description |
 |------|-------------|
 | **`.repo`** | **Repository structure, README, standard files** |
-| `.repo.readme` | README file info (`exists`, `path`, `lines`, `sections`) |
+| `.repo.readme` | README file info (`exists`, `lines`, `sections`) |
 | `.repo.files` | Standard file presence booleans (`gitignore`, `license`, `makefile`, etc.) |
 | `.repo.license` | License info (`type`, `path`) |
 | `.repo.languages` | Detected languages (`primary`, `all`) |
