@@ -138,6 +138,7 @@ Repository structure, README, and standard files.
 
 **Key policy paths:**
 - `.repo.readme.exists` — README present
+- `.repo.readme.path` — Which README file was found
 - `.repo.readme.sections` — Section headings for content requirements
 - `.repo.files.<name>` — Standard file presence
 - `.repo.languages.primary` — Primary language detection
