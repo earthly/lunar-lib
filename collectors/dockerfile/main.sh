@@ -94,6 +94,7 @@ FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name Dockerfile -o -name 
 eval "$FIND_CMD" 2>/dev/null | parallel -j 4 process_file | jq -s '.' | lunar collect -j ".containers.definitions" -
 
 # Submit source metadata
-TOOL_VERSION=$(dockerfile-json --version 2>&1 | head -1 || echo "unknown")
+# dockerfile-json doesn't have a --version flag, so we read from the marker file
+TOOL_VERSION=$(cat /usr/local/bin/dockerfile-json.version 2>/dev/null || echo "unknown")
 jq -n --arg tool "dockerfile-json" --arg version "$TOOL_VERSION" \
     '{tool: $tool, version: $version}' | lunar collect -j ".containers.source" -

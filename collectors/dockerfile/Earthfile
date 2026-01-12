@@ -3,11 +3,13 @@ VERSION 0.8
 image:
     FROM --pass-args ../../+base-image
 
-    # Install dockerfile-json
+    # Install dockerfile-json (no --version flag, so we write a marker file)
     ARG TARGETARCH
+    ARG DOCKERFILE_JSON_VERSION=1.2.2
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/') && \
-        curl -sSL "https://github.com/keilerkonzept/dockerfile-json/releases/download/v1.2.2/dockerfile-json_Linux_${ARCH}.tar.gz" | tar xz && \
-        mv dockerfile-json /usr/local/bin/
+        curl -sSL "https://github.com/keilerkonzept/dockerfile-json/releases/download/v${DOCKERFILE_JSON_VERSION}/dockerfile-json_Linux_${ARCH}.tar.gz" | tar xz && \
+        mv dockerfile-json /usr/local/bin/ && \
+        echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
 
-    ARG VERSION=latest
+    ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:dockerfile-$VERSION

@@ -339,6 +339,56 @@ curl -L "https://example.com/tool-${PLATFORM}-${ARCHITECTURE}.tar.gz" | tar xz
 mv tool "$LUNAR_BIN_DIR/"
 ```
 
+## File Inclusion Configuration
+
+Collectors that analyze files should expose configuration for which files to process. The approach depends on whether single or multiple files are expected.
+
+### Pattern A: Multiple Files Expected (find command)
+
+When a collector processes multiple files of a certain type (e.g., all Dockerfiles, all YAML files), expose a `find_command` input that allows users to customize file discovery.
+
+**lunar-collector.yml:**
+```yaml
+inputs:
+  find_command:
+    description: Command to find files (must output one file path per line)
+    default: "find . -type f \\( -name Dockerfile -o -name '*.Dockerfile' -o -name 'Dockerfile.*' \\)"
+```
+
+**Why a find command?** This gives users full flexibility to:
+- Filter by directory: `find ./k8s -type f -name '*.yaml'`
+- Exclude paths: `find . -type f -name '*.yaml' ! -path './vendor/*'`
+- Use alternative tools: `git ls-files '*.yaml'` (respects .gitignore)
+
+### Pattern B: Single File with Multiple Possible Names (ordered path list)
+
+When a collector expects exactly one file but it may have different possible names (e.g., README.md, README.txt, readme.md), expose a comma-separated list of candidate paths. The collector tries each path in order and uses the first one found.
+
+**lunar-collector.yml:**
+```yaml
+inputs:
+  paths:
+    description: Comma-separated list of paths to try (first match wins)
+    default: "README.md,README.txt,README,readme.md,readme.txt"
+```
+
+**Why ordered paths?** This pattern:
+- Supports naming conventions (README.md vs README.rst)
+- Allows priority (prefer README.md over readme.txt)
+- Handles case sensitivity differences across filesystems
+- Is simpler than a find command for the single-file case
+
+### Choosing Between Patterns
+
+| Scenario | Pattern | Input Name |
+|----------|---------|------------|
+| All Dockerfiles in repo | find command | `find_command` |
+| All K8s manifests | find command | `find_command` |
+| All Terraform files | find command | `find_command` |
+| The README file | ordered paths | `paths` |
+| The CODEOWNERS file | ordered paths | `paths` |
+| Main config file | ordered paths | `paths` |
+
 ## Common Patterns
 
 ### Pattern 1: File Analysis

@@ -10,7 +10,11 @@ def main():
         allowed = [r.strip() for r in allowed_str.split(",") if r.strip()]
         
         if not allowed:
-            return
+            raise ValueError(
+                "Policy misconfiguration: 'allowed_registries' is empty. "
+                "An allow-list must contain at least one entry. "
+                "Configure allowed registries or exclude this check."
+            )
         
         definitions = c.get_node(".containers.definitions")
         if not definitions.exists():
