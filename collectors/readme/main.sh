@@ -2,8 +2,8 @@
 
 set -e
 
-# Convert comma-separated filenames input to array
-IFS=',' read -ra README_CANDIDATES <<< "$LUNAR_VAR_FILENAMES"
+# Convert comma-separated paths input to array
+IFS=',' read -ra README_CANDIDATES <<< "$LUNAR_VAR_PATH"
 
 # Find the first matching README file
 README_FILE=""
@@ -20,8 +20,8 @@ if [ -z "$README_FILE" ]; then
   exit 0
 fi
 
-# Normalize filename (remove leading ./)
-FILENAME="${README_FILE#./}"
+# Normalize path (remove leading ./)
+PATH_NORMALIZED="${README_FILE#./}"
 
 # Count lines
 LINES=$(wc -l < "$README_FILE" | tr -d ' ')
@@ -33,12 +33,12 @@ SECTIONS=$(grep -E '^#{1,6}\s+' "$README_FILE" 2>/dev/null | sed 's/^#\{1,6\}\s*
 # Build JSON object
 JSON=$(jq -n \
   --argjson exists true \
-  --arg filename "$FILENAME" \
+  --arg path "$PATH_NORMALIZED" \
   --argjson lines "$LINES" \
   --argjson sections "$SECTIONS" \
   '{
     exists: $exists,
-    filename: $filename,
+    path: $path,
     lines: $lines,
     sections: $sections
   }')

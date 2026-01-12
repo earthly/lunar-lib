@@ -59,7 +59,7 @@ policies:
   "repo": {
     "readme": {
       "exists": true,
-      "filename": "README.md",
+      "path": "README.md",
       "lines": 150,
       "sections": [
         "Installation",
@@ -100,7 +100,7 @@ This example passes all three policies when configured with:
   "repo": {
     "readme": {
       "exists": true,
-      "filename": "README.md",
+      "path": "README.md",
       "lines": 25,
       "sections": ["Installation", "Usage"]
     }
@@ -117,7 +117,7 @@ This example passes all three policies when configured with:
   "repo": {
     "readme": {
       "exists": true,
-      "filename": "README.md",
+      "path": "README.md",
       "lines": 150,
       "sections": [
         "Installation",

@@ -13,7 +13,7 @@ This table lists important sub-objects within each category. For full details, s
 | Path | Description |
 |------|-------------|
 | **`.repo`** | **Repository structure, README, standard files** |
-| `.repo.readme` | README file info (`exists`, `filename`, `lines`, `sections`) |
+| `.repo.readme` | README file info (`exists`, `path`, `lines`, `sections`) |
 | `.repo.files` | Standard file presence booleans (`gitignore`, `license`, `makefile`, etc.) |
 | `.repo.license` | License info (`type`, `path`) |
 | `.repo.languages` | Detected languages (`primary`, `all`) |
@@ -112,7 +112,7 @@ Repository structure, README, and standard files.
   "repo": {
     "readme": {
       "exists": true,
-      "filename": "README.md",
+      "path": "README.md",
       "lines": 150,
       "sections": ["Installation", "Usage", "API", "Contributing"]
     },
@@ -138,7 +138,7 @@ Repository structure, README, and standard files.
 
 **Key policy paths:**
 - `.repo.readme.exists` — README present
-- `.repo.readme.filename` — Which README file was found
+- `.repo.readme.path` — Which README file was found
 - `.repo.readme.sections` — Section headings for content requirements
 - `.repo.files.<name>` — Standard file presence
 - `.repo.languages.primary` — Primary language detection
