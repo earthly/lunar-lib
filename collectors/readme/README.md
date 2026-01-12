@@ -21,6 +21,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.repo.readme.exists` | boolean | Whether a README file exists in the repository root |
+| `.repo.readme.filename` | string | The filename/path of the README file found (only present if file exists) |
 | `.repo.readme.lines` | number | Number of lines in the README file (only present if file exists) |
 | `.repo.readme.sections[]` | array | List of section headings extracted from the README file (only present if file exists) |
 
@@ -34,6 +35,7 @@ See the example below for the full structure.
   "repo": {
     "readme": {
       "exists": true,
+      "filename": "README.md",
       "lines": 150,
       "sections": [
         "Installation",

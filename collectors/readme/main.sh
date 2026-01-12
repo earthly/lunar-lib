@@ -20,6 +20,9 @@ if [ -z "$README_FILE" ]; then
   exit 0
 fi
 
+# Normalize filename (remove leading ./)
+FILENAME="${README_FILE#./}"
+
 # Count lines
 LINES=$(wc -l < "$README_FILE" | tr -d ' ')
 
@@ -30,10 +33,12 @@ SECTIONS=$(grep -E '^#{1,6}\s+' "$README_FILE" 2>/dev/null | sed 's/^#\{1,6\}\s*
 # Build JSON object
 JSON=$(jq -n \
   --argjson exists true \
+  --arg filename "$FILENAME" \
   --argjson lines "$LINES" \
   --argjson sections "$SECTIONS" \
   '{
     exists: $exists,
+    filename: $filename,
     lines: $lines,
     sections: $sections
   }')
