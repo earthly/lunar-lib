@@ -12,6 +12,7 @@ This document specifies possible policies for the **Repository and Ownership** c
   * Collector(s): Scan the repository root for README.md or README files
   * Component JSON:
     * `.repo.readme.exists` - Boolean indicating if README file is present
+    * `.repo.readme.path` - Path to the README file (e.g., "README.md")
   * Policy: Assert that `.repo.readme.exists` is true
   * Configuration: None
   * Strategy: Strategy 8 (File Parsing and Schema Extraction)
