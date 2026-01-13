@@ -81,6 +81,10 @@ collectors:
     #   path: "README.md,docs/README.md"  # Customize which files to check
 ```
 
+## Docker Image
+
+This collector uses the base Lunar lib image (`earthly/lunar-lib:base-main`) since it has no additional dependencies.
+
 ## Related Policies
 
 This collector is typically used with:
