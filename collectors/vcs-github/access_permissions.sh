@@ -104,16 +104,8 @@ echo "Found $(echo "$TEAMS" | jq 'length') teams"
 
 echo "Direct collaborators: $(echo "$COLLABORATORS" | jq 'length')"
 
-# Build the access permissions JSON
-ACCESS_JSON=$(jq -n \
-  --argjson collaborators "$COLLABORATORS" \
-  --argjson teams "$TEAMS" \
-  '{
-    collaborators: $collaborators,
-    teams: $teams
-  }')
-
-# Collect the access permissions data
-echo "$ACCESS_JSON" | lunar collect -j ".vcs.access" -
+# Collect access permissions using dot notation
+echo "$COLLABORATORS" | lunar collect -j ".vcs.access.collaborators" -
+echo "$TEAMS" | lunar collect -j ".vcs.access.teams" -
 
 echo "GitHub access permissions collected successfully"
