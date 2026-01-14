@@ -119,3 +119,16 @@ collectors:
     # with:                       # Uncomment if you want to check a specific branch
     #   default_branch: "develop"
 ```
+
+## Related Policies
+
+This collector is typically used with policies that enforce:
+- Branch protection is enabled with minimum required approvals
+- CODEOWNER review is required
+- Force push and deletions are disabled
+- Required status checks are configured
+- Commit signing is enforced
+- Repository visibility matches organizational standards
+- Required topics/tags are present
+
+Example guardrails: `vcs-branch-protection-enabled`, `vcs-pr-min-approvals`, `vcs-codeowner-review-required`, `vcs-status-checks-required`, `vcs-no-force-push`, `vcs-signed-commits-required`, `vcs-repo-topics`, `vcs-visibility`.
