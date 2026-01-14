@@ -31,9 +31,9 @@ collectors:
   - name: access-permissions
     description: |
       Collects GitHub repository access permissions:
-      - Direct collaborator access (users with permission levels)
-      - Team access (teams with permission levels)
-      - Aggregated counts by permission level
+      - Direct collaborators with their permission levels
+      - Teams with access and their permission levels
+      Note: Does not expand team memberships for performance
     mainBash: access_permissions.sh
     hook:
       type: cron
