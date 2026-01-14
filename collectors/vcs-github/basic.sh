@@ -64,29 +64,21 @@ echo "  Visibility: $VISIBILITY"
 echo "  Topics: $TOPICS"
 echo "  Merge strategies: merge=$ALLOW_MERGE_COMMIT, squash=$ALLOW_SQUASH_MERGE, rebase=$ALLOW_REBASE_MERGE"
 
-# Collect provider
-lunar collect -j ".vcs.provider" "github"
+# Collect provider (string)
+lunar collect ".vcs.provider" "github"
 
-# Collect default branch
-lunar collect -j ".vcs.default_branch" "$DEFAULT_BRANCH"
+# Collect default branch (string)
+lunar collect ".vcs.default_branch" "$DEFAULT_BRANCH"
 
-# Collect visibility
-lunar collect -j ".vcs.visibility" "$VISIBILITY"
+# Collect visibility (string)
+lunar collect ".vcs.visibility" "$VISIBILITY"
 
-# Collect topics
+# Collect topics (array)
 echo "$TOPICS" | lunar collect -j ".vcs.topics" -
 
-# Collect merge strategies
-MERGE_STRATEGIES_JSON=$(jq -n \
-  --argjson allow_merge_commit "$ALLOW_MERGE_COMMIT" \
-  --argjson allow_squash_merge "$ALLOW_SQUASH_MERGE" \
-  --argjson allow_rebase_merge "$ALLOW_REBASE_MERGE" \
-  '{
-    allow_merge_commit: $allow_merge_commit,
-    allow_squash_merge: $allow_squash_merge,
-    allow_rebase_merge: $allow_rebase_merge
-  }')
-
-echo "$MERGE_STRATEGIES_JSON" | lunar collect -j ".vcs.merge_strategies" -
+# Collect merge strategies (booleans)
+lunar collect -j ".vcs.merge_strategies.allow_merge_commit" "$ALLOW_MERGE_COMMIT"
+lunar collect -j ".vcs.merge_strategies.allow_squash_merge" "$ALLOW_SQUASH_MERGE"
+lunar collect -j ".vcs.merge_strategies.allow_rebase_merge" "$ALLOW_REBASE_MERGE"
 
 echo "Basic GitHub repository settings collected successfully"

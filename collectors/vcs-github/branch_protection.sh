@@ -66,104 +66,77 @@ PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${BRANCH_TO_CHECK}/pr
 if echo "$PROTECTION_DATA" | jq -e '.message == "Branch not protected"' > /dev/null 2>&1 || \
    echo "$PROTECTION_DATA" | jq -e 'has("message") and .message != null' > /dev/null 2>&1; then
   echo "Branch protection is not enabled for $BRANCH_TO_CHECK"
-  PROTECTION_ENABLED=false
 
-  # Collect minimal branch protection object
-  PROTECTION_JSON=$(jq -n \
-    --argjson enabled false \
-    --arg branch "$BRANCH_TO_CHECK" \
-    '{
-      enabled: $enabled,
-      branch: $branch
-    }')
-else
-  echo "Branch protection is enabled for $BRANCH_TO_CHECK"
-  PROTECTION_ENABLED=true
+  # Collect minimal branch protection data
+  lunar collect -j ".vcs.branch_protection.enabled" false
+  lunar collect ".vcs.branch_protection.branch" "$BRANCH_TO_CHECK"
 
-  # Extract branch protection details
-  REQUIRE_PR=$(echo "$PROTECTION_DATA" | jq 'has("required_pull_request_reviews")')
-
-  if [ "$REQUIRE_PR" = "true" ]; then
-    REQUIRED_APPROVALS=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.required_approving_review_count // 0')
-    REQUIRE_CODEOWNER_REVIEW=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.require_code_owner_reviews // false')
-    DISMISS_STALE_REVIEWS=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.dismiss_stale_reviews // false')
-  else
-    REQUIRED_APPROVALS=0
-    REQUIRE_CODEOWNER_REVIEW=false
-    DISMISS_STALE_REVIEWS=false
-  fi
-
-  # Status checks
-  REQUIRE_STATUS_CHECKS=$(echo "$PROTECTION_DATA" | jq 'has("required_status_checks") and .required_status_checks != null')
-  if [ "$REQUIRE_STATUS_CHECKS" = "true" ]; then
-    REQUIRED_CHECKS=$(echo "$PROTECTION_DATA" | jq -c '.required_status_checks.contexts // []')
-    REQUIRE_BRANCHES_UP_TO_DATE=$(echo "$PROTECTION_DATA" | jq '.required_status_checks.strict // false')
-  else
-    REQUIRED_CHECKS='[]'
-    REQUIRE_BRANCHES_UP_TO_DATE=false
-  fi
-
-  # Force push and deletion restrictions
-  ALLOW_FORCE_PUSH=$(echo "$PROTECTION_DATA" | jq '.allow_force_pushes.enabled // false')
-  ALLOW_DELETIONS=$(echo "$PROTECTION_DATA" | jq '.allow_deletions.enabled // false')
-
-  # Linear history and signed commits
-  REQUIRE_LINEAR_HISTORY=$(echo "$PROTECTION_DATA" | jq '.required_linear_history.enabled // false')
-  REQUIRE_SIGNED_COMMITS=$(echo "$PROTECTION_DATA" | jq '.required_signatures.enabled // false')
-
-  # Push restrictions (who can push)
-  RESTRICTIONS_EXIST=$(echo "$PROTECTION_DATA" | jq 'has("restrictions") and .restrictions != null')
-  if [ "$RESTRICTIONS_EXIST" = "true" ]; then
-    RESTRICTIONS_USERS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.users[]?.login] // []')
-    RESTRICTIONS_TEAMS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.teams[]?.slug] // []')
-    RESTRICTIONS_APPS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.apps[]?.slug] // []')
-  else
-    RESTRICTIONS_USERS='[]'
-    RESTRICTIONS_TEAMS='[]'
-    RESTRICTIONS_APPS='[]'
-  fi
-
-  # Build branch protection JSON
-  PROTECTION_JSON=$(jq -n \
-    --argjson enabled "$PROTECTION_ENABLED" \
-    --arg branch "$BRANCH_TO_CHECK" \
-    --argjson require_pr "$REQUIRE_PR" \
-    --argjson required_approvals "$REQUIRED_APPROVALS" \
-    --argjson require_codeowner_review "$REQUIRE_CODEOWNER_REVIEW" \
-    --argjson dismiss_stale_reviews "$DISMISS_STALE_REVIEWS" \
-    --argjson require_status_checks "$REQUIRE_STATUS_CHECKS" \
-    --argjson required_checks "$REQUIRED_CHECKS" \
-    --argjson require_branches_up_to_date "$REQUIRE_BRANCHES_UP_TO_DATE" \
-    --argjson allow_force_push "$ALLOW_FORCE_PUSH" \
-    --argjson allow_deletions "$ALLOW_DELETIONS" \
-    --argjson require_linear_history "$REQUIRE_LINEAR_HISTORY" \
-    --argjson require_signed_commits "$REQUIRE_SIGNED_COMMITS" \
-    --argjson restrictions_users "$RESTRICTIONS_USERS" \
-    --argjson restrictions_teams "$RESTRICTIONS_TEAMS" \
-    --argjson restrictions_apps "$RESTRICTIONS_APPS" \
-    '{
-      enabled: $enabled,
-      branch: $branch,
-      require_pr: $require_pr,
-      required_approvals: $required_approvals,
-      require_codeowner_review: $require_codeowner_review,
-      dismiss_stale_reviews: $dismiss_stale_reviews,
-      require_status_checks: $require_status_checks,
-      required_checks: $required_checks,
-      require_branches_up_to_date: $require_branches_up_to_date,
-      allow_force_push: $allow_force_push,
-      allow_deletions: $allow_deletions,
-      require_linear_history: $require_linear_history,
-      require_signed_commits: $require_signed_commits,
-      restrictions: {
-        users: $restrictions_users,
-        teams: $restrictions_teams,
-        apps: $restrictions_apps
-      }
-    }')
+  echo "GitHub branch protection settings collected successfully"
+  exit 0
 fi
 
-# Collect the branch protection data
-echo "$PROTECTION_JSON" | lunar collect -j ".vcs.branch_protection" -
+# Branch protection is enabled
+echo "Branch protection is enabled for $BRANCH_TO_CHECK"
+
+# Extract branch protection details
+REQUIRE_PR=$(echo "$PROTECTION_DATA" | jq 'has("required_pull_request_reviews")')
+
+if [ "$REQUIRE_PR" = "true" ]; then
+  REQUIRED_APPROVALS=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.required_approving_review_count // 0')
+  REQUIRE_CODEOWNER_REVIEW=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.require_code_owner_reviews // false')
+  DISMISS_STALE_REVIEWS=$(echo "$PROTECTION_DATA" | jq '.required_pull_request_reviews.dismiss_stale_reviews // false')
+else
+  REQUIRED_APPROVALS=0
+  REQUIRE_CODEOWNER_REVIEW=false
+  DISMISS_STALE_REVIEWS=false
+fi
+
+# Status checks
+REQUIRE_STATUS_CHECKS=$(echo "$PROTECTION_DATA" | jq 'has("required_status_checks") and .required_status_checks != null')
+if [ "$REQUIRE_STATUS_CHECKS" = "true" ]; then
+  REQUIRED_CHECKS=$(echo "$PROTECTION_DATA" | jq -c '.required_status_checks.contexts // []')
+  REQUIRE_BRANCHES_UP_TO_DATE=$(echo "$PROTECTION_DATA" | jq '.required_status_checks.strict // false')
+else
+  REQUIRED_CHECKS='[]'
+  REQUIRE_BRANCHES_UP_TO_DATE=false
+fi
+
+# Force push and deletion restrictions
+ALLOW_FORCE_PUSH=$(echo "$PROTECTION_DATA" | jq '.allow_force_pushes.enabled // false')
+ALLOW_DELETIONS=$(echo "$PROTECTION_DATA" | jq '.allow_deletions.enabled // false')
+
+# Linear history and signed commits
+REQUIRE_LINEAR_HISTORY=$(echo "$PROTECTION_DATA" | jq '.required_linear_history.enabled // false')
+REQUIRE_SIGNED_COMMITS=$(echo "$PROTECTION_DATA" | jq '.required_signatures.enabled // false')
+
+# Push restrictions (who can push)
+RESTRICTIONS_EXIST=$(echo "$PROTECTION_DATA" | jq 'has("restrictions") and .restrictions != null')
+if [ "$RESTRICTIONS_EXIST" = "true" ]; then
+  RESTRICTIONS_USERS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.users[]?.login] // []')
+  RESTRICTIONS_TEAMS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.teams[]?.slug] // []')
+  RESTRICTIONS_APPS=$(echo "$PROTECTION_DATA" | jq -c '[.restrictions.apps[]?.slug] // []')
+else
+  RESTRICTIONS_USERS='[]'
+  RESTRICTIONS_TEAMS='[]'
+  RESTRICTIONS_APPS='[]'
+fi
+
+# Collect branch protection data using dot notation
+lunar collect -j ".vcs.branch_protection.enabled" true
+lunar collect ".vcs.branch_protection.branch" "$BRANCH_TO_CHECK"
+lunar collect -j ".vcs.branch_protection.require_pr" "$REQUIRE_PR"
+lunar collect -j ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS"
+lunar collect -j ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER_REVIEW"
+lunar collect -j ".vcs.branch_protection.dismiss_stale_reviews" "$DISMISS_STALE_REVIEWS"
+lunar collect -j ".vcs.branch_protection.require_status_checks" "$REQUIRE_STATUS_CHECKS"
+echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -
+lunar collect -j ".vcs.branch_protection.require_branches_up_to_date" "$REQUIRE_BRANCHES_UP_TO_DATE"
+lunar collect -j ".vcs.branch_protection.allow_force_push" "$ALLOW_FORCE_PUSH"
+lunar collect -j ".vcs.branch_protection.allow_deletions" "$ALLOW_DELETIONS"
+lunar collect -j ".vcs.branch_protection.require_linear_history" "$REQUIRE_LINEAR_HISTORY"
+lunar collect -j ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNED_COMMITS"
+echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictions.users" -
+echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
+echo "$RESTRICTIONS_APPS" | lunar collect -j ".vcs.branch_protection.restrictions.apps" -
 
 echo "GitHub branch protection settings collected successfully"
