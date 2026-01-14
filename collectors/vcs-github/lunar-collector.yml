@@ -1,0 +1,44 @@
+version: 0
+
+name: vcs-github
+description: Collect GitHub repository settings and branch protection rules
+author: earthly
+
+collectors:
+  - name: basic
+    description: |
+      Collects basic GitHub repository settings:
+      - Repository visibility (public, private, internal)
+      - Default branch name
+      - Topics and tags
+      - Allowed merge strategies (merge, squash, rebase)
+    mainBash: basic.sh
+    hook:
+      type: cron
+
+  - name: branch-protection
+    description: |
+      Collects GitHub branch protection rules:
+      - Required approvals and code owner review
+      - Required status checks
+      - Force push and deletion restrictions
+      - Commit signing requirements
+      - Push restrictions (users, teams, apps)
+    mainBash: branch_protection.sh
+    hook:
+      type: cron
+
+  - name: access-permissions
+    description: |
+      Collects GitHub repository access permissions:
+      - Direct collaborator access (users with permission levels)
+      - Team access (teams with permission levels)
+      - Aggregated counts by permission level
+    mainBash: access_permissions.sh
+    hook:
+      type: cron
+
+inputs:
+  default_branch:
+    description: Branch to check protection rules for (defaults to repository's default branch)
+    default: ""
