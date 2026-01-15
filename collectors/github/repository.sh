@@ -68,6 +68,7 @@ lunar collect ".vcs.visibility" "$VISIBILITY"
 echo "$TOPICS" | lunar collect -j ".vcs.topics" -
 
 # Collect merge strategies (booleans)
-lunar collect -j ".vcs.merge_strategies.allow_merge_commit" "$ALLOW_MERGE_COMMIT"
-lunar collect -j ".vcs.merge_strategies.allow_squash_merge" "$ALLOW_SQUASH_MERGE"
-lunar collect -j ".vcs.merge_strategies.allow_rebase_merge" "$ALLOW_REBASE_MERGE"
+lunar collect -j \
+      ".vcs.merge_strategies.allow_merge_commit" "$ALLOW_MERGE_COMMIT" \
+      ".vcs.merge_strategies.allow_squash_merge" "$ALLOW_SQUASH_MERGE" \
+      ".vcs.merge_strategies.allow_rebase_merge" "$ALLOW_REBASE_MERGE"

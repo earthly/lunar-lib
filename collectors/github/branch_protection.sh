@@ -105,19 +105,21 @@ else
 fi
 
 # Collect branch protection data using dot notation
-lunar collect -j ".vcs.branch_protection.enabled" true
-lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
-lunar collect -j ".vcs.branch_protection.require_pr" "$REQUIRE_PR"
-lunar collect -j ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS"
-lunar collect -j ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER_REVIEW"
-lunar collect -j ".vcs.branch_protection.dismiss_stale_reviews" "$DISMISS_STALE_REVIEWS"
-lunar collect -j ".vcs.branch_protection.require_status_checks" "$REQUIRE_STATUS_CHECKS"
-echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -
-lunar collect -j ".vcs.branch_protection.require_branches_up_to_date" "$REQUIRE_BRANCHES_UP_TO_DATE"
-lunar collect -j ".vcs.branch_protection.allow_force_push" "$ALLOW_FORCE_PUSH"
-lunar collect -j ".vcs.branch_protection.allow_deletions" "$ALLOW_DELETIONS"
-lunar collect -j ".vcs.branch_protection.require_linear_history" "$REQUIRE_LINEAR_HISTORY"
-lunar collect -j ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNED_COMMITS"
+lunar collect -j \
+      ".vcs.branch_protection.enabled" true \
+      ".vcs.branch_protection.branch" "$DEFAULT_BRANCH" \
+      ".vcs.branch_protection.require_pr" "$REQUIRE_PR" \
+      ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS" \
+      ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER_REVIEW" \
+      ".vcs.branch_protection.dismiss_stale_reviews" "$DISMISS_STALE_REVIEWS" \
+      ".vcs.branch_protection.require_status_checks" "$REQUIRE_STATUS_CHECKS" \
+      ".vcs.branch_protection.require_branches_up_to_date" "$REQUIRE_BRANCHES_UP_TO_DATE" \
+      ".vcs.branch_protection.allow_force_push" "$ALLOW_FORCE_PUSH" \
+      ".vcs.branch_protection.allow_deletions" "$ALLOW_DELETIONS" \
+      ".vcs.branch_protection.require_linear_history" "$REQUIRE_LINEAR_HISTORY" \
+      ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNED_COMMITS"
+
 echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictions.users" -
 echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
 echo "$RESTRICTIONS_APPS" | lunar collect -j ".vcs.branch_protection.restrictions.apps" -
+echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -
