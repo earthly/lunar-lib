@@ -42,6 +42,15 @@ See the example below for the full structure.
 
 </details>
 
+## Collectors
+
+This plugin provides the following collectors (use `include` to select a subset):
+
+| Collector | Description |
+|--------|-------------|
+| `example-collector-1` | Checks for the existence of X |
+| `example-collector-2` | Adds more data about Y |
+
 ## Inputs
 
 {If the collector has configurable inputs, list them here. If not, write "This collector has no configurable inputs."}
@@ -50,6 +59,10 @@ See the example below for the full structure.
 |-------|----------|---------|-------------|
 | `threshold` | No | `10` | Minimum threshold for X |
 | `api_url` | Yes | - | Base URL for the external API |
+
+## Secrets
+
+- `{secret-name}` - {brief description}
 
 ## Installation
 
