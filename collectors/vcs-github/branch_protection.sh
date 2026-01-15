@@ -4,12 +4,18 @@ set -e
 
 # Check for required environment variables
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
-  echo "Error: LUNAR_SECRET_GH_TOKEN is not set"
+  echo "Error: LUNAR_SECRET_GH_TOKEN is not set" >&2
   exit 1
 fi
 
 if [ -z "$LUNAR_COMPONENT_ID" ]; then
-  echo "Error: LUNAR_COMPONENT_ID is not set"
+  echo "Error: LUNAR_COMPONENT_ID is not set" >&2
+  exit 1
+fi
+
+# Only process GitHub repositories
+if [[ ! "$LUNAR_COMPONENT_ID" =~ ^github\.com/ ]]; then
+  echo "Error: LUNAR_COMPONENT_ID must start with github.com (got: $LUNAR_COMPONENT_ID)" >&2
   exit 1
 fi
 
@@ -19,7 +25,7 @@ OWNER=$(echo "$LUNAR_COMPONENT_ID" | cut -d'/' -f2)
 REPO=$(echo "$LUNAR_COMPONENT_ID" | cut -d'/' -f3)
 
 if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
-  echo "Error: Could not parse LUNAR_COMPONENT_ID='$LUNAR_COMPONENT_ID' (expected format: github.com/owner/repo)"
+  echo "Error: Could not parse LUNAR_COMPONENT_ID='$LUNAR_COMPONENT_ID' (expected format: github.com/owner/repo)" >&2
   exit 1
 fi
 
