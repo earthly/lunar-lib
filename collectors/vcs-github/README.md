@@ -81,25 +81,23 @@ See the example below for the full structure.
 
 </details>
 
-## Subcollectors
+## Collectors
 
-This plugin includes three subcollectors:
+This plugin provides the following collectors (use `include` to select a subset):
 
-### `basic`
-Collects basic repository settings including visibility, default branch, topics, and allowed merge strategies.
+| Collector | Description |
+|-----------|-------------|
+| `basic` | Collects basic repository settings including visibility, default branch, topics, and allowed merge strategies |
+| `branch-protection` | Collects branch protection rules including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions |
+| `access-permissions` | Collects repository access permissions including direct collaborators and teams (does not expand team memberships) |
 
-### `branch-protection`
-Collects branch protection rules including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions.
+## Inputs
 
-### `access-permissions`
-Collects repository access permissions including direct collaborators with their permission levels and teams with access to the repository. Note: Does not expand team memberships to individual users for performance reasons.
+This collector has no configurable inputs.
 
-## Environment Variables
+## Secrets
 
-This collector requires the following environment variables:
-
-- `LUNAR_SECRET_GH_TOKEN` - GitHub personal access token with `repo` scope for API authentication
-- `LUNAR_COMPONENT_ID` - Component identifier in format `github.com/owner/repo`
+- `GH_TOKEN` - GitHub personal access token with `repo` scope for API authentication
 
 ## Installation
 
