@@ -56,13 +56,9 @@ ALLOW_SQUASH_MERGE=$(echo "$REPO_DATA" | jq '.allow_squash_merge')
 ALLOW_REBASE_MERGE=$(echo "$REPO_DATA" | jq '.allow_rebase_merge')
 
 # Collect provider (string)
-lunar collect ".vcs.provider" "github"
-
-# Collect default branch (string)
-lunar collect ".vcs.default_branch" "$DEFAULT_BRANCH"
-
-# Collect visibility (string)
-lunar collect ".vcs.visibility" "$VISIBILITY"
+lunar collect ".vcs.provider" "github" \
+      ".vcs.default_branch" "$DEFAULT_BRANCH" \
+      ".vcs.visibility" "$VISIBILITY"
 
 # Collect topics (array)
 echo "$TOPICS" | lunar collect -j ".vcs.topics" -

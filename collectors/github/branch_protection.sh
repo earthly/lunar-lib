@@ -105,9 +105,7 @@ else
 fi
 
 # Collect branch protection data using dot notation
-lunar collect -j \
-      ".vcs.branch_protection.enabled" true \
-      ".vcs.branch_protection.branch" "$DEFAULT_BRANCH" \
+lunar collect -j ".vcs.branch_protection.enabled" true \
       ".vcs.branch_protection.require_pr" "$REQUIRE_PR" \
       ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS" \
       ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER_REVIEW" \
@@ -118,6 +116,8 @@ lunar collect -j \
       ".vcs.branch_protection.allow_deletions" "$ALLOW_DELETIONS" \
       ".vcs.branch_protection.require_linear_history" "$REQUIRE_LINEAR_HISTORY" \
       ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNED_COMMITS"
+
+lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
 
 echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictions.users" -
 echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
