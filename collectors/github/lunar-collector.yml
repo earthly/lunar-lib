@@ -15,7 +15,7 @@ collectors:
       - Allowed merge strategies (merge, squash, rebase)
     mainBash: repository.sh
     hook:
-      type: cron
+      type: code
 
   - name: branch-protection
     description: |
@@ -27,7 +27,7 @@ collectors:
       - Push restrictions (users, teams, apps)
     mainBash: branch_protection.sh
     hook:
-      type: cron
+      type: code
 
   - name: access-permissions
     description: |
@@ -37,4 +37,4 @@ collectors:
       Note: Does not expand team memberships for performance
     mainBash: access_permissions.sh
     hook:
-      type: cron
+      type: code
