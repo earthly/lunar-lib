@@ -85,11 +85,11 @@ See the example below for the full structure.
 
 This plugin provides the following collectors (use `include` to select a subset):
 
-| Collector | Description |
-|-----------|-------------|
-| `basic` | Collects basic repository settings including visibility, default branch, topics, and allowed merge strategies |
-| `branch-protection` | Collects branch protection rules including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions |
-| `access-permissions` | Collects repository access permissions including direct collaborators and teams (does not expand team memberships) |
+| Collector            | Description                                                                                                                                                      |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `repository`         | Collects basic repository settings including visibility, default branch, topics, and allowed merge strategies                                                    |
+| `branch-protection`  | Collects branch protection rules including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions |
+| `access-permissions` | Collects repository access permissions including direct collaborators and teams (does not expand team memberships)                                               |
 
 ## Inputs
 
@@ -107,4 +107,5 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github.com/earthly/lunar-lib/collectors/vcs-github@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
+    # include: [repository]  # Only run specific checks (omit to run all)
 ```
