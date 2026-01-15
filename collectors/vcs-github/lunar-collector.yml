@@ -37,8 +37,3 @@ collectors:
     mainBash: access_permissions.sh
     hook:
       type: cron
-
-inputs:
-  default_branch:
-    description: Branch to check protection rules for (defaults to repository's default branch)
-    default: ""

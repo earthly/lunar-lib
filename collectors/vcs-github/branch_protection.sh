@@ -45,26 +45,20 @@ gh_api() {
        "$url"
 }
 
-# First, get the default branch if we need it
-if [ -z "$LUNAR_VAR_DEFAULT_BRANCH" ]; then
-  REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
-  DEFAULT_BRANCH=$(echo "$REPO_DATA" | jq -r '.default_branch')
-else
-  DEFAULT_BRANCH="$LUNAR_VAR_DEFAULT_BRANCH"
-fi
-
-BRANCH_TO_CHECK="$DEFAULT_BRANCH"
+# Get the default branch from the repository
+REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
+DEFAULT_BRANCH=$(echo "$REPO_DATA" | jq -r '.default_branch')
 
 # Fetch branch protection settings
 # Note: This endpoint returns 404 if branch protection is not enabled
-PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${BRANCH_TO_CHECK}/protection" 2>/dev/null || echo '{}')
+PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${DEFAULT_BRANCH}/protection" 2>/dev/null || echo '{}')
 
 # Check if branch protection is enabled
 if echo "$PROTECTION_DATA" | jq -e '.message == "Branch not protected"' > /dev/null 2>&1 || \
    echo "$PROTECTION_DATA" | jq -e 'has("message") and .message != null' > /dev/null 2>&1; then
   # Collect minimal branch protection data
   lunar collect -j ".vcs.branch_protection.enabled" false
-  lunar collect ".vcs.branch_protection.branch" "$BRANCH_TO_CHECK"
+  lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
   exit 0
 fi
 
@@ -113,7 +107,7 @@ fi
 
 # Collect branch protection data using dot notation
 lunar collect -j ".vcs.branch_protection.enabled" true
-lunar collect ".vcs.branch_protection.branch" "$BRANCH_TO_CHECK"
+lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
 lunar collect -j ".vcs.branch_protection.require_pr" "$REQUIRE_PR"
 lunar collect -j ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS"
 lunar collect -j ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER_REVIEW"

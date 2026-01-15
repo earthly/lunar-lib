@@ -94,19 +94,12 @@ Collects branch protection rules including required approvals, status checks, fo
 ### `access-permissions`
 Collects repository access permissions including direct collaborators with their permission levels and teams with access to the repository. Note: Does not expand team memberships to individual users for performance reasons.
 
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `default_branch` | No | (repository default) | Branch to check protection rules for |
-
 ## Environment Variables
 
-This collector requires the following environment variable:
+This collector requires the following environment variables:
 
 - `LUNAR_SECRET_GH_TOKEN` - GitHub personal access token with `repo` scope for API authentication
 - `LUNAR_COMPONENT_ID` - Component identifier in format `github.com/owner/repo`
-- `LUNAR_CI` - Must be set to `github` for the collector to run
 
 ## Installation
 
@@ -116,19 +109,4 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github.com/earthly/lunar-lib/collectors/vcs-github@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
-    # with:                       # Uncomment if you want to check a specific branch
-    #   default_branch: "develop"
 ```
-
-## Related Policies
-
-This collector is typically used with policies that enforce:
-- Branch protection is enabled with minimum required approvals
-- CODEOWNER review is required
-- Force push and deletions are disabled
-- Required status checks are configured
-- Commit signing is enforced
-- Repository visibility matches organizational standards
-- Required topics/tags are present
-
-Example guardrails: `vcs-branch-protection-enabled`, `vcs-pr-min-approvals`, `vcs-codeowner-review-required`, `vcs-status-checks-required`, `vcs-no-force-push`, `vcs-signed-commits-required`, `vcs-repo-topics`, `vcs-visibility`.
