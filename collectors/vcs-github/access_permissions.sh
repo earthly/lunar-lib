@@ -67,10 +67,7 @@ gh_api() {
   echo "$all_data"
 }
 
-echo "Fetching access permissions for $REPO_FULL_NAME..."
-
 # Fetch direct collaborators
-echo "Fetching collaborators..."
 COLLABORATORS_DATA=$(gh_api "/repos/${OWNER}/${REPO}/collaborators")
 
 # Extract collaborator information (login and permissions)
@@ -87,10 +84,7 @@ COLLABORATORS=$(echo "$COLLABORATORS_DATA" | jq '[.[] | {
   type: .type
 }]')
 
-echo "Found $(echo "$COLLABORATORS" | jq 'length') collaborators"
-
 # Fetch teams with access
-echo "Fetching teams..."
 TEAMS_DATA=$(gh_api "/repos/${OWNER}/${REPO}/teams")
 
 # Extract team information (slug and permission)
@@ -100,12 +94,6 @@ TEAMS=$(echo "$TEAMS_DATA" | jq '[.[] | {
   permission: .permission
 }]')
 
-echo "Found $(echo "$TEAMS" | jq 'length') teams"
-
-echo "Direct collaborators: $(echo "$COLLABORATORS" | jq 'length')"
-
 # Collect access permissions using dot notation
 echo "$COLLABORATORS" | lunar collect -j ".vcs.access.collaborators" -
 echo "$TEAMS" | lunar collect -j ".vcs.access.teams" -
-
-echo "GitHub access permissions collected successfully"

@@ -45,8 +45,6 @@ gh_api() {
        "$url"
 }
 
-echo "Fetching basic repository settings for $REPO_FULL_NAME..."
-
 # Fetch repository information
 REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
 
@@ -57,12 +55,6 @@ TOPICS=$(echo "$REPO_DATA" | jq -c '.topics // []')
 ALLOW_MERGE_COMMIT=$(echo "$REPO_DATA" | jq '.allow_merge_commit')
 ALLOW_SQUASH_MERGE=$(echo "$REPO_DATA" | jq '.allow_squash_merge')
 ALLOW_REBASE_MERGE=$(echo "$REPO_DATA" | jq '.allow_rebase_merge')
-
-echo "Repository settings collected:"
-echo "  Default branch: $DEFAULT_BRANCH"
-echo "  Visibility: $VISIBILITY"
-echo "  Topics: $TOPICS"
-echo "  Merge strategies: merge=$ALLOW_MERGE_COMMIT, squash=$ALLOW_SQUASH_MERGE, rebase=$ALLOW_REBASE_MERGE"
 
 # Collect provider (string)
 lunar collect ".vcs.provider" "github"
@@ -80,5 +72,3 @@ echo "$TOPICS" | lunar collect -j ".vcs.topics" -
 lunar collect -j ".vcs.merge_strategies.allow_merge_commit" "$ALLOW_MERGE_COMMIT"
 lunar collect -j ".vcs.merge_strategies.allow_squash_merge" "$ALLOW_SQUASH_MERGE"
 lunar collect -j ".vcs.merge_strategies.allow_rebase_merge" "$ALLOW_REBASE_MERGE"
-
-echo "Basic GitHub repository settings collected successfully"

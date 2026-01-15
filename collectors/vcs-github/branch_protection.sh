@@ -47,7 +47,6 @@ gh_api() {
 
 # First, get the default branch if we need it
 if [ -z "$LUNAR_VAR_DEFAULT_BRANCH" ]; then
-  echo "Fetching default branch for $REPO_FULL_NAME..."
   REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
   DEFAULT_BRANCH=$(echo "$REPO_DATA" | jq -r '.default_branch')
 else
@@ -56,8 +55,6 @@ fi
 
 BRANCH_TO_CHECK="$DEFAULT_BRANCH"
 
-echo "Fetching branch protection for $REPO_FULL_NAME on branch: $BRANCH_TO_CHECK..."
-
 # Fetch branch protection settings
 # Note: This endpoint returns 404 if branch protection is not enabled
 PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${BRANCH_TO_CHECK}/protection" 2>/dev/null || echo '{}')
@@ -65,18 +62,11 @@ PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${BRANCH_TO_CHECK}/pr
 # Check if branch protection is enabled
 if echo "$PROTECTION_DATA" | jq -e '.message == "Branch not protected"' > /dev/null 2>&1 || \
    echo "$PROTECTION_DATA" | jq -e 'has("message") and .message != null' > /dev/null 2>&1; then
-  echo "Branch protection is not enabled for $BRANCH_TO_CHECK"
-
   # Collect minimal branch protection data
   lunar collect -j ".vcs.branch_protection.enabled" false
   lunar collect ".vcs.branch_protection.branch" "$BRANCH_TO_CHECK"
-
-  echo "GitHub branch protection settings collected successfully"
   exit 0
 fi
-
-# Branch protection is enabled
-echo "Branch protection is enabled for $BRANCH_TO_CHECK"
 
 # Extract branch protection details
 REQUIRE_PR=$(echo "$PROTECTION_DATA" | jq 'has("required_pull_request_reviews")')
@@ -138,5 +128,3 @@ lunar collect -j ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNE
 echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictions.users" -
 echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
 echo "$RESTRICTIONS_APPS" | lunar collect -j ".vcs.branch_protection.restrictions.apps" -
-
-echo "GitHub branch protection settings collected successfully"
