@@ -2,12 +2,6 @@
 
 set -e
 
-# Check if we're in GitHub context
-if [ "$LUNAR_CI" != "github" ]; then
-  echo "Skipping: Not in GitHub CI environment (LUNAR_CI=$LUNAR_CI)"
-  exit 0
-fi
-
 # Check for required environment variables
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
   echo "Error: LUNAR_SECRET_GH_TOKEN is not set"
