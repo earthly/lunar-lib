@@ -2,6 +2,11 @@
 
 set -e
 
+# Only process GitHub repositories
+if [[ ! "$LUNAR_COMPONENT_ID" =~ ^github\.com/ ]]; then
+  exit 0
+fi
+
 # Check for required environment variables
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
   echo "Error: LUNAR_SECRET_GH_TOKEN is not set" >&2
@@ -10,12 +15,6 @@ fi
 
 if [ -z "$LUNAR_COMPONENT_ID" ]; then
   echo "Error: LUNAR_COMPONENT_ID is not set" >&2
-  exit 1
-fi
-
-# Only process GitHub repositories
-if [[ ! "$LUNAR_COMPONENT_ID" =~ ^github\.com/ ]]; then
-  echo "Error: LUNAR_COMPONENT_ID must start with github.com (got: $LUNAR_COMPONENT_ID)" >&2
   exit 1
 fi
 
