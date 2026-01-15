@@ -3,7 +3,7 @@ version: 0
 name: vcs-github
 description: Collect GitHub repository settings and branch protection rules
 author: earthly
-default_image: earthly/lunar-scripts:v1.0
+default_image: earthly/lunar-lib:base-main
 
 collectors:
   - name: basic
