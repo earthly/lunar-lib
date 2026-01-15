@@ -1,0 +1,45 @@
+version: 0
+
+name: vcs
+description: Version control system (VCS) best practices and security policies
+author: earthly
+
+policies:
+  - name: branch-protection
+    description: Validate branch protection rules are properly configured
+    mainPython: ./branch-protection.py
+
+inputs:
+  require_enabled:
+    description: Whether branch protection must be enabled (true/false, or omit to skip check)
+    default: null
+  require_pr:
+    description: Whether pull requests are required before merging (true/false, or omit to skip check)
+    default: null
+  min_approvals:
+    description: Minimum number of required approvals (integer, or omit to skip check)
+    default: null
+  require_codeowner_review:
+    description: Whether code owner review is required (true/false, or omit to skip check)
+    default: null
+  require_dismiss_stale_reviews:
+    description: Whether stale reviews must be dismissed on new commits (true/false, or omit to skip check)
+    default: null
+  require_status_checks:
+    description: Whether status checks are required to pass (true/false, or omit to skip check)
+    default: null
+  require_up_to_date:
+    description: Whether branches must be up to date before merging (true/false, or omit to skip check)
+    default: null
+  disallow_force_push:
+    description: Whether force pushes should be disallowed (true/false, or omit to skip check)
+    default: null
+  disallow_deletions:
+    description: Whether branch deletions should be disallowed (true/false, or omit to skip check)
+    default: null
+  require_linear_history:
+    description: Whether linear history is required (true/false, or omit to skip check)
+    default: null
+  require_signed_commits:
+    description: Whether signed commits are required (true/false, or omit to skip check)
+    default: null
