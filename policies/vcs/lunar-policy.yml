@@ -9,6 +9,10 @@ policies:
     description: Validate branch protection rules are properly configured
     mainPython: ./branch-protection.py
 
+  - name: repository-settings
+    description: Validate repository settings including visibility, default branch, and merge strategies
+    mainPython: ./repository-settings.py
+
 inputs:
   require_enabled:
     description: Whether branch protection must be enabled (true/false, or omit to skip check)
@@ -42,4 +46,19 @@ inputs:
     default: null
   require_signed_commits:
     description: Whether signed commits are required (true/false, or omit to skip check)
+    default: null
+  allowed_visibility:
+    description: Comma-separated list of allowed repository visibility levels (public, private, internal, or omit to skip check)
+    default: null
+  required_default_branch:
+    description: Required default branch name (e.g., 'main', or omit to skip check)
+    default: null
+  allow_merge_commit:
+    description: Whether merge commits should be allowed (true/false, or omit to skip check)
+    default: null
+  allow_squash_merge:
+    description: Whether squash merges should be allowed (true/false, or omit to skip check)
+    default: null
+  allow_rebase_merge:
+    description: Whether rebase merges should be allowed (true/false, or omit to skip check)
     default: null

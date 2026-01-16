@@ -13,26 +13,130 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `branch-protection` | Validates branch protection rules are properly configured | Branch protection is disabled or does not meet required standards |
+| `repository-settings` | Validates repository settings including visibility, default branch, and merge strategies | Repository settings do not meet organizational standards |
 
 ## Required Data
 
 This policy reads from the following Component JSON paths:
 
-| Path | Type | Provided By |
-|------|------|-------------|
-| `.vcs.branch_protection.enabled` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.require_pr` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.required_approvals` | integer | `github/branch-protection` |
-| `.vcs.branch_protection.require_codeowner_review` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.dismiss_stale_reviews` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.require_status_checks` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.require_branches_up_to_date` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.allow_force_push` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.allow_deletions` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.require_linear_history` | boolean | `github/branch-protection` |
-| `.vcs.branch_protection.require_signed_commits` | boolean | `github/branch-protection` |
+| Path | Type |
+|------|------|
+| `.vcs.branch_protection.enabled` | boolean |
+| `.vcs.branch_protection.require_pr` | boolean |
+| `.vcs.branch_protection.required_approvals` | integer |
+| `.vcs.branch_protection.require_codeowner_review` | boolean |
+| `.vcs.branch_protection.dismiss_stale_reviews` | boolean |
+| `.vcs.branch_protection.require_status_checks` | boolean |
+| `.vcs.branch_protection.require_branches_up_to_date` | boolean |
+| `.vcs.branch_protection.allow_force_push` | boolean |
+| `.vcs.branch_protection.allow_deletions` | boolean |
+| `.vcs.branch_protection.require_linear_history` | boolean |
+| `.vcs.branch_protection.require_signed_commits` | boolean |
 
-**Note:** Ensure the `github/branch-protection` collector is configured before enabling this policy.
+**Note:** This policy requires a VCS collector (such as `github`) that populates the `.vcs.branch_protection` data.
+
+---
+
+## Policy: `repository-settings`
+
+### Required Data
+
+This policy reads from the following Component JSON paths:
+
+| Path | Type |
+|------|------|
+| `.vcs.visibility` | string |
+| `.vcs.default_branch` | string |
+| `.vcs.merge_strategies.allow_merge_commit` | boolean |
+| `.vcs.merge_strategies.allow_squash_merge` | boolean |
+| `.vcs.merge_strategies.allow_rebase_merge` | boolean |
+
+**Note:** This policy requires a VCS collector (such as `github/repository`) that populates the `.vcs` repository data.
+
+### Inputs
+
+All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped.
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal") |
+| `required_default_branch` | No | `null` | Required default branch name (e.g., "main") |
+| `allow_merge_commit` | No | `null` | Whether merge commits should be allowed (true/false) |
+| `allow_squash_merge` | No | `null` | Whether squash merges should be allowed (true/false) |
+| `allow_rebase_merge` | No | `null` | Whether rebase merges should be allowed (true/false) |
+
+### Examples
+
+#### Passing Example - Private repository with main branch
+
+```json
+{
+  "vcs": {
+    "provider": "github",
+    "visibility": "private",
+    "default_branch": "main",
+    "merge_strategies": {
+      "allow_merge_commit": false,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": false
+    }
+  }
+}
+```
+
+With policy configuration:
+```yaml
+with:
+  allowed_visibility: "private,internal"
+  required_default_branch: "main"
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+```
+
+#### Failing Example - Public repository when only private allowed
+
+```json
+{
+  "vcs": {
+    "visibility": "public",
+    "default_branch": "main"
+  }
+}
+```
+
+**Failure message (when `allowed_visibility: "private"`):** `"Repository visibility 'public' is not in allowed list: private"`
+
+#### Failing Example - Wrong default branch
+
+```json
+{
+  "vcs": {
+    "visibility": "private",
+    "default_branch": "master"
+  }
+}
+```
+
+**Failure message (when `required_default_branch: "main"`):** `"Default branch is 'master', but policy requires 'main'"`
+
+#### Failing Example - Merge commits enabled when should be disabled
+
+```json
+{
+  "vcs": {
+    "merge_strategies": {
+      "allow_merge_commit": true,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": false
+    }
+  }
+}
+```
+
+**Failure message (when `allow_merge_commit: false`):** `"Merge commits are allowed, but policy requires them to be disabled"`
+
+---
 
 ## Inputs
 
@@ -62,10 +166,26 @@ policies:
     on: ["domain:your-domain"]  # Or use tags like [production, critical]
     enforcement: report-pr       # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     with:
+      # Branch protection settings
       require_enabled: true
       require_pr: true
       min_approvals: 1
       disallow_force_push: true
+
+      # Repository settings
+      allowed_visibility: "private,internal"
+      required_default_branch: "main"
+      allow_squash_merge: true
+      allow_merge_commit: false
+
+  # Or use include to run only specific policies
+  - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
+    include: [repository-settings]
+    on: ["domain:your-domain"]
+    enforcement: block-pr
+    with:
+      allowed_visibility: "private"
+      required_default_branch: "main"
 ```
 
 ## Examples
@@ -131,12 +251,15 @@ Another failing example - insufficient required approvals:
 
 ## Related Collectors
 
-This policy works with any collector that populates the required data paths. Common options include:
+These policies work with any collector that populates the required data paths. Common options include:
+- `github/repository` - Collects GitHub repository settings (visibility, default branch, merge strategies)
 - `github/branch-protection` - Collects GitHub branch protection rules via GitHub API
 
 ## Remediation
 
-When this policy fails, you can resolve it by configuring branch protection rules in your repository settings:
+### Branch Protection Policy Failures
+
+When the `branch-protection` policy fails, you can resolve it by configuring branch protection rules in your repository settings:
 
 1. **GitHub:** Navigate to your repository → Settings → Branches → Branch protection rules
 2. Select your default branch (typically `main` or `master`) or create a new rule
@@ -151,3 +274,23 @@ When this policy fails, you can resolve it by configuring branch protection rule
    - **Require signed commits** - Enable if required by policy
 4. Save the branch protection rule
 5. Re-run the Lunar collector and policy to verify compliance
+
+### Repository Settings Policy Failures
+
+When the `repository-settings` policy fails, you can resolve it by updating repository settings:
+
+1. **GitHub:** Navigate to your repository → Settings
+2. Update the relevant settings based on the policy failures:
+   - **Repository visibility** (General section):
+     - Change visibility to match policy requirements (Private, Public, or Internal)
+     - Note: Changing visibility may have security implications - consult your security team
+   - **Default branch** (General section):
+     - Rename your default branch if required (e.g., from `master` to `main`)
+     - GitHub provides a "Rename branch" button in the repository settings
+     - Update local clones and CI/CD configurations after renaming
+   - **Merge button** (Pull Requests section):
+     - Enable/disable "Allow merge commits" based on policy
+     - Enable/disable "Allow squash merging" based on policy
+     - Enable/disable "Allow rebase merging" based on policy
+3. Save the changes
+4. Re-run the Lunar collector and policy to verify compliance
