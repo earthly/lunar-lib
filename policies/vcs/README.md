@@ -57,13 +57,15 @@ This policy reads from the following Component JSON paths:
 
 All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped.
 
+**Boolean inputs support bidirectional checks:** Set `true` to require the setting be enabled, or `false` to require it be disabled.
+
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal") |
 | `required_default_branch` | No | `null` | Required default branch name (e.g., "main") |
-| `allow_merge_commit` | No | `null` | Whether merge commits should be allowed (true/false) |
-| `allow_squash_merge` | No | `null` | Whether squash merges should be allowed (true/false) |
-| `allow_rebase_merge` | No | `null` | Whether rebase merges should be allowed (true/false) |
+| `allow_merge_commit` | No | `null` | Whether merge commits should be allowed. Set `true` to require enabled, `false` to require disabled |
+| `allow_squash_merge` | No | `null` | Whether squash merges should be allowed. Set `true` to require enabled, `false` to require disabled |
+| `allow_rebase_merge` | No | `null` | Whether rebase merges should be allowed. Set `true` to require enabled, `false` to require disabled |
 
 ### Examples
 
@@ -136,25 +138,51 @@ with:
 
 **Failure message (when `allow_merge_commit: false`):** `"Merge commits are allowed, but policy requires them to be disabled"`
 
+#### Bidirectional Example - Require Merge Commits Enabled
+
+Some teams prefer merge commits over squash for better git history:
+
+```json
+{
+  "vcs": {
+    "merge_strategies": {
+      "allow_merge_commit": false,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": false
+    }
+  }
+}
+```
+
+With policy requiring merge commits:
+```yaml
+with:
+  allow_merge_commit: true  # Require merge commits enabled
+```
+
+**Failure message:** `"Merge commits are disabled, but policy requires them to be allowed"`
+
 ---
 
 ## Inputs
 
 All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. This allows you to selectively enforce only the branch protection settings that matter to your organization.
 
+**Boolean inputs support bidirectional checks:** Set `true` to require the setting be enabled, or `false` to require it be disabled.
+
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `require_enabled` | No | `null` | Whether branch protection must be enabled (true/false) |
-| `require_pr` | No | `null` | Whether pull requests are required before merging (true/false) |
-| `min_approvals` | No | `null` | Minimum number of required approvals (integer) |
-| `require_codeowner_review` | No | `null` | Whether code owner review is required (true/false) |
-| `require_dismiss_stale_reviews` | No | `null` | Whether stale reviews must be dismissed on new commits (true/false) |
-| `require_status_checks` | No | `null` | Whether status checks are required to pass (true/false) |
-| `require_up_to_date` | No | `null` | Whether branches must be up to date before merging (true/false) |
-| `disallow_force_push` | No | `null` | Whether force pushes should be disallowed (true/false) |
-| `disallow_deletions` | No | `null` | Whether branch deletions should be disallowed (true/false) |
-| `require_linear_history` | No | `null` | Whether linear history is required (true/false) |
-| `require_signed_commits` | No | `null` | Whether signed commits are required (true/false) |
+| `require_enabled` | No | `null` | Whether branch protection must be enabled. Set `true` to require enabled, `false` to require disabled |
+| `require_pr` | No | `null` | Whether pull requests are required before merging. Set `true` to require, `false` to forbid |
+| `min_approvals` | No | `null` | Minimum number of required approvals (integer, 0 or greater) |
+| `require_codeowner_review` | No | `null` | Whether code owner review is required. Set `true` to require, `false` to forbid |
+| `require_dismiss_stale_reviews` | No | `null` | Whether stale reviews must be dismissed on new commits. Set `true` to require, `false` to forbid |
+| `require_status_checks` | No | `null` | Whether status checks are required to pass. Set `true` to require, `false` to forbid |
+| `require_up_to_date` | No | `null` | Whether branches must be up to date before merging. Set `true` to require, `false` to forbid |
+| `disallow_force_push` | No | `null` | Whether force pushes should be disallowed. Set `true` to disallow, `false` to require allowed |
+| `disallow_deletions` | No | `null` | Whether branch deletions should be disallowed. Set `true` to disallow, `false` to require allowed |
+| `require_linear_history` | No | `null` | Whether linear history is required. Set `true` to require, `false` to forbid |
+| `require_signed_commits` | No | `null` | Whether signed commits are required. Set `true` to require, `false` to forbid |
 
 ## Installation
 
@@ -190,9 +218,9 @@ policies:
 
 ## Examples
 
-### Passing Example
+### Passing Example - Strict Branch Protection
 
-A repository with properly configured branch protection:
+A production repository with strict branch protection enabled:
 
 ```json
 {
@@ -248,6 +276,47 @@ Another failing example - insufficient required approvals:
 ```
 
 **Failure message (when `min_approvals: 1`):** `"Branch protection requires 0 approval(s), but policy requires at least 1"`
+
+### Passing Example - Relaxed Settings for Internal Tools
+
+A test or internal tool repository where restrictions should be minimal:
+
+```json
+{
+  "vcs": {
+    "branch_protection": {
+      "enabled": false,
+      "branch": "main"
+    }
+  }
+}
+```
+
+With policy configuration verifying no excessive restrictions:
+```yaml
+with:
+  require_enabled: false          # Verify branch protection is disabled
+  require_signed_commits: false   # Verify signed commits are not required
+```
+
+**This passes** because branch protection is disabled as required.
+
+### Bidirectional Check Example - Status Checks
+
+Verifying status checks are NOT required (useful for personal projects):
+
+```json
+{
+  "vcs": {
+    "branch_protection": {
+      "enabled": true,
+      "require_status_checks": true
+    }
+  }
+}
+```
+
+**Failure message (when `require_status_checks: false`):** `"Branch protection requires status checks, but policy requires them to not be required"`
 
 ## Related Collectors
 
