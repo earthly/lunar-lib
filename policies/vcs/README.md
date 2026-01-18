@@ -12,25 +12,29 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ### Branch Protection Policies
 
+These policies enforce specific branch protection requirements. Use `include` to select which policies to enforce.
+
 | Policy | Description |
 |--------|-------------|
-| `branch-protection-enabled` | Validates that branch protection is enabled or disabled as required |
-| `require-pull-request` | Validates that pull requests are required or not required |
-| `minimum-approvals` | Validates that pull requests require minimum number of approvals |
-| `require-codeowner-review` | Validates that code owner review is required or not required |
-| `dismiss-stale-reviews` | Validates that stale reviews are dismissed or not dismissed |
-| `require-status-checks` | Validates that status checks are required or not required |
-| `require-branches-up-to-date` | Validates that branches must be up to date before merging or not |
-| `disallow-force-push` | Validates that force pushes are allowed or disallowed |
-| `disallow-branch-deletion` | Validates that branch deletions are allowed or disallowed |
-| `require-linear-history` | Validates that linear history is required or not required |
-| `require-signed-commits` | Validates that signed commits are required or not required |
+| `branch-protection-enabled` | Branch protection must be enabled |
+| `require-pull-request` | Pull requests must be required before merging |
+| `minimum-approvals` | Pull requests must have minimum number of approvals (configurable via `min_approvals` input) |
+| `require-codeowner-review` | Code owner review must be required |
+| `dismiss-stale-reviews` | Stale reviews must be dismissed on new commits |
+| `require-status-checks` | Status checks must be required to pass |
+| `require-branches-up-to-date` | Branches must be up to date before merging |
+| `disallow-force-push` | Force pushes must be disallowed |
+| `disallow-branch-deletion` | Branch deletions must be disallowed |
+| `require-linear-history` | Linear history must be required |
+| `require-signed-commits` | Signed commits must be required |
 
 ### Repository Settings Policies
 
 | Policy | Description |
 |--------|-------------|
-| `repository-settings` | Validates repository settings including visibility, default branch, and merge strategies |
+| `require-private` | Repository visibility must be private |
+| `require-default-branch` | Default branch must match required name (configurable via `required_default_branch` input, defaults to "main") |
+| `allowed-merge-strategies` | Merge strategies must match allowed list (configurable via `allowed_merge_strategies` input) |
 
 ## Required Data
 
@@ -49,7 +53,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.branch_protection.allow_deletions` | boolean | Whether branch deletions are allowed |
 | `.vcs.branch_protection.require_linear_history` | boolean | Whether linear history is required |
 | `.vcs.branch_protection.require_signed_commits` | boolean | Whether signed commits are required |
-| `.vcs.visibility` | string | Repository visibility (public, private) |
+| `.vcs.visibility` | string | Repository visibility |
 | `.vcs.default_branch` | string | Default branch name |
 | `.vcs.merge_strategies.allow_merge_commit` | boolean | Whether merge commits are allowed |
 | `.vcs.merge_strategies.allow_squash_merge` | boolean | Whether squash merges are allowed |
@@ -59,33 +63,15 @@ This policy reads from the following Component JSON paths:
 
 ## Inputs
 
-All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. **Exception:** `required_default_branch` defaults to `"main"`.
+All inputs are optional. **Exception:** `required_default_branch` defaults to `"main"`.
 
-**Boolean inputs support bidirectional checks:** Set `true` to require the setting be enabled, or `false` to require it be disabled.
-
-### Branch Protection Inputs
+**Note:** Most policies have no configurable inputs. Use the `include` parameter to control which policies are enforced.
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `require_enabled` | No | `null` | Whether branch protection must be enabled. Set `true` to require enabled, `false` to require disabled |
-| `require_pr` | No | `null` | Whether pull requests are required before merging. Set `true` to require, `false` to forbid |
-| `min_approvals` | No | `null` | Minimum number of required approvals (integer, 0 or greater) |
-| `require_codeowner_review` | No | `null` | Whether code owner review is required. Set `true` to require, `false` to forbid |
-| `require_dismiss_stale_reviews` | No | `null` | Whether stale reviews must be dismissed on new commits. Set `true` to require, `false` to forbid |
-| `require_status_checks` | No | `null` | Whether status checks are required to pass. Set `true` to require, `false` to forbid |
-| `require_up_to_date` | No | `null` | Whether branches must be up to date before merging. Set `true` to require, `false` to forbid |
-| `disallow_force_push` | No | `null` | Whether force pushes should be disallowed. Set `true` to disallow, `false` to require allowed |
-| `disallow_deletions` | No | `null` | Whether branch deletions should be disallowed. Set `true` to disallow, `false` to require allowed |
-| `require_linear_history` | No | `null` | Whether linear history is required. Set `true` to require, `false` to forbid |
-| `require_signed_commits` | No | `null` | Whether signed commits are required. Set `true` to require, `false` to forbid |
-
-### Repository Settings Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private"). Only listed levels are allowed |
-| `required_default_branch` | No | `"main"` | Required default branch name. Defaults to requiring "main". Set to null to skip check |
-| `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies: "merge", "squash", "rebase" (e.g., "squash,rebase"). Only listed strategies will be allowed (others must be disabled) |
+| `min_approvals` | No | `null` | Minimum number of required approvals for the `minimum-approvals` policy (integer, 0 or greater) |
+| `required_default_branch` | No | `"main"` | Required default branch name for the `require-default-branch` policy |
+| `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies for the `allowed-merge-strategies` policy: "merge", "squash", "rebase" (e.g., "squash,rebase") |
 
 ## Installation
 
@@ -93,39 +79,35 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  # Run all policies (default)
+  # Run all policies (default - enforces all branch protection and repository settings)
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [production, critical]
     enforcement: report-pr       # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     with:
-      # Branch protection settings
-      require_enabled: true
-      require_pr: true
-      min_approvals: 1
-      disallow_force_push: true
-      require_signed_commits: true
-
-      # Repository settings
-      allowed_visibility: "private"
+      min_approvals: 2
       allowed_merge_strategies: "squash"
 
-  # Or use include to run only specific policies
+  # Use include to run only specific policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    include: [branch-protection-enabled, minimum-approvals, disallow-force-push]
+    include: [
+      branch-protection-enabled,
+      require-pull-request,
+      minimum-approvals,
+      disallow-force-push,
+      require-signed-commits,
+      require-private
+    ]
     on: ["domain:your-domain"]
     enforcement: block-pr
     with:
-      require_enabled: true
       min_approvals: 2
-      disallow_force_push: true
 
-  # Or run only repository settings
+  # Run only repository settings policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    include: [repository-settings]
+    include: [require-private, require-default-branch, allowed-merge-strategies]
     on: ["domain:your-domain"]
     enforcement: report-pr
     with:
-      allowed_visibility: "private"
       allowed_merge_strategies: "squash,rebase"
 ```
 
@@ -164,16 +146,25 @@ A production repository with strict security controls:
 }
 ```
 
-With policy configuration:
+With policy configuration using `include` to select desired checks:
 ```yaml
+include: [
+  branch-protection-enabled,
+  require-pull-request,
+  minimum-approvals,
+  require-codeowner-review,
+  dismiss-stale-reviews,
+  require-status-checks,
+  require-branches-up-to-date,
+  disallow-force-push,
+  disallow-branch-deletion,
+  require-signed-commits,
+  require-private,
+  require-default-branch,
+  allowed-merge-strategies
+]
 with:
-  require_enabled: true
-  require_pr: true
   min_approvals: 2
-  require_codeowner_review: true
-  disallow_force_push: true
-  require_signed_commits: true
-  allowed_visibility: "private"
   allowed_merge_strategies: "squash"
 ```
 
@@ -192,21 +183,22 @@ with:
 }
 ```
 
-With policy requiring branch protection:
+With policy configuration:
 ```yaml
+include: [branch-protection-enabled, minimum-approvals]
 with:
-  require_enabled: true
   min_approvals: 1
 ```
 
 **Failure messages:**
 - `"Branch protection is not enabled on main"`
 
-### Failing Example - Wrong Default Branch
+### Failing Example - Wrong Settings
 
 ```json
 {
   "vcs": {
+    "visibility": "public",
     "default_branch": "master",
     "merge_strategies": {
       "allow_merge_commit": true,
@@ -217,14 +209,16 @@ with:
 }
 ```
 
-With default policy settings:
+With policy configuration:
 ```yaml
+include: [require-private, require-default-branch, allowed-merge-strategies]
 with:
   allowed_merge_strategies: "squash"
   # required_default_branch defaults to "main"
 ```
 
 **Failure messages:**
+- `"Repository visibility is 'public', but policy requires 'private'"`
 - `"Default branch is 'master', but policy requires 'main'"`
 - `"Merge commits are enabled, but policy does not allow them (should be disabled)"`
 

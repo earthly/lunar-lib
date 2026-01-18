@@ -49,50 +49,25 @@ policies:
     description: Validate that signed commits are required or not required as configured
     mainPython: ./require-signed-commits.py
 
-  - name: repository-settings
-    description: Validate repository settings including visibility, default branch, and merge strategies
-    mainPython: ./repository-settings.py
+  - name: require-private
+    description: Validate that repository visibility is private
+    mainPython: ./require-private.py
+
+  - name: require-default-branch
+    description: Validate that default branch matches required name
+    mainPython: ./require-default-branch.py
+
+  - name: allowed-merge-strategies
+    description: Validate that merge strategies match allowed list
+    mainPython: ./allowed-merge-strategies.py
 
 inputs:
-  require_enabled:
-    description: Whether branch protection must be enabled. Set true to require enabled, false to require disabled, or omit to skip check
-    default: null
-  require_pr:
-    description: Whether pull requests are required before merging. Set true to require PRs, false to require no PRs, or omit to skip check
-    default: null
   min_approvals:
     description: Minimum number of required approvals (integer, or omit to skip check)
     default: null
-  require_codeowner_review:
-    description: Whether code owner review is required. Set true to require, false to forbid, or omit to skip check
-    default: null
-  require_dismiss_stale_reviews:
-    description: Whether stale reviews must be dismissed on new commits. Set true to require, false to forbid, or omit to skip check
-    default: null
-  require_status_checks:
-    description: Whether status checks are required to pass. Set true to require, false to forbid, or omit to skip check
-    default: null
-  require_up_to_date:
-    description: Whether branches must be up to date before merging. Set true to require, false to forbid, or omit to skip check
-    default: null
-  disallow_force_push:
-    description: Whether force pushes should be disallowed. Set true to disallow, false to require allowed, or omit to skip check
-    default: null
-  disallow_deletions:
-    description: Whether branch deletions should be disallowed. Set true to disallow, false to require allowed, or omit to skip check
-    default: null
-  require_linear_history:
-    description: Whether linear history is required. Set true to require, false to forbid, or omit to skip check
-    default: null
-  require_signed_commits:
-    description: Whether signed commits are required. Set true to require, false to forbid, or omit to skip check
-    default: null
-  allowed_visibility:
-    description: Comma-separated list of allowed repository visibility levels (public, private, or omit to skip check)
-    default: null
   required_default_branch:
-    description: Required default branch name. Defaults to 'main'. Set to null to skip check
+    description: Required default branch name for the require-default-branch policy. Defaults to 'main'
     default: "main"
   allowed_merge_strategies:
-    description: Comma-separated list of allowed merge strategies (merge, squash, rebase). Only listed strategies will be allowed. Omit to skip check
+    description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
     default: null
