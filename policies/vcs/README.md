@@ -32,7 +32,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.branch_protection.allow_deletions` | boolean | Whether branch deletions are allowed |
 | `.vcs.branch_protection.require_linear_history` | boolean | Whether linear history is required |
 | `.vcs.branch_protection.require_signed_commits` | boolean | Whether signed commits are required |
-| `.vcs.visibility` | string | Repository visibility (public, private, internal) |
+| `.vcs.visibility` | string | Repository visibility (public, private) |
 | `.vcs.default_branch` | string | Default branch name |
 | `.vcs.merge_strategies.allow_merge_commit` | boolean | Whether merge commits are allowed |
 | `.vcs.merge_strategies.allow_squash_merge` | boolean | Whether squash merges are allowed |
@@ -66,7 +66,7 @@ All inputs are optional. If an input is not provided (left as `null`), the corre
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal"). Only listed levels are allowed |
+| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private"). Only listed levels are allowed |
 | `required_default_branch` | No | `"main"` | Required default branch name. Defaults to requiring "main". Set to null to skip check |
 | `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies: "merge", "squash", "rebase" (e.g., "squash,rebase"). Only listed strategies will be allowed (others must be disabled) |
 
@@ -87,7 +87,7 @@ policies:
       disallow_force_push: true
 
       # Repository settings
-      allowed_visibility: "private,internal"
+      allowed_visibility: "private"
       allowed_merge_strategies: "squash"
 
   # Or use include to run only specific policies
@@ -232,7 +232,7 @@ When the `repository-settings` policy fails, update repository settings:
 1. **GitHub:** Navigate to your repository → Settings
 2. Update the relevant settings based on the policy failures:
    - **Repository visibility** (General section):
-     - Change visibility to match policy requirements (Private, Public, or Internal)
+     - Change visibility to match policy requirements (Private or Public)
      - Note: Changing visibility may have security implications - consult your security team
    - **Default branch** (General section):
      - Rename your default branch if required (e.g., from `master` to `main`)
