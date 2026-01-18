@@ -3,15 +3,6 @@ from lunar_policy import Check, variable_or_default
 
 def main():
     with Check("allowed-merge-strategies", "Merge strategies should match allowed list") as c:
-        vcs = c.get_node(".vcs")
-
-        if not vcs.exists():
-            c.skip("No VCS data collected")
-
-        merge_strategies = vcs.get_node(".merge_strategies")
-        if not merge_strategies.exists():
-            c.skip("No merge strategies data collected")
-
         allowed_merge_strategies = variable_or_default("allowed_merge_strategies", None)
         if allowed_merge_strategies is None:
             c.skip("allowed_merge_strategies not configured")
@@ -38,7 +29,7 @@ def main():
         # Check each strategy type
         for strategy_name, json_path in strategy_map.items():
             is_allowed = strategy_name in allowed_list
-            is_enabled = merge_strategies.get_value_or_default(json_path, False)
+            is_enabled = c.get_value(f".vcs.merge_strategies{json_path}")
 
             strategy_display = {
                 "merge": "Merge commits",
