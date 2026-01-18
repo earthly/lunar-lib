@@ -51,14 +51,8 @@ inputs:
     description: Comma-separated list of allowed repository visibility levels (public, private, internal, or omit to skip check)
     default: null
   required_default_branch:
-    description: Required default branch name (e.g., 'main', or omit to skip check)
-    default: null
-  allow_merge_commit:
-    description: Whether merge commits should be allowed (true/false, or omit to skip check)
-    default: null
-  allow_squash_merge:
-    description: Whether squash merges should be allowed (true/false, or omit to skip check)
-    default: null
-  allow_rebase_merge:
-    description: Whether rebase merges should be allowed (true/false, or omit to skip check)
+    description: Required default branch name. Defaults to 'main'. Set to null to skip check
+    default: "main"
+  allowed_merge_strategies:
+    description: Comma-separated list of allowed merge strategies (merge, squash, rebase). Only listed strategies will be allowed. Omit to skip check
     default: null

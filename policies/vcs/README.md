@@ -55,21 +55,17 @@ This policy reads from the following Component JSON paths:
 
 ### Inputs
 
-All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped.
-
-**Boolean inputs support bidirectional checks:** Set `true` to require the setting be enabled, or `false` to require it be disabled.
+All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. **Exception:** `required_default_branch` defaults to `"main"`.
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal") |
-| `required_default_branch` | No | `null` | Required default branch name (e.g., "main") |
-| `allow_merge_commit` | No | `null` | Whether merge commits should be allowed. Set `true` to require enabled, `false` to require disabled |
-| `allow_squash_merge` | No | `null` | Whether squash merges should be allowed. Set `true` to require enabled, `false` to require disabled |
-| `allow_rebase_merge` | No | `null` | Whether rebase merges should be allowed. Set `true` to require enabled, `false` to require disabled |
+| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal"). Only listed levels are allowed |
+| `required_default_branch` | No | `"main"` | Required default branch name (e.g., "main"). Defaults to requiring "main" |
+| `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies: "merge", "squash", "rebase" (e.g., "squash,rebase"). Only listed strategies will be allowed (others must be disabled) |
 
 ### Examples
 
-#### Passing Example - Private repository with main branch
+#### Passing Example - Private repository with main branch (using defaults)
 
 ```json
 {
@@ -86,15 +82,17 @@ All inputs are optional. If an input is not provided (left as `null`), the corre
 }
 ```
 
-With policy configuration:
+With minimal policy configuration (using default for `required_default_branch`):
 ```yaml
 with:
   allowed_visibility: "private,internal"
-  required_default_branch: "main"
-  allow_squash_merge: true
-  allow_merge_commit: false
-  allow_rebase_merge: false
+  # required_default_branch defaults to "main", no need to specify
+  allowed_merge_strategies: "squash"  # Only squash merges allowed
 ```
+
+**This passes** because:
+- The default branch is "main" as required by the default policy setting
+- Only squash merge is enabled (merge and rebase are disabled as required)
 
 #### Failing Example - Public repository when only private allowed
 
@@ -120,9 +118,15 @@ with:
 }
 ```
 
-**Failure message (when `required_default_branch: "main"`):** `"Default branch is 'master', but policy requires 'main'"`
+**Failure message (with default `required_default_branch: "main"`):** `"Default branch is 'master', but policy requires 'main'"`
 
-#### Failing Example - Merge commits enabled when should be disabled
+To skip this check for repositories that haven't migrated yet, explicitly set:
+```yaml
+with:
+  required_default_branch: null
+```
+
+#### Failing Example - Merge commits enabled when only squash allowed
 
 ```json
 {
@@ -136,11 +140,17 @@ with:
 }
 ```
 
-**Failure message (when `allow_merge_commit: false`):** `"Merge commits are allowed, but policy requires them to be disabled"`
+With policy allowing only squash:
+```yaml
+with:
+  allowed_merge_strategies: "squash"
+```
 
-#### Bidirectional Example - Require Merge Commits Enabled
+**Failure message:** `"Merge commits are enabled, but policy does not allow them (should be disabled)"`
 
-Some teams prefer merge commits over squash for better git history:
+#### Example - Multiple Strategies Allowed
+
+Allow both squash and rebase (but not merge commits):
 
 ```json
 {
@@ -148,19 +158,19 @@ Some teams prefer merge commits over squash for better git history:
     "merge_strategies": {
       "allow_merge_commit": false,
       "allow_squash_merge": true,
-      "allow_rebase_merge": false
+      "allow_rebase_merge": true
     }
   }
 }
 ```
 
-With policy requiring merge commits:
+With policy configuration:
 ```yaml
 with:
-  allow_merge_commit: true  # Require merge commits enabled
+  allowed_merge_strategies: "squash,rebase"
 ```
 
-**Failure message:** `"Merge commits are disabled, but policy requires them to be allowed"`
+**This passes** because both squash and rebase are enabled, and merge commits are disabled.
 
 ---
 
@@ -202,9 +212,8 @@ policies:
 
       # Repository settings
       allowed_visibility: "private,internal"
-      required_default_branch: "main"
-      allow_squash_merge: true
-      allow_merge_commit: false
+      # required_default_branch: "main"  # This is the default, can be omitted
+      allowed_merge_strategies: "squash"
 
   # Or use include to run only specific policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
@@ -213,7 +222,8 @@ policies:
     enforcement: block-pr
     with:
       allowed_visibility: "private"
-      required_default_branch: "main"
+      # required_default_branch defaults to "main", so can be omitted
+      # Set to null to skip the check: required_default_branch: null
 ```
 
 ## Examples
@@ -358,8 +368,8 @@ When the `repository-settings` policy fails, you can resolve it by updating repo
      - GitHub provides a "Rename branch" button in the repository settings
      - Update local clones and CI/CD configurations after renaming
    - **Merge button** (Pull Requests section):
-     - Enable/disable "Allow merge commits" based on policy
-     - Enable/disable "Allow squash merging" based on policy
-     - Enable/disable "Allow rebase merging" based on policy
+     - Enable only the merge strategies listed in `allowed_merge_strategies`
+     - Disable any strategies not in the allowed list
+     - Example: If policy specifies `"squash,rebase"`, enable those two and disable merge commits
 3. Save the changes
 4. Re-run the Lunar collector and policy to verify compliance

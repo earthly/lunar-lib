@@ -36,47 +36,43 @@ def main():
             # If merge strategies data doesn't exist, skip these checks
             return
 
-        # Check if merge commits should be allowed
-        allow_merge_commit = variable_or_default("allow_merge_commit", None)
-        if allow_merge_commit is not None:
-            try:
-                allow_merge_commit = allow_merge_commit.lower() in ['true', '1', 'yes']
-            except (AttributeError, ValueError):
-                raise ValueError(f"allow_merge_commit must be a boolean, got: {allow_merge_commit}")
+        # Check allowed merge strategies
+        allowed_merge_strategies = variable_or_default("allowed_merge_strategies", None)
+        if allowed_merge_strategies is not None:
+            # Parse comma-separated list
+            allowed_list = [s.strip().lower() for s in allowed_merge_strategies.split(",") if s.strip()]
 
-            actual = merge_strategies.get_value_or_default(".allow_merge_commit", False)
-            if allow_merge_commit and not actual:
-                c.fail("Merge commits are disabled, but policy requires them to be allowed")
-            elif not allow_merge_commit and actual:
-                c.fail("Merge commits are allowed, but policy requires them to be disabled")
+            # Validate the list contains valid strategies
+            valid_strategies = {"merge", "squash", "rebase"}
+            invalid = [s for s in allowed_list if s not in valid_strategies]
+            if invalid:
+                raise ValueError(
+                    f"Policy misconfiguration: Invalid merge strategies: {', '.join(invalid)}. "
+                    f"Valid options are: merge, squash, rebase"
+                )
 
-        # Check if squash merges should be allowed
-        allow_squash_merge = variable_or_default("allow_squash_merge", None)
-        if allow_squash_merge is not None:
-            try:
-                allow_squash_merge = allow_squash_merge.lower() in ['true', '1', 'yes']
-            except (AttributeError, ValueError):
-                raise ValueError(f"allow_squash_merge must be a boolean, got: {allow_squash_merge}")
+            # Map strategy names to component JSON paths
+            strategy_map = {
+                "merge": ".allow_merge_commit",
+                "squash": ".allow_squash_merge",
+                "rebase": ".allow_rebase_merge"
+            }
 
-            actual = merge_strategies.get_value_or_default(".allow_squash_merge", False)
-            if allow_squash_merge and not actual:
-                c.fail("Squash merges are disabled, but policy requires them to be allowed")
-            elif not allow_squash_merge and actual:
-                c.fail("Squash merges are allowed, but policy requires them to be disabled")
+            # Check each strategy type
+            for strategy_name, json_path in strategy_map.items():
+                is_allowed = strategy_name in allowed_list
+                is_enabled = merge_strategies.get_value_or_default(json_path, False)
 
-        # Check if rebase merges should be allowed
-        allow_rebase_merge = variable_or_default("allow_rebase_merge", None)
-        if allow_rebase_merge is not None:
-            try:
-                allow_rebase_merge = allow_rebase_merge.lower() in ['true', '1', 'yes']
-            except (AttributeError, ValueError):
-                raise ValueError(f"allow_rebase_merge must be a boolean, got: {allow_rebase_merge}")
+                strategy_display = {
+                    "merge": "Merge commits",
+                    "squash": "Squash merges",
+                    "rebase": "Rebase merges"
+                }[strategy_name]
 
-            actual = merge_strategies.get_value_or_default(".allow_rebase_merge", False)
-            if allow_rebase_merge and not actual:
-                c.fail("Rebase merges are disabled, but policy requires them to be allowed")
-            elif not allow_rebase_merge and actual:
-                c.fail("Rebase merges are allowed, but policy requires them to be disabled")
+                if is_allowed and not is_enabled:
+                    c.fail(f"{strategy_display} are disabled, but policy allows them (should be enabled)")
+                elif not is_allowed and is_enabled:
+                    c.fail(f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
 
 
 if __name__ == "__main__":
