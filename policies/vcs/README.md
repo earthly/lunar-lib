@@ -10,10 +10,27 @@ This policy plugin enforces version control system security standards, focusing 
 
 This plugin provides the following policies (use `include` to select a subset):
 
-| Policy | Description | Failure Meaning |
-|--------|-------------|-----------------|
-| `branch-protection` | Validates branch protection rules are properly configured | Branch protection is disabled or does not meet required standards |
-| `repository-settings` | Validates repository settings including visibility, default branch, and merge strategies | Repository settings do not meet organizational standards |
+### Branch Protection Policies
+
+| Policy | Description |
+|--------|-------------|
+| `branch-protection-enabled` | Validates that branch protection is enabled or disabled as required |
+| `require-pull-request` | Validates that pull requests are required or not required |
+| `minimum-approvals` | Validates that pull requests require minimum number of approvals |
+| `require-codeowner-review` | Validates that code owner review is required or not required |
+| `dismiss-stale-reviews` | Validates that stale reviews are dismissed or not dismissed |
+| `require-status-checks` | Validates that status checks are required or not required |
+| `require-branches-up-to-date` | Validates that branches must be up to date before merging or not |
+| `disallow-force-push` | Validates that force pushes are allowed or disallowed |
+| `disallow-branch-deletion` | Validates that branch deletions are allowed or disallowed |
+| `require-linear-history` | Validates that linear history is required or not required |
+| `require-signed-commits` | Validates that signed commits are required or not required |
+
+### Repository Settings Policies
+
+| Policy | Description |
+|--------|-------------|
+| `repository-settings` | Validates repository settings including visibility, default branch, and merge strategies |
 
 ## Required Data
 
@@ -76,6 +93,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
+  # Run all policies (default)
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [production, critical]
     enforcement: report-pr       # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
@@ -85,6 +103,7 @@ policies:
       require_pr: true
       min_approvals: 1
       disallow_force_push: true
+      require_signed_commits: true
 
       # Repository settings
       allowed_visibility: "private"
@@ -92,12 +111,22 @@ policies:
 
   # Or use include to run only specific policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    include: [repository-settings]
+    include: [branch-protection-enabled, minimum-approvals, disallow-force-push]
     on: ["domain:your-domain"]
     enforcement: block-pr
     with:
+      require_enabled: true
+      min_approvals: 2
+      disallow_force_push: true
+
+  # Or run only repository settings
+  - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
+    include: [repository-settings]
+    on: ["domain:your-domain"]
+    enforcement: report-pr
+    with:
       allowed_visibility: "private"
-      # required_default_branch defaults to "main", can be omitted
+      allowed_merge_strategies: "squash,rebase"
 ```
 
 ## Examples

@@ -5,9 +5,49 @@ description: Version control system (VCS) best practices and security policies
 author: earthly
 
 policies:
-  - name: branch-protection
-    description: Validate branch protection rules are properly configured
-    mainPython: ./branch-protection.py
+  - name: branch-protection-enabled
+    description: Validate that branch protection is enabled or disabled as required
+    mainPython: ./branch-protection-enabled.py
+
+  - name: require-pull-request
+    description: Validate that pull requests are required or not required as configured
+    mainPython: ./require-pull-request.py
+
+  - name: minimum-approvals
+    description: Validate that pull requests require minimum number of approvals
+    mainPython: ./minimum-approvals.py
+
+  - name: require-codeowner-review
+    description: Validate that code owner review is required or not required as configured
+    mainPython: ./require-codeowner-review.py
+
+  - name: dismiss-stale-reviews
+    description: Validate that stale reviews are dismissed or not dismissed as configured
+    mainPython: ./dismiss-stale-reviews.py
+
+  - name: require-status-checks
+    description: Validate that status checks are required or not required as configured
+    mainPython: ./require-status-checks.py
+
+  - name: require-branches-up-to-date
+    description: Validate that branches are required to be up to date or not as configured
+    mainPython: ./require-branches-up-to-date.py
+
+  - name: disallow-force-push
+    description: Validate that force pushes are allowed or disallowed as configured
+    mainPython: ./disallow-force-push.py
+
+  - name: disallow-branch-deletion
+    description: Validate that branch deletions are allowed or disallowed as configured
+    mainPython: ./disallow-branch-deletion.py
+
+  - name: require-linear-history
+    description: Validate that linear history is required or not required as configured
+    mainPython: ./require-linear-history.py
+
+  - name: require-signed-commits
+    description: Validate that signed commits are required or not required as configured
+    mainPython: ./require-signed-commits.py
 
   - name: repository-settings
     description: Validate repository settings including visibility, default branch, and merge strategies
@@ -48,7 +88,7 @@ inputs:
     description: Whether signed commits are required. Set true to require, false to forbid, or omit to skip check
     default: null
   allowed_visibility:
-    description: Comma-separated list of allowed repository visibility levels (public, private, internal, or omit to skip check)
+    description: Comma-separated list of allowed repository visibility levels (public, private, or omit to skip check)
     default: null
   required_default_branch:
     description: Required default branch name. Defaults to 'main'. Set to null to skip check
