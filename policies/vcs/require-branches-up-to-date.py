@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_branches_up_to_date = c.get_value(".vcs.branch_protection.require_branches_up_to_date")
-        if not require_branches_up_to_date:
-            c.fail("Branch protection does not require branches to be up to date before merging")
+        c.assert_true(require_branches_up_to_date, "Branch protection does not require branches to be up to date before merging")
 
 
 if __name__ == "__main__":

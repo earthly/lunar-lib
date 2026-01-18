@@ -37,10 +37,10 @@ def main():
                 "rebase": "Rebase merges"
             }[strategy_name]
 
-            if is_allowed and not is_enabled:
-                c.fail(f"{strategy_display} are disabled, but policy allows them (should be enabled)")
-            elif not is_allowed and is_enabled:
-                c.fail(f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
+            if is_allowed:
+                c.assert_true(is_enabled, f"{strategy_display} are disabled, but policy allows them (should be enabled)")
+            else:
+                c.assert_false(is_enabled, f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
 
 
 if __name__ == "__main__":

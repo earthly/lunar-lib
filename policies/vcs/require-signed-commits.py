@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_signed_commits = c.get_value(".vcs.branch_protection.require_signed_commits")
-        if not require_signed_commits:
-            c.fail("Branch protection does not require signed commits")
+        c.assert_true(require_signed_commits, "Branch protection does not require signed commits")
 
 
 if __name__ == "__main__":

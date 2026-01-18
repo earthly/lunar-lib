@@ -6,8 +6,7 @@ def main():
         enabled = c.get_value(".vcs.branch_protection.enabled")
         branch = c.get_value_or_default(".vcs.branch_protection.branch", "default branch")
 
-        if not enabled:
-            c.fail(f"Branch protection is not enabled on {branch}")
+        c.assert_true(enabled, f"Branch protection is not enabled on {branch}")
 
 
 if __name__ == "__main__":

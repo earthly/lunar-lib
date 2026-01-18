@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         allow_deletions = c.get_value(".vcs.branch_protection.allow_deletions")
-        if allow_deletions:
-            c.fail("Branch protection allows branch deletion, but policy requires it to be disabled")
+        c.assert_false(allow_deletions, "Branch protection allows branch deletion, but policy requires it to be disabled")
 
 
 if __name__ == "__main__":

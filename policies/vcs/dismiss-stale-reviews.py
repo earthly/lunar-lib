@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         dismiss_stale_reviews = c.get_value(".vcs.branch_protection.dismiss_stale_reviews")
-        if not dismiss_stale_reviews:
-            c.fail("Branch protection does not dismiss stale reviews when new commits are pushed")
+        c.assert_true(dismiss_stale_reviews, "Branch protection does not dismiss stale reviews when new commits are pushed")
 
 
 if __name__ == "__main__":

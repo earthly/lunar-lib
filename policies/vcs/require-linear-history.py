@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_linear_history = c.get_value(".vcs.branch_protection.require_linear_history")
-        if not require_linear_history:
-            c.fail("Branch protection does not require linear history")
+        c.assert_true(require_linear_history, "Branch protection does not require linear history")
 
 
 if __name__ == "__main__":

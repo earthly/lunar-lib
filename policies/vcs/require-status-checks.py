@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_status_checks = c.get_value(".vcs.branch_protection.require_status_checks")
-        if not require_status_checks:
-            c.fail("Branch protection does not require status checks to pass")
+        c.assert_true(require_status_checks, "Branch protection does not require status checks to pass")
 
 
 if __name__ == "__main__":

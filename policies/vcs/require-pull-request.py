@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_pr = c.get_value(".vcs.branch_protection.require_pr")
-        if not require_pr:
-            c.fail("Branch protection does not require pull requests before merging")
+        c.assert_true(require_pr, "Branch protection does not require pull requests before merging")
 
 
 if __name__ == "__main__":

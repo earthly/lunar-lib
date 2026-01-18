@@ -8,8 +8,7 @@ def main():
             c.skip("Branch protection is not enabled")
 
         require_codeowner_review = c.get_value(".vcs.branch_protection.require_codeowner_review")
-        if not require_codeowner_review:
-            c.fail("Branch protection does not require code owner review")
+        c.assert_true(require_codeowner_review, "Branch protection does not require code owner review")
 
 
 if __name__ == "__main__":
