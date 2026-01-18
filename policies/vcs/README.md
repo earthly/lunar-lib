@@ -19,166 +19,34 @@ This plugin provides the following policies (use `include` to select a subset):
 
 This policy reads from the following Component JSON paths:
 
-| Path | Type |
-|------|------|
-| `.vcs.branch_protection.enabled` | boolean |
-| `.vcs.branch_protection.require_pr` | boolean |
-| `.vcs.branch_protection.required_approvals` | integer |
-| `.vcs.branch_protection.require_codeowner_review` | boolean |
-| `.vcs.branch_protection.dismiss_stale_reviews` | boolean |
-| `.vcs.branch_protection.require_status_checks` | boolean |
-| `.vcs.branch_protection.require_branches_up_to_date` | boolean |
-| `.vcs.branch_protection.allow_force_push` | boolean |
-| `.vcs.branch_protection.allow_deletions` | boolean |
-| `.vcs.branch_protection.require_linear_history` | boolean |
-| `.vcs.branch_protection.require_signed_commits` | boolean |
+| Path | Type | Description |
+|------|------|-------------|
+| `.vcs.branch_protection.enabled` | boolean | Whether branch protection is enabled |
+| `.vcs.branch_protection.require_pr` | boolean | Whether pull requests are required |
+| `.vcs.branch_protection.required_approvals` | integer | Number of required approvals |
+| `.vcs.branch_protection.require_codeowner_review` | boolean | Whether code owner review is required |
+| `.vcs.branch_protection.dismiss_stale_reviews` | boolean | Whether stale reviews are dismissed |
+| `.vcs.branch_protection.require_status_checks` | boolean | Whether status checks are required |
+| `.vcs.branch_protection.require_branches_up_to_date` | boolean | Whether branches must be up to date |
+| `.vcs.branch_protection.allow_force_push` | boolean | Whether force pushes are allowed |
+| `.vcs.branch_protection.allow_deletions` | boolean | Whether branch deletions are allowed |
+| `.vcs.branch_protection.require_linear_history` | boolean | Whether linear history is required |
+| `.vcs.branch_protection.require_signed_commits` | boolean | Whether signed commits are required |
+| `.vcs.visibility` | string | Repository visibility (public, private, internal) |
+| `.vcs.default_branch` | string | Default branch name |
+| `.vcs.merge_strategies.allow_merge_commit` | boolean | Whether merge commits are allowed |
+| `.vcs.merge_strategies.allow_squash_merge` | boolean | Whether squash merges are allowed |
+| `.vcs.merge_strategies.allow_rebase_merge` | boolean | Whether rebase merges are allowed |
 
-**Note:** This policy requires a VCS collector (such as `github`) that populates the `.vcs.branch_protection` data.
-
----
-
-## Policy: `repository-settings`
-
-### Required Data
-
-This policy reads from the following Component JSON paths:
-
-| Path | Type |
-|------|------|
-| `.vcs.visibility` | string |
-| `.vcs.default_branch` | string |
-| `.vcs.merge_strategies.allow_merge_commit` | boolean |
-| `.vcs.merge_strategies.allow_squash_merge` | boolean |
-| `.vcs.merge_strategies.allow_rebase_merge` | boolean |
-
-**Note:** This policy requires a VCS collector (such as `github/repository`) that populates the `.vcs` repository data.
-
-### Inputs
-
-All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. **Exception:** `required_default_branch` defaults to `"main"`.
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal"). Only listed levels are allowed |
-| `required_default_branch` | No | `"main"` | Required default branch name (e.g., "main"). Defaults to requiring "main" |
-| `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies: "merge", "squash", "rebase" (e.g., "squash,rebase"). Only listed strategies will be allowed (others must be disabled) |
-
-### Examples
-
-#### Passing Example - Private repository with main branch (using defaults)
-
-```json
-{
-  "vcs": {
-    "provider": "github",
-    "visibility": "private",
-    "default_branch": "main",
-    "merge_strategies": {
-      "allow_merge_commit": false,
-      "allow_squash_merge": true,
-      "allow_rebase_merge": false
-    }
-  }
-}
-```
-
-With minimal policy configuration (using default for `required_default_branch`):
-```yaml
-with:
-  allowed_visibility: "private,internal"
-  # required_default_branch defaults to "main", no need to specify
-  allowed_merge_strategies: "squash"  # Only squash merges allowed
-```
-
-**This passes** because:
-- The default branch is "main" as required by the default policy setting
-- Only squash merge is enabled (merge and rebase are disabled as required)
-
-#### Failing Example - Public repository when only private allowed
-
-```json
-{
-  "vcs": {
-    "visibility": "public",
-    "default_branch": "main"
-  }
-}
-```
-
-**Failure message (when `allowed_visibility: "private"`):** `"Repository visibility 'public' is not in allowed list: private"`
-
-#### Failing Example - Wrong default branch
-
-```json
-{
-  "vcs": {
-    "visibility": "private",
-    "default_branch": "master"
-  }
-}
-```
-
-**Failure message (with default `required_default_branch: "main"`):** `"Default branch is 'master', but policy requires 'main'"`
-
-To skip this check for repositories that haven't migrated yet, explicitly set:
-```yaml
-with:
-  required_default_branch: null
-```
-
-#### Failing Example - Merge commits enabled when only squash allowed
-
-```json
-{
-  "vcs": {
-    "merge_strategies": {
-      "allow_merge_commit": true,
-      "allow_squash_merge": true,
-      "allow_rebase_merge": false
-    }
-  }
-}
-```
-
-With policy allowing only squash:
-```yaml
-with:
-  allowed_merge_strategies: "squash"
-```
-
-**Failure message:** `"Merge commits are enabled, but policy does not allow them (should be disabled)"`
-
-#### Example - Multiple Strategies Allowed
-
-Allow both squash and rebase (but not merge commits):
-
-```json
-{
-  "vcs": {
-    "merge_strategies": {
-      "allow_merge_commit": false,
-      "allow_squash_merge": true,
-      "allow_rebase_merge": true
-    }
-  }
-}
-```
-
-With policy configuration:
-```yaml
-with:
-  allowed_merge_strategies: "squash,rebase"
-```
-
-**This passes** because both squash and rebase are enabled, and merge commits are disabled.
-
----
+**Note:** This policy requires a VCS collector (such as `github`) that populates the `.vcs` data.
 
 ## Inputs
 
-All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. This allows you to selectively enforce only the branch protection settings that matter to your organization.
+All inputs are optional. If an input is not provided (left as `null`), the corresponding check is skipped. **Exception:** `required_default_branch` defaults to `"main"`.
 
 **Boolean inputs support bidirectional checks:** Set `true` to require the setting be enabled, or `false` to require it be disabled.
+
+### Branch Protection Inputs
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
@@ -193,6 +61,14 @@ All inputs are optional. If an input is not provided (left as `null`), the corre
 | `disallow_deletions` | No | `null` | Whether branch deletions should be disallowed. Set `true` to disallow, `false` to require allowed |
 | `require_linear_history` | No | `null` | Whether linear history is required. Set `true` to require, `false` to forbid |
 | `require_signed_commits` | No | `null` | Whether signed commits are required. Set `true` to require, `false` to forbid |
+
+### Repository Settings Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `allowed_visibility` | No | `null` | Comma-separated list of allowed repository visibility levels (e.g., "private,internal"). Only listed levels are allowed |
+| `required_default_branch` | No | `"main"` | Required default branch name. Defaults to requiring "main". Set to null to skip check |
+| `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies: "merge", "squash", "rebase" (e.g., "squash,rebase"). Only listed strategies will be allowed (others must be disabled) |
 
 ## Installation
 
@@ -212,7 +88,6 @@ policies:
 
       # Repository settings
       allowed_visibility: "private,internal"
-      # required_default_branch: "main"  # This is the default, can be omitted
       allowed_merge_strategies: "squash"
 
   # Or use include to run only specific policies
@@ -222,19 +97,21 @@ policies:
     enforcement: block-pr
     with:
       allowed_visibility: "private"
-      # required_default_branch defaults to "main", so can be omitted
-      # Set to null to skip the check: required_default_branch: null
+      # required_default_branch defaults to "main", can be omitted
 ```
 
 ## Examples
 
-### Passing Example - Strict Branch Protection
+### Passing Example - Production Repository
 
-A production repository with strict branch protection enabled:
+A production repository with strict security controls:
 
 ```json
 {
   "vcs": {
+    "provider": "github",
+    "visibility": "private",
+    "default_branch": "main",
     "branch_protection": {
       "enabled": true,
       "branch": "main",
@@ -247,86 +124,80 @@ A production repository with strict branch protection enabled:
       "allow_force_push": false,
       "allow_deletions": false,
       "require_linear_history": false,
-      "require_signed_commits": false
+      "require_signed_commits": true
+    },
+    "merge_strategies": {
+      "allow_merge_commit": false,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": false
     }
   }
 }
 ```
 
-### Failing Example
-
-A repository with branch protection disabled:
-
-```json
-{
-  "vcs": {
-    "branch_protection": {
-      "enabled": false,
-      "branch": "main"
-    }
-  }
-}
-```
-
-**Failure message:** `"Branch protection is not enabled on main"`
-
-Another failing example - insufficient required approvals:
-
-```json
-{
-  "vcs": {
-    "branch_protection": {
-      "enabled": true,
-      "branch": "main",
-      "require_pr": true,
-      "required_approvals": 0
-    }
-  }
-}
-```
-
-**Failure message (when `min_approvals: 1`):** `"Branch protection requires 0 approval(s), but policy requires at least 1"`
-
-### Passing Example - Relaxed Settings for Internal Tools
-
-A test or internal tool repository where restrictions should be minimal:
-
-```json
-{
-  "vcs": {
-    "branch_protection": {
-      "enabled": false,
-      "branch": "main"
-    }
-  }
-}
-```
-
-With policy configuration verifying no excessive restrictions:
+With policy configuration:
 ```yaml
 with:
-  require_enabled: false          # Verify branch protection is disabled
-  require_signed_commits: false   # Verify signed commits are not required
+  require_enabled: true
+  require_pr: true
+  min_approvals: 2
+  require_codeowner_review: true
+  disallow_force_push: true
+  require_signed_commits: true
+  allowed_visibility: "private"
+  allowed_merge_strategies: "squash"
 ```
 
-**This passes** because branch protection is disabled as required.
+**This passes** because all security controls match policy requirements.
 
-### Bidirectional Check Example - Status Checks
-
-Verifying status checks are NOT required (useful for personal projects):
+### Failing Example - Branch Protection Not Enabled
 
 ```json
 {
   "vcs": {
     "branch_protection": {
-      "enabled": true,
-      "require_status_checks": true
+      "enabled": false,
+      "branch": "main"
     }
   }
 }
 ```
 
-**Failure message (when `require_status_checks: false`):** `"Branch protection requires status checks, but policy requires them to not be required"`
+With policy requiring branch protection:
+```yaml
+with:
+  require_enabled: true
+  min_approvals: 1
+```
+
+**Failure messages:**
+- `"Branch protection is not enabled on main"`
+
+### Failing Example - Wrong Default Branch
+
+```json
+{
+  "vcs": {
+    "default_branch": "master",
+    "merge_strategies": {
+      "allow_merge_commit": true,
+      "allow_squash_merge": true,
+      "allow_rebase_merge": false
+    }
+  }
+}
+```
+
+With default policy settings:
+```yaml
+with:
+  allowed_merge_strategies: "squash"
+  # required_default_branch defaults to "main"
+```
+
+**Failure messages:**
+- `"Default branch is 'master', but policy requires 'main'"`
+- `"Merge commits are enabled, but policy does not allow them (should be disabled)"`
 
 ## Related Collectors
 
@@ -338,7 +209,7 @@ These policies work with any collector that populates the required data paths. C
 
 ### Branch Protection Policy Failures
 
-When the `branch-protection` policy fails, you can resolve it by configuring branch protection rules in your repository settings:
+When the `branch-protection` policy fails, configure branch protection rules in your repository settings:
 
 1. **GitHub:** Navigate to your repository → Settings → Branches → Branch protection rules
 2. Select your default branch (typically `main` or `master`) or create a new rule
@@ -356,7 +227,7 @@ When the `branch-protection` policy fails, you can resolve it by configuring bra
 
 ### Repository Settings Policy Failures
 
-When the `repository-settings` policy fails, you can resolve it by updating repository settings:
+When the `repository-settings` policy fails, update repository settings:
 
 1. **GitHub:** Navigate to your repository → Settings
 2. Update the relevant settings based on the policy failures:
