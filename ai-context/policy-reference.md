@@ -80,6 +80,60 @@ The `enforcement` field controls how policy failures affect the development work
 
 **Recommended rollout:** `draft` → `score` → `report-pr` → `block-pr`
 
+### Additional Policy Configuration
+
+#### `runs_on`
+
+Controls when the policy runs:
+
+```yaml
+policies:
+  - uses: ./policies/coverage
+    on: [backend]
+    runs_on: [prs, default-branch]  # Default: runs on both
+    enforcement: block-pr
+```
+
+| Value | Meaning |
+|-------|---------|
+| `prs` | Run on pull requests |
+| `default-branch` | Run on the default branch (main/master) |
+
+Default is `[prs, default-branch]`. Use `runs_on: [prs]` to run only on PRs, or `runs_on: [default-branch]` to run only on the main branch.
+
+#### `initiative`
+
+Groups related policies for management and reporting:
+
+```yaml
+policies:
+  - uses: ./policies/security-scan
+    on: [backend]
+    initiative: security-q1  # Groups this policy under "security-q1"
+    enforcement: block-pr
+```
+
+If not specified, policies are associated with the built-in "default" initiative.
+
+#### `include` and `exclude`
+
+When importing a policy plugin that defines multiple sub-policies, selectively enable or disable specific checks:
+
+```yaml
+policies:
+  # Include only specific checks
+  - uses: ./policies/container
+    on: [docker]
+    include: [no-latest, healthcheck]  # Only run these two checks
+
+  # Exclude specific checks
+  - uses: ./policies/container
+    on: [docker]
+    exclude: [user]  # Run all checks except "user"
+```
+
+If neither `include` nor `exclude` is specified, all sub-policies are included by default.
+
 ## The lunar_policy SDK
 
 Install the SDK:
@@ -90,7 +144,7 @@ pip install lunar-policy
 
 **requirements.txt:**
 ```
-lunar-policy==0.1.6
+lunar-policy==0.2.2
 ```
 
 ### Core Classes
@@ -99,8 +153,9 @@ lunar-policy==0.1.6
 |-------|---------|
 | `Check` | Main class for making assertions |
 | `Node` | Navigate and explore JSON data |
-| `CheckStatus` | Enum of check outcomes (PASS, FAIL, PENDING, ERROR) |
+| `CheckStatus` | Enum of check outcomes (PASS, FAIL, PENDING, ERROR, SKIPPED) |
 | `NoDataError` | Exception for missing data |
+| `SkippedError` | Exception to skip inapplicable checks |
 | `variable_or_default` | Access policy inputs |
 
 ## The Check Class
@@ -284,6 +339,47 @@ if some_complex_condition:
     c.fail("Custom failure reason")
 ```
 
+#### skip(reason)
+
+Unconditionally skips the check. Use this **only** for applicability filtering—when the check doesn't apply to the current component type.
+
+```python
+# CORRECT: Skip when check doesn't apply to this component type
+if not c.exists(".lang.go"):
+    c.skip("This check only applies to Go projects")
+
+# CORRECT: Skip when relevant files don't exist
+if not c.exists(".k8s"):
+    c.skip("No Kubernetes manifests in this repository")
+```
+
+**When to use `skip()`:**
+- The check is language-specific and the component uses a different language
+- The check requires specific files/config that don't exist (e.g., K8s checks on a repo without manifests)
+- The check is for a specific component type that doesn't match
+
+**When NOT to use `skip()`:**
+- **Policy misconfiguration**: If required inputs are missing or invalid, raise an error instead. Users should know immediately that their policy isn't working.
+- **Missing component data**: Use `assert_exists()` or `get_value()` instead—these handle pending vs permanently missing data correctly (see [Handling Missing Data](#handling-missing-data)).
+
+```python
+# BAD: Don't skip for misconfiguration - error instead
+allowed = variable_or_default("allowed_registries", "")
+if not allowed:
+    c.skip("No registries configured")  # ❌ Wrong - user won't know policy is broken
+
+# GOOD: Raise an error for misconfiguration
+if not allowed:
+    raise ValueError("Policy misconfiguration: 'allowed_registries' must be configured")
+
+# BAD: Don't skip for missing data - use assert_exists
+if not c.exists(".coverage"):
+    c.skip("No coverage data")  # ❌ Wrong - masks pending/missing data
+
+# GOOD: Use assert_exists for required data
+c.assert_exists(".coverage", "Coverage data not found")
+```
+
 ### Iteration Methods
 
 ```python
@@ -348,6 +444,7 @@ for item in node:
 | `FAIL` | Check failed | One or more assertions failed |
 | `PENDING` | Awaiting data | `NoDataError` raised, collectors still running |
 | `ERROR` | Execution error | Exception in policy code, or missing data after collectors finished |
+| `SKIPPED` | Not applicable | `SkippedError` raised (check doesn't apply to this component) |
 
 ## Handling Missing Data
 
@@ -597,7 +694,7 @@ if cpu_limit is None:
 ```python
 from lunar_policy import Check
 
-with Check("k8s-valid", "All K8s manifests should be valid") as c:
+with Check("manifests-valid", "All K8s manifests should be valid") as c:
     manifests = c.get_node(".k8s.manifests")
     if not manifests.exists():
         return
@@ -670,7 +767,7 @@ policies:
 from lunar_policy import Check, variable_or_default
 
 def check_replicas():
-    with Check("k8s-min-replicas", "HPAs should have minimum replicas") as c:
+    with Check("min-replicas", "HPAs should have minimum replicas") as c:
         min_required = int(variable_or_default("minReplicas", "3"))
         
         hpas = c.get_node(".k8s.hpas")
@@ -692,7 +789,7 @@ from lunar_policy import Check
 
 def check_pdb_coverage():
     """Ensure each Deployment has a PodDisruptionBudget."""
-    with Check("k8s-pdb-coverage", "Deployments should have PDBs") as c:
+    with Check("pdb-coverage", "Deployments should have PDBs") as c:
         workloads = c.get_node(".k8s.workloads")
         pdbs = c.get_node(".k8s.pdbs")
         
@@ -833,7 +930,7 @@ name: my-policy                       # Required
 description: What this policy checks  # Should always specify
 author: team@example.com              # Required
 
-default_image: earthly/lunar-scripts:v1.0  # Should always specify: base image or custom image
+default_image: earthly/lunar-scripts:1.0.0  # Recommended: specify base or custom image
 
 policies:
   - name: check-one                   # Unique name for this check
@@ -854,6 +951,16 @@ inputs:                               # Optional: Shared across all checks
     default: "80"
 ```
 
+#### `default_image`
+
+The Docker image to use for running the policy. This overrides the global `default_image_policies` setting from `lunar-config.yml`.
+
+**Recommended:** Always use a container image for policies:
+- `earthly/lunar-scripts:1.0.0` — Official base image with Python, Bash, `lunar` CLI, and `lunar-policy` pre-installed
+- Custom image inheriting from `earthly/lunar-scripts` with additional dependencies baked in
+
+Individual policies can override this with their own `image` field.
+
 **Why one check per policy entry?**
 - Users can selectively enable checks: `include: [check-one, check-three]`
 - Each check appears as a separate item in the Lunar UI
@@ -862,41 +969,82 @@ inputs:                               # Optional: Shared across all checks
 
 ## Container Images
 
-Policies must always specify a `default_image`. Use the base `earthly/lunar-scripts:v1.0` image (which includes `lunar-policy`) unless you need additional dependencies.
+Lunar runs policies inside Docker containers, providing isolation, reproducibility, and simplified dependency management.
+
+**Recommendation:** Always use the official `earthly/lunar-scripts:1.0.0` image (or a custom image that inherits from it) for policies. This ensures consistent execution across environments.
+
+### Image Resolution Order
+
+The image used to run a policy is determined in this order (first match wins):
+
+1. **Policy-level `image`** — Set directly on the policy in `lunar-config.yml`
+2. **Plugin-level `default_image`** — Set in `lunar-policy.yml`
+3. **Global `default_image_policies`** — Set in `lunar-config.yml`
+4. **Global `default_image`** — Set in `lunar-config.yml`
+5. **Implicit default** — `native` (no container) — **not recommended for policies**
+
+### Global Default Images
+
+Configure default images in `lunar-config.yml`:
+
+```yaml
+version: 0
+
+default_image: earthly/lunar-scripts:1.0.0    # Recommended: use for all scripts
+default_image_policies: earthly/lunar-scripts:1.0.0  # Default for policies
+
+# ... rest of configuration
+```
+
+### Official Image: `earthly/lunar-scripts`
+
+Lunar provides an official Docker image that includes:
+
+- Alpine Linux (or `-debian` variant if needed)
+- Python 3 with venv
+- Bash
+- The `lunar-policy` Python package
+- The `lunar` CLI
+- Common tools: `jq`, `yq`, `curl`
+
+**For development**, the image automatically executes any `requirements.txt` and/or `install.sh` files found in the plugin directory.
+
+**For production**, bake all dependencies directly into your image for faster startup, reproducible builds, and elimination of network dependencies.
 
 ### Creating a Custom Image
 
-Create a `Dockerfile` that inherits from the official base image and installs your dependencies:
+Create a `Dockerfile` that inherits from the official base image:
 
 ```dockerfile
-FROM earthly/lunar-scripts:v1.0
+FROM earthly/lunar-scripts:1.0.0
+
+# Install additional system dependencies (if needed)
+RUN apk add --no-cache git make
 
 # Copy and install Python dependencies
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 ```
 
-### Wiring Images to the Earthfile
+### Building and Publishing the Image
 
-Add a build target in `Earthfile` to build and publish your image:
+Build and push the image to your container registry:
 
-```earthfile
-my-policy-image:
-    FROM DOCKERFILE ./policies/my-policy
-    ARG VERSION=latest
-    SAVE IMAGE --push earthly/lunar-lib-my-policy:$VERSION
+```bash
+docker build -t your-registry/my-policy:1.0.0 ./policies/my-policy
+docker push your-registry/my-policy:1.0.0
 ```
 
 Then reference this image in your `lunar-policy.yml`:
 
 ```yaml
-default_image: earthly/lunar-lib-my-policy:latest
+default_image: your-registry/my-policy:1.0.0
 ```
 
 If you don't need additional dependencies, use the base image:
 
 ```yaml
-default_image: earthly/lunar-scripts:v1.0
+default_image: earthly/lunar-scripts:1.0.0
 ```
 
 **Important:** Always bake dependencies into the image rather than relying on runtime installation. This provides faster startup, reproducible builds, and eliminates network dependencies at runtime.
@@ -907,7 +1055,7 @@ default_image: earthly/lunar-scripts:v1.0
 
 ```python
 # Good
-with Check("k8s-deployment-replicas", "Deployments should have at least 3 replicas") as c:
+with Check("deployment-replicas", "Deployments should have at least 3 replicas") as c:
     c.assert_greater_or_equal(replicas, 3, 
         f"Deployment {name} has {replicas} replicas, minimum is 3")
 
