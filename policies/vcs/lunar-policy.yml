@@ -64,7 +64,7 @@ policies:
 inputs:
   min_approvals:
     description: Minimum number of required approvals (integer, or omit to skip check)
-    default: null
+    default: 1
   required_default_branch:
     description: Required default branch name for the require-default-branch policy. Defaults to 'main'
     default: "main"

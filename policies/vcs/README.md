@@ -69,7 +69,7 @@ All inputs are optional. **Exception:** `required_default_branch` defaults to `"
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `min_approvals` | No | `null` | Minimum number of required approvals for the `minimum-approvals` policy (integer, 0 or greater) |
+| `min_approvals` | No | `1` | Minimum number of required approvals for the `minimum-approvals` policy (integer, 0 or greater) |
 | `required_default_branch` | No | `"main"` | Required default branch name for the `require-default-branch` policy |
 | `allowed_merge_strategies` | No | `null` | Comma-separated list of allowed merge strategies for the `allowed-merge-strategies` policy: "merge", "squash", "rebase" (e.g., "squash,rebase") |
 
