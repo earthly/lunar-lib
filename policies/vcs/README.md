@@ -79,31 +79,33 @@ Add to your `lunar-config.yml`:
 policies:
   # Run all policies (default - enforces all branch protection and repository settings)
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    on: ["domain:your-domain"]  # Or use tags like [production, critical]
-    enforcement: report-pr       # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
+    on: "domain:your-domain"  # Or use tags like production, critical
+    enforcement: report-pr    # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     with:
       min_approvals: 2
       allowed_merge_strategies: "squash"
 
   # Use include to run only specific policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    include: [
-      branch-protection-enabled,
-      require-pull-request,
-      minimum-approvals,
-      disallow-force-push,
-      require-signed-commits,
-      require-private
-    ]
-    on: ["domain:your-domain"]
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+      - minimum-approvals
+      - disallow-force-push
+      - require-signed-commits
+      - require-private
+    on: "domain:your-domain"
     enforcement: block-pr
     with:
       min_approvals: 2
 
   # Run only repository settings policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
-    include: [require-private, require-default-branch, allowed-merge-strategies]
-    on: ["domain:your-domain"]
+    include:
+      - require-private
+      - require-default-branch
+      - allowed-merge-strategies
+    on: "domain:your-domain"
     enforcement: report-pr
     with:
       allowed_merge_strategies: "squash,rebase"
@@ -146,21 +148,20 @@ A production repository with strict security controls:
 
 With policy configuration using `include` to select desired checks:
 ```yaml
-include: [
-  branch-protection-enabled,
-  require-pull-request,
-  minimum-approvals,
-  require-codeowner-review,
-  dismiss-stale-reviews,
-  require-status-checks,
-  require-branches-up-to-date,
-  disallow-force-push,
-  disallow-branch-deletion,
-  require-signed-commits,
-  require-private,
-  require-default-branch,
-  allowed-merge-strategies
-]
+include:
+  - branch-protection-enabled
+  - require-pull-request
+  - minimum-approvals
+  - require-codeowner-review
+  - dismiss-stale-reviews
+  - require-status-checks
+  - require-branches-up-to-date
+  - disallow-force-push
+  - disallow-branch-deletion
+  - require-signed-commits
+  - require-private
+  - require-default-branch
+  - allowed-merge-strategies
 with:
   min_approvals: 2
   allowed_merge_strategies: "squash"
@@ -183,7 +184,9 @@ with:
 
 With policy configuration:
 ```yaml
-include: [branch-protection-enabled, minimum-approvals]
+include:
+  - branch-protection-enabled
+  - minimum-approvals
 with:
   min_approvals: 1
 ```
@@ -210,7 +213,10 @@ with:
 
 With policy configuration:
 ```yaml
-include: [require-private, require-default-branch, allowed-merge-strategies]
+include:
+  - require-private
+  - require-default-branch
+  - allowed-merge-strategies
 with:
   allowed_merge_strategies: "squash"
   # required_default_branch defaults to "main"
