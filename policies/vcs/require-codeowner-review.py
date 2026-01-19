@@ -4,8 +4,7 @@ from lunar_policy import Check
 def main():
     with Check("require-codeowner-review", "Code owner review should be required") as c:
         enabled = c.get_value(".vcs.branch_protection.enabled")
-        if not enabled:
-            c.skip("Branch protection is not enabled")
+        c.assert_true(enabled, "Branch protection is not enabled")
 
         require_codeowner_review = c.get_value(".vcs.branch_protection.require_codeowner_review")
         c.assert_true(require_codeowner_review, "Branch protection does not require code owner review")

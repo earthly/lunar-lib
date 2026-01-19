@@ -4,20 +4,18 @@ from lunar_policy import Check, variable_or_default
 def main():
     with Check("allowed-merge-strategies", "Merge strategies should match allowed list") as c:
         allowed_merge_strategies = variable_or_default("allowed_merge_strategies", "")
-        if not allowed_merge_strategies:
-            c.skip("allowed_merge_strategies not configured")
-
-        # Parse comma-separated list
         allowed_list = [s.strip().lower() for s in allowed_merge_strategies.split(",") if s.strip()]
 
-        # Validate the list contains valid strategies
+        # Validate configuration
         valid_strategies = {"merge", "squash", "rebase"}
         invalid = [s for s in allowed_list if s not in valid_strategies]
-        if invalid:
-            raise ValueError(
-                f"Policy misconfiguration: Invalid merge strategies: {', '.join(invalid)}. "
-                f"Valid options are: merge, squash, rebase"
-            )
+
+        if not allowed_list or invalid:
+            if not allowed_list:
+                error_msg = "allowed_merge_strategies must be configured. Provide a comma-separated list of allowed strategies (merge, squash, rebase)"
+            else:
+                error_msg = f"Invalid merge strategies: {', '.join(invalid)}. Valid options are: merge, squash, rebase"
+            raise ValueError(f"Policy misconfiguration: {error_msg}")
 
         # Map strategy names to component JSON paths
         strategy_map = {
@@ -26,20 +24,19 @@ def main():
             "rebase": ".allow_rebase_merge"
         }
 
-        # Check each strategy type
+        # Check each strategy type - only fail if disallowed strategies are enabled
         for strategy_name, json_path in strategy_map.items():
             is_allowed = strategy_name in allowed_list
             is_enabled = c.get_value(f".vcs.merge_strategies{json_path}")
 
-            strategy_display = {
-                "merge": "Merge commits",
-                "squash": "Squash merges",
-                "rebase": "Rebase merges"
-            }[strategy_name]
+            # Only assert false for strategies not in the allowed list
+            if not is_allowed:
+                strategy_display = {
+                    "merge": "Merge commits",
+                    "squash": "Squash merges",
+                    "rebase": "Rebase merges"
+                }[strategy_name]
 
-            if is_allowed:
-                c.assert_true(is_enabled, f"{strategy_display} are disabled, but policy allows them (should be enabled)")
-            else:
                 c.assert_false(is_enabled, f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
 
 

@@ -63,15 +63,13 @@ This policy reads from the following Component JSON paths:
 
 ## Inputs
 
-All inputs are optional. **Exception:** `required_default_branch` defaults to `"main"`.
-
 **Note:** Most policies have no configurable inputs. Use the `include` parameter to control which policies are enforced.
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `min_approvals` | No | `1` | Minimum number of required approvals for the `minimum-approvals` policy (integer, 0 or greater) |
 | `required_default_branch` | No | `"main"` | Required default branch name for the `require-default-branch` policy |
-| `allowed_merge_strategies` | No | `""` | Comma-separated list of allowed merge strategies for the `allowed-merge-strategies` policy: "merge", "squash", "rebase" (e.g., "squash,rebase") |
+| `allowed_merge_strategies` | Yes, if policy included | `""` | Comma-separated list of allowed merge strategies for the `allowed-merge-strategies` policy: "merge", "squash", "rebase" (e.g., "squash,rebase"). **Must be configured if the `allowed-merge-strategies` policy is included.** |
 
 ## Installation
 
@@ -191,7 +189,8 @@ with:
 ```
 
 **Failure messages:**
-- `"Branch protection is not enabled on main"`
+- `branch-protection-enabled`: `"Branch protection is not enabled on main"`
+- `minimum-approvals`: `"Branch protection is not enabled"`
 
 ### Failing Example - Wrong Settings
 
@@ -230,9 +229,9 @@ These policies work with any collector that populates the required data paths. C
 
 ## Remediation
 
-### Branch Protection Policy Failures
+### Branch Protection Policies
 
-When the `branch-protection` policy fails, configure branch protection rules in your repository settings:
+When branch protection policies fail, configure branch protection rules in your repository settings:
 
 1. **GitHub:** Navigate to your repository → Settings → Branches → Branch protection rules
 2. Select your default branch (typically `main` or `master`) or create a new rule
@@ -248,9 +247,9 @@ When the `branch-protection` policy fails, configure branch protection rules in 
 4. Save the branch protection rule
 5. Re-run the Lunar collector and policy to verify compliance
 
-### Repository Settings Policy Failures
+### Repository Settings Policies
 
-When the `repository-settings` policy fails, update repository settings:
+When repository settings policies fail, update repository settings:
 
 1. **GitHub:** Navigate to your repository → Settings
 2. Update the relevant settings based on the policy failures:
