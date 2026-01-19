@@ -1,0 +1,73 @@
+version: 0
+
+name: vcs
+description: Version control system (VCS) best practices and security policies
+author: earthly
+
+policies:
+  - name: branch-protection-enabled
+    description: Validate that branch protection is enabled or disabled as required
+    mainPython: ./branch-protection-enabled.py
+
+  - name: require-pull-request
+    description: Validate that pull requests are required or not required as configured
+    mainPython: ./require-pull-request.py
+
+  - name: minimum-approvals
+    description: Validate that pull requests require minimum number of approvals
+    mainPython: ./minimum-approvals.py
+
+  - name: require-codeowner-review
+    description: Validate that code owner review is required or not required as configured
+    mainPython: ./require-codeowner-review.py
+
+  - name: dismiss-stale-reviews
+    description: Validate that stale reviews are dismissed or not dismissed as configured
+    mainPython: ./dismiss-stale-reviews.py
+
+  - name: require-status-checks
+    description: Validate that status checks are required or not required as configured
+    mainPython: ./require-status-checks.py
+
+  - name: require-branches-up-to-date
+    description: Validate that branches are required to be up to date or not as configured
+    mainPython: ./require-branches-up-to-date.py
+
+  - name: disallow-force-push
+    description: Validate that force pushes are allowed or disallowed as configured
+    mainPython: ./disallow-force-push.py
+
+  - name: disallow-branch-deletion
+    description: Validate that branch deletions are allowed or disallowed as configured
+    mainPython: ./disallow-branch-deletion.py
+
+  - name: require-linear-history
+    description: Validate that linear history is required or not required as configured
+    mainPython: ./require-linear-history.py
+
+  - name: require-signed-commits
+    description: Validate that signed commits are required or not required as configured
+    mainPython: ./require-signed-commits.py
+
+  - name: require-private
+    description: Validate that repository visibility is private
+    mainPython: ./require-private.py
+
+  - name: require-default-branch
+    description: Validate that default branch matches required name
+    mainPython: ./require-default-branch.py
+
+  - name: allowed-merge-strategies
+    description: Validate that merge strategies match allowed list
+    mainPython: ./allowed-merge-strategies.py
+
+inputs:
+  min_approvals:
+    description: Minimum number of required approvals (integer, or omit to skip check)
+    default: 1
+  required_default_branch:
+    description: Required default branch name for the require-default-branch policy. Defaults to 'main'
+    default: "main"
+  allowed_merge_strategies:
+    description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
+    default: ""
