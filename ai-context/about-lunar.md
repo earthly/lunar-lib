@@ -82,11 +82,12 @@ Lunar includes 100+ pre-built guardrails across categories like testing, securit
 
 Not every standard needs to block deployments immediately. Lunar supports five enforcement levels:
 
-1. **Draft**: Visible only to the platform team for testing
-2. **Score**: Affects application health scores in dashboards
-3. **Report-PR**: Adds comments to pull requests without blocking
-4. **Block-PR**: Prevents pull requests from merging
-5. **Block-Deploy**: Stops production deployments
+1. `draft`: Visible only to the platform team for testing
+2. `score`: Affects application health scores in dashboards
+3. `report-pr`: Adds comments to pull requests without blocking
+4. `block-pr`: Prevents pull requests from merging
+5. `block-release`: Stops production deployments
+6. `block-pr-and-release`: Blocks both PRs and releases
 
 This allows teams to roll out guardrails progressively—starting with visibility and guidance, then tightening enforcement as adoption grows.
 

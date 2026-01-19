@@ -153,7 +153,7 @@ hook:
 - Build artifacts
 - Test results
 - Environment variables
-- The `LUNAR_HOOK_CMD` variable (for command hooks)
+- The `LUNAR_CI_COMMAND` variable (for command hooks)
 
 **Use cases:**
 - Capturing test coverage after test runs
@@ -660,7 +660,7 @@ Lunar provides an official Docker image that includes:
 - Python 3 with venv
 - Bash
 - The `lunar` CLI
-- Common tools: `jq`, `yq`, `curl`
+- Common tools: `jq`, `yq`, `curl`, `parallel`, `wget`
 
 **For development**, the image automatically executes any `requirements.txt` and/or `install.sh` files found in the plugin directory.
 

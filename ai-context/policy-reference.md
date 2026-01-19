@@ -556,7 +556,9 @@ max_complexity = int(variable_or_default("maxComplexity", "15"))  # widely accep
 
 #### Pattern: No Default for User-Dependent Settings
 
-When the correct value depends on internal infrastructure or conventions (e.g., internal registry URLs, team-specific values), **do not provide a default**. The policy should raise an error when not configured:
+When the correct value depends on internal infrastructure or conventions (e.g., internal registry URLs, team-specific values), **do not provide a default**. The policy should raise an error when not configured.
+
+**Why raise an error?** A misconfigured policy that silently passes is dangerous—it gives false confidence that checks are running when they're not. By raising an error, the misconfiguration surfaces immediately as an `error` status in the Lunar UI, alerting the platform team to fix it. This is far better than a silent pass that masks the problem:
 
 ```python
 from lunar_policy import variable_or_default
@@ -1005,7 +1007,7 @@ Lunar provides an official Docker image that includes:
 - Bash
 - The `lunar-policy` Python package
 - The `lunar` CLI
-- Common tools: `jq`, `yq`, `curl`
+- Common tools: `jq`, `yq`, `curl`, `parallel`, `wget`
 
 **For development**, the image automatically executes any `requirements.txt` and/or `install.sh` files found in the plugin directory.
 
