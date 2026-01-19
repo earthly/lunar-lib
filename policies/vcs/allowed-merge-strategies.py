@@ -3,8 +3,8 @@ from lunar_policy import Check, variable_or_default
 
 def main():
     with Check("allowed-merge-strategies", "Merge strategies should match allowed list") as c:
-        allowed_merge_strategies = variable_or_default("allowed_merge_strategies", None)
-        if allowed_merge_strategies is None:
+        allowed_merge_strategies = variable_or_default("allowed_merge_strategies", "")
+        if not allowed_merge_strategies:
             c.skip("allowed_merge_strategies not configured")
 
         # Parse comma-separated list

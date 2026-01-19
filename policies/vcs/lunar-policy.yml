@@ -70,4 +70,4 @@ inputs:
     default: "main"
   allowed_merge_strategies:
     description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
-    default: null
+    default: ""
