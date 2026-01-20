@@ -2,7 +2,7 @@
 
 This document defines the design principles and conventions for the Component JSON—the central data contract between collectors and policies.
 
-**See also:** [component-json-structure.md](component-json-structure.md) for the standard structure of each category (`.repo`, `.sca`, `.k8s`, etc.).
+**See also:** [structure.md](structure.md) for the standard structure of each category (`.repo`, `.sca`, `.k8s`, etc.).
 
 ## Design Principles
 
@@ -500,3 +500,74 @@ The `.lang` category complements, not replaces, normalized categories:
 | Language-specific safety | — | `.lang.rust.unsafe_blocks` |
 
 **Rule of thumb:** If a policy could reasonably apply across multiple languages, normalize the data. If the policy only makes sense for one language, use `.lang.<language>`.
+
+---
+
+## Naming Conventions
+
+### Boolean Fields
+- **Existence:** `exists`, `configured`, `enabled`
+- **Presence aggregates:** `has_<thing>` (e.g., `has_critical`, `has_runbook`)
+- **State:** `is_<state>` (e.g., `is_latest`, `is_pinned`)
+- **All-aggregates:** `all_<condition>` (e.g., `all_valid`, `all_passing`)
+- **Clean state:** `clean` (no issues found)
+
+### Numeric Fields
+- Include units: `duration_seconds`, `latency_ms`
+- Use `_count` for quantities: `error_count`, `file_count`
+- Use `_percentage` for percentages: `coverage_percentage`
+
+### Arrays
+- Plural names: `files`, `findings`, `issues`, `containers`
+- Each item has identifying context: `path`, `name`, `id`
+
+### Source Metadata
+- `source.tool` — Tool name (e.g., "snyk", "trivy")
+- `source.version` — Tool version
+- `source.integration` — How collected: `ci`, `github_app`, `code`, `api`
+- `source.collected_at` — Timestamp (ISO 8601)
+
+### Errors
+- `valid: boolean` — Parse/validation success
+- `error: string` — Error message (only when `valid: false`)
+- `errors: array` — Multiple errors
+
+### Summary Objects
+- Use `.summary` for aggregated/derived booleans that simplify policies
+- Example: `.k8s.summary.all_have_resources` instead of iterating all containers
+
+---
+
+## Writing Tool-Agnostic Policies
+
+**Good:** Check normalized fields
+
+```python
+with Check("sca-no-critical", "No critical SCA vulnerabilities") as c:
+    c.assert_exists(".sca", "SCA scanner must be configured")
+    c.assert_equals(c.get_value(".sca.vulnerabilities.critical"), 0,
+        "Critical vulnerabilities found")
+```
+
+**Bad:** Check specific tool
+
+```python
+# Don't do this unless compliance requires a specific tool
+with Check("must-use-snyk") as c:
+    c.assert_equals(c.get_value(".sca.source.tool"), "snyk")
+```
+
+**When to check specific tools:** Only when compliance/policy explicitly mandates a particular scanner (e.g., "must use Snyk Enterprise for SCA").
+
+---
+
+## Extending the Schema
+
+When adding new data:
+
+1. **Does it fit an existing category?** — Don't create new top-level keys unnecessarily
+2. **Is it tool-specific or capability-specific?** — Name for the capability, not the tool
+3. **Can multiple tools provide this data?** — Design for normalization
+4. **Include source metadata** — So policies CAN check tools if needed
+5. **Add summary fields** — Make common policy checks easy
+6. **Document the contract** — Update the structure docs and collector/policy READMEs
