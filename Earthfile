@@ -1,5 +1,7 @@
 VERSION 0.8
 
+FROM alpine:3.21
+
 ai-context:
     COPY --dir ai-context .
     SAVE ARTIFACT ai-context
