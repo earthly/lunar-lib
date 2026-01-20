@@ -849,6 +849,95 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ---
 
+## Test Quality Patterns (AST-Based)
+
+These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect test quality issues via structural analysis.
+
+### Test Assertions
+
+* `test-has-assertions` **Test functions contain assertions**: Test functions must include assertion statements, not just run code.
+  * Collector(s): Use ast-grep to detect test functions without any assertion calls (assert, expect, require, t.Error)
+  * Component JSON:
+    * `.code_patterns.testing.tests_without_assertions` - Array of test functions missing assertions
+    * `.code_patterns.testing.tests_without_assertions_count` - Count of tests without assertions
+    * `.code_patterns.testing.all_have_assertions` - Boolean indicating all tests have assertions
+  * Policy: Assert that all test functions contain at least one assertion
+  * Configuration: Assertion patterns per language
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `test-no-print-assertions` **Tests use assertions not print statements**: Tests must use proper assertions, not print statements to manually verify output.
+  * Collector(s): Use ast-grep to detect print/log statements in test functions without accompanying assertions
+  * Component JSON:
+    * `.code_patterns.testing.print_only_tests` - Array of tests using print instead of assert
+    * `.code_patterns.testing.print_only_tests_count` - Count of such tests
+  * Policy: Assert that tests use assertions, not print statements
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Error Handling in Tests
+
+* `test-no-empty-catch` **Tests do not have empty catch blocks**: Test catch/except blocks must not be empty, which can hide failures.
+  * Collector(s): Use ast-grep to detect empty `catch {}`, `except: pass`, or `catch (e) {}` in test files
+  * Component JSON:
+    * `.code_patterns.testing.empty_catch_blocks` - Array of empty catch blocks in tests
+    * `.code_patterns.testing.empty_catch_count` - Count of empty catch blocks
+    * `.code_patterns.testing.no_empty_catches` - Boolean for no empty catches
+  * Policy: Assert that no empty catch blocks exist in tests
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `test-errors-checked` **Test error returns are checked**: Tests must check error return values, not ignore them.
+  * Collector(s): Use ast-grep to detect ignored error returns in test code (e.g., `result, _ := funcThatReturnsError()`)
+  * Component JSON:
+    * `.code_patterns.testing.ignored_errors` - Array of ignored errors in tests
+    * `.code_patterns.testing.ignored_errors_count` - Count of ignored errors
+  * Policy: Assert that test code checks error returns
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Test Structure
+
+* `test-no-sleep-delays` **Tests do not use arbitrary sleep delays**: Tests should use proper synchronization, not sleep delays which cause flakiness.
+  * Collector(s): Use ast-grep to detect `time.Sleep()`, `Thread.sleep()`, `asyncio.sleep()` in test files
+  * Component JSON:
+    * `.code_patterns.testing.sleep_usage` - Array of sleep calls in tests
+    * `.code_patterns.testing.sleep_count` - Count of sleep usages
+    * `.code_patterns.testing.no_sleeps` - Boolean for no sleep delays
+  * Policy: Assert that tests do not use arbitrary sleep delays (may be advisory)
+  * Configuration: Allowed sleep patterns (e.g., test utilities)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `test-no-hardcoded-values` **Tests do not hardcode environment-specific values**: Tests must not contain hardcoded URLs, ports, or paths that vary by environment.
+  * Collector(s): Use ast-grep to detect hardcoded localhost URLs, file paths, or port numbers in tests
+  * Component JSON:
+    * `.code_patterns.testing.hardcoded_values` - Array of hardcoded values in tests
+    * `.code_patterns.testing.hardcoded_count` - Count of hardcoded values
+  * Policy: Assert that tests use configuration or fixtures, not hardcoded values
+  * Configuration: Patterns considered hardcoded
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Mock Usage
+
+* `test-mocks-have-expectations` **Mocks verify expected calls**: Mock objects should verify that expected methods were called.
+  * Collector(s): Use ast-grep to detect mock creation without corresponding verification (e.g., `mock.Mock()` without `mock.assert_called`)
+  * Component JSON:
+    * `.code_patterns.testing.unverified_mocks` - Array of mocks without verification
+    * `.code_patterns.testing.unverified_mocks_count` - Count of unverified mocks
+  * Policy: Assert that mocks include call verification (may be advisory)
+  * Configuration: Mock patterns per language
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `test-no-production-dependencies` **Tests do not import production secrets or configs**: Test code must not import production configuration modules.
+  * Collector(s): Use ast-grep to detect imports of production config modules in test files
+  * Component JSON:
+    * `.code_patterns.testing.production_imports` - Array of production imports in tests
+    * `.code_patterns.testing.production_imports_count` - Count of such imports
+  * Policy: Assert that tests do not import production configuration
+  * Configuration: Production module patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+---
+
 ## Summary Policies
 
 * **All required test types exist**: Aggregate check that all required test types (unit, integration, etc.) are present.

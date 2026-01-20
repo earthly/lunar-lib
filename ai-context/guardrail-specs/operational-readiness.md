@@ -868,6 +868,147 @@ This document specifies possible policies for the **Operational Readiness** cate
 
 ---
 
+## Code-Level Operational Patterns (AST-Based)
+
+These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to verify operational readiness patterns are implemented in code.
+
+### Metrics Implementation
+
+* `ops-metrics-declared` **Prometheus metrics are declared in code**: Services must declare Prometheus metrics (counters, gauges, histograms) for monitoring.
+  * Collector(s): Use ast-grep to extract `prometheus.NewCounter()`, `prometheus.NewGauge()`, `prometheus.NewHistogram()` declarations
+  * Component JSON:
+    * `.code_patterns.metrics.declared` - Array of declared metrics with name, type, file, line
+    * `.code_patterns.metrics.count` - Number of metrics declared
+    * `.code_patterns.metrics.has_metrics` - Boolean indicating metrics are declared
+  * Policy: Assert that at least minimum metrics are declared for service components
+  * Configuration: Minimum metric count (default: 3)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-metrics-naming-convention` **Metrics follow naming conventions**: Declared metrics must follow Prometheus naming conventions (snake_case, appropriate suffixes).
+  * Collector(s): Use ast-grep to extract metric names and validate against naming rules
+  * Component JSON:
+    * `.code_patterns.metrics.naming_violations` - Array of metrics with naming issues
+    * `.code_patterns.metrics.follows_conventions` - Boolean for naming compliance
+  * Policy: Assert that all metrics follow naming conventions
+  * Configuration: Naming convention rules (suffix requirements for counters, histograms)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-metrics-have-labels` **Metrics have appropriate labels**: Metrics should have consistent labels for filtering and aggregation.
+  * Collector(s): Use ast-grep to extract metric label definitions
+  * Component JSON:
+    * `.code_patterns.metrics.labels_used` - Array of label names across metrics
+    * `.code_patterns.metrics.has_required_labels` - Boolean for required labels present
+  * Policy: Assert that required labels are present on metrics
+  * Configuration: Required labels (e.g., ["service", "environment"])
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Tracing Implementation
+
+* `ops-tracing-spans-created` **Tracing spans are created for key operations**: Code must create tracing spans for important operations.
+  * Collector(s): Use ast-grep to detect `tracer.Start()`, `otel.Tracer().Start()`, `span.Start()` patterns
+  * Component JSON:
+    * `.code_patterns.tracing.spans_created.count` - Number of span creation points
+    * `.code_patterns.tracing.spans_created.locations` - Array of file/line locations
+    * `.code_patterns.tracing.has_tracing` - Boolean indicating tracing is implemented
+  * Policy: Assert that tracing spans are created in service code
+  * Configuration: Minimum span creation points
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-tracing-context-propagated` **Tracing context is extracted and injected**: Code must propagate tracing context across service boundaries.
+  * Collector(s): Use ast-grep to detect `otel.GetTextMapPropagator().Extract()` and `Inject()` patterns
+  * Component JSON:
+    * `.code_patterns.tracing.propagation.extract_count` - Number of context extractions
+    * `.code_patterns.tracing.propagation.inject_count` - Number of context injections
+    * `.code_patterns.tracing.propagates_context` - Boolean for context propagation
+  * Policy: Assert that tracing context is propagated in HTTP/gRPC handlers and clients
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Graceful Shutdown
+
+* `ops-sigterm-handling` **SIGTERM signal is handled for graceful shutdown**: Services must handle SIGTERM for graceful shutdown in containerized environments.
+  * Collector(s): Use ast-grep to detect `signal.Notify($$$, syscall.SIGTERM)` or equivalent patterns
+  * Component JSON:
+    * `.code_patterns.lifecycle.sigterm_handled` - Boolean for SIGTERM handling
+    * `.code_patterns.lifecycle.signal_handling.location` - File/line of signal handling
+  * Policy: Assert that SIGTERM is handled for service components
+  * Configuration: Tags requiring signal handling (default: ["service", "backend"])
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-graceful-shutdown-implemented` **Graceful shutdown drains connections**: Services must implement connection draining and cleanup on shutdown.
+  * Collector(s): Use ast-grep to detect `server.Shutdown()`, drain patterns, or cleanup in signal handlers
+  * Component JSON:
+    * `.code_patterns.lifecycle.graceful_shutdown` - Boolean for graceful shutdown implementation
+    * `.code_patterns.lifecycle.shutdown_pattern` - Type of shutdown pattern detected
+  * Policy: Assert that graceful shutdown is implemented
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Feature Flags
+
+* `ops-feature-flags-inventoried` **Feature flags are collected for inventory**: Feature flag usages should be extracted for tracking and lifecycle management.
+  * Collector(s): Use ast-grep to detect feature flag library calls (LaunchDarkly, Unleash, custom patterns)
+  * Component JSON:
+    * `.code_patterns.feature_flags.flags` - Array of flag keys with file/line locations
+    * `.code_patterns.feature_flags.count` - Number of distinct feature flags
+    * `.code_patterns.feature_flags.library` - Feature flag library detected
+  * Policy: Collect feature flag inventory (informational, not enforcement)
+  * Configuration: Feature flag library patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-feature-flags-naming` **Feature flags follow naming conventions**: Feature flag keys must follow organizational naming conventions.
+  * Collector(s): Use ast-grep to extract flag keys and validate naming
+  * Component JSON:
+    * `.code_patterns.feature_flags.naming_violations` - Array of flags with naming issues
+    * `.code_patterns.feature_flags.follows_conventions` - Boolean for naming compliance
+  * Policy: Assert that all feature flags follow naming conventions
+  * Configuration: Naming convention pattern (e.g., kebab-case, prefix requirements)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Health Check Implementation
+
+* `ops-health-endpoint-implemented` **Health check endpoint is implemented in code**: Service code must implement a health check handler.
+  * Collector(s): Use ast-grep to detect health endpoint handler patterns (e.g., routes for /health, /healthz)
+  * Component JSON:
+    * `.code_patterns.health.endpoint_implemented` - Boolean for health endpoint in code
+    * `.code_patterns.health.endpoint_path` - Detected health endpoint path
+    * `.code_patterns.health.handler_location` - File/line of health handler
+  * Policy: Assert that health endpoint handler exists in code
+  * Configuration: Health endpoint patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-health-checks-dependencies` **Health check verifies dependencies**: Health check implementation should verify critical dependencies.
+  * Collector(s): Use ast-grep to analyze health handler for database ping, cache check, or dependency verification patterns
+  * Component JSON:
+    * `.code_patterns.health.checks_database` - Boolean for database check in health
+    * `.code_patterns.health.checks_cache` - Boolean for cache check in health
+    * `.code_patterns.health.dependency_checks` - Array of dependencies verified
+  * Policy: Assert that health check verifies critical dependencies
+  * Configuration: Required dependency checks
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Configuration Patterns
+
+* `ops-env-vars-documented` **Environment variables are collected from code**: Environment variable usages should be extracted for documentation.
+  * Collector(s): Use ast-grep to detect `os.Getenv()`, `env.Get()`, `process.env.` patterns
+  * Component JSON:
+    * `.code_patterns.config.env_vars` - Array of environment variable names with file/line
+    * `.code_patterns.config.env_var_count` - Number of distinct environment variables
+  * Policy: Collect environment variable inventory (informational)
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `ops-config-has-defaults` **Configuration values have defaults**: Configuration retrieval should include default values for optional settings.
+  * Collector(s): Use ast-grep to detect `os.Getenv($KEY)` without fallback vs `getEnvOrDefault($KEY, $DEFAULT)` patterns
+  * Component JSON:
+    * `.code_patterns.config.missing_defaults.count` - Number of config reads without defaults
+    * `.code_patterns.config.missing_defaults.locations` - Array of file/line locations
+  * Policy: Assert that configuration values have appropriate defaults (may be advisory)
+  * Configuration: Required vs optional config patterns
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+---
+
 ## Summary Policies
 
 * `summary-oncall-ready` **On-call readiness is complete**: Aggregate check that all on-call requirements are met.

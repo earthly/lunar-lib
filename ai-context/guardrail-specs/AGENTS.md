@@ -24,9 +24,19 @@ These specs define **what** guardrails to build—each entry includes:
 
 ## Usage
 
-1. **Pick a guardrail** from any spec file
+**Important**: Do not read all specs at once! Read only select files, and only in small chunks, as needed. Avoid reading all of them as that is too much information to process at once.
+
+If you need to find a specific spec, you can grep these files for the guardrail identifier.
+
+How to implement a guardrail:
+
+1. **Pick a guardrail** from any spec file (or grep for one based on the guardrail identifier)
 2. **Read the ai-context docs** for implementation details:
+   - [about-lunar.md](../about-lunar.md) — what Lunar is and how it works
+   - [core-concepts.md](../core-concepts.md) — core concepts
    - [collector-reference.md](../collector-reference.md) — how to write collectors
    - [policy-reference.md](../policy-reference.md) — how to write policies
+   - [strategies.md](../strategies.md) — implementation strategies
    - [component-json-conventions.md](../component-json-conventions.md) — schema design
+   - [component-json-reference.md](../component-json-reference.md) — schema reference
 3. **Implement** the collector(s) and policy following the spec

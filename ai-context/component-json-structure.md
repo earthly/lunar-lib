@@ -88,6 +88,22 @@ This table lists important sub-objects within each category. For full details, s
 | `.compliance.controls` | Control status (`access_reviews`, `audit_logging`, `encryption_at_rest`) |
 | **`.api`** | **API specifications and documentation** |
 | `.api.specs[]` | API spec files (`type`, `path`, `valid`, `version`) |
+| **`.code_patterns`** | **AST-based code pattern analysis (Strategy 16)** |
+| `.code_patterns.source` | Tool source (`tool`, `version`) |
+| `.code_patterns.security` | Security anti-patterns (`sql_concat`, `eval_exec`, `weak_crypto`, etc.) |
+| `.code_patterns.logging` | Logging patterns (`printf_violations`, `uses_structured_logging`) |
+| `.code_patterns.errors` | Error handling (`ignored_errors`, `unwrapped_errors`, `panic_usage`) |
+| `.code_patterns.http` | HTTP client patterns (`missing_timeout`, `default_client_usage`) |
+| `.code_patterns.resources` | Resource management (`missing_close`) |
+| `.code_patterns.concurrency` | Concurrency patterns (`missing_unlock`) |
+| `.code_patterns.deprecated` | Deprecated API usage (`api_usage`) |
+| `.code_patterns.metrics` | Declared metrics (`declared[]`, `count`, `naming_violations`) |
+| `.code_patterns.tracing` | Tracing impl (`spans_created`, `propagation`) |
+| `.code_patterns.lifecycle` | Lifecycle patterns (`sigterm_handled`, `graceful_shutdown`) |
+| `.code_patterns.feature_flags` | Feature flag inventory (`flags[]`, `count`, `library`) |
+| `.code_patterns.health` | Health check impl (`endpoint_implemented`, `dependency_checks`) |
+| `.code_patterns.config` | Config patterns (`env_vars[]`, `missing_defaults`) |
+| `.code_patterns.testing` | Test quality (`tests_without_assertions`, `empty_catch_blocks`) |
 | **`.lang.<language>`** | **Language-specific data (Go, Rust, Java, etc.)** — see [Language-Specific Data](component-json-conventions.md#language-specific-data) |
 | `.lang.<language>.version` | Language/runtime version (e.g., `"17"` for Java, `"1.21"` for Go) |
 | `.lang.<language>.build_system` | Build tool name (`maven`, `gradle`, `cargo`, etc.) |
@@ -95,6 +111,8 @@ This table lists important sub-objects within each category. For full details, s
 | `.lang.<language>.native.<tool>` | Build-system specific data (e.g., `.lang.java.native.gradle`) |
 | `.lang.go.module` | Go module path |
 | `.lang.go.golangci_lint` | golangci-lint findings |
+| `.lang.go.context` | Context propagation (`wrong_position`, `background_misuse`) |
+| `.lang.go.init` | Init function patterns (`side_effects`) |
 | `.lang.java.group_id` | Maven/Gradle group ID |
 | `.lang.java.artifact_id` | Maven/Gradle artifact ID |
 | `.lang.java.spotbugs` | SpotBugs findings by severity |
@@ -915,6 +933,157 @@ API specifications.
 - `.api.spec_exists` — API spec present
 - `.api.specs[].valid` — Spec is valid
 - `.api.all_secured` — All endpoints have auth
+
+---
+
+## Category: `.code_patterns`
+
+AST-based code pattern analysis from Strategy 16. These patterns are extracted by analyzing source code structure using tools like ast-grep.
+
+```json
+{
+  "code_patterns": {
+    "source": {
+      "tool": "ast-grep",
+      "version": "0.25.0"
+    },
+    "security": {
+      "sql_concat": {
+        "count": 0,
+        "locations": [],
+        "clean": true
+      },
+      "eval_exec": {
+        "count": 2,
+        "locations": [
+          {"file": "utils/dynamic.py", "line": 45},
+          {"file": "handlers/admin.py", "line": 112}
+        ],
+        "clean": false
+      },
+      "weak_crypto": {
+        "count": 1,
+        "algorithms": ["md5"],
+        "locations": [{"file": "auth/hash.go", "line": 23}]
+      },
+      "hardcoded_credentials": {
+        "count": 0,
+        "locations": [],
+        "clean": true
+      }
+    },
+    "logging": {
+      "printf_violations": {
+        "count": 5,
+        "locations": [
+          {"file": "handler.go", "line": 42, "code": "fmt.Printf(...)"}
+        ]
+      },
+      "uses_structured_logging": false,
+      "library": "fmt"
+    },
+    "errors": {
+      "ignored_errors": {
+        "count": 3,
+        "locations": [{"file": "db.go", "line": 88}]
+      },
+      "panic_usage": {
+        "count": 0,
+        "locations": [],
+        "panic_free": true
+      },
+      "all_handled": false
+    },
+    "http": {
+      "missing_timeout": {
+        "count": 2,
+        "locations": [{"file": "client.go", "line": 15}]
+      },
+      "all_have_timeout": false
+    },
+    "metrics": {
+      "declared": [
+        {
+          "type": "counter",
+          "name": "http_requests_total",
+          "file": "metrics/http.go",
+          "line": 23,
+          "has_help_text": true
+        },
+        {
+          "type": "histogram",
+          "name": "http_request_duration_seconds",
+          "file": "metrics/http.go",
+          "line": 30,
+          "has_help_text": true
+        }
+      ],
+      "count": 8,
+      "has_metrics": true,
+      "naming_violations": [],
+      "follows_conventions": true
+    },
+    "feature_flags": {
+      "library": "launchdarkly",
+      "flags": [
+        {
+          "key": "enable-new-checkout",
+          "file": "checkout/handler.go",
+          "line": 45,
+          "variation_type": "bool"
+        }
+      ],
+      "count": 12,
+      "follows_conventions": true
+    },
+    "lifecycle": {
+      "sigterm_handled": true,
+      "graceful_shutdown": true,
+      "signal_handling": {
+        "location": {"file": "main.go", "line": 52}
+      }
+    },
+    "health": {
+      "endpoint_implemented": true,
+      "endpoint_path": "/healthz",
+      "checks_database": true,
+      "checks_cache": true,
+      "dependency_checks": ["database", "redis"]
+    },
+    "config": {
+      "env_vars": [
+        {"name": "DATABASE_URL", "file": "config/db.go", "line": 12},
+        {"name": "API_KEY", "file": "config/auth.go", "line": 8}
+      ],
+      "env_var_count": 15
+    },
+    "testing": {
+      "tests_without_assertions": [],
+      "tests_without_assertions_count": 0,
+      "all_have_assertions": true,
+      "empty_catch_blocks": [],
+      "empty_catch_count": 0
+    }
+  }
+}
+```
+
+**Key policy paths:**
+- `.code_patterns.security.sql_concat.clean` — No SQL injection patterns
+- `.code_patterns.security.eval_exec.clean` — No eval/exec usage
+- `.code_patterns.security.weak_crypto.count` — Weak crypto usage count
+- `.code_patterns.logging.uses_structured_logging` — Structured logging enforced
+- `.code_patterns.errors.all_handled` — All errors handled
+- `.code_patterns.http.all_have_timeout` — HTTP clients have timeouts
+- `.code_patterns.metrics.has_metrics` — Prometheus metrics declared
+- `.code_patterns.metrics.follows_conventions` — Metrics follow naming conventions
+- `.code_patterns.feature_flags.count` — Feature flag count
+- `.code_patterns.lifecycle.sigterm_handled` — SIGTERM handling for graceful shutdown
+- `.code_patterns.lifecycle.graceful_shutdown` — Graceful shutdown implemented
+- `.code_patterns.health.endpoint_implemented` — Health check in code
+- `.code_patterns.testing.all_have_assertions` — Tests have assertions
+
+**Note:** The `.code_patterns` category is populated by Strategy 16 collectors using ast-grep. Subcategories may be extended based on organizational needs. Unlike `.sast` which runs security-focused SAST tools, `.code_patterns` captures custom structural patterns specific to organizational standards (logging libraries, error handling conventions, metrics patterns, etc.).
 
 ---
 
