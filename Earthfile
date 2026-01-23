@@ -9,6 +9,7 @@ ai-context:
 all:
     BUILD --pass-args +base-image
     BUILD --pass-args ./collectors/dockerfile+image
+    BUILD --pass-args ./collectors/ast-grep+image
 
 base-image:
     ARG SCRIPTS_VERSION=main-alpine

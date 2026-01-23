@@ -1,0 +1,19 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install ast-grep (sg CLI)
+    # Release assets are named app-<arch>-unknown-linux-gnu.zip and contain both 'sg' and 'ast-grep' binaries
+    ARG TARGETARCH
+    ARG AST_GREP_VERSION=0.40.5
+    RUN apk add --no-cache unzip && \
+        ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
+        curl -sSL "https://github.com/ast-grep/ast-grep/releases/download/${AST_GREP_VERSION}/app-${ARCH}-unknown-linux-gnu.zip" -o /tmp/ast-grep.zip && \
+        unzip -j /tmp/ast-grep.zip sg -d /usr/local/bin/ && \
+        chmod +x /usr/local/bin/sg && \
+        rm /tmp/ast-grep.zip && \
+        echo "${AST_GREP_VERSION}" > /usr/local/bin/sg.version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:ast-grep-$VERSION

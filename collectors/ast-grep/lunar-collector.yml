@@ -1,0 +1,32 @@
+version: 0
+
+name: ast-grep
+description: Extracts code patterns using AST-based analysis with ast-grep
+author: earthly
+
+default_image_non_ci_collectors: earthly/lunar-lib:ast-grep-main
+
+collectors:
+  - name: ast-grep
+    description: |
+      Runs ast-grep rules against source code and collects pattern matches.
+      Supports full ast-grep rule syntax including relational rules (inside, has),
+      composite rules (all, any, not), and metavariables.
+      Results are written to .code_patterns in the Component JSON.
+    mainBash: main.sh
+    hook:
+      type: code
+
+inputs:
+  rules:
+    description: |
+      Multi-line YAML string containing ast-grep rules. Use YAML multi-document
+      syntax (---) to define multiple rules. Rule IDs should follow the format
+      <category>.<subcategory> to map to Component JSON paths.
+      Example: id: security.sql_concat -> .code_patterns.security.sql_concat
+  exclude_paths:
+    description: Comma-separated paths to exclude from scanning
+    default: "vendor,node_modules,.git,dist,build"
+  max_matches_per_rule:
+    description: Maximum matches to report per rule (prevents huge output)
+    default: "100"
