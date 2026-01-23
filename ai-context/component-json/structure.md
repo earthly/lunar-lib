@@ -54,7 +54,7 @@ This table lists important sub-objects within each category. For full details, s
 | **[`.testing`](cat-testing.md)** | **Test execution results and code coverage** |
 | `.testing.results` | Test results (`total`, `passed`, `failed`, `skipped`) |
 | `.testing.failures[]` | Failure details (`name`, `file`, `line`, `message`) |
-| `.testing.coverage` | Coverage data (`percentage`, `meets_threshold`, `threshold`) |
+| `.testing.coverage` | Coverage data (`percentage`, `lines`, `files[]`) |
 | `.testing.coverage.lines` | Line coverage (`covered`, `total`) |
 | **[`.sca`](cat-sca.md)** | **Software Composition Analysis (dependency vulnerabilities)** |
 | `.sca.source` | Tool source (`tool`, `version`, `integration`) |
@@ -106,8 +106,8 @@ This table lists important sub-objects within each category. For full details, s
 | `.code_patterns.testing` | Test quality (`tests_without_assertions`, `empty_catch_blocks`) |
 | **`.lang.<language>`** | **Language-specific data (Go, Rust, Java, etc.)** — see [Language-Specific Data](conventions.md#language-specific-data) |
 | `.lang.<language>.version` | Language/runtime version (e.g., `"17"` for Java, `"1.21"` for Go) |
-| `.lang.<language>.build_system` | Build tool name (`maven`, `gradle`, `cargo`, etc.) |
-| `.lang.<language>.dependencies` | Dependency counts (`direct`, `transitive`) |
+| `.lang.<language>.build_systems` | Build tools array (`["maven"]`, `["gradle", "maven"]`, `["go"]`) |
+| `.lang.<language>.dependencies` | Full dependency data (`direct[]`, `transitive[]`) |
 | `.lang.<language>.native.<tool>` | Build-system specific data (e.g., `.lang.java.native.gradle`) |
 | `.lang.go.module` | Go module path |
 | `.lang.go.golangci_lint` | golangci-lint findings |

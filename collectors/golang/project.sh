@@ -1,9 +1,5 @@
 #!/bin/bash
-
 set -e
-
-lunar collect ".lang.golang.debug2" "debug2"
-lunar collect ".lang.golang.debug2_2" "debug2_2"
 
 check_go_files() {
     local go_mod_exists=false
@@ -11,12 +7,15 @@ check_go_files() {
     local vendor_exists=false
     local goreleaser_exists=false
     local go_mod_version=""
+    local go_module_path=""
 
     # Check for go.mod
     if [[ -f "go.mod" ]]; then
         go_mod_exists=true
         # Extract Go version using go list (preferred over grep)
         go_mod_version=$(go list -m -f '{{.GoVersion}}' 2>/dev/null || true)
+        # Extract module path
+        go_module_path=$(go list -m -f '{{.Path}}' 2>/dev/null || true)
     fi
 
     # Check for go.sum
@@ -41,7 +40,9 @@ check_go_files() {
         --argjson vendor_exists "$vendor_exists" \
         --argjson goreleaser_exists "$goreleaser_exists" \
         --arg go_mod_version "$go_mod_version" \
+        --arg go_module_path "$go_module_path" \
         '{
+            module_path: ($go_module_path | select(. != "")),
             go_mod: {
                 exists: $go_mod_exists,
                 version: ($go_mod_version | select(. != ""))
@@ -58,24 +59,24 @@ check_go_files() {
         }'
 }
 
-# Main collection process
-main() {
-    # Check if this is actually a Go project by looking for .go files
-    if ! find . -name "*.go" -type f 2>/dev/null | grep -q .; then
-        echo "No Go files found, exiting"
-        exit 0
-    fi
-    
-    # Check for Go files and structure
-    go_files_info=$(check_go_files || echo '{}')
+# Check if this is actually a Go project by looking for .go files
+if ! find . -name "*.go" -type f 2>/dev/null | grep -q .; then
+    echo "No Go files found, exiting"
+    exit 0
+fi
 
-    # Collect version, build_systems at top level and native info (including go_mod_version) under native key
-    echo "$go_files_info" | jq '{
-        version: (.go_mod.version // ""),
-        build_systems: ["go"],
-        native: .
-    }' | lunar collect -j ".lang.go" -
-}
+# Check for Go files and structure
+go_files_info=$(check_go_files || echo '{}')
 
-main "$@"
+# Collect module, version, build_systems at top level and native info under native key
+echo "$go_files_info" | jq '{
+    module: (.module_path // null),
+    version: (.go_mod.version // ""),
+    build_systems: ["go"],
+    native: (del(.module_path)),
+    source: {
+        tool: "go",
+        integration: "code"
+    }
+}' | lunar collect -j ".lang.go" -
 

@@ -19,9 +19,12 @@ if [[ -f ".golangci.yml" ]] || [[ -f ".golangci.yaml" ]] || [[ -f "golangci.yml"
   golangci_lint_config_exists=true
 fi
 
+# Get timeout from input (defaults to 5m)
+LINT_TIMEOUT="${LINT_TIMEOUT:-5m}"
+
 # Run golangci-lint
 set +e
-golangci_lint_output=$(golangci-lint run --timeout=5m 2>&1)
+golangci_lint_output=$(golangci-lint run --timeout="$LINT_TIMEOUT" 2>&1)
 golangci_lint_exit_code=$?
 set -e
 
@@ -66,12 +69,16 @@ if [[ -n "$golangci_lint_output" ]] && [[ $golangci_lint_exit_code -ne 0 ]]; the
   done | jq -s '.')
 fi
 
-# Collect normalized lint data
+# Collect normalized lint data with source metadata
 jq -n \
   --argjson warnings "$warnings_json" \
   '{
     warnings: $warnings,
-    linters: ["golangci-lint"]
+    linters: ["golangci-lint"],
+    source: {
+      tool: "golangci-lint",
+      integration: "code"
+    }
   }' | lunar collect -j ".lang.go.lint" -
 
 # Collect tool-specific golangci-lint data
@@ -85,6 +92,6 @@ jq -n \
     config_exists: $config_exists,
     exit_code: ($exit_code | tonumber),
     output: $output
-  }' | lunar collect -j ".lang.go.golangci-lint" -
+  }' | lunar collect -j ".lang.go.golangci_lint" -
 
 
