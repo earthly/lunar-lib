@@ -4,7 +4,7 @@ name: ast-grep
 description: Extracts code patterns using AST-based analysis with ast-grep
 author: earthly
 
-default_image_non_ci_collectors: earthly/lunar-lib:ast-grep-main
+default_image: earthly/lunar-lib:ast-grep-main
 
 collectors:
   - name: ast-grep
