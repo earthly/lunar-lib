@@ -30,3 +30,6 @@ inputs:
   max_matches_per_rule:
     description: Maximum matches to report per rule (prevents huge output)
     default: "100"
+  debug:
+    description: Enable debug output (echoes rules and raw ast-grep output)
+    default: "false"

@@ -40,7 +40,7 @@ This document outlines the design for a generic, configurable ast-grep collector
 │                   ast-grep Collector                         │
 │                                                              │
 │  1. Write `rules` string to temp YAML file                  │
-│  2. Run `sg scan --rule <temp-file> --json .` (single call) │
+│  2. Run `ast-grep scan --rule <temp-file> --json .`          │
 │  3. Parse JSON output, group matches by ruleId              │
 │  4. Map ruleId → category.subcategory for Component JSON    │
 │  5. Write to Component JSON via `lunar collect`             │
@@ -361,7 +361,7 @@ Policies can derive "clean" status from `count == 0`.
 ## Next Steps
 
 1. **Review this plan** — Confirm the `rules` input format and output structure
-2. **Implement `main.sh`** — Write rules to temp file, run `sg scan`, parse JSON, aggregate
+2. **Implement `main.sh`** — Write rules to temp file, run `ast-grep scan`, parse JSON, aggregate
 3. **Create `lunar-collector.yml`** — Define `rules`, `exclude_paths`, `max_matches_per_rule` inputs
 4. **Build container image** — Dockerfile/Earthfile with ast-grep binary
 5. **Write README** — Document rule format, examples, and best practices

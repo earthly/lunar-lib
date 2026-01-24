@@ -2,10 +2,18 @@
 
 set -e
 
-# Configuration from inputs (uppercase env vars)
-RULES="${RULES:-}"
-EXCLUDE_PATHS="${EXCLUDE_PATHS:-vendor,node_modules,.git,dist,build}"
-MAX_MATCHES="${MAX_MATCHES_PER_RULE:-100}"
+# Configuration from inputs (LUNAR_VAR_ prefix)
+RULES="${LUNAR_VAR_RULES:-}"
+EXCLUDE_PATHS="${LUNAR_VAR_EXCLUDE_PATHS:-vendor,node_modules,.git,dist,build}"
+MAX_MATCHES="${LUNAR_VAR_MAX_MATCHES_PER_RULE:-100}"
+DEBUG="${LUNAR_VAR_DEBUG:-false}"
+
+# Debug helper
+debug() {
+    if [ "$DEBUG" = "true" ]; then
+        echo "DEBUG: $*" >&2
+    fi
+}
 
 # Check if rules are provided
 if [ -z "$RULES" ]; then
@@ -13,26 +21,42 @@ if [ -z "$RULES" ]; then
     exit 1
 fi
 
-# Create temp file for rules
-RULES_FILE=$(mktemp --suffix=.yml)
+# Create temp file for rules (BusyBox-compatible)
+RULES_FILE=$(mktemp -t ast-grep-rules-XXXXXX)
+mv "$RULES_FILE" "${RULES_FILE}.yml"
+RULES_FILE="${RULES_FILE}.yml"
 trap "rm -f '$RULES_FILE'" EXIT
 
 # Write rules to temp file
 echo "$RULES" > "$RULES_FILE"
 
-# Build exclusion arguments for sg
+debug "ast-grep version: $(ast-grep --version 2>/dev/null || echo 'unknown')"
+debug "Rules file content:"
+if [ "$DEBUG" = "true" ]; then
+    cat "$RULES_FILE" >&2
+fi
+
+# Build exclusion arguments for ast-grep
+# ast-grep uses --globs for file patterns
 EXCLUDE_ARGS=""
 IFS=',' read -ra EXCLUDE_ARRAY <<< "$EXCLUDE_PATHS"
 for path in "${EXCLUDE_ARRAY[@]}"; do
     path=$(echo "$path" | xargs)  # trim whitespace
     if [ -n "$path" ]; then
-        EXCLUDE_ARGS="$EXCLUDE_ARGS --no-ignore-vcs --globs !$path/**"
+        EXCLUDE_ARGS="$EXCLUDE_ARGS --globs !${path}/**"
     fi
 done
 
+debug "Exclude args: $EXCLUDE_ARGS"
+debug "Running: ast-grep scan --rule $RULES_FILE --json . $EXCLUDE_ARGS"
+
 # Run ast-grep and capture output
-# Note: sg scan returns exit code 0 even with matches
-SG_OUTPUT=$(sg scan --rule "$RULES_FILE" --json . $EXCLUDE_ARGS 2>/dev/null || true)
+SG_OUTPUT=$(ast-grep scan --rule "$RULES_FILE" --json . $EXCLUDE_ARGS 2>/dev/null || true)
+
+debug "Raw ast-grep output:"
+if [ "$DEBUG" = "true" ]; then
+    echo "$SG_OUTPUT" >&2
+fi
 
 # If no output or empty array, create empty result
 if [ -z "$SG_OUTPUT" ] || [ "$SG_OUTPUT" = "[]" ] || [ "$SG_OUTPUT" = "null" ]; then
@@ -84,7 +108,7 @@ reduce .[] as $rule ({};
 ')
 
 # Get ast-grep version
-SG_VERSION=$(sg --version 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
+SG_VERSION=$(ast-grep --version 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
 
 # Add source metadata
 FINAL_OUTPUT=$(echo "$RESULT" | jq --arg version "$SG_VERSION" '{

@@ -87,6 +87,7 @@ If a rule ID doesn't contain a dot, it goes under `.code_patterns.custom.<rule_i
 | `rules` | Yes | - | Multi-line YAML string containing ast-grep rules. Use YAML multi-document syntax (`---`) to define multiple rules. See [ast-grep.github.io](https://ast-grep.github.io/) for rule syntax. |
 | `exclude_paths` | No | `vendor,node_modules,.git,dist,build` | Comma-separated paths to exclude from scanning |
 | `max_matches_per_rule` | No | `100` | Maximum matches to report per rule |
+| `debug` | No | `false` | Enable debug output (echoes rules and raw ast-grep output) |
 
 ## Installation
 
@@ -98,12 +99,21 @@ collectors:
     on: [go, python]
     with:
       rules: |
-        id: security.sql_concat
+        id: logging.logrus_fatal
         language: go
-        message: SQL query built via string concatenation
-        severity: error
+        message: Found logrus.Fatal - consider error handling instead
+        severity: warning
         rule:
-          pattern: $DB.Query($SQL + $VAR)
+          kind: call_expression
+          regex: "^logrus\\.Fatal"
+        ---
+        id: http.hardcoded_port
+        language: go
+        message: Hardcoded port in ListenAndServe
+        severity: warning
+        rule:
+          kind: call_expression
+          regex: "^http\\.ListenAndServe"
         ---
         id: security.eval
         language: python
@@ -111,13 +121,6 @@ collectors:
         severity: error
         rule:
           pattern: eval($EXPR)
-        ---
-        id: logging.printf
-        language: go
-        message: Use structured logging instead of fmt.Printf
-        severity: warning
-        rule:
-          pattern: fmt.Printf($$$)
 ```
 
 ## Related Policies
