@@ -4,6 +4,8 @@ name: readme
 description: README file best practices
 author: support@earthly.dev
 
+default_image: earthly/lunar-lib:base-main
+
 policies:
   - name: readme-exists
     description: Ensure README file exists in root of repository
