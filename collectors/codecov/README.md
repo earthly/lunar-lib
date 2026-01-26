@@ -1,4 +1,4 @@
-# Codecov
+# `codecov` Collector
 
 Detects Codecov usage and fetches coverage results from the Codecov API.
 
