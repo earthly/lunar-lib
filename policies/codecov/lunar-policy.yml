@@ -6,8 +6,12 @@ author: earthly
 
 policies:
   - name: ran
-    description: Codecov upload should run in CI
+    description: Codecov should run in CI
     mainPython: ran.py
+
+  - name: uploaded
+    description: Codecov upload should run in CI
+    mainPython: uploaded.py
 
   - name: min-coverage
     description: Code coverage should meet minimum threshold

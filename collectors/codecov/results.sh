@@ -17,6 +17,9 @@ if [ "$IS_UPLOAD" != "true" ]; then
   exit 0
 fi
 
+# Record that an upload was detected
+lunar collect -j ".testing.codecov.uploaded" true
+
 # Check for API token
 if [ -z "$LUNAR_SECRET_CODECOV_API_TOKEN" ]; then
   echo "Warning: LUNAR_SECRET_CODECOV_API_TOKEN not set, skipping results fetch" >&2
