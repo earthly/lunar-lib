@@ -580,12 +580,12 @@ def validate_readme(
             # Validate the uses: path matches the collector directory
             # Match: uses: github.com/earthly/lunar-lib/collectors/{name}@...
             uses_pattern = re.compile(
-                r"uses:\s*github\.com/earthly/lunar-lib/collectors/([^@\s]+)"
+                r"uses:\s*github\.com://earthly/lunar-lib/collectors/([^@\s]+)"
             )
             uses_match = uses_pattern.search(body)
             if not uses_match:
                 result.errors.append(
-                    "## Installation must have 'uses: github.com/earthly/lunar-lib/collectors/{name}@...'"
+                    "## Installation must have 'uses: github.com://earthly/lunar-lib/collectors/{name}@...'"
                 )
             else:
                 uses_path = uses_match.group(1)
