@@ -17,9 +17,6 @@ if [[ ! -f "$coverprofile_path" ]]; then
   exit 1
 fi
 
-# Read raw coverage profile
-raw_profile=$(cat "$coverprofile_path" 2>/dev/null || echo "")
-
 # Extract total percentage
 coverage_pct=$(go tool cover -func="$coverprofile_path" 2>/dev/null | awk '/^total:/ {print $NF}' | sed 's/%$//' || echo "0")
 
@@ -28,7 +25,7 @@ coverage_pct=$(go tool cover -func="$coverprofile_path" 2>/dev/null | awk '/^tot
 jq -n \
   --argjson percentage "$coverage_pct" \
   --arg profile_path "$coverprofile_path" \
-  --arg raw_profile "$raw_profile" \
+  --rawfile raw_profile "$coverprofile_path" \
   '{
     percentage: $percentage,
     profile_path: $profile_path,

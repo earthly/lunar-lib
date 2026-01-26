@@ -20,7 +20,7 @@ This collector writes to the following Component JSON paths:
 | `.lang.go.tests` | object | Test scope and coverage information |
 | `.lang.go.dependencies` | object | Direct and transitive dependencies |
 | `.lang.go.lint` | object | Normalized lint warnings from golangci-lint |
-| `.lang.go.golangci_lint` | object | Raw golangci-lint output and status |
+| `.lang.go.native.golangci_lint` | object | Raw golangci-lint output and status |
 
 **Note:** This collector writes Go-native coverage data to `.lang.go.tests.coverage`. For normalized cross-language coverage at `.testing.coverage`, use a dedicated coverage tool collector (CodeCov, Coveralls, etc.).
 
@@ -47,6 +47,12 @@ This collector writes to the following Component JSON paths:
         },
         "goreleaser": {
           "exists": true
+        },
+        "golangci_lint": {
+          "passed": false,
+          "config_exists": true,
+          "exit_code": 1,
+          "output": "main.go:42:5: unused variable 'x' (unused)"
         }
       },
       "source": {
@@ -113,12 +119,6 @@ This collector writes to the following Component JSON paths:
           "tool": "golangci-lint",
           "integration": "code"
         }
-      },
-      "golangci_lint": {
-        "passed": false,
-        "config_exists": true,
-        "exit_code": 1,
-        "output": "main.go:42:5: unused variable 'x' (unused)"
       }
     }
   }
@@ -150,22 +150,6 @@ This plugin provides the following collectors (use `include` to select a subset)
 
 This collector does not require any secrets.
 
-## Container Image
-
-The code-hook collectors run in a custom Docker image (`earthly/lunar-lib:golang-main`) that includes:
-
-- Go (latest Alpine package)
-- golangci-lint v1.57.1
-- All tools from the base `earthly/lunar-scripts` image (jq, yq, curl, etc.)
-
-CI-hook collectors (`cicd`, `test-scope`, `test-coverage`) run natively in the CI environment to access Go and test artifacts.
-
-To build the image locally:
-
-```bash
-docker build -t earthly/lunar-lib:golang-main ./collectors/golang
-```
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -174,25 +158,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github.com/earthly/lunar-lib/collectors/golang@v1.0.0
     on: [go]  # Or use domain: ["domain:your-domain"]
+    # include: [project, dependencies]  # Only include specific subcollectors
     # with:
     #   lint_timeout: "10m"
-    #   collect_licenses: "false"
-```
-
-To include only specific subcollectors:
-
-```yaml
-collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/golang@v1.0.0
-    on: [go]
-    include: [project, dependencies]  # Only static analysis, no CI hooks
 ```
 
 ## Related Policies
-
-This collector is typically used with policies that check:
-
-- **Test coverage thresholds** - Using `.testing.coverage.percentage` or `.lang.go.tests.coverage.percentage`
-- **Lint cleanliness** - Using `.lang.go.lint.warnings` or `.lang.go.golangci_lint.passed`
-- **Go version requirements** - Using `.lang.go.version`
-- **Dependency license compliance** - Use an SBOM plugin (Syft, Trivy) for `.sbom` or `.sca` data

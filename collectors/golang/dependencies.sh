@@ -52,8 +52,8 @@ done < <(go list -m -json all 2>/dev/null | jq -c '.')
 
 # Build final JSON structure with source metadata
 deps_json=$(jq -n \
-  --argjson direct "$(printf '%s\n' "${direct_deps[@]}" | jq -s '.')" \
-  --argjson transitive "$(printf '%s\n' "${transitive_deps[@]}" | jq -s '.')" \
+  --argjson direct "$(printf '%s\n' "${direct_deps[@]}" | jq -s '. // []')" \
+  --argjson transitive "$(printf '%s\n' "${transitive_deps[@]}" | jq -s '. // []')" \
   '{
       direct: $direct,
       transitive: $transitive,

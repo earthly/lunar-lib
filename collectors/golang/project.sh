@@ -23,8 +23,8 @@ check_go_files() {
         go_sum_exists=true
     fi
 
-    # Check for vendor directory
-    if [[ -d "vendor" ]]; then
+    # Check for vendor directory (Go-specific: vendor/modules.txt)
+    if [[ -f "vendor/modules.txt" ]]; then
         vendor_exists=true
     fi
 
