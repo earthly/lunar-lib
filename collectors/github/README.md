@@ -105,7 +105,13 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/vcs-github@v1.0.0
+  - uses: github.com/earthly/lunar-lib/collectors/github@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     # include: [repository]  # Only run specific checks (omit to run all)
 ```
+
+## Related Policies
+
+This collector is typically used with:
+
+- [`vcs`](https://github.com/earthly/lunar-lib/tree/main/policies/vcs) - VCS policies including branch protection, merge strategies, and access controls

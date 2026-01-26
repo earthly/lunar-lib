@@ -78,10 +78,13 @@ collectors:
 
 ## Related Policies
 
-{List any policies that consume this collector's data, or write "No specific policies required."}
-
 This collector is typically used with:
-- `{policy-name}` - {brief description}
+
+- [`policy-name`](https://github.com/earthly/lunar-lib/tree/main/policies/policy-name) - Brief description of the policy
+
+Or if no policies consume this data yet:
+
+None.
 
 ---
 
