@@ -95,7 +95,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/ast-grep@v1.0.0
+  - uses: github.com://earthly/lunar-lib/collectors/ast-grep@v1.0.0
     on: [go, python]
     with:
       rules: |
