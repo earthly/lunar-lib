@@ -9,7 +9,7 @@ This document describes common implementation strategies for building collectors
 Detect when a binary or tool runs in CI and optionally extract additional information about its results.
 
 **How it works:**
-* Use a CI collector (hook type `ci-after-command`) to detect when a specific binary has run.
+* Use a CI collector to detect when a specific binary has run.
 * Optionally run a helper command to extract more information about the activity. Examples:
   * Version of the binary
   * Results of execution (e.g., after `npm install`, fetch list of installed packages)
@@ -20,6 +20,10 @@ Detect when a binary or tool runs in CI and optionally extract additional inform
 * The tool has run (object presence check)
 * The tool version meets requirements
 * The results meet thresholds (e.g., no critical vulnerabilities, coverage above minimum)
+
+**Tips:** 
+* Use the `ci-after-command` hook type in most cases, as the command results are available at that point
+* Use the `ci-before-command` only if you need to modify the command before it is run
 
 ---
 

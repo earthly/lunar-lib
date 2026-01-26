@@ -572,7 +572,7 @@ my-collector/
 ├── lunar-collector.yml    # Required: Plugin configuration
 ├── main.sh                # Main collector script
 ├── Dockerfile             # For non-CI collectors with additional dependencies
-├── helper.sh              # Optional: Helper scripts
+├── helpers.sh             # Optional: Shared helper functions
 └── requirements.txt       # Optional: Python dependencies (baked into image)
 ```
 
@@ -709,6 +709,16 @@ Inputs are passed as environment variables with the input name in uppercase:
 echo "API URL: $API_URL"
 echo "Threshold: $THRESHOLD"
 ```
+
+### Shared Helper Functions
+
+When multiple scripts in a collector share common logic, extract it into `helpers.sh` and source it:
+
+```bash
+source "$(dirname "$0")/helpers.sh"
+```
+
+The `$(dirname "$0")` pattern ensures the path resolves relative to the script's location, not the current working directory.
 
 ## Best Practices
 

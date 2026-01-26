@@ -2,11 +2,13 @@
 
 set -e
 
+source "$(dirname "$0")/helpers.sh"
+
 # Run golangci-lint and collect results under .lang.go.lint (normalized) and .lang.go.golangci-lint (tool-specific)
 
-# Check if this is actually a Go project by looking for .go files
-if ! find . -name "*.go" -type f 2>/dev/null | grep -q .; then
-    echo "No Go files found, exiting"
+# Check if this is a Go project
+if ! is_go_project; then
+    echo "No Go project detected, exiting"
     exit 0
 fi
 
@@ -19,12 +21,16 @@ if [[ -f ".golangci.yml" ]] || [[ -f ".golangci.yaml" ]] || [[ -f "golangci.yml"
   golangci_lint_config_exists=true
 fi
 
-# Get timeout from input (defaults to 5m)
-LINT_TIMEOUT="${LINT_TIMEOUT:-5m}"
+# Get timeout from input (defaults to 10m for slower environments)
+LINT_TIMEOUT="${LINT_TIMEOUT:-10m}"
+
+# Ensure Go modules are downloaded first 
+# (avoids timeout during package loading during golangci-lint run)
+go mod download 2>/dev/null || true
 
 # Run golangci-lint with JSON output for reliable parsing
 set +e
-golangci_lint_json=$(golangci-lint run --timeout="$LINT_TIMEOUT" --out-format=json 2>&1)
+golangci_lint_json=$(golangci-lint run --timeout="$LINT_TIMEOUT" --output.json.path=stdout 2>&1)
 golangci_lint_exit_code=$?
 set -e
 
@@ -46,15 +52,16 @@ if [[ -n "$golangci_lint_json" ]] && echo "$golangci_lint_json" | jq -e '.Issues
   }]')
 fi
 
-# Store the text output for human readability (re-run with text format or extract from JSON)
-# We'll store a summary from the JSON for the output field
-golangci_lint_output=$(echo "$golangci_lint_json" | jq -r '
-  if .Issues then
+# Store the text output for human readability
+# Extract formatted issues from JSON, or preserve raw output if golangci-lint failed
+if echo "$golangci_lint_json" | jq -e '.Issues' >/dev/null 2>&1; then
+  golangci_lint_output=$(echo "$golangci_lint_json" | jq -r '
     [.Issues[] | "\(.Pos.Filename):\(.Pos.Line):\(.Pos.Column): \(.Text) (\(.FromLinter))"] | join("\n")
-  else
-    ""
-  end
-' 2>/dev/null || echo "")
+  ')
+else
+  # Preserve error output when golangci-lint fails (e.g., exit code 3)
+  golangci_lint_output="$golangci_lint_json"
+fi
 
 # Collect normalized lint data with source metadata
 jq -n \

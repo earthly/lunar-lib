@@ -50,4 +50,4 @@ collectors:
 inputs:
   lint_timeout:
     description: Timeout for golangci-lint (e.g., 5m, 10m)
-    default: "5m"
+    default: "10m"

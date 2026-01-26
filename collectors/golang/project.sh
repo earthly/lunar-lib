@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/helpers.sh"
+
 check_go_files() {
     local go_mod_exists=false
     local go_sum_exists=false
@@ -59,9 +61,9 @@ check_go_files() {
         }'
 }
 
-# Check if this is actually a Go project by looking for .go files
-if ! find . -name "*.go" -type f 2>/dev/null | grep -q .; then
-    echo "No Go files found, exiting"
+# Check if this is a Go project
+if ! is_go_project; then
+    echo "No Go project detected, exiting"
     exit 0
 fi
 

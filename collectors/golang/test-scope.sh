@@ -1,9 +1,11 @@
 #!/bin/bash
 set -e
 
-# Check if this is actually a Go project by looking for .go files
-if ! find . -name "*.go" -type f 2>/dev/null | grep -q .; then
-    echo "No Go files found, exiting"
+source "$(dirname "$0")/helpers.sh"
+
+# Check if this is a Go project
+if ! is_go_project; then
+    echo "No Go project detected, exiting"
     exit 0
 fi
 
