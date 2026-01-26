@@ -78,7 +78,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   # Run all policies (default - enforces all branch protection and repository settings)
-  - uses: github.com://earthly/lunar-lib/policies/vcs@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
     on: "domain:your-domain"  # Or use tags like production, critical
     enforcement: report-pr    # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     with:
@@ -87,7 +87,7 @@ policies:
       # required_default_branch: "main"
 
   # Use include to run only specific policies
-  - uses: github.com://earthly/lunar-lib/policies/vcs@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
     include:
       - branch-protection-enabled
       - require-pull-request
@@ -101,7 +101,7 @@ policies:
       min_approvals: 2
 
   # Run only repository settings policies
-  - uses: github.com://earthly/lunar-lib/policies/vcs@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
     include:
       - require-private
       - require-default-branch

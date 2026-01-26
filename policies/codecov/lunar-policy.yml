@@ -1,0 +1,19 @@
+version: 0
+
+name: codecov
+description: Validates Codecov usage and coverage thresholds
+author: earthly
+
+policies:
+  - name: ran
+    description: Codecov upload should run in CI
+    mainPython: ran.py
+
+  - name: min-coverage
+    description: Code coverage should meet minimum threshold
+    mainPython: min_coverage.py
+
+inputs:
+  min_coverage:
+    description: Minimum required coverage percentage
+    default: "80"

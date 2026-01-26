@@ -527,13 +527,14 @@ def validate_readme(
             )
         else:
             # Validate the uses: path matches the policy directory
+            # Match: uses: github://earthly/lunar-lib/policies/{name}@...
             uses_pattern = re.compile(
-                r"uses:\s*github\.com://earthly/lunar-lib/policies/([^@\s]+)"
+                r"uses:\s*github://earthly/lunar-lib/policies/([^@\s]+)"
             )
             uses_match = uses_pattern.search(body)
             if not uses_match:
                 result.errors.append(
-                    "## Installation must have 'uses: github.com://earthly/lunar-lib/policies/{name}@...'"
+                    "## Installation must have 'uses: github://earthly/lunar-lib/policies/{name}@...'"
                 )
             else:
                 uses_path = uses_match.group(1)
