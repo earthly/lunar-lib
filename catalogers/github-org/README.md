@@ -97,7 +97,7 @@ Examples:
 
 ## Secrets
 
-- `GH_TOKEN` - GitHub personal access token with `repo` scope (or `read:org` for public repos only)
+- `GH_TOKEN` - GitHub personal access token with `repo` scope (or `read:org` for public repos only).
 
 ## Installation
 
@@ -140,8 +140,8 @@ catalogers:
 
 This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:
 
-1. **GitHub CLI** installed and available in the container (included in base image)
-2. **Authentication** via `GH_TOKEN` secret with appropriate scopes:
+1. **GitHub CLI** installed and available in the container (included in custom image)
+2. **Authentication** via `LUNAR_SECRET_GH_TOKEN` (same as other GitHub collectors) with appropriate scopes:
    - `repo` scope for private/internal repositories
    - `read:org` scope for public repositories only
 

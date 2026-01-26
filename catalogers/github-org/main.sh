@@ -4,6 +4,14 @@ set -e
 # GitHub Organization Cataloger
 # Syncs all repositories from a GitHub organization as Lunar components
 
+# Set up GitHub CLI authentication from Lunar secret
+if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
+    export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
+elif [ -z "${GH_TOKEN:-}" ]; then
+    echo "Error: GH_TOKEN or LUNAR_SECRET_GH_TOKEN must be set" >&2
+    exit 1
+fi
+
 # Required input
 ORG_NAME="${LUNAR_VAR_ORG_NAME:?org_name input is required}"
 
