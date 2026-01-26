@@ -31,6 +31,14 @@ chmod +x "$TEST_DIR/lunar"
 export PATH="$TEST_DIR:$PATH"
 export LUNAR_TEST_OUTPUT_FILE="$OUTPUT_FILE"
 
+# Set GH_TOKEN from gh CLI auth if not already set
+if [ -z "${GH_TOKEN:-}" ] && [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
+    export GH_TOKEN=$(gh auth token 2>/dev/null || echo "")
+    if [ -z "$GH_TOKEN" ]; then
+        echo "Warning: No GH_TOKEN set and 'gh auth token' failed. Run 'gh auth login' first."
+    fi
+fi
+
 # Initialize output file
 echo "" > "$OUTPUT_FILE"
 
