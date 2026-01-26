@@ -121,6 +121,9 @@ collectors:
         severity: error
         rule:
           pattern: eval($EXPR)
+      # exclude_paths: "vendor,node_modules,.git,dist,build"
+      # max_matches_per_rule: "100"
+      # debug: "false"
 ```
 
 ## Related Policies

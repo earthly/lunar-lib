@@ -87,8 +87,8 @@ policies:
 ## Related Collectors
 
 This policy works with any collector that populates the required data paths. Common options include:
-- `{collector-name}` - {brief description}
-- `{alternative-collector}` - {brief description}
+
+- [`collector-name`](https://github.com/earthly/lunar-lib/tree/main/collectors/collector-name) - Brief description of the collector
 
 ## Remediation
 
