@@ -706,13 +706,12 @@ default_image: your-registry/my-collector:1.0.0
 
 ### Accessing Inputs
 
-Inputs are passed as environment variables with the input name in uppercase:
+Inputs are passed as environment variables with the prefix `LUNAR_VAR_` and the input name in uppercase:
 
 ```bash
 #!/bin/bash
 # If input is named "api_url", access it as:
-echo "API URL: $API_URL"
-echo "Threshold: $THRESHOLD"
+echo "API URL: $LUNAR_VAR_API_URL"
 ```
 
 ## Best Practices
