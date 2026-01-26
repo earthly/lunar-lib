@@ -1,4 +1,4 @@
-# GitHub VCS Collector
+# `github` Collector
 
 Collects GitHub repository settings and branch protection rules via the GitHub API.
 

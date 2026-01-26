@@ -1,4 +1,4 @@
-# ast-grep
+# `ast-grep` Collector
 
 Extracts code patterns from source code using AST-based analysis with [ast-grep](https://ast-grep.github.io/).
 

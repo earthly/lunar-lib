@@ -4,7 +4,7 @@ Use this template when creating the `README.md` for a new policy plugin.
 
 ---
 
-# {Policy Name}
+# `{directory-name}` Policies
 
 {One-line description of what this policy enforces}
 

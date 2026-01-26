@@ -1,4 +1,4 @@
-# README Policies
+# `readme` Policies
 
 Enforces README best practices including file existence, minimum content length, and required sections.
 

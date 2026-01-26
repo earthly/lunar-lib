@@ -1,4 +1,4 @@
-# README Collector
+# `readme` Collector
 
 Collects README file information including existence, line count, and section headings.
 

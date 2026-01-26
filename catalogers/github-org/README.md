@@ -1,4 +1,4 @@
-# GitHub Organization Cataloger
+# `github-org` Cataloger
 
 Catalogs all repositories from a GitHub organization as Lunar components.
 

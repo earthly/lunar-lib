@@ -1,4 +1,4 @@
-# VCS
+# `vcs` Policies
 
 Version control system (VCS) best practices and security policies for repositories
 
