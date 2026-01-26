@@ -5,7 +5,8 @@ FROM alpine:3.21
 lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
-    COPY --dir collectors policies scripts .
+    COPY --dir catalogers collectors policies scripts .
+    RUN python scripts/enforce_cataloger_readme_structure.py
     RUN python scripts/enforce_collector_readme_structure.py
     RUN python scripts/enforce_policy_readme_structure.py
 
@@ -17,6 +18,7 @@ all:
     BUILD --pass-args +base-image
     BUILD --pass-args ./collectors/dockerfile+image
     BUILD --pass-args ./collectors/ast-grep+image
+    BUILD --pass-args ./catalogers/github-org+image
 
 base-image:
     ARG SCRIPTS_VERSION=main-alpine

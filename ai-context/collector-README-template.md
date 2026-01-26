@@ -4,7 +4,7 @@ Use this template when creating the `README.md` for a new collector plugin.
 
 ---
 
-# {Collector Name}
+# `{directory-name}` Collector
 
 {One-line description of what this collector does}
 

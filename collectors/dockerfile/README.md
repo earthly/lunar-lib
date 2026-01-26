@@ -1,4 +1,4 @@
-# Dockerfile Collector
+# `dockerfile` Collector
 
 Parses Dockerfiles and collects container definition metadata including base images, final stage configuration, and labels.
 
@@ -75,7 +75,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/dockerfile@v1.0.0
+  - uses: github.com://earthly/lunar-lib/collectors/dockerfile@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, containerized]
     # with:
     #   find_command: "find ./docker -name Dockerfile"  # Custom find command

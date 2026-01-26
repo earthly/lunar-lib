@@ -1,4 +1,4 @@
-# GitHub VCS Collector
+# `github` Collector
 
 Collects GitHub repository settings and branch protection rules via the GitHub API.
 
@@ -105,7 +105,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/github@v1.0.0
+  - uses: github.com://earthly/lunar-lib/collectors/github@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     # include: [repository]  # Only run specific checks (omit to run all)
 ```
