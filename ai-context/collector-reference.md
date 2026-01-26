@@ -586,8 +586,9 @@ description: What this collector does # Optional
 author: team@example.com              # Required
 
 # Recommended: specify container image
+# Use default_image alone when plugin has no CI collectors
+# Add default_image_ci_collectors: native when plugin includes CI collectors
 default_image: earthly/lunar-scripts:1.0.0
-default_image_ci_collectors: native  # CI collectors often need access to CI environment
 
 collectors:
   - name: main-collector              # Can define multiple collectors
@@ -628,11 +629,15 @@ Configure default images in `lunar-config.yml`:
 ```yaml
 version: 0
 
-default_image: earthly/lunar-scripts:1.0.0    # Recommended: use for all scripts
-default_image_ci_collectors: native           # CI collectors often need CI environment access
+default_image: earthly/lunar-scripts:1.0.0    # Used for all collectors by default
+default_image_ci_collectors: native           # Only add when you have CI collectors
 
 # ... rest of configuration
 ```
+
+**Convention:**
+- Use `default_image` alone when your plugin has no CI collectors
+- Add `default_image_ci_collectors: native` only when your plugin includes CI collectors (hooks like `ci-after-command`, `ci-after-job`, etc.)
 
 ### The `native` Value
 
@@ -701,13 +706,12 @@ default_image: your-registry/my-collector:1.0.0
 
 ### Accessing Inputs
 
-Inputs are passed as environment variables with the input name in uppercase:
+Inputs are passed as environment variables with the prefix `LUNAR_VAR_` and the input name in uppercase:
 
 ```bash
 #!/bin/bash
 # If input is named "api_url", access it as:
-echo "API URL: $API_URL"
-echo "Threshold: $THRESHOLD"
+echo "API URL: $LUNAR_VAR_API_URL"
 ```
 
 ### Shared Helper Functions
