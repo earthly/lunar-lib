@@ -1,4 +1,4 @@
-# Golang Collector
+# `golang` Collector
 
 Collects Go project information, CI/CD commands, test coverage, dependencies, and linting results.
 
@@ -146,21 +146,19 @@ This plugin provides the following collectors (use `include` to select a subset)
 |-------|----------|---------|-------------|
 | `lint_timeout` | No | `5m` | Timeout for golangci-lint execution |
 
-## Secrets
-
-This collector does not require any secrets.
-
 ## Installation
 
 Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/golang@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.0
     on: [go]  # Or use domain: ["domain:your-domain"]
-    # include: [project, dependencies]  # Only include specific subcollectors
+    # include: [project, golangci-lint]  # Only include specific subcollectors
     # with:
     #   lint_timeout: "10m"
 ```
 
 ## Related Policies
+
+None.

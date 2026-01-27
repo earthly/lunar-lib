@@ -67,7 +67,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/readme@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/readme@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
     # with:
     #   path: "README.md,docs/README.md"  # Customize which files to check
