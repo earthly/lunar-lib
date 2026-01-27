@@ -4,7 +4,7 @@ Use this template when creating the `README.md` for a new cataloger plugin.
 
 ---
 
-# {Cataloger Name}
+# `{directory-name}` Cataloger
 
 {One-line description of what this cataloger does}
 

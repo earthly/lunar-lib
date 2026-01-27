@@ -1,0 +1,618 @@
+{
+  "github.com/earthly/lunar-lib": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/skills": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/lunar-ci-agent-dist": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/lunar-config-template": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly": {
+    "tags": [
+      "gh-build-automation",
+      "gh-build",
+      "gh-container-builder",
+      "gh-hacktoberfest",
+      "gh-docker-images",
+      "gh-hacktoberfest2020",
+      "gh-reproducible-builds",
+      "gh-dockerfiles",
+      "gh-hacktoberfest2021",
+      "gh-build-tool",
+      "gh-build-system",
+      "gh-ci",
+      "gh-ci-cd",
+      "gh-cicd",
+      "gh-framework"
+    ],
+    "meta": {
+      "description": "Super simple build framework with fast, repeatable builds and an instantly familiar syntax – like Dockerfile and Makefile had a baby.",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/dind": {
+    "tags": [],
+    "meta": {
+      "description": "Manage earthly/dind docker images",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/actions-setup": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/lunar-dist": {
+    "tags": [],
+    "meta": {
+      "description": "Lunar binary releases",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/lunar-actions": {
+    "tags": [],
+    "meta": {
+      "description": "Installs the Lunar agent in a GHA job",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/appjwt": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/charts": {
+    "tags": [],
+    "meta": {
+      "description": "Lunar Helm Charts",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-intellij-plugin": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/homebrew-earthly": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-demo": {
+    "tags": [],
+    "meta": {
+      "description": "Files used for live earthly demos",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/setup-ucacher": {
+    "tags": [
+      "gh-cache",
+      "gh-ptrace",
+      "gh-syscall",
+      "gh-universal"
+    ],
+    "meta": {
+      "description": "Installs ucacher (Earthly Universal Caching) in a GHA job",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/react": {
+    "tags": [],
+    "meta": {
+      "description": "The library for web and native user interfaces.",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/grpc-gateway": {
+    "tags": [],
+    "meta": {
+      "description": "gRPC to JSON proxy generator following the gRPC HTTP spec",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/cloud-api": {
+    "tags": [],
+    "meta": {
+      "description": "Contains Protobuf specifications and generated clients for Earthly Cloud APIs",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-staging": {
+    "tags": [],
+    "meta": {
+      "description": "dummy repo to stage pre-release versions of earthly",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/lib": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/terraform-aws-byoc": {
+    "tags": [],
+    "meta": {
+      "description": "Deploy Earthly BYOC infrastructure using Terraform",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-emacs": {
+    "tags": [
+      "gh-emacs",
+      "gh-earthly",
+      "gh-earthfile",
+      "gh-emacs-mode"
+    ],
+    "meta": {
+      "description": "Major mode for editing Earthly Earthfile",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/buildkit": {
+    "tags": [],
+    "meta": {
+      "description": "a fork of moby/buildkit",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/cloud-services-example": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/codespaces-example": {
+    "tags": [],
+    "meta": {
+      "description": "An example of how to use Earthly with Docker in Codespaces",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthfile-grammar": {
+    "tags": [
+      "gh-hacktoberfest",
+      "gh-hacktoberfest2021"
+    ],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/ci-example-project": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/ebook-creator": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/test-remote": {
+    "tags": [],
+    "meta": {
+      "description": "A collection of targets that earthly's tests references for testing remote targets",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly.vim": {
+    "tags": [
+      "gh-vim",
+      "gh-earthly"
+    ],
+    "meta": {
+      "description": "Earthfile syntax highlighting for vim",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/test-runc-in-earthly-buildkitd": {
+    "tags": [],
+    "meta": {
+      "description": "test script for debugging runc errors",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/awesome-earthly": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/dbt-segment": {
+    "tags": [],
+    "meta": {
+      "description": "Data models for Segment built using dbt (getdbt.com).",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-function-example": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-vs-gha": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-proto": {
+    "tags": [],
+    "meta": {
+      "description": "example proto generation",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-command-example": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/misp-warninglists": {
+    "tags": [],
+    "meta": {
+      "description": "Warning lists to inform users of MISP about potential false-positives or other information in indicators",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/simple-icons": {
+    "tags": [],
+    "meta": {
+      "description": "SVG icons for popular brands",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-solutions": {
+    "tags": [],
+    "meta": {
+      "description": "Solutions leveraging Earthly Core, Satellites, and CI",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/mergefast": {
+    "tags": [],
+    "meta": {
+      "description": "merge two sorted lists fast",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/fsutil": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/go-grpc-middleware": {
+    "tags": [],
+    "meta": {
+      "description": "Golang gRPC Middlewares: interceptor chaining, auth, logging, retries and more.",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/devcontainer-features": {
+    "tags": [],
+    "meta": {
+      "description": "Devcontainer features for Earthly ",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/workshop-2023-09-18": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-workshop": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/sublimetext-earthly-syntax": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/hello-world": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/build-transpose": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-ci": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-scala": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/phoenix": {
+    "tags": [],
+    "meta": {
+      "description": "Peace of mind from prototype to production",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/benchmarks": {
+    "tags": [],
+    "meta": {
+      "description": "Some benchmarks of different languages",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/homebrew-earthly-staging": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-multirepo-js": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/programming-challenge-dependencies": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-multirepo-static": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-proto-server": {
+    "tags": [],
+    "meta": {
+      "description": "example go protobuf server",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-proto-ruby-client": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/earthly-example-proto-python-client": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/docs": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/cloud-issues": {
+    "tags": [],
+    "meta": {
+      "description": "A repository to track issues related to earthly cloud",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/firebase-admin-go": {
+    "tags": [],
+    "meta": {
+      "description": "Firebase Admin Go SDK",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-apt-repo": {
+    "tags": [],
+    "meta": {
+      "description": "Example apt repo",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-grpc-key-value-store": {
+    "tags": [],
+    "meta": {
+      "description": "An example key-value store with a go server, and python and ruby clients",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-dont-use-pie-charts": {
+    "tags": [],
+    "meta": {
+      "description": "",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/cert-manager-webhook-namecheap": {
+    "tags": [],
+    "meta": {
+      "description": "A cert-manager ACME DNS01 solver webhook for  Namecheap",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/ci-examples": {
+    "tags": [],
+    "meta": {
+      "description": "Examples using different CI systems to build with Earthly.",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-plotting-precipitation": {
+    "tags": [],
+    "meta": {
+      "description": "example of plotting annual precipitation data using python, pandas, and matplotlib",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/registry": {
+    "tags": [],
+    "meta": {
+      "description": "Recent builds of the Docker registry.",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-yum-repo": {
+    "tags": [],
+    "meta": {
+      "description": "example of creating rpm packages and a yum repo",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-dos-gaming": {
+    "tags": [],
+    "meta": {
+      "description": "Contains the code for this blog article:",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  },
+  "github.com/earthly/example-diy-ngrok": {
+    "tags": [],
+    "meta": {
+      "description": "Code for the blog post here: ",
+      "visibility": "PUBLIC",
+      "archived": "false"
+    }
+  }
+}

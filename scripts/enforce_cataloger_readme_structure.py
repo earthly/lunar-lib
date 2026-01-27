@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Enforce collector README structure based on the template.
+Enforce cataloger README structure based on the template.
 
-This script validates that all collector README.md files follow the structure
-defined in ai-context/collector-README-template.md.
+This script validates that all cataloger README.md files follow the structure
+defined in ai-context/cataloger-README-template.md.
 
 Usage:
-    python scripts/enforce_collector_readme_structure.py [--verbose]
+    python scripts/enforce_cataloger_readme_structure.py [--verbose]
 
 Options:
     --verbose   Show detailed information about each README
@@ -24,12 +24,13 @@ from typing import Optional
 # Sections marked as optional can be missing without error
 TEMPLATE_SECTIONS = [
     {"name": "Overview", "required": True},
-    {"name": "Collected Data", "required": True},
-    {"name": "Collectors", "required": False},  # Optional: only if multiple collectors
+    {"name": "Synced Data", "required": True},
+    {"name": "Catalogers", "required": False},  # Optional: only if multiple catalogers
+    {"name": "Hook Type", "required": True},
     {"name": "Inputs", "required": True},
     {"name": "Secrets", "required": False},  # Optional: only if secrets are needed
     {"name": "Installation", "required": True},
-    {"name": "Related Policies", "required": True},
+    {"name": "Source System", "required": True},
 ]
 
 # Section names in order for validation
@@ -171,12 +172,12 @@ def get_section_body(section: Section) -> str:
 
 def validate_title(title: str, directory_name: str) -> tuple[bool, str]:
     """
-    Validate that title follows the exact format: `directory-name` Collector
+    Validate that title follows the exact format: `directory-name` Cataloger
     
     Returns:
         tuple of (is_valid, error_message)
     """
-    expected = f"`{directory_name}` Collector"
+    expected = f"`{directory_name}` Cataloger"
     if title == expected:
         return True, ""
     return False, f"Title must be exactly '{expected}', got '{title}'"
@@ -212,9 +213,9 @@ def extract_path_table_paths(content: str) -> list[str]:
     return paths
 
 
-def extract_collector_names(content: str) -> list[str]:
-    """Extract collector names from the Collectors section table."""
-    # Match: | `collector-name` | description |
+def extract_cataloger_names(content: str) -> list[str]:
+    """Extract cataloger names from the Catalogers section table."""
+    # Match: | `cataloger-name` | description |
     pattern = re.compile(r"^\|\s*`([^`]+)`\s*\|", re.MULTILINE)
     return pattern.findall(content)
 
@@ -232,36 +233,58 @@ def get_plugin_name_from_yaml(yaml_file: Path) -> Optional[str]:
     return None
 
 
-def get_collector_names_from_yaml(collector_dir: Path) -> set[str]:
-    """Get collector names from lunar-collector.yml file."""
-    yaml_file = collector_dir / "lunar-collector.yml"
+def get_cataloger_names_from_yaml(cataloger_dir: Path) -> set[str]:
+    """Get cataloger names from lunar-cataloger.yml file."""
+    yaml_file = cataloger_dir / "lunar-cataloger.yml"
     if not yaml_file.exists():
         return set()
     
-    collector_names = set()
+    cataloger_names = set()
     content = yaml_file.read_text()
     
-    # Simple YAML parsing - look for "- name: collector-name" patterns under collectors:
-    name_pattern = re.compile(r"^\s*-\s*name:\s*(.+)$", re.MULTILINE)
-    matches = name_pattern.findall(content)
+    # Simple YAML parsing - look for "- name: cataloger-name" patterns under catalogers:
+    in_catalogers_section = False
+    lines = content.split("\n")
     
-    for match in matches:
-        collector_names.add(match.strip())
+    for line in lines:
+        # Check if we're entering the catalogers section
+        if re.match(r"^catalogers:\s*$", line):
+            in_catalogers_section = True
+            continue
+        
+        # Check if we're leaving the catalogers section (new top-level key)
+        if in_catalogers_section and re.match(r"^[a-zA-Z]", line) and not line.startswith(" "):
+            in_catalogers_section = False
+            continue
+        
+        # Extract cataloger names
+        if in_catalogers_section:
+            match = re.match(r"^\s+-\s*name:\s*(.+)$", line)
+            if match:
+                cataloger_names.add(match.group(1).strip())
     
-    return collector_names
+    return cataloger_names
 
 
-def get_inputs_from_yaml(yaml_file: Path) -> set[str]:
-    """Get input names from a lunar-collector.yml file."""
+def get_inputs_from_yaml(yaml_file: Path) -> tuple[set[str], set[str]]:
+    """
+    Get input names from a lunar-cataloger.yml file.
+    
+    Returns:
+        tuple of (required_inputs, optional_inputs)
+    """
     if not yaml_file.exists():
-        return set()
+        return set(), set()
     
-    input_names = set()
+    required_inputs = set()
+    optional_inputs = set()
     content = yaml_file.read_text()
     
     # Find the inputs: section and extract input names
     # Inputs are defined as top-level keys under "inputs:"
     in_inputs_section = False
+    current_input = None
+    has_default = False
     lines = content.split("\n")
     
     for line in lines:
@@ -272,6 +295,12 @@ def get_inputs_from_yaml(yaml_file: Path) -> set[str]:
         
         # Check if we're leaving the inputs section (new top-level key)
         if in_inputs_section and re.match(r"^[a-zA-Z]", line) and not line.startswith(" "):
+            # Save the last input
+            if current_input:
+                if has_default:
+                    optional_inputs.add(current_input)
+                else:
+                    required_inputs.add(current_input)
             in_inputs_section = False
             continue
         
@@ -279,9 +308,25 @@ def get_inputs_from_yaml(yaml_file: Path) -> set[str]:
         if in_inputs_section:
             match = re.match(r"^  ([a-zA-Z_][a-zA-Z0-9_]*):\s*$", line)
             if match:
-                input_names.add(match.group(1))
+                # Save the previous input
+                if current_input:
+                    if has_default:
+                        optional_inputs.add(current_input)
+                    else:
+                        required_inputs.add(current_input)
+                current_input = match.group(1)
+                has_default = False
+            elif current_input and re.match(r"^\s+default:", line):
+                has_default = True
     
-    return input_names
+    # Save the last input
+    if current_input:
+        if has_default:
+            optional_inputs.add(current_input)
+        else:
+            required_inputs.add(current_input)
+    
+    return required_inputs, optional_inputs
 
 
 @dataclass
@@ -321,7 +366,8 @@ def extract_inputs(content: str) -> list[InputInfo]:
                 name_match = re.match(r"`([^`]+)`", cols[1])
                 if name_match:
                     name = name_match.group(1)
-                    required = cols[2].lower() == "yes"
+                    # Handle both "Yes" and "**Yes**" formats
+                    required = "yes" in cols[2].lower()
                     inputs.append(InputInfo(name=name, required=required))
     
     return inputs
@@ -329,8 +375,7 @@ def extract_inputs(content: str) -> list[InputInfo]:
 
 def validate_readme(
     readme_path: Path,
-    collector_name: str,
-    policies_dir: Path,
+    cataloger_name: str,
 ) -> ValidationResult:
     """Validate a README against the template structure."""
     result = ValidationResult(readme_path=readme_path)
@@ -347,22 +392,22 @@ def validate_readme(
     result.sections = sections
     
     # Validate YAML name matches directory name
-    collector_dir = readme_path.parent
-    yaml_file = collector_dir / "lunar-collector.yml"
+    cataloger_dir = readme_path.parent
+    yaml_file = cataloger_dir / "lunar-cataloger.yml"
     yaml_name = get_plugin_name_from_yaml(yaml_file)
     if yaml_name is None:
-        result.errors.append("Missing lunar-collector.yml or 'name' field in YAML")
-    elif yaml_name != collector_name:
+        result.errors.append("Missing lunar-cataloger.yml or 'name' field in YAML")
+    elif yaml_name != cataloger_name:
         result.errors.append(
-            f"YAML 'name: {yaml_name}' does not match directory name '{collector_name}'"
+            f"YAML 'name: {yaml_name}' does not match directory name '{cataloger_name}'"
         )
     
     # Validate title
     if not title:
         result.errors.append("Missing title (# heading)")
     else:
-        # Title must be exactly: `directory-name` Collector
-        is_valid, error_msg = validate_title(title, collector_name)
+        # Title must be exactly: `directory-name` Cataloger
+        is_valid, error_msg = validate_title(title, cataloger_name)
         if not is_valid:
             result.errors.append(error_msg)
     
@@ -431,31 +476,31 @@ def validate_readme(
                 f"Maximum: {OVERVIEW_MAX_SENTENCES} sentences"
             )
     
-    # Validate Collected Data section
-    collected_data = next((s for s in sections if s.name == "Collected Data"), None)
-    if collected_data:
-        body = collected_data.content
+    # Validate Synced Data section
+    synced_data = next((s for s in sections if s.name == "Synced Data"), None)
+    if synced_data:
+        body = synced_data.content
         
         # Must have a <details> block with example JSON
         if "<details>" not in body:
             result.errors.append(
-                "## Collected Data must have a <details> block with example JSON"
+                "## Synced Data must have a <details> block with example JSON"
             )
         else:
             # Check for proper structure: <details> with <summary> and json code block
             if "<summary>" not in body:
                 result.errors.append(
-                    "## Collected Data <details> must have a <summary> element"
+                    "## Synced Data <details> must have a <summary> element"
                 )
             if "```json" not in body:
                 result.errors.append(
-                    "## Collected Data <details> must contain a ```json code block"
+                    "## Synced Data <details> must contain a ```json code block"
                 )
         
         # Must have a path table
         if "| Path |" not in body:
             result.errors.append(
-                "## Collected Data must have a table with Path, Type, Description columns"
+                "## Synced Data must have a table with Path, Type, Description columns"
             )
         else:
             # Validate that paths in the Path table start with `.`
@@ -463,57 +508,68 @@ def validate_readme(
             invalid_paths = [p for p in paths if not p.startswith(".")]
             if invalid_paths:
                 result.errors.append(
-                    f"## Collected Data paths must start with '.': {invalid_paths}"
+                    f"## Synced Data paths must start with '.': {invalid_paths}"
                 )
     
-    # Get collector names from lunar-collector.yml for validation
-    collector_dir = readme_path.parent
-    yaml_collectors = get_collector_names_from_yaml(collector_dir)
+    # Get cataloger names from lunar-cataloger.yml for validation
+    cataloger_dir = readme_path.parent
+    yaml_catalogers = get_cataloger_names_from_yaml(cataloger_dir)
     
-    # Validate Collectors section (when present) has proper table format
-    collectors_section = next((s for s in sections if s.name == "Collectors"), None)
+    # Validate Catalogers section (when present) has proper table format
+    catalogers_section = next((s for s in sections if s.name == "Catalogers"), None)
     
-    # If there are multiple collectors in YAML, Collectors section is required
-    if len(yaml_collectors) > 1 and not collectors_section:
+    # If there are multiple catalogers in YAML, Catalogers section is required
+    if len(yaml_catalogers) > 1 and not catalogers_section:
         result.errors.append(
-            f"## Collectors section is required since lunar-collector.yml has "
-            f"{len(yaml_collectors)} collectors: {sorted(yaml_collectors)}"
+            f"## Catalogers section is required since lunar-cataloger.yml has "
+            f"{len(yaml_catalogers)} catalogers: {sorted(yaml_catalogers)}"
         )
     
-    if collectors_section:
-        body = collectors_section.content
-        # Check for table header with Collector and Description columns (flexible spacing)
-        has_collector_table = re.search(r"\|\s*Collector\s*\|.*Description\s*\|", body)
-        if not has_collector_table:
+    if catalogers_section:
+        body = catalogers_section.content
+        # Check for table header with Cataloger and Description columns (flexible spacing)
+        has_cataloger_table = re.search(r"\|\s*Cataloger\s*\|.*Description\s*\|", body)
+        if not has_cataloger_table:
             result.errors.append(
-                "## Collectors must have a table with Collector, Description columns"
+                "## Catalogers must have a table with Cataloger, Description columns"
             )
         else:
             # Check table has at least one data row (not just header)
-            collector_names_in_readme = set(extract_collector_names(body))
-            if not collector_names_in_readme:
+            cataloger_names_in_readme = set(extract_cataloger_names(body))
+            if not cataloger_names_in_readme:
                 result.errors.append(
-                    "## Collectors table must have at least one collector listed"
+                    "## Catalogers table must have at least one cataloger listed"
                 )
-            elif yaml_collectors:
-                # Verify completeness against lunar-collector.yml
-                missing_from_readme = yaml_collectors - collector_names_in_readme
-                extra_in_readme = collector_names_in_readme - yaml_collectors
+            elif yaml_catalogers:
+                # Verify completeness against lunar-cataloger.yml
+                missing_from_readme = yaml_catalogers - cataloger_names_in_readme
+                extra_in_readme = cataloger_names_in_readme - yaml_catalogers
                 
                 if missing_from_readme:
                     result.errors.append(
-                        f"## Collectors table is missing collectors from lunar-collector.yml: "
+                        f"## Catalogers table is missing catalogers from lunar-cataloger.yml: "
                         f"{sorted(missing_from_readme)}"
                     )
                 if extra_in_readme:
                     result.errors.append(
-                        f"## Collectors table lists collectors not in lunar-collector.yml: "
+                        f"## Catalogers table lists catalogers not in lunar-cataloger.yml: "
                         f"{sorted(extra_in_readme)}"
                     )
     
-    # Get inputs from lunar-collector.yml for validation
-    yaml_file = collector_dir / "lunar-collector.yml"
-    yaml_inputs = get_inputs_from_yaml(yaml_file)
+    # Validate Hook Type section
+    hook_type_section = next((s for s in sections if s.name == "Hook Type"), None)
+    if hook_type_section:
+        body = hook_type_section.content
+        # Must have a table with Hook column
+        if "| Hook |" not in body:
+            result.errors.append(
+                "## Hook Type must have a table with Hook, Schedule/Trigger, Description columns"
+            )
+    
+    # Get inputs from lunar-cataloger.yml for validation
+    yaml_file = cataloger_dir / "lunar-cataloger.yml"
+    required_yaml_inputs, optional_yaml_inputs = get_inputs_from_yaml(yaml_file)
+    all_yaml_inputs = required_yaml_inputs | optional_yaml_inputs
     
     # Validate Inputs section has a table or "no configurable inputs" note
     inputs_section = next((s for s in sections if s.name == "Inputs"), None)
@@ -523,36 +579,50 @@ def validate_readme(
         # Only consider "no configurable inputs" if there's NO table
         has_no_inputs = not has_table and "no configurable inputs" in body.lower()
         
-        if yaml_inputs and has_no_inputs:
+        if all_yaml_inputs and has_no_inputs:
             result.errors.append(
-                f"## Inputs says 'no configurable inputs' but lunar-collector.yml has inputs: "
-                f"{sorted(yaml_inputs)}"
+                f"## Inputs says 'no configurable inputs' but lunar-cataloger.yml has inputs: "
+                f"{sorted(all_yaml_inputs)}"
             )
-        elif not yaml_inputs and has_table:
+        elif not all_yaml_inputs and has_table:
             result.warnings.append(
-                "## Inputs has a table but lunar-collector.yml has no inputs defined"
+                "## Inputs has a table but lunar-cataloger.yml has no inputs defined"
             )
         elif not has_table and not has_no_inputs:
             result.errors.append(
                 "## Inputs must have a table or state 'no configurable inputs'"
             )
-        elif has_table and yaml_inputs:
+        elif has_table and all_yaml_inputs:
             # Verify all inputs from YAML are documented
             inputs_in_readme = set(i.name for i in extract_inputs(body))
             
-            missing_from_readme = yaml_inputs - inputs_in_readme
-            extra_in_readme = inputs_in_readme - yaml_inputs
+            missing_from_readme = all_yaml_inputs - inputs_in_readme
+            extra_in_readme = inputs_in_readme - all_yaml_inputs
             
             if missing_from_readme:
                 result.errors.append(
-                    f"## Inputs table is missing inputs from lunar-collector.yml: "
+                    f"## Inputs table is missing inputs from lunar-cataloger.yml: "
                     f"{sorted(missing_from_readme)}"
                 )
             if extra_in_readme:
                 result.errors.append(
-                    f"## Inputs table lists inputs not in lunar-collector.yml: "
+                    f"## Inputs table lists inputs not in lunar-cataloger.yml: "
                     f"{sorted(extra_in_readme)}"
                 )
+            
+            # Verify required status matches
+            readme_inputs = extract_inputs(body)
+            for inp in readme_inputs:
+                if inp.name in required_yaml_inputs and not inp.required:
+                    result.errors.append(
+                        f"## Inputs: '{inp.name}' is required in YAML (no default) "
+                        f"but marked as optional in README"
+                    )
+                elif inp.name in optional_yaml_inputs and inp.required:
+                    result.errors.append(
+                        f"## Inputs: '{inp.name}' has a default in YAML "
+                        f"but marked as required in README"
+                    )
     
     # Validate Secrets section - only present if there are actual secrets
     secrets_section = next((s for s in sections if s.name == "Secrets"), None)
@@ -577,127 +647,76 @@ def validate_readme(
                 "## Installation must have a ```yaml code block with example config"
             )
         else:
-            # Validate the uses: path matches the collector directory
-            # Match: uses: github.com/earthly/lunar-lib/collectors/{name}@...
+            # Validate the uses: path matches the cataloger directory
+            # Match: uses: github.com/earthly/lunar-lib/catalogers/{name}@...
             uses_pattern = re.compile(
-                r"uses:\s*github\.com://earthly/lunar-lib/collectors/([^@\s]+)"
+                r"uses:\s*github\.com/earthly/lunar-lib/catalogers/([^@\s]+)"
             )
             uses_match = uses_pattern.search(body)
             if not uses_match:
                 result.errors.append(
-                    "## Installation must have 'uses: github.com://earthly/lunar-lib/collectors/{name}@...'"
+                    "## Installation must have 'uses: github.com/earthly/lunar-lib/catalogers/{name}@...'"
                 )
             else:
                 uses_path = uses_match.group(1)
-                if uses_path != collector_name:
+                if uses_path != cataloger_name:
                     result.errors.append(
                         f"## Installation 'uses:' path '{uses_path}' does not match "
-                        f"collector directory '{collector_name}'"
+                        f"cataloger directory '{cataloger_name}'"
                     )
             
-            # Check for include suggestion if multiple collectors exist
-            if collectors_section:
-                collector_names = extract_collector_names(collectors_section.content)
-                if len(collector_names) > 1:
-                    # Should have a commented include line with a valid collector name
+            # Check for include suggestion if multiple catalogers exist
+            if catalogers_section:
+                cataloger_names = extract_cataloger_names(catalogers_section.content)
+                if len(cataloger_names) > 1:
+                    # Should have a commented include line with a valid cataloger name
                     include_pattern = re.compile(r"#\s*include:\s*\[([^\]]+)\]")
                     include_match = include_pattern.search(body)
                     if not include_match:
                         result.errors.append(
-                            f"## Installation should have '# include: [{collector_names[0]}]' "
-                            f"comment since there are {len(collector_names)} sub-collectors"
+                            f"## Installation should have '# include: [{cataloger_names[0]}]' "
+                            f"comment since there are {len(cataloger_names)} sub-catalogers"
                         )
                     else:
-                        # Validate the example collector names exist
-                        include_examples = [c.strip() for c in include_match.group(1).split(",")]
-                        invalid_collectors = [c for c in include_examples if c not in collector_names]
-                        if invalid_collectors:
+                        # Validate the example cataloger name exists
+                        include_example = include_match.group(1).strip()
+                        if include_example not in cataloger_names:
                             result.errors.append(
-                                f"## Installation include example '{', '.join(invalid_collectors)}' is not a valid "
-                                f"collector. Available: {collector_names}"
+                                f"## Installation include example '{include_example}' is not a valid "
+                                f"cataloger. Available: {cataloger_names}"
                             )
             
-            # Check for with: section if there are inputs
-            if inputs_section:
+            # Check for with: section if there are required inputs
+            if inputs_section and required_yaml_inputs:
                 inputs = extract_inputs(inputs_section.content)
-                if inputs:
-                    required_inputs = [i for i in inputs if i.required]
-                    optional_inputs = [i for i in inputs if not i.required]
-                    
-                    # Required inputs must be uncommented in with: block
-                    for inp in required_inputs:
-                        # Check for uncommented input (not starting with #)
-                        req_pattern = re.compile(rf"^\s+{inp.name}:", re.MULTILINE)
-                        if not req_pattern.search(body):
-                            result.errors.append(
-                                f"## Installation must have required input '{inp.name}:' "
-                                f"uncommented in with: block"
-                            )
-                    
-                    # Optional inputs should be shown as comments
-                    if optional_inputs:
-                        has_with_section = "with:" in body or "# with:" in body
-                        if not has_with_section:
-                            result.errors.append(
-                                "## Installation should have a 'with:' section (commented or not) "
-                                "showing available optional inputs"
-                            )
-                        else:
-                            # Check that all optional inputs are shown as comments
-                            missing_optional = []
-                            for inp in optional_inputs:
-                                # Look for commented input: #   input_name: or # input_name:
-                                opt_pattern = re.compile(rf"#\s*{inp.name}:", re.MULTILINE)
-                                if not opt_pattern.search(body):
-                                    missing_optional.append(inp.name)
-                            if missing_optional:
-                                result.errors.append(
-                                    f"## Installation should show optional inputs as comments: "
-                                    f"{missing_optional}"
-                                )
+                required_inputs = [i for i in inputs if i.required]
+                
+                # Required inputs must be uncommented in with: block
+                for inp in required_inputs:
+                    # Check for uncommented input (not starting with #)
+                    req_pattern = re.compile(rf"^\s+{inp.name}:", re.MULTILINE)
+                    if not req_pattern.search(body):
+                        result.errors.append(
+                            f"## Installation must have required input '{inp.name}:' "
+                            f"uncommented in with: block"
+                        )
     
-    # Validate Related Policies section
-    related_policies = next((s for s in sections if s.name == "Related Policies"), None)
-    if related_policies:
-        body = get_section_body(related_policies)
-        
-        # Must have either "None." or a bulleted list with markdown links
-        has_none = body.strip().lower() in ("none.", "none")
-        
-        # Check for markdown links in bullet points: - [`name`](url) or - [name](url)
-        link_pattern = re.compile(r"^-\s+\[.*?\]\(.*?\)", re.MULTILINE)
-        links = link_pattern.findall(body)
-        
-        if not has_none and not links:
+    # Validate Source System section has content
+    source_system = next((s for s in sections if s.name == "Source System"), None)
+    if source_system:
+        body = get_section_body(source_system)
+        if len(body) < 50:
             result.errors.append(
-                "## Related Policies must have either 'None.' or a bulleted list "
-                "with markdown links: - [`policy-name`](url) - description"
+                f"## Source System section is too short ({len(body)} chars). "
+                f"Should describe the external system and setup requirements."
             )
-        
-        # Validate that linked policies actually exist
-        if links and policies_dir.exists():
-            # Extract policy names from links
-            # Match: [name](https://github.com/earthly/lunar-lib/tree/main/policies/{policy})
-            policy_link_pattern = re.compile(
-                r"\[.*?\]\(https://github\.com/earthly/lunar-lib/tree/main/policies/([^/)]+)"
-            )
-            linked_policies = policy_link_pattern.findall(body)
-            
-            existing_policies = {d.name for d in policies_dir.iterdir() if d.is_dir()}
-            missing_policies = [p for p in linked_policies if p not in existing_policies]
-            
-            if missing_policies:
-                result.errors.append(
-                    f"## Related Policies links to non-existent policies: {missing_policies}. "
-                    f"Available: {sorted(existing_policies)}"
-                )
     
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate collector README structure against template"
+        description="Validate cataloger README structure against template"
     )
     parser.add_argument(
         "--verbose",
@@ -706,39 +725,36 @@ def main():
         help="Show detailed information about each README",
     )
     parser.add_argument(
-        "--collectors-dir",
+        "--catalogers-dir",
         type=Path,
-        default=Path(__file__).parent.parent / "collectors",
-        help="Path to collectors directory",
+        default=Path(__file__).parent.parent / "catalogers",
+        help="Path to catalogers directory",
     )
     args = parser.parse_args()
     
-    collectors_dir = args.collectors_dir.resolve()
-    if not collectors_dir.exists():
-        print(f"Error: Collectors directory not found: {collectors_dir}")
+    catalogers_dir = args.catalogers_dir.resolve()
+    if not catalogers_dir.exists():
+        print(f"Error: Catalogers directory not found: {catalogers_dir}")
         sys.exit(1)
     
-    # Policies directory is sibling to collectors
-    policies_dir = collectors_dir.parent / "policies"
-    
-    # Find all README.md files in collector directories
-    readme_files = sorted(collectors_dir.glob("*/README.md"))
+    # Find all README.md files in cataloger directories
+    readme_files = sorted(catalogers_dir.glob("*/README.md"))
     
     if not readme_files:
-        print(f"No README.md files found in {collectors_dir}")
+        print(f"No README.md files found in {catalogers_dir}")
         sys.exit(0)
     
-    print(f"Validating {len(readme_files)} collector README(s)...\n")
+    print(f"Validating {len(readme_files)} cataloger README(s)...\n")
     
     all_valid = True
     
     for readme_path in readme_files:
-        collector_name = readme_path.parent.name
-        result = validate_readme(readme_path, collector_name, policies_dir)
+        cataloger_name = readme_path.parent.name
+        result = validate_readme(readme_path, cataloger_name)
         
         # Print status
         status = "✓" if result.is_valid else "✗"
-        print(f"{status} {collector_name}/README.md")
+        print(f"{status} {cataloger_name}/README.md")
         
         if args.verbose:
             print(f"  Title: {result.title or '(missing)'}")
@@ -764,24 +780,25 @@ def main():
     # Summary
     print("-" * 60)
     if all_valid:
-        print("All collector READMEs follow the template structure.")
+        print("All cataloger READMEs follow the template structure.")
         sys.exit(0)
     else:
-        print("Some collector READMEs have structural issues.")
+        print("Some cataloger READMEs have structural issues.")
         print("\nExpected section order (from template):")
         for section in TEMPLATE_SECTIONS:
             req = "required" if section["required"] else "optional"
             print(f"  ## {section['name']} ({req})")
         print(f"\nConstraints:")
-        print(f"  Title: must match collector directory name")
+        print(f"  Title: must match cataloger directory name")
         print(f"  One-liner: {ONE_LINER_MIN_LENGTH}-{ONE_LINER_MAX_LENGTH} chars")
         print(f"  Overview: {OVERVIEW_MIN_SENTENCES}-{OVERVIEW_MAX_SENTENCES} sentences, "
               f"{OVERVIEW_MIN_LENGTH}-{OVERVIEW_MAX_LENGTH} chars")
-        print(f"  Collected Data: table with paths starting with '.' + <details> JSON example")
-        print(f"  Collectors: table with Collector/Description columns (when present)")
+        print(f"  Synced Data: table with paths starting with '.' + <details> JSON example")
+        print(f"  Catalogers: table with Cataloger/Description columns (when present)")
+        print(f"  Hook Type: table with Hook/Schedule/Description columns")
         print(f"  Secrets: only include if secrets exist (bullet list)")
-        print(f"  Installation: YAML with correct 'uses:' path matching collector directory")
-        print(f"  Related Policies: 'None.' or bulleted links to existing policies")
+        print(f"  Installation: YAML with correct 'uses:' path matching cataloger directory")
+        print(f"  Source System: description of external system (min 50 chars)")
         sys.exit(1)
 
 
