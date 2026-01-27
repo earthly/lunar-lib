@@ -29,9 +29,11 @@ LINT_TIMEOUT="${LINT_TIMEOUT:-10m}"
 go mod download 2>/dev/null || true
 
 # Run golangci-lint with JSON output for reliable parsing
+# --show-stats=false disables the human-readable summary that would otherwise be mixed with JSON
 set +e
-golangci_lint_json=$(golangci-lint run --timeout="$LINT_TIMEOUT" --output.json.path=stdout 2>&1)
+golangci_lint_json=$(golangci-lint run --timeout="$LINT_TIMEOUT" --output.json.path stdout --show-stats=false 2>/tmp/stderr)
 golangci_lint_exit_code=$?
+golangci_lint_errors=$(cat /tmp/stderr)
 set -e
 
 if [[ $golangci_lint_exit_code -eq 0 ]]; then
@@ -58,9 +60,13 @@ if echo "$golangci_lint_json" | jq -e '.Issues' >/dev/null 2>&1; then
   golangci_lint_output=$(echo "$golangci_lint_json" | jq -r '
     [.Issues[] | "\(.Pos.Filename):\(.Pos.Line):\(.Pos.Column): \(.Text) (\(.FromLinter))"] | join("\n")
   ')
+  # Append any stderr errors (e.g., timeout warnings)
+  if [[ -n "$golangci_lint_errors" ]]; then
+    golangci_lint_output="${golangci_lint_output}"$'\n'"${golangci_lint_errors}"
+  fi
 else
   # Preserve error output when golangci-lint fails (e.g., exit code 3)
-  golangci_lint_output="$golangci_lint_json"
+  golangci_lint_output="$golangci_lint_errors"
 fi
 
 # Collect normalized lint data with source metadata
