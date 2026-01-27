@@ -608,11 +608,12 @@ def validate_readme(
                             f"comment since there are {len(collector_names)} sub-collectors"
                         )
                     else:
-                        # Validate the example collector name exists
-                        include_example = include_match.group(1).strip()
-                        if include_example not in collector_names:
+                        # Validate the example collector names exist
+                        include_examples = [c.strip() for c in include_match.group(1).split(",")]
+                        invalid_collectors = [c for c in include_examples if c not in collector_names]
+                        if invalid_collectors:
                             result.errors.append(
-                                f"## Installation include example '{include_example}' is not a valid "
+                                f"## Installation include example '{', '.join(invalid_collectors)}' is not a valid "
                                 f"collector. Available: {collector_names}"
                             )
             

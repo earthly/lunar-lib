@@ -1,0 +1,53 @@
+version: 0
+
+name: golang
+description: Collect Go project information, CI/CD commands, test coverage, and linting
+author: earthly
+
+default_image: earthly/lunar-lib:golang-main
+default_image_ci_collectors: native
+
+collectors:
+  - name: cicd
+    description: Collects every Go command run in CI/CD along with the version of Go used.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b .*
+
+  - name: test-scope
+    description: Collect the scope of the tests run in Go
+    mainBash: test-scope.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b test.*
+
+  - name: test-coverage
+    description: Detects if go tests produced a coverage report using -coverprofile and extracts the results
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\bgo\b test.*-coverprofile.*
+
+  - name: project
+    description: Collect Go project information
+    mainBash: project.sh
+    hook:
+      type: code
+
+  - name: golangci-lint
+    description: Run golangci-lint and collect results
+    mainBash: golangci-lint.sh
+    hook:
+      type: code
+
+  - name: dependencies
+    description: Collect Go module dependencies
+    mainBash: dependencies.sh
+    hook:
+      type: code
+
+inputs:
+  lint_timeout:
+    description: Timeout for golangci-lint (e.g., 5m, 10m)
+    default: "10m"

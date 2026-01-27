@@ -460,7 +460,8 @@ For language-specific data, use `.lang.<language_name>`:
 
 Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn vs pnpm) may warrant their own structure. The recommendation:
 
-- **Normalize where practical** — Package counts, version info
+- **Use `build_systems` as an array** — Projects may use multiple build tools (e.g., Gradle for builds + Maven for publishing)
+- **Store full dependency arrays** — Enable language-specific version policies for example replace directive tracking in go
 - **Use `.native.<build_system>` for build-system specifics** — When raw config details are needed
 
 ```json
@@ -468,10 +469,14 @@ Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn v
   "lang": {
     "java": {
       "version": "17",
-      "build_system": "gradle",
+      "build_systems": ["gradle", "maven"],
       "dependencies": {
-        "direct": 45,
-        "transitive": 230
+        "direct": [
+          {"path": "com.google.guava:guava", "version": "31.0.1"}
+        ],
+        "transitive": [
+          {"path": "org.checkerframework:checker-qual", "version": "3.12.0"}
+        ]
       },
       "native": {
         "gradle": {
@@ -480,6 +485,11 @@ Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn v
           "plugins": ["java", "org.springframework.boot", "com.github.spotbugs"],
           "subprojects": ["api", "client", "common"],
           "build_cache_enabled": true
+        },
+        "maven": {
+          "version": "3.9.6",
+          "plugins": ["maven-publish", "maven-gpg-plugin"],
+          "profiles": ["release", "ci"]
         }
       }
     }
@@ -500,6 +510,34 @@ The `.lang` category complements, not replaces, normalized categories:
 | Language-specific safety | — | `.lang.rust.unsafe_blocks` |
 
 **Rule of thumb:** If a policy could reasonably apply across multiple languages, normalize the data. If the policy only makes sense for one language, use `.lang.<language>`.
+
+### `.lang.<language>.dependencies` vs `.sbom`
+
+Both capture dependency information, but serve different purposes:
+
+| Use Case | Best Source | Why |
+|----------|-------------|-----|
+| **Dependency version policies** | `.lang.<lang>.dependencies` | Supports language-native version semantics |
+| **License compliance** | `.sbom` | SPDX license identifiers, cross-language |
+| **Vulnerability scanning** | `.sca` / `.sbom` | CVE correlation via CPE/PURL |
+| **"No GPL dependencies"** | `.sbom` | License data, cross-language |
+
+**Why keep both?**
+
+1. **Language-native data in `.lang.<lang>.dependencies`:**
+   - Replace directives (Go `replace`, npm `overrides`) — often missed by SBOMs
+   - Direct vs transitive distinction with language semantics
+   - Exact toolchain resolution (what the build actually uses)
+   - No SBOM tooling required
+   - Enables version policies with language-aware comparison
+
+2. **Standardized data in `.sbom`:**
+   - License information (SPDX identifiers)
+   - Cross-language policies (single policy for Go, Java, Node)
+   - Vulnerability correlation via PURL
+   - Compliance requirements (many frameworks mandate SBOM)
+
+**Version comparison note:** Version strings remain language-native in both sources (`v1.2.3` for Go, `1.2.3-SNAPSHOT` for Maven). Policies checking minimum versions should normalize versions for comparison, handling prefixes (`v`), suffixes (`-SNAPSHOT`, `+incompatible`), and special formats (Go pseudo-versions, calendar versioning).
 
 ---
 

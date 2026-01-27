@@ -34,8 +34,6 @@ Test execution results and code coverage. Normalized across frameworks and tools
         "covered": 1200,
         "total": 1404
       },
-      "meets_threshold": true,
-      "threshold": 80,
       "files": [
         {
           "path": "payment.go",
@@ -53,5 +51,4 @@ Test execution results and code coverage. Normalized across frameworks and tools
 - `.testing.results.failed` — Failure count
 - `.testing.all_passing` — Clean test run
 - `.testing.coverage` — Coverage collected (use `assert_exists(".testing.coverage")`)
-- `.testing.coverage.percentage` — Overall coverage
-- `.testing.coverage.meets_threshold` — Above minimum
+- `.testing.coverage.percentage` — Overall coverage (policy compares against threshold)

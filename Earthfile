@@ -17,6 +17,7 @@ ai-context:
 all:
     BUILD --pass-args +base-image
     BUILD --pass-args ./collectors/dockerfile+image
+    BUILD --pass-args ./collectors/golang+image
     BUILD --pass-args ./collectors/ast-grep+image
     BUILD --pass-args ./catalogers/github-org+image
 
