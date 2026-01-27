@@ -92,12 +92,6 @@ policies:
 
 - [codecov](../../collectors/codecov) - Detects Codecov usage and fetches coverage results from the API
 
-```yaml
-collectors:
-  - uses: github://earthly/lunar-lib/collectors/codecov@main
-    on: [backend]
-```
-
 ## Remediation
 
 When this policy fails, you can resolve it by:
