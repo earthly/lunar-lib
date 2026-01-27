@@ -2,6 +2,8 @@ version: 0
 
 name: readme
 description: Collect README file information
+author: earthly
+default_image: earthly/lunar-lib:base-main
 
 collectors:
   - name: readme

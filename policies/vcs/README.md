@@ -84,6 +84,7 @@ policies:
     with:
       min_approvals: 2
       allowed_merge_strategies: "squash"
+      # required_default_branch: "main"
 
   # Use include to run only specific policies
   - uses: github.com/earthly/lunar-lib/policies/vcs@v1.0.0
@@ -230,8 +231,8 @@ with:
 ## Related Collectors
 
 These policies work with any collector that populates the required data paths. Common options include:
-- `github/repository` - Collects GitHub repository settings (visibility, default branch, merge strategies)
-- `github/branch-protection` - Collects GitHub branch protection rules via GitHub API
+
+- [`github`](https://github.com/earthly/lunar-lib/tree/main/collectors/github) - Collects GitHub repository settings and branch protection rules via GitHub API
 
 ## Remediation
 

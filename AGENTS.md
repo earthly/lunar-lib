@@ -7,6 +7,7 @@ This directory contains reference documentation for AI agents working with the L
 * [about-lunar.md](ai-context/about-lunar.md): **Start here.** High-level overview of the Lunar platform, the problem it solves, and key concepts from a user perspective.
 * [core-concepts.md](ai-context/core-concepts.md): **Then read this.** Comprehensive explanation of Lunar's architecture, key entities, execution flow, and how collectors/policies interact via the Component JSON.
 * [collector-reference.md](ai-context/collector-reference.md): Complete guide to writing collectors—hooks, environment variables, the `lunar collect` command, patterns, and best practices.
+* [cataloger-reference.md](ai-context/cataloger-reference.md): Complete guide to writing catalogers—syncing catalog data from external systems, the `lunar catalog` command, patterns, and best practices.
 * [policy-reference.md](ai-context/policy-reference.md): Complete guide to writing policies—the Check class, assertions, handling missing data, patterns, and testing.
 
 ## Component JSON Schema
@@ -21,6 +22,7 @@ The `structure.md` file links to individual category files (`cat-repo.md`, `cat-
 ## Plugin Templates
 
 * [collector-README-template.md](ai-context/collector-README-template.md): Standard README.md template for collector plugins.
+* [cataloger-README-template.md](ai-context/cataloger-README-template.md): Standard README.md template for cataloger plugins.
 * [policy-README-template.md](ai-context/policy-README-template.md): Standard README.md template for policy plugins.
 
 ## Implementation Guides

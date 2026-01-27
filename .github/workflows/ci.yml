@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: +lint
+    runs-on: ubuntu-latest
+    env:
+      FORCE_COLOR: 1
+      EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
+      EARTHLY_INSTALL_ID: "earthly-lunar"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Earthly
+        uses: earthly/actions-setup@v1
+      - name: Lint
+        run: earthly --ci +lint
+
   build-and-push:
     name: +all
     runs-on: ubuntu-latest
@@ -19,7 +33,7 @@ jobs:
       EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
       EARTHLY_INSTALL_ID: "earthly-lunar"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set branch name
         run: |-
           if [ "${{ github.event_name }}" == "pull_request" ]; then

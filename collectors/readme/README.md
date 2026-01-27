@@ -4,15 +4,7 @@ Collects README file information including existence, line count, and section he
 
 ## Overview
 
-This collector scans the repository root for a README file and extracts metadata about its contents. It checks if the file exists, counts the number of lines, and extracts section headings (headers starting with `#`). The collector runs on code changes and provides data for documentation-related policies.
-
-By default, the collector checks for README files in the following order (first match wins):
-1. `README.md` (Markdown)
-2. `README` (no extension)
-3. `README.txt` (plain text)
-4. `README.rst` (reStructuredText)
-
-This can be customized via the `path` input.
+This collector scans the repository root for a README file and extracts metadata about its contents, including existence, line count, and section headings. It runs on code changes and checks for common README variants (`README.md`, `README`, `README.txt`, `README.rst`) in order, which can be customized via the `path` input.
 
 ## Collected Data
 
