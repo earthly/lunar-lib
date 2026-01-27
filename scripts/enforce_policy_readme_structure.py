@@ -77,14 +77,30 @@ def count_sentences(text: str) -> int:
     return len([s for s in sentences if s.strip()])
 
 
-def normalize_name(name: str) -> str:
-    """Normalize a name for comparison (lowercase, remove common suffixes, hyphens)."""
-    name = name.lower()
-    for suffix in (" policies", "-policies", "_policies", " policy", "-policy", "_policy"):
-        if name.endswith(suffix):
-            name = name[:-len(suffix)]
-    name = name.replace("-", "").replace("_", "")
-    return name
+def validate_title(title: str, directory_name: str) -> tuple[bool, str]:
+    """
+    Validate that title follows the exact format: `directory-name` Policies
+    
+    Returns:
+        tuple of (is_valid, error_message)
+    """
+    expected = f"`{directory_name}` Policies"
+    if title == expected:
+        return True, ""
+    return False, f"Title must be exactly '{expected}', got '{title}'"
+
+
+def get_plugin_name_from_yaml(yaml_file: Path) -> Optional[str]:
+    """Get the top-level 'name' field from a YAML file."""
+    if not yaml_file.exists():
+        return None
+    
+    content = yaml_file.read_text()
+    # Match top-level name: field (not indented)
+    match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def extract_policy_names(content: str) -> list[str]:
@@ -317,17 +333,25 @@ def validate_readme(
     result.one_liner = one_liner
     result.sections = sections
     
+    # Validate YAML name matches directory name
+    policy_dir = readme_path.parent
+    yaml_file = policy_dir / "lunar-policy.yml"
+    yaml_name = get_plugin_name_from_yaml(yaml_file)
+    if yaml_name is None:
+        result.errors.append("Missing lunar-policy.yml or 'name' field in YAML")
+    elif yaml_name != policy_name:
+        result.errors.append(
+            f"YAML 'name: {yaml_name}' does not match directory name '{policy_name}'"
+        )
+    
     # Validate title
     if not title:
         result.errors.append("Missing title (# heading)")
     else:
-        normalized_title = normalize_name(title)
-        normalized_dir = normalize_name(policy_name)
-        if normalized_title != normalized_dir:
-            result.errors.append(
-                f"Title '{title}' does not match policy directory '{policy_name}'. "
-                f"Expected title like '{policy_name}' or '{policy_name.title()} Policies'"
-            )
+        # Title must be exactly: `directory-name` Policies
+        is_valid, error_msg = validate_title(title, policy_name)
+        if not is_valid:
+            result.errors.append(error_msg)
     
     # Validate one-liner description
     if not one_liner:

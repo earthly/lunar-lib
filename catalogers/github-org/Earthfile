@@ -1,0 +1,16 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install GitHub CLI
+    ARG TARGETARCH
+    ARG GH_VERSION=2.62.0
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+        curl -sSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz && \
+        mv gh_${GH_VERSION}_linux_${ARCH}/bin/gh /usr/local/bin/ && \
+        rm -rf gh_${GH_VERSION}_linux_${ARCH} && \
+        echo "${GH_VERSION}" > /usr/local/bin/gh.version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:github-org-$VERSION

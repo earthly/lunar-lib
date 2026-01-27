@@ -1,4 +1,4 @@
-# Dockerfile Collector
+# `dockerfile` Collector
 
 Parses Dockerfiles and collects container definition metadata including base images, final stage configuration, and labels.
 

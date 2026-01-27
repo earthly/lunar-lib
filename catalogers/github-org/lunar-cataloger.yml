@@ -1,0 +1,61 @@
+version: 0
+
+name: github-org
+description: Catalogs GitHub organization repositories as Lunar components
+author: earthly
+default_image: earthly/lunar-lib:github-org-main
+
+catalogers:
+  - name: repos
+    description: |
+      Syncs all repositories from a GitHub organization as components.
+      - Maps GitHub topics to Lunar tags with configurable prefix
+      - Supports filtering by visibility (public, private, internal)
+      - Supports include/exclude patterns for repository names
+      - Optionally includes archived repositories
+    mainBash: main.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"
+
+inputs:
+  org_name:
+    description: GitHub organization name to sync (required)
+    # No default = required input
+
+  include_public:
+    description: Include public repositories
+    default: "true"
+
+  include_private:
+    description: Include private repositories
+    default: "true"
+
+  include_internal:
+    description: Include internal repositories (GitHub Enterprise)
+    default: "true"
+
+  include_archived:
+    description: Include archived repositories
+    default: "false"
+
+  include_repos:
+    description: |
+      Comma-separated list of glob patterns for repos to include.
+      Empty means include all. Examples: "api-*,backend-*"
+    default: ""
+
+  exclude_repos:
+    description: |
+      Comma-separated list of glob patterns for repos to exclude.
+      Examples: "sandbox-*,deprecated-*,test-*"
+    default: ""
+
+  tag_prefix:
+    description: Prefix for GitHub topics when converting to Lunar tags
+    default: "gh-"
+
+  default_owner:
+    description: |
+      Default owner email for all components. Leave empty to not set owner.
+    default: ""

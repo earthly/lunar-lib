@@ -1,4 +1,4 @@
-# Container Policies
+# `container` Policies
 
 Enforces best practices for container definitions including tag stability, registry allowlists, required labels, and security configurations.
 
@@ -40,7 +40,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/container@v1.0.0
+  - uses: github.com://earthly/lunar-lib/policies/container@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [no-latest, stable-tags]  # Only include specific policies
