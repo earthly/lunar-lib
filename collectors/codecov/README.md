@@ -31,17 +31,31 @@ See the example below for the full structure.
     "coverage": {
       "source": {
         "tool": "codecov",
-        "integration": "ci"
+        "integration": "ci",
+        "version": "0.7.2"
       },
       "percentage": 85.5,
       "native": {
         "codecov": {
-          "coverage": 85.5,
-          "files": 42,
-          "lines": 1250,
-          "hits": 1068,
-          "misses": 182,
-          "partials": 0
+          "totals": {
+            "files": 3,
+            "lines": 1250,
+            "hits": 1068,
+            "misses": 182,
+            "partials": 0,
+            "coverage": 85.5
+          },
+          "files": [
+            {
+              "name": "src/main.py",
+              "totals": {
+                "lines": 500,
+                "hits": 450,
+                "misses": 50,
+                "coverage": 90.0
+              }
+            }
+          ]
         }
       }
     }
@@ -96,4 +110,4 @@ To fetch coverage results, configure one of the token options described above.
 
 ## Related Policies
 
-- [`codecov`](https://github.com/earthly/lunar-lib/tree/main/policies/codecov) - Validates Codecov usage and coverage thresholds
+- [`coverage`](https://github.com/earthly/lunar-lib/tree/main/policies/coverage) - Vendor-agnostic coverage policies (works with any coverage collector)

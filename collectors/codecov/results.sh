@@ -42,9 +42,9 @@ if [ -z "$SERVICE" ] || [ -z "$OWNER" ] || [ -z "$REPO" ]; then
   exit 1
 fi
 
-# Fetch coverage totals from Codecov API for this commit
+# Fetch coverage report from Codecov API for this commit
 SHA="$LUNAR_COMPONENT_GIT_SHA"
-API_URL="https://api.codecov.io/api/v2/${SERVICE}/${OWNER}/repos/${REPO}/totals/"
+API_URL="https://api.codecov.io/api/v2/${SERVICE}/${OWNER}/repos/${REPO}/report/"
 if [ -n "$SHA" ]; then
   API_URL="${API_URL}?sha=${SHA}"
 fi
@@ -53,7 +53,7 @@ RESULTS=$(curl -fsS --connect-timeout 10 --max-time 30 \
   "$API_URL" 2>/dev/null || echo "")
 
 if [ -n "$RESULTS" ]; then
-  # Extract coverage from totals response (per Codecov API docs)
+  # Extract coverage from report response (per Codecov API docs)
   COVERAGE=$(echo "$RESULTS" | jq -r '.totals.coverage // empty')
   if [ -n "$COVERAGE" ]; then
     # Write coverage percentage - presence signals upload succeeded
