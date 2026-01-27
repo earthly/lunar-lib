@@ -1,0 +1,28 @@
+version: 0
+
+name: codecov
+description: |
+  Detects Codecov usage and fetches coverage results from the Codecov API.
+author: earthly
+
+default_image: native
+
+inputs:
+  use_env_token:
+    description: Use CODECOV_TOKEN from environment instead of Lunar secret
+    default: "false"
+
+collectors:
+  - name: ran
+    description: Records that codecov ran
+    mainBash: ran.sh
+    hook:
+      type: ci-after-command
+      pattern: codecov(cli)?|bash.*codecov
+
+  - name: results
+    description: Fetches coverage results from Codecov API
+    mainBash: results.sh
+    hook:
+      type: ci-after-command
+      pattern: codecov(cli)?|bash.*codecov
