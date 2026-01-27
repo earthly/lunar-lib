@@ -7,9 +7,9 @@ CMD="$LUNAR_CI_COMMAND"
 IS_UPLOAD=false
 if echo "$CMD" | grep -qE '(^|\s)(upload|do-upload|upload-process)(\s|$)'; then
   IS_UPLOAD=true
-elif echo "$CMD" | grep -qE '(\s|^)(-t|--token)(\s|=)'; then
+elif echo "$CMD" | grep -qE '(\s|^)(-t(\s|=|[^[:space:]])|--token(\s|=))'; then
   IS_UPLOAD=true
-elif echo "$CMD" | grep -qE '(\s|^)(-f|--file)(\s|=)'; then
+elif echo "$CMD" | grep -qE '(\s|^)(-f(\s|=|[^[:space:]])|--file(\s|=))'; then
   IS_UPLOAD=true
 fi
 
