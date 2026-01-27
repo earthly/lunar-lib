@@ -83,7 +83,7 @@ policies:
 
 **Failure message:** `"Coverage 72.0% is below minimum 80%"`
 
-## Compatible Collectors
+## Related Collectors
 
 Any collector that writes to `.testing.coverage` can be used with this policy:
 
