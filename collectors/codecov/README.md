@@ -64,16 +64,23 @@ Both collectors use hook type `ci-after-command` with pattern `codecov(cli)?|bas
 
 The `results` collector:
 1. Detects upload commands (`upload`, `do-upload`, `upload-process`, or commands with `-t`/`-f` flags)
-2. Fetches coverage from the Codecov API using `LUNAR_SECRET_CODECOV_API_TOKEN`
+2. Fetches coverage from the Codecov API
 3. Writes `.testing.coverage.percentage` (normalized) and `.testing.coverage.native.codecov` (full API response)
 
 ## Inputs
 
-This collector has no configurable inputs.
+| Input | Default | Description |
+|-------|---------|-------------|
+| `use_env_token` | `false` | Use `CODECOV_TOKEN` from environment instead of Lunar secret |
 
 ## Secrets
 
-- `CODECOV_API_TOKEN` - Codecov API token for fetching coverage results (required for the `results` collector)
+The `results` collector requires a Codecov API token. There are two options:
+
+1. **Lunar secret (default):** Configure `CODECOV_API_TOKEN` in your Lunar secrets
+2. **Environment variable:** Set `use_env_token: "true"` to use `CODECOV_TOKEN` from the CI environment
+
+If `use_env_token` is enabled, the collector checks `CODECOV_TOKEN` first, then falls back to the Lunar secret.
 
 ## Installation
 
@@ -84,9 +91,11 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/codecov@main
     on: [backend]
     # include: [ran]  # Only record that codecov ran (no API call needed)
+    # with:
+    #   use_env_token: "true"  # Use CODECOV_TOKEN from CI environment
 ```
 
-To fetch coverage results, configure the `CODECOV_API_TOKEN` secret in your Lunar configuration.
+To fetch coverage results, configure one of the token options described above.
 
 ## Related Policies
 

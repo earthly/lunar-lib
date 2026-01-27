@@ -7,6 +7,11 @@ author: earthly
 
 default_image: native
 
+inputs:
+  use_env_token:
+    description: Use CODECOV_TOKEN from environment instead of Lunar secret
+    default: "false"
+
 collectors:
   - name: ran
     description: Records that codecov ran

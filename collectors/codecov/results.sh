@@ -17,9 +17,16 @@ if [ "$IS_UPLOAD" != "true" ]; then
   exit 0
 fi
 
-# Check for API token
-if [ -z "$LUNAR_SECRET_CODECOV_API_TOKEN" ]; then
-  echo "Warning: LUNAR_SECRET_CODECOV_API_TOKEN not set, skipping results fetch" >&2
+# Determine which token to use
+API_TOKEN=""
+if [ "$LUNAR_VAR_USE_ENV_TOKEN" = "true" ] && [ -n "$CODECOV_TOKEN" ]; then
+  API_TOKEN="$CODECOV_TOKEN"
+fi
+if [ -z "$API_TOKEN" ] && [ -n "$LUNAR_SECRET_CODECOV_API_TOKEN" ]; then
+  API_TOKEN="$LUNAR_SECRET_CODECOV_API_TOKEN"
+fi
+if [ -z "$API_TOKEN" ]; then
+  echo "Warning: No Codecov API token available, skipping results fetch" >&2
   exit 0
 fi
 
@@ -42,7 +49,7 @@ if [ -n "$SHA" ]; then
   API_URL="${API_URL}?sha=${SHA}"
 fi
 RESULTS=$(curl -fsS --connect-timeout 10 --max-time 30 \
-  -H "Authorization: Bearer $LUNAR_SECRET_CODECOV_API_TOKEN" \
+  -H "Authorization: Bearer $API_TOKEN" \
   "$API_URL" 2>/dev/null || echo "")
 
 if [ -n "$RESULTS" ]; then
