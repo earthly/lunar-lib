@@ -1,4 +1,4 @@
-# Codecov
+# `codecov` Policies
 
 Validates Codecov usage and coverage thresholds.
 
