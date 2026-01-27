@@ -69,18 +69,15 @@ The `results` collector:
 
 ## Inputs
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| `use_env_token` | `false` | Use `CODECOV_TOKEN` from environment instead of Lunar secret |
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `use_env_token` | No | `false` | Use `CODECOV_TOKEN` from environment instead of Lunar secret |
 
 ## Secrets
 
-The `results` collector requires a Codecov API token. There are two options:
+- `CODECOV_API_TOKEN` - Codecov API token for fetching coverage results
 
-1. **Lunar secret (default):** Configure `CODECOV_API_TOKEN` in your Lunar secrets
-2. **Environment variable:** Set `use_env_token: "true"` to use `CODECOV_TOKEN` from the CI environment
-
-If `use_env_token` is enabled, the collector checks `CODECOV_TOKEN` first, then falls back to the Lunar secret.
+If `use_env_token` is enabled, the collector checks `CODECOV_TOKEN` from the environment first, then falls back to the Lunar secret.
 
 ## Installation
 
