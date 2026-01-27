@@ -53,8 +53,8 @@ RESULTS=$(curl -fsS --connect-timeout 10 --max-time 30 \
   "$API_URL" 2>/dev/null || echo "")
 
 if [ -n "$RESULTS" ]; then
-  # Extract coverage from totals response
-  COVERAGE=$(echo "$RESULTS" | jq -r '.coverage // empty')
+  # Extract coverage from totals response (per Codecov API docs)
+  COVERAGE=$(echo "$RESULTS" | jq -r '.totals.coverage // empty')
   if [ -n "$COVERAGE" ]; then
     # Write coverage percentage - presence signals upload succeeded
     lunar collect -j ".testing.coverage.percentage" "$COVERAGE"
