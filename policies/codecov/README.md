@@ -22,9 +22,13 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.testing.codecov.detected` | boolean | `codecov` collector (`ran` sub-collector) |
-| `.testing.codecov.uploaded` | boolean | `codecov` collector (`results` sub-collector) |
-| `.testing.codecov.results.coverage` | number | `codecov` collector (`results` sub-collector) |
+| `.testing.coverage` | object | `codecov` collector (`ran` sub-collector) |
+| `.testing.coverage.percentage` | number | `codecov` collector (`results` sub-collector) |
+| `.testing.coverage.native.codecov` | object | Full API response (for custom policies) |
+
+**Note:** Object presence is the signal—the `ran` policy uses `assert_exists(".testing.coverage")` and the `uploaded` policy uses `assert_exists(".testing.coverage.percentage")`.
+
+**Note:** The `.native.codecov` field contains the full Codecov API response for custom policies that need additional fields (e.g., `files`, `lines`, `hits`, `misses`).
 
 **Note:** Ensure the `codecov` collector is configured before enabling this policy.
 
@@ -55,12 +59,12 @@ policies:
 ```json
 {
   "testing": {
-    "codecov": {
-      "detected": true,
-      "uploaded": true,
-      "results": {
-        "coverage": 85.5
-      }
+    "coverage": {
+      "source": {
+        "tool": "codecov",
+        "integration": "ci"
+      },
+      "percentage": 85.5
     }
   }
 }
@@ -71,12 +75,12 @@ policies:
 ```json
 {
   "testing": {
-    "codecov": {
-      "detected": true,
-      "uploaded": true,
-      "results": {
-        "coverage": 72.0
-      }
+    "coverage": {
+      "source": {
+        "tool": "codecov",
+        "integration": "ci"
+      },
+      "percentage": 72.0
     }
   }
 }

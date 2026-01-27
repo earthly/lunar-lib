@@ -17,9 +17,6 @@ if [ "$IS_UPLOAD" != "true" ]; then
   exit 0
 fi
 
-# Record that an upload was detected
-lunar collect -j ".testing.codecov.uploaded" true
-
 # Check for API token
 if [ -z "$LUNAR_SECRET_CODECOV_API_TOKEN" ]; then
   echo "Warning: LUNAR_SECRET_CODECOV_API_TOKEN not set, skipping results fetch" >&2
@@ -52,7 +49,9 @@ if [ -n "$RESULTS" ]; then
   # Extract coverage from totals response
   COVERAGE=$(echo "$RESULTS" | jq -r '.coverage // empty')
   if [ -n "$COVERAGE" ]; then
-    jq -n --argjson coverage "$COVERAGE" '{coverage: $coverage}' | \
-      lunar collect -j ".testing.codecov.results" -
+    # Write coverage percentage - presence signals upload succeeded
+    lunar collect -j ".testing.coverage.percentage" "$COVERAGE"
+    # Write full API response to native field for policies needing raw data
+    echo "$RESULTS" | lunar collect -j ".testing.coverage.native.codecov" -
   fi
 fi
