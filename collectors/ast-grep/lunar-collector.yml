@@ -6,36 +6,30 @@ author: earthly
 
 default_image: earthly/lunar-lib:ast-grep-main
 
-# Landing page metadata for earthly.dev/lunar/guardrails/collectors/ast-grep
 landing_page:
-  status: "beta"
-  display_name: "AST-Grep"
+  display_name: "AST-Grep Collector"
   tagline: "Define custom code patterns using AST-based rules and detect matches across your codebase"
-  seo_title: "AST-Grep Code Pattern Collector"
-  seo_description: |
+  long_description: |
     Analyze source code using AST-based pattern matching with ast-grep. Define custom
     rules to detect security issues, anti-patterns, and code style violations.
   categories:
     - "security-and-compliance"
     - "testing-and-quality"
-  icon: "assets/ast-grep.svg"
+  status: "beta"
   related: []
 
 collectors:
   - name: ast-grep
     description: |
-      Runs ast-grep rules against source code and collects pattern matches.
-      Supports full ast-grep rule syntax including relational rules (inside, has),
-      composite rules (all, any, not), and metavariables.
-      Results are written to .code_patterns in the Component JSON.
+      Runs user-defined ast-grep YAML rules against source code and collects pattern matches.
+      Supports full ast-grep rule syntax including relational rules (inside, has), composite
+      rules (all, any, not), and metavariables ($VAR, $$$ARGS). Groups results by rule ID
+      (format: category.subcategory) and writes structured matches with file, range, and code
+      snippet to .code_patterns.<category>.<subcategory>.
     mainBash: main.sh
     hook:
       type: code
-    seo_title: "AST-Based Code Pattern Detection"
-    seo_description: |
-      Define custom AST patterns to detect security issues, anti-patterns, 
-      and code style violations across your codebase.
-    seo_keywords: ["ast-grep", "code patterns", "static analysis", "security scanning"]
+    keywords: ["ast-grep", "code patterns", "static analysis", "security scanning"]
 
 inputs:
   rules:

@@ -62,10 +62,7 @@ VALID_RELATED_TYPES = {"collector", "policy", "cataloger"}
 # Character limits
 DISPLAY_NAME_MAX_LENGTH = 50
 TAGLINE_MAX_LENGTH = 100
-SEO_TITLE_MAX_LENGTH = 50
-SEO_DESCRIPTION_MAX_LENGTH = 160
-SUB_SEO_TITLE_MAX_LENGTH = 60
-SUB_SEO_DESCRIPTION_MAX_LENGTH = 200
+LONG_DESCRIPTION_MAX_LENGTH = 300  # Displayed in hero, can be longer than meta description
 RELATED_REASON_MAX_LENGTH = 80
 
 
@@ -267,7 +264,7 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
         result["landing_page"] = {}
         
         # Extract simple fields
-        for field_name in ["display_name", "tagline", "seo_title", "category", "icon", "status"]:
+        for field_name in ["display_name", "tagline", "category", "icon", "status"]:
             match = re.search(
                 rf'^  {field_name}:\s*["\']?([^"\'\n]+)["\']?\s*$',
                 landing_section,
@@ -276,15 +273,15 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
             if match:
                 result["landing_page"][field_name] = match.group(1).strip()
         
-        # Extract seo_description (multiline)
-        seo_desc_match = re.search(
-            r'^  seo_description:\s*\|?\s*$\n((?:[ ]{4,}.*\n)*)',
+        # Extract long_description (multiline)
+        long_desc_match = re.search(
+            r'^  long_description:\s*\|?\s*$\n((?:[ ]{4,}.*\n)*)',
             landing_section,
             re.MULTILINE
         )
-        if seo_desc_match:
-            desc_lines = seo_desc_match.group(1).strip()
-            result["landing_page"]["seo_description"] = " ".join(
+        if long_desc_match:
+            desc_lines = long_desc_match.group(1).strip()
+            result["landing_page"]["long_description"] = " ".join(
                 line.strip() for line in desc_lines.split("\n")
             )
         
@@ -298,22 +295,25 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
             cats = re.findall(r'^\s+- ["\']?([^"\'\n]+)["\']?', categories_match.group(1), re.MULTILINE)
             result["landing_page"]["categories"] = cats
         
-        # Extract related array
-        related_match = re.search(
-            r'^  related:\s*$\n((?:[ ]+.*\n)*)',
-            landing_section,
-            re.MULTILINE
-        )
-        if related_match:
-            related_section = related_match.group(1)
-            related_items = []
+        # Helper to extract relationship arrays (used for both 'related' and 'requires')
+        def extract_relationship_array(field_name: str) -> list[dict]:
+            field_match = re.search(
+                rf'^  {field_name}:\s*$\n((?:[ ]+.*\n)*)',
+                landing_section,
+                re.MULTILINE
+            )
+            if not field_match:
+                return []
             
-            # Find each related item (starts with - slug:)
+            field_section = field_match.group(1)
+            items = []
+            
+            # Find each item (starts with - slug:)
             item_matches = re.finditer(
                 r'^\s+- slug:\s*["\']?([^"\'\n]+)["\']?\s*$\n'
                 r'(?:\s+type:\s*["\']?([^"\'\n]+)["\']?\s*$\n)?'
                 r'(?:\s+reason:\s*["\']?([^"\'\n]+)["\']?\s*$)?',
-                related_section,
+                field_section,
                 re.MULTILINE
             )
             for match in item_matches:
@@ -322,8 +322,18 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
                     item["type"] = match.group(2).strip()
                 if match.group(3):
                     item["reason"] = match.group(3).strip()
-                related_items.append(item)
+                items.append(item)
             
+            return items
+        
+        # Extract requires array (policies require collectors)
+        requires_items = extract_relationship_array("requires")
+        if requires_items:
+            result["landing_page"]["requires"] = requires_items
+        
+        # Extract related array
+        related_items = extract_relationship_array("related")
+        if related_items:
             result["landing_page"]["related"] = related_items
     
     # Extract collectors array with SEO fields
@@ -348,30 +358,9 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
             if name_match:
                 collector["name"] = name_match.group(1).strip()
             
-            # Get seo_title
-            seo_title_match = re.search(
-                r'^\s+seo_title:\s*["\']?([^"\'\n]+)["\']?\s*$',
-                block,
-                re.MULTILINE
-            )
-            if seo_title_match:
-                collector["seo_title"] = seo_title_match.group(1).strip()
-            
-            # Get seo_description (multiline)
-            seo_desc_match = re.search(
-                r'^\s+seo_description:\s*\|?\s*$\n((?:[ ]{6,}.*\n)*)',
-                block,
-                re.MULTILINE
-            )
-            if seo_desc_match:
-                desc_lines = seo_desc_match.group(1).strip()
-                collector["seo_description"] = " ".join(
-                    line.strip() for line in desc_lines.split("\n")
-                )
-            
-            # Get seo_keywords (array)
+            # Get keywords (array) - renamed from seo_keywords
             keywords_match = re.search(
-                r'^\s+seo_keywords:\s*\[([^\]]+)\]',
+                r'^\s+keywords:\s*\[([^\]]+)\]',
                 block,
                 re.MULTILINE
             )
@@ -380,7 +369,7 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
                     k.strip().strip('"\'') 
                     for k in keywords_match.group(1).split(",")
                 ]
-                collector["seo_keywords"] = [k for k in keywords if k]
+                collector["keywords"] = [k for k in keywords if k]
             
             if collector.get("name"):
                 collectors.append(collector)
@@ -454,13 +443,26 @@ def validate_plugin(
     
     # Validate display_name
     display_name = landing_page.get("display_name")
+    # Expected suffix based on plugin type
+    display_name_suffix = {
+        "collector": "Collector",
+        "policy": "Policies",
+        "cataloger": "Cataloger",
+    }.get(plugin_type, "")
+    
     if not display_name:
         result.errors.append("Missing landing_page.display_name")
-    elif len(display_name) > DISPLAY_NAME_MAX_LENGTH:
-        result.errors.append(
-            f"landing_page.display_name too long ({len(display_name)} chars, "
-            f"max {DISPLAY_NAME_MAX_LENGTH})"
-        )
+    else:
+        if len(display_name) > DISPLAY_NAME_MAX_LENGTH:
+            result.errors.append(
+                f"landing_page.display_name too long ({len(display_name)} chars, "
+                f"max {DISPLAY_NAME_MAX_LENGTH})"
+            )
+        if not display_name.endswith(display_name_suffix):
+            result.errors.append(
+                f"landing_page.display_name must end with '{display_name_suffix}', "
+                f"got '{display_name}'"
+            )
     
     # Validate tagline
     tagline = landing_page.get("tagline")
@@ -472,24 +474,14 @@ def validate_plugin(
             f"max {TAGLINE_MAX_LENGTH})"
         )
     
-    # Validate seo_title
-    seo_title = landing_page.get("seo_title")
-    if not seo_title:
-        result.errors.append("Missing landing_page.seo_title")
-    elif len(seo_title) > SEO_TITLE_MAX_LENGTH:
+    # Validate long_description
+    long_description = landing_page.get("long_description")
+    if not long_description:
+        result.errors.append("Missing landing_page.long_description")
+    elif len(long_description) > LONG_DESCRIPTION_MAX_LENGTH:
         result.errors.append(
-            f"landing_page.seo_title too long ({len(seo_title)} chars, "
-            f"max {SEO_TITLE_MAX_LENGTH})"
-        )
-    
-    # Validate seo_description
-    seo_description = landing_page.get("seo_description")
-    if not seo_description:
-        result.errors.append("Missing landing_page.seo_description")
-    elif len(seo_description) > SEO_DESCRIPTION_MAX_LENGTH:
-        result.errors.append(
-            f"landing_page.seo_description too long ({len(seo_description)} chars, "
-            f"max {SEO_DESCRIPTION_MAX_LENGTH})"
+            f"landing_page.long_description too long ({len(long_description)} chars, "
+            f"max {LONG_DESCRIPTION_MAX_LENGTH})"
         )
     
     # Validate category/categories
@@ -508,7 +500,7 @@ def validate_plugin(
                     f"Invalid category '{cat}'. Must be one of: {sorted(VALID_CATEGORIES)}"
                 )
     
-    # Validate icon (required)
+    # Validate icon (required, file must exist)
     icon = landing_page.get("icon")
     if not icon:
         result.errors.append("Missing landing_page.icon")
@@ -526,37 +518,45 @@ def validate_plugin(
             f"Invalid status '{status}'. Must be one of: {sorted(VALID_STATUSES)}"
         )
     
-    # Validate related (optional, but structure must be valid if present)
-    related = landing_page.get("related", [])
-    if related:
-        for i, rel in enumerate(related):
+    # Helper to validate relationship entries (used for both 'related' and 'requires')
+    def validate_relationship_entries(
+        entries: list,
+        field_name: str,
+        allowed_types: set[str] | None = None,
+    ) -> None:
+        for i, rel in enumerate(entries):
             if not isinstance(rel, dict):
-                result.errors.append(f"landing_page.related[{i}] must be an object")
+                result.errors.append(f"landing_page.{field_name}[{i}] must be an object")
                 continue
             
             # slug is required
             if not rel.get("slug"):
-                result.errors.append(f"landing_page.related[{i}].slug is required")
+                result.errors.append(f"landing_page.{field_name}[{i}].slug is required")
             
             # type is required
             rel_type = rel.get("type")
             if not rel_type:
-                result.errors.append(f"landing_page.related[{i}].type is required")
+                result.errors.append(f"landing_page.{field_name}[{i}].type is required")
             elif rel_type not in VALID_RELATED_TYPES:
                 result.errors.append(
-                    f"landing_page.related[{i}].type '{rel_type}' invalid. "
+                    f"landing_page.{field_name}[{i}].type '{rel_type}' invalid. "
                     f"Must be one of: {sorted(VALID_RELATED_TYPES)}"
+                )
+            elif allowed_types and rel_type not in allowed_types:
+                result.errors.append(
+                    f"landing_page.{field_name}[{i}].type '{rel_type}' not allowed. "
+                    f"Must be one of: {sorted(allowed_types)}"
                 )
             
             # reason is optional but has max length
             reason = rel.get("reason", "")
             if reason and len(reason) > RELATED_REASON_MAX_LENGTH:
                 result.errors.append(
-                    f"landing_page.related[{i}].reason too long ({len(reason)} chars, "
+                    f"landing_page.{field_name}[{i}].reason too long ({len(reason)} chars, "
                     f"max {RELATED_REASON_MAX_LENGTH})"
                 )
             
-            # Cross-validate: check if related plugin exists
+            # Cross-validate: check if referenced plugin exists
             slug = rel.get("slug")
             if slug and rel_type:
                 if rel_type == "policy":
@@ -569,12 +569,32 @@ def validate_plugin(
                     target_dir = None
                 
                 if target_dir and not target_dir.exists():
-                    result.warnings.append(
-                        f"landing_page.related[{i}] references non-existent "
+                    result.errors.append(
+                        f"landing_page.{field_name}[{i}] references non-existent "
                         f"{rel_type} '{slug}'"
                     )
     
-    # Validate sub-items SEO fields
+    # Validate requires (required for policies, must reference collectors)
+    requires = landing_page.get("requires", [])
+    if plugin_type == "policy":
+        if not requires:
+            result.errors.append(
+                "Missing landing_page.requires - policies must specify at least one "
+                "required collector"
+            )
+        else:
+            # For policies, requires must only reference collectors
+            validate_relationship_entries(requires, "requires", allowed_types={"collector"})
+    elif requires:
+        # For other types, requires is optional but validate if present
+        validate_relationship_entries(requires, "requires")
+    
+    # Validate related (optional, but structure must be valid if present)
+    related = landing_page.get("related", [])
+    if related:
+        validate_relationship_entries(related, "related")
+    
+    # Validate sub-items have keywords
     item_key = config["item_key"]
     items = data.get(item_key, [])
     if not items:
@@ -583,49 +603,22 @@ def validate_plugin(
         for i, item in enumerate(items):
             name = item.get("name", f"[{i}]")
             
-            # seo_title required
-            sub_seo_title = item.get("seo_title")
-            if not sub_seo_title:
-                result.errors.append(f"{item_key}.{name}: missing seo_title")
-            elif len(sub_seo_title) > SUB_SEO_TITLE_MAX_LENGTH:
+            # keywords optional but must be valid array if present
+            sub_keywords = item.get("keywords", [])
+            if sub_keywords and (not isinstance(sub_keywords, list) or len(sub_keywords) < 1):
                 result.errors.append(
-                    f"{item_key}.{name}: seo_title too long ({len(sub_seo_title)} chars, "
-                    f"max {SUB_SEO_TITLE_MAX_LENGTH})"
-                )
-            
-            # seo_description required
-            sub_seo_desc = item.get("seo_description")
-            if not sub_seo_desc:
-                result.errors.append(f"{item_key}.{name}: missing seo_description")
-            elif len(sub_seo_desc) > SUB_SEO_DESCRIPTION_MAX_LENGTH:
-                result.errors.append(
-                    f"{item_key}.{name}: seo_description too long ({len(sub_seo_desc)} chars, "
-                    f"max {SUB_SEO_DESCRIPTION_MAX_LENGTH})"
-                )
-            
-            # seo_keywords required (at least 1)
-            sub_keywords = item.get("seo_keywords", [])
-            if not sub_keywords:
-                result.errors.append(f"{item_key}.{name}: missing seo_keywords")
-            elif not isinstance(sub_keywords, list) or len(sub_keywords) < 1:
-                result.errors.append(
-                    f"{item_key}.{name}: seo_keywords must be an array with at least 1 keyword"
+                    f"{item_key}.{name}: keywords must be an array with at least 1 keyword"
                 )
     
-    # Validate README title matches display_name
+    # Validate README title matches display_name exactly
     if display_name and readme_path.exists():
         readme_title = get_readme_title(readme_path)
-        # README title should be "{display_name} Collector" or similar based on type
-        suffix = {"collector": "Collector", "policy": "Policies", "cataloger": "Cataloger"}.get(plugin_type, "")
-        expected_title = f"{display_name} {suffix}".strip()
-        
-        # Also accept the backtick format from existing READMEs
-        alt_expected = f"`{plugin_name}` {suffix}".strip()
-        
-        if readme_title and readme_title != expected_title and readme_title != alt_expected:
-            result.warnings.append(
+        # README title must match display_name exactly
+        # (display_name includes the type suffix, e.g., "GitHub Collector")
+        if readme_title and readme_title != display_name:
+            result.errors.append(
                 f"README title '{readme_title}' doesn't match expected "
-                f"'{expected_title}' (from display_name)"
+                f"'{display_name}' (from display_name)"
             )
     
     return result
@@ -752,17 +745,17 @@ def main():
         print("\nRequired landing_page fields:")
         print(f"  display_name: max {DISPLAY_NAME_MAX_LENGTH} chars")
         print(f"  tagline: max {TAGLINE_MAX_LENGTH} chars")
-        print(f"  seo_title: max {SEO_TITLE_MAX_LENGTH} chars")
-        print(f"  seo_description: max {SEO_DESCRIPTION_MAX_LENGTH} chars")
+        print(f"  long_description: max {LONG_DESCRIPTION_MAX_LENGTH} chars")
         print(f"  category: one of {sorted(VALID_CATEGORIES)}")
         print(f"  icon: path to SVG file (must exist)")
+        print(f"\nRequired for policies:")
+        print(f"  requires: array of {{slug, type, reason}} - collectors the policy needs")
         print(f"\nOptional landing_page fields:")
         print(f"  status: one of {sorted(VALID_STATUSES)} (defaults to stable)")
         print(f"  related: array of {{slug, type, reason}}")
-        print(f"\nRequired per-item fields:")
-        print(f"  seo_title: max {SUB_SEO_TITLE_MAX_LENGTH} chars")
-        print(f"  seo_description: max {SUB_SEO_DESCRIPTION_MAX_LENGTH} chars")
-        print(f"  seo_keywords: array with at least 1 keyword")
+        print(f"  requires: (optional for collectors/catalogers)")
+        print(f"\nOptional per-item fields:")
+        print(f"  keywords: array for SEO meta keywords")
         sys.exit(1)
 
 

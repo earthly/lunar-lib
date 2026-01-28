@@ -85,18 +85,18 @@ description: Collect GitHub repository settings and branch protection rules
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
-# === Landing page metadata (NEW fields) ===
+# === Landing page metadata ===
 landing_page:
-  display_name: "GitHub Repository Settings"       # Required, max 50 chars
+  display_name: "GitHub Collector"                 # Required, max 50 chars, must end with "Collector"
   tagline: "Collect GitHub repository settings and branch protection rules"  # Required, max 100 chars
-  seo_title: "GitHub Repository Collector"         # Required, max 50 chars (website appends "| Earthly Lunar")
-  seo_description: |                               # Required, max 160 chars
+  long_description: |                              # Required, max 300 chars
     Automatically collect GitHub repository settings, branch protection rules, 
     and access permissions. Enforce VCS standards across your organization.
   category: "repository-and-ownership"             # Required, see categories below
+  status: "beta"                                   # Optional: stable|beta|experimental|deprecated
   icon: "assets/github.svg"                        # Required, relative to plugin dir
   
-  # Related plugins for cross-linking
+  # Related plugins for cross-linking (optional for collectors)
   related:
     - slug: "vcs"
       type: "policy"
@@ -117,13 +117,7 @@ collectors:
     mainBash: repository.sh
     hook:
       type: code
-    
-    # NEW: SEO fields for this sub-collector
-    seo_title: "Collect Repository Settings"                    # Max 60 chars
-    seo_description: |                                           # Max 200 chars
-      Automatically collect repository visibility, default branch, topics, 
-      and merge strategies from all GitHub repositories.
-    seo_keywords: ["github settings", "repository visibility", "merge strategies"]
+    keywords: ["github settings", "repository visibility", "merge strategies"]  # Optional SEO keywords
 
   - name: branch-protection
     description: |
@@ -134,13 +128,7 @@ collectors:
     mainBash: branch_protection.sh
     hook:
       type: code
-    
-    # NEW: SEO fields
-    seo_title: "Enforce Branch Protection Standards"
-    seo_description: |
-      Collect branch protection settings from all repositories and verify 
-      they meet your organization's security requirements.
-    seo_keywords: ["branch protection", "code review", "github security", "required reviewers"]
+    keywords: ["branch protection", "code review", "github security", "required reviewers"]
 
   - name: access-permissions
     description: |
@@ -150,13 +138,7 @@ collectors:
     mainBash: access_permissions.sh
     hook:
       type: code
-    
-    # NEW: SEO fields
-    seo_title: "Audit Repository Access Controls"
-    seo_description: |
-      Track who has access to each repository and at what permission level. 
-      Identify over-permissioned users and ensure least-privilege access.
-    seo_keywords: ["access control", "permissions", "audit", "least privilege"]
+    keywords: ["access control", "permissions", "audit", "least privilege"]
 ```
 
 ### Extended `lunar-policy.yml` Example
@@ -169,78 +151,55 @@ description: Container definition policies
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
-# === Landing page metadata (NEW) ===
+# === Landing page metadata ===
 landing_page:
-  display_name: "Container Security"
-  tagline: "Enforce Dockerfile best practices and container security standards"
-  seo_title: "Container Security Policies"
-  seo_description: |
+  display_name: "Container Policies"               # Required, max 50 chars, must end with "Policies"
+  tagline: "Enforce Dockerfile best practices and container security standards"  # Required, max 100 chars
+  long_description: |                              # Required, max 300 chars
     Enforce container best practices including tag stability, registry allowlists, 
     required labels, and security configurations for Dockerfiles.
-  category: "devex-build-and-ci"
-  icon: "assets/docker.svg"
+  category: "devex-build-and-ci"                   # Required
+  status: "stable"                                 # Optional
+  icon: "assets/docker.svg"                        # Optional (for now)
   
-  related:
+  # Required collectors - policies MUST specify at least one
+  requires:
     - slug: "dockerfile"
       type: "collector"
-      reason: "Collects Dockerfile data that this policy evaluates"
+      reason: "Provides Dockerfile data that this policy evaluates"
+  
+  # Related plugins (optional)
+  related:
+    - slug: "k8s"
+      type: "policy"
+      reason: "Also enforces container resource limits in Kubernetes"
 
 # === Existing + extended sub-policies ===
 policies:
   - name: no-latest
     description: Container definitions should not use the :latest tag
     mainPython: no_latest.py
-    
-    # NEW: SEO fields
-    seo_title: "Prevent :latest Tags"
-    seo_description: |
-      Block Dockerfiles that use implicit or explicit :latest tags, 
-      ensuring reproducible builds and avoiding surprise updates.
-    seo_keywords: ["dockerfile", "latest tag", "reproducible builds", "image tags"]
+    keywords: ["dockerfile", "latest tag", "reproducible builds", "image tags"]
 
   - name: stable-tags
     description: Container definitions should use stable tags (digests or full semver)
     mainPython: stable_tags.py
-    
-    # NEW: SEO fields
-    seo_title: "Require Stable Image Tags"
-    seo_description: |
-      Enforce full semver (1.2.3) or digest (sha256:...) tags for all 
-      base images, preventing version drift across environments.
-    seo_keywords: ["semver", "image digest", "version pinning", "tag policy"]
+    keywords: ["semver", "image digest", "version pinning", "tag policy"]
 
   - name: allowed-registries
     description: Container definitions should only use allowed registries
     mainPython: allowed_registries.py
-    
-    # NEW: SEO fields
-    seo_title: "Registry Allowlist"
-    seo_description: |
-      Ensure all container images come from approved registries, 
-      preventing supply chain attacks from untrusted sources.
-    seo_keywords: ["container registry", "supply chain security", "registry policy"]
+    keywords: ["container registry", "supply chain security", "registry policy"]
 
   - name: healthcheck
     description: Container definitions should have HEALTHCHECK instruction
     mainPython: healthcheck.py
-    
-    # NEW: SEO fields
-    seo_title: "Require HEALTHCHECK"
-    seo_description: |
-      Verify containers define health checks for orchestrator integration 
-      and automatic recovery from unhealthy states.
-    seo_keywords: ["healthcheck", "kubernetes", "container orchestration", "docker health"]
+    keywords: ["healthcheck", "kubernetes", "container orchestration", "docker health"]
 
   - name: user
     description: Container definitions should specify USER instruction
     mainPython: user.py
-    
-    # NEW: SEO fields
-    seo_title: "Non-Root Containers"
-    seo_description: |
-      Ensure containers run as non-root users, reducing attack surface 
-      and meeting security compliance requirements.
-    seo_keywords: ["non-root", "container security", "least privilege", "USER instruction"]
+    keywords: ["non-root", "container security", "least privilege", "USER instruction"]
 
 inputs:
   allowed_registries:
@@ -261,17 +220,18 @@ description: Catalogs GitHub organization repositories as Lunar components
 author: earthly
 default_image: earthly/lunar-lib:github-org-main
 
-# === Landing page metadata (NEW) ===
+# === Landing page metadata ===
 landing_page:
-  display_name: "GitHub Organization Sync"
-  tagline: "Automatically catalog all repositories from your GitHub organization"
-  seo_title: "GitHub Organization Cataloger"
-  seo_description: |
+  display_name: "GitHub Org Cataloger"             # Required, max 50 chars, must end with "Cataloger"
+  tagline: "Automatically catalog all repositories from your GitHub organization"  # Required, max 100 chars
+  long_description: |                              # Required, max 300 chars
     Sync repositories from GitHub organizations into your Lunar catalog. 
     Automatically track visibility, topics, and metadata across all repos.
-  category: "repository-and-ownership"
-  icon: "assets/github-org.svg"
+  category: "repository-and-ownership"             # Required
+  status: "stable"                                 # Optional
+  icon: "assets/github-org.svg"                    # Optional (for now)
   
+  # Related plugins (optional for catalogers)
   related:
     - slug: "github"
       type: "collector"
@@ -289,13 +249,7 @@ catalogers:
     hook:
       type: cron
       schedule: "0 2 * * *"
-    
-    # NEW: SEO fields
-    seo_title: "Auto-Discover Repositories"
-    seo_description: |
-      Automatically add new repositories to your catalog as they're created, 
-      ensuring complete coverage without manual registration.
-    seo_keywords: ["service catalog", "auto-discovery", "github", "repository sync"]
+    keywords: ["service catalog", "auto-discovery", "github", "repository sync"]
 
 inputs:
   org_name:
@@ -457,29 +411,45 @@ This keeps all data processing in JavaScript within the website repo.
 
 ### `scripts/validate_landing_page_metadata.py` (lunar-lib)
 
-Validates all `lunar-*.yml` files have complete landing page metadata:
+Unified validator for all plugin types (collectors, policies, catalogers).
 
 **Plugin-level validation:**
-- `landing_page.display_name` required, max 50 chars
+- `landing_page.display_name` required, max 50 chars, must end with type suffix:
+  - Collectors: must end with "Collector" (e.g., "GitHub Collector")
+  - Policies: must end with "Policies" (e.g., "Container Policies")
+  - Catalogers: must end with "Cataloger" (e.g., "GitHub Org Cataloger")
 - `landing_page.tagline` required, max 100 chars
-- `landing_page.seo_title` required, max 50 chars
-- `landing_page.seo_description` required, max 160 chars
+- `landing_page.long_description` required, max 300 chars
 - `landing_page.category` required, must be one of the 6 valid categories
-- `landing_page.icon` required, file must exist
+- `landing_page.icon` required
+- `landing_page.status` required, must be one of: stable, beta, experimental, deprecated
 - `landing_page.related[].slug`, `.type`, `.reason` validated if present
+- `landing_page.requires[]` required for policies (must reference collectors)
 
 **Sub-component validation (collectors/policies/catalogers arrays):**
-- Each sub-component must have `seo_title` (max 60 chars)
-- Each sub-component must have `seo_description` (max 200 chars)
-- Each sub-component must have `seo_keywords` (array, at least 1 keyword)
+- `keywords` required, must be array if present
 
-**Cross-validation:**
-- Warn if `related` references plugins that don't exist
-- **README title validation:** The README `# Title` must match `landing_page.display_name` or `name` from the YAML (to avoid formatting issues like backticks in titles rendering incorrectly on landing pages). The existing title valiation needs to be adjusted accordingly.
+**Cross-validation (all errors, not warnings):**
+- `related` or `requires` referencing non-existent plugins → error
+- README title must match `display_name` exactly → error
+- Unknown README sections (not in template) → error
+- Disallowed README sections (Inputs, Secrets, Related Policies, etc.) → error
 
 **Integration:**
-- Add to existing `+lint` Earthfile target
+- Integrated into `+lint` Earthfile target
 - Exit non-zero on validation failures
+
+### `scripts/validate_readme_structure.py` (lunar-lib)
+
+Unified README validator for all plugin types (replaces individual enforce_*_readme_structure.py scripts).
+
+**Validation rules:**
+- README title must match `display_name` from YAML
+- Required sections enforced per plugin type
+- Disallowed sections (moved to YAML) cause errors:
+  - Collectors: Inputs, Secrets, Related Policies, Related Collectors, Example Component JSON
+  - Policies: Inputs, Related Collectors, Related Policies
+  - Catalogers: Inputs, Secrets, Related Policies, Related Collectors
 
 ### `src/_data/guardrails.js` (earthly-website)
 
@@ -762,18 +732,51 @@ Get one complete page live with minimal implementation. Skip strict validation, 
 
 Once Phase 1 passes review, scale to all plugins.
 
-**lunar-lib:**
-- [ ] Add `landing_page:` + sub-component SEO fields to remaining collectors
-- [ ] Add `landing_page:` + sub-component SEO fields to all policies
-- [ ] Add `landing_page:` + sub-component SEO fields to all catalogers
-- [ ] Create/source icon SVGs for each plugin
-- [ ] Add `example_component_json` field to all plugin YAMLs (move from READMEs)
-- [ ] Add `secrets` field to all plugin YAMLs that have secrets (move from READMEs)
-- [ ] Update all READMEs:
-  - Remove "Example Component JSON output" collapsible sections (now in YAML)
-  - Remove "Inputs" sections (now in YAML)
-  - Remove "Secrets" sections (now in YAML)
-  - Remove "Related Policies/Collectors" sections (now in YAML)
+**lunar-lib - Collectors (DONE):**
+- [x] Add `landing_page:` + `keywords` to all collectors (6 total)
+- [x] Simplified schema: `display_name` (with suffix), `tagline`, `long_description`, `category`, `status`
+- [x] Sub-collectors: use `name`, `description`, `keywords` (removed seo_title, seo_description)
+- [x] Add `example_component_json` field to all collector YAMLs
+- [x] Add `secrets` field to collectors that have secrets
+- [x] Update all collector READMEs:
+  - [x] Remove "Example Component JSON output" sections
+  - [x] Remove "Inputs" sections
+  - [x] Remove "Secrets" sections
+  - [x] Remove "Related Policies/Collectors" sections
+  - [x] Update titles to match `display_name`
+- [ ] Create/source icon SVGs for each collector (deferred)
+
+**lunar-lib - Policies (TODO):**
+- [ ] Add `landing_page:` section to all policy YAMLs with:
+  - `display_name` ending with "Policies" (e.g., "Container Policies")
+  - `tagline`, `long_description`, `category`, `status`
+  - `requires:` array (REQUIRED - must reference at least one collector)
+  - `related:` array (optional)
+- [ ] Add `keywords` to sub-policies
+- [ ] Add `example_component_json` field (move from READMEs)
+- [ ] Add `inputs` field (move from READMEs)
+- [ ] Update all policy READMEs:
+  - Remove "Related Collectors" sections
+  - Remove "Inputs" sections
+  - Update titles to match `display_name`
+- [ ] Create/source icon SVGs for each policy (deferred)
+
+**lunar-lib - Catalogers (TODO):**
+- [ ] Add `landing_page:` section to all cataloger YAMLs with:
+  - `display_name` ending with "Cataloger" (e.g., "GitHub Org Cataloger")
+  - `tagline`, `long_description`, `category`, `status`
+  - `related:` array (optional)
+- [ ] Add `keywords` to sub-catalogers
+- [ ] Add `example_component_json` field (move from READMEs)
+- [ ] Add `inputs` and `secrets` fields (move from READMEs)
+- [ ] Update all cataloger READMEs:
+  - Remove "Related" sections
+  - Remove "Inputs" sections
+  - Remove "Secrets" sections
+  - Update titles to match `display_name`
+- [ ] Create/source icon SVGs for each cataloger (deferred)
+
+**lunar-lib - Templates (TODO):**
 - [ ] Update `ai-context/collector-README-template.md`:
   - Remove "Related Policies" section
   - Remove "Inputs" section
@@ -794,36 +797,33 @@ Once Phase 1 passes review, scale to all plugins.
 - [x] Create main index page (`/lunar/guardrails/`)
 - [x] Create collectors list page (`/lunar/guardrails/collectors/`)
 - [x] Add category filtering to collectors list page
-- [x] Wire up meta descriptions from `seo_description` in templates
+- [x] Wire up meta descriptions from `long_description` in templates
 - [x] Add JSON-LD structured data to list pages
 - [x] Add canonical URLs and Open Graph meta tags
+- [x] Update collector.njk template for simplified schema
 - [ ] Create paginated templates for policies (`policy.njk`)
 - [ ] Create paginated templates for catalogers (`cataloger.njk`)
 - [ ] Create policies list page (`/lunar/guardrails/policies/`)
 - [ ] Create catalogers list page (`/lunar/guardrails/catalogers/`)
 - [ ] Add category filtering to policies and catalogers list pages
+- [ ] Add "Requires" section to policy pages (show required collectors)
 
 ---
 
 ### Phase 3: Polish & Validation
 
-**lunar-lib:**
-- [ ] Create `scripts/validate_landing_page_metadata.py` (strict validation)
-- [ ] Integrate validation into `+lint` target
-- [ ] Update `scripts/enforce_collector_readme_structure.py`:
-  - Remove `"Related Policies"` from `TEMPLATE_SECTIONS`
-  - Remove `"Inputs"` from `TEMPLATE_SECTIONS`
-  - Remove `"Secrets"` from `TEMPLATE_SECTIONS`
-  - Remove validation logic for these sections
-  - Keep "Collected Data" but remove requirement for example JSON collapsible
-- [ ] Update `scripts/enforce_policy_readme_structure.py`:
-  - Remove `"Related Collectors"` from `TEMPLATE_SECTIONS`
-  - Remove `"Inputs"` from `TEMPLATE_SECTIONS` (if present)
-  - Remove validation logic for these sections
-- [ ] Update `scripts/enforce_cataloger_readme_structure.py`:
-  - Remove `"Inputs"` from `TEMPLATE_SECTIONS`
-  - Remove `"Secrets"` from `TEMPLATE_SECTIONS`
-  - Remove validation logic for these sections
+**lunar-lib - Validation (DONE):**
+- [x] Create `scripts/validate_landing_page_metadata.py` (unified for all plugin types)
+  - Validates display_name suffix, tagline, long_description, category
+  - Validates `requires` for policies (must have at least one collector)
+  - Cross-validates related/requires references exist
+  - Validates README title matches display_name
+- [x] Create `scripts/validate_readme_structure.py` (unified, replaces individual scripts)
+  - Validates required sections per plugin type
+  - Errors on disallowed sections (Inputs, Secrets, Related, etc.)
+  - Errors on unknown sections
+- [x] Integrate validation into `+lint` Earthfile target
+- [x] Remove old individual enforce_*_readme_structure.py scripts
 
 **Templates:**
 - [x] Add "What's Included" section with sub-component cards
@@ -859,12 +859,36 @@ Once Phase 1 passes review, scale to all plugins.
 ### Phase 4: Automation & Maintenance
 
 - [ ] Set up nightly GitHub Actions workflow to run `+update-lunar-lib` and create PR if changes
-- [ ] Add cross-validation for `related` plugin references
+- [x] Add cross-validation for `related` plugin references (now an error, not warning)
 - [ ] Add client-side search (Lunr.js)
+
+---
+
+## Schema Simplifications (Implemented)
+
+During implementation, the schema was simplified from the original plan:
+
+| Original Field | New Field | Notes |
+|----------------|-----------|-------|
+| `seo_title` | (removed) | Use `display_name` for page titles |
+| `seo_description` | `long_description` | Clearer naming, max 300 chars |
+| `display_name` | `display_name` + suffix | Must end with "Collector", "Policies", or "Cataloger" |
+| Sub-component `seo_title` | (removed) | Use `name` directly |
+| Sub-component `seo_description` | (removed) | Use `description` directly |
+| Sub-component `seo_keywords` | `keywords` | Simpler naming |
+| `icon` | `icon` | Made optional (deferred to later) |
+| `related` (for policies) | `requires` + `related` | Policies must have `requires` for collectors |
+
+**Rationale:**
+- Reduced duplication between SEO fields and existing name/description
+- `display_name` with suffix ensures consistent naming across types
+- `requires` makes the collector dependency explicit for policies
+- Simpler sub-component schema reduces maintenance burden
 
 ---
 
 ## Open Questions
 
 1. **Icon sourcing**: Create new SVGs or use existing assets?
-  It's going to be manual (user researches online). In some cases, generate simple consistent SVG icons, in other cases use an emoji (but generally avoid emojis)
+   - Deferred for now (icon field is optional)
+   - Will be manual: user researches online, generates simple SVGs, or uses emoji sparingly

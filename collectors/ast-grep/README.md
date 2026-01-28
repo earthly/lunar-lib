@@ -1,4 +1,4 @@
-# `ast-grep` Collector
+# AST-Grep Collector
 
 Extracts code patterns from source code using AST-based analysis with [ast-grep](https://ast-grep.github.io/).
 
@@ -61,7 +61,3 @@ collectors:
       # max_matches_per_rule: "100"
       # debug: "false"
 ```
-
-## Related Policies
-
-None.

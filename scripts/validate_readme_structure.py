@@ -43,6 +43,14 @@ PLUGIN_CONFIGS = {
             {"name": "Collectors", "required": False},
             {"name": "Installation", "required": True},
         ],
+        # Sections that have been moved to YAML and should not be in README
+        "disallowed_sections": [
+            "Inputs",
+            "Secrets",
+            "Related Policies",
+            "Related Collectors",
+            "Example Component JSON",
+        ],
     },
     "policy": {
         "directory": "policies",
@@ -63,6 +71,12 @@ PLUGIN_CONFIGS = {
             {"name": "Examples", "required": True},
             {"name": "Remediation", "required": True},
         ],
+        # Sections that have been moved to YAML and should not be in README
+        "disallowed_sections": [
+            "Inputs",
+            "Related Collectors",
+            "Related Policies",
+        ],
     },
     "cataloger": {
         "directory": "catalogers",
@@ -82,6 +96,13 @@ PLUGIN_CONFIGS = {
             {"name": "Hook Type", "required": True},
             {"name": "Installation", "required": True},
             {"name": "Source System", "required": True},
+        ],
+        # Sections that have been moved to YAML and should not be in README
+        "disallowed_sections": [
+            "Inputs",
+            "Secrets",
+            "Related Policies",
+            "Related Collectors",
         ],
     },
 }
@@ -443,9 +464,21 @@ def validate_readme(
             f"Found: {readme_sections_in_template}"
         )
     
-    unknown_sections = [s for s in section_names if s not in section_order]
+    # Check for disallowed sections (moved to YAML)
+    disallowed_sections = config.get("disallowed_sections", [])
+    found_disallowed = [s for s in section_names if s in disallowed_sections]
+    if found_disallowed:
+        for section in found_disallowed:
+            result.errors.append(
+                f"Section '## {section}' is not allowed - this content has been moved to the YAML file"
+            )
+    
+    unknown_sections = [
+        s for s in section_names 
+        if s not in section_order and s not in disallowed_sections
+    ]
     if unknown_sections:
-        result.warnings.append(f"Unknown sections (not in template): {unknown_sections}")
+        result.errors.append(f"Unknown sections (not in template): {unknown_sections}")
     
     # Validate Overview section
     overview = next((s for s in sections if s.name == "Overview"), None)
