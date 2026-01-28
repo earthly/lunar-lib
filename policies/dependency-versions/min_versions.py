@@ -19,8 +19,7 @@ def check_min_versions(language, min_versions, include_indirect=False, node=None
     c = Check("min-versions", "Ensures dependencies meet minimum safe version requirements", node=node)
     with c:
         # Skip if language data doesn't exist
-        lang_node = c.get_node(f".lang.{language}")
-        if not lang_node.exists():
+        if not c.exists(f".lang.{language}"):
             c.skip(f"No {language} language data found")
             return c
         
