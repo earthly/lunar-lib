@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-with Check("lint-ran", "Ensures linting was executed") as c:
+with Check("ran", "Ensures linting was executed") as c:
     language = variable_or_default("language", "")
     
     # Validate required input
@@ -9,6 +9,11 @@ with Check("lint-ran", "Ensures linting was executed") as c:
             "Policy misconfiguration: 'language' must be specified. "
             "Set this to the programming language to check (e.g., 'go', 'java', 'python')."
         )
+    
+    # Skip if this language is not present in the component
+    lang_node = c.get_node(f".lang.{language}")
+    if not lang_node.exists():
+        c.skip(f"No {language} code detected in this component")
     
     # Check that lint data exists
     lint_path = f".lang.{language}.lint"

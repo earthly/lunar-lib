@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-with Check("lint-warnings", "Ensures lint warnings are at or below the maximum allowed") as c:
+with Check("max-warnings", "Ensures lint warnings are at or below the maximum allowed") as c:
     language = variable_or_default("language", "")
     max_warnings_str = variable_or_default("max_warnings", "0")
     
@@ -18,6 +18,11 @@ with Check("lint-warnings", "Ensures lint warnings are at or below the maximum a
         raise ValueError(
             f"Policy misconfiguration: 'max_warnings' must be an integer, got '{max_warnings_str}'"
         )
+    
+    # Skip if this language is not present in the component
+    lang_node = c.get_node(f".lang.{language}")
+    if not lang_node.exists():
+        c.skip(f"No {language} code detected in this component")
     
     # Check for lint warnings
     lint_path = f".lang.{language}.lint"

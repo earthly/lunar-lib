@@ -7,11 +7,11 @@ author: support@earthly.dev
 default_image: earthly/lunar-scripts:1.0.0
 
 policies:
-  - name: lint-ran
+  - name: ran
     description: Ensures linting was executed
     mainPython: ./lint-ran.py
 
-  - name: lint-warnings
+  - name: max-warnings
     description: Ensures lint warnings are at or below the maximum allowed
     mainPython: ./lint-warnings.py
 

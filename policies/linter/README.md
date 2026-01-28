@@ -12,8 +12,8 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `lint-ran` | Ensures linting was executed | Linting was not run or no linter is configured |
-| `lint-warnings` | Ensures lint warnings are at or below threshold | Too many lint warnings in the codebase |
+| `ran` | Ensures linting was executed | Linting was not run or no linter is configured |
+| `max-warnings` | Ensures lint warnings are at or below threshold | Too many lint warnings in the codebase |
 
 ## Required Data
 
@@ -65,7 +65,7 @@ policies:
 policies:
   - uses: github://earthly/lunar-lib/policies/linter@v1.0.0
     on: [go]
-    include: [lint-ran]  # Only check that linting occurred
+    include: [ran]  # Only check that linting occurred
     enforcement: block-pr
     with:
       language: "go"
