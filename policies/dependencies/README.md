@@ -57,37 +57,14 @@ policies:
 ### Passing Example
 
 ```json
-{
-  "lang": {
-    "go": {
-      "dependencies": {
-        "direct": [
-          {"path": "github.com/example/lib", "version": "v1.3.0"},
-          {"path": "golang.org/x/crypto", "version": "v0.18.0"}
-        ]
-      }
-    }
-  }
-}
+{"lang": {"go": {"dependencies": {"direct": [{"path": "github.com/example/lib", "version": "v1.3.0"}]}}}}
 ```
 
 ### Failing Example
 
 ```json
-{
-  "lang": {
-    "go": {
-      "dependencies": {
-        "direct": [
-          {"path": "github.com/example/lib", "version": "v1.1.0"}
-        ]
-      }
-    }
-  }
-}
+{"lang": {"go": {"dependencies": {"direct": [{"path": "github.com/example/lib", "version": "v1.0.0"}]}}}}
 ```
-
-**Failure message:** `"'github.com/example/lib' version v1.1.0 is below minimum safe version 1.2.0"`
 
 ## Related Collectors
 
