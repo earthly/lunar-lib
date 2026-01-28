@@ -1,0 +1,24 @@
+version: 0
+
+name: linter
+description: Checks that linting ran and passes with acceptable warning count
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+policies:
+  - name: lint-ran
+    description: Ensures linting was executed
+    mainPython: ./lint-ran.py
+
+  - name: lint-warnings
+    description: Ensures lint warnings are at or below the maximum allowed
+    mainPython: ./lint-warnings.py
+
+inputs:
+  language:
+    description: Programming language to check (e.g., "go", "java", "python")
+    default: ""
+  max_warnings:
+    description: Maximum number of lint warnings allowed (0 = no warnings allowed)
+    default: "0"
