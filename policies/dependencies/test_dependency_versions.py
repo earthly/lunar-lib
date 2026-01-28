@@ -426,6 +426,190 @@ class TestMinVersionsPolicy(unittest.TestCase):
         
         self.assertEqual(check.status, CheckStatus.PASS)
 
+    def test_version_without_v_prefix(self):
+        """Version without 'v' prefix should be parsed correctly."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "org.apache.commons:commons-text", "version": "1.10.0"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"org.apache.commons:commons-text": "1.9.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_version_without_v_prefix_fails(self):
+        """Version without 'v' prefix below minimum should fail."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "org.apache.commons:commons-text", "version": "1.8.0"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"org.apache.commons:commons-text": "1.9.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_snapshot_version(self):
+        """SNAPSHOT versions should be parsed as prerelease (less than release)."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "com.example:mylib", "version": "2.0.0-SNAPSHOT"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"com.example:mylib": "2.0.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        # SNAPSHOT (2.0.0-SNAPSHOT) is less than release (2.0.0)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_snapshot_version_meets_snapshot_minimum(self):
+        """SNAPSHOT version should pass when minimum is also SNAPSHOT."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "com.example:mylib", "version": "2.0.0-SNAPSHOT"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"com.example:mylib": "2.0.0-SNAPSHOT"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_rc_version(self):
+        """Release candidate versions should be parsed as prerelease."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "com.example:mylib", "version": "1.0.0-rc1"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"com.example:mylib": "1.0.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        # rc1 (1.0.0-rc1) is less than release (1.0.0)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_beta_version(self):
+        """Beta versions should be parsed as prerelease."""
+        data = {
+            "lang": {
+                "nodejs": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "lodash", "version": "5.0.0-beta.2"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"lodash": "5.0.0"}
+        
+        check = check_min_versions("nodejs", min_versions, node=node)
+        
+        # beta.2 is less than release
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_mixed_v_prefix_dep_has_v_min_does_not(self):
+        """Dependency with v prefix, minimum without v prefix should work."""
+        data = {
+            "lang": {
+                "go": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "github.com/example/lib", "version": "v1.5.0"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"github.com/example/lib": "1.2.0"}
+        
+        check = check_min_versions("go", min_versions, node=node)
+        
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_mixed_v_prefix_dep_no_v_min_has_v(self):
+        """Dependency without v prefix, minimum with v prefix should work."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "com.example:mylib", "version": "1.5.0"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"com.example:mylib": "v1.2.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_build_metadata_version(self):
+        """Version with build metadata should be parsed correctly."""
+        data = {
+            "lang": {
+                "java": {
+                    "dependencies": {
+                        "direct": [
+                            {"path": "com.example:mylib", "version": "1.0.0+build.123"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        min_versions = {"com.example:mylib": "1.0.0"}
+        
+        check = check_min_versions("java", min_versions, node=node)
+        
+        # Build metadata is ignored in semver comparison, so 1.0.0+build.123 == 1.0.0
+        self.assertEqual(check.status, CheckStatus.PASS)
+
 
 if __name__ == "__main__":
     unittest.main()
