@@ -7,6 +7,21 @@ author: earthly
 default_image: earthly/lunar-lib:golang-main
 default_image_ci_collectors: native
 
+# Landing page metadata for earthly.dev/lunar/guardrails/collectors/golang
+landing_page:
+  status: "stable"
+  display_name: "Go"
+  tagline: "Collect Go project metadata, dependencies, test coverage, and linting results"
+  seo_title: "Go Project Collector"
+  seo_description: |
+    Analyze Go projects to collect module info, dependencies, test coverage, and
+    golangci-lint results. Enforce Go-specific engineering standards.
+  category: "devex-build-and-ci"
+  related:
+    - slug: "coverage"
+      type: "policy"
+      reason: "Enforces test coverage thresholds using collected coverage metrics"
+
 collectors:
   - name: cicd
     description: Collects every Go command run in CI/CD along with the version of Go used.
@@ -14,6 +29,11 @@ collectors:
     hook:
       type: ci-before-command
       pattern: .*\bgo\b .*
+    seo_title: "Track CI/CD Go Commands"
+    seo_description: |
+      Record all Go commands executed in CI pipelines with version information
+      for audit and analysis.
+    seo_keywords: ["go ci", "go version", "ci commands", "build tracking"]
 
   - name: test-scope
     description: Collect the scope of the tests run in Go
@@ -21,6 +41,11 @@ collectors:
     hook:
       type: ci-before-command
       pattern: .*\bgo\b test.*
+    seo_title: "Detect Test Scope"
+    seo_description: |
+      Determine whether tests run recursively (./...) or target specific packages
+      to verify comprehensive test execution.
+    seo_keywords: ["go test", "test scope", "recursive tests", "package tests"]
 
   - name: test-coverage
     description: Detects if go tests produced a coverage report using -coverprofile and extracts the results
@@ -28,26 +53,98 @@ collectors:
     hook:
       type: ci-after-command
       pattern: .*\bgo\b test.*-coverprofile.*
+    seo_title: "Extract Test Coverage"
+    seo_description: |
+      Capture coverage percentage from go test -coverprofile output without
+      requiring external coverage services.
+    seo_keywords: ["code coverage", "go test coverage", "coverprofile", "coverage metrics"]
 
   - name: project
     description: Collect Go project information
     mainBash: project.sh
     hook:
       type: code
+    seo_title: "Analyze Project Structure"
+    seo_description: |
+      Detect Go project structure including go.mod, go.sum, vendor directory,
+      and goreleaser configuration.
+    seo_keywords: ["go modules", "go.mod", "project structure", "go workspace"]
 
   - name: golangci-lint
     description: Run golangci-lint and collect results
     mainBash: golangci-lint.sh
     hook:
       type: code
+    seo_title: "Run golangci-lint"
+    seo_description: |
+      Execute golangci-lint and collect warnings with file locations for
+      code quality enforcement.
+    seo_keywords: ["golangci-lint", "go linting", "static analysis", "code quality"]
 
   - name: dependencies
     description: Collect Go module dependencies
     mainBash: dependencies.sh
     hook:
       type: code
+    seo_title: "Map Dependencies"
+    seo_description: |
+      Extract direct and transitive dependencies from go.mod with version
+      information for supply chain visibility.
+    seo_keywords: ["go dependencies", "go modules", "dependency graph", "supply chain"]
 
 inputs:
   lint_timeout:
     description: Timeout for golangci-lint (e.g., 5m, 10m)
     default: "10m"
+
+example_component_json: |
+  {
+    "lang": {
+      "go": {
+        "module": "github.com/acme/myproject",
+        "version": "1.21",
+        "build_systems": ["go"],
+        "native": {
+          "go_mod": { "exists": true, "version": "1.21" },
+          "go_sum": { "exists": true },
+          "vendor": { "exists": false },
+          "goreleaser": { "exists": true },
+          "golangci_lint": {
+            "passed": false,
+            "config_exists": true,
+            "exit_code": 1,
+            "output": "main.go:42:5: unused variable 'x' (unused)"
+          }
+        },
+        "source": { "tool": "go", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "go test ./...", "version": "1.21.5" }],
+          "source": { "tool": "go", "integration": "ci" }
+        },
+        "tests": {
+          "scope": "recursive",
+          "coverage": {
+            "percentage": 78.5,
+            "profile_path": "coverage.out",
+            "source": { "tool": "go cover", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "github.com/stretchr/testify", "version": "v1.8.4", "indirect": false }
+          ],
+          "transitive": [
+            { "path": "github.com/davecgh/go-spew", "version": "v1.1.1", "indirect": true }
+          ],
+          "source": { "tool": "go mod", "integration": "code" }
+        },
+        "lint": {
+          "warnings": [
+            { "file": "main.go", "line": 42, "column": 5, "message": "unused variable 'x'", "linter": "unused" }
+          ],
+          "linters": ["golangci-lint"],
+          "source": { "tool": "golangci-lint", "integration": "code" }
+        }
+      }
+    }
+  }

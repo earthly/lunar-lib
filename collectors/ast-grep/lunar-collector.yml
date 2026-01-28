@@ -6,6 +6,21 @@ author: earthly
 
 default_image: earthly/lunar-lib:ast-grep-main
 
+# Landing page metadata for earthly.dev/lunar/guardrails/collectors/ast-grep
+landing_page:
+  status: "beta"
+  display_name: "AST-Grep"
+  tagline: "Define custom code patterns using AST-based rules and detect matches across your codebase"
+  seo_title: "AST-Grep Code Pattern Collector"
+  seo_description: |
+    Analyze source code using AST-based pattern matching with ast-grep. Define custom
+    rules to detect security issues, anti-patterns, and code style violations.
+  categories:
+    - "security-and-compliance"
+    - "testing-and-quality"
+  icon: "assets/ast-grep.svg"
+  related: []
+
 collectors:
   - name: ast-grep
     description: |
@@ -16,6 +31,11 @@ collectors:
     mainBash: main.sh
     hook:
       type: code
+    seo_title: "AST-Based Code Pattern Detection"
+    seo_description: |
+      Define custom AST patterns to detect security issues, anti-patterns, 
+      and code style violations across your codebase.
+    seo_keywords: ["ast-grep", "code patterns", "static analysis", "security scanning"]
 
 inputs:
   rules:
@@ -33,3 +53,52 @@ inputs:
   debug:
     description: Enable debug output (echoes rules and raw ast-grep output)
     default: "false"
+
+example_component_json: |
+  {
+    "code_patterns": {
+      "source": {
+        "tool": "ast-grep",
+        "version": "0.40.5"
+      },
+      "security": {
+        "sql_concat": {
+          "count": 0,
+          "message": "SQL query built via string concatenation",
+          "severity": "error",
+          "matches": []
+        },
+        "eval": {
+          "count": 2,
+          "message": "Dangerous eval() usage",
+          "severity": "error",
+          "matches": [
+            {
+              "file": "utils/dynamic.py",
+              "range": { "start": { "line": 45, "column": 8 }, "end": { "line": 45, "column": 25 } },
+              "code": "eval(user_input)"
+            },
+            {
+              "file": "handlers/admin.py",
+              "range": { "start": { "line": 112, "column": 12 }, "end": { "line": 112, "column": 30 } },
+              "code": "exec(code_string)"
+            }
+          ]
+        }
+      },
+      "logging": {
+        "printf": {
+          "count": 5,
+          "message": "Use structured logging instead of fmt.Printf",
+          "severity": "warning",
+          "matches": [
+            {
+              "file": "handler.go",
+              "range": { "start": { "line": 42, "column": 2 }, "end": { "line": 42, "column": 38 } },
+              "code": "fmt.Printf(\"User: %s\", user)"
+            }
+          ]
+        }
+      }
+    }
+  }

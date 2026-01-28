@@ -1,4 +1,4 @@
-# `dockerfile` Collector
+# Dockerfile Collector
 
 Parses Dockerfiles and collects container definition metadata including base images, final stage configuration, and labels.
 
@@ -15,60 +15,6 @@ This collector writes to the following Component JSON paths:
 | `.containers.source` | object | Tool metadata (tool name and version) |
 | `.containers.definitions[]` | array | Parsed Dockerfile definitions with inline native AST |
 
-See the example below for the full structure.
-
-<details>
-<summary>Example Component JSON output</summary>
-
-```json
-{
-  "containers": {
-    "source": {
-      "tool": "dockerfile-json",
-      "version": "1.2.2"
-    },
-    "definitions": [
-      {
-        "path": "Dockerfile",
-        "valid": true,
-        "base_images": [
-          {
-            "reference": "golang:1.21-alpine",
-            "image": "golang",
-            "tag": "1.21-alpine"
-          },
-          {
-            "reference": "gcr.io/distroless/static-debian12:nonroot-amd64",
-            "image": "gcr.io/distroless/static-debian12",
-            "tag": "nonroot-amd64"
-          }
-        ],
-        "final_stage": {
-          "base_name": "runtime",
-          "base_image": "gcr.io/distroless/static-debian12:nonroot-amd64",
-          "user": "nonroot",
-          "has_healthcheck": false
-        },
-        "labels": {
-          "org.opencontainers.image.source": "https://github.com/acme/api"
-        },
-        "native": {
-          "ast": { "Stages": ["..."] }
-        }
-      }
-    ]
-  }
-}
-```
-
-</details>
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `find_command` | No | `find . -type f \( -name Dockerfile -o -name '*.Dockerfile' -o -name 'Dockerfile.*' \)` | Command to find Dockerfiles (must output one file path per line) |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -80,7 +26,3 @@ collectors:
     # with:
     #   find_command: "find ./docker -name Dockerfile"  # Custom find command
 ```
-
-## Related Policies
-
-- [`container`](https://github.com/earthly/lunar-lib/tree/main/policies/container) - Container definition policies

@@ -318,6 +318,38 @@ Categories are **required** and must be one of the following (matching `ai-conte
 | `security-and-compliance` | Security & Compliance | Scanning, vulnerabilities, SBOM, secrets, compliance frameworks |
 | `operational-readiness` | Operational Readiness | Runbooks, on-call, observability, monitoring, resilience |
 
+**Multiple Categories:** Plugins can belong to multiple categories using an array:
+```yaml
+landing_page:
+  categories:
+    - "security-and-compliance"
+    - "testing-and-quality"
+```
+The template supports both `category` (single string, backward compatible) and `categories` (array). When using an array, the first category is used as the primary for display purposes.
+
+---
+
+## Status / Maturity
+
+Plugins can declare their maturity status using the `status` field:
+
+```yaml
+landing_page:
+  status: "stable"  # Optional, defaults to "stable" if not specified
+```
+
+| Status | Badge Color | Description |
+|--------|-------------|-------------|
+| `stable` | Green | Production ready, well tested, recommended for use |
+| `beta` | Blue | Feature complete, may have minor issues, API stable |
+| `experimental` | Amber | Early development, API may change, use with caution |
+| `deprecated` | Red | No longer recommended, will be removed in future |
+
+**Visual Language:**
+- Status is shown as a small badge next to the type badge in the hero section
+- Uses distinct colors for quick visual recognition
+- Experimental/deprecated statuses show a tooltip with additional context
+
 ---
 
 ## Build Pipeline Architecture
@@ -349,18 +381,23 @@ A nightly `+update-lunar-lib` target syncs the latest data from lunar-lib.
 │                        earthly-website                               │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  src/_data/guardrails/        ← CHECKED INTO GIT             │   │
-│  │    ├── collectors/                                            │   │
-│  │    │   ├── github/                                            │   │
-│  │    │   │   ├── lunar-collector.yml  (copied from lunar-lib)   │   │
-│  │    │   │   └── README.md                                      │   │
-│  │    │   └── ...                                                │   │
-│  │    ├── policies/                                              │   │
-│  │    └── catalogers/                                            │   │
+│  │  src/_data/guardrails/                                        │   │
+│  │    └── lunar-lib-data/      ← AUTO-GENERATED, do not edit    │   │
+│  │        ├── collectors/                                        │   │
+│  │        │   ├── github/                                        │   │
+│  │        │   │   ├── lunar-collector.yml                        │   │
+│  │        │   │   └── README.md                                  │   │
+│  │        │   └── ...                                            │   │
+│  │        ├── policies/                                          │   │
+│  │        └── catalogers/                                        │   │
 │  │                                                                │   │
-│  │  src/assets/guardrails/       ← CHECKED INTO GIT             │   │
-│  │    ├── github.svg                                             │   │
-│  │    └── ...                                                    │   │
+│  │  src/assets/guardrails/                                       │   │
+│  │    └── lunar-lib-icons/     ← AUTO-GENERATED, do not edit    │   │
+│  │        ├── collectors/                                        │   │
+│  │        │   ├── github/github.svg                              │   │
+│  │        │   └── ast-grep/ast-grep.svg                          │   │
+│  │        ├── policies/                                          │   │
+│  │        └── catalogers/                                        │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                              │                                       │
 │                    ┌─────────▼─────────┐                            │
@@ -368,12 +405,17 @@ A nightly `+update-lunar-lib` target syncs the latest data from lunar-lib.
 │                    └─────────┬─────────┘                            │
 │                              │                                       │
 │                              ▼                                       │
-│            ┌─────────────────────────────────────────┐              │
-│            │  Eleventy reads YAML directly via JS    │              │
-│            │  data files and generates HTML pages    │              │
-│            └─────────────────────────────────────────┘              │
+│            ┌─────────────────────────────────────────────────────┐  │
+│            │  Eleventy reads YAML via guardrails.js data file    │  │
+│            │  and generates static HTML pages                    │  │
+│            └─────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+**Directory Naming Convention:**
+- Directories prefixed with `lunar-lib-` are auto-generated by the sync process
+- These should never be manually edited—changes will be overwritten
+- This convention is documented in `earthly-website/AGENTS.md`
 
 ### earthly-website Earthfile: `+update-lunar-lib`
 
@@ -382,16 +424,15 @@ A nightly `+update-lunar-lib` target syncs the latest data from lunar-lib.
 ```bash
 # Run manually or via nightly CI job
 earthly +update-lunar-lib
-git add src/_data/guardrails/ src/assets/guardrails/
+git add src/_data/guardrails/lunar-lib-data/ src/assets/guardrails/lunar-lib-icons/
 git commit -m "chore: sync lunar-lib guardrail data"
 git push
 ```
 
 **Implementation:**
-- Clone/pull `lunar-lib` repo (or fetch via GitHub API)
-- Copy `lunar-*.yml` files to `src/_data/guardrails/{type}/{slug}/`
-- Copy README.md files alongside the YAML
-- Copy icons to `src/assets/guardrails/{slug}.svg`
+- Imports lunar-lib Earthfile targets (`+guardrails-data`, `+guardrails-assets`)
+- Copies `lunar-*.yml` + README files to `src/_data/guardrails/lunar-lib-data/{type}/{slug}/`
+- Copies icons to `src/assets/guardrails/lunar-lib-icons/{type}/{slug}/` (preserving directory structure to avoid name clashes)
 - Files are checked into git for fast, Earthly-free builds
 
 ### Website Build (no Earthly required)
@@ -434,6 +475,7 @@ Validates all `lunar-*.yml` files have complete landing page metadata:
 
 **Cross-validation:**
 - Warn if `related` references plugins that don't exist
+- **README title validation:** The README `# Title` must match `landing_page.display_name` or `name` from the YAML (to avoid formatting issues like backticks in titles rendering incorrectly on landing pages). The existing title valiation needs to be adjusted accordingly.
 
 **Integration:**
 - Add to existing `+lint` Earthfile target
@@ -445,31 +487,39 @@ JavaScript data file that Eleventy loads automatically:
 
 ```javascript
 // src/_data/guardrails.js
-const yaml = require('js-yaml');
-const fs = require('fs');
-const path = require('path');
+import yaml from 'js-yaml';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-module.exports = function() {
-  const types = ['collectors', 'policies', 'catalogers'];
-  const guardrails = { collectors: [], policies: [], catalogers: [] };
-  
-  for (const type of types) {
-    const dir = path.join(__dirname, 'guardrails', type);
-    if (!fs.existsSync(dir)) continue;
-    
-    for (const slug of fs.readdirSync(dir)) {
-      const ymlPath = path.join(dir, slug, `lunar-${type.slice(0,-1)}.yml`);
-      const mdPath = path.join(dir, slug, 'README.md');
-      
-      if (fs.existsSync(ymlPath)) {
-        const data = yaml.load(fs.readFileSync(ymlPath, 'utf8'));
-        const readme = fs.existsSync(mdPath) ? fs.readFileSync(mdPath, 'utf8') : '';
-        guardrails[type].push({ slug, ...data, readme });
-      }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default function () {
+    const types = ['collectors', 'policies', 'catalogers'];
+    const guardrails = { collectors: [], policies: [], catalogers: [] };
+
+    for (const type of types) {
+        const dir = path.join(__dirname, 'guardrails', 'lunar-lib-data', type);
+        if (!fs.existsSync(dir)) continue;
+
+        for (const slug of fs.readdirSync(dir)) {
+            const slugDir = path.join(dir, slug);
+            if (!fs.statSync(slugDir).isDirectory()) continue;
+
+            const ymlPath = path.join(slugDir, `lunar-${type.slice(0, -1)}.yml`);
+            const mdPath = path.join(slugDir, 'README.md');
+
+            if (fs.existsSync(ymlPath)) {
+                const data = yaml.load(fs.readFileSync(ymlPath, 'utf8'));
+                const readme = fs.existsSync(mdPath) ? fs.readFileSync(mdPath, 'utf8') : '';
+                guardrails[type].push({ slug, ...data, readme });
+            }
+        }
     }
-  }
-  return guardrails;
-};
+
+    return guardrails;
+}
 ```
 
 This provides `guardrails.collectors`, `guardrails.policies`, `guardrails.catalogers` to all templates.
@@ -488,38 +538,38 @@ For dynamic page generation from data, Eleventy uses [pagination](https://www.11
 
 ```
 src/
-├── _includes/
-│   └── guardrails/
-│       ├── base.njk                # Base layout for all guardrail pages
-│       ├── collector.njk           # Collector-specific sections
-│       ├── policy.njk              # Policy-specific sections
-│       ├── cataloger.njk           # Cataloger-specific sections
-│       ├── sub-component-card.njk  # Reusable card for sub-collectors/policies
-│       └── related.njk             # Cross-links section
 ├── _data/
-│   ├── guardrails.js               # JS data file (parses YAML, see above)
-│   └── guardrails/                 # Raw data synced from lunar-lib
-│       ├── collectors/
-│       │   └── github/
-│       │       ├── lunar-collector.yml
-│       │       └── README.md
-│       ├── policies/
-│       └── catalogers/
+│   ├── guardrails.js                      # JS data file (parses YAML, see above)
+│   └── guardrails/
+│       └── lunar-lib-data/                # ⚠️ AUTO-GENERATED - do not edit
+│           ├── collectors/{slug}/
+│           │   ├── lunar-collector.yml
+│           │   └── README.md
+│           ├── policies/{slug}/
+│           └── catalogers/{slug}/
 ├── lunar/
 │   └── guardrails/
-│       ├── index.njk               # All guardrails index → /lunar/guardrails/
-│       ├── collectors.njk          # Collector index → /lunar/guardrails/collectors/
-│       ├── collector.njk           # Paginated template → /lunar/guardrails/collectors/{slug}/
-│       ├── policies.njk            # Policy index
-│       ├── policy.njk              # Paginated template
-│       ├── catalogers.njk          # Cataloger index
-│       └── cataloger.njk           # Paginated template
+│       ├── index.njk                      # All guardrails index → /lunar/guardrails/
+│       ├── collectors.njk                 # Collector list → /lunar/guardrails/collectors/
+│       ├── collector.njk                  # Paginated detail → /lunar/guardrails/collectors/{slug}/
+│       ├── policies.njk                   # Policy list (TODO)
+│       ├── policy.njk                     # Paginated detail (TODO)
+│       ├── catalogers.njk                 # Cataloger list (TODO)
+│       └── cataloger.njk                  # Paginated detail (TODO)
 └── assets/
     ├── css/
-    │   └── guardrails.css
-    └── guardrails/                 # Icons synced from lunar-lib
-        ├── github.svg
-        └── ...
+    │   ├── guardrails.css                 # Common styles (badges, hero, breadcrumbs)
+    │   ├── guardrails-index.css           # Main index page styles
+    │   ├── collectors.css                 # Collectors list page styles
+    │   └── collector.css                  # Individual collector page styles
+    ├── js/
+    │   ├── collectors.js                  # Category filtering, URL hash handling
+    │   └── collector.js                   # Copy-to-clipboard for uses line
+    └── guardrails/
+        └── lunar-lib-icons/               # ⚠️ AUTO-GENERATED - do not edit
+            ├── collectors/{slug}/{icon}.svg
+            ├── policies/{slug}/{icon}.svg
+            └── catalogers/{slug}/{icon}.svg
 ```
 
 ### Pagination Example
@@ -685,19 +735,24 @@ Follow the existing Earthly website design language (from `COLOR-PALETTE.md`).
 Get one complete page live with minimal implementation. Skip strict validation, use basic CSS.
 
 **lunar-lib:**
-- [ ] Add `landing_page:` section to `collectors/github/lunar-collector.yml`:
+- [x] Add `landing_page:` section to `collectors/github/lunar-collector.yml`:
   - Top-level: `display_name`, `tagline`, `seo_title`, `seo_description`, `category`, `icon`
   - Sub-components: `seo_title`, `seo_description`, `seo_keywords` for each collector
-- [ ] Create/source `collectors/github/assets/github.svg` icon
-- [ ] Remove "Related Policies" section from `collectors/github/README.md` (now in YAML)
+- [x] Create/source `collectors/github/assets/github.svg` icon
+- [x] Remove "Related Policies" section from `collectors/github/README.md` (now in YAML)
+- [x] Add `landing_page:` section to `collectors/ast-grep/lunar-collector.yml` (second example with inputs)
+- [x] Create/source `collectors/ast-grep/assets/ast-grep.svg` icon
+- [x] Add `example_component_json` field to github and ast-grep YAMLs
+- [x] Add `secrets` field to github YAML
+- [x] Remove "Example Component JSON output", "Inputs", "Secrets" from github and ast-grep READMEs
 
 **earthly-website:**
-- [ ] Create `+update-lunar-lib` target in Earthfile (copies files from lunar-lib)
-- [ ] Run sync, check in initial `src/_data/guardrails/collectors/github/` directory
-- [ ] Create `src/_data/guardrails.js` (JS data file to parse YAML)
-- [ ] Create minimal `base.njk` template (header, tagline, README content, meta tags, footer)
-- [ ] Create paginated collector template at `lunar/guardrails/collector.njk`
-- [ ] Add basic `guardrails.css` (readable layout, minimal styling)
+- [x] Create `+update-lunar-lib` target in Earthfile (copies files from lunar-lib)
+- [x] Run sync, check in initial `src/_data/guardrails/collectors/github/` directory
+- [x] Create `src/_data/guardrails.js` (JS data file to parse YAML)
+- [x] Create minimal `base.njk` template (header, tagline, README content, meta tags, footer)
+- [x] Create paginated collector template at `lunar/guardrails/collector.njk`
+- [x] Add basic `guardrails.css` (readable layout, minimal styling)
 
 **Checkpoint:** Local review before proceeding.
 
@@ -712,22 +767,41 @@ Once Phase 1 passes review, scale to all plugins.
 - [ ] Add `landing_page:` + sub-component SEO fields to all policies
 - [ ] Add `landing_page:` + sub-component SEO fields to all catalogers
 - [ ] Create/source icon SVGs for each plugin
-- [ ] Remove "Related Policies/Collectors" sections from all READMEs (now in YAML)
-- [ ] Update `ai-context/collector-README-template.md`: remove "Related Policies" section
-- [ ] Update `ai-context/policy-README-template.md`: remove "Related Collectors" section
-- [ ] Update `scripts/enforce_collector_readme_structure.py`:
-  - Remove `"Related Policies"` from `TEMPLATE_SECTIONS` entirely
-  - Remove validation logic for this section (lines 659-693)
-- [ ] Update `scripts/enforce_policy_readme_structure.py`:
-  - Remove `"Related Collectors"` from `TEMPLATE_SECTIONS` entirely
-  - Remove validation logic for this section (lines 626-655)
+- [ ] Add `example_component_json` field to all plugin YAMLs (move from READMEs)
+- [ ] Add `secrets` field to all plugin YAMLs that have secrets (move from READMEs)
+- [ ] Update all READMEs:
+  - Remove "Example Component JSON output" collapsible sections (now in YAML)
+  - Remove "Inputs" sections (now in YAML)
+  - Remove "Secrets" sections (now in YAML)
+  - Remove "Related Policies/Collectors" sections (now in YAML)
+- [ ] Update `ai-context/collector-README-template.md`:
+  - Remove "Related Policies" section
+  - Remove "Inputs" section
+  - Remove "Secrets" section
+  - Remove "Example Component JSON output" collapsible
+- [ ] Update `ai-context/policy-README-template.md`:
+  - Remove "Related Collectors" section
+  - Remove "Inputs" section (if present)
+  - Remove "Example Component JSON output" collapsible
+- [ ] Update `ai-context/cataloger-README-template.md`:
+  - Remove "Related" sections
+  - Remove "Inputs" section
+  - Remove "Secrets" section
+  - Remove "Example Component JSON output" collapsible
 
 **earthly-website:**
-- [ ] Run full sync, check in all guardrail data
-- [ ] Create paginated templates for policies and catalogers
-- [ ] Create index pages (`/guardrails/`, `/guardrails/collectors/`, etc.)
-- [ ] Add category filtering to index pages
-- [ ] Wire up meta descriptions from `seo_description` in templates
+- [x] Run full sync, check in all guardrail data
+- [x] Create main index page (`/lunar/guardrails/`)
+- [x] Create collectors list page (`/lunar/guardrails/collectors/`)
+- [x] Add category filtering to collectors list page
+- [x] Wire up meta descriptions from `seo_description` in templates
+- [x] Add JSON-LD structured data to list pages
+- [x] Add canonical URLs and Open Graph meta tags
+- [ ] Create paginated templates for policies (`policy.njk`)
+- [ ] Create paginated templates for catalogers (`cataloger.njk`)
+- [ ] Create policies list page (`/lunar/guardrails/policies/`)
+- [ ] Create catalogers list page (`/lunar/guardrails/catalogers/`)
+- [ ] Add category filtering to policies and catalogers list pages
 
 ---
 
@@ -736,20 +810,49 @@ Once Phase 1 passes review, scale to all plugins.
 **lunar-lib:**
 - [ ] Create `scripts/validate_landing_page_metadata.py` (strict validation)
 - [ ] Integrate validation into `+lint` target
+- [ ] Update `scripts/enforce_collector_readme_structure.py`:
+  - Remove `"Related Policies"` from `TEMPLATE_SECTIONS`
+  - Remove `"Inputs"` from `TEMPLATE_SECTIONS`
+  - Remove `"Secrets"` from `TEMPLATE_SECTIONS`
+  - Remove validation logic for these sections
+  - Keep "Collected Data" but remove requirement for example JSON collapsible
+- [ ] Update `scripts/enforce_policy_readme_structure.py`:
+  - Remove `"Related Collectors"` from `TEMPLATE_SECTIONS`
+  - Remove `"Inputs"` from `TEMPLATE_SECTIONS` (if present)
+  - Remove validation logic for these sections
+- [ ] Update `scripts/enforce_cataloger_readme_structure.py`:
+  - Remove `"Inputs"` from `TEMPLATE_SECTIONS`
+  - Remove `"Secrets"` from `TEMPLATE_SECTIONS`
+  - Remove validation logic for these sections
 
 **Templates:**
-- [ ] Add "What's Included" section with sub-component cards
-- [ ] Add "Related Plugins" cross-linking section
-- [ ] Add type-specific context sections (collector/policy/cataloger intros)
+- [x] Add "What's Included" section with sub-component cards
+- [x] Add "Related Plugins" cross-linking section
+- [x] Add type-specific context sections (collector/policy/cataloger intros)
+- [x] Add "Example Collected Data" section with collapsible JSON preview
+- [x] Add "Configuration" section with inputs table and secrets table
+- [x] Add copy-to-clipboard buttons for all code blocks
+- [x] Support multiple categories (array) in addition to single category
 
 **Styling:**
-- [ ] Full `guardrails.css` with type colors, category badges, card styling
-- [ ] Responsive layout for mobile
-- [ ] Dark mode consistency with rest of site
+- [x] Full CSS with type colors, category badges, card styling
+  - `guardrails.css` - Common styles (badges, hero sections, breadcrumbs)
+  - `guardrails-index.css` - Main index page (tech cloud, plugin grid, flow diagram)
+  - `collectors.css` - Collectors list page (filter bar, item cards)
+  - `collector.css` - Individual collector page (detail sections)
+- [x] Responsive layout for mobile
+- [x] Dark mode consistency with rest of site
 
 **SEO:**
-- [ ] Add JSON-LD schema markup
-- [ ] Verify title tag format
+- [x] Add JSON-LD schema markup (BreadcrumbList, SoftwareSourceCode, FAQPage)
+- [x] Verify title tag format
+- [x] Dynamic canonical URLs per page
+- [x] Dynamic Open Graph URLs per page
+- [x] Meta keywords from seo_keywords data
+- [x] Article meta tags (publisher, section, tags)
+- [x] Robots meta tag with optimal crawl directives
+- [x] Microdata (itemscope/itemprop) on hero section and breadcrumbs
+- [x] Improved alt text with context on images
 
 ---
 
