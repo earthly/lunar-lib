@@ -19,6 +19,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git diff/log commands
+
+      - name: Setup git branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # Fetch and checkout PR branch (using env vars to avoid shell injection)
+          git fetch origin "$PR_HEAD_REF"
+          git checkout "$PR_HEAD_REF"
+          
+          # Fetch base branch for comparison
+          git fetch origin "$PR_BASE_REF"
 
       - name: Get PR context
         id: pr-context
@@ -29,9 +44,6 @@ jobs:
           gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' > /tmp/files.txt
           FILE_COUNT=$(wc -l < /tmp/files.txt | tr -d ' ')
           echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
-          
-          # Get the diff directly from GitHub API
-          gh pr diff ${{ github.event.pull_request.number }} > /tmp/pr_diff.txt
           
           # Get diff stats
           gh pr view ${{ github.event.pull_request.number }} --json additions,deletions,changedFiles \
@@ -51,62 +63,36 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Prepare the prompt
-          cat > /tmp/prompt.txt << 'PROMPT_EOF'
-          You are a principal software engineer reviewing a pull request. Analyze the changes and provide a structured assessment.
+          # Load file contents into env vars for template substitution
+          export PR_STATS="$(cat /tmp/stats.txt)"
+          export CHANGED_FILES="$(cat /tmp/files.txt)"
           
-          ## Your Task
-          
-          1. Determine if the changes are ISOLATED or EXTENSIVE:
-             - ISOLATED: Focused on a single feature, bug fix, or small improvement. Few files, clear scope, low blast radius.
-             - EXTENSIVE: Spans multiple systems, architectural changes, many files, or high blast radius.
-          
-          2. Identify any MAJOR ISSUES (things that would block merge):
-             - Security vulnerabilities
-             - Critical bugs
-             - Breaking API changes without migration
-             - Missing error handling for critical paths
-             - Obvious logic errors
-             - Changes that are dangerous from an access, approval, or compliance perspective
-          
-          Note: Style issues, minor improvements, or suggestions are NOT major issues.
-          
-          ## Response Rules
-          
-          For major_issues: include file path and issue description. Line number is optional.
-          If no issues, use empty array.
-          
-          Set "recommendation" to "APPROVE" only if BOTH:
-          1. scope is "ISOLATED"
-          2. major_issues is empty
-          
-          Otherwise, set "recommendation" to "REVIEW_NEEDED".
-          PROMPT_EOF
-          
-          # Add PR context (using env vars to prevent command injection from untrusted input)
-          {
-            echo ""
-            echo "## PR Information"
-            echo ""
-            echo "**Title:** $PR_TITLE"
-            echo "**Author:** $PR_AUTHOR"
-            echo "**Stats:** $(cat /tmp/stats.txt)"
-            echo ""
-            echo "**Changed Files:**"
-            cat /tmp/files.txt
-            echo ""
-            echo "**Diff:**"
-            cat /tmp/pr_diff.txt
-          } >> /tmp/prompt.txt
+          # Hydrate prompt template with envsubst
+          envsubst < .github/prompts/auto-approve-review-prompt.md > /tmp/prompt.txt
           
           # Define JSON schema for structured output
           JSON_SCHEMA='{
             "type": "object",
             "properties": {
-              "scope": { "type": "string", "enum": ["ISOLATED", "EXTENSIVE"] },
+              "scope": { "type": "string", "enum": ["ISOLATED", "ISOLATED_SENSITIVE", "EXTENSIVE"] },
               "scope_reasoning": { "type": "string" },
               "major_issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "type": "integer" },
+                    "issue": { "type": "string" }
+                  },
+                  "required": ["file", "issue"]
+                }
+              },
+              "medium_issues": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -121,11 +107,18 @@ jobs:
               "summary": { "type": "string" },
               "recommendation": { "type": "string", "enum": ["APPROVE", "REVIEW_NEEDED"] }
             },
-            "required": ["scope", "scope_reasoning", "major_issues", "summary", "recommendation"]
+            "required": ["scope", "scope_reasoning", "major_issues", "medium_issues", "summary", "recommendation"]
           }'
           
           # Run Claude CLI with JSON schema enforcement (using Opus for highest quality review)
-          RESPONSE=$(claude -p "$(cat /tmp/prompt.txt)" --model opus --output-format json --json-schema "$JSON_SCHEMA" 2>&1) || true
+          # Allow only safe read-only git commands and file reading
+          # Read prompt from stdin using -p -
+          RESPONSE=$(claude -p - \
+            --model opus \
+            --output-format json \
+            --json-schema "$JSON_SCHEMA" \
+            --allowedTools "Bash(git diff*)" "Bash(git log*)" "Bash(git show*)" "Bash(git status*)" "Read" "Grep" "Glob" \
+            < /tmp/prompt.txt 2>&1) || true
           
           echo "Raw Claude Response:"
           echo "$RESPONSE"
@@ -225,7 +218,9 @@ jobs:
           SCOPE=$(echo "$ANALYSIS" | jq -r '.scope // "EXTENSIVE"')
           SCOPE_REASONING=$(echo "$ANALYSIS" | jq -r '.scope_reasoning // ""')
           MAJOR_ISSUES=$(echo "$ANALYSIS" | jq -c '.major_issues // []')
-          ISSUES_COUNT=$(echo "$MAJOR_ISSUES" | jq 'length')
+          MAJOR_ISSUES_COUNT=$(echo "$MAJOR_ISSUES" | jq 'length')
+          MEDIUM_ISSUES=$(echo "$ANALYSIS" | jq -c '.medium_issues // []')
+          MEDIUM_ISSUES_COUNT=$(echo "$MEDIUM_ISSUES" | jq 'length')
           
           # Set outputs
           if [ "$RECOMMENDATION" = "APPROVE" ]; then
@@ -243,17 +238,25 @@ jobs:
             echo "**Scope:** $SCOPE"
             echo "> $SCOPE_REASONING"
             echo ""
-            if [ "$ISSUES_COUNT" -gt 0 ]; then
-              echo "**Major Issues Found:** $ISSUES_COUNT"
+            if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
+              echo "**Major Issues Found:** $MAJOR_ISSUES_COUNT"
               echo ""
               echo "$MAJOR_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
             else
               echo "**Major Issues Found:** None"
             fi
             echo ""
+            if [ "$MEDIUM_ISSUES_COUNT" -gt 0 ]; then
+              echo "**Medium Issues Found:** $MEDIUM_ISSUES_COUNT"
+              echo ""
+              echo "$MEDIUM_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
+            else
+              echo "**Medium Issues Found:** None"
+            fi
+            echo ""
             echo "---"
             if [ "$RECOMMENDATION" = "APPROVE" ]; then
-              echo "Conclusion: ✅ **Auto-approved** (isolated changes, no major issues)"
+              echo "Conclusion: ✅ **Auto-approved** (isolated changes, no issues)"
             else
               echo "👀 **Manual review needed**"
             fi
