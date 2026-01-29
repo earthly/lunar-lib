@@ -11,6 +11,7 @@ landing_page:
     required approvals, status checks, and merge strategies. Prevent unauthorized
     changes to critical branches.
   category: "repository-and-ownership"
+  icon: "assets/vcs.svg"
   status: "stable"
   requires:
     - slug: "github"

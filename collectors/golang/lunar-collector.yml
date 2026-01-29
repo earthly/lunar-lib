@@ -13,6 +13,7 @@ landing_page:
     Analyze Go projects to collect module info, dependencies, test coverage, and
     golangci-lint results. Enforce Go-specific engineering standards.
   category: "devex-build-and-ci"
+  icon: "assets/golang.svg"
   status: "stable"
   related:
     - slug: "coverage"

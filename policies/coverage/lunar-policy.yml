@@ -10,6 +10,7 @@ landing_page:
     Validate that code coverage data is collected in CI and meets minimum thresholds.
     Works with any coverage collector that writes to standard testing.coverage paths.
   category: "testing-and-quality"
+  icon: "assets/coverage.svg"
   status: "stable"
   requires:
     - slug: "codecov"

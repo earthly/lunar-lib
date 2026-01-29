@@ -12,6 +12,7 @@ landing_page:
     Enforce container best practices including tag stability, registry allowlists,
     required labels, and security configurations for Dockerfiles.
   category: "devex-build-and-ci"
+  icon: "assets/container.svg"
   status: "stable"
   requires:
     - slug: "dockerfile"

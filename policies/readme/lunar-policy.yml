@@ -11,6 +11,7 @@ landing_page:
     proper documentation by checking for file existence, minimum content length,
     and required section headings.
   category: "repository-and-ownership"
+  icon: "assets/readme.svg"
   status: "stable"
   requires:
     - slug: "readme"

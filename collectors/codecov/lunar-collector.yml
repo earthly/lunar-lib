@@ -13,6 +13,7 @@ landing_page:
     Automatically detect Codecov runs in CI and fetch coverage percentage and file-level
     details. Track test coverage trends across your organization.
   category: "testing-and-quality"
+  icon: "assets/codecov.svg"
   status: "stable"
   related:
     - slug: "coverage"
