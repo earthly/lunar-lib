@@ -1,4 +1,4 @@
-# `dependencies` Policies
+# Dependency Policies
 
 Policies for validating project dependencies.
 
@@ -8,7 +8,7 @@ This policy plugin validates that project dependencies meet organizational requi
 
 ## Policies
 
-This plugin provides the following policies:
+This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
@@ -20,22 +20,12 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.lang.{language}.dependencies.direct` | array | Language-specific collectors (e.g., `golang`) |
+| `.lang.{language}.dependencies.direct` | array | Language-specific collectors (e.g., [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang)) |
 | `.lang.{language}.dependencies.direct[].path` | string | Dependency identifier |
 | `.lang.{language}.dependencies.direct[].version` | string | Version string |
 | `.lang.{language}.dependencies.indirect` | array | Language-specific collectors (when `include_indirect` is enabled) |
 
 **Note:** Ensure the corresponding language collector is configured before enabling this policy.
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `language` | **Yes** | `""` | Programming language to check (e.g., `"go"`, `"java"`, `"python"`, `"nodejs"`) |
-| `min_versions` | No | `"{}"` | JSON object mapping dependency paths to minimum safe versions |
-| `include_indirect` | No | `"false"` | Whether to also check indirect (transitive) dependencies |
-
-**Note:** The `language` input is required. The policy will error if not specified. Versions must follow [semver](https://semver.org/) format (e.g., `1.2.3`). Date-based versioning (e.g., `2024.01.15`) and CalVer schemes are not supported.
 
 ## Installation
 
@@ -57,20 +47,37 @@ policies:
 ### Passing Example
 
 ```json
-{"lang": {"go": {"dependencies": {"direct": [{"path": "github.com/example/lib", "version": "v1.3.0"}]}}}}
+{
+  "lang": {
+    "go": {
+      "dependencies": {
+        "direct": [
+          {"path": "github.com/example/lib", "version": "v1.3.0"},
+          {"path": "golang.org/x/crypto", "version": "v0.18.0"}
+        ]
+      }
+    }
+  }
+}
 ```
 
 ### Failing Example
 
 ```json
-{"lang": {"go": {"dependencies": {"direct": [{"path": "github.com/example/lib", "version": "v1.0.0"}]}}}}
+{
+  "lang": {
+    "go": {
+      "dependencies": {
+        "direct": [
+          {"path": "github.com/example/lib", "version": "v1.1.0"}
+        ]
+      }
+    }
+  }
+}
 ```
 
-## Related Collectors
-
-This policy works with any collector that populates `.lang.{language}.dependencies.direct`:
-
-- [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) — Collects Go module dependencies
+**Failure message:** `"'github.com/example/lib' version v1.1.0 is below minimum safe version 1.2.0"`
 
 ## Remediation
 
