@@ -18,6 +18,30 @@ landing_page:
       type: "collector"
       reason: "Collects detailed settings for each discovered repository"
 
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/payment-api": {
+        "owner": "platform-team@acme.com",
+        "tags": ["gh-backend", "gh-go", "gh-production", "github-visibility-private"],
+        "meta": {
+          "description": "Payment processing API service",
+          "visibility": "private",
+          "archived": "false"
+        }
+      },
+      "github.com/acme/frontend-app": {
+        "owner": "platform-team@acme.com",
+        "tags": ["gh-react", "gh-typescript", "github-visibility-public"],
+        "meta": {
+          "description": "Customer-facing web application",
+          "visibility": "public",
+          "archived": "false"
+        }
+      }
+    }
+  }
+
 catalogers:
   - name: repos
     description: |

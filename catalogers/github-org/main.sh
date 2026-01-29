@@ -207,7 +207,7 @@ CATALOG_ENTRIES=$(jq \
         key: (.url | gsub("https://"; "")),
         value: (
             {
-                tags: [(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"],
+                tags: [(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"] + ["github-visibility-\(.visibility | ascii_downcase)"],
                 meta: {
                     description: .description,
                     visibility: .visibility,

@@ -734,7 +734,7 @@ Once Phase 1 passes review, scale to all plugins.
   - [x] Remove "Secrets" sections
   - [x] Remove "Related Policies/Collectors" sections
   - [x] Update titles to match `display_name`
-- [ ] Create/source icon SVGs for each collector (deferred)
+- [x] Create/source icon SVGs for each collector
 
 **lunar-lib - Policies (DONE):**
 - [x] Add `landing_page:` section to all policy YAMLs with:
@@ -749,7 +749,7 @@ Once Phase 1 passes review, scale to all plugins.
   - Remove "Related Collectors" sections
   - Remove "Inputs" sections
   - Update titles to match `display_name`
-- [ ] Create/source icon SVGs for each policy (deferred)
+- [x] Create/source icon SVGs for each policy
 
 **lunar-lib - Catalogers (DONE):**
 - [x] Add `landing_page:` section to all cataloger YAMLs with:
@@ -757,14 +757,14 @@ Once Phase 1 passes review, scale to all plugins.
   - `long_description`, `category`, `status`
   - `related:` array (optional)
 - [x] Add `keywords` to sub-catalogers
-- [ ] Add `example_component_json` field (move from READMEs)
+- [x] Add `example_catalog_json` field (catalog entry example, different from Component JSON)
 - [ ] Add `inputs` and `secrets` fields (move from READMEs)
 - [x] Update all cataloger READMEs:
   - Remove "Related" sections
   - Remove "Inputs" sections
   - Remove "Secrets" sections
   - Update titles to match `display_name`
-- [ ] Create/source icon SVGs for each cataloger (deferred)
+- [x] Create/source icon SVGs for each cataloger
 
 **lunar-lib - Templates (TODO):**
 - [ ] Update `ai-context/collector-README-template.md`:
@@ -792,12 +792,12 @@ Once Phase 1 passes review, scale to all plugins.
 - [x] Add canonical URLs and Open Graph meta tags
 - [x] Update collector.njk template for simplified schema
 - [x] Add graceful icon fallback (placeholder symbols when icons missing)
-- [ ] Create paginated templates for policies (`policy.njk`)
-- [ ] Create paginated templates for catalogers (`cataloger.njk`)
+- [x] Create paginated templates for policies (`policy.njk`)
+- [x] Create paginated templates for catalogers (`cataloger.njk`)
 - [ ] Create policies list page (`/lunar/guardrails/policies/`)
 - [ ] Create catalogers list page (`/lunar/guardrails/catalogers/`)
 - [ ] Add category filtering to policies and catalogers list pages
-- [ ] Add "Requires" section to policy pages (show required collectors)
+- [x] Add "Requires" section to policy pages (show required collectors)
 
 ---
 
@@ -886,8 +886,10 @@ During implementation, the schema was simplified from the original plan:
 
 ## Open Questions
 
-1. **Icon sourcing**: Create new SVGs or use existing assets?
+1. **Icon sourcing**: ~~Create new SVGs or use existing assets?~~ **DONE**
    - Icon field is required by validator
    - Templates gracefully fallback to placeholder symbols (↓ for collectors, ✓ for policies, ⇄ for catalogers)
-   - Currently have icons for: ast-grep, github (collectors only)
-   - Missing icons for: codecov, dockerfile, golang, readme (collectors), all policies, all catalogers
+   - All collectors have icons: ast-grep, github, codecov, dockerfile, golang, readme
+   - All policies have icons: container (docker), coverage, readme, vcs
+   - All catalogers have icons: github-org (reuses github icon)
+   - Icons must have transparent backgrounds with solid shapes (CSS filter flattens to white)
