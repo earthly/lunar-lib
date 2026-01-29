@@ -32,15 +32,6 @@ This policy reads from the following Component JSON paths:
 
 **Note:** Ensure the corresponding collector(s) are configured before enabling this policy.
 
-## Inputs
-
-{If the policy has configurable inputs, list them here. If not, write "This policy has no configurable inputs."}
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `minThreshold` | No | `80` | Minimum required threshold |
-| `requiredLabels` | No | `""` | Comma-separated list of required labels |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -84,12 +75,6 @@ policies:
 
 **Failure message:** `"X is required but was not found"`
 
-## Related Collectors
-
-This policy works with any collector that populates the required data paths. Common options include:
-
-- [`collector-name`](https://github.com/earthly/lunar-lib/tree/main/collectors/collector-name) - Brief description of the collector
-
 ## Remediation
 
 {Explain how to fix failures.}
@@ -107,8 +92,7 @@ When this policy fails, you can resolve it by:
 When using this template:
 
 1. Replace all `{placeholders}` with actual values
-2. Remove sections that don't apply (e.g., Inputs if there are none)
-3. Be specific about check IDs - these appear in the Lunar UI
-4. Always document the required Component JSON paths and which collector provides them
-5. Include remediation steps - help developers fix issues
-6. Remove this "Template Usage Notes" section from the final README
+2. Be specific about check IDs - these appear in the Lunar UI
+3. Always document the required Component JSON paths and which collector provides them
+4. Include remediation steps - help developers fix issues
+5. Remove this "Template Usage Notes" section from the final README
