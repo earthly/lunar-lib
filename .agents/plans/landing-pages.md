@@ -855,6 +855,30 @@ Once Phase 1 passes review, scale to all plugins.
 
 ---
 
+### Phase 5: Granular Sub-Policy + Collector Pages
+
+Create dynamic landing pages for every combination of sub-policy + required collector. This provides highly targeted SEO pages for specific guardrail use cases.
+
+**Examples:**
+- `/lunar/guardrails/codecov/ensure-ran/` - Codecov collector + "ensure coverage ran" sub-policy
+- `/lunar/guardrails/github/default-branch-main/` - GitHub collector + "default branch is main" sub-policy
+- `/lunar/guardrails/dockerfile/no-latest/` - Dockerfile collector + "no latest tag" sub-policy
+- `/lunar/guardrails/k8s/resource-limits/` - Kubernetes collector + "resource limits" sub-policy
+
+**Benefits:**
+- Captures long-tail searches like "how to enforce main branch on github"
+- Shows the complete collector → policy workflow for a specific check
+- Provides copy-paste configuration for enabling a single guardrail
+
+**TODO:**
+- [ ] Design URL structure for sub-policy + collector combinations
+- [ ] Determine data source: derive from `requires` relationships in policy YAMLs
+- [ ] Create paginated template for combination pages
+- [ ] Add cross-linking from parent collector/policy pages (call these "use-cases")
+- [ ] Add to sitemap and internal linking structure
+
+---
+
 ## Schema Simplifications (Implemented)
 
 During implementation, the schema was simplified from the original plan:
