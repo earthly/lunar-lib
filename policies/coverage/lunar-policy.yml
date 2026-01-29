@@ -4,18 +4,43 @@ name: coverage
 description: Validates code coverage collection and thresholds
 author: earthly
 
+landing_page:
+  display_name: "Coverage Policies"
+  long_description: |
+    Validate that code coverage data is collected in CI and meets minimum thresholds.
+    Works with any coverage collector that writes to standard testing.coverage paths.
+  category: "testing-and-quality"
+  status: "stable"
+  requires:
+    - slug: "codecov"
+      type: "collector"
+      reason: "Provides coverage data from Codecov"
+    - slug: "golang"
+      type: "collector"
+      reason: "Provides Go test coverage data"
+  related: []
+
 policies:
   - name: collected
-    description: Coverage data should be collected in CI
+    description: |
+      Verifies that code coverage data is being collected.
+      Catches misconfigurations where coverage tools are not running or uploading.
     mainPython: collected.py
+    keywords: ["code coverage", "ci coverage", "test coverage"]
 
   - name: reported
-    description: Coverage percentage should be reported
+    description: |
+      Ensures that a coverage percentage is available and reported.
+      Fails if coverage runs but the percentage metric is not captured.
     mainPython: reported.py
+    keywords: ["coverage percentage", "coverage reporting"]
 
   - name: min-coverage
-    description: Code coverage should meet minimum threshold
+    description: |
+      Enforces a minimum code coverage threshold (default 80%).
+      Fails when coverage percentage is below the configured minimum.
     mainPython: min_coverage.py
+    keywords: ["coverage threshold", "minimum coverage", "quality gates"]
 
 inputs:
   min_coverage:

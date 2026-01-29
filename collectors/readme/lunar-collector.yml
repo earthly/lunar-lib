@@ -7,7 +7,6 @@ default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "README Collector"
-  tagline: "Collect README file metadata including existence, content length, and section structure"
   long_description: |
     Verify README files exist and analyze their structure including line count and
     section headings. Enforce documentation standards across your repositories.

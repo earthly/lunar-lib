@@ -9,7 +9,6 @@ default_image_ci_collectors: native
 
 landing_page:
   display_name: "Go Collector"
-  tagline: "Collect Go project metadata, dependencies, test coverage, and linting results"
   long_description: |
     Analyze Go projects to collect module info, dependencies, test coverage, and
     golangci-lint results. Enforce Go-specific engineering standards.

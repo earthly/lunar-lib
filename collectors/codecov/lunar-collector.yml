@@ -9,7 +9,6 @@ default_image: native
 
 landing_page:
   display_name: "Codecov Collector"
-  tagline: "Detect Codecov usage and fetch coverage results from the Codecov API"
   long_description: |
     Automatically detect Codecov runs in CI and fetch coverage percentage and file-level
     details. Track test coverage trends across your organization.

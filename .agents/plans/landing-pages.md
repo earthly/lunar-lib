@@ -88,13 +88,12 @@ default_image: earthly/lunar-lib:base-main
 # === Landing page metadata ===
 landing_page:
   display_name: "GitHub Collector"                 # Required, max 50 chars, must end with "Collector"
-  tagline: "Collect GitHub repository settings and branch protection rules"  # Required, max 100 chars
-  long_description: |                              # Required, max 300 chars
+  long_description: |                              # Required, max 300 chars, used for hero tagline + meta description
     Automatically collect GitHub repository settings, branch protection rules, 
     and access permissions. Enforce VCS standards across your organization.
   category: "repository-and-ownership"             # Required, see categories below
-  status: "beta"                                   # Optional: stable|beta|experimental|deprecated
-  icon: "assets/github.svg"                        # Required, relative to plugin dir
+  status: "beta"                                   # Required: stable|beta|experimental|deprecated
+  icon: "assets/github.svg"                        # Required (templates fallback to placeholder if missing)
   
   # Related plugins for cross-linking (optional for collectors)
   related:
@@ -117,7 +116,7 @@ collectors:
     mainBash: repository.sh
     hook:
       type: code
-    keywords: ["github settings", "repository visibility", "merge strategies"]  # Optional SEO keywords
+    keywords: ["github settings", "repository visibility", "merge strategies"]  # Required SEO keywords
 
   - name: branch-protection
     description: |
@@ -154,13 +153,12 @@ default_image: earthly/lunar-lib:base-main
 # === Landing page metadata ===
 landing_page:
   display_name: "Container Policies"               # Required, max 50 chars, must end with "Policies"
-  tagline: "Enforce Dockerfile best practices and container security standards"  # Required, max 100 chars
-  long_description: |                              # Required, max 300 chars
+  long_description: |                              # Required, max 300 chars, used for hero tagline + meta description
     Enforce container best practices including tag stability, registry allowlists, 
     required labels, and security configurations for Dockerfiles.
   category: "devex-build-and-ci"                   # Required
-  status: "stable"                                 # Optional
-  icon: "assets/docker.svg"                        # Optional (for now)
+  status: "stable"                                 # Required
+  icon: "assets/docker.svg"                        # Required (templates fallback to placeholder if missing)
   
   # Required collectors - policies MUST specify at least one
   requires:
@@ -223,13 +221,12 @@ default_image: earthly/lunar-lib:github-org-main
 # === Landing page metadata ===
 landing_page:
   display_name: "GitHub Org Cataloger"             # Required, max 50 chars, must end with "Cataloger"
-  tagline: "Automatically catalog all repositories from your GitHub organization"  # Required, max 100 chars
-  long_description: |                              # Required, max 300 chars
+  long_description: |                              # Required, max 300 chars, used for hero tagline + meta description
     Sync repositories from GitHub organizations into your Lunar catalog. 
     Automatically track visibility, topics, and metadata across all repos.
   category: "repository-and-ownership"             # Required
-  status: "stable"                                 # Optional
-  icon: "assets/github-org.svg"                    # Optional (for now)
+  status: "stable"                                 # Required
+  icon: "assets/github-org.svg"                    # Required (templates fallback to placeholder if missing)
   
   # Related plugins (optional for catalogers)
   related:
@@ -272,14 +269,7 @@ Categories are **required** and must be one of the following (matching `ai-conte
 | `security-and-compliance` | Security & Compliance | Scanning, vulnerabilities, SBOM, secrets, compliance frameworks |
 | `operational-readiness` | Operational Readiness | Runbooks, on-call, observability, monitoring, resilience |
 
-**Multiple Categories:** Plugins can belong to multiple categories using an array:
-```yaml
-landing_page:
-  categories:
-    - "security-and-compliance"
-    - "testing-and-quality"
-```
-The template supports both `category` (single string, backward compatible) and `categories` (array). When using an array, the first category is used as the primary for display purposes.
+**Note:** Only single `category` is supported. The `categories` (plural) array was considered but rejected for simplicity.
 
 ---
 
@@ -289,7 +279,7 @@ Plugins can declare their maturity status using the `status` field:
 
 ```yaml
 landing_page:
-  status: "stable"  # Optional, defaults to "stable" if not specified
+  status: "stable"  # Required - must be one of the values below
 ```
 
 | Status | Badge Color | Description |
@@ -418,16 +408,16 @@ Unified validator for all plugin types (collectors, policies, catalogers).
   - Collectors: must end with "Collector" (e.g., "GitHub Collector")
   - Policies: must end with "Policies" (e.g., "Container Policies")
   - Catalogers: must end with "Cataloger" (e.g., "GitHub Org Cataloger")
-- `landing_page.tagline` required, max 100 chars
-- `landing_page.long_description` required, max 300 chars
+- `landing_page.long_description` required, max 300 chars (used for hero tagline + meta description)
 - `landing_page.category` required, must be one of the 6 valid categories
-- `landing_page.icon` required
+- `landing_page.icon` required (templates gracefully fallback to placeholders if missing)
 - `landing_page.status` required, must be one of: stable, beta, experimental, deprecated
-- `landing_page.related[].slug`, `.type`, `.reason` validated if present
-- `landing_page.requires[]` required for policies (must reference collectors)
+- `landing_page.related[].slug`, `.type`, `.reason` validated if present (optional)
+- `landing_page.requires[]` required for policies only (must reference collectors)
+- `landing_page.requires` is **disallowed** for collectors and catalogers
 
 **Sub-component validation (collectors/policies/catalogers arrays):**
-- `keywords` required, must be array if present
+- `keywords` required, must be array
 
 **Cross-validation (all errors, not warnings):**
 - `related` or `requires` referencing non-existent plugins → error
@@ -556,7 +546,7 @@ permalink: "lunar/guardrails/collectors/{{ collector.slug }}/"
 
 {% block content %}
   <h1>{{ collector.landing_page.display_name }}</h1>
-  <p>{{ collector.landing_page.tagline }}</p>
+  <p>{{ collector.landing_page.long_description }}</p>
   {{ collector.readme | markdown | safe }}
 {% endblock %}
 ```
@@ -576,7 +566,7 @@ This generates one HTML page per collector from the data.
 │  │  [Icon]  {display_name}                                         │ │
 │  │          {TYPE} · {category}                                    │ │
 │  │                                                                 │ │
-│  │  {tagline}                                                      │ │
+│  │  {long_description}                                             │ │
 │  │                                                                 │ │
 │  │  [Get Started →]  [View on GitHub →]                            │ │
 │  └────────────────────────────────────────────────────────────────┘ │
@@ -661,7 +651,7 @@ Each section should include a simple diagram or visual showing where this plugin
 │  - display_name                                                    │
 │  - Type badge (Collector/Policy/Cataloger)                         │
 │  - Category badge                                                  │
-│  - tagline                                                         │
+│  - long_description                                                │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -706,8 +696,8 @@ Get one complete page live with minimal implementation. Skip strict validation, 
 
 **lunar-lib:**
 - [x] Add `landing_page:` section to `collectors/github/lunar-collector.yml`:
-  - Top-level: `display_name`, `tagline`, `seo_title`, `seo_description`, `category`, `icon`
-  - Sub-components: `seo_title`, `seo_description`, `seo_keywords` for each collector
+  - Top-level: `display_name`, `long_description`, `category`, `icon`
+  - Sub-components: `keywords` for each collector
 - [x] Create/source `collectors/github/assets/github.svg` icon
 - [x] Remove "Related Policies" section from `collectors/github/README.md` (now in YAML)
 - [x] Add `landing_page:` section to `collectors/ast-grep/lunar-collector.yml` (second example with inputs)
@@ -720,7 +710,7 @@ Get one complete page live with minimal implementation. Skip strict validation, 
 - [x] Create `+update-lunar-lib` target in Earthfile (copies files from lunar-lib)
 - [x] Run sync, check in initial `src/_data/guardrails/collectors/github/` directory
 - [x] Create `src/_data/guardrails.js` (JS data file to parse YAML)
-- [x] Create minimal `base.njk` template (header, tagline, README content, meta tags, footer)
+- [x] Create minimal `base.njk` template (header, long_description, README content, meta tags, footer)
 - [x] Create paginated collector template at `lunar/guardrails/collector.njk`
 - [x] Add basic `guardrails.css` (readable layout, minimal styling)
 
@@ -734,7 +724,7 @@ Once Phase 1 passes review, scale to all plugins.
 
 **lunar-lib - Collectors (DONE):**
 - [x] Add `landing_page:` + `keywords` to all collectors (6 total)
-- [x] Simplified schema: `display_name` (with suffix), `tagline`, `long_description`, `category`, `status`
+- [x] Simplified schema: `display_name` (with suffix), `long_description`, `category`, `status`
 - [x] Sub-collectors: use `name`, `description`, `keywords` (removed seo_title, seo_description)
 - [x] Add `example_component_json` field to all collector YAMLs
 - [x] Add `secrets` field to collectors that have secrets
@@ -746,30 +736,30 @@ Once Phase 1 passes review, scale to all plugins.
   - [x] Update titles to match `display_name`
 - [ ] Create/source icon SVGs for each collector (deferred)
 
-**lunar-lib - Policies (TODO):**
-- [ ] Add `landing_page:` section to all policy YAMLs with:
+**lunar-lib - Policies (DONE):**
+- [x] Add `landing_page:` section to all policy YAMLs with:
   - `display_name` ending with "Policies" (e.g., "Container Policies")
-  - `tagline`, `long_description`, `category`, `status`
+  - `long_description`, `category`, `status`
   - `requires:` array (REQUIRED - must reference at least one collector)
   - `related:` array (optional)
-- [ ] Add `keywords` to sub-policies
+- [x] Add `keywords` to sub-policies
 - [ ] Add `example_component_json` field (move from READMEs)
 - [ ] Add `inputs` field (move from READMEs)
-- [ ] Update all policy READMEs:
+- [x] Update all policy READMEs:
   - Remove "Related Collectors" sections
   - Remove "Inputs" sections
   - Update titles to match `display_name`
 - [ ] Create/source icon SVGs for each policy (deferred)
 
-**lunar-lib - Catalogers (TODO):**
-- [ ] Add `landing_page:` section to all cataloger YAMLs with:
+**lunar-lib - Catalogers (DONE):**
+- [x] Add `landing_page:` section to all cataloger YAMLs with:
   - `display_name` ending with "Cataloger" (e.g., "GitHub Org Cataloger")
-  - `tagline`, `long_description`, `category`, `status`
+  - `long_description`, `category`, `status`
   - `related:` array (optional)
-- [ ] Add `keywords` to sub-catalogers
+- [x] Add `keywords` to sub-catalogers
 - [ ] Add `example_component_json` field (move from READMEs)
 - [ ] Add `inputs` and `secrets` fields (move from READMEs)
-- [ ] Update all cataloger READMEs:
+- [x] Update all cataloger READMEs:
   - Remove "Related" sections
   - Remove "Inputs" sections
   - Remove "Secrets" sections
@@ -801,6 +791,7 @@ Once Phase 1 passes review, scale to all plugins.
 - [x] Add JSON-LD structured data to list pages
 - [x] Add canonical URLs and Open Graph meta tags
 - [x] Update collector.njk template for simplified schema
+- [x] Add graceful icon fallback (placeholder symbols when icons missing)
 - [ ] Create paginated templates for policies (`policy.njk`)
 - [ ] Create paginated templates for catalogers (`cataloger.njk`)
 - [ ] Create policies list page (`/lunar/guardrails/policies/`)
@@ -814,7 +805,7 @@ Once Phase 1 passes review, scale to all plugins.
 
 **lunar-lib - Validation (DONE):**
 - [x] Create `scripts/validate_landing_page_metadata.py` (unified for all plugin types)
-  - Validates display_name suffix, tagline, long_description, category
+  - Validates display_name suffix, long_description, category
   - Validates `requires` for policies (must have at least one collector)
   - Cross-validates related/requires references exist
   - Validates README title matches display_name
@@ -832,7 +823,7 @@ Once Phase 1 passes review, scale to all plugins.
 - [x] Add "Example Collected Data" section with collapsible JSON preview
 - [x] Add "Configuration" section with inputs table and secrets table
 - [x] Add copy-to-clipboard buttons for all code blocks
-- [x] Support multiple categories (array) in addition to single category
+- [x] Support single category (plural `categories` array rejected for simplicity)
 
 **Styling:**
 - [x] Full CSS with type colors, category badges, card styling
@@ -876,19 +867,27 @@ During implementation, the schema was simplified from the original plan:
 | Sub-component `seo_title` | (removed) | Use `name` directly |
 | Sub-component `seo_description` | (removed) | Use `description` directly |
 | Sub-component `seo_keywords` | `keywords` | Simpler naming |
-| `icon` | `icon` | Made optional (deferred to later) |
+| `icon` | `icon` | Required by validator, templates fallback to placeholders |
+| `tagline` | (removed) | `long_description` serves as both meta description and hero tagline |
+| `status` | `status` | Now required (was optional with default) |
+| `keywords` | `keywords` | Now required for sub-components (was optional) |
 | `related` (for policies) | `requires` + `related` | Policies must have `requires` for collectors |
 
 **Rationale:**
 - Reduced duplication between SEO fields and existing name/description
 - `display_name` with suffix ensures consistent naming across types
-- `requires` makes the collector dependency explicit for policies
+- `requires` makes the collector dependency explicit for policies (disallowed for collectors/catalogers)
 - Simpler sub-component schema reduces maintenance burden
+- `tagline` removed (redundant with `long_description`)
+- `status` and `keywords` made strictly required
+- Templates gracefully handle missing icons with placeholder symbols
 
 ---
 
 ## Open Questions
 
 1. **Icon sourcing**: Create new SVGs or use existing assets?
-   - Deferred for now (icon field is optional)
-   - Will be manual: user researches online, generates simple SVGs, or uses emoji sparingly
+   - Icon field is required by validator
+   - Templates gracefully fallback to placeholder symbols (↓ for collectors, ✓ for policies, ⇄ for catalogers)
+   - Currently have icons for: ast-grep, github (collectors only)
+   - Missing icons for: codecov, dockerfile, golang, readme (collectors), all policies, all catalogers

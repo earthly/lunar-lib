@@ -1,4 +1,4 @@
-# `github-org` Cataloger
+# GitHub Org Cataloger
 
 Catalogs all repositories from a GitHub organization as Lunar components.
 
@@ -69,35 +69,6 @@ This plugin provides the following catalogers:
 | Hook | Schedule | Description |
 |------|----------|-------------|
 | `cron` | `0 2 * * *` | Runs daily at 2am UTC |
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `org_name` | **Yes** | - | GitHub organization name to sync |
-| `include_public` | No | `true` | Include public repositories |
-| `include_private` | No | `true` | Include private repositories |
-| `include_internal` | No | `true` | Include internal repositories (GitHub Enterprise) |
-| `include_archived` | No | `false` | Include archived repositories |
-| `include_repos` | No | `""` | Comma-separated glob patterns for repos to include (empty = all) |
-| `exclude_repos` | No | `""` | Comma-separated glob patterns for repos to exclude |
-| `tag_prefix` | No | `gh-` | Prefix for GitHub topics when converting to Lunar tags |
-| `default_owner` | No | `""` | Default owner email for all components (empty = don't set) |
-
-The `include_repos` and `exclude_repos` inputs accept comma-separated glob patterns:
-
-- `*` matches any sequence of characters
-- `?` matches any single character
-- `[abc]` matches any character in the set
-
-Examples:
-- `api-*,backend-*` - Include repos starting with `api-` or `backend-`
-- `sandbox-*,deprecated-*,*-test` - Exclude sandbox, deprecated, and test repos
-- `*-service` - Match all repos ending with `-service`
-
-## Secrets
-
-- `GH_TOKEN` - GitHub personal access token with `repo` scope (or `read:org` for public repos only).
 
 ## Installation
 

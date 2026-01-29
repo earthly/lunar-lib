@@ -61,7 +61,7 @@ VALID_RELATED_TYPES = {"collector", "policy", "cataloger"}
 
 # Character limits
 DISPLAY_NAME_MAX_LENGTH = 50
-TAGLINE_MAX_LENGTH = 100
+# TAGLINE_MAX_LENGTH = 100  # Removed - long_description serves this purpose
 LONG_DESCRIPTION_MAX_LENGTH = 300  # Displayed in hero, can be longer than meta description
 RELATED_REASON_MAX_LENGTH = 80
 
@@ -264,7 +264,7 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
         result["landing_page"] = {}
         
         # Extract simple fields
-        for field_name in ["display_name", "tagline", "category", "icon", "status"]:
+        for field_name in ["display_name", "category", "icon", "status"]:
             match = re.search(
                 rf'^  {field_name}:\s*["\']?([^"\'\n]+)["\']?\s*$',
                 landing_section,
@@ -336,29 +336,33 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
         if related_items:
             result["landing_page"]["related"] = related_items
     
-    # Extract collectors array with SEO fields
-    collectors_match = re.search(
-        r"^collectors:\s*$\n((?:[ ]+.*\n)*)",
-        content,
-        re.MULTILINE
-    )
-    
-    if collectors_match:
-        collectors_section = collectors_match.group(1)
-        collectors = []
+    # Extract item arrays (collectors, policies, catalogers) with keywords
+    def extract_items_array(item_type: str) -> list[dict]:
+        """Extract items array (collectors, policies, or catalogers) from YAML."""
+        items_match = re.search(
+            rf"^{item_type}:\s*$\n((?:[ ]+.*\n)*)",
+            content,
+            re.MULTILINE
+        )
         
-        # Split by "- name:" to get individual collectors
-        collector_blocks = re.split(r'^  - name:', collectors_section, flags=re.MULTILINE)
+        if not items_match:
+            return []
         
-        for block in collector_blocks[1:]:  # Skip first empty split
-            collector: dict[str, Any] = {}
+        items_section = items_match.group(1)
+        items = []
+        
+        # Split by "- name:" to get individual items
+        item_blocks = re.split(r'^  - name:', items_section, flags=re.MULTILINE)
+        
+        for block in item_blocks[1:]:  # Skip first empty split
+            item: dict[str, Any] = {}
             
             # Get name (first line)
             name_match = re.match(r'\s*([^\n]+)', block)
             if name_match:
-                collector["name"] = name_match.group(1).strip()
+                item["name"] = name_match.group(1).strip()
             
-            # Get keywords (array) - renamed from seo_keywords
+            # Get keywords (array)
             keywords_match = re.search(
                 r'^\s+keywords:\s*\[([^\]]+)\]',
                 block,
@@ -369,12 +373,17 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
                     k.strip().strip('"\'') 
                     for k in keywords_match.group(1).split(",")
                 ]
-                collector["keywords"] = [k for k in keywords if k]
+                item["keywords"] = [k for k in keywords if k]
             
-            if collector.get("name"):
-                collectors.append(collector)
+            if item.get("name"):
+                items.append(item)
         
-        result["collectors"] = collectors
+        return items
+    
+    # Extract all item types
+    result["collectors"] = extract_items_array("collectors")
+    result["policies"] = extract_items_array("policies")
+    result["catalogers"] = extract_items_array("catalogers")
     
     # Extract top-level name
     name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
@@ -464,16 +473,6 @@ def validate_plugin(
                 f"got '{display_name}'"
             )
     
-    # Validate tagline
-    tagline = landing_page.get("tagline")
-    if not tagline:
-        result.errors.append("Missing landing_page.tagline")
-    elif len(tagline) > TAGLINE_MAX_LENGTH:
-        result.errors.append(
-            f"landing_page.tagline too long ({len(tagline)} chars, "
-            f"max {TAGLINE_MAX_LENGTH})"
-        )
-    
     # Validate long_description
     long_description = landing_page.get("long_description")
     if not long_description:
@@ -511,9 +510,11 @@ def validate_plugin(
                 f"Icon file not found: {icon} (expected at {icon_path})"
             )
     
-    # Validate status (optional, but must be valid if present)
+    # Validate status (required)
     status = landing_page.get("status")
-    if status and status not in VALID_STATUSES:
+    if not status:
+        result.errors.append("Missing landing_page.status")
+    elif status not in VALID_STATUSES:
         result.errors.append(
             f"Invalid status '{status}'. Must be one of: {sorted(VALID_STATUSES)}"
         )
@@ -586,8 +587,10 @@ def validate_plugin(
             # For policies, requires must only reference collectors
             validate_relationship_entries(requires, "requires", allowed_types={"collector"})
     elif requires:
-        # For other types, requires is optional but validate if present
-        validate_relationship_entries(requires, "requires")
+        # requires is NOT allowed for collectors or catalogers
+        result.errors.append(
+            f"landing_page.requires is not allowed for {plugin_type}s (only for policies)"
+        )
     
     # Validate related (optional, but structure must be valid if present)
     related = landing_page.get("related", [])
@@ -603,9 +606,13 @@ def validate_plugin(
         for i, item in enumerate(items):
             name = item.get("name", f"[{i}]")
             
-            # keywords optional but must be valid array if present
-            sub_keywords = item.get("keywords", [])
-            if sub_keywords and (not isinstance(sub_keywords, list) or len(sub_keywords) < 1):
+            # keywords required for each sub-component
+            sub_keywords = item.get("keywords")
+            if not sub_keywords:
+                result.errors.append(
+                    f"{item_key}.{name}: missing keywords"
+                )
+            elif not isinstance(sub_keywords, list) or len(sub_keywords) < 1:
                 result.errors.append(
                     f"{item_key}.{name}: keywords must be an array with at least 1 keyword"
                 )
@@ -744,17 +751,15 @@ def main():
         print(f"Validation failed: {total_errors} error(s), {total_warnings} warning(s)")
         print("\nRequired landing_page fields:")
         print(f"  display_name: max {DISPLAY_NAME_MAX_LENGTH} chars")
-        print(f"  tagline: max {TAGLINE_MAX_LENGTH} chars")
         print(f"  long_description: max {LONG_DESCRIPTION_MAX_LENGTH} chars")
         print(f"  category: one of {sorted(VALID_CATEGORIES)}")
         print(f"  icon: path to SVG file (must exist)")
+        print(f"  status: one of {sorted(VALID_STATUSES)}")
         print(f"\nRequired for policies:")
         print(f"  requires: array of {{slug, type, reason}} - collectors the policy needs")
         print(f"\nOptional landing_page fields:")
-        print(f"  status: one of {sorted(VALID_STATUSES)} (defaults to stable)")
         print(f"  related: array of {{slug, type, reason}}")
-        print(f"  requires: (optional for collectors/catalogers)")
-        print(f"\nOptional per-item fields:")
+        print(f"\nRequired per-item fields (for each sub-component):")
         print(f"  keywords: array for SEO meta keywords")
         sys.exit(1)
 

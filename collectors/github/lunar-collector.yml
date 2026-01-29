@@ -7,11 +7,11 @@ default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "GitHub Collector"
-  tagline: "Collect GitHub repository settings and branch protection rules"
   long_description: |
     Automatically collect GitHub repository settings, branch protection rules,
     and access permissions. Enforce VCS standards across your organization.
   category: "repository-and-ownership"
+  icon: "assets/github.svg"
   status: "beta"
   related:
     - slug: "vcs"

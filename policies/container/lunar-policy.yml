@@ -6,30 +6,61 @@ author: earthly
 
 default_image: earthly/lunar-lib:base-main
 
+landing_page:
+  display_name: "Container Policies"
+  long_description: |
+    Enforce container best practices including tag stability, registry allowlists,
+    required labels, and security configurations for Dockerfiles.
+  category: "devex-build-and-ci"
+  status: "stable"
+  requires:
+    - slug: "dockerfile"
+      type: "collector"
+      reason: "Provides Dockerfile data that these policies evaluate"
+  related: []
+
 policies:
   - name: no-latest
-    description: Container definitions should not use the :latest tag
+    description: |
+      Prevents use of the :latest tag (explicit or implicit) in base images.
+      Using :latest creates non-reproducible builds and makes debugging difficult.
     mainPython: no_latest.py
+    keywords: ["dockerfile", "latest tag", "reproducible builds", "image tags"]
 
   - name: stable-tags
-    description: Container definitions should use stable tags (digests or full semver)
+    description: |
+      Requires base images to use stable tags: digests (sha256:...) or full semver (1.2.3).
+      Partial versions like "node:20" can change unexpectedly and break builds.
     mainPython: stable_tags.py
+    keywords: ["semver", "image digest", "version pinning", "tag policy"]
 
   - name: allowed-registries
-    description: Container definitions should only use allowed registries
+    description: |
+      Restricts base images to approved container registries only.
+      Prevents supply chain attacks from untrusted image sources.
     mainPython: allowed_registries.py
+    keywords: ["container registry", "supply chain security", "registry policy"]
 
   - name: required-labels
-    description: Container definitions should have required labels
+    description: |
+      Ensures Dockerfiles include required OCI labels for traceability.
+      Common labels: org.opencontainers.image.source, version, maintainer.
     mainPython: required_labels.py
+    keywords: ["dockerfile labels", "oci labels", "image metadata"]
 
   - name: healthcheck
-    description: Container definitions should have HEALTHCHECK instruction
+    description: |
+      Requires a HEALTHCHECK instruction in the final stage of multi-stage builds.
+      Enables container orchestrators to detect and restart unhealthy containers.
     mainPython: healthcheck.py
+    keywords: ["healthcheck", "kubernetes", "container orchestration", "docker health"]
 
   - name: user
-    description: Container definitions should specify USER instruction
+    description: |
+      Requires a USER instruction to run the container as a non-root user.
+      Running as root inside containers is a security risk and violates least privilege.
     mainPython: user.py
+    keywords: ["non-root", "container security", "least privilege", "USER instruction"]
 
 inputs:
   allowed_registries:

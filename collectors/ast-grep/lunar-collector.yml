@@ -8,13 +8,11 @@ default_image: earthly/lunar-lib:ast-grep-main
 
 landing_page:
   display_name: "AST-Grep Collector"
-  tagline: "Define custom code patterns using AST-based rules and detect matches across your codebase"
   long_description: |
     Analyze source code using AST-based pattern matching with ast-grep. Define custom
     rules to detect security issues, anti-patterns, and code style violations.
-  categories:
-    - "security-and-compliance"
-    - "testing-and-quality"
+  category: "security-and-compliance"
+  icon: "assets/ast-grep.svg"
   status: "beta"
   related: []
 

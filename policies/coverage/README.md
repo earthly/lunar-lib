@@ -1,4 +1,4 @@
-# `coverage` Policies
+# Coverage Policies
 
 Validates code coverage collection and thresholds.
 
@@ -26,12 +26,6 @@ This policy reads from the following Component JSON paths:
 | `.testing.coverage.percentage` | number | Any coverage collector |
 
 **Note:** Object presence is the signal—the `collected` policy uses `assert_exists(".testing.coverage")` and the `reported` policy uses `assert_exists(".testing.coverage.percentage")`.
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `min_coverage` | No | `80` | Minimum required coverage percentage |
 
 ## Installation
 
@@ -82,12 +76,6 @@ policies:
 ```
 
 **Failure message:** `"Coverage 72.0% is below minimum 80%"`
-
-## Related Collectors
-
-Any collector that writes to `.testing.coverage` can be used with this policy:
-
-- [codecov](../../collectors/codecov) - Codecov integration
 
 ## Remediation
 
