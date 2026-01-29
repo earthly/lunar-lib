@@ -103,6 +103,7 @@ PLUGIN_CONFIGS = {
             "Secrets",
             "Related Policies",
             "Related Collectors",
+            "Example Catalog JSON",
         ],
     },
 }
@@ -128,13 +129,6 @@ class Section:
     start_line: int
     end_line: int
     content: str
-
-
-@dataclass
-class InputInfo:
-    """Information about an input parameter."""
-    name: str
-    required: bool
 
 
 @dataclass
@@ -339,41 +333,6 @@ def extract_path_table_paths(content: str) -> list[str]:
                 paths.append(path_match.group(1))
     
     return paths
-
-
-def extract_inputs(content: str) -> list[InputInfo]:
-    """Extract input names and required status from an Inputs section table."""
-    inputs = []
-    lines = content.split("\n")
-    in_table = False
-    has_required_column = False
-    
-    for line in lines:
-        if "| Input |" in line:
-            in_table = True
-            has_required_column = "| Required |" in line
-            continue
-        
-        if in_table and (line.strip().startswith("|--") or line.strip().startswith("| --")):
-            continue
-        
-        if in_table and (not line.strip() or line.startswith("#")):
-            in_table = False
-            continue
-        
-        if in_table and line.strip().startswith("|"):
-            cols = [c.strip() for c in line.split("|")]
-            if len(cols) >= 3:
-                name_match = re.match(r"`([^`]+)`", cols[1])
-                if name_match:
-                    name = name_match.group(1)
-                    if has_required_column and len(cols) >= 4:
-                        required = "yes" in cols[2].lower()
-                    else:
-                        required = False
-                    inputs.append(InputInfo(name=name, required=required))
-    
-    return inputs
 
 
 # =============================================================================
@@ -646,10 +605,6 @@ def _validate_cataloger_specific(
     synced_data = next((s for s in sections if s.name == "Synced Data"), None)
     if synced_data:
         body = synced_data.content
-        if "<details>" not in body:
-            result.errors.append(
-                "## Synced Data must have a <details> block with example JSON"
-            )
         if "| Path |" not in body:
             result.errors.append(
                 "## Synced Data must have a table with Path, Type, Description columns"

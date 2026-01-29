@@ -743,8 +743,7 @@ Once Phase 1 passes review, scale to all plugins.
   - `requires:` array (REQUIRED - must reference at least one collector)
   - `related:` array (optional)
 - [x] Add `keywords` to sub-policies
-- [ ] Add `example_component_json` field (move from READMEs)
-- [ ] Add `inputs` field (move from READMEs)
+- [x] Add `inputs` field (move from READMEs)
 - [x] Update all policy READMEs:
   - Remove "Related Collectors" sections
   - Remove "Inputs" sections
@@ -767,16 +766,16 @@ Once Phase 1 passes review, scale to all plugins.
 - [x] Create/source icon SVGs for each cataloger
 
 **lunar-lib - Templates (TODO):**
-- [ ] Update `ai-context/collector-README-template.md`:
+- [x] Update `ai-context/collector-README-template.md`:
   - Remove "Related Policies" section
   - Remove "Inputs" section
   - Remove "Secrets" section
   - Remove "Example Component JSON output" collapsible
-- [ ] Update `ai-context/policy-README-template.md`:
+- [x] Update `ai-context/policy-README-template.md`:
   - Remove "Related Collectors" section
   - Remove "Inputs" section (if present)
   - Remove "Example Component JSON output" collapsible
-- [ ] Update `ai-context/cataloger-README-template.md`:
+- [x] Update `ai-context/cataloger-README-template.md`:
   - Remove "Related" sections
   - Remove "Inputs" section
   - Remove "Secrets" section
