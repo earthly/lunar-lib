@@ -12,7 +12,7 @@ landing_page:
     Enforce code quality standards by validating that linting tools run and pass.
     Ensures consistent code style, catches common bugs, and maintains codebase health
     by tracking lint warnings against configurable thresholds.
-  category: "code-quality"
+  category: "testing-and-quality"
   icon: "assets/linter.svg"
   status: "stable"
   requires:
