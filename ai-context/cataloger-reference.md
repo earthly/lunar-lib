@@ -511,29 +511,114 @@ my-cataloger/
 ```yaml
 version: 0
 
-name: my-cataloger                    # Required: Unique name
-description: What this cataloger does # Optional
+name: my-cataloger                    # Required: Must match directory name
+description: What this cataloger does # Required: Brief description
 author: team@example.com              # Required
 
 # Recommended: specify container image
 default_image: earthly/lunar-scripts:1.0.0
 
+# === Landing page metadata (required for public plugins) ===
+landing_page:
+  display_name: "My Cataloger"        # Required: Max 50 chars, must end with "Cataloger"
+  long_description: |                 # Required: Max 300 chars, used for hero tagline + meta description
+    Sync components from XYZ into your Lunar catalog. Automatically 
+    track ownership, domains, and metadata across your organization.
+  category: "repository-and-ownership" # Required: See categories below
+  status: "stable"                    # Required: stable|beta|experimental|deprecated
+  icon: "assets/my-icon.svg"          # Required: Path relative to plugin directory
+  
+  # Related plugins for cross-linking (optional)
+  related:
+    - slug: "my-collector"
+      type: "collector"
+      reason: "Collects detailed data for discovered components"
+
+# === Catalogers (sub-components) ===
 catalogers:
-  - name: main-cataloger              # Can define multiple catalogers
-    description: Primary sync
+  - name: sync-components             # Required: Unique within plugin
+    description: |                    # Required: Multi-line description
+      Syncs all components from XYZ including:
+      - Feature A
+      - Feature B
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
       type: cron                      # Or: repo, component-repo
       schedule: "0 2 * * *"
+    keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
-inputs:                               # Optional: Configurable inputs
+# === Inputs (optional) ===
+inputs:
   api_url:
     description: Base URL for API
     default: "https://api.example.com"
   org_name:
     description: Organization to sync
     # No default = required input
+
+# === Secrets (optional) ===
+secrets:
+  - name: API_TOKEN
+    description: API authentication token
+    required: true
+
+# === Example output (required for public plugins) ===
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/api": {
+        "owner": "jane@example.com",
+        "domain": "platform.backend",
+        "tags": ["go", "production"]
+      }
+    },
+    "domains": {
+      "platform": {
+        "description": "Platform services",
+        "owner": "platform-team@example.com"
+      }
+    }
+  }
 ```
+
+### Landing Page Field Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `landing_page.display_name` | Yes | Human-readable name, max 50 chars, must end with "Cataloger" |
+| `landing_page.long_description` | Yes | Marketing description, max 300 chars, used for hero + meta |
+| `landing_page.category` | Yes | One of the 6 valid categories (see below) |
+| `landing_page.status` | Yes | `stable`, `beta`, `experimental`, or `deprecated` |
+| `landing_page.icon` | Yes | Path to SVG icon relative to plugin directory (file must exist) |
+| `landing_page.related[]` | No | Array of related plugins (`slug`, `type`, `reason` max 80 chars) |
+| `catalogers[].keywords` | Yes | Array of SEO keywords for this sub-cataloger (at least 1) |
+| `inputs` | No | Configuration inputs (for website display, moved from README) |
+| `secrets[]` | No | Array of secrets this cataloger needs (for website display) |
+| `example_catalog_json` | No | Example Catalog JSON output (for website display, recommended) |
+
+**Cross-validation:** The README title (`# ...`) must match `landing_page.display_name` exactly.
+
+**Note:** `landing_page.requires` is not allowed for catalogers (only for policies).
+
+### Categories
+
+| Slug | Display Name |
+|------|--------------|
+| `repository-and-ownership` | Repository & Ownership |
+| `deployment-and-infrastructure` | Deployment & Infrastructure |
+| `testing-and-quality` | Testing & Quality |
+| `devex-build-and-ci` | DevEx, Build & CI |
+| `security-and-compliance` | Security & Compliance |
+| `operational-readiness` | Operational Readiness |
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `stable` | Production ready, well tested |
+| `beta` | Feature complete, API stable |
+| `experimental` | Early development, API may change |
+| `deprecated` | No longer recommended |
 
 ## Container Images
 
