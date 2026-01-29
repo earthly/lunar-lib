@@ -1,4 +1,4 @@
-# `vcs` Policies
+# VCS Policies
 
 Version control system (VCS) best practices and security policies for repositories
 
@@ -60,16 +60,6 @@ This policy reads from the following Component JSON paths:
 | `.vcs.merge_strategies.allow_rebase_merge` | boolean | Whether rebase merges are allowed |
 
 **Note:** This policy requires a VCS collector (such as `github`) that populates the `.vcs` data.
-
-## Inputs
-
-**Note:** Most policies have no configurable inputs. Use the `include` parameter to control which policies are enforced.
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `min_approvals` | No | `1` | Minimum number of required approvals for the `minimum-approvals` policy (integer, 0 or greater) |
-| `required_default_branch` | No | `"main"` | Required default branch name for the `require-default-branch` policy |
-| `allowed_merge_strategies` | Yes, if policy included | `""` | Comma-separated list of allowed merge strategies for the `allowed-merge-strategies` policy: "merge", "squash", "rebase" (e.g., "squash,rebase"). **Must be configured if the `allowed-merge-strategies` policy is included.** |
 
 ## Installation
 
@@ -227,12 +217,6 @@ with:
 - `"Repository visibility is 'public', but policy requires 'private'"`
 - `"Default branch is 'master', but policy requires 'main'"`
 - `"Merge commits are enabled, but policy does not allow them (should be disabled)"`
-
-## Related Collectors
-
-These policies work with any collector that populates the required data paths. Common options include:
-
-- [`github`](https://github.com/earthly/lunar-lib/tree/main/collectors/github) - Collects GitHub repository settings and branch protection rules via GitHub API
 
 ## Remediation
 

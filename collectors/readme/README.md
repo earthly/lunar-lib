@@ -1,4 +1,4 @@
-# `readme` Collector
+# README Collector
 
 Collects README file information including existence, line count, and section headings.
 
@@ -17,50 +17,6 @@ This collector writes to the following Component JSON paths:
 | `.repo.readme.lines` | number | Number of lines in the README file (only present if file exists) |
 | `.repo.readme.sections[]` | array | List of section headings extracted from the README file (only present if file exists) |
 
-See the example below for the full structure.
-
-<details>
-<summary>Example Component JSON output</summary>
-
-```json
-{
-  "repo": {
-    "readme": {
-      "exists": true,
-      "path": "README.md",
-      "lines": 150,
-      "sections": [
-        "Installation",
-        "Usage",
-        "API",
-        "Contributing",
-        "License"
-      ]
-    }
-  }
-}
-```
-
-When README file doesn't exist:
-
-```json
-{
-  "repo": {
-    "readme": {
-      "exists": false
-    }
-  }
-}
-```
-
-</details>
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `path` | No | `README.md,README,README.txt,README.rst` | Comma-separated list of README paths to check (first match wins) |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -72,9 +28,4 @@ collectors:
     # with:
     #   path: "README.md,docs/README.md"  # Customize which files to check
 ```
-
-## Related Policies
-
-This collector is typically used with:
-- [`readme`](https://github.com/earthly/lunar-lib/tree/main/policies/readme) - README best practices policies
 

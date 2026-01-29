@@ -581,8 +581,8 @@ my-collector/
 ```yaml
 version: 0
 
-name: my-collector                    # Required: Unique name
-description: What this collector does # Optional
+name: my-collector                    # Required: Unique name (must match directory name)
+description: What this collector does # Required: Brief description
 author: team@example.com              # Required
 
 # Recommended: specify container image
@@ -590,21 +590,97 @@ author: team@example.com              # Required
 # Add default_image_ci_collectors: native when plugin includes CI collectors
 default_image: earthly/lunar-scripts:1.0.0
 
+# === Landing page metadata (required for public plugins) ===
+landing_page:
+  display_name: "My Collector"        # Required: Max 50 chars, must end with "Collector"
+  long_description: |                 # Required: Max 300 chars, used for hero tagline + meta description
+    Collects XYZ data from repositories. Enables enforcement of 
+    ABC standards across your organization.
+  category: "devex-build-and-ci"      # Required: See categories below
+  status: "stable"                    # Required: stable|beta|experimental|deprecated
+  icon: "assets/my-icon.svg"          # Required: Path relative to plugin directory
+  
+  # Related plugins for cross-linking (optional)
+  related:
+    - slug: "my-policy"               # Plugin directory name
+      type: "policy"                  # collector|policy|cataloger
+      reason: "Enforces standards using this collector's data"  # Max 80 chars
+
+# === Collectors (sub-components) ===
 collectors:
-  - name: main-collector              # Can define multiple collectors
-    description: Primary collection
+  - name: main-collector              # Required: Unique within plugin
+    description: |                    # Required: Multi-line description for landing page
+      Collects XYZ data including:
+      - Feature A
+      - Feature B
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
       type: code                      # Or: cron, ci-before-command, etc.
+    keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
-inputs:                               # Optional: Configurable inputs
+# === Inputs (optional) ===
+inputs:
   api_url:
     description: Base URL for API
     default: "https://api.example.com"
   threshold:
     description: Minimum threshold
     # No default = required input
+
+# === Secrets (optional) ===
+secrets:
+  - name: API_TOKEN
+    description: API authentication token
+    required: true
+
+# === Example output (required for public plugins) ===
+example_component_json: |
+  {
+    "my_category": {
+      "items": [
+        {"name": "example", "valid": true}
+      ]
+    }
+  }
 ```
+
+### Landing Page Field Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `landing_page.display_name` | Yes | Human-readable name, max 50 chars, must end with "Collector" |
+| `landing_page.long_description` | Yes | Marketing description, max 300 chars, used for hero + meta |
+| `landing_page.category` | Yes | One of the 6 valid categories (see below) |
+| `landing_page.status` | Yes | `stable`, `beta`, `experimental`, or `deprecated` |
+| `landing_page.icon` | Yes | Path to SVG icon relative to plugin directory (file must exist) |
+| `landing_page.related[]` | No | Array of related plugins (`slug`, `type`, `reason` max 80 chars) |
+| `collectors[].keywords` | Yes | Array of SEO keywords for this sub-collector (at least 1) |
+| `secrets[]` | No | Array of secrets this collector needs (for website display) |
+| `example_component_json` | No | Example JSON output (for website display, recommended) |
+
+**Cross-validation:** The README title (`# ...`) must match `landing_page.display_name` exactly.
+
+**Note:** `landing_page.requires` is not allowed for collectors (only for policies).
+
+### Categories
+
+| Slug | Display Name |
+|------|--------------|
+| `repository-and-ownership` | Repository & Ownership |
+| `deployment-and-infrastructure` | Deployment & Infrastructure |
+| `testing-and-quality` | Testing & Quality |
+| `devex-build-and-ci` | DevEx, Build & CI |
+| `security-and-compliance` | Security & Compliance |
+| `operational-readiness` | Operational Readiness |
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `stable` | Production ready, well tested |
+| `beta` | Feature complete, API stable |
+| `experimental` | Early development, API may change |
+| `deprecated` | No longer recommended |
 
 ## Container Images
 
