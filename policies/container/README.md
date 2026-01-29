@@ -1,4 +1,4 @@
-# `container` Policies
+# Container Policies
 
 Enforces best practices for container definitions including tag stability, registry allowlists, required labels, and security configurations.
 
@@ -26,13 +26,6 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.containers.definitions[]` | array | [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector |
-
-## Inputs
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `allowed_registries` | `docker.io` | Comma-separated list of allowed registries |
-| `required_labels` | `""` | Comma-separated list of required labels (empty = no requirement) |
 
 ## Installation
 
@@ -127,10 +120,6 @@ policies:
   }
 }
 ```
-
-## Related Collectors
-
-- [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector
 
 ## Remediation
 

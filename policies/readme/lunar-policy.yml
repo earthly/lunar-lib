@@ -4,16 +4,42 @@ name: readme
 description: README file best practices
 author: support@earthly.dev
 
+landing_page:
+  display_name: "README Policies"
+  long_description: |
+    Validate README files against documentation standards. Ensure repositories have
+    proper documentation by checking for file existence, minimum content length,
+    and required section headings.
+  category: "repository-and-ownership"
+  icon: "assets/readme.svg"
+  status: "stable"
+  requires:
+    - slug: "readme"
+      type: "collector"
+      reason: "Provides README file metadata"
+  related: []
+
 policies:
   - name: readme-exists
-    description: Ensure README file exists in root of repository
+    description: |
+      Verifies that a README.md or README file exists in the repository root.
+      Every repository should have basic documentation for discoverability.
     mainPython: ./readme-exists.py
+    keywords: ["readme", "documentation", "repository docs"]
+
   - name: readme-min-line-count
-    description: Ensure README file has a minimum number of lines
+    description: |
+      Requires the README to have a minimum number of lines (default 25).
+      Prevents placeholder READMEs that lack useful information.
     mainPython: ./min-line-count.py
+    keywords: ["readme length", "documentation quality"]
+
   - name: readme-required-sections
-    description: Ensure README file contains required sections
+    description: |
+      Ensures the README contains required section headings (e.g., Installation, Usage).
+      Configurable via the required_sections input parameter.
     mainPython: ./required-sections.py
+    keywords: ["readme sections", "documentation structure"]
 
 inputs:
   min_lines:

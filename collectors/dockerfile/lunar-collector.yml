@@ -6,6 +6,19 @@ author: earthly
 
 default_image: earthly/lunar-lib:dockerfile-main
 
+landing_page:
+  display_name: "Dockerfile Collector"
+  long_description: |
+    Parse Dockerfiles to extract base images, final stage configuration, healthchecks,
+    users, and labels. Enforce container security and best practices.
+  category: "devex-build-and-ci"
+  icon: "assets/docker.svg"
+  status: "stable"
+  related:
+    - slug: "container"
+      type: "policy"
+      reason: "Enforces container best practices on collected Dockerfile data"
+
 collectors:
   - name: dockerfile
     description: |
@@ -16,8 +29,49 @@ collectors:
     mainBash: main.sh
     hook:
       type: code
+    keywords: ["dockerfile", "docker", "container images", "base images", "multi-stage builds"]
 
 inputs:
   find_command:
     description: Command to find Dockerfiles (must output one file path per line)
     default: "find . -type f \\( -name Dockerfile -o -name '*.Dockerfile' -o -name 'Dockerfile.*' \\)"
+
+example_component_json: |
+  {
+    "containers": {
+      "source": {
+        "tool": "dockerfile-json",
+        "version": "1.2.2"
+      },
+      "definitions": [
+        {
+          "path": "Dockerfile",
+          "valid": true,
+          "base_images": [
+            {
+              "reference": "golang:1.21-alpine",
+              "image": "golang",
+              "tag": "1.21-alpine"
+            },
+            {
+              "reference": "gcr.io/distroless/static-debian12:nonroot-amd64",
+              "image": "gcr.io/distroless/static-debian12",
+              "tag": "nonroot-amd64"
+            }
+          ],
+          "final_stage": {
+            "base_name": "runtime",
+            "base_image": "gcr.io/distroless/static-debian12:nonroot-amd64",
+            "user": "nonroot",
+            "has_healthcheck": false
+          },
+          "labels": {
+            "org.opencontainers.image.source": "https://github.com/acme/api"
+          },
+          "native": {
+            "ast": { "Stages": ["..."] }
+          }
+        }
+      ]
+    }
+  }

@@ -928,30 +928,93 @@ Each policy in the `policies:` array should have a unique `name` and point to it
 ```yaml
 version: 0
 
-name: my-policy                       # Required
-description: What this policy checks  # Should always specify
+name: my-policy                       # Required: Must match directory name
+description: What this policy checks  # Required: Brief description
 author: team@example.com              # Required
 
 default_image: earthly/lunar-scripts:1.0.0  # Recommended: specify base or custom image
 
+# === Landing page metadata (required for public plugins) ===
+landing_page:
+  display_name: "My Policies"         # Required: Max 50 chars, must end with "Policies"
+  long_description: |                 # Required: Max 300 chars, used for hero tagline + meta description
+    Enforce XYZ standards across your codebase. Validates ABC 
+    configurations and ensures DEF compliance.
+  category: "security-and-compliance" # Required: See categories below
+  status: "stable"                    # Required: stable|beta|experimental|deprecated
+  icon: "assets/my-icon.svg"          # Required: Path relative to plugin directory
+  
+  # Required collectors - policies MUST specify at least one
+  requires:
+    - slug: "my-collector"            # Plugin directory name
+      type: "collector"               # Must be "collector"
+      reason: "Provides data that this policy evaluates"  # Max 80 chars
+  
+  # Related plugins for cross-linking (optional)
+  related:
+    - slug: "other-policy"
+      type: "policy"
+      reason: "Also enforces related standards"
+
+# === Policies (sub-components) ===
 policies:
-  - name: check-one                   # Unique name for this check
-    description: Validates X          # Shown in UI and reports
+  - name: check-one                   # Required: Unique name for this check
+    description: |                    # Required: Multi-line description
+      Validates X exists and is properly configured.
+      Checks for common misconfigurations.
     mainPython: checks/check_one.py
+    keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
   - name: check-two
     description: Ensures Y meets requirements
     mainPython: checks/check_two.py
+    keywords: ["keyword3", "keyword4"]
 
-  - name: check-three
-    description: Verifies Z is configured
-    mainPython: checks/check_three.py
-
-inputs:                               # Optional: Shared across all checks
+# === Inputs (optional) ===
+inputs:
   threshold:
-    description: Minimum threshold
+    description: Minimum threshold percentage
     default: "80"
+  allowed_values:
+    description: Comma-separated list of allowed values
+    default: "value1,value2"
 ```
+
+### Landing Page Field Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `landing_page.display_name` | Yes | Human-readable name, max 50 chars, must end with "Policies" |
+| `landing_page.long_description` | Yes | Marketing description, max 300 chars, used for hero + meta |
+| `landing_page.category` | Yes | One of the 6 valid categories (see below) |
+| `landing_page.status` | Yes | `stable`, `beta`, `experimental`, or `deprecated` |
+| `landing_page.icon` | Yes | Path to SVG icon relative to plugin directory (file must exist) |
+| `landing_page.requires[]` | Yes | Array of required collectors (`slug`, `type: collector`, `reason` max 80 chars) |
+| `landing_page.related[]` | No | Array of related plugins (`slug`, `type`, `reason` max 80 chars) |
+| `policies[].keywords` | Yes | Array of SEO keywords for this sub-policy (at least 1) |
+| `inputs` | No | Configuration inputs (for website display, moved from README) |
+
+**Cross-validation:** The README title (`# ...`) must match `landing_page.display_name` exactly.
+
+### Categories
+
+| Slug | Display Name |
+|------|--------------|
+| `repository-and-ownership` | Repository & Ownership |
+| `deployment-and-infrastructure` | Deployment & Infrastructure |
+| `testing-and-quality` | Testing & Quality |
+| `devex-build-and-ci` | DevEx, Build & CI |
+| `security-and-compliance` | Security & Compliance |
+| `operational-readiness` | Operational Readiness |
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `stable` | Production ready, well tested |
+| `beta` | Feature complete, API stable |
+| `experimental` | Early development, API may change |
+| `deprecated` | No longer recommended |
 
 #### `default_image`
 

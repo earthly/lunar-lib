@@ -1,4 +1,4 @@
-# `codecov` Collector
+# Codecov Collector
 
 Detects Codecov usage and fetches coverage results from the Codecov API.
 
@@ -20,51 +20,6 @@ This collector writes to the following Component JSON paths:
 - `.testing.coverage` exists → codecov ran
 - `.testing.coverage.percentage` exists → upload succeeded and coverage was fetched
 
-See the example below for the full structure.
-
-<details>
-<summary>Example Component JSON output</summary>
-
-```json
-{
-  "testing": {
-    "coverage": {
-      "source": {
-        "tool": "codecov",
-        "integration": "ci",
-        "version": "0.7.2"
-      },
-      "percentage": 85.5,
-      "native": {
-        "codecov": {
-          "totals": {
-            "files": 3,
-            "lines": 1250,
-            "hits": 1068,
-            "misses": 182,
-            "partials": 0,
-            "coverage": 85.5
-          },
-          "files": [
-            {
-              "name": "src/main.py",
-              "totals": {
-                "lines": 500,
-                "hits": 450,
-                "misses": 50,
-                "coverage": 90.0
-              }
-            }
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
-</details>
-
 ## Collectors
 
 This plugin provides the following collectors (use `include` to select a subset):
@@ -81,18 +36,6 @@ The `results` collector:
 2. Fetches coverage from the Codecov API
 3. Writes `.testing.coverage.percentage` (normalized) and `.testing.coverage.native.codecov` (full API response)
 
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `use_env_token` | No | `false` | Use `CODECOV_TOKEN` from environment instead of Lunar secret |
-
-## Secrets
-
-- `CODECOV_API_TOKEN` - Codecov API token for fetching coverage results
-
-If `use_env_token` is enabled, the collector checks `CODECOV_TOKEN` from the environment first, then falls back to the Lunar secret.
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -106,8 +49,4 @@ collectors:
     #   use_env_token: "true"  # Use CODECOV_TOKEN from CI environment
 ```
 
-To fetch coverage results, configure one of the token options described above.
-
-## Related Policies
-
-- [`coverage`](https://github.com/earthly/lunar-lib/tree/main/policies/coverage) - Vendor-agnostic coverage policies (works with any coverage collector)
+To fetch coverage results, configure the `CODECOV_API_TOKEN` secret. If `use_env_token` is enabled, the collector checks `CODECOV_TOKEN` from the environment first, then falls back to the Lunar secret.

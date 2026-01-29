@@ -1,4 +1,4 @@
-# `golang` Collector
+# Go Collector
 
 Collects Go project information, CI/CD commands, test coverage, dependencies, and linting results.
 
@@ -24,109 +24,6 @@ This collector writes to the following Component JSON paths:
 
 **Note:** This collector writes Go-native coverage data to `.lang.go.tests.coverage`. For normalized cross-language coverage at `.testing.coverage`, use a dedicated coverage tool collector (CodeCov, Coveralls, etc.).
 
-<details>
-<summary>Example Component JSON output</summary>
-
-```json
-{
-  "lang": {
-    "go": {
-      "module": "github.com/acme/myproject",
-      "version": "1.21",
-      "build_systems": ["go"],
-      "native": {
-        "go_mod": {
-          "exists": true,
-          "version": "1.21"
-        },
-        "go_sum": {
-          "exists": true
-        },
-        "vendor": {
-          "exists": false
-        },
-        "goreleaser": {
-          "exists": true
-        },
-        "golangci_lint": {
-          "passed": false,
-          "config_exists": true,
-          "exit_code": 1,
-          "output": "main.go:42:5: unused variable 'x' (unused)"
-        }
-      },
-      "source": {
-        "tool": "go",
-        "integration": "code"
-      },
-      "cicd": {
-        "cmds": [
-          {"cmd": "go test ./...", "version": "1.21.5"}
-        ],
-        "source": {
-          "tool": "go",
-          "integration": "ci"
-        }
-      },
-      "tests": {
-        "scope": "recursive",
-        "coverage": {
-          "percentage": 78.5,
-          "profile_path": "coverage.out",
-          "native": {
-            "profile": "mode: set\ngithub.com/acme/myproject/main.go:10.2,12.16 1 1\n..."
-          },
-          "source": {
-            "tool": "go cover",
-            "integration": "ci"
-          }
-        }
-      },
-      "dependencies": {
-        "direct": [
-          {
-            "path": "github.com/stretchr/testify",
-            "version": "v1.8.4",
-            "indirect": false,
-            "replace": null
-          }
-        ],
-        "transitive": [
-          {
-            "path": "github.com/davecgh/go-spew",
-            "version": "v1.1.1",
-            "indirect": true,
-            "replace": null
-          }
-        ],
-        "source": {
-          "tool": "go mod",
-          "integration": "code"
-        }
-      },
-      "lint": {
-        "warnings": [
-          {
-            "file": "main.go",
-            "line": 42,
-            "column": 5,
-            "message": "unused variable 'x'",
-            "linter": "unused"
-          }
-        ],
-        "linters": ["golangci-lint"],
-        "source": {
-          "tool": "golangci-lint",
-          "integration": "code"
-        }
-      }
-    }
-  }
-}
-```
-
-</details>
-
 ## Collectors
 
 This plugin provides the following collectors (use `include` to select a subset):
@@ -140,12 +37,6 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `test-scope` | ci-before-command | Determines test scope (recursive vs package) |
 | `test-coverage` | ci-after-command | Detects if go tests produced a coverage report and extracts results |
 
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `lint_timeout` | No | `5m` | Timeout for golangci-lint execution |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -158,7 +49,3 @@ collectors:
     # with:
     #   lint_timeout: "10m"
 ```
-
-## Related Policies
-
-None.

@@ -5,14 +5,49 @@ description: Collect README file information
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
+landing_page:
+  display_name: "README Collector"
+  long_description: |
+    Verify README files exist and analyze their structure including line count and
+    section headings. Enforce documentation standards across your repositories.
+  category: "repository-and-ownership"
+  icon: "assets/readme.svg"
+  status: "stable"
+  related:
+    - slug: "readme"
+      type: "policy"
+      reason: "Enforces README best practices based on collected metadata"
+
 collectors:
   - name: readme
-    description: Collect README file information
+    description: |
+      Scans repository root for README files (README.md, README, README.txt, README.rst)
+      in order, taking the first match. Extracts line count and section headings by
+      parsing markdown headers. Writes exists, path, lines, and sections to .repo.readme.
     mainBash: main.sh
     hook:
       type: code
+    keywords: ["readme", "documentation", "repository docs", "markdown"]
 
 inputs:
   path:
     description: Comma-separated list of README paths to check (first match wins)
     default: "README.md,README,README.txt,README.rst"
+
+example_component_json: |
+  {
+    "repo": {
+      "readme": {
+        "exists": true,
+        "path": "README.md",
+        "lines": 150,
+        "sections": [
+          "Installation",
+          "Usage",
+          "API",
+          "Contributing",
+          "License"
+        ]
+      }
+    }
+  }

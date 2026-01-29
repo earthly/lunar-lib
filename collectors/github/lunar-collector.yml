@@ -5,36 +5,107 @@ description: Collect GitHub repository settings and branch protection rules
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
+landing_page:
+  display_name: "GitHub Collector"
+  long_description: |
+    Automatically collect GitHub repository settings, branch protection rules,
+    and access permissions. Enforce VCS standards across your organization.
+  category: "repository-and-ownership"
+  icon: "assets/github.svg"
+  status: "beta"
+  related:
+    - slug: "vcs"
+      type: "policy"
+      reason: "Enforces branch protection and merge strategy standards"
+
 collectors:
   - name: repository
     description: |
-      Collects basic GitHub repository settings:
-      - Repository visibility (public, private, internal)
-      - Default branch name
-      - Topics and tags
-      - Allowed merge strategies (merge, squash, rebase)
+      Fetches basic repository settings from the GitHub API including visibility
+      (public/private/internal), default branch name, topics, and allowed merge
+      strategies (merge commit, squash, rebase). Writes to .vcs.provider, .vcs.visibility,
+      .vcs.default_branch, .vcs.topics, and .vcs.merge_strategies.
     mainBash: repository.sh
     hook:
       type: code
+    keywords: ["github settings", "repository visibility", "merge strategies"]
 
   - name: branch-protection
     description: |
-      Collects GitHub branch protection rules:
-      - Required approvals and code owner review
-      - Required status checks
-      - Force push and deletion restrictions
-      - Commit signing requirements
-      - Push restrictions (users, teams, apps)
+      Fetches branch protection rules for the default branch from the GitHub API.
+      Collects required approvals, code owner review, dismiss stale reviews, required
+      status checks, force push/deletion restrictions, linear history requirements,
+      signed commit requirements, and push restrictions (users, teams, apps).
+      Writes comprehensive settings to .vcs.branch_protection.
     mainBash: branch_protection.sh
     hook:
       type: code
+    keywords: ["branch protection", "code review", "github security", "required reviewers"]
 
   - name: access-permissions
     description: |
-      Collects GitHub repository access permissions:
-      - Direct collaborators with their permission levels
-      - Teams with access and their permission levels
-      Note: Does not expand team memberships for performance
+      Fetches repository access permissions from the GitHub API with pagination support.
+      Collects direct collaborators (login, permission level, type) and teams with access
+      (slug, name, permission). Does not expand team memberships for performance. Writes
+      to .vcs.access.collaborators and .vcs.access.teams.
     mainBash: access_permissions.sh
     hook:
       type: code
+    keywords: ["access control", "permissions", "audit", "least privilege"]
+
+secrets:
+  GH_TOKEN:
+    description: GitHub personal access token with `repo` scope for API authentication
+
+example_component_json: |
+  {
+    "vcs": {
+      "provider": "github",
+      "default_branch": "main",
+      "visibility": "private",
+      "topics": ["backend", "api", "microservice"],
+      "merge_strategies": {
+        "allow_merge_commit": true,
+        "allow_squash_merge": true,
+        "allow_rebase_merge": false
+      },
+      "branch_protection": {
+        "enabled": true,
+        "branch": "main",
+        "require_pr": true,
+        "required_approvals": 2,
+        "require_codeowner_review": true,
+        "dismiss_stale_reviews": true,
+        "require_status_checks": true,
+        "required_checks": ["ci/build", "ci/test", "security/scan"],
+        "require_branches_up_to_date": true,
+        "allow_force_push": false,
+        "allow_deletions": false,
+        "require_linear_history": false,
+        "require_signed_commits": true,
+        "restrictions": {
+          "users": ["deployment-bot"],
+          "teams": ["platform-team"],
+          "apps": ["github-actions"]
+        }
+      },
+      "access": {
+        "collaborators": [
+          {
+            "login": "alice",
+            "permission": "admin",
+            "type": "User"
+          },
+          {
+            "login": "deployment-bot",
+            "permission": "write",
+            "type": "Bot"
+          }
+        ],
+        "teams": [
+          {"slug": "backend-team", "name": "Backend Team", "permission": "write"},
+          {"slug": "platform-team", "name": "Platform Team", "permission": "admin"}
+        ]
+      }
+    }
+  }
