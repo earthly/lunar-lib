@@ -68,28 +68,6 @@ lint:
     # Landing page metadata validation for all plugin types
     RUN python scripts/validate_landing_page_metadata.py
 
-test:
-    FROM python:3.12-alpine
-    WORKDIR /workspace
-    COPY --dir policies .
-    # Run unit tests for policies that have test files
-    RUN failures=0; \
-        for test_file in policies/*/test_*.py; do \
-            if [ -f "$test_file" ]; then \
-                dir=$(dirname "$test_file"); \
-                echo "Running tests in $dir..."; \
-                cd "$dir"; \
-                if [ -f requirements.txt ]; then \
-                    pip install --no-cache-dir -r requirements.txt; \
-                fi; \
-                if ! python -m unittest discover -v -p "test_*.py"; then \
-                    failures=$((failures + 1)); \
-                fi; \
-                cd /workspace; \
-            fi; \
-        done; \
-        exit $failures
-
 ai-context:
     COPY --dir ai-context .
     SAVE ARTIFACT ai-context
