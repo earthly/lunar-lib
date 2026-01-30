@@ -4,8 +4,8 @@ name: ci-otel
 description: Emit OpenTelemetry traces for CI pipeline runs
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
-default_image_ci_collectors: native
+default_image: earthly/lunar-lib:ci-otel-main
+default_image_ci_collectors: earthly/lunar-lib:ci-otel-main
 
 landing_page:
   display_name: "CI OpenTelemetry Collector"
