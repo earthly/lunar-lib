@@ -18,6 +18,8 @@ landing_page:
       type: "policy"
       reason: "Enforces README best practices based on collected metadata"
 
+default_image_non_ci_collectors: earthly/lunar-lib:base-main
+
 collectors:
   - name: readme
     description: |

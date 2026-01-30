@@ -4,6 +4,7 @@ name: readme
 description: README file best practices
 author: support@earthly.dev
 
+default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "README Policies"
   long_description: |
