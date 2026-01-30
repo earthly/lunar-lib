@@ -1,31 +1,41 @@
 from lunar_policy import Check, variable_or_default
 
-with Check("min-go-version", "Ensures Go version meets minimum") as c:
-    min_version = variable_or_default("min_go_version", "1.21")
 
-    # Skip if not a Go project
-    if not c.exists(".lang.go"):
-        c.skip("Not a Go project")
+def check_min_go_version(min_version=None, node=None):
+    """Check that Go version meets minimum requirement."""
+    if min_version is None:
+        min_version = variable_or_default("min_go_version", "1.21")
 
-    # Skip if version data not available
-    if not c.exists(".lang.go.version"):
-        c.skip("Go version not detected")
+    c = Check("min-go-version", "Ensures Go version meets minimum", node=node)
+    with c:
+        # Skip if not a Go project
+        if not c.exists(".lang.go"):
+            c.skip("Not a Go project")
 
-    actual_version = c.get_value(".lang.go.version")
+        # Skip if version data not available
+        if not c.exists(".lang.go.version"):
+            c.skip("Go version not detected")
 
-    # Parse versions for comparison (e.g., "1.21" -> (1, 21))
-    def parse_version(v):
-        parts = str(v).split(".")
-        return tuple(int(p) for p in parts[:2])
+        actual_version = c.get_value(".lang.go.version")
 
-    try:
-        actual = parse_version(actual_version)
-        minimum = parse_version(min_version)
+        # Parse versions for comparison (e.g., "1.21" -> (1, 21))
+        def parse_version(v):
+            parts = str(v).split(".")
+            return tuple(int(p) for p in parts[:2])
 
-        c.assert_true(
-            actual >= minimum,
-            f"Go version {actual_version} is below minimum {min_version}. "
-            f"Update go.mod to require Go {min_version} or higher."
-        )
-    except (ValueError, TypeError) as e:
-        c.fail(f"Could not parse Go version: {actual_version}")
+        try:
+            actual = parse_version(actual_version)
+            minimum = parse_version(min_version)
+
+            c.assert_true(
+                actual >= minimum,
+                f"Go version {actual_version} is below minimum {min_version}. "
+                f"Update go.mod to require Go {min_version} or higher."
+            )
+        except (ValueError, TypeError) as e:
+            c.fail(f"Could not parse Go version: {actual_version}")
+    return c
+
+
+if __name__ == "__main__":
+    check_min_go_version()
