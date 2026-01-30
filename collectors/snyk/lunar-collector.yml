@@ -17,9 +17,9 @@ landing_page:
   icon: "assets/snyk.svg"
   status: "stable"
   related:
-    - slug: "sca"
+    - slug: "dependencies"
       type: "policy"
-      reason: "Enforces SCA vulnerability thresholds using Snyk data"
+      reason: "Enforces dependency version requirements using Snyk data"
 
 collectors:
   - name: github-app
