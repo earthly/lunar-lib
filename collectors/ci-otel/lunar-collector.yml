@@ -1,0 +1,104 @@
+version: 0
+
+name: ci-otel
+description: Emit OpenTelemetry traces for CI pipeline runs
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "CI OpenTelemetry Collector"
+  long_description: |
+    Instruments CI pipelines with OpenTelemetry distributed tracing.
+    Captures job, step, and command-level spans for detailed CI observability.
+    Sends traces to any OTLP-compatible backend (Tempo, Jaeger, etc.).
+  category: "devex-build-and-ci"
+  icon: "assets/ci-otel.svg"
+  status: "stable"
+  related: []
+
+inputs:
+  otel_endpoint:
+    description: The OTLP HTTP endpoint for sending traces (e.g., http://tempo:4318)
+    default: "http://tempo:4318"
+  debug:
+    description: Enable debug mode to collect detailed debugging information in the Component JSON
+    default: "false"
+
+collectors:
+  - name: job-start
+    description: |
+      Starts the root span for the CI job. Generates trace ID from component
+      and job ID, stores context in temp files for child spans.
+    mainBash: job-start.sh
+    hook:
+      type: ci-before-job
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci job", "observability"]
+
+  - name: job-end
+    description: |
+      Ends the root span for the CI job. Reads start time from temp file,
+      calculates duration, and sends the complete span to the OTLP endpoint.
+    mainBash: job-end.sh
+    hook:
+      type: ci-after-job
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci job", "span completion"]
+
+  - name: step-start
+    description: |
+      Starts a span for each CI step. Creates child span under the job root
+      span, stores step context for command spans.
+    mainBash: step-start.sh
+    hook:
+      type: ci-before-step
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci step", "observability"]
+
+  - name: step-end
+    description: |
+      Ends the span for each CI step. Calculates step duration and sends
+      the complete span to the OTLP endpoint.
+    mainBash: step-end.sh
+    hook:
+      type: ci-after-step
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci step", "span completion"]
+
+  - name: cmd-start
+    description: |
+      Starts a span for each CI command. Creates child span under the current
+      step, captures command details and PID for correlation.
+    mainBash: cmd-start.sh
+    hook:
+      type: ci-before-command
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci command", "process tracing"]
+
+  - name: cmd-end
+    description: |
+      Ends the span for each CI command. Captures exit code, calculates
+      duration, and sends the complete span with command metadata.
+    mainBash: cmd-end.sh
+    hook:
+      type: ci-after-command
+      pattern: .*
+    keywords: ["opentelemetry", "tracing", "ci command", "span completion"]
+
+example_component_json: |
+  {
+    "ci": {
+      "traces": {
+        "abc123def456...": {
+          "trace_id": "abc123def456...",
+          "root_span_id": "1234567890abcdef",
+          "job_id": "12345",
+          "job_name": "build",
+          "component_id": "github.com/acme/myproject",
+          "status": "completed"
+        }
+      }
+    }
+  }
