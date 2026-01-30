@@ -309,74 +309,106 @@ class TestCoverageDataPresent(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.PASS)
 
 
-class TestRequiredTagsFiltering(unittest.TestCase):
-    """Tests for required_tags input filtering."""
+class TestRequiredLanguagesFiltering(unittest.TestCase):
+    """Tests for required_languages input filtering."""
 
-    def test_executed_skips_when_no_matching_tags(self):
-        """When required_tags is set and component doesn't match, check should skip."""
-        data = {"testing": {"source": {"framework": "go test"}}}
+    def test_executed_skips_when_no_matching_language(self):
+        """When required_languages is set and component has no matching lang, check should skip."""
+        # Component has no .lang.* data
+        data = {"repo": {"readme": {"exists": True}}}
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go,python"}):
-            # Component has no matching tags
-            check = check_executed(node=node, component_tags=["frontend", "nodejs"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "go,python"}):
+            check = check_executed(node=node)
             self.assertEqual(check.status, CheckStatus.SKIPPED)
-            self.assertIn("don't match required tags", check.skip_reason)
+            self.assertIn("No project detected", check.skip_reason)
 
-    def test_executed_passes_when_matching_tags(self):
-        """When required_tags is set and component matches, check should run."""
+    def test_executed_runs_when_matching_language(self):
+        """When required_languages is set and component has matching lang, check should run."""
+        data = {
+            "lang": {"go": {"module": "github.com/example/test"}},
+            "testing": {"source": {"framework": "go test"}}
+        }
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "go,python"}):
+            check = check_executed(node=node)
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_executed_runs_when_no_required_languages_set(self):
+        """When required_languages is empty, check should run for all components."""
         data = {"testing": {"source": {"framework": "go test"}}}
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go,python"}):
-            # Component has matching tag
-            check = check_executed(node=node, component_tags=["backend", "go"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": ""}):
+            check = check_executed(node=node)
             self.assertEqual(check.status, CheckStatus.PASS)
 
-    def test_executed_runs_when_no_required_tags_set(self):
-        """When required_tags is empty, check should run for all components."""
-        data = {"testing": {"source": {"framework": "go test"}}}
-        node = Node.from_component_json(data)
-        
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": ""}):
-            check = check_executed(node=node, component_tags=["frontend", "nodejs"])
-            self.assertEqual(check.status, CheckStatus.PASS)
-
-    def test_passing_skips_when_no_matching_tags(self):
-        """When required_tags is set and component doesn't match, passing should skip."""
+    def test_passing_skips_when_no_matching_language(self):
+        """When required_languages is set and component has no matching lang, passing should skip."""
         data = {"testing": {"all_passing": True}}
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "backend,java"}):
-            check = check_passing(node=node, component_tags=["docs", "readme"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "java,python"}):
+            check = check_passing(node=node)
             self.assertEqual(check.status, CheckStatus.SKIPPED)
-            self.assertIn("don't match required tags", check.skip_reason)
+            self.assertIn("No project detected", check.skip_reason)
 
-    def test_passing_runs_when_matching_tags(self):
-        """When required_tags is set and component matches, passing should run."""
-        data = {"testing": {"all_passing": True}}
+    def test_passing_runs_when_matching_language(self):
+        """When required_languages is set and component has matching lang, passing should run."""
+        data = {
+            "lang": {"python": {"version": "3.11"}},
+            "testing": {"all_passing": True}
+        }
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "backend,java"}):
-            check = check_passing(node=node, component_tags=["service", "java", "SOC2"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "python,java"}):
+            check = check_passing(node=node)
             self.assertEqual(check.status, CheckStatus.PASS)
 
-    def test_required_tags_with_spaces_are_trimmed(self):
-        """Tags with extra spaces should be trimmed correctly."""
-        data = {"testing": {"source": {"framework": "go test"}}}
+    def test_required_languages_with_spaces_are_trimmed(self):
+        """Languages with extra spaces should be trimmed correctly."""
+        data = {
+            "lang": {"nodejs": {"version": "18.0"}},
+            "testing": {"source": {"framework": "jest"}}
+        }
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": " go , python , java "}):
-            check = check_executed(node=node, component_tags=["python"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": " go , nodejs , java "}):
+            check = check_executed(node=node)
             self.assertEqual(check.status, CheckStatus.PASS)
 
-    def test_single_required_tag(self):
-        """Test with a single required tag."""
-        data = {"testing": {"source": {"framework": "go test"}}}
+    def test_single_required_language(self):
+        """Test with a single required language."""
+        data = {
+            "lang": {"go": {"module": "github.com/test"}},
+            "testing": {"source": {"framework": "go test"}}
+        }
         node = Node.from_component_json(data)
         
-        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go"}):
-            check = check_executed(node=node, component_tags=["go", "backend"])
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "go"}):
+            check = check_executed(node=node)
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_multiple_languages_any_match_works(self):
+        """If component has any of the required languages, it should run."""
+        data = {
+            "lang": {
+                "go": {"module": "github.com/test"},
+                "python": {"version": "3.11"}
+            },
+            "testing": {"source": {"framework": "go test"}}
+        }
+        node = Node.from_component_json(data)
+        
+        # Only requires java, but component has go and python
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "java"}):
+            check = check_executed(node=node)
+            self.assertEqual(check.status, CheckStatus.SKIPPED)
+        
+        # Requires go (which component has)
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_languages": "java,go"}):
+            check = check_executed(node=node)
             self.assertEqual(check.status, CheckStatus.PASS)
 
 

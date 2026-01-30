@@ -36,10 +36,11 @@ policies:
     keywords: ["tests", "passing", "test results", "quality"]
 
 inputs:
-  required_tags:
+  required_languages:
     description: |
-      Comma-separated list of component tags that require tests.
-      Components without any of these tags will be skipped.
-      Example: "go,python,nodejs,java" or "backend,service"
+      Comma-separated list of languages that require tests.
+      Components without a detected project for any of these languages will be skipped.
+      Checks for .lang.<language> existence (set by language collectors like golang, python, etc.)
+      Example: "go,python,nodejs,java"
       If empty, the policy applies to all components.
     default: ""

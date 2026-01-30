@@ -30,7 +30,7 @@ This policy reads from the following Component JSON paths:
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `required_tags` | Comma-separated list of component tags that require tests. Components without any of these tags will be skipped. | `""` (applies to all) |
+| `required_languages` | Comma-separated list of languages that require tests. Components without a detected project for any of these languages will be skipped. Checks for `.lang.<language>` existence. | `""` (applies to all) |
 
 ## Installation
 
@@ -43,9 +43,9 @@ policies:
     enforcement: report-pr
     # include: [executed]  # Only run specific checks (omit to run all)
     with:
-      # Only enforce tests for components with these tags
-      # (skips docs-only repos, infrastructure components, etc.)
-      required_tags: "go,python,nodejs,java"
+      # Only enforce tests for components with detected language projects
+      # (skips docs-only repos, infrastructure components, repos that just run scripts)
+      required_languages: "go,python,nodejs,java"
 ```
 
 ### Example: Only Go Projects
@@ -56,7 +56,7 @@ policies:
     on: ["domain:engineering"]
     enforcement: report-pr
     with:
-      required_tags: "go"
+      required_languages: "go"
 ```
 
 ## Examples
