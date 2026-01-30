@@ -18,10 +18,7 @@ landing_page:
     - slug: "golang"
       type: "collector"
       reason: "Provides test execution data for Go projects"
-  related:
-    - slug: "coverage"
-      type: "policy"
-      reason: "Validates test coverage thresholds"
+  related: []
 
 policies:
   - name: executed
