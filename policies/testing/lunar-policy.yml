@@ -1,0 +1,41 @@
+version: 0
+
+name: testing
+description: Validates that tests are executed and pass
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Testing Policies"
+  long_description: |
+    Ensure tests are executed in CI and passing. Works with any collector
+    that writes to the normalized .testing paths.
+  category: "testing-and-quality"
+  icon: "assets/testing.svg"
+  status: "stable"
+  requires:
+    - slug: "golang"
+      type: "collector"
+      reason: "Provides test execution data for Go projects"
+  related:
+    - slug: "coverage"
+      type: "policy"
+      reason: "Validates test coverage thresholds"
+
+policies:
+  - name: executed
+    description: |
+      Ensures tests were executed in CI.
+      Fails if no test execution data is found.
+    mainPython: ./executed.py
+    keywords: ["tests", "ci", "test execution", "quality"]
+
+  - name: passing
+    description: |
+      Ensures all tests pass. Skips if pass/fail data is not available
+      (some collectors only report execution, not results).
+    mainPython: ./passing.py
+    keywords: ["tests", "passing", "test results", "quality"]
+
+inputs: {}
