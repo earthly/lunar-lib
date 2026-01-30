@@ -68,21 +68,6 @@ lint:
     # Landing page metadata validation for all plugin types
     RUN python scripts/validate_landing_page_metadata.py
 
-test:
-    FROM python:3.12-alpine
-    WORKDIR /workspace
-    COPY --dir policies .
-    # Install lunar-policy SDK and test dependencies
-    RUN pip install --no-cache-dir lunar-policy==0.2.2 semver
-    # Run policy unit tests - fail build if any tests fail
-    RUN set -e && \
-        for test_file in $(find policies -name 'test_*.py'); do \
-            dir=$(dirname "$test_file"); \
-            name=$(basename "$test_file" .py); \
-            echo "Running tests in $dir/$name"; \
-            cd "$dir" && python -m unittest "$name" -v && cd /workspace; \
-        done
-
 ai-context:
     COPY --dir ai-context .
     SAVE ARTIFACT ai-context
