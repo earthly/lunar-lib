@@ -5,7 +5,7 @@ description: Validates code coverage collection and thresholds
 author: earthly
 
 landing_page:
-  display_name: "Coverage Policies"
+  display_name: "Coverage Guardrails"
   long_description: |
     Validate that code coverage data is collected in CI and meets minimum thresholds.
     Works with any coverage collector that writes to standard testing.coverage paths.

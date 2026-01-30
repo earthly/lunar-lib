@@ -1,4 +1,4 @@
-# Coverage Policies
+# Coverage Guardrails
 
 Validates code coverage collection and thresholds.
 

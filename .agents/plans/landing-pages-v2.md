@@ -339,7 +339,7 @@ New categories for collectors and catalogers, organized by technology rather tha
 | `documentation` | Documentation | README detection, OpenAPI |
 | `service-catalog` | Service Catalog | Backstage, OpsLevel, Cortex |
 
-**Note:** A single integration can belong to multiple categories (e.g., Dockerfile collector → `containers` + `ci-cd`).
+**Note:** A single integration can belong to multiple categories (e.g., Dockerfile collector → `categories: ["containers", "build"]`). Uses the same `categories` field as policies, but with different valid values.
 
 ### Policy/Guardrail Categories (Verification-Use-Case Aligned)
 
@@ -358,23 +358,25 @@ Keep existing 6 categories — these make sense for "what do I want to enforce?"
 
 ## Implementation Phases
 
-### Phase 1: Terminology Updates (lunar-lib)
+### Phase 1: Terminology Updates (lunar-lib) ✅ COMPLETE
 
 **Validation script updates:**
-- [ ] Update `display_name` suffix requirements:
+- [x] Update `display_name` suffix requirements:
   - Collectors: must end with "Collector" *(unchanged)*
   - Catalogers: must end with "Cataloger" *(unchanged)*
   - Policies: must end with "Guardrails" *(new)*
-- [ ] Add new `integration_category` field for collectors/catalogers (multi-value)
-- [ ] Keep existing `category` field for policies (single value, unchanged)
+- [x] Update `category` field to validate against different sets based on type:
+  - Policies: verification use-case aligned (repository-and-ownership, testing-and-quality, etc.)
+  - Collectors/Catalogers: technology-aligned (vcs, containers, build, languages, etc.)
 
 **YAML file updates:**
-- [ ] Update all policy `display_name` values (e.g., "Container Policies" → "Container Guardrails")
-- [ ] Add `integration_category` to all collectors/catalogers
+- [x] Update all policy `display_name` values (e.g., "Container Policies" → "Container Guardrails")
+- [x] Update all policy README titles to match new display_name
+- [x] Update all collectors/catalogers to use `categories` with technology-aligned values
 
 **README template updates:**
-- [ ] Update terminology in all templates
-- [ ] Remove "plugin" references
+- [x] Update terminology in all templates
+- [x] Remove "plugin" references
 
 ### Phase 2: URL Structure & Redirects (earthly-website)
 

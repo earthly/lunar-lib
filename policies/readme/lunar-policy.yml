@@ -6,7 +6,7 @@ author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
 landing_page:
-  display_name: "README Policies"
+  display_name: "README Guardrails"
   long_description: |
     Validate README files against documentation standards. Ensure repositories have
     proper documentation by checking for file existence, minimum content length,

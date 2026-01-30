@@ -10,7 +10,7 @@ landing_page:
   long_description: |
     Automatically collect GitHub repository settings, branch protection rules,
     and access permissions. Enforce VCS standards across your organization.
-  category: "repository-and-ownership"
+  categories: ["vcs"]
   icon: "assets/github.svg"
   status: "beta"
   related:
