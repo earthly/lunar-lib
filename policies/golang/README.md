@@ -24,14 +24,12 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.lang.go` | object | `golang` collector |
-| `.lang.go.native.go_mod.exists` | boolean | `golang` collector |
-| `.lang.go.native.go_sum.exists` | boolean | `golang` collector |
-| `.lang.go.version` | string | `golang` collector |
-| `.lang.go.tests.scope` | string | `golang` collector |
-| `.lang.go.native.vendor.exists` | boolean | `golang` collector |
-
-**Note:** Ensure the `golang` collector is configured before enabling this policy.
+| `.lang.go` | object | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.native.go_mod.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.native.go_sum.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.version` | string | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.tests.scope` | string | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.native.vendor.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
 
 ## Installation
 
@@ -39,21 +37,14 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/golang@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/golang@v1.0.0
     on: [go]  # Or use tags like ["domain:backend"]
-    enforcement: report-pr  # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # include: [go-mod-exists, go-sum-exists]  # Only run specific checks (omit to run all)
+    enforcement: report-pr
+    # include: [go-mod-exists, go-sum-exists]  # Only run specific checks
     with:
-      min_go_version: "1.21"
-      vendoring_mode: "none"  # Options: required, forbidden, none
+      min_go_version: "1.21"       # Minimum required Go version (default: "1.21")
+      vendoring_mode: "none"       # "required", "forbidden", or "none" (default: "none")
 ```
-
-## Configuration
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `min_go_version` | `"1.21"` | Minimum required Go version |
-| `vendoring_mode` | `"none"` | `"required"`, `"forbidden"`, or `"none"` (skip) |
 
 ## Examples
 
@@ -100,8 +91,6 @@ policies:
 - `"Go version 1.19 is below minimum 1.21. Update go.mod to require Go 1.21 or higher."`
 
 ## Remediation
-
-When this policy fails, you can resolve it by:
 
 ### go-mod-exists
 1. Run `go mod init <module-path>` to create a go.mod file
