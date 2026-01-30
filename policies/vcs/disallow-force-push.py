@@ -8,10 +8,11 @@ def main(node=None):
             "VCS data not found. Ensure the github collector is configured and has run.")
         
         enabled = c.get_value(".vcs.branch_protection.enabled")
-        c.assert_true(enabled, "Branch protection is not enabled")
-
-        allow_force_push = c.get_value(".vcs.branch_protection.allow_force_push")
-        c.assert_false(allow_force_push, "Branch protection allows force pushes, but policy requires them to be disabled")
+        if not enabled:
+            c.fail("Branch protection is not enabled")
+        else:
+            allow_force_push = c.get_value(".vcs.branch_protection.allow_force_push")
+            c.assert_false(allow_force_push, "Branch protection allows force pushes, but policy requires them to be disabled")
     return c
 
 
