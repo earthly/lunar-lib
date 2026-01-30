@@ -1,0 +1,75 @@
+version: 0
+
+name: golang
+description: Enforces Go project structure and standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Go Project Policies"
+  long_description: |
+    Enforce Go-specific project standards including module configuration,
+    Go version requirements, test execution scope, and vendoring policies.
+  category: "devex-build-and-ci"
+  icon: "assets/golang.svg"
+  status: "stable"
+  requires:
+    - slug: "golang"
+      type: "collector"
+      reason: "Provides Go project metadata"
+  related:
+    - slug: "linter"
+      type: "policy"
+      reason: "Enforces linting standards (works with golang collector)"
+    - slug: "dependencies"
+      type: "policy"
+      reason: "Validates dependency versions"
+
+policies:
+  - name: go-mod-exists
+    description: |
+      Ensures the project has a go.mod file for module management.
+      Required for all Go projects using modules.
+    mainPython: ./go-mod-exists.py
+    keywords: ["go modules", "go.mod", "project structure"]
+
+  - name: go-sum-exists
+    description: |
+      Ensures the project has a go.sum file for dependency verification.
+      Required for reproducible builds.
+    mainPython: ./go-sum-exists.py
+    keywords: ["go.sum", "dependencies", "checksums", "reproducibility"]
+
+  - name: min-go-version
+    description: |
+      Ensures the project uses at least the minimum required Go version.
+      Helps maintain security and compatibility standards.
+    mainPython: ./min-go-version.py
+    keywords: ["go version", "compatibility", "security"]
+
+  - name: tests-recursive
+    description: |
+      Ensures tests run recursively (./...) to cover all packages.
+      Prevents accidentally missing tests in subpackages.
+    mainPython: ./tests-recursive.py
+    keywords: ["go test", "test scope", "recursive tests"]
+
+  - name: vendoring
+    description: |
+      Enforces vendoring policy - can require vendor directory exists
+      or forbid it, depending on team standards.
+    mainPython: ./vendoring.py
+    keywords: ["vendor", "go mod vendor", "dependencies"]
+
+inputs:
+  min_go_version:
+    description: Minimum required Go version (e.g., "1.21", "1.22")
+    default: "1.21"
+  vendoring_mode:
+    description: |
+      Vendoring enforcement mode:
+      - "required": Fail if vendor/ directory doesn't exist
+      - "forbidden": Fail if vendor/ directory exists
+      - "none": Skip vendoring check (default)
+    default: "none"
