@@ -20,8 +20,7 @@ fi
 # Extract total percentage
 coverage_pct=$(go tool cover -func="$coverprofile_path" 2>/dev/null | awk '/^total:/ {print $NF}' | sed 's/%$//' || echo "0")
 
-# Collect to .lang.go.tests.coverage only (language-specific)
-# Normalized .testing.coverage should come from CodeCov or similar cross-language tools
+# Collect to .lang.go.tests.coverage (language-specific)
 jq -n \
   --argjson percentage "$coverage_pct" \
   --arg profile_path "$coverprofile_path" \
@@ -37,3 +36,14 @@ jq -n \
       integration: "ci"
     }
   }' | lunar collect -j ".lang.go.tests.coverage" -
+
+# Also write to normalized .testing.coverage for cross-language policies
+jq -n \
+  --argjson percentage "$coverage_pct" \
+  '{
+    percentage: $percentage,
+    source: {
+      tool: "go cover",
+      integration: "ci"
+    }
+  }' | lunar collect -j ".testing.coverage" -
