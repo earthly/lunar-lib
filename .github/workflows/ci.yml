@@ -25,6 +25,20 @@ jobs:
       - name: Lint
         run: earthly --ci +lint
 
+  test:
+    name: +test
+    runs-on: ubuntu-latest
+    env:
+      FORCE_COLOR: 1
+      EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
+      EARTHLY_INSTALL_ID: "earthly-lunar"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Earthly
+        uses: earthly/actions-setup@v1
+      - name: Test
+        run: earthly --ci +test
+
   build-and-push:
     name: +all
     runs-on: ubuntu-latest
