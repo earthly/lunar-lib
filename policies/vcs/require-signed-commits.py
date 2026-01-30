@@ -8,10 +8,11 @@ def main(node=None):
             "VCS data not found. Ensure the github collector is configured and has run.")
         
         enabled = c.get_value(".vcs.branch_protection.enabled")
-        c.assert_true(enabled, "Branch protection is not enabled")
-
-        require_signed_commits = c.get_value(".vcs.branch_protection.require_signed_commits")
-        c.assert_true(require_signed_commits, "Branch protection does not require signed commits")
+        if not enabled:
+            c.fail("Branch protection is not enabled")
+        else:
+            require_signed_commits = c.get_value(".vcs.branch_protection.require_signed_commits")
+            c.assert_true(require_signed_commits, "Branch protection does not require signed commits")
     return c
 
 
