@@ -33,7 +33,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
 | `github-app` | code (PRs only) | Detects Snyk GitHub App scans by querying commit status API |
-| `github-app-main` | code (default-branch only) | Checks if Snyk ran on recent PRs via database query |
+| `github-app-default-branch` | code (default-branch only) | Checks if Snyk ran on recent PRs via database query |
 | `cli` | ci-after-command | Captures Snyk CLI executions in CI pipelines |
 
 ## Installation
