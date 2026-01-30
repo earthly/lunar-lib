@@ -35,4 +35,11 @@ policies:
     mainPython: ./passing.py
     keywords: ["tests", "passing", "test results", "quality"]
 
-inputs: {}
+inputs:
+  required_tags:
+    description: |
+      Comma-separated list of component tags that require tests.
+      Components without any of these tags will be skipped.
+      Example: "go,python,nodejs,java" or "backend,service"
+      If empty, the policy applies to all components.
+    default: ""

@@ -26,6 +26,12 @@ This policy reads from the following Component JSON paths:
 
 **Note:** The `passing` check will **skip** (not fail) if `.testing.all_passing` is not available. This is intentional—some collectors only report that tests were executed, not detailed results. Use the `executed` check alone if your collector doesn't provide pass/fail data.
 
+## Configuration
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `required_tags` | Comma-separated list of component tags that require tests. Components without any of these tags will be skipped. | `""` (applies to all) |
+
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -33,9 +39,24 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/testing@main
-    on: [backend]
+    on: ["domain:engineering"]
     enforcement: report-pr
     # include: [executed]  # Only run specific checks (omit to run all)
+    with:
+      # Only enforce tests for components with these tags
+      # (skips docs-only repos, infrastructure components, etc.)
+      required_tags: "go,python,nodejs,java"
+```
+
+### Example: Only Go Projects
+
+```yaml
+policies:
+  - uses: github://earthly/lunar-lib/policies/testing@main
+    on: ["domain:engineering"]
+    enforcement: report-pr
+    with:
+      required_tags: "go"
 ```
 
 ## Examples

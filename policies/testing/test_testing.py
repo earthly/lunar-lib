@@ -9,7 +9,9 @@ The skip() logic is tested via scenarios where .testing exists but .all_passing
 is missing, which correctly triggers the skip path.
 """
 
+import os
 import unittest
+from unittest.mock import patch
 from lunar_policy import Node, CheckStatus
 
 from executed import check_executed
@@ -305,6 +307,77 @@ class TestCoverageDataPresent(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_passing(node=node)
         self.assertEqual(check.status, CheckStatus.PASS)
+
+
+class TestRequiredTagsFiltering(unittest.TestCase):
+    """Tests for required_tags input filtering."""
+
+    def test_executed_skips_when_no_matching_tags(self):
+        """When required_tags is set and component doesn't match, check should skip."""
+        data = {"testing": {"source": {"framework": "go test"}}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go,python"}):
+            # Component has no matching tags
+            check = check_executed(node=node, component_tags=["frontend", "nodejs"])
+            self.assertEqual(check.status, CheckStatus.SKIPPED)
+            self.assertIn("don't match required tags", check.skip_reason)
+
+    def test_executed_passes_when_matching_tags(self):
+        """When required_tags is set and component matches, check should run."""
+        data = {"testing": {"source": {"framework": "go test"}}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go,python"}):
+            # Component has matching tag
+            check = check_executed(node=node, component_tags=["backend", "go"])
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_executed_runs_when_no_required_tags_set(self):
+        """When required_tags is empty, check should run for all components."""
+        data = {"testing": {"source": {"framework": "go test"}}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": ""}):
+            check = check_executed(node=node, component_tags=["frontend", "nodejs"])
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_passing_skips_when_no_matching_tags(self):
+        """When required_tags is set and component doesn't match, passing should skip."""
+        data = {"testing": {"all_passing": True}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "backend,java"}):
+            check = check_passing(node=node, component_tags=["docs", "readme"])
+            self.assertEqual(check.status, CheckStatus.SKIPPED)
+            self.assertIn("don't match required tags", check.skip_reason)
+
+    def test_passing_runs_when_matching_tags(self):
+        """When required_tags is set and component matches, passing should run."""
+        data = {"testing": {"all_passing": True}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "backend,java"}):
+            check = check_passing(node=node, component_tags=["service", "java", "SOC2"])
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_required_tags_with_spaces_are_trimmed(self):
+        """Tags with extra spaces should be trimmed correctly."""
+        data = {"testing": {"source": {"framework": "go test"}}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": " go , python , java "}):
+            check = check_executed(node=node, component_tags=["python"])
+            self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_single_required_tag(self):
+        """Test with a single required tag."""
+        data = {"testing": {"source": {"framework": "go test"}}}
+        node = Node.from_component_json(data)
+        
+        with patch.dict(os.environ, {"LUNAR_INPUT_required_tags": "go"}):
+            check = check_executed(node=node, component_tags=["go", "backend"])
+            self.assertEqual(check.status, CheckStatus.PASS)
 
 
 if __name__ == "__main__":
