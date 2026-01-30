@@ -26,12 +26,6 @@ This policy reads from the following Component JSON paths:
 
 **Note:** The `passing` check will **skip** (not fail) if `.testing.all_passing` is not available. This is intentional—some collectors only report that tests were executed, not detailed results. Use the `executed` check alone if your collector doesn't provide pass/fail data.
 
-## Configuration
-
-| Input | Description | Default |
-|-------|-------------|---------|
-| `required_languages` | Comma-separated list of languages that require tests. Components without a detected project for any of these languages will be skipped. Checks for `.lang.<language>` existence. | `""` (applies to all) |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -43,21 +37,15 @@ policies:
     enforcement: report-pr
     # include: [executed]  # Only run specific checks (omit to run all)
     with:
-      # Only enforce tests for components with detected language projects
-      # (skips docs-only repos, infrastructure components, repos that just run scripts)
+      # required_languages: Only enforce for components with detected language projects
+      # Checks for .lang.<language> existence (set by language collectors)
+      # Skips docs-only repos, infrastructure components, repos that just run scripts
       required_languages: "go,python,nodejs,java"
 ```
 
-### Example: Only Go Projects
+**Input: `required_languages`** (default: empty = applies to all)
 
-```yaml
-policies:
-  - uses: github://earthly/lunar-lib/policies/testing@main
-    on: ["domain:engineering"]
-    enforcement: report-pr
-    with:
-      required_languages: "go"
-```
+Comma-separated list of languages. Components without a detected project for any of these languages will be skipped. This prevents false failures on repos that don't have a supported test collector.
 
 ## Examples
 
