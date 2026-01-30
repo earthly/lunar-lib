@@ -29,16 +29,16 @@ collectors:
       runs_on: [prs]
     keywords: ["semgrep", "github app", "sast", "code analysis"]
 
-  - name: github-app-main
+  - name: github-app-default-branch
     description: |
       Checks if Semgrep GitHub App has run on recent PRs by querying the
-      Lunar Hub database. Provides proof of scanning on the main branch
+      Lunar Hub database. Provides proof of scanning on the default branch
       even though Semgrep doesn't post checks there directly.
-    mainBash: github-app-main.sh
+    mainBash: github-app-default-branch.sh
     hook:
       type: code
       runs_on: [default-branch]
-    keywords: ["semgrep", "main branch", "compliance proof"]
+    keywords: ["semgrep", "default branch", "compliance proof"]
 
   - name: cli
     description: |

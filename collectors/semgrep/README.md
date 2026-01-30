@@ -26,7 +26,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
 | `github-app` | code (PRs only) | Detects Semgrep GitHub App scans on pull requests |
-| `github-app-main` | code (default branch) | Checks if Semgrep has run on recent PRs (proof for main branch) |
+| `github-app-default-branch` | code (default branch) | Checks if Semgrep has run on recent PRs (proof for default branch) |
 | `cli` | ci-after-command | Detects Semgrep CLI executions in CI pipelines |
 
 ## Installation
