@@ -4,7 +4,12 @@ Detects Snyk security scans and collects vulnerability data from GitHub App or C
 
 ## Overview
 
-This collector detects Snyk security scanning across multiple integration methods (GitHub App, CLI) and automatically categorizes results based on scan type. It writes normalized data to the appropriate Component JSON category (`.sca`, `.sast`, `.container_scan`, `.iac`) depending on which Snyk product was used.
+This collector detects Snyk security scanning across multiple integration methods (GitHub App, CLI) and automatically categorizes results based on scan type. It writes normalized data to the appropriate Component JSON category depending on which Snyk product was used:
+
+- **Snyk Open Source** → `.sca` (default, or `snyk test` command)
+- **Snyk Code** → `.sast` (context contains "code", or `snyk code` command)
+- **Snyk Container** → `.container_scan` (context contains "container", or `snyk container` command)
+- **Snyk IaC** → `.iac` (context contains "iac" or "infrastructure", or `snyk iac` command)
 
 ## Collected Data
 
@@ -57,14 +62,3 @@ secrets:
   PG_PASSWORD:
     from_env: LUNAR_DB_PASSWORD
 ```
-
-## Scan Type Detection
-
-The collector automatically categorizes Snyk scans based on the check context or CLI command:
-
-| Snyk Product | Category | Detection |
-|--------------|----------|-----------|
-| Snyk Open Source | `.sca` | Default, or `snyk test` command |
-| Snyk Code | `.sast` | Context contains "code", or `snyk code` command |
-| Snyk Container | `.container_scan` | Context contains "container", or `snyk container` command |
-| Snyk IaC | `.iac` | Context contains "iac" or "infrastructure", or `snyk iac` command |
