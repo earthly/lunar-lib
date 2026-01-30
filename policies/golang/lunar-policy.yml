@@ -18,13 +18,7 @@ landing_page:
     - slug: "golang"
       type: "collector"
       reason: "Provides Go project metadata"
-  related:
-    - slug: "linter"
-      type: "policy"
-      reason: "Enforces linting standards (works with golang collector)"
-    - slug: "dependencies"
-      type: "policy"
-      reason: "Validates dependency versions"
+  related: []
 
 policies:
   - name: go-mod-exists
