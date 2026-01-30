@@ -27,20 +27,13 @@ This policy reads from the following Component JSON paths:
 |------|------|-------------|
 | `.containers.definitions[]` | array | [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector |
 
-## Inputs
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `allowed_registries` | `docker.io` | Comma-separated list of allowed registries |
-| `required_labels` | `""` | Comma-separated list of required labels (empty = no requirement) |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/container@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/container@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [no-latest, stable-tags]  # Only include specific policies
@@ -127,10 +120,6 @@ policies:
   }
 }
 ```
-
-## Related Collectors
-
-- [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector
 
 ## Remediation
 

@@ -2,7 +2,7 @@
 
 This document defines the design principles and conventions for the Component JSON—the central data contract between collectors and policies.
 
-**See also:** [component-json-structure.md](component-json-structure.md) for the standard structure of each category (`.repo`, `.sca`, `.k8s`, etc.).
+**See also:** [structure.md](structure.md) for the standard structure of each category (`.repo`, `.sca`, `.k8s`, etc.).
 
 ## Design Principles
 
@@ -460,7 +460,8 @@ For language-specific data, use `.lang.<language_name>`:
 
 Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn vs pnpm) may warrant their own structure. The recommendation:
 
-- **Normalize where practical** — Package counts, version info
+- **Use `build_systems` as an array** — Projects may use multiple build tools (e.g., Gradle for builds + Maven for publishing)
+- **Store full dependency arrays** — Enable language-specific version policies for example replace directive tracking in go
 - **Use `.native.<build_system>` for build-system specifics** — When raw config details are needed
 
 ```json
@@ -468,10 +469,14 @@ Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn v
   "lang": {
     "java": {
       "version": "17",
-      "build_system": "gradle",
+      "build_systems": ["gradle", "maven"],
       "dependencies": {
-        "direct": 45,
-        "transitive": 230
+        "direct": [
+          {"path": "com.google.guava:guava", "version": "31.0.1"}
+        ],
+        "transitive": [
+          {"path": "org.checkerframework:checker-qual", "version": "3.12.0"}
+        ]
       },
       "native": {
         "gradle": {
@@ -480,6 +485,11 @@ Within a language, different build systems (e.g., Maven vs Gradle, npm vs yarn v
           "plugins": ["java", "org.springframework.boot", "com.github.spotbugs"],
           "subprojects": ["api", "client", "common"],
           "build_cache_enabled": true
+        },
+        "maven": {
+          "version": "3.9.6",
+          "plugins": ["maven-publish", "maven-gpg-plugin"],
+          "profiles": ["release", "ci"]
         }
       }
     }
@@ -500,3 +510,102 @@ The `.lang` category complements, not replaces, normalized categories:
 | Language-specific safety | — | `.lang.rust.unsafe_blocks` |
 
 **Rule of thumb:** If a policy could reasonably apply across multiple languages, normalize the data. If the policy only makes sense for one language, use `.lang.<language>`.
+
+### `.lang.<language>.dependencies` vs `.sbom`
+
+Both capture dependency information, but serve different purposes:
+
+| Use Case | Best Source | Why |
+|----------|-------------|-----|
+| **Dependency version policies** | `.lang.<lang>.dependencies` | Supports language-native version semantics |
+| **License compliance** | `.sbom` | SPDX license identifiers, cross-language |
+| **Vulnerability scanning** | `.sca` / `.sbom` | CVE correlation via CPE/PURL |
+| **"No GPL dependencies"** | `.sbom` | License data, cross-language |
+
+**Why keep both?**
+
+1. **Language-native data in `.lang.<lang>.dependencies`:**
+   - Replace directives (Go `replace`, npm `overrides`) — often missed by SBOMs
+   - Direct vs transitive distinction with language semantics
+   - Exact toolchain resolution (what the build actually uses)
+   - No SBOM tooling required
+   - Enables version policies with language-aware comparison
+
+2. **Standardized data in `.sbom`:**
+   - License information (SPDX identifiers)
+   - Cross-language policies (single policy for Go, Java, Node)
+   - Vulnerability correlation via PURL
+   - Compliance requirements (many frameworks mandate SBOM)
+
+**Version comparison note:** Version strings remain language-native in both sources (`v1.2.3` for Go, `1.2.3-SNAPSHOT` for Maven). Policies checking minimum versions should normalize versions for comparison, handling prefixes (`v`), suffixes (`-SNAPSHOT`, `+incompatible`), and special formats (Go pseudo-versions, calendar versioning).
+
+---
+
+## Naming Conventions
+
+### Boolean Fields
+- **Existence:** `exists`, `configured`, `enabled`
+- **Presence aggregates:** `has_<thing>` (e.g., `has_critical`, `has_runbook`)
+- **State:** `is_<state>` (e.g., `is_latest`, `is_pinned`)
+- **All-aggregates:** `all_<condition>` (e.g., `all_valid`, `all_passing`)
+- **Clean state:** `clean` (no issues found)
+
+### Numeric Fields
+- Include units: `duration_seconds`, `latency_ms`
+- Use `_count` for quantities: `error_count`, `file_count`
+- Use `_percentage` for percentages: `coverage_percentage`
+
+### Arrays
+- Plural names: `files`, `findings`, `issues`, `containers`
+- Each item has identifying context: `path`, `name`, `id`
+
+### Source Metadata
+- `source.tool` — Tool name (e.g., "snyk", "trivy")
+- `source.version` — Tool version
+- `source.integration` — How collected: `ci`, `github_app`, `code`, `api`
+- `source.collected_at` — Timestamp (ISO 8601)
+
+### Errors
+- `valid: boolean` — Parse/validation success
+- `error: string` — Error message (only when `valid: false`)
+- `errors: array` — Multiple errors
+
+### Summary Objects
+- Use `.summary` for aggregated/derived booleans that simplify policies
+- Example: `.k8s.summary.all_have_resources` instead of iterating all containers
+
+---
+
+## Writing Tool-Agnostic Policies
+
+**Good:** Check normalized fields
+
+```python
+with Check("sca-no-critical", "No critical SCA vulnerabilities") as c:
+    c.assert_exists(".sca", "SCA scanner must be configured")
+    c.assert_equals(c.get_value(".sca.vulnerabilities.critical"), 0,
+        "Critical vulnerabilities found")
+```
+
+**Bad:** Check specific tool
+
+```python
+# Don't do this unless compliance requires a specific tool
+with Check("must-use-snyk") as c:
+    c.assert_equals(c.get_value(".sca.source.tool"), "snyk")
+```
+
+**When to check specific tools:** Only when compliance/policy explicitly mandates a particular scanner (e.g., "must use Snyk Enterprise for SCA").
+
+---
+
+## Extending the Schema
+
+When adding new data:
+
+1. **Does it fit an existing category?** — Don't create new top-level keys unnecessarily
+2. **Is it tool-specific or capability-specific?** — Name for the capability, not the tool
+3. **Can multiple tools provide this data?** — Design for normalization
+4. **Include source metadata** — So policies CAN check tools if needed
+5. **Add summary fields** — Make common policy checks easy
+6. **Document the contract** — Update the structure docs and collector/policy READMEs

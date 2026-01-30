@@ -830,6 +830,168 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
 
 ---
 
+## Code Quality Patterns (AST-Based)
+
+These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to enforce code quality standards via structural analysis.
+
+### Logging Standards
+
+* `code-structured-logging-only` **Code uses structured logging only**: Code must use structured logging libraries, not printf-style logging.
+  * Collector(s): Use ast-grep to detect `fmt.Printf`, `fmt.Println`, `log.Printf`, `print()`, `console.log` in non-test code
+  * Component JSON:
+    * `.code_patterns.logging.printf_violations.count` - Number of printf-style calls
+    * `.code_patterns.logging.printf_violations.locations` - Array of file/line locations
+    * `.code_patterns.logging.uses_structured_logging` - Boolean indicating structured logging only
+  * Policy: Assert that no printf-style logging is used in production code
+  * Configuration: Excluded paths (tests, scripts)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-approved-logger` **Code uses approved logging library**: Code must use the organization-approved structured logging library.
+  * Collector(s): Use ast-grep to detect imports and usage of approved vs unapproved logging libraries
+  * Component JSON:
+    * `.code_patterns.logging.library` - Detected logging library
+    * `.code_patterns.logging.uses_approved` - Boolean for approved library usage
+  * Policy: Assert that the approved logging library is used
+  * Configuration: Approved logging libraries per language (e.g., Go: slog/zap/zerolog, Python: structlog)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Error Handling
+
+* `code-errors-not-ignored` **Errors are not ignored**: Code must not discard errors using blank identifiers or empty catch blocks.
+  * Collector(s): Use ast-grep to detect `_, _ = $FUNC($$$)` in Go, empty `except:` blocks in Python, empty `catch` in JS/Java
+  * Component JSON:
+    * `.code_patterns.errors.ignored_errors.count` - Number of ignored errors
+    * `.code_patterns.errors.ignored_errors.locations` - Array of file/line locations
+    * `.code_patterns.errors.all_handled` - Boolean indicating all errors handled
+  * Policy: Assert that no errors are silently discarded
+  * Configuration: Allowed exceptions with justification
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-errors-wrapped` **Errors are wrapped with context**: Errors should be wrapped with context using error wrapping functions rather than returned bare.
+  * Collector(s): Use ast-grep to detect bare `return err` vs `return fmt.Errorf("context: %w", err)` patterns
+  * Component JSON:
+    * `.code_patterns.errors.unwrapped_errors.count` - Number of unwrapped error returns
+    * `.code_patterns.errors.unwrapped_errors.locations` - Array of file/line locations
+  * Policy: Assert that errors are wrapped with context (may be advisory)
+  * Configuration: Wrapping function patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-no-panic-in-library` **Libraries do not use panic**: Library code must not use panic() for error handling; return errors instead.
+  * Collector(s): Use ast-grep to detect `panic($$$)` calls in non-main packages
+  * Component JSON:
+    * `.code_patterns.errors.panic_usage.count` - Number of panic calls
+    * `.code_patterns.errors.panic_usage.locations` - Array of file/line locations
+    * `.code_patterns.errors.panic_free` - Boolean indicating no panics in library code
+  * Policy: Assert that library code does not use panic
+  * Configuration: Packages excluded from check (main, test)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Context Propagation (Go)
+
+* `code-context-first-param` **Context is first parameter in Go functions**: Go functions that accept context should have it as the first parameter.
+  * Collector(s): Use ast-grep to detect functions with context.Context not as first parameter
+  * Component JSON:
+    * `.lang.go.context.wrong_position.count` - Number of functions with misplaced context
+    * `.lang.go.context.wrong_position.locations` - Array of file/line locations
+    * `.lang.go.context.follows_convention` - Boolean for convention compliance
+  * Policy: Assert that context is first parameter where used
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-context-propagated` **Context is propagated to downstream calls**: Functions receiving context should pass it to downstream calls, not use context.Background().
+  * Collector(s): Use ast-grep to detect `context.Background()` or `context.TODO()` inside functions that receive a context
+  * Component JSON:
+    * `.lang.go.context.background_misuse.count` - Number of context.Background() misuses
+    * `.lang.go.context.background_misuse.locations` - Array of file/line locations
+  * Policy: Assert that received context is propagated
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### HTTP Client Configuration
+
+* `code-http-client-timeout` **HTTP clients have timeouts configured**: HTTP clients must have explicit timeouts configured, not use default zero timeout.
+  * Collector(s): Use ast-grep to detect `http.Client{}` without Timeout field, or `http.Get()` (uses default client)
+  * Component JSON:
+    * `.code_patterns.http.missing_timeout.count` - Number of clients without timeouts
+    * `.code_patterns.http.missing_timeout.locations` - Array of file/line locations
+    * `.code_patterns.http.all_have_timeout` - Boolean indicating all clients have timeouts
+  * Policy: Assert that all HTTP clients have explicit timeouts
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-no-default-http-client` **Code does not use default HTTP client**: Code must not use http.Get/http.Post (default client) in production.
+  * Collector(s): Use ast-grep to detect `http.Get($$$)`, `http.Post($$$)` direct calls
+  * Component JSON:
+    * `.code_patterns.http.default_client_usage.count` - Number of default client usages
+    * `.code_patterns.http.default_client_usage.locations` - Array of file/line locations
+  * Policy: Assert that default HTTP client is not used
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Resource Management
+
+* `code-defer-close` **Opened resources are closed with defer**: Files, connections, and other resources must be closed using defer immediately after opening.
+  * Collector(s): Use ast-grep to detect `os.Open($$$)` or similar without nearby `defer $F.Close()`
+  * Component JSON:
+    * `.code_patterns.resources.missing_close.count` - Number of resources without defer close
+    * `.code_patterns.resources.missing_close.locations` - Array of file/line locations
+  * Policy: Assert that resources are closed with defer
+  * Configuration: Resource opening patterns to check
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-defer-unlock` **Mutexes are unlocked with defer**: Mutex locks should be followed by defer unlock to prevent deadlocks.
+  * Collector(s): Use ast-grep to detect `$M.Lock()` without nearby `defer $M.Unlock()`
+  * Component JSON:
+    * `.code_patterns.concurrency.missing_unlock.count` - Number of locks without defer unlock
+    * `.code_patterns.concurrency.missing_unlock.locations` - Array of file/line locations
+  * Policy: Assert that mutex locks have corresponding defer unlock
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Deprecated API Detection
+
+* `code-no-deprecated-apis` **Code does not use deprecated APIs**: Code must not use APIs that have been deprecated by the organization.
+  * Collector(s): Use ast-grep with configurable patterns for deprecated function/method calls
+  * Component JSON:
+    * `.code_patterns.deprecated.api_usage.count` - Number of deprecated API usages
+    * `.code_patterns.deprecated.api_usage.apis` - Array of deprecated APIs used
+    * `.code_patterns.deprecated.api_usage.locations` - Array of file/line locations
+  * Policy: Assert that no deprecated APIs are used
+  * Configuration: List of deprecated API patterns
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-no-legacy-patterns` **Code does not use legacy patterns**: Code must use modern patterns, not legacy alternatives.
+  * Collector(s): Use ast-grep to detect legacy patterns (e.g., callback-style vs async/await, old error handling)
+  * Component JSON:
+    * `.code_patterns.legacy.patterns_found.count` - Number of legacy patterns
+    * `.code_patterns.legacy.patterns_found.types` - Types of legacy patterns
+    * `.code_patterns.legacy.patterns_found.locations` - Array of file/line locations
+  * Policy: Assert that legacy patterns are not used (may be advisory for migration tracking)
+  * Configuration: Legacy pattern definitions
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Code Organization
+
+* `code-no-global-state` **No mutable global state**: Code should not use mutable global variables that can cause concurrency issues.
+  * Collector(s): Use ast-grep to detect `var $NAME = ...` at package level with mutable types
+  * Component JSON:
+    * `.code_patterns.globals.mutable_globals.count` - Number of mutable global variables
+    * `.code_patterns.globals.mutable_globals.locations` - Array of file/line locations
+  * Policy: Assert that no mutable global state exists
+  * Configuration: Allowed global patterns (constants, singletons)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `code-no-init-side-effects` **Init functions have no side effects**: Go init() functions should not have external side effects (network calls, file I/O).
+  * Collector(s): Use ast-grep to detect side-effect patterns inside init() functions
+  * Component JSON:
+    * `.lang.go.init.side_effects.count` - Number of init functions with side effects
+    * `.lang.go.init.side_effects.locations` - Array of file/line locations
+  * Policy: Assert that init functions have no external side effects
+  * Configuration: Patterns considered side effects
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+---
+
 ## Summary Policies
 
 * `summary-build-ci-score` **Build and CI compliance score**: Aggregate score reflecting overall build and CI quality.

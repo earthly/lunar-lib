@@ -7,13 +7,22 @@ This directory contains reference documentation for AI agents working with the L
 * [about-lunar.md](ai-context/about-lunar.md): **Start here.** High-level overview of the Lunar platform, the problem it solves, and key concepts from a user perspective.
 * [core-concepts.md](ai-context/core-concepts.md): **Then read this.** Comprehensive explanation of Lunar's architecture, key entities, execution flow, and how collectors/policies interact via the Component JSON.
 * [collector-reference.md](ai-context/collector-reference.md): Complete guide to writing collectors—hooks, environment variables, the `lunar collect` command, patterns, and best practices.
+* [cataloger-reference.md](ai-context/cataloger-reference.md): Complete guide to writing catalogers—syncing catalog data from external systems, the `lunar catalog` command, patterns, and best practices.
 * [policy-reference.md](ai-context/policy-reference.md): Complete guide to writing policies—the Check class, assertions, handling missing data, patterns, and testing.
-* [component-json-conventions.md](ai-context/component-json-conventions.md): **The schema contract.** Design principles and conventions for Component JSON—source metadata, presence detection, PR-specific data, native data, and language-specific patterns.
-* [component-json-structure.md](ai-context/component-json-structure.md): **The category reference.** Standard structure for each top-level category (`.repo`, `.sca`, `.k8s`, etc.) with examples and key policy paths.
+
+## Component JSON Schema
+
+The Component JSON schema documentation lives in [component-json/](ai-context/component-json/):
+
+* [conventions.md](ai-context/component-json/conventions.md): **The schema contract.** Design principles, source metadata patterns, presence detection, PR-specific data, native data, and language-specific patterns.
+* [structure.md](ai-context/component-json/structure.md): **The category reference.** Quick reference table of all paths, links to individual category docs (`.repo`, `.sca`, `.k8s`, etc.), naming conventions, and schema extension guidelines.
+
+The `structure.md` file links to individual category files (`cat-repo.md`, `cat-sca.md`, etc.) for detailed examples and key policy paths.
 
 ## Plugin Templates
 
 * [collector-README-template.md](ai-context/collector-README-template.md): Standard README.md template for collector plugins.
+* [cataloger-README-template.md](ai-context/cataloger-README-template.md): Standard README.md template for cataloger plugins.
 * [policy-README-template.md](ai-context/policy-README-template.md): Standard README.md template for policy plugins.
 
 ## Implementation Guides

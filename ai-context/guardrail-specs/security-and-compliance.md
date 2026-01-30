@@ -879,6 +879,144 @@ This document specifies possible policies for the **Security and Compliance** ca
 
 ---
 
+## Code-Level Security Patterns (AST-Based)
+
+These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect security anti-patterns directly in source code via structural analysis.
+
+### Injection Vulnerabilities
+
+* `sec-no-sql-string-concat` **No SQL string concatenation**: Code must not construct SQL queries using string concatenation, which can lead to SQL injection vulnerabilities.
+  * Collector(s): Use ast-grep to find patterns like `db.Query($SQL + $VAR)` or string interpolation in SQL contexts
+  * Component JSON:
+    * `.code_patterns.security.sql_concat.count` - Number of SQL concatenation patterns found
+    * `.code_patterns.security.sql_concat.locations` - Array of file/line locations
+    * `.code_patterns.security.sql_concat.clean` - Boolean indicating no patterns found
+  * Policy: Assert that no SQL string concatenation patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-command-injection` **No command injection patterns**: Code must not pass user input directly to shell commands or system calls.
+  * Collector(s): Use ast-grep to detect patterns like `os.system($VAR)`, `subprocess.call($CMD, shell=True)`, `exec.Command($VAR)`
+  * Component JSON:
+    * `.code_patterns.security.command_injection.count` - Number of dangerous patterns found
+    * `.code_patterns.security.command_injection.locations` - Array of file/line locations
+    * `.code_patterns.security.command_injection.clean` - Boolean indicating no patterns found
+  * Policy: Assert that no command injection patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-path-traversal` **No path traversal patterns**: Code must not construct file paths using unsanitized user input.
+  * Collector(s): Use ast-grep to detect patterns like `os.Open($BASE + $USER_INPUT)` or `path.Join($BASE, $USER_INPUT)` without validation
+  * Component JSON:
+    * `.code_patterns.security.path_traversal.count` - Number of patterns found
+    * `.code_patterns.security.path_traversal.locations` - Array of file/line locations
+  * Policy: Assert that no path traversal patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Dangerous Functions
+
+* `sec-no-eval-exec` **No eval or exec usage**: Code must not use eval(), exec(), or similar dynamic code execution functions.
+  * Collector(s): Use ast-grep to detect `eval($$$)`, `exec($$$)`, `Function($$$)()` patterns
+  * Component JSON:
+    * `.code_patterns.security.eval_exec.count` - Number of eval/exec usages found
+    * `.code_patterns.security.eval_exec.locations` - Array of file/line locations
+    * `.code_patterns.security.eval_exec.clean` - Boolean indicating no patterns found
+  * Policy: Assert that no eval/exec patterns are detected
+  * Configuration: Allowed exceptions with justification
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-unsafe-deserialization` **No unsafe deserialization**: Code must not deserialize untrusted data using unsafe methods (pickle, yaml.load without SafeLoader, etc.).
+  * Collector(s): Use ast-grep to detect `pickle.loads($$$)`, `yaml.load($$$)` without Loader, `Marshal.load($$$)`
+  * Component JSON:
+    * `.code_patterns.security.unsafe_deserialization.count` - Number of unsafe patterns found
+    * `.code_patterns.security.unsafe_deserialization.locations` - Array of file/line locations
+  * Policy: Assert that no unsafe deserialization patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-unsafe-reflection` **No unsafe reflection**: Code must not use reflection to invoke methods based on user input.
+  * Collector(s): Use ast-grep to detect patterns where user input flows into reflection APIs
+  * Component JSON:
+    * `.code_patterns.security.unsafe_reflection.count` - Number of patterns found
+    * `.code_patterns.security.unsafe_reflection.locations` - Array of file/line locations
+  * Policy: Assert that no unsafe reflection patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Cryptography
+
+* `sec-no-weak-crypto` **No weak cryptographic algorithms**: Code must not use deprecated/weak cryptographic algorithms (MD5, SHA1 for security, DES, RC4).
+  * Collector(s): Use ast-grep to detect `md5.New()`, `sha1.New()`, `crypto.MD5`, `hashlib.md5()` in security contexts
+  * Component JSON:
+    * `.code_patterns.security.weak_crypto.count` - Number of weak crypto usages
+    * `.code_patterns.security.weak_crypto.algorithms` - Array of weak algorithms found
+    * `.code_patterns.security.weak_crypto.locations` - Array of file/line locations
+  * Policy: Assert that no weak cryptographic algorithms are used for security purposes
+  * Configuration: Allowed algorithms (exclude MD5/SHA1 used for checksums only)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-hardcoded-crypto-keys` **No hardcoded cryptographic keys**: Code must not contain hardcoded encryption keys, IVs, or salts.
+  * Collector(s): Use ast-grep to detect patterns like `key = "..."` or `iv = []byte{...}` in crypto contexts
+  * Component JSON:
+    * `.code_patterns.security.hardcoded_keys.count` - Number of hardcoded keys found
+    * `.code_patterns.security.hardcoded_keys.locations` - Array of file/line locations
+  * Policy: Assert that no hardcoded cryptographic material is detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-insecure-random` **No insecure random for security purposes**: Code must use cryptographically secure random number generators for security-sensitive operations.
+  * Collector(s): Use ast-grep to detect `math/rand` or `random.random()` usage in security contexts (tokens, passwords, keys)
+  * Component JSON:
+    * `.code_patterns.security.insecure_random.count` - Number of insecure random usages
+    * `.code_patterns.security.insecure_random.locations` - Array of file/line locations
+  * Policy: Assert that cryptographic random is used for security operations
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Credential Patterns
+
+* `sec-no-hardcoded-credentials` **No hardcoded credentials in code**: Code must not contain hardcoded passwords, API keys, or tokens.
+  * Collector(s): Use ast-grep to detect patterns like `password = "..."`, `apiKey = "..."`, `token = "..."`
+  * Component JSON:
+    * `.code_patterns.security.hardcoded_credentials.count` - Number of hardcoded credentials
+    * `.code_patterns.security.hardcoded_credentials.types` - Types of credentials found
+    * `.code_patterns.security.hardcoded_credentials.locations` - Array of file/line locations
+  * Policy: Assert that no hardcoded credentials are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-credentials-in-urls` **No credentials embedded in URLs**: Code must not embed credentials in URL strings.
+  * Collector(s): Use ast-grep to detect URL patterns containing credentials like `http://user:pass@host`
+  * Component JSON:
+    * `.code_patterns.security.credential_urls.count` - Number of credential URLs found
+    * `.code_patterns.security.credential_urls.locations` - Array of file/line locations
+  * Policy: Assert that no credentials are embedded in URLs
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+### Logging and Information Disclosure
+
+* `sec-no-sensitive-data-logging` **No sensitive data in log statements**: Log statements must not include passwords, tokens, PII, or other sensitive data.
+  * Collector(s): Use ast-grep to detect logging calls that include sensitive variable names or patterns
+  * Component JSON:
+    * `.code_patterns.security.sensitive_logging.count` - Number of sensitive logging patterns
+    * `.code_patterns.security.sensitive_logging.locations` - Array of file/line locations
+  * Policy: Assert that no sensitive data logging patterns are detected
+  * Configuration: Sensitive field patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+* `sec-no-stack-trace-exposure` **No stack trace exposure to users**: Code must not return stack traces or internal errors directly to users.
+  * Collector(s): Use ast-grep to detect patterns like returning `err.Error()` or `traceback` in HTTP responses
+  * Component JSON:
+    * `.code_patterns.security.stack_trace_exposure.count` - Number of exposure patterns
+    * `.code_patterns.security.stack_trace_exposure.locations` - Array of file/line locations
+  * Policy: Assert that no stack trace exposure patterns are detected
+  * Configuration: None
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
+
+---
+
 ## Implementation Notes
 
 ### Multi-Vendor Collector Strategy

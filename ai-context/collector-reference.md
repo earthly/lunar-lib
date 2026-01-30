@@ -73,6 +73,25 @@ collectors:
     on: [backend]
 ```
 
+### `include` and `exclude`
+
+When importing a collector plugin that defines multiple subcollectors, selectively enable or disable specific ones:
+
+```yaml
+collectors:
+  # Include only specific subcollectors
+  - uses: ./collectors/go
+    on: [go]
+    include: [version, dependencies]  # Only run these two
+
+  # Exclude specific subcollectors
+  - uses: ./collectors/go
+    on: [go]
+    exclude: [build-info]  # Run all except "build-info"
+```
+
+If neither `include` nor `exclude` is specified, all subcollectors are included by default.
+
 ## Hook Types
 
 Hooks define **when** a collector runs and **in what context**.
@@ -134,7 +153,7 @@ hook:
 - Build artifacts
 - Test results
 - Environment variables
-- The `LUNAR_HOOK_CMD` variable (for command hooks)
+- The `LUNAR_CI_COMMAND` variable (for command hooks)
 
 **Use cases:**
 - Capturing test coverage after test runs
@@ -157,6 +176,25 @@ collectors:
         pattern: ^go test.*
 ```
 
+### Hook Options
+
+#### `runs_on`
+
+Controls when the hook triggers:
+
+```yaml
+hook:
+  type: code
+  runs_on: [prs, default-branch]  # Default: runs on both
+```
+
+| Value | Meaning |
+|-------|---------|
+| `prs` | Run on pull requests |
+| `default-branch` | Run on the default branch (main/master) |
+
+Default is `[prs, default-branch]`. Use `runs_on: [prs]` to run only on PRs, or `runs_on: [default-branch]` to run only on the main branch.
+
 ## Environment Variables
 
 Collectors have access to these environment variables:
@@ -169,6 +207,8 @@ Collectors have access to these environment variables:
 | `LUNAR_COMPONENT_DOMAIN` | Domain the component belongs to | `payments.api` |
 | `LUNAR_COMPONENT_OWNER` | Component owner email | `jane@example.com` |
 | `LUNAR_COMPONENT_PR` | PR number (if in PR context) | `123` or empty |
+| `LUNAR_COMPONENT_HEAD_BRANCH` | Head branch of PR (branch with changes) | `feature/add-auth` |
+| `LUNAR_COMPONENT_BASE_BRANCH` | Base branch of PR (target branch) | `main` |
 | `LUNAR_COMPONENT_GIT_SHA` | Git SHA being evaluated | `abc123...` |
 | `LUNAR_COMPONENT_TAGS` | Component tags (JSON array) | `["go","backend"]` |
 | `LUNAR_COMPONENT_META` | Component metadata (JSON) | `{"tier":"1"}` |
@@ -200,14 +240,33 @@ curl -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" ...
 
 ### CI Hook-Specific
 
+For `ci-before-job`, `ci-after-job`, `ci-before-step`, `ci-after-step`, `ci-before-command`, and `ci-after-command` hooks:
+
 | Variable | Description |
 |----------|-------------|
-| `LUNAR_HOOK_CMD` | The command that triggered the hook (JSON array) |
+| `LUNAR_CI` | CI provider identifier (github, buildkite, ...) |
+| `LUNAR_CI_PIPELINE_RUN_ID` | Unique identifier for the current pipeline run |
+| `LUNAR_CI_PIPELINE_NAME` | Name of the pipeline (if available) |
+| `LUNAR_CI_JOB_ID` | Job ID |
+| `LUNAR_CI_JOB_NAME` | Job name (if available) |
+
+For `ci-before-step`, `ci-after-step`, `ci-before-command`, and `ci-after-command` hooks:
+
+| Variable | Description |
+|----------|-------------|
+| `LUNAR_CI_STEP_INDEX` | Step index (1-based) |
+| `LUNAR_CI_STEP_NAME` | Step name (if available) |
+
+For `ci-before-command` and `ci-after-command` hooks:
+
+| Variable | Description |
+|----------|-------------|
+| `LUNAR_CI_COMMAND` | Command and arguments of the hooked command |
 
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
-# LUNAR_HOOK_CMD = ["docker", "build", "-t", "myimage", "."]
-CMD_STR=$(echo "$LUNAR_HOOK_CMD" | jq -r 'join(" ")')
+# LUNAR_CI_COMMAND contains the full command line
+echo "Hooked command: $LUNAR_CI_COMMAND"
 ```
 
 ## The lunar collect Command
@@ -513,7 +572,7 @@ my-collector/
 ├── lunar-collector.yml    # Required: Plugin configuration
 ├── main.sh                # Main collector script
 ├── Dockerfile             # For non-CI collectors with additional dependencies
-├── helper.sh              # Optional: Helper scripts
+├── helpers.sh             # Optional: Shared helper functions
 └── requirements.txt       # Optional: Python dependencies (baked into image)
 ```
 
@@ -522,41 +581,181 @@ my-collector/
 ```yaml
 version: 0
 
-name: my-collector                    # Required: Unique name
-description: What this collector does # Optional
+name: my-collector                    # Required: Unique name (must match directory name)
+description: What this collector does # Required: Brief description
 author: team@example.com              # Required
 
-default_image_non_ci_collectors: earthly/lunar-lib-my-collector:latest
+# Recommended: specify container image
+# Use default_image alone when plugin has no CI collectors
+# Add default_image_ci_collectors: native when plugin includes CI collectors
+default_image: earthly/lunar-scripts:1.0.0
 
+# === Landing page metadata (required for public plugins) ===
+landing_page:
+  display_name: "My Collector"        # Required: Max 50 chars, must end with "Collector"
+  long_description: |                 # Required: Max 300 chars, used for hero tagline + meta description
+    Collects XYZ data from repositories. Enables enforcement of 
+    ABC standards across your organization.
+  category: "devex-build-and-ci"      # Required: See categories below
+  status: "stable"                    # Required: stable|beta|experimental|deprecated
+  icon: "assets/my-icon.svg"          # Required: Path relative to plugin directory
+  
+  # Related plugins for cross-linking (optional)
+  related:
+    - slug: "my-policy"               # Plugin directory name
+      type: "policy"                  # collector|policy|cataloger
+      reason: "Enforces standards using this collector's data"  # Max 80 chars
+
+# === Collectors (sub-components) ===
 collectors:
-  - name: main-collector              # Can define multiple collectors
-    description: Primary collection
+  - name: main-collector              # Required: Unique within plugin
+    description: |                    # Required: Multi-line description for landing page
+      Collects XYZ data including:
+      - Feature A
+      - Feature B
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
       type: code                      # Or: cron, ci-before-command, etc.
+    keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
-inputs:                               # Optional: Configurable inputs
+# === Inputs (optional) ===
+inputs:
   api_url:
     description: Base URL for API
     default: "https://api.example.com"
   threshold:
     description: Minimum threshold
     # No default = required input
+
+# === Secrets (optional) ===
+secrets:
+  - name: API_TOKEN
+    description: API authentication token
+    required: true
+
+# === Example output (required for public plugins) ===
+example_component_json: |
+  {
+    "my_category": {
+      "items": [
+        {"name": "example", "valid": true}
+      ]
+    }
+  }
 ```
+
+### Landing Page Field Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `landing_page.display_name` | Yes | Human-readable name, max 50 chars, must end with "Collector" |
+| `landing_page.long_description` | Yes | Marketing description, max 300 chars, used for hero + meta |
+| `landing_page.category` | Yes | One of the 6 valid categories (see below) |
+| `landing_page.status` | Yes | `stable`, `beta`, `experimental`, or `deprecated` |
+| `landing_page.icon` | Yes | Path to SVG icon relative to plugin directory (file must exist) |
+| `landing_page.related[]` | No | Array of related plugins (`slug`, `type`, `reason` max 80 chars) |
+| `collectors[].keywords` | Yes | Array of SEO keywords for this sub-collector (at least 1) |
+| `secrets[]` | No | Array of secrets this collector needs (for website display) |
+| `example_component_json` | No | Example JSON output (for website display, recommended) |
+
+**Cross-validation:** The README title (`# ...`) must match `landing_page.display_name` exactly.
+
+**Note:** `landing_page.requires` is not allowed for collectors (only for policies).
+
+### Categories
+
+| Slug | Display Name |
+|------|--------------|
+| `repository-and-ownership` | Repository & Ownership |
+| `deployment-and-infrastructure` | Deployment & Infrastructure |
+| `testing-and-quality` | Testing & Quality |
+| `devex-build-and-ci` | DevEx, Build & CI |
+| `security-and-compliance` | Security & Compliance |
+| `operational-readiness` | Operational Readiness |
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `stable` | Production ready, well tested |
+| `beta` | Feature complete, API stable |
+| `experimental` | Early development, API may change |
+| `deprecated` | No longer recommended |
 
 ## Container Images
 
-Non-CI collectors should specify a `default_image_non_ci_collectors` when they have dependencies beyond the base image. CI collectors (hooks: `ci-before-command`, `ci-after-command`, `ci-before-job`, `ci-after-job`) typically run natively to access the CI environment directly.
+Lunar runs collectors inside Docker containers, providing isolation and reproducibility.
+
+**Recommendation:** Use the official `earthly/lunar-scripts:1.0.0` image (or a custom image that inherits from it) for collectors. The exception is **CI collectors**, which often need to run natively to access the CI environment directly.
+
+### Image Resolution Order
+
+The image used to run a collector is determined in this order (first match wins):
+
+1. **Collector-level `image`** — Set directly on the collector in `lunar-config.yml`
+2. **Plugin-level default** — Set in `lunar-collector.yml`
+3. **Global default** — `default_image_ci_collectors` or `default_image_non_ci_collectors` in `lunar-config.yml`
+4. **Global `default_image`** — Fallback in `lunar-config.yml`
+5. **Implicit default** — `native` (no container)
+
+### Global Default Images
+
+Configure default images in `lunar-config.yml`:
+
+```yaml
+version: 0
+
+default_image: earthly/lunar-scripts:1.0.0    # Used for all collectors by default
+default_image_ci_collectors: native           # Only add when you have CI collectors
+
+# ... rest of configuration
+```
+
+**Convention:**
+- Use `default_image` alone when your plugin has no CI collectors
+- Add `default_image_ci_collectors: native` only when your plugin includes CI collectors (hooks like `ci-after-command`, `ci-after-job`, etc.)
+
+### The `native` Value
+
+The special value `native` explicitly opts out of containerized execution. The script runs directly on the host system.
+
+**Use `native` only for CI collectors** that need direct access to the CI environment (environment variables, build artifacts, CI tools):
+
+```yaml
+collectors:
+  - runBash: lunar collect .ci-info "$CI_JOB_ID"
+    image: native  # CI collector needs access to CI environment
+    hook:
+      type: ci-after-command
+      pattern: ^.*
+    on: [my-tag]
+```
+
+**Do not use `native` for code or cron collectors.** These should always run in containers for consistency and isolation.
+
+### Official Image: `earthly/lunar-scripts`
+
+Lunar provides an official Docker image that includes:
+
+- Alpine Linux (or `-debian` variant if needed for certain tools)
+- Python 3 with venv
+- Bash
+- The `lunar` CLI
+- Common tools: `jq`, `yq`, `curl`, `parallel`, `wget`
+
+**For development**, the image automatically executes any `requirements.txt` and/or `install.sh` files found in the plugin directory.
+
+**For production**, bake all dependencies directly into your image.
 
 ### Creating a Custom Image
 
 When your collector requires additional dependencies (tools, binaries, Python packages), create a `Dockerfile` that inherits from the official base image:
 
 ```dockerfile
-FROM earthly/lunar-scripts:v1.0
+FROM earthly/lunar-scripts:1.0.0
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y some-tool && rm -rf /var/lib/apt/lists/*
+# Install additional system dependencies (if needed)
+RUN apk add --no-cache git make
 
 # Or download binaries
 ARG TARGETARCH=amd64
@@ -564,35 +763,42 @@ RUN curl -sSL "https://example.com/tool-${TARGETARCH}.tar.gz" | tar xz && \
     mv tool /usr/local/bin/
 ```
 
-### Wiring Images to the Earthfile
+### Building and Publishing the Image
 
-Add a build target in `Earthfile` to build and publish your image:
+Build and push the image to your container registry:
 
-```earthfile
-my-collector-image:
-    FROM DOCKERFILE ./collectors/my-collector
-    ARG VERSION=latest
-    SAVE IMAGE --push earthly/lunar-lib-my-collector:$VERSION
+```bash
+docker build -t your-registry/my-collector:1.0.0 ./collectors/my-collector
+docker push your-registry/my-collector:1.0.0
 ```
 
 Then reference this image in your `lunar-collector.yml`:
 
 ```yaml
-default_image_non_ci_collectors: earthly/lunar-lib-my-collector:latest
+default_image: your-registry/my-collector:1.0.0
 ```
 
 **Important:** Always bake dependencies into the image rather than using `install.sh` for production. This provides faster startup, reproducible builds, and eliminates network dependencies at runtime.
 
 ### Accessing Inputs
 
-Inputs are passed as environment variables with the input name in uppercase:
+Inputs are passed as environment variables with the prefix `LUNAR_VAR_` and the input name in uppercase:
 
 ```bash
 #!/bin/bash
 # If input is named "api_url", access it as:
-echo "API URL: $API_URL"
-echo "Threshold: $THRESHOLD"
+echo "API URL: $LUNAR_VAR_API_URL"
 ```
+
+### Shared Helper Functions
+
+When multiple scripts in a collector share common logic, extract it into `helpers.sh` and source it:
+
+```bash
+source "$(dirname "$0")/helpers.sh"
+```
+
+The `$(dirname "$0")` pattern ensures the path resolves relative to the script's location, not the current working directory.
 
 ## Best Practices
 

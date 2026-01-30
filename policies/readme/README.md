@@ -28,20 +28,13 @@ This policy reads from the following Component JSON paths:
 
 **Note:** Ensure the corresponding collector is configured before enabling this policy.
 
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `min_lines` | No | `25` | Minimum number of lines required in README file (0 = no requirement) |
-| `required_sections` | No | `""` | Comma-separated list of required section headings (empty = no requirement) |
-
 ## Installation
 
 Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/readme@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/readme@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     # include: [readme-exists]  # Only run specific checks (omit to run all)
@@ -129,10 +122,6 @@ This example passes all three policies when configured with:
 ```
 
 **Failure message:** `"README file is missing required sections: Contributing"`
-
-## Related Collectors
-
-- [`readme`](https://github.com/earthly/lunar-lib/tree/main/collectors/readme) collector
 
 ## Remediation
 

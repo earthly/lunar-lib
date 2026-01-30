@@ -1,0 +1,142 @@
+version: 0
+
+name: golang
+description: Collect Go project information, CI/CD commands, test coverage, and linting
+author: earthly
+
+default_image: earthly/lunar-lib:golang-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Go Collector"
+  long_description: |
+    Analyze Go projects to collect module info, dependencies, test coverage, and
+    golangci-lint results. Enforce Go-specific engineering standards.
+  category: "devex-build-and-ci"
+  icon: "assets/golang.svg"
+  status: "stable"
+  related:
+    - slug: "coverage"
+      type: "policy"
+      reason: "Enforces test coverage thresholds using collected coverage metrics"
+
+collectors:
+  - name: cicd
+    description: |
+      Records every Go command executed in CI pipelines along with the Go version.
+      Writes command strings and version info to .lang.go.cicd for audit trails
+      and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b .*
+    keywords: ["go ci", "go version", "ci commands", "build tracking"]
+
+  - name: test-scope
+    description: |
+      Determines whether go test runs recursively (./...) or targets specific packages.
+      Writes scope to .lang.go.tests.scope as "recursive" or "package" to verify
+      comprehensive test execution in CI.
+    mainBash: test-scope.sh
+    hook:
+      type: ci-before-command
+      pattern: .*\bgo\b test.*
+    keywords: ["go test", "test scope", "recursive tests", "package tests"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from go test -coverprofile output after tests complete.
+      Parses the coverage profile file, runs go tool cover -func to calculate total
+      percentage, and writes results to .lang.go.tests.coverage including the raw profile.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\bgo\b test.*-coverprofile.*
+    keywords: ["code coverage", "go test coverage", "coverprofile", "coverage metrics"]
+
+  - name: project
+    description: |
+      Analyzes Go project structure by detecting go.mod, go.sum, vendor directory,
+      and goreleaser configuration. Extracts the module path and Go version from
+      go.mod using go list. Writes project metadata to .lang.go with build system info.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["go modules", "go.mod", "project structure", "go workspace"]
+
+  - name: golangci-lint
+    description: |
+      Runs golangci-lint with JSON output and collects structured lint warnings.
+      Parses each issue into file, line, column, message, and linter name. Writes
+      normalized warnings to .lang.go.lint and raw output to .lang.go.native.golangci_lint.
+    mainBash: golangci-lint.sh
+    hook:
+      type: code
+    keywords: ["golangci-lint", "go linting", "static analysis", "code quality"]
+
+  - name: dependencies
+    description: |
+      Extracts direct and transitive dependencies from go.mod using go list -m -json all.
+      Captures module path, version, and whether each dependency is indirect. Also records
+      replace directives. Writes dependency graph to .lang.go.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["go dependencies", "go modules", "dependency graph", "supply chain"]
+
+inputs:
+  lint_timeout:
+    description: Timeout for golangci-lint (e.g., 5m, 10m)
+    default: "10m"
+
+example_component_json: |
+  {
+    "lang": {
+      "go": {
+        "module": "github.com/acme/myproject",
+        "version": "1.21",
+        "build_systems": ["go"],
+        "native": {
+          "go_mod": { "exists": true, "version": "1.21" },
+          "go_sum": { "exists": true },
+          "vendor": { "exists": false },
+          "goreleaser": { "exists": true },
+          "golangci_lint": {
+            "passed": false,
+            "config_exists": true,
+            "exit_code": 1,
+            "output": "main.go:42:5: unused variable 'x' (unused)"
+          }
+        },
+        "source": { "tool": "go", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "go test ./...", "version": "1.21.5" }],
+          "source": { "tool": "go", "integration": "ci" }
+        },
+        "tests": {
+          "scope": "recursive",
+          "coverage": {
+            "percentage": 78.5,
+            "profile_path": "coverage.out",
+            "source": { "tool": "go cover", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "github.com/stretchr/testify", "version": "v1.8.4", "indirect": false }
+          ],
+          "transitive": [
+            { "path": "github.com/davecgh/go-spew", "version": "v1.1.1", "indirect": true }
+          ],
+          "source": { "tool": "go mod", "integration": "code" }
+        },
+        "lint": {
+          "warnings": [
+            { "file": "main.go", "line": 42, "column": 5, "message": "unused variable 'x'", "linter": "unused" }
+          ],
+          "linters": ["golangci-lint"],
+          "source": { "tool": "golangci-lint", "integration": "code" }
+        }
+      }
+    }
+  }

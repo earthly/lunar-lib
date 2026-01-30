@@ -1,0 +1,292 @@
+name: Claude Auto-Approve
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    name: claude-review
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git diff/log commands
+
+      - name: Setup git branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # Fetch and checkout PR branch (using env vars to avoid shell injection)
+          git fetch origin "$PR_HEAD_REF"
+          git checkout "$PR_HEAD_REF"
+          
+          # Fetch base branch for comparison
+          git fetch origin "$PR_BASE_REF"
+
+      - name: Get PR context
+        id: pr-context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get changed files
+          gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' > /tmp/files.txt
+          FILE_COUNT=$(wc -l < /tmp/files.txt | tr -d ' ')
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+          
+          # Get diff stats
+          gh pr view ${{ github.event.pull_request.number }} --json additions,deletions,changedFiles \
+            --jq '"additions: \(.additions), deletions: \(.deletions), files: \(.changedFiles)"' > /tmp/stats.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Analyze with Claude
+        id: analyze
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Load file contents into env vars for template substitution
+          export PR_STATS="$(cat /tmp/stats.txt)"
+          export CHANGED_FILES="$(cat /tmp/files.txt)"
+          
+          # Hydrate prompt template with envsubst
+          envsubst < .github/prompts/auto-approve-review-prompt.md > /tmp/prompt.txt
+          
+          # Define JSON schema for structured output
+          JSON_SCHEMA='{
+            "type": "object",
+            "properties": {
+              "scope": { "type": "string", "enum": ["ISOLATED", "ISOLATED_SENSITIVE", "EXTENSIVE"] },
+              "scope_reasoning": { "type": "string" },
+              "major_issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "type": "integer" },
+                    "issue": { "type": "string" }
+                  },
+                  "required": ["file", "issue"]
+                }
+              },
+              "medium_issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "type": "integer" },
+                    "issue": { "type": "string" }
+                  },
+                  "required": ["file", "issue"]
+                }
+              },
+              "summary": { "type": "string" },
+              "recommendation": { "type": "string", "enum": ["APPROVE", "REVIEW_NEEDED"] }
+            },
+            "required": ["scope", "scope_reasoning", "major_issues", "medium_issues", "summary", "recommendation"]
+          }'
+          
+          # Run Claude CLI with JSON schema enforcement (using Opus for highest quality review)
+          # Allow only safe read-only git commands and file reading
+          # Read prompt from stdin using -p -
+          RESPONSE=$(claude -p - \
+            --model opus \
+            --output-format json \
+            --json-schema "$JSON_SCHEMA" \
+            --allowedTools "Bash(git diff*)" "Bash(git log*)" "Bash(git show*)" "Bash(git status*)" "Read" "Grep" "Glob" \
+            < /tmp/prompt.txt 2>&1) || true
+          
+          echo "Raw Claude Response:"
+          echo "$RESPONSE"
+          
+          # Check for errors in the response
+          IS_ERROR=$(echo "$RESPONSE" | jq -r '.is_error // false' 2>/dev/null || echo "false")
+          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.result // empty' 2>/dev/null || echo "")
+          
+          if [ "$IS_ERROR" = "true" ] || [ -z "$RESPONSE" ] || ! echo "$RESPONSE" | jq -e '.' > /dev/null 2>&1; then
+            echo "Claude CLI error detected"
+            echo "has_error=true" >> $GITHUB_OUTPUT
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+            
+            # Build error comment
+            {
+              echo "## Claude Auto-Approve Review"
+              echo ""
+              echo "⚠️ **Error:** Claude analysis failed"
+              echo ""
+              if [ -n "$ERROR_MSG" ]; then
+                echo "$ERROR_MSG"
+              else
+                echo "No response received from Claude CLI."
+              fi
+              echo ""
+              if [ -n "$RESPONSE" ]; then
+                echo "<details>"
+                echo "<summary>Raw response</summary>"
+                echo ""
+                echo "\`\`\`json"
+                echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+                echo "\`\`\`"
+                echo "</details>"
+                echo ""
+              fi
+              echo "---"
+              echo "Conclusion: 👀 **Manual review needed** (auto-review failed)"
+            } > /tmp/comment.txt
+            
+            cat /tmp/comment.txt
+            echo "parse_failed=true" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Parse successful response (--json-schema puts output in .structured_output)
+          if echo "$RESPONSE" | jq -e '.structured_output' > /dev/null 2>&1; then
+            # With --json-schema, the structured output is directly in .structured_output
+            ANALYSIS=$(echo "$RESPONSE" | jq -c '.structured_output')
+          elif echo "$RESPONSE" | jq -e '.result' > /dev/null 2>&1; then
+            # Fallback to .result if structured_output not present
+            RESULT_RAW=$(echo "$RESPONSE" | jq -r '.result')
+            if echo "$RESULT_RAW" | jq -e '.' > /dev/null 2>&1; then
+              ANALYSIS="$RESULT_RAW"
+            else
+              ANALYSIS="{}"
+            fi
+          else
+            ANALYSIS="{}"
+          fi
+          
+          echo "Parsed Analysis:"
+          echo "$ANALYSIS" | jq '.' 2>/dev/null || echo "$ANALYSIS"
+          
+          # Validate we have the expected fields
+          if ! echo "$ANALYSIS" | jq -e '.recommendation' > /dev/null 2>&1; then
+            echo "Invalid analysis format - missing required fields"
+            echo "has_error=true" >> $GITHUB_OUTPUT
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+            
+            {
+              echo "## Claude Auto-Approve Review"
+              echo ""
+              echo "⚠️ **Error:** Could not parse Claude's response"
+              echo ""
+              echo "<details>"
+              echo "<summary>Raw response</summary>"
+              echo ""
+              echo "\`\`\`json"
+              echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+              echo "\`\`\`"
+              echo "</details>"
+              echo ""
+              echo "---"
+              echo "Conclusion: 👀 **Manual review needed** (auto-review failed)"
+            } > /tmp/comment.txt
+            
+            cat /tmp/comment.txt
+            echo "parse_failed=true" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "has_error=false" >> $GITHUB_OUTPUT
+          
+          # Extract fields
+          RECOMMENDATION=$(echo "$ANALYSIS" | jq -r '.recommendation // "REVIEW_NEEDED"')
+          SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "Unable to summarize"')
+          SCOPE=$(echo "$ANALYSIS" | jq -r '.scope // "EXTENSIVE"')
+          SCOPE_REASONING=$(echo "$ANALYSIS" | jq -r '.scope_reasoning // ""')
+          MAJOR_ISSUES=$(echo "$ANALYSIS" | jq -c '.major_issues // []')
+          MAJOR_ISSUES_COUNT=$(echo "$MAJOR_ISSUES" | jq 'length')
+          MEDIUM_ISSUES=$(echo "$ANALYSIS" | jq -c '.medium_issues // []')
+          MEDIUM_ISSUES_COUNT=$(echo "$MEDIUM_ISSUES" | jq 'length')
+          
+          # Set outputs
+          if [ "$RECOMMENDATION" = "APPROVE" ]; then
+            echo "should_approve=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Build comment body
+          {
+            echo "## Claude Auto-Approve Review"
+            echo ""
+            echo "**Summary:** $SUMMARY"
+            echo ""
+            echo "**Scope:** $SCOPE"
+            echo "> $SCOPE_REASONING"
+            echo ""
+            if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
+              echo "**Major Issues Found:** $MAJOR_ISSUES_COUNT"
+              echo ""
+              echo "$MAJOR_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
+            else
+              echo "**Major Issues Found:** None"
+            fi
+            echo ""
+            if [ "$MEDIUM_ISSUES_COUNT" -gt 0 ]; then
+              echo "**Medium Issues Found:** $MEDIUM_ISSUES_COUNT"
+              echo ""
+              echo "$MEDIUM_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
+            else
+              echo "**Medium Issues Found:** None"
+            fi
+            echo ""
+            echo "---"
+            if [ "$RECOMMENDATION" = "APPROVE" ]; then
+              echo "Conclusion: ✅ **Auto-approved** (isolated changes, no issues)"
+            else
+              echo "👀 **Manual review needed**"
+            fi
+          } > /tmp/comment.txt
+          
+          cat /tmp/comment.txt
+
+      - name: Post or update review comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          # Find existing comment by searching for our title (GitHub strips HTML comments)
+          EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("## Claude Auto-Approve Review")) | .id' | head -1)
+          
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            echo "Updating existing comment: $EXISTING_COMMENT_ID"
+            gh api "repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT_ID}" \
+              -X PATCH \
+              -f body="$(cat /tmp/comment.txt)"
+          else
+            echo "Creating new comment"
+            gh pr comment "$PR_NUMBER" --body "$(cat /tmp/comment.txt)"
+          fi
+
+      - name: Auto-approve PR
+        if: steps.analyze.outputs.should_approve == 'true'
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

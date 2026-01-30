@@ -1,0 +1,130 @@
+version: 0
+
+name: vcs
+description: Version control system (VCS) best practices and security policies
+author: earthly
+
+landing_page:
+  display_name: "VCS Policies"
+  long_description: |
+    Enforce version control security standards including branch protection rules,
+    required approvals, status checks, and merge strategies. Prevent unauthorized
+    changes to critical branches.
+  category: "repository-and-ownership"
+  icon: "assets/vcs.svg"
+  status: "stable"
+  requires:
+    - slug: "github"
+      type: "collector"
+      reason: "Provides GitHub repository and branch protection data"
+  related: []
+
+policies:
+  - name: branch-protection-enabled
+    description: |
+      Requires branch protection rules to be enabled on the default branch.
+      Branch protection is the foundation for all other VCS security controls.
+    mainPython: ./branch-protection-enabled.py
+    keywords: ["branch protection", "github security"]
+
+  - name: require-pull-request
+    description: |
+      Requires all changes to go through pull requests before merging.
+      Prevents direct pushes to protected branches without review.
+    mainPython: ./require-pull-request.py
+    keywords: ["pull request", "code review", "pr required"]
+
+  - name: minimum-approvals
+    description: |
+      Enforces a minimum number of approving reviews before merge (default 1).
+      Configurable via the min_approvals input for stricter requirements.
+    mainPython: ./minimum-approvals.py
+    keywords: ["code review", "approvals", "required reviewers"]
+
+  - name: require-codeowner-review
+    description: |
+      Requires approval from designated code owners defined in CODEOWNERS file.
+      Ensures domain experts review changes to critical paths.
+    mainPython: ./require-codeowner-review.py
+    keywords: ["codeowners", "code owner review"]
+
+  - name: dismiss-stale-reviews
+    description: |
+      Automatically dismisses approvals when new commits are pushed to a PR.
+      Prevents merging outdated approvals after significant changes.
+    mainPython: ./dismiss-stale-reviews.py
+    keywords: ["stale reviews", "review dismissal"]
+
+  - name: require-status-checks
+    description: |
+      Requires CI status checks to pass before merging pull requests.
+      Prevents merging code that fails tests or linting.
+    mainPython: ./require-status-checks.py
+    keywords: ["status checks", "ci checks", "required checks"]
+
+  - name: require-branches-up-to-date
+    description: |
+      Requires PR branches to be up-to-date with the base branch before merging.
+      Prevents merging stale branches that may have integration issues.
+    mainPython: ./require-branches-up-to-date.py
+    keywords: ["up to date", "branch sync"]
+
+  - name: disallow-force-push
+    description: |
+      Prohibits force pushes to protected branches to preserve commit history.
+      Force pushes can destroy audit trails and cause data loss.
+    mainPython: ./disallow-force-push.py
+    keywords: ["force push", "git security"]
+
+  - name: disallow-branch-deletion
+    description: |
+      Prevents deletion of protected branches (typically main/master).
+      Protects against accidental or malicious branch removal.
+    mainPython: ./disallow-branch-deletion.py
+    keywords: ["branch deletion", "protected branches"]
+
+  - name: require-linear-history
+    description: |
+      Enforces linear commit history by requiring squash or rebase merges.
+      Makes git history cleaner and easier to bisect for debugging.
+    mainPython: ./require-linear-history.py
+    keywords: ["linear history", "git rebase"]
+
+  - name: require-signed-commits
+    description: |
+      Requires all commits to be GPG or SSH signed for authenticity verification.
+      Proves commits were made by the claimed author.
+    mainPython: ./require-signed-commits.py
+    keywords: ["signed commits", "gpg signing", "commit verification"]
+
+  - name: require-private
+    description: |
+      Ensures repository visibility is set to private, not public.
+      Prevents accidental exposure of proprietary code.
+    mainPython: ./require-private.py
+    keywords: ["private repository", "visibility"]
+
+  - name: require-default-branch
+    description: |
+      Validates the default branch name matches the required name (default "main").
+      Helps standardize branch naming across repositories.
+    mainPython: ./require-default-branch.py
+    keywords: ["default branch", "main branch"]
+
+  - name: allowed-merge-strategies
+    description: |
+      Restricts merge strategies to an allowed list (merge, squash, rebase).
+      Enforces consistent merge practices across the organization.
+    mainPython: ./allowed-merge-strategies.py
+    keywords: ["merge strategies", "squash merge", "rebase merge"]
+
+inputs:
+  min_approvals:
+    description: Minimum number of required approvals (integer, or omit to skip check)
+    default: 1
+  required_default_branch:
+    description: Required default branch name for the require-default-branch policy. Defaults to 'main'
+    default: "main"
+  allowed_merge_strategies:
+    description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
+    default: ""

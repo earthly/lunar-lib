@@ -1,0 +1,21 @@
+VERSION 0.8
+
+image:
+    # Use Debian variant for glibc compatibility with ast-grep binary
+    ARG SCRIPTS_VERSION=main-debian
+    FROM --platform=linux/amd64 earthly/lunar-scripts:$SCRIPTS_VERSION
+
+    # Install ast-grep CLI
+    ARG TARGETARCH
+    ARG AST_GREP_VERSION=0.40.5
+    RUN apt-get update && apt-get install -y --no-install-recommends unzip && \
+        ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
+        curl -sSL "https://github.com/ast-grep/ast-grep/releases/download/${AST_GREP_VERSION}/app-${ARCH}-unknown-linux-gnu.zip" -o /tmp/ast-grep.zip && \
+        unzip -j /tmp/ast-grep.zip ast-grep -d /usr/local/bin/ && \
+        chmod +x /usr/local/bin/ast-grep && \
+        rm /tmp/ast-grep.zip && \
+        apt-get remove -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && \
+        echo "${AST_GREP_VERSION}" > /usr/local/bin/ast-grep.version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:ast-grep-$VERSION

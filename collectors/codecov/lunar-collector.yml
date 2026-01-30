@@ -1,0 +1,91 @@
+version: 0
+
+name: codecov
+description: |
+  Detects Codecov usage and fetches coverage results from the Codecov API.
+author: earthly
+
+default_image: native
+
+landing_page:
+  display_name: "Codecov Collector"
+  long_description: |
+    Automatically detect Codecov runs in CI and fetch coverage percentage and file-level
+    details. Track test coverage trends across your organization.
+  category: "testing-and-quality"
+  icon: "assets/codecov.svg"
+  status: "stable"
+  related:
+    - slug: "coverage"
+      type: "policy"
+      reason: "Vendor-agnostic coverage policies that work with Codecov data"
+
+collectors:
+  - name: ran
+    description: |
+      Records that Codecov ran in CI by writing source metadata to .testing.coverage.
+      The presence of this object signals that codecov was executed. Also captures
+      the Codecov CLI version when available via the codecov --version command.
+    mainBash: ran.sh
+    hook:
+      type: ci-after-command
+      pattern: codecov(cli)?|bash.*codecov
+    keywords: ["codecov", "coverage detection", "ci integration"]
+
+  - name: results
+    description: |
+      Fetches coverage percentage and file-level details from the Codecov API after
+      upload commands complete. Detects upload commands (-t, -f flags or upload subcommands),
+      calls the Codecov API with the commit SHA, and writes coverage percentage to
+      .testing.coverage.percentage with full API response in .testing.coverage.native.codecov.
+    mainBash: results.sh
+    hook:
+      type: ci-after-command
+      pattern: codecov(cli)?|bash.*codecov
+    keywords: ["code coverage", "coverage percentage", "codecov api", "test coverage"]
+
+inputs:
+  use_env_token:
+    description: Use CODECOV_TOKEN from environment instead of Lunar secret
+    default: "false"
+
+secrets:
+  CODECOV_API_TOKEN:
+    description: Codecov API token for fetching coverage results (required for results collector)
+
+example_component_json: |
+  {
+    "testing": {
+      "coverage": {
+        "source": {
+          "tool": "codecov",
+          "integration": "ci",
+          "version": "0.7.2"
+        },
+        "percentage": 85.5,
+        "native": {
+          "codecov": {
+            "totals": {
+              "files": 3,
+              "lines": 1250,
+              "hits": 1068,
+              "misses": 182,
+              "partials": 0,
+              "coverage": 85.5
+            },
+            "files": [
+              {
+                "name": "src/main.py",
+                "totals": {
+                  "lines": 500,
+                  "hits": 450,
+                  "misses": 50,
+                  "coverage": 90.0
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
