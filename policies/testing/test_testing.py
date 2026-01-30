@@ -1,12 +1,7 @@
 """Unit tests for the testing policy.
 
-Note: The lunar_policy SDK's Node.from_component_json() treats missing data as
-"collectors still running" (PENDING status), not as "data permanently missing".
-Therefore, tests for missing data scenarios expect PENDING, not FAIL or SKIPPED.
-
-In production, missing data would eventually become FAIL after collectors complete.
-The skip() logic is tested via scenarios where .testing exists but .all_passing
-is missing, which correctly triggers the skip path.
+The policy uses get_node().exists() which returns a boolean without raising
+NoDataError. This allows skip() logic to execute correctly when data is missing.
 """
 
 import os
@@ -129,22 +124,17 @@ class TestPassingPolicy(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("Tests are failing", check.failure_reasons[0])
 
-    def test_no_testing_data_is_pending(self):
-        """When .testing doesn't exist, check is PENDING (collectors may still be running)."""
+    def test_no_testing_data_skips(self):
+        """When .testing doesn't exist, check should skip."""
         data = {}
         node = Node.from_component_json(data)
         check = check_passing(node=node)
-        # SDK interprets missing .testing as "collectors still running"
-        # Note: The skip() logic in the policy is never reached because
-        # exists() raises NoDataError before skip() can be called
-        self.assertEqual(check.status, CheckStatus.PENDING)
+        # Using get_node().exists() allows skip() to be reached
+        self.assertEqual(check.status, CheckStatus.SKIPPED)
+        self.assertIn("No test execution data found", check.skip_reason)
 
-    def test_testing_exists_but_no_all_passing_is_pending(self):
-        """When .testing exists but .all_passing doesn't, check is PENDING.
-        
-        Note: The policy has skip() logic for this case, but the SDK's exists()
-        raises NoDataError before skip() is reached, resulting in PENDING.
-        """
+    def test_testing_exists_but_no_all_passing_skips(self):
+        """When .testing exists but .all_passing doesn't, check should skip."""
         data = {
             "testing": {
                 "source": {
@@ -155,8 +145,9 @@ class TestPassingPolicy(unittest.TestCase):
         }
         node = Node.from_component_json(data)
         check = check_passing(node=node)
-        # SDK returns PENDING because .testing.all_passing doesn't exist
-        self.assertEqual(check.status, CheckStatus.PENDING)
+        # Using get_node().exists() allows skip() to be reached
+        self.assertEqual(check.status, CheckStatus.SKIPPED)
+        self.assertIn("Test pass/fail data not available", check.skip_reason)
 
 
 class TestPassingPolicyEdgeCases(unittest.TestCase):

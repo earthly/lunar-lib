@@ -17,10 +17,11 @@ def check_executed(node=None):
         required_langs = [lang.strip() for lang in required_langs_str.split(",") if lang.strip()]
         
         # If required_languages is set, check if component has any matching language project
+        # Use get_node().exists() to get a boolean without raising NoDataError
         if required_langs:
             detected_langs = []
             for lang in required_langs:
-                if c.exists(f".lang.{lang}"):
+                if c.get_node(f".lang.{lang}").exists():
                     detected_langs.append(lang)
             
             if not detected_langs:

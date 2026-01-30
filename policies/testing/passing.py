@@ -20,23 +20,27 @@ def check_passing(node=None):
         required_langs = [lang.strip() for lang in required_langs_str.split(",") if lang.strip()]
         
         # If required_languages is set, check if component has any matching language project
+        # Use get_node().exists() to get a boolean without raising NoDataError
         if required_langs:
             detected_langs = []
             for lang in required_langs:
-                if c.exists(f".lang.{lang}"):
+                if c.get_node(f".lang.{lang}").exists():
                     detected_langs.append(lang)
             
             if not detected_langs:
                 c.skip(f"No project detected for required languages: {required_langs}")
                 return c
         
-        # First check if we have test execution data at all
-        if not c.exists(".testing"):
+        # Check if we have test execution data at all
+        # get_node().exists() returns False without raising NoDataError
+        testing_node = c.get_node(".testing")
+        if not testing_node.exists():
             c.skip("No test execution data found")
             return c
 
         # Check if pass/fail data is available
-        if not c.exists(".testing.all_passing"):
+        all_passing_node = c.get_node(".testing.all_passing")
+        if not all_passing_node.exists():
             c.skip(
                 "Test pass/fail data not available. "
                 "This requires a collector that reports detailed test results."
