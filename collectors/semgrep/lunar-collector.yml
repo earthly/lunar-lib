@@ -16,13 +16,6 @@ landing_page:
   category: "security-and-compliance"
   icon: "assets/semgrep.svg"
   status: "stable"
-  related:
-    - slug: "sast"
-      type: "policy"
-      reason: "Enforces SAST findings thresholds using Semgrep data"
-    - slug: "sca"
-      type: "policy"
-      reason: "Enforces SCA vulnerability thresholds using Semgrep Supply Chain data"
 
 collectors:
   - name: github-app
