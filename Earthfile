@@ -74,6 +74,7 @@ ai-context:
 
 all:
     BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/ci-otel+image
     BUILD --pass-args ./collectors/dockerfile+image
     BUILD --pass-args ./collectors/golang+image
     BUILD --pass-args ./collectors/ast-grep+image

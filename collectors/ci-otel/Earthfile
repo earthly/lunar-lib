@@ -1,0 +1,13 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install xxd for hex encoding (used in span ID generation fallbacks)
+    RUN apk add --no-cache xxd
+
+    # Verify all required tools are available
+    RUN jq --version && curl --version && xxd -v 2>&1 | head -1
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:ci-otel-$VERSION
