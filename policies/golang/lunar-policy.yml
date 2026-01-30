@@ -25,28 +25,28 @@ policies:
     description: |
       Ensures the project has a go.mod file for module management.
       Required for all Go projects using modules.
-    mainPython: ./go-mod-exists.py
+    mainPython: ./go_mod_exists.py
     keywords: ["go modules", "go.mod", "project structure"]
 
   - name: go-sum-exists
     description: |
       Ensures the project has a go.sum file for dependency verification.
       Required for reproducible builds.
-    mainPython: ./go-sum-exists.py
+    mainPython: ./go_sum_exists.py
     keywords: ["go.sum", "dependencies", "checksums", "reproducibility"]
 
   - name: min-go-version
     description: |
       Ensures the project uses at least the minimum required Go version.
       Helps maintain security and compatibility standards.
-    mainPython: ./min-go-version.py
+    mainPython: ./min_go_version.py
     keywords: ["go version", "compatibility", "security"]
 
   - name: tests-recursive
     description: |
       Ensures tests run recursively (./...) to cover all packages.
       Prevents accidentally missing tests in subpackages.
-    mainPython: ./tests-recursive.py
+    mainPython: ./tests_recursive.py
     keywords: ["go test", "test scope", "recursive tests"]
 
   - name: vendoring
