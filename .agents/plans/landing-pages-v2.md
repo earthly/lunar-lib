@@ -819,11 +819,67 @@ Static pages mostly rely on base template defaults and are missing page-specific
 
 - [x] All pages have explicit canonical_url and og_url
 - [x] All pages have custom meta_description (no defaults)
-- [x] All dynamic pages have JSON-LD schemas (SoftwareSourceCode, BreadcrumbList, ItemList, HowTo)
+- [x] All dynamic pages have JSON-LD schemas (SoftwareSourceCode, BreadcrumbList, ItemList, HowTo) — fixed in Phase 8.1
 - [x] Core meta tags (robots, author) moved to `<head>` via extraHeadContent
 - [x] No TODO comments remain in templates
 - [x] Internal linking via breadcrumbs and related sections
-- [x] Sitemap includes all pages with priority and changefreq
+- [x] Sitemap includes all pages with priority and changefreq — fixed in Phase 8.2 (88 URLs now)
 - [x] Robots.txt verified accurate
 
-**Phase 7 Status: COMPLETE** ✓
+**Phase 7 Status: COMPLETE** ✓ (issues fixed in Phase 8)
+
+### Phase 8: SEO Verification Fixes
+
+Issues discovered during production spot-check (curl + jq validation):
+
+#### 8.1 JSON-LD HTML Entity Bug ✓ COMPLETE
+
+Dynamic pages had `&quot;` HTML entities in JSON-LD description fields instead of proper JSON escaping.
+
+**Root cause:** Nunjucks `| dump` filter was used, but output was being HTML-escaped by auto-escaping. Fix: add `| safe` after `| dump`.
+
+**Fixed templates:**
+- [x] `policy.njk` - SoftwareSourceCode description
+- [x] `guardrail.njk` - SoftwareSourceCode description
+- [x] `guardrail-collector.njk` - ItemList sub-collector descriptions
+- [x] `collector.njk` - SoftwareSourceCode description, ItemList sub-collector descriptions
+- [x] `cataloger.njk` - SoftwareSourceCode description, ItemList sub-cataloger descriptions
+- [x] `base.njk` - WebSite description (also had newline issue)
+
+**Fix pattern applied:**
+```nunjucks
+# Before (HTML entities in output)
+"description": {{ value | dump }},
+
+# After (valid JSON)
+"description": {{ value | replace('\r', '') | replace('\n', ' ') | dump | safe }},
+```
+
+**Verified:** All JSON-LD blocks validate with `jq` after local build
+
+#### 8.2 Sitemap Missing Dynamic Pages ✓ COMPLETE
+
+**Root cause:** Eleventy 3.x defaults `addAllPagesToCollections: false`, so only the first page of each paginated template was added to `collections.all`. The sitemap iterates over `collections.all`, so most pages were missing.
+
+**Fix applied:** Added `addAllPagesToCollections: true` to all paginated templates:
+- [x] `policy.njk`
+- [x] `guardrail.njk`
+- [x] `guardrail-collector.njk`
+- [x] `collector.njk`
+- [x] `cataloger.njk`
+
+**Results:**
+- Before: 19 URLs in sitemap
+- After: 88 URLs in sitemap (78 lunar pages + 10 static pages)
+
+#### 8.3 Post-Fix Verification ✓ COMPLETE
+
+- [x] Re-run JSON-LD validation on all page types with `jq` — verified in production
+- [x] Verify sitemap includes all dynamic pages — 88 URLs confirmed in production
+- [x] Run broken link checker — 0 broken links on key pages:
+  - `/lunar/guardrails/` — 133 links checked, 0 broken
+  - `/lunar/integrations/` — all OK
+  - `/lunar/integrations/collectors/github/` — all OK
+  - `/lunar/guardrails/vcs/branch-protection-enabled/` — all OK
+
+**Phase 8 Status: COMPLETE** ✓
