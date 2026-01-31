@@ -378,73 +378,115 @@ Keep existing 6 categories — these make sense for "what do I want to enforce?"
 - [x] Update terminology in all templates
 - [x] Remove "plugin" references
 
-### Phase 2: URL Structure & Redirects (earthly-website)
+### Phase 2: URL Structure & Redirects (earthly-website) ✅ COMPLETE
 
 **File renames:**
-- [ ] `collectors.njk` → delete (functionality moves to integrations index)
-- [ ] `collector.njk` → `src/lunar/integrations/collector.njk`
-- [ ] `cataloger.njk` → `src/lunar/integrations/cataloger.njk`
-- [ ] `index.njk` → `src/lunar/integrations/index.njk` (adapt content)
-- [ ] `policy.njk` → `src/lunar/guardrails/policy.njk` (rename from policies/)
-- [ ] Create new `src/lunar/guardrails/index.njk` (guardrails index page)
+- [x] `collectors.njk` → delete (functionality moves to integrations index)
+- [x] `collector.njk` → `src/lunar/integrations/collector.njk`
+- [x] `cataloger.njk` → `src/lunar/integrations/cataloger.njk`
+- [x] `index.njk` → `src/lunar/integrations/index.njk` (adapt content)
+- [x] `policy.njk` stays at `src/lunar/guardrails/policy.njk` (was already there)
+- [x] Create new `src/lunar/guardrails/index.njk` (guardrails index page placeholder)
 
 **Permalink updates:**
-- [ ] Collector pages: `/lunar/integrations/collectors/{slug}/`
-- [ ] Cataloger pages: `/lunar/integrations/catalogers/{slug}/`
-- [ ] Policy pages: `/lunar/guardrails/{slug}/`
+- [x] Collector pages: `/lunar/integrations/collectors/{slug}/`
+- [x] Cataloger pages: `/lunar/integrations/catalogers/{slug}/`
+- [x] Policy pages: `/lunar/guardrails/{slug}/`
 
-**Redirects (in netlify.toml or eleventy config):**
-- [ ] `/lunar/integrations/collectors/` → `/lunar/integrations/`
-- [ ] `/lunar/integrations/catalogers/` → `/lunar/integrations/`
+**Redirects (in netlify.toml):**
+- [x] `/lunar/integrations/collectors/` → `/lunar/integrations/`
+- [x] `/lunar/integrations/catalogers/` → `/lunar/integrations/`
 
 ### Phase 3: Integrations Index Page
 
 **Create `/lunar/integrations/index.njk`:**
-- [ ] Adapt hero section from old guardrails index
-- [ ] Simplify "How It Works" to 2-step flow
-- [ ] Combine collectors + catalogers into single grid
-- [ ] Add type toggle filter: All | Collectors | Catalogers
-- [ ] Add category filter bar with new technology-aligned categories
-- [ ] Update all terminology (remove "plugin", use "integration")
-- [ ] Remove sub-collector/sub-cataloger counts — just show integration count
+- [x] Adapt hero section from old guardrails index
+- [x] Simplify "How It Works" to 2-step flow
+- [x] Combine collectors + catalogers into single grid
+- [x] Add type toggle filter: All | Collectors | Catalogers
+- [x] Add category filter bar with new technology-aligned categories
+- [x] Update all terminology (remove "plugin", use "integration")
+- [x] Remove sub-collector/sub-cataloger counts — just show integration count
 
 ### Phase 4: Guardrails Index Page
 
 **Create `/lunar/guardrails/index.njk`:**
-- [ ] New hero section focused on "what can I enforce?"
-- [ ] Policy/guardrail grid with expandable guardrail previews
-- [ ] Category filter bar (6 existing categories)
-- [ ] **Client-side search** using Lunr.js or similar
+- [x] New hero section focused on "what can I enforce?"
+- [x] Policy/guardrail grid with expandable guardrail previews
+- [x] Category filter bar (6 existing categories)
+- [x] **Client-side search** (custom implementation with debounce)
   - Index policy names, guardrail names, descriptions, keywords
   - Real-time filtering as user types
-- [ ] Add CTA at bottom linking to integrations page
+- [x] Add CTA at bottom linking to integrations page
 
-### Phase 5: Diagram Simplifications
+**Files modified:**
+- `src/lunar/guardrails/index.njk` - Full template with search, filters, expandable previews
+- `src/assets/js/lunar-plugin-index.js` - Extended to handle both integrations and guardrails pages
+- `src/assets/css/lunar-plugin-index.css` - Extended with search, preview, and guardrails-specific styles
+
+### Phase 5: Diagram Simplifications (DONE)
 
 **Collector page (`collector.njk`):**
-- [ ] Remove cataloger step from "How Collectors Fit" diagram
-- [ ] Update to 3-step flow: Collectors → JSON → Guardrails
+- [x] Remove cataloger step from "How Collectors Fit" diagram
+- [x] Update to 3-step flow: Collectors → JSON → Guardrails
+- [x] Update "Included Collectors" → "What This Integration Collects"
+- [x] Update "Related Plugins" → "Related Integrations"
+- [x] Fix related links to use new URL structure
+- [x] Fix breadcrumb to show Integrations instead of Guardrails
 
 **Cataloger page (`cataloger.njk`):**
-- [ ] Collapse steps 2-4 into single "Guardrails Engine" step
-- [ ] Update to 2-step flow: Catalogers → Guardrails Engine
-- [ ] Add subtext explaining collectors + guardrails work on cataloged data
+- [x] Collapse steps 2-4 into single "Guardrails Engine" step
+- [x] Update to 2-step flow: Catalogers → Guardrails Engine
+- [x] Add subtext explaining collectors + guardrails work on cataloged data
+- [x] Update "Included Catalogers" → "What This Integration Syncs"
+- [x] Update "Related Plugins" → "Related Integrations"
+- [x] Fix related links to use new URL structure
 
 **Policy page (`policy.njk`):**
-- [ ] Remove cataloger step from "How Policies Fit" diagram
-- [ ] Update to 3-step flow: Collectors → JSON → Guardrails
-- [ ] Rename "Required Collectors" → "Required Integrations"
+- [x] Remove cataloger step from "How Policies Fit" diagram
+- [x] Update to 3-step flow: Integrations → JSON → Guardrails
+- [x] Rename "Required Collectors" → "Required Integrations"
+- [x] Update "Included Policies" → "Included Guardrails"
+- [x] Update "Related Plugins" → "Related Guardrails"
+- [x] Fix related and requires links to use new URL structure
 
-### Phase 6: Individual Guardrail Pages
+### Phase 6: Individual Guardrail Pages ✅ COMPLETE
 
-**Create `/lunar/guardrails/{policy}/{guardrail}/`:**
-- [ ] Design URL structure for guardrail + collector combinations
-- [ ] Create paginated template for individual guardrail pages
-- [ ] Add `?collector=` query param support for collector-specific context
-- [ ] Show which integrations provide data for this guardrail
-- [ ] Include copy-paste YAML configuration snippet
-- [ ] Add cross-linking from parent policy pages
-- [ ] Implement SEO for long-tail keywords
+**Zapier-style combination pages implemented:**
+
+The implementation follows Zapier's pattern (e.g., `/apps/fathom/integrations/gmail`) where each page combines two entities. In Lunar's case:
+- **Guardrail + Collector** combinations (e.g., "Branch Protection + GitHub")
+
+**URL Structure:**
+- Base guardrail page: `/lunar/guardrails/{policy}/{guardrail}/` (hub with compatible integrations)
+- Combination page: `/lunar/guardrails/{policy}/{guardrail}/{collector}/` (detailed combo page)
+
+**Example URLs:**
+- `/lunar/guardrails/vcs/branch-protection-enabled/` → Hub listing compatible collectors
+- `/lunar/guardrails/vcs/branch-protection-enabled/github/` → Full combo page with GitHub Collector
+
+**Checklist:**
+- [x] Design URL structure for guardrail + collector combinations
+- [x] Create paginated template for individual guardrail pages (`guardrail.njk`)
+- [x] Create Zapier-style combination page template (`guardrail-collector.njk`)
+- [x] Show "Compatible Integrations" on base guardrail page with links to combo pages
+- [x] Include combined YAML configuration snippet (collector + policy)
+- [x] Show data flow: Collector → Component JSON → Guardrail
+- [x] Add cross-linking from parent policy pages
+- [x] Implement SEO for long-tail keywords (e.g., "GitHub branch protection enforcement")
+
+**Files created/modified:**
+- `src/_data/guardrails.js`:
+  - Added `individualGuardrails` array (base guardrail pages)
+  - Added `guardrailCollectorCombos` array (combination pages)
+  - Each combo includes full guardrail + collector data for template access
+- `src/lunar/guardrails/guardrail.njk` - Base guardrail page (hub listing compatible integrations)
+- `src/lunar/guardrails/guardrail-collector.njk` - Zapier-style combination page
+- `src/lunar/guardrails/policy.njk` - Updated to link to individual guardrail pages
+- `src/lunar/guardrails/index.njk` - Updated guardrail links to point to individual pages
+- `src/assets/css/lunar-plugin-detail.css`:
+  - Added `.compatible-integrations-section` styles (hub page)
+  - Added `.combo-*` styles (combination page: dual icons, flow diagram, etc.)
 
 ### Phase 7: SEO Metadata Review
 
@@ -454,13 +496,8 @@ Defer full SEO implementation until after structure is finalized. Initial implem
 - [ ] Basic meta keywords (from `keywords` arrays)
 - [ ] Canonical URLs for all pages
 - [ ] Basic Open Graph tags
-
-**Full SEO implementation (later):**
 - [ ] Review and update JSON-LD structured data for new URL structure
 - [ ] Update BreadcrumbList schemas for new hierarchy
 - [ ] Review SoftwareSourceCode schemas
 - [ ] Update FAQPage schemas with new terminology
-- [ ] Generate XML sitemap with new URLs
-- [ ] Submit sitemap to search engines
-- [ ] Set up URL monitoring in Google Search Console
 - [ ] Review and update internal linking structure
