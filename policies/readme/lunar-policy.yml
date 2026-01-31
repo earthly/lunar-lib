@@ -6,7 +6,7 @@ author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
 landing_page:
-  display_name: "README Policies"
+  display_name: "README Guardrails"
   long_description: |
     Validate README files against documentation standards. Ensure repositories have
     proper documentation by checking for file existence, minimum content length,
@@ -23,7 +23,7 @@ landing_page:
 policies:
   - name: readme-exists
     description: |
-      Verifies that a README.md or README file exists in the repository root.
+      Verifies that a `README.md` or `README` file exists in the repository root.
       Every repository should have basic documentation for discoverability.
     mainPython: ./readme-exists.py
     keywords: ["readme", "documentation", "repository docs"]

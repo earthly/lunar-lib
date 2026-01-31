@@ -1,4 +1,4 @@
-# Dependency Policies
+# Dependency Guardrails
 
 Policies for validating project dependencies.
 

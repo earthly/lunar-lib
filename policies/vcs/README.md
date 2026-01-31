@@ -1,4 +1,4 @@
-# VCS Policies
+# VCS Guardrails
 
 Version control system (VCS) best practices and security policies for repositories
 

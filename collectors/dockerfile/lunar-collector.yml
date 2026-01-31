@@ -11,7 +11,7 @@ landing_page:
   long_description: |
     Parse Dockerfiles to extract base images, final stage configuration, healthchecks,
     users, and labels. Enforce container security and best practices.
-  category: "devex-build-and-ci"
+  categories: ["containers", "build"]
   icon: "assets/docker.svg"
   status: "stable"
   related:

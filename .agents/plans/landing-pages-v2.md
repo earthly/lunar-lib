@@ -339,7 +339,7 @@ New categories for collectors and catalogers, organized by technology rather tha
 | `documentation` | Documentation | README detection, OpenAPI |
 | `service-catalog` | Service Catalog | Backstage, OpsLevel, Cortex |
 
-**Note:** A single integration can belong to multiple categories (e.g., Dockerfile collector → `containers` + `ci-cd`).
+**Note:** A single integration can belong to multiple categories (e.g., Dockerfile collector → `categories: ["containers", "build"]`). Uses the same `categories` field as policies, but with different valid values.
 
 ### Policy/Guardrail Categories (Verification-Use-Case Aligned)
 
@@ -358,107 +358,472 @@ Keep existing 6 categories — these make sense for "what do I want to enforce?"
 
 ## Implementation Phases
 
-### Phase 1: Terminology Updates (lunar-lib)
+### Phase 1: Terminology Updates (lunar-lib) ✅ COMPLETE
 
 **Validation script updates:**
-- [ ] Update `display_name` suffix requirements:
+- [x] Update `display_name` suffix requirements:
   - Collectors: must end with "Collector" *(unchanged)*
   - Catalogers: must end with "Cataloger" *(unchanged)*
   - Policies: must end with "Guardrails" *(new)*
-- [ ] Add new `integration_category` field for collectors/catalogers (multi-value)
-- [ ] Keep existing `category` field for policies (single value, unchanged)
+- [x] Update `category` field to validate against different sets based on type:
+  - Policies: verification use-case aligned (repository-and-ownership, testing-and-quality, etc.)
+  - Collectors/Catalogers: technology-aligned (vcs, containers, build, languages, etc.)
 
 **YAML file updates:**
-- [ ] Update all policy `display_name` values (e.g., "Container Policies" → "Container Guardrails")
-- [ ] Add `integration_category` to all collectors/catalogers
+- [x] Update all policy `display_name` values (e.g., "Container Policies" → "Container Guardrails")
+- [x] Update all policy README titles to match new display_name
+- [x] Update all collectors/catalogers to use `categories` with technology-aligned values
 
 **README template updates:**
-- [ ] Update terminology in all templates
-- [ ] Remove "plugin" references
+- [x] Update terminology in all templates
+- [x] Remove "plugin" references
 
-### Phase 2: URL Structure & Redirects (earthly-website)
+### Phase 2: URL Structure & Redirects (earthly-website) ✅ COMPLETE
 
 **File renames:**
-- [ ] `collectors.njk` → delete (functionality moves to integrations index)
-- [ ] `collector.njk` → `src/lunar/integrations/collector.njk`
-- [ ] `cataloger.njk` → `src/lunar/integrations/cataloger.njk`
-- [ ] `index.njk` → `src/lunar/integrations/index.njk` (adapt content)
-- [ ] `policy.njk` → `src/lunar/guardrails/policy.njk` (rename from policies/)
-- [ ] Create new `src/lunar/guardrails/index.njk` (guardrails index page)
+- [x] `collectors.njk` → delete (functionality moves to integrations index)
+- [x] `collector.njk` → `src/lunar/integrations/collector.njk`
+- [x] `cataloger.njk` → `src/lunar/integrations/cataloger.njk`
+- [x] `index.njk` → `src/lunar/integrations/index.njk` (adapt content)
+- [x] `policy.njk` stays at `src/lunar/guardrails/policy.njk` (was already there)
+- [x] Create new `src/lunar/guardrails/index.njk` (guardrails index page placeholder)
 
 **Permalink updates:**
-- [ ] Collector pages: `/lunar/integrations/collectors/{slug}/`
-- [ ] Cataloger pages: `/lunar/integrations/catalogers/{slug}/`
-- [ ] Policy pages: `/lunar/guardrails/{slug}/`
+- [x] Collector pages: `/lunar/integrations/collectors/{slug}/`
+- [x] Cataloger pages: `/lunar/integrations/catalogers/{slug}/`
+- [x] Policy pages: `/lunar/guardrails/{slug}/`
 
-**Redirects (in netlify.toml or eleventy config):**
-- [ ] `/lunar/integrations/collectors/` → `/lunar/integrations/`
-- [ ] `/lunar/integrations/catalogers/` → `/lunar/integrations/`
+**Redirects (in netlify.toml):**
+- [x] `/lunar/integrations/collectors/` → `/lunar/integrations/`
+- [x] `/lunar/integrations/catalogers/` → `/lunar/integrations/`
 
 ### Phase 3: Integrations Index Page
 
 **Create `/lunar/integrations/index.njk`:**
-- [ ] Adapt hero section from old guardrails index
-- [ ] Simplify "How It Works" to 2-step flow
-- [ ] Combine collectors + catalogers into single grid
-- [ ] Add type toggle filter: All | Collectors | Catalogers
-- [ ] Add category filter bar with new technology-aligned categories
-- [ ] Update all terminology (remove "plugin", use "integration")
-- [ ] Remove sub-collector/sub-cataloger counts — just show integration count
+- [x] Adapt hero section from old guardrails index
+- [x] Simplify "How It Works" to 2-step flow
+- [x] Combine collectors + catalogers into single grid
+- [x] Add type toggle filter: All | Collectors | Catalogers
+- [x] Add category filter bar with new technology-aligned categories
+- [x] Update all terminology (remove "plugin", use "integration")
+- [x] Remove sub-collector/sub-cataloger counts — just show integration count
 
 ### Phase 4: Guardrails Index Page
 
 **Create `/lunar/guardrails/index.njk`:**
-- [ ] New hero section focused on "what can I enforce?"
-- [ ] Policy/guardrail grid with expandable guardrail previews
-- [ ] Category filter bar (6 existing categories)
-- [ ] **Client-side search** using Lunr.js or similar
+- [x] New hero section focused on "what can I enforce?"
+- [x] Policy/guardrail grid with expandable guardrail previews
+- [x] Category filter bar (6 existing categories)
+- [x] **Client-side search** (custom implementation with debounce)
   - Index policy names, guardrail names, descriptions, keywords
   - Real-time filtering as user types
-- [ ] Add CTA at bottom linking to integrations page
+- [x] Add CTA at bottom linking to integrations page
 
-### Phase 5: Diagram Simplifications
+**Files modified:**
+- `src/lunar/guardrails/index.njk` - Full template with search, filters, expandable previews
+- `src/assets/js/lunar-plugin-index.js` - Extended to handle both integrations and guardrails pages
+- `src/assets/css/lunar-plugin-index.css` - Extended with search, preview, and guardrails-specific styles
+
+### Phase 5: Diagram Simplifications (DONE)
 
 **Collector page (`collector.njk`):**
-- [ ] Remove cataloger step from "How Collectors Fit" diagram
-- [ ] Update to 3-step flow: Collectors → JSON → Guardrails
+- [x] Remove cataloger step from "How Collectors Fit" diagram
+- [x] Update to 3-step flow: Collectors → JSON → Guardrails
+- [x] Update "Included Collectors" → "What This Integration Collects"
+- [x] Update "Related Plugins" → "Related Integrations"
+- [x] Fix related links to use new URL structure
+- [x] Fix breadcrumb to show Integrations instead of Guardrails
 
 **Cataloger page (`cataloger.njk`):**
-- [ ] Collapse steps 2-4 into single "Guardrails Engine" step
-- [ ] Update to 2-step flow: Catalogers → Guardrails Engine
-- [ ] Add subtext explaining collectors + guardrails work on cataloged data
+- [x] Collapse steps 2-4 into single "Guardrails Engine" step
+- [x] Update to 2-step flow: Catalogers → Guardrails Engine
+- [x] Add subtext explaining collectors + guardrails work on cataloged data
+- [x] Update "Included Catalogers" → "What This Integration Syncs"
+- [x] Update "Related Plugins" → "Related Integrations"
+- [x] Fix related links to use new URL structure
 
 **Policy page (`policy.njk`):**
-- [ ] Remove cataloger step from "How Policies Fit" diagram
-- [ ] Update to 3-step flow: Collectors → JSON → Guardrails
-- [ ] Rename "Required Collectors" → "Required Integrations"
+- [x] Remove cataloger step from "How Policies Fit" diagram
+- [x] Update to 3-step flow: Integrations → JSON → Guardrails
+- [x] Rename "Required Collectors" → "Required Integrations"
+- [x] Update "Included Policies" → "Included Guardrails"
+- [x] Update "Related Plugins" → "Related Guardrails"
+- [x] Fix related and requires links to use new URL structure
 
-### Phase 6: Individual Guardrail Pages
+### Phase 6: Individual Guardrail Pages ✅ COMPLETE
 
-**Create `/lunar/guardrails/{policy}/{guardrail}/`:**
-- [ ] Design URL structure for guardrail + collector combinations
-- [ ] Create paginated template for individual guardrail pages
-- [ ] Add `?collector=` query param support for collector-specific context
-- [ ] Show which integrations provide data for this guardrail
-- [ ] Include copy-paste YAML configuration snippet
-- [ ] Add cross-linking from parent policy pages
-- [ ] Implement SEO for long-tail keywords
+**Zapier-style combination pages implemented:**
+
+The implementation follows Zapier's pattern (e.g., `/apps/fathom/integrations/gmail`) where each page combines two entities. In Lunar's case:
+- **Guardrail + Collector** combinations (e.g., "Branch Protection + GitHub")
+
+**URL Structure:**
+- Base guardrail page: `/lunar/guardrails/{policy}/{guardrail}/` (hub with compatible integrations)
+- Combination page: `/lunar/guardrails/{policy}/{guardrail}/{collector}/` (detailed combo page)
+
+**Example URLs:**
+- `/lunar/guardrails/vcs/branch-protection-enabled/` → Hub listing compatible collectors
+- `/lunar/guardrails/vcs/branch-protection-enabled/github/` → Full combo page with GitHub Collector
+
+**Checklist:**
+- [x] Design URL structure for guardrail + collector combinations
+- [x] Create paginated template for individual guardrail pages (`guardrail.njk`)
+- [x] Create Zapier-style combination page template (`guardrail-collector.njk`)
+- [x] Show "Compatible Integrations" on base guardrail page with links to combo pages
+- [x] Include combined YAML configuration snippet (collector + policy)
+- [x] Show data flow: Collector → Component JSON → Guardrail
+- [x] Add cross-linking from parent policy pages
+- [x] Implement SEO for long-tail keywords (e.g., "GitHub branch protection enforcement")
+
+**Files created/modified:**
+- `src/_data/guardrails.js`:
+  - Added `individualGuardrails` array (base guardrail pages)
+  - Added `guardrailCollectorCombos` array (combination pages)
+  - Each combo includes full guardrail + collector data for template access
+- `src/lunar/guardrails/guardrail.njk` - Base guardrail page (hub listing compatible integrations)
+- `src/lunar/guardrails/guardrail-collector.njk` - Zapier-style combination page
+- `src/lunar/guardrails/policy.njk` - Updated to link to individual guardrail pages
+- `src/lunar/guardrails/index.njk` - Updated guardrail links to point to individual pages
+- `src/assets/css/lunar-plugin-detail.css`:
+  - Added `.compatible-integrations-section` styles (hub page)
+  - Added `.combo-*` styles (combination page: dual icons, flow diagram, etc.)
 
 ### Phase 7: SEO Metadata Review
 
-Defer full SEO implementation until after structure is finalized. Initial implementation should include only:
+#### Current State Summary
 
-- [ ] Basic meta description (from `long_description`)
-- [ ] Basic meta keywords (from `keywords` arrays)
-- [ ] Canonical URLs for all pages
-- [ ] Basic Open Graph tags
+The base template (`base.njk`) provides default SEO metadata:
+- Title, meta description, canonical URL, Open Graph, Twitter Cards
+- Organization and WebSite JSON-LD schemas
 
-**Full SEO implementation (later):**
-- [ ] Review and update JSON-LD structured data for new URL structure
-- [ ] Update BreadcrumbList schemas for new hierarchy
-- [ ] Review SoftwareSourceCode schemas
-- [ ] Update FAQPage schemas with new terminology
-- [ ] Generate XML sitemap with new URLs
-- [ ] Submit sitemap to search engines
-- [ ] Set up URL monitoring in Google Search Console
-- [ ] Review and update internal linking structure
+Dynamic plugin pages (policies, guardrails, collectors, catalogers) have:
+- Meta keywords, robots, author/publisher tags
+- Inline microdata for SoftwareSourceCode and BreadcrumbList
+- TODO comments for JSON-LD conversion
+
+Static pages mostly rely on base template defaults and are missing page-specific SEO.
+
+---
+
+#### 7.1 Homepage (`/`)
+
+**File:** `src/index.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/"` to frontmatter
+- [x] Add custom `meta_description` (currently uses default)
+- [x] Add JSON-LD WebPage schema with mainEntity pointing to Product
+- [x] Add JSON-LD SoftwareApplication schema for Earthly Lunar (with featureList)
+- [x] Internal links verified: CTAs point to /book-demo/, /how-lunar-works/, etc.
+
+---
+
+#### 7.2 About Page (`/about/`)
+
+**File:** `src/about.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/about/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/about/"` to frontmatter
+- [x] Add custom `meta_description` summarizing company mission
+- [x] Add JSON-LD AboutPage schema
+- [x] Add JSON-LD Organization schema (extended from base)
+- [x] Internal links verified: uses standard CTA patterns
+
+---
+
+#### 7.3 How Lunar Works (`/how-lunar-works/`)
+
+**File:** `src/how-lunar-works.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/how-lunar-works/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/how-lunar-works/"` to frontmatter
+- [x] Add custom `meta_description` explaining Lunar's guardrails engine
+- [x] Add JSON-LD WebPage schema with BreadcrumbList
+- [x] Add JSON-LD HowTo schema for the step-by-step explanation (Instrument → Normalize → Evaluate → Enforce)
+- [x] Internal links verified: uses standard CTA patterns
+
+---
+
+#### 7.4 Book Demo (`/book-demo/`)
+
+**File:** `src/book-demo.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/book-demo/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/book-demo/"` to frontmatter
+- [x] Add custom `meta_description` for demo booking (enhanced existing)
+- [x] Add JSON-LD ContactPage schema with Product mainEntity and BreadcrumbList
+- [x] Form uses HubSpot embed with standard accessibility (managed by HubSpot)
+
+---
+
+#### 7.5 Security (`/security/`)
+
+**File:** `src/security.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/security/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/security/"` to frontmatter
+- [x] Update frontmatter to use `meta_description` instead of `description`
+- [x] Add JSON-LD WebPage schema with BreadcrumbList and SOC 2 credential
+- [x] Update title (removed "Better SDLC", now "Security | Earthly")
+
+---
+
+#### 7.6 Earthfile Page (`/earthfile/`)
+
+**File:** `src/earthfile.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/earthfile/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/earthfile/"` to frontmatter
+- [x] Add custom `meta_description` for Earthfile product
+- [x] Add JSON-LD SoftwareApplication schema for Earthfile (with featureList, downloadUrl, license)
+- [x] Updated title to "Earthfiles - Fast, Consistent Builds | Earthly"
+- [x] Earthfile page: keeping as-is (low prominence, not deprecated)
+
+---
+
+#### 7.7 Lunar and OPA (`/lunar-and-opa/`)
+
+**File:** `src/lunar-and-opa.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/lunar-and-opa/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/lunar-and-opa/"` to frontmatter
+- [x] Add custom `meta_description` for Lunar vs OPA comparison
+- [x] Add JSON-LD BreadcrumbList schema (FAQPage schema already existed)
+- [x] Updated title to "Earthly Lunar + OPA - Better Together | Policy Enforcement"
+- [x] Internal links verified: uses standard CTA patterns
+
+---
+
+#### 7.8 Newsroom (`/newsroom/`)
+
+**File:** `src/newsroom.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/newsroom/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/newsroom/"` to frontmatter
+- [x] Add custom `meta_description` for press/news section
+- [x] Add JSON-LD CollectionPage schema with BreadcrumbList
+- [x] Updated title to "Newsroom | Earthly" (removed "Better SDLC")
+- [x] Added `rel="noopener noreferrer"` to all external links
+
+---
+
+#### 7.9 Legal Pages
+
+##### 7.9.1 Terms of Service (`/tos/`)
+
+**File:** `src/tos.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/tos/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/tos/"` to frontmatter
+- [x] Add custom `meta_description`
+- [x] Updated title to "Terms of Service | Earthly"
+- [x] Verified: no robots meta = defaults to indexable (appropriate for legal pages)
+
+##### 7.9.2 Privacy Policy (`/privacy-policy/`)
+
+**File:** `src/privacy-policy.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/privacy-policy/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/privacy-policy/"` to frontmatter
+- [x] Add custom `meta_description`
+- [x] Updated title to "Privacy Policy | Earthly"
+- [x] Verified: no robots meta = defaults to indexable
+
+##### 7.9.3 Acceptable Use Policy (`/acceptable-use-policy/`)
+
+**File:** `src/acceptable-use-policy.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/acceptable-use-policy/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/acceptable-use-policy/"` to frontmatter
+- [x] Add custom `meta_description`
+- [x] Updated title to "Acceptable Use Policy | Earthly"
+- [x] Verified: no robots meta = defaults to indexable
+
+##### 7.9.4 API Terms (`/api-terms/`)
+
+**File:** `src/api-terms.html`
+
+- [x] Add `canonical_url: "https://earthly.dev/api-terms/"` to frontmatter
+- [x] Add `og_url: "https://earthly.dev/api-terms/"` to frontmatter
+- [x] Add custom `meta_description`
+- [x] Updated title to "API Terms | Earthly"
+- [x] Verified: no robots meta = defaults to indexable
+
+---
+
+#### 7.10 Guardrails Index (`/lunar/guardrails/`)
+
+**File:** `src/lunar/guardrails/index.njk`
+
+- [x] Remove TODO comment
+- [x] Add JSON-LD CollectionPage schema
+- [x] Add JSON-LD BreadcrumbList schema (Lunar → Guardrails)
+- [x] Verify all policy cards link to correct URLs
+- [x] Review category filter functionality and accessibility
+- [x] Meta keywords aggregation not needed (index has focused meta_description + CollectionPage schema)
+
+---
+
+#### 7.11 Policy Pages (`/lunar/guardrails/{policy-slug}/`)
+
+**File:** `src/lunar/guardrails/policy.njk`
+
+- [x] Add JSON-LD SoftwareSourceCode schema (via eleventyComputed.extraHeadContent)
+- [x] Add JSON-LD BreadcrumbList schema (3-level: Lunar → Guardrails → Policy)
+- [x] Move robots/author meta tags to extraHeadContent
+- [x] Add JSON-LD ItemList schema for included guardrails (dynamically generated)
+- [x] Verify all guardrail links use correct URL structure
+- [x] Add internal links to related policies (same category)
+
+---
+
+#### 7.12 Individual Guardrail Pages (`/lunar/guardrails/{policy-slug}/{guardrail-slug}/`)
+
+**File:** `src/lunar/guardrails/guardrail.njk`
+
+- [x] Add JSON-LD SoftwareSourceCode schema (via eleventyComputed.extraHeadContent)
+- [x] Add JSON-LD BreadcrumbList schema (4-level: Lunar → Guardrails → Policy → Guardrail)
+- [x] Move robots/author meta tags to extraHeadContent
+- [x] Add JSON-LD ItemList schema for compatible integrations (dynamically generated)
+- [x] Verify all collector links use correct URL structure
+- [x] Add internal links to sibling guardrails (same policy)
+
+---
+
+#### 7.13 Guardrail + Collector Combo Pages (`/lunar/guardrails/{policy-slug}/{guardrail-slug}/{collector-slug}/`)
+
+**File:** `src/lunar/guardrails/guardrail-collector.njk`
+
+- [x] Add JSON-LD HowTo schema for configuration steps (via eleventyComputed.extraHeadContent)
+- [x] Add JSON-LD BreadcrumbList schema (5-level: Lunar → Guardrails → Policy → Guardrail → Collector)
+- [x] Move robots/author meta tags to extraHeadContent
+- [x] Verify back-links to parent guardrail and collector pages
+- [x] Add internal links to other combos for same guardrail
+
+---
+
+#### 7.14 Integrations Index (`/lunar/integrations/`)
+
+**File:** `src/lunar/integrations/index.njk`
+
+- [x] Remove TODO comment
+- [x] Add JSON-LD CollectionPage schema
+- [x] Add JSON-LD BreadcrumbList schema (Lunar → Integrations)
+- [x] Verify all collector/cataloger cards link to correct URLs
+- [x] Review category filter functionality and accessibility
+- [x] Add cross-link to guardrails index
+
+---
+
+#### 7.15 Collector Pages (`/lunar/integrations/collectors/{collector-slug}/`)
+
+**File:** `src/lunar/integrations/collector.njk`
+
+- [x] Remove TODO comment
+- [x] Add JSON-LD SoftwareSourceCode schema (via eleventyComputed.extraHeadContent)
+- [x] Add JSON-LD BreadcrumbList schema (3-level: Lunar → Integrations → Collector)
+- [x] Move robots/author meta tags to extraHeadContent
+- [x] Add JSON-LD ItemList schema for included sub-collectors (dynamically generated)
+- [x] Add internal links to related collectors (same category)
+- [x] Add internal links to guardrails that use this collector
+
+---
+
+#### 7.16 Cataloger Pages (`/lunar/integrations/catalogers/{cataloger-slug}/`)
+
+**File:** `src/lunar/integrations/cataloger.njk`
+
+- [x] Remove TODO comment
+- [x] Add JSON-LD SoftwareSourceCode schema (via eleventyComputed.extraHeadContent)
+- [x] Add JSON-LD BreadcrumbList schema (3-level: Lunar → Integrations → Cataloger)
+- [x] Move robots/author meta tags to extraHeadContent
+- [x] Add JSON-LD ItemList schema for included sub-catalogers (dynamically generated)
+- [x] Add internal links to related catalogers (same category)
+
+---
+
+#### 7.17 Error Page (`/404.html`)
+
+**File:** `src/404.html`
+
+- [x] Add noindex meta tag (via extraHeadContent)
+- [x] Add helpful internal links (How Lunar Works, Guardrails, Integrations, Docs)
+- [x] Ensure consistent branding (uses gradient 404, standard buttons, site nav links)
+
+---
+
+#### 7.18 SEO Infrastructure Files
+
+##### 7.18.1 Robots.txt
+
+**File:** `src/robots.njk`
+
+- [x] Verify sitemap URL is correct (https://earthly.dev/sitemap.xml)
+- [x] Review disallow rules (only /automate-your-process/)
+- [x] Verified `/automate-your-process/` is disallowed
+
+##### 7.18.2 Sitemap Index
+
+**File:** `src/sitemap.njk`
+
+- [x] Verified sitemap index includes sitemap-pages.xml and blog sitemap
+- [x] Sitemap index structure is correct (no lastmod needed at index level)
+- [x] Priority values added to sitemap-pages.njk (see below)
+
+##### 7.18.3 Sitemap Pages
+
+**File:** `src/sitemap-pages.njk`
+
+- [x] Dynamic pages included via collections.all (policies, guardrails, collectors, catalogers, combos)
+- [x] Added changefreq values by page type (weekly for index, monthly for detail, yearly for legal)
+- [x] Added priority values (1.0 homepage, 0.9 indexes, 0.7 plugin pages, 0.3 legal)
+- [x] Excluded 404.html from sitemap
+
+---
+
+#### 7.19 Cross-Cutting Tasks
+
+##### Meta Tags Placement Fix
+
+- [x] Moved robots/author meta tags to `eleventyComputed.extraHeadContent` in all dynamic templates
+  - `policy.njk` ✓
+  - `guardrail.njk` ✓
+  - `guardrail-collector.njk` ✓
+  - `collector.njk` ✓
+  - `cataloger.njk` ✓
+- Note: Original meta keywords blocks (article:tag etc.) remain in body but are low priority; main SEO tags are now in head
+
+##### Internal Linking Audit
+
+- [x] Policy pages link to parent guardrails index (via breadcrumb)
+- [x] Guardrail pages link to parent policy (via breadcrumb and "View All" button)
+- [x] Guardrail pages link to sibling guardrails (via "Related Guardrails" section)
+- [x] Combo pages link to parent guardrail and collector (via breadcrumb)
+- [x] Collector pages link to guardrails via "Used By" section (where applicable)
+- [x] Add "Related" sections on index pages for cross-category discovery (future enhancement)
+- [ ] **Pre-deploy**: Run broken link checker (manual step, recommend `npx broken-link-checker`)
+
+##### JSON-LD Template Patterns
+
+- [x] Added JSON-LD schemas inline in templates (simpler than partials for this use case)
+  - BreadcrumbList: all pages
+  - SoftwareSourceCode: plugin detail pages
+  - CollectionPage: index pages
+  - ItemList: for sub-items on detail pages
+  - HowTo: combo pages
+- [x] Document JSON-LD patterns in AGENTS.md (added SEO Requirements section with schema table)
+
+---
+
+#### Phase 7 Completion Criteria
+
+- [x] All pages have explicit canonical_url and og_url
+- [x] All pages have custom meta_description (no defaults)
+- [x] All dynamic pages have JSON-LD schemas (SoftwareSourceCode, BreadcrumbList, ItemList, HowTo)
+- [x] Core meta tags (robots, author) moved to `<head>` via extraHeadContent
+- [x] No TODO comments remain in templates
+- [x] Internal linking via breadcrumbs and related sections
+- [x] Sitemap includes all pages with priority and changefreq
+- [x] Robots.txt verified accurate
+
+**Phase 7 Status: COMPLETE** ✓

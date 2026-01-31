@@ -1,4 +1,4 @@
-# Linter Policies
+# Linter Guardrails
 
 Policies for validating that linting runs and passes with acceptable warning counts.
 
