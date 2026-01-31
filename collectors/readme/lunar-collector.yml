@@ -23,9 +23,9 @@ default_image_non_ci_collectors: earthly/lunar-lib:base-main
 collectors:
   - name: readme
     description: |
-      Scans repository root for README files (README.md, README, README.txt, README.rst)
+      Scans repository root for README files (`README.md`, `README`, `README.txt`, `README.rst`)
       in order, taking the first match. Extracts line count and section headings by
-      parsing markdown headers. Writes exists, path, lines, and sections to .repo.readme.
+      parsing markdown headers. Writes exists, path, lines, and sections to `.repo.readme`.
     mainBash: main.sh
     hook:
       type: code
