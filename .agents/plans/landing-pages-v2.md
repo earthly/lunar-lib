@@ -490,8 +490,6 @@ The implementation follows Zapier's pattern (e.g., `/apps/fathom/integrations/gm
 
 ### Phase 7: SEO Metadata Review
 
-Defer full SEO implementation until after structure is finalized. Initial implementation should include only:
-
 - [ ] Basic meta description (from `long_description`)
 - [ ] Basic meta keywords (from `keywords` arrays)
 - [ ] Canonical URLs for all pages
