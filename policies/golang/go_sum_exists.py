@@ -9,6 +9,10 @@ def check_go_sum_exists(node=None):
         if not c.exists(".lang.go"):
             c.skip("Not a Go project")
 
+        # Skip if native data not available (collector may not have run)
+        if not c.exists(".lang.go.native.go_sum.exists"):
+            c.skip("Go module data not available - ensure golang collector has run")
+
         c.assert_true(
             c.get_value(".lang.go.native.go_sum.exists"),
             "go.sum not found. Run 'go mod tidy' to generate checksums."

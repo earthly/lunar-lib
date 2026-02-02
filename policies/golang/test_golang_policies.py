@@ -6,6 +6,7 @@ from lunar_policy import Node, CheckStatus
 from go_mod_exists import check_go_mod_exists
 from go_sum_exists import check_go_sum_exists
 from min_go_version import check_min_go_version
+from min_go_version_cicd import check_min_go_version_cicd
 from tests_recursive import check_tests_recursive
 from vendoring import check_vendoring
 
@@ -60,6 +61,14 @@ class TestGoModExistsPolicy(unittest.TestCase):
         # Should either skip or be pending
         self.assertIn(check.status, [CheckStatus.SKIPPED, CheckStatus.PENDING])
 
+    def test_go_project_without_native_data_skips(self):
+        """Go project without native data should skip gracefully."""
+        data = {"lang": {"go": {"version": "1.21"}}}
+        node = Node.from_component_json(data)
+        check = check_go_mod_exists(node=node)
+        self.assertEqual(check.status, CheckStatus.SKIPPED)
+        self.assertIn("Go module data not available", check.skip_reason)
+
 
 class TestGoSumExistsPolicy(unittest.TestCase):
     """Tests for the go-sum-exists policy."""
@@ -108,6 +117,14 @@ class TestGoSumExistsPolicy(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_go_sum_exists(node=node)
         self.assertIn(check.status, [CheckStatus.SKIPPED, CheckStatus.PENDING])
+
+    def test_go_project_without_native_data_skips(self):
+        """Go project without native data should skip gracefully."""
+        data = {"lang": {"go": {"version": "1.21"}}}
+        node = Node.from_component_json(data)
+        check = check_go_sum_exists(node=node)
+        self.assertEqual(check.status, CheckStatus.SKIPPED)
+        self.assertIn("Go module data not available", check.skip_reason)
 
 
 class TestMinGoVersionPolicy(unittest.TestCase):
@@ -190,6 +207,95 @@ class TestMinGoVersionPolicy(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_min_go_version(min_version="1.21.5", node=node)
         self.assertEqual(check.status, CheckStatus.PASS)
+
+
+class TestMinGoVersionCicdPolicy(unittest.TestCase):
+    """Tests for the min-go-version-cicd policy."""
+
+    def test_version_meets_minimum_passes(self):
+        """CI/CD Go version at minimum should pass."""
+        data = {
+            "lang": {
+                "go": {
+                    "cicd": {
+                        "cmds": [{"cmd": "go test ./...", "version": "1.21.5"}]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_version_exceeds_minimum_passes(self):
+        """CI/CD Go version above minimum should pass."""
+        data = {
+            "lang": {
+                "go": {
+                    "cicd": {
+                        "cmds": [{"cmd": "go build", "version": "1.22.0"}]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_version_below_minimum_fails(self):
+        """CI/CD Go version below minimum should fail."""
+        data = {
+            "lang": {
+                "go": {
+                    "cicd": {
+                        "cmds": [{"cmd": "go test ./...", "version": "1.19.5"}]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("below", check.failure_reasons[0])
+
+    def test_multiple_commands_one_fails(self):
+        """Multiple commands with one below minimum should fail."""
+        data = {
+            "lang": {
+                "go": {
+                    "cicd": {
+                        "cmds": [
+                            {"cmd": "go test ./...", "version": "1.22.0"},
+                            {"cmd": "go build", "version": "1.19.0"}
+                        ]
+                    }
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_not_go_project_skips(self):
+        """Non-Go project should skip."""
+        data = {"lang": {"python": {}}}
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertIn(check.status, [CheckStatus.SKIPPED, CheckStatus.PENDING])
+
+    def test_no_cicd_data_skips(self):
+        """Go project without CI/CD data should skip."""
+        data = {"lang": {"go": {"version": "1.21"}}}
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertIn(check.status, [CheckStatus.SKIPPED, CheckStatus.PENDING])
+
+    def test_empty_data_skips(self):
+        """Empty component JSON should skip."""
+        data = {}
+        node = Node.from_component_json(data)
+        check = check_min_go_version_cicd(min_version="1.21", node=node)
+        self.assertIn(check.status, [CheckStatus.SKIPPED, CheckStatus.PENDING])
 
 
 class TestTestsRecursivePolicy(unittest.TestCase):

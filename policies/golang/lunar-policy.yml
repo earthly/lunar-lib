@@ -42,6 +42,13 @@ policies:
     mainPython: ./min_go_version.py
     keywords: ["go version", "compatibility", "security"]
 
+  - name: min-go-version-cicd
+    description: |
+      Ensures the Go version used in CI/CD commands meets the minimum required version.
+      Helps maintain security and compatibility standards for build environments.
+    mainPython: ./min_go_version_cicd.py
+    keywords: ["go version", "ci/cd", "compatibility", "security"]
+
   - name: tests-recursive
     description: |
       Ensures tests run recursively (./...) to cover all packages.
@@ -59,6 +66,9 @@ policies:
 inputs:
   min_go_version:
     description: Minimum required Go version (e.g., "1.21", "1.22")
+    default: "1.21"
+  min_go_version_cicd:
+    description: Minimum required Go version for CI/CD commands (e.g., "1.21", "1.22")
     default: "1.21"
   vendoring_mode:
     description: |
