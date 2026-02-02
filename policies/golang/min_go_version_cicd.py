@@ -9,11 +9,11 @@ def check_min_go_version_cicd(min_version=None, node=None):
     c = Check("min-go-version-cicd", "Ensures CI/CD Go version meets minimum", node=node)
     with c:
         # Skip if not a Go project
-        if not c.exists(".lang.go"):
+        if not c.get_node(".lang.go").exists():
             c.skip("Not a Go project")
 
         # Skip if no CI/CD data available
-        if not c.exists(".lang.go.cicd.cmds"):
+        if not c.get_node(".lang.go.cicd.cmds").exists():
             c.skip("No CI/CD Go commands recorded")
 
         cmds = c.get_value(".lang.go.cicd.cmds")

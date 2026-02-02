@@ -9,11 +9,11 @@ def check_min_go_version(min_version=None, node=None):
     c = Check("min-go-version", "Ensures Go version meets minimum", node=node)
     with c:
         # Skip if not a Go project
-        if not c.exists(".lang.go"):
+        if not c.get_node(".lang.go").exists():
             c.skip("Not a Go project")
 
         # Skip if version data not available
-        if not c.exists(".lang.go.version"):
+        if not c.get_node(".lang.go.version").exists():
             c.skip("Go version not detected")
 
         actual_version = c.get_value(".lang.go.version")

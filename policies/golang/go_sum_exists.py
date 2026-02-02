@@ -6,11 +6,11 @@ def check_go_sum_exists(node=None):
     c = Check("go-sum-exists", "Ensures go.sum exists", node=node)
     with c:
         # Skip if not a Go project
-        if not c.exists(".lang.go"):
+        if not c.get_node(".lang.go").exists():
             c.skip("Not a Go project")
 
         # Skip if native data not available (collector may not have run)
-        if not c.exists(".lang.go.native.go_sum.exists"):
+        if not c.get_node(".lang.go.native.go_sum.exists").exists():
             c.skip("Go module data not available - ensure golang collector has run")
 
         c.assert_true(

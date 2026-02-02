@@ -9,7 +9,7 @@ def check_vendoring(mode=None, node=None):
     c = Check("vendoring", "Enforces vendoring policy", node=node)
     with c:
         # Skip if not a Go project
-        if not c.exists(".lang.go"):
+        if not c.get_node(".lang.go").exists():
             c.skip("Not a Go project")
 
         if mode == "none":
