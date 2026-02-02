@@ -7,7 +7,7 @@ author: support@earthly.dev
 default_image: earthly/lunar-scripts:1.0.0
 
 landing_page:
-  display_name: "Testing Policies"
+  display_name: "Testing Guardrails"
   long_description: |
     Ensure tests are executed in CI and passing. Works with any collector
     that writes to the normalized .testing paths.
