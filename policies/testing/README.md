@@ -1,4 +1,4 @@
-# Testing Policies
+# Testing Guardrails
 
 Validates that tests are executed and pass.
 
