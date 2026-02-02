@@ -7,7 +7,7 @@ author: support@earthly.dev
 default_image: earthly/lunar-scripts:1.0.0
 
 landing_page:
-  display_name: "Go Project Policies"
+  display_name: "Go Project Guardrails"
   long_description: |
     Enforce Go-specific project standards including module configuration,
     Go version requirements, test execution scope, and vendoring policies.
