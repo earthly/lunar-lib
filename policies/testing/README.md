@@ -71,7 +71,7 @@ Tests executed and all passing:
 }
 ```
 
-### Failing Example — No Tests Executed
+### Failing Example — No Tests Executed (`executed` policy)
 
 ```json
 {}
@@ -79,7 +79,9 @@ Tests executed and all passing:
 
 **Failure message:** `"No test execution data found. Ensure tests are configured to run in CI."`
 
-### Failing Example — Tests Failing
+**Note:** The `passing` policy **skips** in this case with: `"No test execution data found"`
+
+### Failing Example — Tests Failing (`passing` policy)
 
 ```json
 {
@@ -101,7 +103,7 @@ Tests executed and all passing:
 
 **Failure message:** `"Tests are failing. Check CI logs for test failure details."`
 
-### Skipped Example — No Pass/Fail Data
+### Skipped Example — No Pass/Fail Data (`passing` policy)
 
 When the collector only reports test execution (not results):
 
@@ -116,7 +118,7 @@ When the collector only reports test execution (not results):
 }
 ```
 
-The `executed` check passes, but `passing` is **skipped** with message: `"Test pass/fail data not available. This requires a collector that reports detailed test results."`
+The `executed` policy **passes**, but `passing` is **skipped** with message: `"Test pass/fail data not available. This requires a collector that reports detailed test results."`
 
 ## Remediation
 
