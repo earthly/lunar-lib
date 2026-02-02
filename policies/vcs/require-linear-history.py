@@ -8,10 +8,11 @@ def main(node=None):
             "VCS data not found. Ensure the github collector is configured and has run.")
         
         enabled = c.get_value(".vcs.branch_protection.enabled")
-        c.assert_true(enabled, "Branch protection is not enabled")
-
-        require_linear_history = c.get_value(".vcs.branch_protection.require_linear_history")
-        c.assert_true(require_linear_history, "Branch protection does not require linear history")
+        if not enabled:
+            c.fail("Branch protection is not enabled")
+        else:
+            require_linear_history = c.get_value(".vcs.branch_protection.require_linear_history")
+            c.assert_true(require_linear_history, "Branch protection does not require linear history")
     return c
 
 
