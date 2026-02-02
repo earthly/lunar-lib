@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Flag pole -->
+  <rect x="12" y="8" width="4" height="48" rx="2" fill="#1D63ED"/>
+  
+  <!-- Flag banner -->
+  <path d="M16 10 L48 10 C50 10 52 12 50 16 L46 22 L50 28 C52 32 50 34 48 34 L16 34 Z" fill="#1D63ED"/>
+  
+  <!-- Flag highlight -->
+  <rect x="20" y="16" width="18" height="3" rx="1.5" fill="white" opacity="0.8"/>
+  <rect x="20" y="23" width="12" height="3" rx="1.5" fill="white" opacity="0.6"/>
+  
+  <!-- Clock circle (age indicator) -->
+  <circle cx="48" cy="48" r="12" fill="#F59E0B"/>
+  
+  <!-- Clock hands -->
+  <line x1="48" y1="48" x2="48" y2="42" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="48" y1="48" x2="53" y2="48" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Clock center dot -->
+  <circle cx="48" cy="48" r="1.5" fill="white"/>
+</svg>
+
