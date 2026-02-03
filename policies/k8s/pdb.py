@@ -12,13 +12,14 @@ def main(node=None):
 
         pdbs = c.get_node(".k8s.pdbs")
 
-        # Build set of workloads that have PDBs
+        # Build set of (namespace, workload_name) tuples that have PDBs
         pdb_targets = set()
         if pdbs.exists():
             for pdb in pdbs:
                 target = pdb.get_value_or_default(".target_workload", "")
+                pdb_namespace = pdb.get_value_or_default(".namespace", "default")
                 if target:
-                    pdb_targets.add(target)
+                    pdb_targets.add((pdb_namespace, target))
 
         # Check Deployments and StatefulSets have matching PDBs
         for workload in workloads:
@@ -32,7 +33,7 @@ def main(node=None):
             namespace = workload.get_value_or_default(".namespace", "default")
             path = workload.get_value_or_default(".path", "<unknown>")
 
-            has_pdb = name in pdb_targets
+            has_pdb = (namespace, name) in pdb_targets
             c.assert_true(
                 has_pdb,
                 f"{path}: {kind} {namespace}/{name} has no matching PodDisruptionBudget"
