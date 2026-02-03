@@ -44,10 +44,10 @@ def main(node=None):
                 mem_limit = container.get_value_or_default(".memory_limit", None)
 
                 # Validate CPU ratio
-                if cpu_request and cpu_limit:
+                if cpu_request is not None and cpu_limit is not None:
                     r_cpu = parse_cpu_millicores(cpu_request)
                     l_cpu = parse_cpu_millicores(cpu_limit)
-                    if r_cpu and l_cpu:
+                    if r_cpu is not None and l_cpu is not None:
                         c.assert_true(
                             r_cpu <= l_cpu,
                             f"{prefix} has requests.cpu > limits.cpu ({cpu_request} > {cpu_limit})"
@@ -59,10 +59,10 @@ def main(node=None):
                             )
 
                 # Validate memory ratio
-                if mem_request and mem_limit:
+                if mem_request is not None and mem_limit is not None:
                     r_mem = parse_mem_bytes(mem_request)
                     l_mem = parse_mem_bytes(mem_limit)
-                    if r_mem and l_mem:
+                    if r_mem is not None and l_mem is not None:
                         c.assert_true(
                             r_mem <= l_mem,
                             f"{prefix} has requests.memory > limits.memory ({mem_request} > {mem_limit})"
