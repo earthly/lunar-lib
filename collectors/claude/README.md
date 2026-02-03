@@ -35,7 +35,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: ["domain:your-domain"]
     with:
       path: ".claude.feature_flags"
@@ -48,7 +48,7 @@ For structured output, provide a JSON schema:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: [backend]
     with:
       path: ".claude.graceful_shutdown"
@@ -92,7 +92,7 @@ secrets:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: [backend]
     with:
       path: ".claude.feature_flags"
@@ -127,7 +127,7 @@ collectors:
 
 ```yaml
 collectors:
-  - uses: github.com/earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: [tier1]
     with:
       path: ".claude.runbook_analysis"
