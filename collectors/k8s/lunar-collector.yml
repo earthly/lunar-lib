@@ -1,7 +1,7 @@
 version: 0
 
 name: k8s
-description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata
+description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata. Enforce K8s best practices.
 author: earthly
 
 image: +image

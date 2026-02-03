@@ -1,10 +1,10 @@
 # Kubernetes Collector
 
-Parses Kubernetes manifests and collects workload, PodDisruptionBudget, and HorizontalPodAutoscaler metadata.
+Parses Kubernetes manifests and collects workload, PodDisruptionBudget, and HorizontalPodAutoscaler metadata. 
 
 ## Overview
 
-This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform v0.6.7](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. The collector runs on code changes and outputs normalized data for K8s-related policies.
+This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. The collector runs on code changes and outputs normalized data for K8s-related policies.
 
 ## Collected Data
 

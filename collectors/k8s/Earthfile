@@ -1,5 +1,5 @@
 VERSION 0.8
-
+# Build the k8s collector image
 image:
     FROM --pass-args ../../+base-image
 

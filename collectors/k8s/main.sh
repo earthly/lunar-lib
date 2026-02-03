@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Collects Kubernetes manifests and collects workload, PDB, and HPA metadata. Enforce K8s best practices.
 set -e
 
 # Source helper function for helm template detection

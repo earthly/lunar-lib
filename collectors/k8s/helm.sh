@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Function to detect if content is a Helm template.
-# Helm templates can look a lot like native Kubernetes yaml,
-# but we can detect them by looking for specific Helm template directives or values file patterns.
+# Helm templates can look a lot like native Kubernetes yaml, but we can detect them by looking for specific Helm template directives or values file patterns.
 is_helm_template() {
     local content="$1"
     
