@@ -6,7 +6,7 @@ author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
 landing_page:
-  display_name: "Feature Flags Policies"
+  display_name: "Feature Flags Guardrails"
   long_description: |
     Enforce feature flag hygiene across your codebase. Ensure feature flags don't
     become permanent fixtures by detecting flags older than a configurable threshold,

@@ -1,14 +1,14 @@
-# Feature Flags Policies
+# Feature Flags Guardrails
 
 Enforces feature flag hygiene by detecting flags that have exceeded their expected lifespan.
 
 ## Overview
 
-This policy plugin helps teams manage feature flag lifecycle by identifying flags that have existed longer than a configurable threshold. Feature flags should be temporary—once a feature is fully rolled out and stable, the flag should be removed. Stale feature flags add unnecessary complexity, increase cognitive load, and contribute to technical debt.
+This plugin helps teams manage feature flag lifecycle by identifying flags that have existed longer than a configurable threshold. Feature flags should be temporary—once a feature is fully rolled out and stable, the flag should be removed. Stale feature flags add unnecessary complexity, increase cognitive load, and contribute to technical debt.
 
 ## Policies
 
-This plugin provides the following policies (use `include` to select a subset):
+This plugin provides the following guardrails (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
@@ -16,7 +16,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ## Required Data
 
-This policy reads from the following Component JSON paths:
+This plugin reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
