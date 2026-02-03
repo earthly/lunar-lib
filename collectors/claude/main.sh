@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e
 export ANTHROPIC_API_KEY="$LUNAR_SECRET_ANTHROPIC_API_KEY"
 
@@ -37,7 +39,7 @@ if [ "$error" != "null" ] && [ -n "$error" ]; then
     echo "Error: $error" >&2
     exit 1
 fi
-result=$(echo "$response" | jq -r '.result')
+result=$(echo "$response" | jq -r '.result // ""')
 if [ -n "$result" ]; then
     echo "$result" | lunar collect -j "$LUNAR_VAR_PATH" -
 else
