@@ -28,30 +28,6 @@ IGNORE_FILES=(
 # Workload kinds we track
 WORKLOAD_KINDS="Deployment|StatefulSet|DaemonSet|Job|CronJob"
 
-# Function to extract container info from a container spec
-extract_container() {
-    local container="$1"
-    
-    jq -n --argjson c "$container" '
-    {
-        name: $c.name,
-        image: ($c.image // null),
-        has_resources: (($c.resources.requests != null) or ($c.resources.limits != null)),
-        has_requests: ($c.resources.requests != null),
-        has_limits: ($c.resources.limits != null),
-        cpu_request: ($c.resources.requests.cpu // null),
-        cpu_limit: ($c.resources.limits.cpu // null),
-        memory_request: ($c.resources.requests.memory // null),
-        memory_limit: ($c.resources.limits.memory // null),
-        has_liveness_probe: ($c.livenessProbe != null),
-        has_readiness_probe: ($c.readinessProbe != null),
-        runs_as_non_root: (($c.securityContext.runAsNonRoot == true) // false),
-        read_only_root_fs: (($c.securityContext.readOnlyRootFilesystem == true) // false),
-        privileged: (($c.securityContext.privileged == true) // false)
-    }'
-}
-export -f extract_container
-
 # Function to process a single file
 process_file() {
     local f="$1"
