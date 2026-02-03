@@ -11,7 +11,7 @@ landing_page:
   long_description: |
     Execute Claude AI prompts against your repository to extract insights, detect patterns,
     and analyze code that's difficult to capture with traditional pattern matching.
-  category: "devex-build-and-ci"
+  category: "code-analysis"
   icon: "assets/claude.svg"
   status: "beta"
   related:
