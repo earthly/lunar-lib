@@ -19,6 +19,14 @@ This collector writes to the following Component JSON paths:
 | `.k8s.hpas[]` | array | HorizontalPodAutoscalers |
 | `.k8s.summary` | object | Aggregated boolean flags for policy checks |
 
+## Collectors
+
+This integration provides the following collectors (use `include` to select a subset):
+
+| Collector | Description |
+|-----------|-------------|
+| `k8s` | Collects Kubernetes manifests, workloads, PodDisruptionBudgets, and HorizontalPodAutoscalers |
+
 ## Installation
 
 Add to your `lunar-config.yml`:

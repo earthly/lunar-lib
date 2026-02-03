@@ -1,7 +1,7 @@
 version: 0
 
 name: k8s
-description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata. Enforce K8s best practices.
+description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata. Enforces K8s best practices.
 author: earthly
 
 image: +image
@@ -10,7 +10,7 @@ landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
     Parse Kubernetes YAML manifests to extract workloads, containers, resource limits,
-    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. Enforce K8s best practices.
+    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. Enforces K8s best practices.
   categories: ["orchestration", "containers"]
   icon: "assets/k8s.svg"
   status: "stable"
