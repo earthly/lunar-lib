@@ -10,7 +10,6 @@ landing_page:
   display_name: "Testing Guardrails"
   long_description: |
     Ensure tests are executed in CI, passing, and meet coverage thresholds.
-    Works with any collector that writes to the normalized .testing paths.
   category: "testing-and-quality"
   icon: "assets/testing.svg"
   status: "stable"
@@ -25,42 +24,29 @@ landing_page:
 
 policies:
   - name: executed
-    description: |
-      Ensures tests were executed in CI.
-      Fails if no test execution data is found.
+    description: Ensures tests were executed in CI.
     mainPython: ./executed.py
     keywords: ["tests", "ci", "test execution", "quality"]
 
   - name: passing
-    description: |
-      Ensures all tests pass. Skips if pass/fail data is not available
-      (some collectors only report execution, not results).
+    description: Ensures all tests pass.
     mainPython: ./passing.py
     keywords: ["tests", "passing", "test results", "quality"]
 
   - name: coverage-collected
-    description: |
-      Ensures coverage data is being collected in CI.
-      Fails if no coverage data is found.
+    description: Ensures coverage data is being collected in CI.
     mainPython: ./coverage_collected.py
     keywords: ["coverage", "code coverage", "ci", "quality"]
 
   - name: min-coverage
-    description: |
-      Enforces a minimum code coverage threshold (default 80%).
-      Skips if coverage data is not available.
+    description: Enforces a minimum code coverage threshold.
     mainPython: ./min_coverage.py
     keywords: ["coverage", "coverage threshold", "minimum coverage", "quality"]
 
 inputs:
   required_languages:
-    description: |
-      Comma-separated list of languages that require tests.
-      Components without a detected project for any of these languages will be skipped.
-      Checks for .lang.<language> existence (set by language collectors like golang, python, etc.)
-      Example: "go,python,nodejs,java"
-      If empty, the policy applies to all components.
+    description: Comma-separated list of languages to enforce testing for. Skips components without a matching language project.
     default: ""
   min_coverage:
-    description: Minimum required coverage percentage (for min-coverage check)
+    description: Minimum required coverage percentage (default 80%).
     default: "80"
