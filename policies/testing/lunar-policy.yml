@@ -24,22 +24,22 @@ landing_page:
 
 policies:
   - name: executed
-    description: Ensures tests were executed in CI.
+    description: Ensures tests were executed in CI. Skips if project does not contain a specified language.
     mainPython: ./executed.py
     keywords: ["tests", "ci", "test execution", "quality"]
 
   - name: passing
-    description: Ensures all tests pass.
+    description: Ensures all tests pass. Skips if project does not contain a specified language.
     mainPython: ./passing.py
     keywords: ["tests", "passing", "test results", "quality"]
 
   - name: coverage-collected
-    description: Ensures coverage data is being collected in CI.
+    description: Ensures coverage data is being collected in CI. Skips if project does not contain a specified language.
     mainPython: ./coverage_collected.py
     keywords: ["coverage", "code coverage", "ci", "quality"]
 
   - name: min-coverage
-    description: Enforces a minimum code coverage threshold.
+    description: Enforces a minimum code coverage threshold. Skips if project does not contain a specified language.
     mainPython: ./min_coverage.py
     keywords: ["coverage", "coverage threshold", "minimum coverage", "quality"]
 
