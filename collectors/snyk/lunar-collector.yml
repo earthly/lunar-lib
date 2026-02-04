@@ -13,7 +13,7 @@ landing_page:
     Detects Snyk security scanning via GitHub App or CLI integration.
     Automatically categorizes results (SCA, SAST, Container, IaC) based on
     scan type and writes to normalized Component JSON paths.
-  category: "security-and-compliance"
+  category: "security"
   icon: "assets/snyk.svg"
   status: "stable"
   related:
