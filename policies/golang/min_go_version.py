@@ -21,14 +21,15 @@ def check_min_go_version(min_version=None, node=None):
         # Parse versions for comparison (e.g., "1.21" -> (1, 21))
         def parse_version(v):
             parts = str(v).split(".")
-            return tuple(int(p) for p in parts[:2])
+            return tuple(int(p) for p in parts)
 
         try:
             actual = parse_version(actual_version)
             minimum = parse_version(min_version)
 
+            # Compare only as many components as minimum specifies
             c.assert_true(
-                actual >= minimum,
+                actual[:len(minimum)] >= minimum,
                 f"Go version {actual_version} is below minimum {min_version}. "
                 f"Update go.mod to require Go {min_version} or higher."
             )
