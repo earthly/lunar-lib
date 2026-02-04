@@ -1,7 +1,7 @@
 version: 0
 
 name: testing
-description: Validates that tests are executed and pass
+description: Validates that tests are executed, pass, and meet coverage thresholds
 author: support@earthly.dev
 
 default_image: earthly/lunar-scripts:1.0.0
@@ -9,15 +9,18 @@ default_image: earthly/lunar-scripts:1.0.0
 landing_page:
   display_name: "Testing Guardrails"
   long_description: |
-    Ensure tests are executed in CI and passing. Works with any collector
-    that writes to the normalized .testing paths.
+    Ensure tests are executed in CI, passing, and meet coverage thresholds.
+    Works with any collector that writes to the normalized .testing paths.
   category: "testing-and-quality"
   icon: "assets/testing.svg"
   status: "stable"
   requires:
     - slug: "golang"
       type: "collector"
-      reason: "Provides test execution data for Go projects"
+      reason: "Provides test execution and coverage data for Go projects"
+    - slug: "codecov"
+      type: "collector"
+      reason: "Provides coverage data from Codecov"
   related: []
 
 policies:
@@ -35,6 +38,20 @@ policies:
     mainPython: ./passing.py
     keywords: ["tests", "passing", "test results", "quality"]
 
+  - name: coverage-collected
+    description: |
+      Ensures coverage data is being collected in CI.
+      Fails if no coverage data is found.
+    mainPython: ./coverage_collected.py
+    keywords: ["coverage", "code coverage", "ci", "quality"]
+
+  - name: min-coverage
+    description: |
+      Enforces a minimum code coverage threshold (default 80%).
+      Skips if coverage data is not available.
+    mainPython: ./min_coverage.py
+    keywords: ["coverage", "coverage threshold", "minimum coverage", "quality"]
+
 inputs:
   required_languages:
     description: |
@@ -44,3 +61,6 @@ inputs:
       Example: "go,python,nodejs,java"
       If empty, the policy applies to all components.
     default: ""
+  min_coverage:
+    description: Minimum required coverage percentage (for min-coverage check)
+    default: "80"

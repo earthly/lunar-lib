@@ -1,10 +1,10 @@
 # Testing Guardrails
 
-Validates that tests are executed and pass.
+Validates that tests are executed, pass, and meet coverage thresholds.
 
 ## Overview
 
-This policy enforces that tests are executed in CI and all tests pass. It is language-agnostic and works with any collector that writes to the normalized `.testing` paths (e.g., the `golang` collector for Go projects).
+This policy enforces that tests are executed in CI, all tests pass, and code coverage meets minimum thresholds. It is language-agnostic and works with any collector that writes to the normalized `.testing` paths (e.g., the `golang` collector for Go projects, `codecov` for coverage data).
 
 ## Policies
 
@@ -14,6 +14,8 @@ This plugin provides the following policies (use `include` to select a subset):
 |--------|-------------|-----------------|
 | `executed` | Tests should be executed in CI | No test execution data found |
 | `passing` | All tests should pass | Tests are failing (or skipped if pass/fail data unavailable) |
+| `coverage-collected` | Coverage data should be collected | No coverage data found |
+| `min-coverage` | Coverage should meet minimum threshold | Coverage below required percentage (or skipped if no data) |
 
 ## Required Data
 
@@ -23,8 +25,10 @@ This policy reads from the following Component JSON paths:
 |------|------|-------------|
 | `.testing` | object | Any test collector (e.g., `golang`) |
 | `.testing.all_passing` | boolean | Collectors that parse test results |
+| `.testing.coverage` | object | Any coverage collector (e.g., `codecov`, `golang`) |
+| `.testing.coverage.percentage` | number | Coverage collectors that report percentage |
 
-**Note:** The `passing` check will **skip** (not fail) if `.testing.all_passing` is not available. This is intentional—some collectors only report that tests were executed, not detailed results. Use the `executed` check alone if your collector doesn't provide pass/fail data.
+**Note:** The `passing` and `min-coverage` checks will **skip** (not fail) if their required data is not available. This is intentional—some collectors only report partial data.
 
 ## Installation
 
@@ -35,23 +39,28 @@ policies:
   - uses: github://earthly/lunar-lib/policies/testing@main
     on: ["domain:engineering"]
     enforcement: report-pr
-    # include: [executed]  # Only run specific checks (omit to run all)
+    # include: [executed, passing]  # Only run specific checks (omit to run all)
     with:
       # required_languages: Only enforce for components with detected language projects
       # Checks for .lang.<language> existence (set by language collectors)
       # Skips docs-only repos, infrastructure components, repos that just run scripts
       required_languages: "go,python,nodejs,java"
+      # min_coverage: Minimum coverage percentage for min-coverage check
+      min_coverage: "80"
 ```
 
-**Input: `required_languages`** (default: empty = applies to all)
+**Inputs:**
 
-Comma-separated list of languages. Components without a detected project for any of these languages will be skipped. This prevents false failures on repos that don't have a supported test collector.
+| Input | Default | Description |
+|-------|---------|-------------|
+| `required_languages` | `""` | Comma-separated languages. Components without a matching `.lang.<lang>` project are skipped. |
+| `min_coverage` | `"80"` | Minimum coverage percentage for the `min-coverage` check |
 
 ## Examples
 
-### Passing Example
+### Passing Example — Full Data
 
-Tests executed and all passing:
+Tests executed, passing, and good coverage:
 
 ```json
 {
@@ -66,7 +75,10 @@ Tests executed and all passing:
       "failed": 0,
       "skipped": 0
     },
-    "all_passing": true
+    "all_passing": true,
+    "coverage": {
+      "percentage": 85.5
+    }
   }
 }
 ```
@@ -86,16 +98,6 @@ Tests executed and all passing:
 ```json
 {
   "testing": {
-    "source": {
-      "framework": "go test",
-      "integration": "ci"
-    },
-    "results": {
-      "total": 156,
-      "passed": 154,
-      "failed": 2,
-      "skipped": 0
-    },
     "all_passing": false
   }
 }
@@ -103,22 +105,33 @@ Tests executed and all passing:
 
 **Failure message:** `"Tests are failing. Check CI logs for test failure details."`
 
-### Skipped Example — No Pass/Fail Data (`passing` policy)
-
-When the collector only reports test execution (not results):
+### Failing Example — Low Coverage (`min-coverage` policy)
 
 ```json
 {
   "testing": {
-    "source": {
-      "framework": "go test",
-      "integration": "ci"
+    "coverage": {
+      "percentage": 65.0
     }
   }
 }
 ```
 
-The `executed` policy **passes**, but `passing` is **skipped** with message: `"Test pass/fail data not available. This requires a collector that reports detailed test results."`
+**Failure message:** `"Coverage 65.0% is below minimum 80%"`
+
+### Skipped Example — No Coverage Data (`min-coverage` policy)
+
+When coverage isn't collected:
+
+```json
+{
+  "testing": {
+    "source": {"framework": "go test"}
+  }
+}
+```
+
+The `min-coverage` check is **skipped** with message: `"No coverage data available"`
 
 ## Remediation
 
@@ -126,3 +139,5 @@ When this policy fails, you can resolve it by:
 
 1. **`executed` failure:** Configure your CI pipeline to run tests and ensure a collector is capturing test execution data
 2. **`passing` failure:** Fix the failing tests in your codebase—check CI logs for specific test failure details
+3. **`coverage-collected` failure:** Configure a coverage collector to run in your CI pipeline
+4. **`min-coverage` failure:** Add more tests to increase code coverage, or adjust the `min_coverage` input
