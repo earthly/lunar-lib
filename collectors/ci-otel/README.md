@@ -43,3 +43,4 @@ collectors:
       otel_endpoint: "http://tempo:4318"  # Your OTLP HTTP endpoint
       # debug: "true"  # Enable to collect trace data in Component JSON
 ```
+
