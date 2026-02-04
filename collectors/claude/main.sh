@@ -33,7 +33,14 @@ prompt="$LUNAR_VAR_PROMPT. If the following json schema is correct, return a res
 echo "Running claude with prompt (schema enforcement): $prompt" >&2
 response=$(~/.local/bin/claude -p "$prompt")
 echo "Claude response: $response" >&2
-response=$(echo "$response" | tail -n +2 | head -n -1)
+
+# This code checks if the first line of the "response" variable contains triple backticks (```), 
+# which usually denote the start of a code block in markdown. If it does, it removes the first 
+# and last lines from "response" (typically the opening and closing ```), so that only the 
+# actual content/code inside the code block remains in "response".
+if printf '%s' "$response" | head -n1 | grep -q '```'; then
+    response=$(echo "$response" | tail -n +2 | head -n -1)
+fi
 error=$(echo "$response" | jq -r '.error')
 if [ "$error" != "null" ] && [ -n "$error" ]; then
     echo "Error: $error" >&2
