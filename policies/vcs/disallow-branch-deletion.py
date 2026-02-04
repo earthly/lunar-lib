@@ -8,10 +8,11 @@ def main(node=None):
             "VCS data not found. Ensure the github collector is configured and has run.")
         
         enabled = c.get_value(".vcs.branch_protection.enabled")
-        c.assert_true(enabled, "Branch protection is not enabled")
-
-        allow_deletions = c.get_value(".vcs.branch_protection.allow_deletions")
-        c.assert_false(allow_deletions, "Branch protection allows branch deletion, but policy requires it to be disabled")
+        if not enabled:
+            c.fail("Branch protection is not enabled")
+        else:
+            allow_deletions = c.get_value(".vcs.branch_protection.allow_deletions")
+            c.assert_false(allow_deletions, "Branch protection allows branch deletion, but policy requires it to be disabled")
     return c
 
 
