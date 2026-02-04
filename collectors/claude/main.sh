@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 export ANTHROPIC_API_KEY="$LUNAR_SECRET_ANTHROPIC_API_KEY"
 
 # Validate required environment variables
