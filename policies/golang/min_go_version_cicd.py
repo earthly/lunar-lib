@@ -32,15 +32,17 @@ def check_min_go_version_cicd(min_version=None, node=None):
         # Check all CI/CD commands for Go version
         violations = []
         for cmd_info in cmds:
+            cmd_name = cmd_info.get("cmd", "unknown")
             version = cmd_info.get("version")
             if not version:
+                violations.append(f"'{cmd_name}' has no Go version recorded")
                 continue
             try:
                 actual = parse_version(version)
                 if actual[:len(minimum)] < minimum:
-                    violations.append(f"'{cmd_info.get('cmd', 'unknown')}' used Go {version}")
+                    violations.append(f"'{cmd_name}' used Go {version}")
             except (ValueError, TypeError):
-                violations.append(f"Could not parse version '{version}'")
+                violations.append(f"'{cmd_name}' has unparseable version '{version}'")
 
         if violations:
             c.fail(
