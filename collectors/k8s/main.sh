@@ -39,7 +39,7 @@ process_file() {
     content="$(cat "$f")"
     
     # Skip files that don't look like K8s manifests: require top-level .apiVersion and .kind
-    if ! yq -e '.apiVersion and .kind' "$f" >/dev/null 2>&1; then
+    if ! yq -e -s 'map(select(.apiVersion and .kind)) | length > 0' "$f" >/dev/null 2>&1; then
         return 0
     fi
     
@@ -119,7 +119,7 @@ process_file() {
                     memory_limit: (.resources.limits.memory // null),
                     has_liveness_probe: (.livenessProbe != null),
                     has_readiness_probe: (.readinessProbe != null),
-                    runs_as_non_root: ((.securityContext.runAsNonRoot == true) // ($w.pod_spec.securityContext.runAsNonRoot == true) // false),
+                    runs_as_non_root: (if .securityContext.runAsNonRoot == null then (($w.pod_spec.securityContext.runAsNonRoot == true) // false) else (.securityContext.runAsNonRoot == true) end),
                     read_only_root_fs: ((.securityContext.readOnlyRootFilesystem == true) // false),
                     privileged: ((.securityContext.privileged == true) // false)
                 }
@@ -194,9 +194,9 @@ summary=$(echo "$results" | jq '{
     all_have_probes: ([.workloads[].containers[] | (.has_liveness_probe and .has_readiness_probe)] | if length == 0 then true else all end),
     all_non_root: ([.workloads[].containers[].runs_as_non_root] | if length == 0 then true else all end),
     all_have_pdb: (
-        [.workloads[].name] as $workload_names |
-        [.pdbs[].target_workload] as $pdb_targets |
-        ($workload_names | length == 0) or ($workload_names | all(. as $w | $pdb_targets | contains([$w])))
+        [.workloads[] | "\(.namespace)/\(.name)"] as $workload_keys |
+        [.pdbs[] | "\(.namespace)/\(.target_workload)"] as $pdb_keys |
+        ($workload_keys | length == 0) or ($workload_keys | all(. as $w | $pdb_keys | contains([$w])))
     )
 }')
 
