@@ -425,6 +425,26 @@ When data is fundamentally tied to a particular programming language's ecosystem
 2. **Concepts translate cleanly** — Test coverage percentages, vulnerability counts, dependency totals
 3. **Dashboards compare languages** — "Go services vs Java services coverage"
 
+### Language Detection: Always Create the Object
+
+**When a collector detects a programming language, it MUST create the `.lang.<language>` object**, even if no additional data is collected yet. This signals to policies that the component is a project of that language.
+
+```bash
+# Example: Go collector detects go.mod exists
+# Even if no other data is collected, write the language object:
+echo '{"source": {"tool": "go", "integration": "code"}}' | lunar collect -j ".lang.go" -
+```
+
+**Why this matters:**
+- Policies can use `.lang.<language>` existence to determine applicability
+- Example: A "tests must pass" policy can skip repos that just happen to contain `.go` files but aren't Go projects
+- The testing policy checks `c.get_node(".lang.go").exists()` to know if this is a Go project
+
+**Pattern:** Language collectors should:
+1. Detect if the project is genuinely that language (e.g., `go.mod` exists)
+2. Write `.lang.<language>` with at least `source` metadata
+3. Add additional data (dependencies, build_systems, etc.) as available
+
 ### The `.lang.<language>` Pattern
 
 For language-specific data, use `.lang.<language_name>`:
