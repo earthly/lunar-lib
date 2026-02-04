@@ -8,15 +8,15 @@ def check_min_go_version_cicd(min_version=None, node=None):
 
     c = Check("min-go-version-cicd", "Ensures CI/CD Go version meets minimum", node=node)
     with c:
-        # Skip if not a Go project
-        if not c.get_node(".lang.go").exists():
+        go = c.get_node(".lang.go")
+        if not go.exists():
             c.skip("Not a Go project")
 
-        # Skip if no CI/CD data available
-        if not c.get_node(".lang.go.cicd.cmds").exists():
+        cmds_node = go.get_node(".cicd.cmds")
+        if not cmds_node.exists():
             c.skip("No CI/CD Go commands recorded")
 
-        cmds = c.get_value(".lang.go.cicd.cmds")
+        cmds = cmds_node.get_value()
 
         # Parse versions for comparison (e.g., "1.21.5" -> (1, 21, 5))
         def parse_version(v):
@@ -37,7 +37,6 @@ def check_min_go_version_cicd(min_version=None, node=None):
                 continue
             try:
                 actual = parse_version(version)
-                # Compare using tuple comparison (handles different lengths)
                 if actual[:len(minimum)] < minimum:
                     violations.append(f"'{cmd_info.get('cmd', 'unknown')}' used Go {version}")
             except (ValueError, TypeError):

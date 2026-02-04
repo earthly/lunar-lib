@@ -8,15 +8,15 @@ def check_min_go_version(min_version=None, node=None):
 
     c = Check("min-go-version", "Ensures Go version meets minimum", node=node)
     with c:
-        # Skip if not a Go project
-        if not c.get_node(".lang.go").exists():
+        go = c.get_node(".lang.go")
+        if not go.exists():
             c.skip("Not a Go project")
 
-        # Skip if version data not available
-        if not c.get_node(".lang.go.version").exists():
+        version_node = go.get_node(".version")
+        if not version_node.exists():
             c.skip("Go version not detected")
 
-        actual_version = c.get_value(".lang.go.version")
+        actual_version = version_node.get_value()
 
         # Parse versions for comparison (e.g., "1.21" -> (1, 21))
         def parse_version(v):
@@ -32,7 +32,7 @@ def check_min_go_version(min_version=None, node=None):
                 f"Go version {actual_version} is below minimum {min_version}. "
                 f"Update go.mod to require Go {min_version} or higher."
             )
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             c.fail(f"Could not parse Go version: {actual_version}")
     return c
 

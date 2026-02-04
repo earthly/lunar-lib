@@ -5,15 +5,15 @@ def check_tests_recursive(node=None):
     """Check that tests run recursively (./...)."""
     c = Check("tests-recursive", "Ensures tests run recursively", node=node)
     with c:
-        # Skip if not a Go project
-        if not c.get_node(".lang.go").exists():
+        go = c.get_node(".lang.go")
+        if not go.exists():
             c.skip("Not a Go project")
 
-        # Skip if test scope data not available (tests may not have run in CI)
-        if not c.get_node(".lang.go.tests.scope").exists():
+        scope_node = go.get_node(".tests.scope")
+        if not scope_node.exists():
             c.skip("Test scope data not available - tests may not have run in CI")
 
-        scope = c.get_value(".lang.go.tests.scope")
+        scope = scope_node.get_value()
 
         c.assert_true(
             scope == "recursive",

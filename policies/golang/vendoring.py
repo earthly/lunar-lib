@@ -8,14 +8,15 @@ def check_vendoring(mode=None, node=None):
 
     c = Check("vendoring", "Enforces vendoring policy", node=node)
     with c:
-        # Skip if not a Go project
-        if not c.get_node(".lang.go").exists():
+        go = c.get_node(".lang.go")
+        if not go.exists():
             c.skip("Not a Go project")
 
         if mode == "none":
             c.skip("Vendoring check disabled (vendoring_mode=none)")
 
-        vendor_exists = c.get_value_or_default(".lang.go.native.vendor.exists", False)
+        vendor_node = go.get_node(".native.vendor.exists")
+        vendor_exists = vendor_node.get_value() if vendor_node.exists() else False
 
         if mode == "required":
             c.assert_true(
