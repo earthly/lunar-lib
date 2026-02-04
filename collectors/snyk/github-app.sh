@@ -3,6 +3,11 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
+if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
+    echo "LUNAR_SECRET_GH_TOKEN is required for the Snyk GitHub App collector." >&2
+    exit 1
+fi
+
 REPO="${LUNAR_COMPONENT_ID#github.com/}"
 QUICK_ATTEMPTS=10
 LONG_ATTEMPTS=60
