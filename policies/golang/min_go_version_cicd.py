@@ -46,7 +46,7 @@ def check_min_go_version_cicd(min_version=None, node=None):
 
         if violations:
             c.fail(
-                f"CI/CD commands used Go versions below {min_version}:\n"
+                f"CI/CD Go version issues (minimum: {min_version}):\n"
                 + "\n".join(f"  - {v}" for v in violations)
             )
     return c
