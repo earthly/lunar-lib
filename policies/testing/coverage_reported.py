@@ -33,6 +33,12 @@ def check_coverage_reported(node=None):
                 c.skip("No language project detected")
                 return c
         
+        # First check that coverage data exists at all
+        c.assert_exists(
+            ".testing.coverage",
+            "Coverage data not collected. Configure a coverage tool to run in your CI pipeline."
+        )
+        # Then check that percentage is reported
         c.assert_exists(
             ".testing.coverage.percentage",
             "Coverage percentage not reported. Ensure your coverage tool is configured to report metrics."
