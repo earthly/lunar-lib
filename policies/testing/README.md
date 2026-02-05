@@ -15,6 +15,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `executed` | Tests should be executed in CI | No test execution data found |
 | `passing` | All tests should pass | Tests are failing (or skipped if pass/fail data unavailable) |
 | `coverage-collected` | Coverage data should be collected | No coverage data found |
+| `coverage-reported` | Coverage percentage should be reported | Coverage runs but percentage not captured |
 | `min-coverage` | Coverage should meet minimum threshold | Coverage below required percentage (or skipped if no data) |
 
 ## Required Data
@@ -28,7 +29,7 @@ This policy reads from the following Component JSON paths:
 | `.testing.coverage` | object | Any coverage collector (e.g., `codecov`, `golang`) |
 | `.testing.coverage.percentage` | number | Coverage collectors that report percentage |
 
-**Note:** The `passing` and `min-coverage` checks will **skip** (not fail) if their required data is not available. This is intentional—some collectors only report partial data.
+**Note:** The `passing` and `min-coverage` checks will **skip** (not fail) if their required data is not available. This is intentional—some collectors only report partial data. Use `coverage-reported` if you want to **enforce** that percentage is reported.
 
 ## Installation
 
@@ -140,4 +141,5 @@ When this policy fails, you can resolve it by:
 1. **`executed` failure:** Configure your CI pipeline to run tests and ensure a collector is capturing test execution data
 2. **`passing` failure:** Fix the failing tests in your codebase—check CI logs for specific test failure details
 3. **`coverage-collected` failure:** Configure a coverage collector to run in your CI pipeline
-4. **`min-coverage` failure:** Add more tests to increase code coverage, or adjust the `min_coverage` input
+4. **`coverage-reported` failure:** Ensure your coverage tool is configured to report metrics (percentage)
+5. **`min-coverage` failure:** Add more tests to increase code coverage, or adjust the `min_coverage` input
