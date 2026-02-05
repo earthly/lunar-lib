@@ -44,6 +44,7 @@ collectors:
       Detects Semgrep CLI executions in CI pipelines. Captures command, exit code,
       and version. Categorizes based on flags (--supply-chain for SCA, default SAST).
     mainBash: cli.sh
+    image: native
     hook:
       type: ci-after-command
       pattern: .*\bsemgrep\b.*
