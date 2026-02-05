@@ -12,13 +12,27 @@ fi
 # Get the command that was run
 CMD_RAW="$LUNAR_CI_COMMAND"
 
-# Extract the actual command (first element if JSON array, or first word)
-# This handles both JSON array format and plain string format
-ACTUAL_CMD=$(echo "$CMD_RAW" | jq -r '.[0] // empty' 2>/dev/null || echo "$CMD_RAW" | awk '{print $1}')
+# Check if this is a semgrep command by looking at all arguments, not just the first
+# Semgrep can be invoked as:
+#   - semgrep scan ...
+#   - python3 /path/to/semgrep scan ...
+#   - /path/to/pysemgrep scan ...
+#   - semgrep-core ... (internal, skip)
+# We want to capture semgrep or pysemgrep but NOT git commands with "semgrep" in branch name
+CMD_STR=$(echo "$CMD_RAW" | jq -r 'if type == "array" then join(" ") else . end' 2>/dev/null || echo "$CMD_RAW")
 
-# Verify this is actually a semgrep command, not just a command with "semgrep" in an argument
-if ! echo "$ACTUAL_CMD" | grep -qE '(^|/)semgrep$'; then
-    # Not a semgrep command, skip
+# Skip if this looks like a git command (git commands won't have semgrep/pysemgrep as a path component)
+if echo "$CMD_STR" | grep -qE '^(\[?"/usr/bin/git|git\s)'; then
+    exit 0
+fi
+
+# Verify this command invokes semgrep or pysemgrep (but not semgrep-core which is internal)
+if ! echo "$CMD_STR" | grep -qE '(^|/)(semgrep|pysemgrep)(\s|$|")'; then
+    exit 0
+fi
+
+# Skip semgrep-core (internal subprocess, not the main CLI invocation)
+if echo "$CMD_STR" | grep -qE '(^|/)semgrep-core(\s|$|")'; then
     exit 0
 fi
 
