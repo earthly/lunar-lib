@@ -13,7 +13,7 @@ landing_page:
     Instruments CI pipelines with OpenTelemetry distributed tracing.
     Captures job, step, and command-level spans for detailed CI observability.
     Sends traces to any OTLP-compatible backend (Tempo, Jaeger, etc.).
-  category: "devex-build-and-ci"
+  category: "ci-cd"
   icon: "assets/ci-otel.svg"
   status: "stable"
   related: []
