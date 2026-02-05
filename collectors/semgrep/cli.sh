@@ -12,6 +12,16 @@ fi
 # Get the command that was run
 CMD_RAW="$LUNAR_CI_COMMAND"
 
+# Extract the actual command (first element if JSON array, or first word)
+# This handles both JSON array format and plain string format
+ACTUAL_CMD=$(echo "$CMD_RAW" | jq -r '.[0] // empty' 2>/dev/null || echo "$CMD_RAW" | awk '{print $1}')
+
+# Verify this is actually a semgrep command, not just a command with "semgrep" in an argument
+if ! echo "$ACTUAL_CMD" | grep -qE '(^|/)semgrep$'; then
+    # Not a semgrep command, skip
+    exit 0
+fi
+
 # Detect category from command
 CATEGORY=$(detect_semgrep_category_from_cmd "$CMD_RAW")
 
