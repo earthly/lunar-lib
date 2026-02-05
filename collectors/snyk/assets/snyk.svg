@@ -1,3 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-  <path d="M12 0L2 6v12l10 6 10-6V6L12 0zm7.5 16.5L12 21l-7.5-4.5v-9L12 3l7.5 4.5v9zM12 6.5L7 9.5v5l5 3 5-3v-5l-5-3z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Snyk-style dog/patch logo in purple -->
+  <path d="M32 4C16.536 4 4 16.536 4 32s12.536 28 28 28 28-12.536 28-28S47.464 4 32 4z" fill="#4C4A73"/>
+  <!-- Dog face outline -->
+  <path d="M20 26c0-2.2 1.8-4 4-4s4 1.8 4 4M36 26c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Eyes -->
+  <circle cx="24" cy="28" r="2.5" fill="#fff"/>
+  <circle cx="40" cy="28" r="2.5" fill="#fff"/>
+  <!-- Nose -->
+  <ellipse cx="32" cy="38" rx="4" ry="3" fill="#fff"/>
+  <!-- Snout/mouth -->
+  <path d="M32 41v4M28 47c2 2 6 2 8 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <!-- Ears -->
+  <path d="M14 20c-2-6 2-12 8-12 4 0 6 3 8 6M50 20c2-6-2-12-8-12-4 0-6 3-8 6" fill="#4C4A73" stroke="#4C4A73" stroke-width="2"/>
 </svg>
