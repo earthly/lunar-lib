@@ -41,6 +41,10 @@ CATEGORY=$(detect_semgrep_category_from_cmd "$CMD_RAW")
 
 # Capture exit code from the command
 EXIT_CODE="${LUNAR_CI_COMMAND_EXIT_CODE:-0}"
+# Ensure exit code is numeric (jq --argjson requires valid JSON number)
+if ! [[ "$EXIT_CODE" =~ ^[0-9]+$ ]]; then
+    EXIT_CODE=0
+fi
 
 # Capture Semgrep CLI version
 SEMGREP_VERSION=$(semgrep --version 2>/dev/null || echo "unknown")
