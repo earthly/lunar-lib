@@ -9,9 +9,9 @@ detect_snyk_category() {
     context_lower=$(echo "$context" | tr '[:upper:]' '[:lower:]')
     
     case "$context_lower" in
-        *code*)                     echo "sast" ;;
-        *container*)                echo "container_scan" ;;
         *iac*|*infrastructure*)     echo "iac" ;;
+        *container*)                echo "container_scan" ;;
+        *code*)                     echo "sast" ;;
         *)                          echo "sca" ;;  # Default: Open Source
     esac
 }

@@ -18,7 +18,8 @@ SNYK_VERSION=$(snyk --version 2>/dev/null || echo "unknown")
 # Sanitize command to redact potential secrets (tokens, credentials)
 CMD_SAFE=$(echo "$CMD_RAW" | sed -E \
     -e 's/(snyk auth) [^ ]+/\1 <redacted>/I' \
-    -e 's/(--client-id|--client-secret|--token|--auth-token)(=| )[^ ]+/\1=<redacted>/Ig')
+    -e 's/(--client-id|--client-secret|--token|--auth-token)(=| )[^ ]+/\1=<redacted>/Ig' \
+    -e 's/(^|[[:space:]])(SNYK_TOKEN|SNYK_OAUTH_TOKEN)=[^[:space:]]+/\1\2=<redacted>/Ig')
 
 # Write results
 jq -n \
