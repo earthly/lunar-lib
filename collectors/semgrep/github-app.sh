@@ -3,8 +3,13 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
+if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
+    echo "LUNAR_SECRET_GH_TOKEN is required for the Semgrep GitHub App collector." >&2
+    exit 1
+fi
+
 REPO="${LUNAR_COMPONENT_ID#github.com/}"
-QUICK_ATTEMPTS=3
+QUICK_ATTEMPTS=10
 LONG_ATTEMPTS=60
 SLEEP_SECONDS=2
 
@@ -14,14 +19,14 @@ fetch_semgrep_checks() {
         -H 'Accept: application/vnd.github+json' \
         -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" \
         "https://api.github.com/repos/$REPO/commits/$LUNAR_COMPONENT_GIT_SHA/check-runs" | \
-        jq -c '.check_runs | map(select(.app.slug | test("semgrep";"i")))'
+        jq -c '.check_runs | map(select(.app.slug | test("semgrep";"i")))' 2>/dev/null || echo "[]"
 }
 
 FOUND_CHECK=false
 
 # First check for a short while if Semgrep is showing up
 for i in $(seq 1 $QUICK_ATTEMPTS); do
-    CHECKS=$(fetch_semgrep_checks 2>/dev/null || echo "[]")
+    CHECKS=$(fetch_semgrep_checks)
     if [ "$CHECKS" != "[]" ] && [ -n "$CHECKS" ]; then
         FOUND_CHECK=true
         break
@@ -67,11 +72,12 @@ echo "$CHECKS" | jq -c '.[]' | while read -r CHECK; do
         app_slug: .app.slug
     }')
     
+    # Write native data
     jq -n \
         --argjson results "$RESULT" \
         '{github_app_results: $results}' | \
         lunar collect -j ".$CATEGORY.native.semgrep" -
     
-    jq -n '{tool: "semgrep", integration: "github_app"}' | \
-        lunar collect -j ".$CATEGORY.source" -
+    # Write source metadata
+    write_semgrep_source "$CATEGORY" "github_app"
 done

@@ -24,7 +24,6 @@ for CATEGORY in sast sca; do
         jq -n '{github_app_run_recently: true}' | \
             lunar collect -j ".$CATEGORY.native.semgrep" -
         
-        jq -n '{tool: "semgrep", integration: "github_app"}' | \
-            lunar collect -j ".$CATEGORY.source" -
+        write_semgrep_source "$CATEGORY" "github_app"
     fi
 done

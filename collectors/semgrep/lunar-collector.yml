@@ -13,7 +13,7 @@ landing_page:
     Detects Semgrep security scanning via GitHub App or CLI integration.
     Automatically categorizes results (SAST for code analysis, SCA for
     Supply Chain) and writes to normalized Component JSON paths.
-  category: "security-and-compliance"
+  category: "security"
   icon: "assets/semgrep.svg"
   status: "stable"
 
@@ -42,8 +42,8 @@ collectors:
 
   - name: cli
     description: |
-      Detects Semgrep CLI executions in CI pipelines. Captures command output
-      and categorizes based on flags (--supply-chain for SCA, default SAST).
+      Detects Semgrep CLI executions in CI pipelines. Captures command, exit code,
+      and version. Categorizes based on flags (--supply-chain for SCA, default SAST).
     mainBash: cli.sh
     hook:
       type: ci-after-command

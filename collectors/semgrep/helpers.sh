@@ -28,3 +28,25 @@ detect_semgrep_category_from_cmd() {
         echo "sast"  # Default: Code analysis
     fi
 }
+
+# Write source metadata to a category
+write_semgrep_source() {
+    local category="$1"
+    local integration="$2"  # github_app or ci
+    local version="${3:-}"  # optional version
+    
+    if [ -n "$version" ] && [ "$version" != "unknown" ]; then
+        jq -n \
+            --arg tool "semgrep" \
+            --arg integration "$integration" \
+            --arg version "$version" \
+            '{tool: $tool, integration: $integration, version: $version}' | \
+            lunar collect -j ".$category.source" -
+    else
+        jq -n \
+            --arg tool "semgrep" \
+            --arg integration "$integration" \
+            '{tool: $tool, integration: $integration}' | \
+            lunar collect -j ".$category.source" -
+    fi
+}
