@@ -56,8 +56,8 @@ collectors:
 
 secrets:
   - name: GH_TOKEN
-    description: GitHub token for API access (checking commit statuses)
-    required: true
+    description: GitHub token for API access (checking commit statuses). Required for github-app collectors, not needed for CLI.
+    required: false
   - name: PG_PASSWORD
     description: Database password for main branch queries
     required: false
