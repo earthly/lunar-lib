@@ -37,9 +37,9 @@ done
 step_span_id=$(generate_step_span_id)
 start_time=$(nanoseconds)
 
-# Store step span info for command parent lookups
-echo "$step_span_id" > "/tmp/lunar-otel-step-${LUNAR_CI_STEP_INDEX}"
-echo "$start_time" > "/tmp/lunar-otel-step-start-${LUNAR_CI_STEP_INDEX}"
+# Store step span info for command parent lookups (scoped by job ID)
+echo "$step_span_id" > "/tmp/lunar-otel-step-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDEX}"
+echo "$start_time" > "/tmp/lunar-otel-step-start-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDEX}"
 
 # Structured collection for debugging: Create step object
 debug_collect ".ci.traces.$trace_id.steps.${LUNAR_CI_STEP_INDEX}.step_index" "${LUNAR_CI_STEP_INDEX}" \

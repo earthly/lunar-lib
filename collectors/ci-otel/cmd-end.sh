@@ -40,9 +40,11 @@ fi
 cmd_hash=$(echo -n "${LUNAR_CI_JOB_ID:-}-${LUNAR_CI_STEP_INDEX}-${LUNAR_CI_COMMAND_PID}-${LUNAR_CI_COMMAND_PPID:-}-${LUNAR_CI_COMMAND:-}" | sha256sum | awk '{print $1}')
 
 cmd_file="/tmp/lunar-otel-cmd-${cmd_hash}"
-echo "cmd_file: $cmd_file"
-#echo "cmd_file contents: $(cat $cmd_file)"
-echo "/tmp dir content:  $(ls -la /tmp)"
+
+# Debug logging (gated to avoid leaking secrets in CI logs)
+if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
+  echo "OTEL DEBUG: cmd_file=$cmd_file" >&2
+fi
 
 # Make sure the file exists and has content
 if ! head -n 1 "$cmd_file" >/dev/null 2>&1; then

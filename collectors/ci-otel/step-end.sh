@@ -15,8 +15,8 @@ if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
   exit 0
 fi
 
-step_file="/tmp/lunar-otel-step-${LUNAR_CI_STEP_INDEX}"
-step_start_file="/tmp/lunar-otel-step-start-${LUNAR_CI_STEP_INDEX}"
+step_file="/tmp/lunar-otel-step-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDEX}"
+step_start_file="/tmp/lunar-otel-step-start-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDEX}"
 
 if [ ! -f "$step_file" ] || [ ! -f "$step_start_file" ]; then
   echo "OTEL: No step start found for step ${LUNAR_CI_STEP_INDEX}, skipping"

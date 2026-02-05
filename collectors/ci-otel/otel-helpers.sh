@@ -378,14 +378,18 @@ send_span() {
     return 1
   fi
   
-  # Debug: Log the span structure (first 500 chars to avoid huge logs)
-  local span_preview
-  span_preview=$(echo "$span_json" | jq -c '.' 2>/dev/null | head -c 500)
-  echo "OTEL: Span JSON preview: $span_preview..." >&2
+  # Debug: Log the span structure (gated to avoid leaking sensitive data)
+  if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
+    local span_preview
+    span_preview=$(echo "$span_json" | jq -c '.' 2>/dev/null | head -c 500)
+    echo "OTEL: Span JSON preview: $span_preview..." >&2
+  fi
   
   local response
   local curl_exit_code=0
   response=$(curl -s -w "\n%{http_code}" -X POST \
+    --connect-timeout "${OTEL_CONNECT_TIMEOUT:-5}" \
+    --max-time "${OTEL_TIMEOUT:-10}" \
     "${OTEL_ENDPOINT}/v1/traces" \
     -H "Content-Type: application/json" \
     -d "$otlp_payload" 2>&1) || curl_exit_code=$?

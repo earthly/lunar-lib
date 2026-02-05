@@ -4,7 +4,11 @@ Emits OpenTelemetry traces for CI pipeline runs, providing detailed observabilit
 
 ## Overview
 
-This collector instruments CI pipelines with OpenTelemetry distributed tracing. It captures job, step, and command-level spans with timing and metadata, sending traces to any OTLP-compatible backend (Tempo, Jaeger, Honeycomb, etc.). This collector runs natively on the CI runner (not in a container) for performance — hooks execute on every command. Requires `jq` and `curl` (pre-installed on GitHub Actions Ubuntu runners).
+This collector instruments CI pipelines with OpenTelemetry distributed tracing. It captures job, step, and command-level spans with timing and metadata, sending traces to any OTLP-compatible backend (Tempo, Jaeger, Honeycomb, etc.).
+
+**Performance note:** This collector runs natively on the CI runner (not in a container) because the hooks execute on every single command — containerization would add unacceptable overhead.
+
+**Dependencies:** Requires `jq` and `curl` to be available in your CI runner's environment. These are standard tools pre-installed on most CI runners (GitHub Actions, GitLab CI, CircleCI, etc.). Additionally, `xxd` is used as a fallback for span ID generation but is optional.
 
 ## Collected Data
 

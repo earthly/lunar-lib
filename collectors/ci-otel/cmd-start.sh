@@ -69,13 +69,15 @@ cmd_hash=$(echo -n "${LUNAR_CI_JOB_ID:-}-${LUNAR_CI_STEP_INDEX}-${LUNAR_CI_COMMA
 # Store span info keyed by cmd_hash so we can look it up later
 # Format: start_time,span_id,parent_span_id,command
 cmd_file="/tmp/lunar-otel-cmd-${cmd_hash}"
-echo "cmd_file: $cmd_file"
 echo "$start_time" > "$cmd_file"
 echo "$span_id" >> "$cmd_file"
 echo "$parent_span_id" >> "$cmd_file"
 echo "$LUNAR_CI_COMMAND" >> "$cmd_file"
-echo "cmd_file contents: $(cat $cmd_file)"
-echo "/tmp dir content:  $(ls -la /tmp)"
+
+# Debug logging (gated to avoid leaking secrets in CI logs)
+if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
+  echo "OTEL DEBUG: cmd_file=$cmd_file" >&2
+fi
 
 # Also store PID -> span_id mapping for parent lookups
 # Use job_id-step_id-pid to ensure uniqueness across different jobs/steps (PIDs can be reused)
