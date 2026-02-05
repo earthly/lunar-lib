@@ -30,7 +30,7 @@ This policy reads from the following Component JSON paths:
 | `.iac_scan.summary.has_critical` | boolean | IaC scanner (preferred) |
 | `.iac_scan.summary.has_high` | boolean | IaC scanner (preferred) |
 
-**Note:** Ensure an IaC scanning collector is configured before enabling this policy.
+**Note:** If collectors don't yet write finding counts, the `no-critical`, `no-high`, and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
 ## Installation
 

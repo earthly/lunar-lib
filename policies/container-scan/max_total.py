@@ -7,7 +7,17 @@ def main(node=None):
     c = Check("max-total", "Total container vulnerability findings within threshold", node=node)
     with c:
         threshold_str = variable_or_default("max_total_threshold", "0")
-        threshold = int(threshold_str)
+        try:
+            threshold = int(threshold_str)
+        except ValueError:
+            raise ValueError(
+                f"Policy misconfiguration: 'max_total_threshold' must be an integer, got '{threshold_str}'"
+            )
+
+        if threshold < 0:
+            raise ValueError(
+                f"Policy misconfiguration: 'max_total_threshold' must be non-negative, got '{threshold}'"
+            )
 
         if threshold == 0:
             c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")

@@ -30,7 +30,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_critical` | boolean | Container scanner (preferred) |
 | `.container_scan.summary.has_high` | boolean | Container scanner (preferred) |
 
-**Note:** Ensure a container scanning collector is configured before enabling this policy.
+**Note:** If collectors don't yet write vulnerability counts, the `no-critical`, `no-high`, and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
 ## Installation
 
