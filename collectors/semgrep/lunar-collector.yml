@@ -1,7 +1,7 @@
 version: 0
 
 name: semgrep
-description: Detects Semgrep security scans and collects findings data
+description: Detects Semgrep security scans via GitHub App or CLI integration
 author: support@earthly.dev
 
 default_image: earthly/lunar-scripts:1.0.0
@@ -31,9 +31,11 @@ collectors:
 
   - name: github-app-default-branch
     description: |
-      Checks if Semgrep GitHub App has run on recent PRs by querying the
-      Lunar Hub database. Provides proof of scanning on the default branch
-      even though Semgrep doesn't post checks there directly.
+      Provides compliance proof on the default branch by querying Lunar Hub
+      for Semgrep data from recent PRs. Since Semgrep GitHub App only posts
+      checks on PRs (not the default branch), this collector verifies that
+      PRs to this component are being scanned, which implies the merged code
+      on the default branch was also scanned.
     mainBash: github-app-default-branch.sh
     hook:
       type: code
@@ -52,10 +54,7 @@ collectors:
 
 secrets:
   - name: GH_TOKEN
-    description: GitHub token for API access (required for github-app collectors)
-    required: false
-  - name: PG_PASSWORD
-    description: Database password for main branch queries (required for github-app-default-branch)
+    description: GitHub token for API access (required for github-app collector)
     required: false
 
 example_component_json: |
