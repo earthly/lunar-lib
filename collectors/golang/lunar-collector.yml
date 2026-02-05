@@ -16,9 +16,9 @@ landing_page:
   icon: "assets/golang.svg"
   status: "stable"
   related:
-    - slug: "coverage"
+    - slug: "testing"
       type: "policy"
-      reason: "Enforces test coverage thresholds using collected coverage metrics"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
 
 collectors:
   - name: cicd
