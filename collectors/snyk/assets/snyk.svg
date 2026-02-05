@@ -1,15 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <!-- Snyk-style dog/patch logo in purple -->
-  <path d="M32 4C16.536 4 4 16.536 4 32s12.536 28 28 28 28-12.536 28-28S47.464 4 32 4z" fill="#4C4A73"/>
-  <!-- Dog face outline -->
-  <path d="M20 26c0-2.2 1.8-4 4-4s4 1.8 4 4M36 26c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Eyes -->
-  <circle cx="24" cy="28" r="2.5" fill="#fff"/>
-  <circle cx="40" cy="28" r="2.5" fill="#fff"/>
-  <!-- Nose -->
-  <ellipse cx="32" cy="38" rx="4" ry="3" fill="#fff"/>
-  <!-- Snout/mouth -->
-  <path d="M32 41v4M28 47c2 2 6 2 8 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-  <!-- Ears -->
-  <path d="M14 20c-2-6 2-12 8-12 4 0 6 3 8 6M50 20c2-6-2-12-8-12-4 0-6 3-8 6" fill="#4C4A73" stroke="#4C4A73" stroke-width="2"/>
+  <!-- Shield -->
+  <path d="M32 2L6 14v22c0 16 12 24 26 26 14-2 26-10 26-26V14L32 2z" fill="#DDDCE5"/>
+  <!-- Dog silhouette - simplified doberman head -->
+  <path d="M22 10L18 6l6 12zM42 10l4-4-6 12z" fill="#4C4178"/>
+  <path d="M22 18c-2 4-4 8-4 14 0 8 6 16 14 20 8-4 14-12 14-20 0-6-2-10-4-14l-10-6-10 6z" fill="#4C4178"/>
+  <!-- Snout -->
+  <path d="M26 32l6-4 6 4v8l-6 6-6-6v-8z" fill="#C9A87C"/>
+  <!-- Eyes - simple slits -->
+  <path d="M22 26l4 1v2l-4-1zM42 26l-4 1v2l4-1z" fill="#DDDCE5"/>
 </svg>
