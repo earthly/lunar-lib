@@ -11,10 +11,12 @@ def main(node=None):
             c.skip("High severity check disabled via inputs")
             return c
 
+        c.assert_exists(
+            ".sca",
+            "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured.",
+        )
+
         sca_node = c.get_node(".sca")
-        if not sca_node.exists():
-            c.skip("No SCA data available")
-            return c
 
         # Check summary first (preferred)
         summary = sca_node.get_node(".summary.has_high")
@@ -30,6 +32,9 @@ def main(node=None):
             c.assert_equals(
                 high.get_value(), 0, "High severity vulnerability findings detected"
             )
+            return c
+
+        c.fail("Vulnerability counts not available. Ensure collector reports .sca.vulnerabilities or .sca.summary.")
 
     return c
 

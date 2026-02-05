@@ -30,7 +30,7 @@ This policy reads from the following Component JSON paths:
 | `.sca.summary.has_critical` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_high` | boolean | SCA collector (preferred) |
 
-**Note:** Currently only the `executed` check is functional. The `no-critical`, `no-high`, and `max-total` checks will skip until collectors are enhanced to write vulnerability counts.
+**Note:** If collectors don't yet write vulnerability counts, the `no-critical`, `no-high`, and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
 ## Installation
 

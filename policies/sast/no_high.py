@@ -11,10 +11,12 @@ def main(node=None):
             c.skip("High severity check disabled via inputs")
             return c
 
+        c.assert_exists(
+            ".sast",
+            "No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.",
+        )
+
         sast_node = c.get_node(".sast")
-        if not sast_node.exists():
-            c.skip("No SAST data available")
-            return c
 
         # Check summary first (preferred)
         summary = sast_node.get_node(".summary.has_high")
@@ -26,6 +28,9 @@ def main(node=None):
         high = sast_node.get_node(".findings.high")
         if high.exists():
             c.assert_equals(high.get_value(), 0, "High severity code findings detected")
+            return c
+
+        c.fail("Finding counts not available. Ensure collector reports .sast.findings or .sast.summary.")
 
     return c
 

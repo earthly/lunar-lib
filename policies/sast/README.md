@@ -30,7 +30,7 @@ This policy reads from the following Component JSON paths:
 | `.sast.summary.has_critical` | boolean | SAST collector (preferred) |
 | `.sast.summary.has_high` | boolean | SAST collector (preferred) |
 
-**Note:** Currently only the `executed` check is functional. The `no-critical`, `no-high`, and `max-total` checks will skip until collectors are enhanced to write finding counts.
+**Note:** If collectors don't yet write finding counts, the `no-critical`, `no-high`, and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
 ## Installation
 

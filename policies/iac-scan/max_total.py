@@ -13,14 +13,15 @@ def main(node=None):
             c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")
             return c
 
-        scan_node = c.get_node(".iac_scan")
-        if not scan_node.exists():
-            c.skip("No IaC scan data available")
-            return c
+        c.assert_exists(
+            ".iac_scan",
+            "No IaC scanning data found. Ensure a scanner (Trivy, Checkov, etc.) is configured.",
+        )
 
+        scan_node = c.get_node(".iac_scan")
         total_node = scan_node.get_node(".findings.total")
         if not total_node.exists():
-            c.skip("Total findings count not available")
+            c.fail("Total findings count not available. Ensure collector reports .iac_scan.findings.total.")
             return c
 
         total_value = total_node.get_value()

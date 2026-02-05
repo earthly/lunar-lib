@@ -13,14 +13,15 @@ def main(node=None):
             c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")
             return c
 
-        sca_node = c.get_node(".sca")
-        if not sca_node.exists():
-            c.skip("No SCA data available")
-            return c
+        c.assert_exists(
+            ".sca",
+            "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured.",
+        )
 
+        sca_node = c.get_node(".sca")
         total_node = sca_node.get_node(".vulnerabilities.total")
         if not total_node.exists():
-            c.skip("Total findings count not available")
+            c.fail("Total findings count not available. Ensure collector reports .sca.vulnerabilities.total.")
             return c
 
         total_value = total_node.get_value()

@@ -13,14 +13,15 @@ def main(node=None):
             c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")
             return c
 
-        scan_node = c.get_node(".container_scan")
-        if not scan_node.exists():
-            c.skip("No container scan data available")
-            return c
+        c.assert_exists(
+            ".container_scan",
+            "No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.",
+        )
 
+        scan_node = c.get_node(".container_scan")
         total_node = scan_node.get_node(".vulnerabilities.total")
         if not total_node.exists():
-            c.skip("Total findings count not available")
+            c.fail("Total findings count not available. Ensure collector reports .container_scan.vulnerabilities.total.")
             return c
 
         total_value = total_node.get_value()

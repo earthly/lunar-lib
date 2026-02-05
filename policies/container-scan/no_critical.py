@@ -6,11 +6,12 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("no-critical", "No critical container vulnerability findings", node=node)
     with c:
-        # Skip if no scan data (don't fail components without this scanner type)
+        c.assert_exists(
+            ".container_scan",
+            "No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.",
+        )
+
         scan_node = c.get_node(".container_scan")
-        if not scan_node.exists():
-            c.skip("No container scan data available")
-            return c
 
         # Check summary first (preferred)
         summary = scan_node.get_node(".summary.has_critical")
@@ -26,6 +27,9 @@ def main(node=None):
             c.assert_equals(
                 critical.get_value(), 0, "Critical container vulnerability findings detected"
             )
+            return c
+
+        c.fail("Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary.")
 
     return c
 
