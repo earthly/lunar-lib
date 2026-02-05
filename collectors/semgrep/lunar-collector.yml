@@ -51,10 +51,10 @@ collectors:
 
 secrets:
   - name: GH_TOKEN
-    description: GitHub token for API access (checking check-runs)
-    required: true
+    description: GitHub token for API access (required for github-app collectors)
+    required: false
   - name: PG_PASSWORD
-    description: Database password for main branch queries
+    description: Database password for main branch queries (required for github-app-default-branch)
     required: false
 
 example_component_json: |
