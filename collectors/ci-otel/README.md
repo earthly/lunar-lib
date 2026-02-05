@@ -4,7 +4,7 @@ Emits OpenTelemetry traces for CI pipeline runs, providing detailed observabilit
 
 ## Overview
 
-This collector instruments CI pipelines with OpenTelemetry distributed tracing. It captures job, step, and command-level spans with timing and metadata, sending traces to any OTLP-compatible backend (Tempo, Jaeger, Honeycomb, etc.). This enables detailed visibility into CI performance, bottlenecks, and failures through your observability stack.
+This collector instruments CI pipelines with OpenTelemetry distributed tracing. It captures job, step, and command-level spans with timing and metadata, sending traces to any OTLP-compatible backend (Tempo, Jaeger, Honeycomb, etc.). This collector runs natively on the CI runner (not in a container) for performance — hooks execute on every command. Requires `jq` and `curl` (pre-installed on GitHub Actions Ubuntu runners).
 
 ## Collected Data
 
@@ -43,20 +43,3 @@ collectors:
       otel_endpoint: "http://tempo:4318"  # Your OTLP HTTP endpoint
       # debug: "true"  # Enable to collect trace data in Component JSON
 ```
-
-## CI Runner Requirements
-
-This collector runs **natively** on the CI runner (not in a container) for performance reasons. CI hooks execute on every job, step, and command — container overhead would significantly slow down builds.
-
-The following tools must be available on the CI runner:
-
-| Tool | Required | Notes |
-|------|----------|-------|
-| `jq` | Yes | JSON processing for OTLP payloads |
-| `curl` | Yes | Sending traces to OTLP endpoint |
-| `sha256sum` | Yes | Trace ID generation (standard in coreutils) |
-| `date` | Yes | Timestamps (standard in coreutils) |
-
-**GitHub Actions:** Ubuntu runners (`ubuntu-latest`, `ubuntu-22.04`, `ubuntu-24.04`) have all required tools pre-installed.
-
-**Other CI systems:** Ensure `jq` and `curl` are available. Most Linux distributions include them or they can be installed via package manager.
