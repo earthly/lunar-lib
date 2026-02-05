@@ -35,12 +35,19 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
-# Get database connection string from Lunar CLI
-# This avoids requiring users to configure PG_PASSWORD separately
+# Get database connection string
+# Try lunar sql connection-string first, fall back to environment secrets
 CONN_STRING=$(lunar sql connection-string 2>/dev/null || echo "")
 if [ -z "$CONN_STRING" ]; then
-    echo "Could not get database connection string, skipping." >&2
-    exit 0
+    # Fall back to secrets if lunar sql connection-string isn't available
+    if [ -n "$LUNAR_SECRET_PG_PASSWORD" ]; then
+        PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
+        PG_HOST="${LUNAR_HUB_HOST:-postgres}"
+        CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${PG_HOST}:5432/hub?sslmode=disable"
+    else
+        echo "Could not get database connection string, skipping." >&2
+        exit 0
+    fi
 fi
 
 # Sanitize component ID to prevent SQL injection (escape single quotes)
