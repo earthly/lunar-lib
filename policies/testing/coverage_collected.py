@@ -16,8 +16,9 @@ def check_coverage_collected(node=None):
         required_langs_str = variable_or_default("required_languages", "")
         required_langs = [lang.strip() for lang in required_langs_str.split(",") if lang.strip()]
         
-        # If required_languages is set, check if component has any matching language project
+        # Check if component has a language project
         if required_langs:
+            # Check for specific languages
             detected_langs = []
             for lang in required_langs:
                 if c.get_node(f".lang.{lang}").exists():
@@ -25,6 +26,11 @@ def check_coverage_collected(node=None):
             
             if not detected_langs:
                 c.skip(f"No project detected for required languages: {', '.join(required_langs)}")
+                return c
+        else:
+            # No specific languages required - check if ANY language project exists
+            if not c.get_node(".lang").exists():
+                c.skip("No language project detected")
                 return c
         
         c.assert_exists(

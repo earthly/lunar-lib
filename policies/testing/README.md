@@ -54,7 +54,7 @@ policies:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `required_languages` | `""` | Comma-separated languages. Components without a matching `.lang.<lang>` project are skipped. |
+| `required_languages` | `""` | Comma-separated languages to check. If empty, applies to all components with any detected language project. Components without `.lang.*` are always skipped. |
 | `min_coverage` | `"80"` | Minimum coverage percentage for the `min-coverage` check |
 
 ## Examples

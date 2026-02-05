@@ -62,11 +62,9 @@ policies:
 inputs:
   required_languages:
     description: |
-      Comma-separated list of languages that require tests.
-      Components without a detected project for any of these languages will be skipped.
-      Checks for .lang.<language> existence (set by language collectors like golang, python, etc.)
-      Example: "go,python,nodejs,java"
-      If empty, the policy applies to all components.
+      Comma-separated list of languages to check (e.g., "go,python,nodejs,java").
+      If empty, applies to all components with any detected language project.
+      Components without .lang.* are always skipped (e.g., docs-only repos).
     default: ""
   min_coverage:
     description: Minimum required coverage percentage (for min-coverage check)
