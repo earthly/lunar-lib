@@ -17,7 +17,10 @@ landing_page:
   requires:
     - slug: "golang"
       type: "collector"
-      reason: "Provides test execution data for Go projects"
+      reason: "Provides test execution and coverage data for Go projects"
+    - slug: "codecov"
+      type: "collector"
+      reason: "Provides coverage data from Codecov"
   related: []
 
 policies:
