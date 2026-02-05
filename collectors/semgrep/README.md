@@ -39,4 +39,4 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, python]
 ```
 
-The `github-app` and `github-app-default-branch` collectors require a `GH_TOKEN` secret for GitHub API access. The `github-app-default-branch` collector additionally requires `PG_PASSWORD` for database queries.
+The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `github-app-default-branch` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).
