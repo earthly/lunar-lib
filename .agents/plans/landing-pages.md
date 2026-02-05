@@ -848,7 +848,7 @@ Once Phase 1 passes review, scale to all plugins.
 
 ### Phase 4: Automation & Maintenance
 
-- [ ] Set up nightly GitHub Actions workflow to run `+update-lunar-lib` and create PR if changes
+- [x] Set up nightly GitHub Actions workflow to run `+update-lunar-lib` and commit to main if changes
 - [x] Add cross-validation for `related` plugin references (now an error, not warning)
 - [ ] Add client-side search (Lunr.js)
 

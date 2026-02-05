@@ -1,7 +1,7 @@
 version: 0
 
 name: testing
-description: Validates that tests are executed and pass
+description: Validates that tests are executed, pass, and meet coverage thresholds
 author: support@earthly.dev
 
 default_image: earthly/lunar-scripts:1.0.0
@@ -9,8 +9,8 @@ default_image: earthly/lunar-scripts:1.0.0
 landing_page:
   display_name: "Testing Guardrails"
   long_description: |
-    Ensure tests are executed in CI and passing. Works with any collector
-    that writes to the normalized .testing paths.
+    Ensure tests are executed in CI, passing, and meet coverage thresholds.
+    Works with any collector that writes to the normalized .testing paths.
   category: "testing-and-quality"
   icon: "assets/testing.svg"
   status: "stable"

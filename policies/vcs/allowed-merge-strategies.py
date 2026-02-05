@@ -1,9 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
 
-def main():
-    with Check("allowed-merge-strategies", "Merge strategies should match allowed list") as c:
-        allowed_merge_strategies = variable_or_default("allowed_merge_strategies", "")
+def main(node=None, allowed_strategies_override=None):
+    c = Check("allowed-merge-strategies", "Merge strategies should match allowed list", node=node)
+    with c:
+        c.assert_exists(".vcs.merge_strategies", 
+            "VCS data not found. Ensure the github collector is configured and has run.")
+        
+        allowed_merge_strategies = allowed_strategies_override if allowed_strategies_override is not None else variable_or_default("allowed_merge_strategies", "")
         allowed_list = [s.strip().lower() for s in allowed_merge_strategies.split(",") if s.strip()]
 
         # Validate configuration
@@ -38,6 +42,7 @@ def main():
                 }[strategy_name]
 
                 c.assert_false(is_enabled, f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
+    return c
 
 
 if __name__ == "__main__":

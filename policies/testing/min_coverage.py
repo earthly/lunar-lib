@@ -24,7 +24,7 @@ def check_min_coverage(node=None):
                     detected_langs.append(lang)
             
             if not detected_langs:
-                c.skip(f"No project detected for required languages: {required_langs}")
+                c.skip(f"No project detected for required languages: {', '.join(required_langs)}")
                 return c
         
         # Check if coverage data exists first

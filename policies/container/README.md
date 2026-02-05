@@ -1,4 +1,4 @@
-# Container Policies
+# Container Guardrails
 
 Enforces best practices for container definitions including tag stability, registry allowlists, required labels, and security configurations.
 

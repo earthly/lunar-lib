@@ -11,7 +11,7 @@ landing_page:
   long_description: |
     Analyze source code using AST-based pattern matching with ast-grep. Define custom
     rules to detect security issues, anti-patterns, and code style violations.
-  category: "security-and-compliance"
+  categories: ["code-analysis", "security"]
   icon: "assets/ast-grep.svg"
   status: "beta"
   related: []
