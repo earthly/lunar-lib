@@ -3,13 +3,13 @@ set -e
 
 source "${LUNAR_PLUGIN_ROOT}/otel-helpers.sh"
 
-trace_id=$(cat /tmp/lunar-otel-trace-id 2>/dev/null || echo "")
-root_span_id=$(cat /tmp/lunar-otel-root-span-id 2>/dev/null || echo "")
-start_time=$(cat /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "0")
+trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
+root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
+start_time=$(cat /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
 end_time=$(nanoseconds)
 
-if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
-  echo "OTEL: No trace context found, skipping job end span"
+if [ -z "$trace_id" ] || [ -z "$root_span_id" ] || [ -z "$start_time" ]; then
+  echo "OTEL: No trace context or start time found, skipping job end span"
   # Use a temporary key for skipped events without trace_id
   skip_key="skipped_$(date +%s%N | head -c 13)"
   debug_collect ".ci.debug.job_end.$skip_key.status" "skipped_no_context" \
@@ -62,4 +62,4 @@ send_span \
 }
 
 # Cleanup
-rm -f /tmp/lunar-otel-trace-id /tmp/lunar-otel-root-span-id /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown}
+rm -f /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown}

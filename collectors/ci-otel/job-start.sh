@@ -8,9 +8,9 @@ trace_id=$(generate_trace_id)
 root_span_id=$(generate_job_span_id)
 start_time=$(nanoseconds)
 
-# Store trace context for child spans
-echo "$trace_id" > /tmp/lunar-otel-trace-id
-echo "$root_span_id" > /tmp/lunar-otel-root-span-id
+# Store trace context for child spans (scoped by job ID to avoid cross-job contamination)
+echo "$trace_id" > /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown}
+echo "$root_span_id" > /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown}
 echo "$start_time" > /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown}
 
 # Structured collection for debugging: Create root trace object

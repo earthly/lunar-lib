@@ -3,8 +3,8 @@ set -e
 
 source "${LUNAR_PLUGIN_ROOT}/otel-helpers.sh"
 
-trace_id=$(cat /tmp/lunar-otel-trace-id 2>/dev/null || echo "")
-root_span_id=$(cat /tmp/lunar-otel-root-span-id 2>/dev/null || echo "")
+trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
+root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
 
 if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
   # Use a temporary key for skipped events without trace_id
@@ -49,7 +49,7 @@ if ! head -n 1 "$cmd_file" >/dev/null 2>&1; then
   echo "OTEL: No start time found for command hash ${cmd_hash}, skipping"
   debug_collect ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.status" "skipped_no_start" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.cmd_pid" "${LUNAR_CI_COMMAND_PID}" \
-    ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.command" "${LUNAR_CI_COMMAND:-}" \
+    ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.command" "${LUNAR_CI_COMMAND:-}"
   exit 0
 fi
 

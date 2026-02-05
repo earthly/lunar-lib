@@ -12,8 +12,8 @@ retry_delay=0.1
 retry_count=0
 
 while [ -z "$trace_id" ] || [ -z "$root_span_id" ]; do
-  trace_id=$(cat /tmp/lunar-otel-trace-id 2>/dev/null || echo "")
-  root_span_id=$(cat /tmp/lunar-otel-root-span-id 2>/dev/null || echo "")
+  trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
+  root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
   
   if [ -n "$trace_id" ] && [ -n "$root_span_id" ]; then
     break

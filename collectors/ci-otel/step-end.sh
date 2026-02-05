@@ -3,8 +3,8 @@ set -e
 
 source "${LUNAR_PLUGIN_ROOT}/otel-helpers.sh"
 
-trace_id=$(cat /tmp/lunar-otel-trace-id 2>/dev/null || echo "")
-root_span_id=$(cat /tmp/lunar-otel-root-span-id 2>/dev/null || echo "")
+trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
+root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
 
 if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
   echo "OTEL: No trace context found, skipping step span"
