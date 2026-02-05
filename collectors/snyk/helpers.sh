@@ -37,10 +37,20 @@ detect_snyk_category_from_cmd() {
 write_snyk_source() {
     local category="$1"
     local integration="$2"  # github_app or ci
+    local version="${3:-}"  # optional version
     
-    jq -n \
-        --arg tool "snyk" \
-        --arg integration "$integration" \
-        '{tool: $tool, integration: $integration}' | \
-        lunar collect -j ".$category.source" -
+    if [ -n "$version" ] && [ "$version" != "unknown" ]; then
+        jq -n \
+            --arg tool "snyk" \
+            --arg integration "$integration" \
+            --arg version "$version" \
+            '{tool: $tool, integration: $integration, version: $version}' | \
+            lunar collect -j ".$category.source" -
+    else
+        jq -n \
+            --arg tool "snyk" \
+            --arg integration "$integration" \
+            '{tool: $tool, integration: $integration}' | \
+            lunar collect -j ".$category.source" -
+    fi
 }
