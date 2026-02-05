@@ -3,6 +3,12 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
+# Validate required environment variable
+if [ -z "$LUNAR_CI_COMMAND" ]; then
+    echo "LUNAR_CI_COMMAND is not set, skipping." >&2
+    exit 0
+fi
+
 # Get the command that was run
 CMD_RAW="$LUNAR_CI_COMMAND"
 

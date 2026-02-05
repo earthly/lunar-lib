@@ -22,7 +22,7 @@ detect_semgrep_category_from_cmd() {
     local cmd_lower
     cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
     
-    if echo "$cmd_lower" | grep -qE "(--supply-chain|supply.chain)"; then
+    if echo "$cmd_lower" | grep -qE "(--supply-chain|supply\.chain)"; then
         echo "sca"
     else
         echo "sast"  # Default: Code analysis

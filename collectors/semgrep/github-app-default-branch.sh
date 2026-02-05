@@ -11,6 +11,11 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
+if [ -z "$LUNAR_SECRET_PG_PASSWORD" ]; then
+    echo "LUNAR_SECRET_PG_PASSWORD is required for the default-branch collector." >&2
+    exit 0
+fi
+
 # Sanitize component ID to prevent SQL injection (escape single quotes)
 SAFE_COMPONENT_ID=$(echo "$LUNAR_COMPONENT_ID" | sed "s/'/''/g")
 

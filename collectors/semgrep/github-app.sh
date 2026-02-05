@@ -49,7 +49,8 @@ done
 [ "$FOUND_CHECK" = "false" ] && exit 0
 
 # Process each Semgrep check (there may be multiple: Code, Supply Chain)
-echo "$CHECKS" | jq -c '.[]' | while read -r CHECK; do
+# Using process substitution to avoid subshell issues with set -e
+while read -r CHECK; do
     NAME=$(echo "$CHECK" | jq -r '.name // ""')
     STATUS=$(echo "$CHECK" | jq -r '.status // ""')
     
@@ -91,4 +92,4 @@ echo "$CHECKS" | jq -c '.[]' | while read -r CHECK; do
     
     # Write source metadata
     write_semgrep_source "$CATEGORY" "github_app"
-done
+done < <(echo "$CHECKS" | jq -c '.[]')
