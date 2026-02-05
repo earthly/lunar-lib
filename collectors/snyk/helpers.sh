@@ -22,12 +22,12 @@ detect_snyk_category_from_cmd() {
     local cmd_lower
     cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
     
-    if echo "$cmd_lower" | grep -q "snyk code"; then
-        echo "sast"
+    if echo "$cmd_lower" | grep -q "snyk iac"; then
+        echo "iac_scan"
     elif echo "$cmd_lower" | grep -q "snyk container"; then
         echo "container_scan"
-    elif echo "$cmd_lower" | grep -q "snyk iac"; then
-        echo "iac"
+    elif echo "$cmd_lower" | grep -q "snyk code"; then
+        echo "sast"
     else
         echo "sca"  # Default: snyk test = Open Source
     fi

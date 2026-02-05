@@ -10,7 +10,7 @@ fi
 
 # Query DB to check if Snyk ran on recent PRs
 # This provides proof on main branch that scanning is happening
-for CATEGORY in sca sast container_scan iac; do
+for CATEGORY in sca sast container_scan iac_scan; do
     QUERY="
         SELECT EXISTS (
             SELECT 1
