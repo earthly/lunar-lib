@@ -9,7 +9,7 @@ detect_snyk_category() {
     context_lower=$(echo "$context" | tr '[:upper:]' '[:lower:]')
     
     case "$context_lower" in
-        *iac*|*infrastructure*)     echo "iac" ;;
+        *iac*|*infrastructure*)     echo "iac_scan" ;;
         *container*)                echo "container_scan" ;;
         *code*)                     echo "sast" ;;
         *)                          echo "sca" ;;  # Default: Open Source

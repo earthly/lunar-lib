@@ -70,18 +70,26 @@ example_component_json: |
         "version": "1.1200.0",
         "integration": "github_app"
       },
-      "vulnerabilities": {
-        "critical": 0,
-        "high": 1,
-        "medium": 3,
-        "low": 8,
-        "total": 12
-      },
       "native": {
         "snyk": {
           "github_app_results": {
             "state": "success",
             "context": "security/snyk",
+            "target_url": "https://app.snyk.io/..."
+          }
+        }
+      }
+    },
+    "iac_scan": {
+      "source": {
+        "tool": "snyk",
+        "integration": "github_app"
+      },
+      "native": {
+        "snyk": {
+          "github_app_results": {
+            "state": "success",
+            "context": "security/snyk-iac",
             "target_url": "https://app.snyk.io/..."
           }
         }
