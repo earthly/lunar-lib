@@ -5,7 +5,6 @@ description: Detects Semgrep security scans and collects findings data
 author: support@earthly.dev
 
 default_image: earthly/lunar-scripts:1.0.0
-default_image_ci_collectors: native
 
 landing_page:
   display_name: "Semgrep Collector"
