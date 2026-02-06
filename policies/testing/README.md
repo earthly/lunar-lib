@@ -65,6 +65,7 @@ Tests executed, passing, and good coverage:
 
 ```json
 {
+  "lang": {"go": {"version": "1.22"}},
   "testing": {
     "source": {
       "framework": "go test",
@@ -86,18 +87,23 @@ Tests executed, passing, and good coverage:
 
 ### Failing Example — No Tests Executed (`executed` policy)
 
+When a language project exists but no test data:
+
 ```json
-{}
+{
+  "lang": {"go": {"version": "1.22"}}
+}
 ```
 
 **Failure message:** `"No test execution data found. Ensure tests are configured to run in CI."`
 
-**Note:** The `passing` policy **skips** in this case with: `"No test execution data found"`
+**Note:** All testing checks **fail** together when data is missing for a valid language project.
 
 ### Failing Example — Tests Failing (`passing` policy)
 
 ```json
 {
+  "lang": {"go": {"version": "1.22"}},
   "testing": {
     "all_passing": false
   }
@@ -110,6 +116,7 @@ Tests executed, passing, and good coverage:
 
 ```json
 {
+  "lang": {"go": {"version": "1.22"}},
   "testing": {
     "coverage": {
       "percentage": 65.0
@@ -134,6 +141,18 @@ When coverage isn't collected but component is a valid language project:
 ```
 
 The `min-coverage` check **fails** with message: `"No coverage data collected. Configure a coverage tool to run in your CI pipeline."`
+
+### Skipped Example — Non-Language Component
+
+When no language project is detected (e.g., docs-only repo):
+
+```json
+{
+  "repo": {"readme": {"exists": true}}
+}
+```
+
+All testing checks are **skipped** with message: `"No language project detected"`
 
 ## Remediation
 
