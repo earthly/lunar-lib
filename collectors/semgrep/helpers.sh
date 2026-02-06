@@ -3,16 +3,18 @@
 # Shared helper functions for the semgrep collector
 
 # Detect Semgrep product category from check name
+# Semgrep calls their SCA product "Semgrep Supply Chain"
+# Note: Don't use *sca* as it matches "scan" in check names like "semgrep-cloud-platform/scan"
 detect_semgrep_category() {
     local name="$1"
     local name_lower
     name_lower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     
     case "$name_lower" in
-        *"supply chain"*|*"supply-chain"*|*sca*)
+        *"supply chain"*|*"supply-chain"*)
             echo "sca" ;;
         *)
-            echo "sast" ;;  # Default: Code analysis
+            echo "sast" ;;  # Default: Code analysis (includes "Semgrep Code")
     esac
 }
 
