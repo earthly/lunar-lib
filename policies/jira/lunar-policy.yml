@@ -10,7 +10,7 @@ landing_page:
     Enforce Jira ticket hygiene across your organization. Verify PRs reference
     valid Jira tickets, check ticket status and type, and detect ticket reuse
     across multiple PRs.
-  category: "vcs"
+  category: "devex-build-and-ci"
   icon: "assets/jira.svg"
   status: "stable"
   requires:
