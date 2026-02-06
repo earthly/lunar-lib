@@ -37,7 +37,7 @@ collectors:
       PRs to this component are being scanned, which implies the merged code
       on the default branch was also scanned.
     mainBash: github-app-default-branch.sh
-    image: native
+    # Uses default_image (not native) so install.sh can install postgresql-client
     hook:
       type: code
       runs_on: [default-branch]
