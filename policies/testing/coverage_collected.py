@@ -26,12 +26,10 @@ def check_coverage_collected(node=None):
             
             if not detected_langs:
                 c.skip(f"No project detected for required languages: {', '.join(required_langs)}")
-                return c
         else:
             # No specific languages required - check if ANY language project exists
             if not c.get_node(".lang").exists():
                 c.skip("No language project detected")
-                return c
         
         c.assert_exists(
             ".testing.coverage",
