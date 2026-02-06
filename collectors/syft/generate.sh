@@ -22,7 +22,17 @@ export SYFT_GOLANG_SEARCH_REMOTE_LICENSES="${SYFT_GOLANG_SEARCH_REMOTE_LICENSES:
 export SYFT_JAVA_USE_NETWORK="${SYFT_JAVA_USE_NETWORK:-true}"
 export SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES="${SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES:-true}"
 
+# Cleanup handler for temp files
+cleanup() {
+  rm -f "$tmp_sbom" 2>/dev/null
+  if [[ -n "$python_packages_dir" ]] && [[ -d "$python_packages_dir" ]]; then
+    rm -rf "$python_packages_dir"
+  fi
+}
+trap cleanup EXIT
+
 # For Python projects: install deps to temp dir for license metadata detection
+tmp_sbom=""
 python_packages_dir=""
 if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
   PYTHON_CMD=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
@@ -47,23 +57,14 @@ fi
 tmp_sbom="$(mktemp)"
 if ! syft dir:. -o cyclonedx-json > "$tmp_sbom"; then
   echo "syft failed to generate SBOM" >&2
-  rm -f "$tmp_sbom"
   exit 1
 fi
 
 # Skip empty SBOMs
 if jq -e '(.components // []) | length == 0' "$tmp_sbom" >/dev/null 2>&1; then
   echo "SBOM has no components; skipping collection" >&2
-  rm -f "$tmp_sbom"
   exit 0
 fi
 
 # Collect the full SBOM
 cat "$tmp_sbom" | lunar collect -j ".sbom.auto.cyclonedx" -
-
-# Cleanup
-rm -f "$tmp_sbom"
-if [[ -n "$python_packages_dir" ]] && [[ -d "$python_packages_dir" ]]; then
-  rm -rf "$python_packages_dir"
-  echo "Cleaned up temporary Python packages directory" >&2
-fi
