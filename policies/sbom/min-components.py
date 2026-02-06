@@ -4,7 +4,10 @@ from helpers import get_sbom_components
 from lunar_policy import Check, variable_or_default
 
 with Check("min-components", "Verifies the SBOM contains a minimum number of components") as c:
-    min_count = int(variable_or_default("min_components", "1"))
+    try:
+        min_count = int(variable_or_default("min_components", "1"))
+    except ValueError:
+        raise ValueError("min_components must be a number")
 
     components, has_sbom = get_sbom_components(c)
     if not has_sbom:

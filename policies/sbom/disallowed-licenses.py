@@ -12,7 +12,10 @@ with Check("disallowed-licenses", "Checks for disallowed licenses in SBOM compon
         # No patterns configured — auto-pass
         pass
     else:
-        regex_patterns = [re.compile(p, re.IGNORECASE) for p in disallowed_patterns]
+        try:
+            regex_patterns = [re.compile(p, re.IGNORECASE) for p in disallowed_patterns]
+        except re.error as e:
+            raise ValueError(f"Invalid regex in disallowed_licenses: {e}")
 
         components, has_sbom = get_sbom_components(c)
         if not has_sbom:

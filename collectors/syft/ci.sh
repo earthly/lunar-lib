@@ -24,18 +24,19 @@ fi
 OUTPUT_FILE=""
 OUTPUT_FORMAT=""
 
-# Match patterns like: -o cyclonedx-json=sbom.json, --output spdx-json=report.json
-if echo "$CMD" | grep -qoE '(-o|--output)\s+[a-z]+-[a-z]+=\S+'; then
-  MATCH=$(echo "$CMD" | grep -oE '(-o|--output)\s+([a-z]+-[a-z]+=\S+)' | head -1)
+# Match patterns like: -o cyclonedx-json=sbom.json, --output spdx-json@1.6=report.json
+# Supports: simple (json), hyphenated (cyclonedx-json), versioned (cyclonedx-json@1.6)
+if echo "$CMD" | grep -qoE '(-o|--output)\s+[a-z]+(-[a-z]+)?(@[0-9.]+)?=\S+'; then
+  MATCH=$(echo "$CMD" | grep -oE '(-o|--output)\s+[a-z]+(-[a-z]+)?(@[0-9.]+)?=\S+' | head -1)
   FORMAT_FILE=$(echo "$MATCH" | sed -E 's/(-o|--output)\s+//')
-  OUTPUT_FORMAT=$(echo "$FORMAT_FILE" | cut -d'=' -f1)
+  OUTPUT_FORMAT=$(echo "$FORMAT_FILE" | cut -d'=' -f1 | sed 's/@.*//')
   OUTPUT_FILE=$(echo "$FORMAT_FILE" | cut -d'=' -f2)
 fi
 
-# Match patterns like: -o cyclonedx-json (output to stdout, may be redirected)
+# Match patterns like: -o cyclonedx-json, -o json, -o spdx-json@2.3
 if [ -z "$OUTPUT_FORMAT" ]; then
-  if echo "$CMD" | grep -qoE '(-o|--output)\s+[a-z]+-[a-z]+'; then
-    OUTPUT_FORMAT=$(echo "$CMD" | grep -oE '(-o|--output)\s+([a-z]+-[a-z]+)' | head -1 | sed -E 's/(-o|--output)\s+//')
+  if echo "$CMD" | grep -qoE '(-o|--output)\s+[a-z]+(-[a-z]+)?(@[0-9.]+)?(\s|$)'; then
+    OUTPUT_FORMAT=$(echo "$CMD" | grep -oE '(-o|--output)\s+[a-z]+(-[a-z]+)?(@[0-9.]+)?' | head -1 | sed -E 's/(-o|--output)\s+//' | sed 's/@.*//')
   fi
 fi
 
