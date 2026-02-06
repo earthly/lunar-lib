@@ -5,7 +5,7 @@ description: |
   Generate or detect CycloneDX/SPDX SBOMs using Anchore Syft.
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:syft-main
 default_image_ci_collectors: native
 
 landing_page:

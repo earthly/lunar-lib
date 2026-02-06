@@ -1,0 +1,16 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Syft
+    ARG SYFT_VERSION=1.19.0
+    ARG TARGETARCH
+    RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
+        chmod +x /usr/local/bin/syft
+
+    # Verify installation
+    RUN syft version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:syft-$VERSION
