@@ -586,10 +586,8 @@ name: my-collector                    # Required: Unique name (must match direct
 description: What this collector does # Required: Brief description
 author: team@example.com              # Required
 
-# Recommended: specify container image
-# Use default_image alone when plugin has no CI collectors
-# Add default_image_ci_collectors: native when plugin includes CI collectors
-default_image: earthly/lunar-scripts:1.0.0
+# Always specify a default image - use earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-main
 
 # === Landing page metadata (required for public plugins) ===
 landing_page:
@@ -706,21 +704,20 @@ Configure default images in `lunar-config.yml`:
 ```yaml
 version: 0
 
-default_image: earthly/lunar-scripts:1.0.0    # Used for all collectors by default
-default_image_ci_collectors: native           # Only add when you have CI collectors
+default_image: earthly/lunar-lib:base-main    # Used for all collectors by default
 
 # ... rest of configuration
 ```
 
 **Convention:**
-- Use `default_image` alone when your plugin has no CI collectors
-- Add `default_image_ci_collectors: native` only when your plugin includes CI collectors (hooks like `ci-after-command`, `ci-after-job`, etc.)
+- Always use `default_image: earthly/lunar-lib:base-main` for collectors
+- Only use `default_image_ci_collectors: native` for **performance-intensive** CI collectors that run very frequently (e.g., ci-otel which runs on every CI command). Most CI collectors should use the default image.
 
 ### The `native` Value
 
 The special value `native` explicitly opts out of containerized execution. The script runs directly on the host system.
 
-**Use `native` only for CI collectors** that need direct access to the CI environment (environment variables, build artifacts, CI tools):
+**Use `native` sparingly** — only for **performance-intensive CI collectors** that run very frequently throughout a CI pipeline (e.g., `ci-otel` which captures metrics on every command). Most collectors, including most CI collectors, should use the default container image for consistency and isolation:
 
 ```yaml
 collectors:
