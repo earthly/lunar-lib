@@ -120,19 +120,20 @@ Tests executed, passing, and good coverage:
 
 **Failure message:** `"Coverage 65.0% is below minimum 80%"`
 
-### Skipped Example — No Coverage Data (`min-coverage` policy)
+### Failing Example — No Coverage Data (`min-coverage` policy)
 
-When coverage isn't collected:
+When coverage isn't collected but component is a valid language project:
 
 ```json
 {
+  "lang": {"go": {"version": "1.22"}},
   "testing": {
     "source": {"framework": "go test"}
   }
 }
 ```
 
-The `min-coverage` check is **skipped** with message: `"No coverage data available"`
+The `min-coverage` check **fails** with message: `"No coverage data collected. Configure a coverage tool to run in your CI pipeline."`
 
 ## Remediation
 

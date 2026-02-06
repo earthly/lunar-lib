@@ -44,7 +44,7 @@ def check_min_coverage(node=None):
             "Coverage percentage not reported. Ensure your coverage tool reports metrics."
         )
         
-        min_coverage = int(variable_or_default("min_coverage", "80"))
+        min_coverage = float(variable_or_default("min_coverage", "80"))
         coverage = c.get_value(".testing.coverage.percentage")
         c.assert_greater_or_equal(
             coverage,
