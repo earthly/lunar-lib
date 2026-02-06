@@ -7,9 +7,6 @@ CMD="$LUNAR_CI_COMMAND"
 lunar collect ".sbom.cicd.source.tool" "syft"
 lunar collect ".sbom.cicd.source.integration" "ci"
 
-# Record CI artifact signal
-lunar collect -j ".ci.artifacts.sbom_generated" true
-
 # Try to get syft version
 if command -v syft &>/dev/null; then
   VERSION=$(syft version -o json 2>/dev/null | jq -r '.version // empty' 2>/dev/null || \
