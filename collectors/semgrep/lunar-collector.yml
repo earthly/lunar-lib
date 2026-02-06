@@ -4,8 +4,7 @@ name: semgrep
 description: Detects Semgrep security scans via GitHub App or CLI integration
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
-default_image_ci_collectors: native
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "Semgrep Collector"
@@ -37,7 +36,6 @@ collectors:
       PRs to this component are being scanned, which implies the merged code
       on the default branch was also scanned.
     mainBash: github-app-default-branch.sh
-    # Uses default_image (not native) so install.sh can install postgresql-client
     hook:
       type: code
       runs_on: [default-branch]
