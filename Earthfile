@@ -82,5 +82,7 @@ all:
 base-image:
     ARG SCRIPTS_VERSION=main-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+    # Add postgresql-client for collectors that need to query the Hub database
+    RUN apk add --no-cache postgresql-client
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
