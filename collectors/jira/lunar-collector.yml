@@ -11,7 +11,7 @@ landing_page:
   long_description: |
     Extract Jira ticket references from pull request titles, validate them
     against the Jira REST API, and detect ticket reuse across PRs.
-  categories: ["devex-build-and-ci"]
+  categories: ["vcs"]
   icon: "assets/jira.svg"
   status: "stable"
   related:
