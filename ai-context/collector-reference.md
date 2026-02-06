@@ -864,24 +864,33 @@ LUNAR_COMPONENT_ID="github.com/acme/api" ./main.sh
 
 Document what paths your collector writes to, so policy authors know what to expect.
 
-### 8. Collect All Detected CI Commands in an Array (with Versions)
+### 8. Naming Convention: `.cicd` vs `.auto` Sub-Keys for CI-Detected and Auto-Run Collectors
 
-When a collector is centered around detecting a CI command (e.g., via `ci-after-command` hooks), it should collect **all** invocations it detects into an array—not just the first match or a single boolean. Each entry should include the command name and, where possible, the version of the CLI tool.
+Many collectors either **detect a tool running in CI** or **auto-run a tool** themselves. Use consistent sub-key naming to distinguish how data was produced. See [Component JSON Conventions — CI Detection and Auto-Run Naming](component-json/conventions.md#ci-detection-and-auto-run-naming) for the full schema contract.
 
-**Why this matters:**
-- **Maximum visibility:** Seeing every invocation reveals how a tool is used across the entire pipeline.
-- **Version assertions:** Policies can enforce minimum CLI versions or flag outdated tools.
-- **Discrepancy detection:** Different jobs or steps may use different versions of the same tool—collecting all invocations makes these inconsistencies visible.
+| Sub-key | Meaning | Hook type | Example path |
+|---------|---------|-----------|--------------|
+| `.cicd` | Tool was **detected running in CI** — records command invocations | `ci-after-command` / `ci-before-command` | `.lang.go.cicd`, `.containers.docker.cicd` |
+| `.auto` | Tool was **auto-run by Lunar** — records execution results | `code` / `cron` | `.sast.semgrep.auto`, `.sbom.syft.auto` |
+| *(neither)* | Normalized data from any source — tool-agnostic | any | `.sca.vulnerabilities`, `.testing.coverage` |
+
+**Key rules:**
+
+1. **`.cicd` collectors** should collect **all** invocations into a `cmds` array (not just the first match or a boolean). Each entry should include the command string and, where possible, the CLI version. Lunar [auto-concatenates arrays](#array-concatenation) at the same path, so each CI invocation appends to the list.
+
+2. **`.auto` collectors** should record execution metadata (exit code, version, pass/fail) and write results into both the tool-specific `.auto` sub-key and normalized category paths.
+
+3. **Normalized paths** (e.g., `.sca.vulnerabilities`, `.testing.coverage`) remain tool-agnostic—any source can populate them.
+
+#### Example: CI detection (`.cicd`)
 
 ```bash
 #!/bin/bash
 set -e
 
-# Extract the tool version (example: docker)
+# Detect docker commands in CI and record each invocation
 TOOL_VERSION=$(docker version --format '{{.Client.Version}}' 2>/dev/null || echo "")
 
-# Collect each invocation into a cmds array under .containers.docker.cicd
-# Lunar auto-concatenates arrays at the same path across multiple CI runs
 if [[ -n "$TOOL_VERSION" ]]; then
   cmd_str=$(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')
   jq -n \
@@ -893,8 +902,6 @@ if [[ -n "$TOOL_VERSION" ]]; then
     }' | lunar collect -j ".containers.docker.cicd" -
 fi
 ```
-
-This follows the same convention used by existing collectors (e.g., the Go collector writes to `.lang.go.cicd.cmds`). Because Lunar [automatically concatenates arrays](#array-concatenation) written to the same path across multiple CI runs, each invocation appends to the list. The result is a complete picture:
 
 ```json
 {
@@ -913,4 +920,48 @@ This follows the same convention used by existing collectors (e.g., the Go colle
 }
 ```
 
-Policies can then assert on version consistency, minimum versions, or simply that the tool was invoked at all.
+**Why collect every invocation?** Maximum visibility—policies can enforce minimum CLI versions, flag outdated tools, and detect version discrepancies across different CI jobs or steps.
+
+#### Example: Auto-run (`.auto`)
+
+```bash
+#!/bin/bash
+set -e
+
+# Auto-run Semgrep and record results
+SEMGREP_VERSION=$(semgrep --version 2>/dev/null || echo "unknown")
+
+set +e
+semgrep_output=$(semgrep scan --json --config auto 2>/dev/null)
+semgrep_exit=$?
+set -e
+
+# Write to .sast.semgrep.auto (tool-specific auto-run metadata)
+jq -n \
+  --arg version "$SEMGREP_VERSION" \
+  --argjson exit_code "$semgrep_exit" \
+  '{
+    version: $version,
+    exit_code: $exit_code,
+    source: {tool: "semgrep", integration: "code"}
+  }' | lunar collect -j ".sast.semgrep.auto" -
+
+# Also write to normalized .sast paths for tool-agnostic policies
+echo "$semgrep_output" | jq '{findings: [.results[] | {/* normalize */}]}' | \
+  lunar collect -j ".sast" -
+```
+
+```json
+{
+  "sast": {
+    "findings": [{ "rule": "sql-injection", "severity": "high", "file": "app.py" }],
+    "semgrep": {
+      "auto": {
+        "version": "1.56.0",
+        "exit_code": 0,
+        "source": { "tool": "semgrep", "integration": "code" }
+      }
+    }
+  }
+}
+```
