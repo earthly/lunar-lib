@@ -261,12 +261,13 @@ For `ci-before-command` and `ci-after-command` hooks:
 
 | Variable | Description |
 |----------|-------------|
-| `LUNAR_CI_COMMAND` | Command and arguments of the hooked command |
+| `LUNAR_CI_COMMAND` | Command and arguments of the hooked command (JSON array of strings, e.g., `["go","test","./..."]`) |
 
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
-# LUNAR_CI_COMMAND contains the full command line
-echo "Hooked command: $LUNAR_CI_COMMAND"
+# LUNAR_CI_COMMAND is a JSON array: ["docker","build","-t","myimage","."]
+# Use jq to parse it:
+echo "Hooked command: $(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')"
 ```
 
 ## The lunar collect Command
@@ -863,3 +864,23 @@ LUNAR_COMPONENT_ID="github.com/acme/api" ./main.sh
 ### 7. Document Component JSON Schema
 
 Document what paths your collector writes to, so policy authors know what to expect.
+
+### 8. Naming Convention: `.cicd` vs `.auto` Sub-Keys for CI-Detected and Auto-Run Collectors
+
+Many collectors either **detect a tool running in CI** or **auto-run a tool** themselves. Use consistent sub-key naming to distinguish how data was produced. See [Component JSON Conventions — CI Detection and Auto-Run Naming](component-json/conventions.md#ci-detection-and-auto-run-naming) for the full schema contract.
+
+| Sub-key | Meaning | Hook type | Example path |
+|---------|---------|-----------|--------------|
+| `.cicd` | Tool was **detected running in CI** — records command invocations | `ci-after-command` / `ci-before-command` | `.lang.go.cicd`, `.containers.docker.cicd` |
+| `.auto` | Tool was **auto-run by Lunar** — records execution results | `code` / `cron` | `.sast.semgrep.auto`, `.sbom.syft.auto` |
+| *(neither)* | Normalized data from any source — tool-agnostic | any | `.sca.vulnerabilities`, `.testing.coverage` |
+
+**Key rules:**
+
+1. **`.cicd` collectors** should collect **all** invocations into a `cmds` array (not just the first match or a boolean). Each entry should include the command string and, where possible, the CLI version. Lunar [auto-concatenates arrays](#array-concatenation) at the same path, so each CI invocation appends to the list. This gives maximum visibility—policies can enforce minimum CLI versions, flag outdated tools, and detect version discrepancies across CI jobs.
+
+2. **`.auto` collectors** should record execution metadata (exit code, version, pass/fail) and write results into both the tool-specific `.auto` sub-key and normalized category paths.
+
+3. **Normalized paths** (e.g., `.sca.vulnerabilities`, `.testing.coverage`) remain tool-agnostic—any source can populate them.
+
+See `collectors/golang/cicd.sh` for a reference implementation of the `.cicd` pattern.

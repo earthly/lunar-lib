@@ -561,6 +561,28 @@ Both capture dependency information, but serve different purposes:
 
 ---
 
+## CI Detection and Auto-Run Naming
+
+Collectors that detect a tool in CI or auto-run a tool themselves should use consistent sub-key naming to distinguish how data was produced.
+
+### `.cicd` — Tool Detected in CI
+
+Use a `.cicd` sub-key when a collector **detects a command running in the CI pipeline** (via `ci-after-command` or `ci-before-command` hooks). The `.cicd` object should contain a `cmds` array with every detected invocation, each including the command string and CLI version where possible. Collecting all invocations enables version assertions, discrepancy detection across CI jobs, and full audit trails. See `collectors/golang/cicd.sh` for a reference implementation.
+
+### `.auto` — Tool Auto-Run by Lunar
+
+Use an `.auto` sub-key when a collector **auto-runs a tool** itself (typically via `code` or `cron` hooks, using Strategy 5). The `.auto` object records execution metadata: version, exit code, and source. Auto-run collectors should **also** write to normalized category paths (e.g., `.sast.findings`, `.sbom.summary`) so that tool-agnostic policies work.
+
+### Summary
+
+| Sub-key | When to use | Contains | Example paths |
+|---------|-------------|----------|---------------|
+| `.cicd` | Detecting commands in CI | `cmds` array (command + version), `source` | `.lang.go.cicd`, `.containers.docker.cicd` |
+| `.auto` | Auto-running a tool | Execution metadata (version, exit_code), `source` | `.sast.semgrep.auto`, `.sbom.syft.auto` |
+| *(none)* | Normalized results | Tool-agnostic data for policies | `.sca.vulnerabilities`, `.testing.coverage` |
+
+---
+
 ## Naming Conventions
 
 ### Boolean Fields
