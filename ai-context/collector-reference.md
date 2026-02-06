@@ -261,12 +261,13 @@ For `ci-before-command` and `ci-after-command` hooks:
 
 | Variable | Description |
 |----------|-------------|
-| `LUNAR_CI_COMMAND` | Command and arguments of the hooked command |
+| `LUNAR_CI_COMMAND` | Command and arguments of the hooked command (JSON array of strings, e.g., `["go","test","./..."]`) |
 
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
-# LUNAR_CI_COMMAND contains the full command line
-echo "Hooked command: $LUNAR_CI_COMMAND"
+# LUNAR_CI_COMMAND is a JSON array: ["docker","build","-t","myimage","."]
+# Use jq to parse it:
+echo "Hooked command: $(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')"
 ```
 
 ## The lunar collect Command
