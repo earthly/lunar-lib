@@ -38,7 +38,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github.com/earthly/lunar-lib/policies/{path-to-policy}@v1.0.0
+  - uses: github://earthly/lunar-lib/policies/{path-to-policy}@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
     # include: [example-check-1]  # Only run specific checks (omit to run all)

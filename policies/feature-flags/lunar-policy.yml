@@ -1,0 +1,36 @@
+version: 0
+
+name: feature-flags
+description: Enforce feature flag hygiene and lifecycle management
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+landing_page:
+  display_name: "Feature Flags Guardrails"
+  long_description: |
+    Enforce feature flag hygiene across your codebase. Ensure feature flags don't
+    become permanent fixtures by detecting flags older than a configurable threshold,
+    helping teams maintain clean, manageable codebases.
+  category: "testing-and-quality"
+  icon: "assets/feature-flags.svg"
+  status: "stable"
+  requires:
+    - slug: "ast-grep"
+      type: "collector"
+      reason: "Provides feature flag metadata including creation timestamps"
+  related: []
+
+policies:
+  - name: feature-flags-age
+    description: |
+      Detects feature flags that have existed longer than a configurable threshold.
+      Feature flags should be temporary and removed once a feature is fully rolled out.
+      Stale flags add complexity and technical debt to the codebase.
+    mainPython: ./feature-flags-age.py
+    keywords: ["feature flags", "feature toggles", "technical debt", "code hygiene"]
+
+inputs:
+  max_days:
+    description: Maximum number of days a feature flag should exist before failing the check
+    default: "90"
+
