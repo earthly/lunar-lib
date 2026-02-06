@@ -1,7 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- CI badge in top-left corner (smaller) -->
-  <circle cx="15" cy="15" r="12" fill="#425cc7"/>
-  <text x="15" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">CI</text>
+  <defs>
+    <!-- Mask for CI cutout -->
+    <mask id="ci-cutout">
+      <circle cx="15" cy="15" r="12" fill="white"/>
+      <text x="15" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="black" text-anchor="middle">CI</text>
+    </mask>
+  </defs>
+  <!-- CI badge with cutout letters -->
+  <circle cx="15" cy="15" r="12" fill="#425cc7" mask="url(#ci-cutout)"/>
   <!-- OpenTelemetry official logo (centered) -->
   <g transform="translate(50, 52) scale(0.085) translate(-500, -500)">
     <path fill="#f5a800" d="M528.7 545.9c-42 42-42 110.1 0 152.1s110.1 42 152.1 0 42-110.1 0-152.1-110.1-42-152.1 0zm113.7 113.8c-20.8 20.8-54.5 20.8-75.3 0-20.8-20.8-20.8-54.5 0-75.3 20.8-20.8 54.5-20.8 75.3 0 20.8 20.7 20.8 54.5 0 75.3zm36.6-643l-65.9 65.9c-12.9 12.9-12.9 34.1 0 47l257.3 257.3c12.9 12.9 34.1 12.9 47 0l65.9-65.9c12.9-12.9 12.9-34.1 0-47L725.9 16.7c-12.9-12.9-34-12.9-46.9 0zM217.3 858.8c11.7-11.7 11.7-30.8 0-42.5l-33.5-33.5c-11.7-11.7-30.8-11.7-42.5 0L72.1 852l-.1.1-19-19c-10.5-10.5-27.6-10.5-38 0-10.5 10.5-10.5 27.6 0 38l114 114c10.5 10.5 27.6 10.5 38 0s10.5-27.6 0-38l-19-19 .1-.1 69.2-69.2z"/>
