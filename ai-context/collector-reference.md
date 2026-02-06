@@ -863,3 +863,44 @@ LUNAR_COMPONENT_ID="github.com/acme/api" ./main.sh
 ### 7. Document Component JSON Schema
 
 Document what paths your collector writes to, so policy authors know what to expect.
+
+### 8. Collect All Detected CI Commands in an Array (with Versions)
+
+When a collector is centered around detecting a CI command (e.g., via `ci-after-command` hooks), it should collect **all** invocations it detects into an array—not just the first match or a single boolean. Each entry should include the command name and, where possible, the version of the CLI tool.
+
+**Why this matters:**
+- **Maximum visibility:** Seeing every invocation reveals how a tool is used across the entire pipeline.
+- **Version assertions:** Policies can enforce minimum CLI versions or flag outdated tools.
+- **Discrepancy detection:** Different jobs or steps may use different versions of the same tool—collecting all invocations makes these inconsistencies visible.
+
+```bash
+#!/bin/bash
+set -e
+
+# Extract the tool version (example: docker)
+TOOL_VERSION=$("$(echo "$LUNAR_CI_COMMAND" | awk '{print $1}')" version --format '{{.Client.Version}}' 2>/dev/null || echo "unknown")
+
+# Collect each invocation into an array — Lunar auto-concatenates arrays at the same path
+lunar collect -j ".ci.docker.commands" "$(jq -n \
+  --arg cmd "$LUNAR_CI_COMMAND" \
+  --arg ver "$TOOL_VERSION" \
+  '[{command: $cmd, version: $ver}]')"
+```
+
+Because Lunar [automatically concatenates arrays](#array-concatenation) written to the same path across multiple CI runs, each invocation appends to the list. The result is a complete picture:
+
+```json
+{
+  "ci": {
+    "docker": {
+      "commands": [
+        { "command": "docker build -t myapp .", "version": "24.0.7" },
+        { "command": "docker push myapp:latest", "version": "24.0.7" },
+        { "command": "docker build -t myapp-worker .", "version": "23.0.1" }
+      ]
+    }
+  }
+}
+```
+
+Policies can then assert on version consistency, minimum versions, or simply that the tool was invoked at all.
