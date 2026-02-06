@@ -33,15 +33,16 @@ def check_min_coverage(node=None):
                 c.skip("No language project detected")
                 return c
         
-        # Check if coverage data exists first
-        if not c.get_node(".testing.coverage").exists():
-            c.skip("No coverage data available")
-            return c
-        
-        # Check if percentage is reported
-        if not c.get_node(".testing.coverage.percentage").exists():
-            c.skip("Coverage percentage not reported")
-            return c
+        # Assert coverage data exists - fail (not skip) if missing
+        # This ensures the score correctly reflects missing coverage
+        c.assert_exists(
+            ".testing.coverage",
+            "No coverage data collected. Configure a coverage tool to run in your CI pipeline."
+        )
+        c.assert_exists(
+            ".testing.coverage.percentage",
+            "Coverage percentage not reported. Ensure your coverage tool reports metrics."
+        )
         
         min_coverage = int(variable_or_default("min_coverage", "80"))
         coverage = c.get_value(".testing.coverage.percentage")

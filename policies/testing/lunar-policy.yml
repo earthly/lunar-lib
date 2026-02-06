@@ -33,8 +33,8 @@ policies:
 
   - name: passing
     description: |
-      Ensures all tests pass. Skips if pass/fail data is not available
-      (some collectors only report execution, not results).
+      Ensures all tests pass.
+      Skips if project does not contain a specified language.
     mainPython: ./passing.py
     keywords: ["tests", "passing", "test results", "quality"]
 
@@ -55,7 +55,7 @@ policies:
   - name: min-coverage
     description: |
       Enforces a minimum code coverage threshold (default 80%).
-      Skips if coverage data is not available.
+      Skips if project does not contain a specified language.
     mainPython: ./min_coverage.py
     keywords: ["coverage", "coverage threshold", "minimum coverage", "quality"]
 

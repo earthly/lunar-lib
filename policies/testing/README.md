@@ -13,10 +13,10 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `executed` | Tests should be executed in CI | No test execution data found |
-| `passing` | All tests should pass | Tests are failing (or skipped if pass/fail data unavailable) |
+| `passing` | All tests should pass | Tests are failing or pass/fail data unavailable |
 | `coverage-collected` | Coverage data should be collected | No coverage data found |
 | `coverage-reported` | Coverage percentage should be reported | Coverage runs but percentage not captured |
-| `min-coverage` | Coverage should meet minimum threshold | Coverage below required percentage (or skipped if no data) |
+| `min-coverage` | Coverage should meet minimum threshold | Coverage below threshold or no coverage data |
 
 ## Required Data
 
@@ -29,7 +29,7 @@ This policy reads from the following Component JSON paths:
 | `.testing.coverage` | object | Any coverage collector (e.g., `codecov`, `golang`) |
 | `.testing.coverage.percentage` | number | Coverage collectors that report percentage |
 
-**Note:** The `passing` and `min-coverage` checks will **skip** (not fail) if their required data is not available. This is intentional—some collectors only report partial data. Use `coverage-reported` if you want to **enforce** that percentage is reported.
+**Note:** All checks **fail** (not skip) when expected data is missing for a valid language project. This ensures the compliance score accurately reflects missing test/coverage data. Checks only **skip** when the component is not a language project (e.g., docs-only repos).
 
 ## Installation
 

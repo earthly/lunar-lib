@@ -4,9 +4,6 @@ from lunar_policy import Check, variable_or_default
 def check_passing(node=None):
     """Check that all tests pass.
     
-    Skips if pass/fail data is not available (some collectors only 
-    report execution, not results).
-    
     Args:
         node: Optional Node for testing. If None, loads from environment.
     
@@ -37,21 +34,16 @@ def check_passing(node=None):
                 c.skip("No language project detected")
                 return c
         
-        # Check if we have test execution data at all
-        # get_node().exists() returns False without raising NoDataError
-        testing_node = c.get_node(".testing")
-        if not testing_node.exists():
-            c.skip("No test execution data found")
-            return c
-
-        # Check if pass/fail data is available
-        all_passing_node = c.get_node(".testing.all_passing")
-        if not all_passing_node.exists():
-            c.skip(
-                "Test pass/fail data not available. "
-                "This requires a collector that reports detailed test results."
-            )
-            return c
+        # Assert test data exists - fail (not skip) if missing
+        # This ensures the score correctly reflects missing test data
+        c.assert_exists(
+            ".testing",
+            "No test execution data found. Ensure tests are configured to run in CI."
+        )
+        c.assert_exists(
+            ".testing.all_passing",
+            "Test pass/fail data not available. Configure your test runner to report results."
+        )
 
         # Assert tests are passing
         c.assert_true(
