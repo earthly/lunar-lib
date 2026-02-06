@@ -7,11 +7,9 @@ def main(node=None):
     with c:
         if not is_pr_context():
             c.skip("Not in a PR context")
-            return c
 
         if not c.exists(".jira.ticket"):
             c.skip("No Jira ticket data available")
-            return c
 
         allowed_str = variable_or_default("allowed_statuses", "")
         disallowed_str = variable_or_default("disallowed_statuses", "")
@@ -28,7 +26,6 @@ def main(node=None):
 
         if not status:
             c.skip("Jira ticket has no status information")
-            return c
 
         if allowed and status not in allowed:
             c.fail(f"Ticket {ticket_key} has status '{status}' which is not in "

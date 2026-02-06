@@ -7,16 +7,13 @@ def main(node=None):
     with c:
         if not is_pr_context():
             c.skip("Not in a PR context")
-            return c
 
         if not c.exists(".vcs.pr.ticket"):
             c.skip("No ticket referenced in PR")
-            return c
 
         ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "")
         if not ticket_id:
             c.skip("No ticket ID found")
-            return c
 
         valid = c.get_value_or_default(".vcs.pr.ticket.valid", None)
         if valid is None:

@@ -7,7 +7,6 @@ def main(node=None):
     with c:
         if not is_pr_context():
             c.skip("Not in a PR context")
-            return c
 
         if not c.exists(".vcs.pr.ticket"):
             c.fail("PR does not reference a Jira ticket. "

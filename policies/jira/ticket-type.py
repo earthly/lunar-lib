@@ -7,11 +7,9 @@ def main(node=None):
     with c:
         if not is_pr_context():
             c.skip("Not in a PR context")
-            return c
 
         if not c.exists(".jira.ticket"):
             c.skip("No Jira ticket data available")
-            return c
 
         allowed_str = variable_or_default("allowed_types", "")
         allowed = [t.strip() for t in allowed_str.split(",") if t.strip()]
@@ -25,7 +23,6 @@ def main(node=None):
 
         if not issue_type:
             c.skip("Jira ticket has no type information")
-            return c
 
         c.assert_true(issue_type in allowed,
                       f"Ticket {ticket_key} has type '{issue_type}' which is not in "

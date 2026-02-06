@@ -1,14 +1,19 @@
 #!/bin/bash
 # helpers.sh — Shared ticket extraction logic for Jira collector sub-collectors.
 
-# escape_char: Escapes a character for use in a bash regex pattern.
-escape_char() {
-  local char="$1"
-  case "$char" in
-    "" ) printf "" ;;
-    \.|\^|\$|\*|\+|\?|\(|\)|\[|\]|\{|\}|\||- ) printf "\\%s" "$char" ;;
-    *) printf "%s" "$char" ;;
-  esac
+# escape_string: Escapes special regex characters in a string for bash regex.
+escape_string() {
+  local str="$1"
+  local escaped=""
+  local i char
+  for (( i=0; i<${#str}; i++ )); do
+    char="${str:i:1}"
+    case "$char" in
+      \\|\.|\^|\$|\*|\+|\?|\(|\)|\[|\]|\{|\}|\||- ) escaped+="\\$char" ;;
+      *) escaped+="$char" ;;
+    esac
+  done
+  printf "%s" "$escaped"
 }
 
 # extract_ticket_id: Extracts a Jira ticket ID from a PR title.
@@ -29,8 +34,8 @@ extract_ticket_id() {
   local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
 
   local prefix_pattern suffix_pattern regex
-  prefix_pattern="$(escape_char "$prefix")[[:space:]]*"
-  suffix_pattern="[[:space:]]*$(escape_char "$suffix")"
+  prefix_pattern="$(escape_string "$prefix")[[:space:]]*"
+  suffix_pattern="[[:space:]]*$(escape_string "$suffix")"
   regex="${prefix_pattern}(${pattern})${suffix_pattern}"
 
   if [[ $pr_title =~ $regex ]]; then

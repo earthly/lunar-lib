@@ -7,11 +7,9 @@ def main(node=None):
     with c:
         if not is_pr_context():
             c.skip("Not in a PR context")
-            return c
 
         if not c.exists(".jira.ticket_reuse_count"):
             c.skip("No ticket reuse data available")
-            return c
 
         max_reuse = int(variable_or_default("max_ticket_reuse", "3"))
         reuse_count = c.get_value(".jira.ticket_reuse_count")
