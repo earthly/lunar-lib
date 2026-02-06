@@ -6,12 +6,12 @@ Enforce Jira ticket hygiene across your organization's pull requests.
 
 This policy verifies that PRs reference valid Jira tickets, checks ticket status and type, and detects ticket reuse across multiple PRs. It helps teams maintain traceability between code changes and project management.
 
-## Guardrails
+## Policies
 
-This policy provides the following guardrails (use `include` to select a subset):
+This plugin provides the following policies (use `include` to select a subset):
 
-| Guardrail | Description | Failure Meaning |
-|-----------|-------------|-----------------|
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
 | `ticket-present` | PRs must reference a Jira ticket | No ticket ID found in PR title |
 | `ticket-valid` | Referenced ticket must exist in Jira | Ticket ID was parsed but doesn't exist in Jira |
 | `ticket-status` | Ticket must be in an acceptable status | Ticket status is disallowed or not in allowed list |
