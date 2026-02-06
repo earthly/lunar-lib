@@ -878,26 +878,36 @@ When a collector is centered around detecting a CI command (e.g., via `ci-after-
 set -e
 
 # Extract the tool version (example: docker)
-TOOL_VERSION=$("$(echo "$LUNAR_CI_COMMAND" | awk '{print $1}')" version --format '{{.Client.Version}}' 2>/dev/null || echo "unknown")
+TOOL_VERSION=$(docker version --format '{{.Client.Version}}' 2>/dev/null || echo "")
 
-# Collect each invocation into an array — Lunar auto-concatenates arrays at the same path
-lunar collect -j ".ci.docker.commands" "$(jq -n \
-  --arg cmd "$LUNAR_CI_COMMAND" \
-  --arg ver "$TOOL_VERSION" \
-  '[{command: $cmd, version: $ver}]')"
+# Collect each invocation into a cmds array under .containers.docker.cicd
+# Lunar auto-concatenates arrays at the same path across multiple CI runs
+if [[ -n "$TOOL_VERSION" ]]; then
+  cmd_str=$(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')
+  jq -n \
+    --arg cmd "$cmd_str" \
+    --arg version "$TOOL_VERSION" \
+    '{
+      cmds: [{cmd: $cmd, version: $version}],
+      source: {tool: "docker", integration: "ci"}
+    }' | lunar collect -j ".containers.docker.cicd" -
+fi
 ```
 
-Because Lunar [automatically concatenates arrays](#array-concatenation) written to the same path across multiple CI runs, each invocation appends to the list. The result is a complete picture:
+This follows the same convention used by existing collectors (e.g., the Go collector writes to `.lang.go.cicd.cmds`). Because Lunar [automatically concatenates arrays](#array-concatenation) written to the same path across multiple CI runs, each invocation appends to the list. The result is a complete picture:
 
 ```json
 {
-  "ci": {
+  "containers": {
     "docker": {
-      "commands": [
-        { "command": "docker build -t myapp .", "version": "24.0.7" },
-        { "command": "docker push myapp:latest", "version": "24.0.7" },
-        { "command": "docker build -t myapp-worker .", "version": "23.0.1" }
-      ]
+      "cicd": {
+        "cmds": [
+          { "cmd": "docker build -t myapp .", "version": "24.0.7" },
+          { "cmd": "docker push myapp:latest", "version": "24.0.7" },
+          { "cmd": "docker build -t myapp-worker .", "version": "23.0.1" }
+        ],
+        "source": { "tool": "docker", "integration": "ci" }
+      }
     }
   }
 }
