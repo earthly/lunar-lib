@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Document outline -->
+  <path d="M16 4h22l12 12v40a4 4 0 0 1-4 4H16a4 4 0 0 1-4 4V8a4 4 0 0 1 4-4z" fill="none" stroke="white" stroke-width="2"/>
+  <!-- Folded corner -->
+  <path d="M38 4v12h12" fill="none" stroke="white" stroke-width="2"/>
+  <!-- List lines representing SBOM entries -->
+  <line x1="20" y1="26" x2="44" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="20" y1="34" x2="40" y2="34" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="20" y1="42" x2="36" y2="42" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <!-- Checkmark badge -->
+  <circle cx="46" cy="48" r="10" fill="white"/>
+  <path d="M41 48l3 3 6-6" fill="none" stroke="#1a1a2e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,69 @@
+version: 0
+
+name: sbom
+description: Enforces SBOM existence, license compliance, completeness, and format
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "SBOM Guardrails"
+  long_description: |
+    Enforce Software Bill of Materials standards across your organization.
+    Verify SBOMs are generated, contain license data, use approved formats,
+    and do not include disallowed licenses.
+  category: "security-and-compliance"
+  icon: "assets/sbom.svg"
+  status: "stable"
+  requires:
+    - slug: "syft"
+      type: "collector"
+      reason: "Provides SBOM data for policy evaluation"
+
+policies:
+  - name: sbom-exists
+    description: |
+      Ensures an SBOM was generated, either automatically or detected in CI.
+    mainPython: ./sbom-exists.py
+    keywords: ["sbom", "software bill of materials", "compliance"]
+
+  - name: has-licenses
+    description: |
+      Verifies that SBOM components have license information populated.
+      Fails if license coverage is below the configured threshold.
+    mainPython: ./has-licenses.py
+    keywords: ["sbom", "licenses", "license coverage"]
+
+  - name: disallowed-licenses
+    description: |
+      Checks for disallowed licenses in SBOM components.
+      Matches component licenses against configurable regex patterns.
+    mainPython: ./disallowed-licenses.py
+    keywords: ["sbom", "licenses", "compliance", "gpl", "copyleft"]
+
+  - name: min-components
+    description: |
+      Verifies the SBOM contains a minimum number of components.
+      Catches trivially empty SBOMs that may indicate detection failures.
+    mainPython: ./min-components.py
+    keywords: ["sbom", "completeness", "components"]
+
+  - name: standard-format
+    description: |
+      Validates the SBOM uses an approved format (CycloneDX, SPDX).
+      Auto-passes if no format restriction is configured.
+    mainPython: ./standard-format.py
+    keywords: ["sbom", "cyclonedx", "spdx", "format"]
+
+inputs:
+  disallowed_licenses:
+    description: Comma-separated regex patterns of disallowed licenses (e.g. "GPL.*,AGPL.*")
+  min_license_coverage:
+    description: Minimum percentage of components that must have license info (0-100)
+    default: "90"
+  min_components:
+    description: Minimum number of components the SBOM must contain
+    default: "1"
+  allowed_formats:
+    description: Comma-separated list of allowed SBOM formats (e.g. "cyclonedx,spdx"). Empty means any.
+    default: ""
