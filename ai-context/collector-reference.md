@@ -877,92 +877,10 @@ Many collectors either **detect a tool running in CI** or **auto-run a tool** th
 
 **Key rules:**
 
-1. **`.cicd` collectors** should collect **all** invocations into a `cmds` array (not just the first match or a boolean). Each entry should include the command string and, where possible, the CLI version. Lunar [auto-concatenates arrays](#array-concatenation) at the same path, so each CI invocation appends to the list.
+1. **`.cicd` collectors** should collect **all** invocations into a `cmds` array (not just the first match or a boolean). Each entry should include the command string and, where possible, the CLI version. Lunar [auto-concatenates arrays](#array-concatenation) at the same path, so each CI invocation appends to the list. This gives maximum visibility—policies can enforce minimum CLI versions, flag outdated tools, and detect version discrepancies across CI jobs.
 
 2. **`.auto` collectors** should record execution metadata (exit code, version, pass/fail) and write results into both the tool-specific `.auto` sub-key and normalized category paths.
 
 3. **Normalized paths** (e.g., `.sca.vulnerabilities`, `.testing.coverage`) remain tool-agnostic—any source can populate them.
 
-#### Example: CI detection (`.cicd`)
-
-```bash
-#!/bin/bash
-set -e
-
-# Detect docker commands in CI and record each invocation
-TOOL_VERSION=$(docker version --format '{{.Client.Version}}' 2>/dev/null || echo "")
-
-if [[ -n "$TOOL_VERSION" ]]; then
-  cmd_str=$(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')
-  jq -n \
-    --arg cmd "$cmd_str" \
-    --arg version "$TOOL_VERSION" \
-    '{
-      cmds: [{cmd: $cmd, version: $version}],
-      source: {tool: "docker", integration: "ci"}
-    }' | lunar collect -j ".containers.docker.cicd" -
-fi
-```
-
-```json
-{
-  "containers": {
-    "docker": {
-      "cicd": {
-        "cmds": [
-          { "cmd": "docker build -t myapp .", "version": "24.0.7" },
-          { "cmd": "docker push myapp:latest", "version": "24.0.7" },
-          { "cmd": "docker build -t myapp-worker .", "version": "23.0.1" }
-        ],
-        "source": { "tool": "docker", "integration": "ci" }
-      }
-    }
-  }
-}
-```
-
-**Why collect every invocation?** Maximum visibility—policies can enforce minimum CLI versions, flag outdated tools, and detect version discrepancies across different CI jobs or steps.
-
-#### Example: Auto-run (`.auto`)
-
-```bash
-#!/bin/bash
-set -e
-
-# Auto-run Semgrep and record results
-SEMGREP_VERSION=$(semgrep --version 2>/dev/null || echo "unknown")
-
-set +e
-semgrep_output=$(semgrep scan --json --config auto 2>/dev/null)
-semgrep_exit=$?
-set -e
-
-# Write to .sast.semgrep.auto (tool-specific auto-run metadata)
-jq -n \
-  --arg version "$SEMGREP_VERSION" \
-  --argjson exit_code "$semgrep_exit" \
-  '{
-    version: $version,
-    exit_code: $exit_code,
-    source: {tool: "semgrep", integration: "code"}
-  }' | lunar collect -j ".sast.semgrep.auto" -
-
-# Also write to normalized .sast paths for tool-agnostic policies
-echo "$semgrep_output" | jq '{findings: [.results[] | {/* normalize */}]}' | \
-  lunar collect -j ".sast" -
-```
-
-```json
-{
-  "sast": {
-    "findings": [{ "rule": "sql-injection", "severity": "high", "file": "app.py" }],
-    "semgrep": {
-      "auto": {
-        "version": "1.56.0",
-        "exit_code": 0,
-        "source": { "tool": "semgrep", "integration": "code" }
-      }
-    }
-  }
-}
-```
+See `collectors/golang/cicd.sh` for a reference implementation of the `.cicd` pattern.
