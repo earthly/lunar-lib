@@ -1,0 +1,71 @@
+version: 0
+
+name: jira
+description: Enforce Jira ticket presence, validity, status, type, and reuse limits
+author: support@earthly.dev
+
+landing_page:
+  display_name: "Jira Guardrails"
+  long_description: |
+    Enforce Jira ticket hygiene across your organization. Verify PRs reference
+    valid Jira tickets, check ticket status and type, and detect ticket reuse
+    across multiple PRs.
+  category: "devex-build-and-ci"
+  icon: "assets/jira.svg"
+  status: "stable"
+  requires:
+    - slug: "jira"
+      type: "collector"
+      reason: "Provides Jira ticket data for policy evaluation"
+  related: []
+
+policies:
+  - name: ticket-present
+    description: |
+      Asserts that a Jira ticket is referenced in the PR title.
+      Skips on non-PR contexts (default branch evaluations).
+    mainPython: ./ticket-present.py
+    keywords: ["jira", "ticket", "pr", "sdlc"]
+
+  - name: ticket-valid
+    description: |
+      Asserts the referenced Jira ticket exists and is valid in Jira.
+      Skips when no ticket is referenced.
+    mainPython: ./ticket-valid.py
+    keywords: ["jira", "ticket", "validation"]
+
+  - name: ticket-status
+    description: |
+      Asserts the Jira ticket is in an acceptable status.
+      Configurable via allowed_statuses and disallowed_statuses inputs.
+    mainPython: ./ticket-status.py
+    keywords: ["jira", "ticket", "status", "workflow"]
+
+  - name: ticket-type
+    description: |
+      Asserts the Jira ticket is an acceptable issue type.
+      Configurable via the allowed_types input.
+    mainPython: ./ticket-type.py
+    keywords: ["jira", "ticket", "type", "issue type"]
+
+  - name: ticket-reuse
+    description: |
+      Detects when the same Jira ticket is reused across too many PRs.
+      Prevents teams from recycling a single ticket to circumvent
+      ticketing requirements.
+    mainPython: ./ticket-reuse.py
+    keywords: ["jira", "ticket reuse", "compliance", "audit"]
+
+inputs:
+  allowed_statuses:
+    description: Comma-separated list of allowed Jira statuses (empty = any)
+    default: ""
+  disallowed_statuses:
+    description: Comma-separated list of disallowed Jira statuses (empty = none)
+    default: ""
+  allowed_types:
+    description: Comma-separated list of allowed issue types (empty = any)
+    default: ""
+  max_ticket_reuse:
+    description: Maximum number of other PRs allowed to reference the same ticket
+    default: "3"
