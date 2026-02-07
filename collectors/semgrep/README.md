@@ -26,7 +26,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
 | `github-app` | code (PRs only) | Detects Semgrep GitHub App scans on pull requests |
-| `github-app-default-branch` | code (default branch) | Checks if Semgrep has run on recent PRs (proof for default branch) |
+| `running-in-prs` | code (default branch) | Proves Semgrep is running on PRs (compliance proof for default branch) |
 | `cli` | ci-after-command | Detects Semgrep CLI executions in CI pipelines |
 
 ## Installation
@@ -39,4 +39,4 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, python]
 ```
 
-The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `github-app-default-branch` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).
+The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).
