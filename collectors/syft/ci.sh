@@ -7,10 +7,9 @@ CMD="$LUNAR_CI_COMMAND"
 lunar collect ".sbom.cicd.source.tool" "syft"
 lunar collect ".sbom.cicd.source.integration" "ci"
 
-# Try to get syft version
+# Try to get syft version (no jq — CI runners may not have it)
 if command -v syft &>/dev/null; then
-  VERSION=$(syft version -o json 2>/dev/null | jq -r '.version // empty' 2>/dev/null || \
-    syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
+  VERSION=$(syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
   if [ -n "$VERSION" ]; then
     lunar collect ".sbom.cicd.source.version" "$VERSION"
   fi
@@ -59,13 +58,9 @@ case "$OUTPUT_FORMAT" in
     ;;
 esac
 
-# If we found an output file, collect it
+# If we found an output file, collect it (lunar collect -j validates JSON internally)
 if [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
-  # Verify it's valid JSON before collecting
-  if jq empty "$OUTPUT_FILE" 2>/dev/null; then
-    echo "Collecting SBOM from $OUTPUT_FILE" >&2
-    cat "$OUTPUT_FILE" | lunar collect -j "$SBOM_PATH" -
-  else
-    echo "Warning: SBOM output file $OUTPUT_FILE is not valid JSON" >&2
-  fi
+  echo "Collecting SBOM from $OUTPUT_FILE" >&2
+  cat "$OUTPUT_FILE" | lunar collect -j "$SBOM_PATH" - || \
+    echo "Warning: Failed to collect SBOM from $OUTPUT_FILE" >&2
 fi
