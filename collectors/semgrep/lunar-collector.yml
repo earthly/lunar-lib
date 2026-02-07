@@ -5,6 +5,7 @@ description: Detects Semgrep security scans via GitHub App or CLI integration
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Semgrep Collector"
