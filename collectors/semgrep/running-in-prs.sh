@@ -65,7 +65,9 @@ for CATEGORY in sast sca; do
     RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
     
     if [ "$RESULT" = "t" ]; then
-        jq -n '{github_app_run_recently: true}' | \
+        # pr_scanning_verified: proves PRs for this component are being scanned
+        # (does not imply specific timing, just that scanning capability exists)
+        jq -n '{pr_scanning_verified: true}' | \
             lunar collect -j ".$CATEGORY.native.semgrep" -
         
         write_semgrep_source "$CATEGORY" "github_app"

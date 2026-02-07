@@ -39,4 +39,6 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, python]
 ```
 
-The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).
+The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access.
+
+The `running-in-prs` collector queries the Lunar Hub database to verify PR scanning. It tries `lunar sql connection-string` first. If unavailable, it falls back to using `LUNAR_HUB_HOST` and `LUNAR_SECRET_PG_PASSWORD` (with optional `LUNAR_SECRET_PG_USER`, defaults to `api3`). If neither method is available, the collector skips silently.
