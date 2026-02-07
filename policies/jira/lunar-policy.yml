@@ -22,37 +22,32 @@ landing_page:
 policies:
   - name: ticket-present
     description: |
-      Asserts that a Jira ticket is referenced in the PR title.
-      Skips on non-PR contexts (default branch evaluations).
+      Ensures PRs reference a Jira ticket in the title.
     mainPython: ./ticket-present.py
     keywords: ["jira", "ticket", "pr", "sdlc"]
 
   - name: ticket-valid
     description: |
-      Asserts the referenced Jira ticket exists and is valid in Jira.
-      Skips when no ticket is referenced.
+      Ensures the referenced Jira ticket exists and is valid.
     mainPython: ./ticket-valid.py
     keywords: ["jira", "ticket", "validation"]
 
   - name: ticket-status
     description: |
-      Asserts the Jira ticket is in an acceptable status.
-      Configurable via allowed_statuses and disallowed_statuses inputs.
+      Ensures the Jira ticket is in an acceptable workflow status.
     mainPython: ./ticket-status.py
     keywords: ["jira", "ticket", "status", "workflow"]
 
   - name: ticket-type
     description: |
-      Asserts the Jira ticket is an acceptable issue type.
-      Configurable via the allowed_types input.
+      Ensures the Jira ticket is an acceptable issue type.
     mainPython: ./ticket-type.py
     keywords: ["jira", "ticket", "type", "issue type"]
 
   - name: ticket-reuse
     description: |
-      Detects when the same Jira ticket is reused across too many PRs.
-      Prevents teams from recycling a single ticket to circumvent
-      ticketing requirements.
+      Prevents teams from recycling the same Jira ticket across
+      too many PRs.
     mainPython: ./ticket-reuse.py
     keywords: ["jira", "ticket reuse", "compliance", "audit"]
 

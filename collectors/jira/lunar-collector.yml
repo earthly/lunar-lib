@@ -37,7 +37,6 @@ collectors:
       the same Jira ticket. Writes .jira.ticket_reuse_count for policy
       evaluation. Detects ticket recycling abuse.
     mainBash: ticket-history.sh
-    image: native
     hook:
       type: code
       runs_on: [prs]
