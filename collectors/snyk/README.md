@@ -32,9 +32,9 @@ This plugin provides the following collectors (use `include` to select a subset)
 
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
-| `github-app` | code (PRs only) | Detects Snyk GitHub App scans by querying commit status API |
-| `github-app-default-branch` | code (default-branch only) | Checks if Snyk ran on recent PRs via database query |
-| `cli` | ci-after-command | Captures Snyk CLI executions in CI pipelines |
+| `github-app` | code (PRs only) | Detects Snyk GitHub App scans on pull requests |
+| `running-in-prs` | code (default branch) | Proves Snyk is running on PRs (compliance proof for default branch) |
+| `cli` | ci-after-command | Detects Snyk CLI executions in CI pipelines |
 
 ## Installation
 
@@ -46,19 +46,4 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
 ```
 
-### Required Secrets
-
-| Secret | Required | Description |
-|--------|----------|-------------|
-| `GH_TOKEN` | Yes | GitHub token for API access (checking commit statuses) |
-| `PG_PASSWORD` | No | Database password for main branch queries |
-
-Configure secrets in your `lunar-config.yml`:
-
-```yaml
-secrets:
-  GH_TOKEN:
-    from_env: GITHUB_TOKEN
-  PG_PASSWORD:
-    from_env: LUNAR_DB_PASSWORD
-```
+The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).

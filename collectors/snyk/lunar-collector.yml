@@ -1,10 +1,10 @@
 version: 0
 
 name: snyk
-description: Detects Snyk security scans and collects vulnerability data
+description: Detects Snyk security scans via GitHub App or CLI integration
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 default_image_ci_collectors: native
 
 landing_page:
@@ -33,16 +33,17 @@ collectors:
       runs_on: [prs]
     keywords: ["snyk", "github app", "security scanning", "vulnerabilities"]
 
-  - name: github-app-default-branch
+  - name: running-in-prs
     description: |
-      Checks if Snyk GitHub App has run on recent PRs by querying the
-      Lunar Hub database. Provides proof of scanning on the default branch
-      even though Snyk doesn't post checks there directly.
-    mainBash: github-app-default-branch.sh
+      Proves Snyk is running on PRs by querying Lunar Hub for Snyk data
+      from recent PRs. Used on the default branch to provide compliance proof
+      that PR scanning is happening (since Snyk GitHub App only posts checks
+      on PRs, not directly on the default branch).
+    mainBash: running-in-prs.sh
     hook:
       type: code
       runs_on: [default-branch]
-    keywords: ["snyk", "main branch", "compliance proof"]
+    keywords: ["snyk", "pr scanning", "compliance proof", "default branch"]
 
   - name: cli
     description: |
@@ -56,10 +57,13 @@ collectors:
 
 secrets:
   - name: GH_TOKEN
-    description: GitHub token for API access (checking commit statuses). Required for github-app collectors, not needed for CLI.
+    description: GitHub token for API access (required for github-app collector)
     required: false
   - name: PG_PASSWORD
-    description: Database password for main branch queries
+    description: Database password for default-branch collector (optional, uses lunar sql connection-string if not set)
+    required: false
+  - name: PG_USER
+    description: Database user for default-branch collector (optional, defaults to api3)
     required: false
 
 example_component_json: |
