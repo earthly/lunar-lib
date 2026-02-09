@@ -60,7 +60,7 @@ inputs:
     description: Comma-separated regex patterns of disallowed licenses (e.g. "GPL.*,AGPL.*")
   min_license_coverage:
     description: Minimum percentage of components that must have license info (0-100)
-    default: "90"
+    default: "50"
   min_components:
     description: Minimum number of components the SBOM must contain
     default: "1"

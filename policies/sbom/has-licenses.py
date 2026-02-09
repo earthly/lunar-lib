@@ -4,7 +4,7 @@ from helpers import get_sbom_components
 from lunar_policy import Check, variable_or_default
 
 with Check("has-licenses", "Verifies SBOM components have license information") as c:
-    min_coverage = int(variable_or_default("min_license_coverage", "90"))
+    min_coverage = int(variable_or_default("min_license_coverage", "50"))
 
     components, has_sbom = get_sbom_components(c)
     if not has_sbom:
