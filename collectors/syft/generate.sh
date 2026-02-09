@@ -45,17 +45,17 @@ if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
 fi
 
 # Generate CycloneDX JSON SBOM
-tmp_sbom="$(mktemp)"
-if ! syft dir:. -o cyclonedx-json > "$tmp_sbom"; then
+SBOM_FILE="/tmp/sbom.json"
+if ! syft dir:. -o cyclonedx-json > "$SBOM_FILE"; then
   echo "syft failed to generate SBOM" >&2
   exit 1
 fi
 
 # Skip empty SBOMs
-if jq -e '(.components // []) | length == 0' "$tmp_sbom" >/dev/null 2>&1; then
+if jq -e '(.components // []) | length == 0' "$SBOM_FILE" >/dev/null 2>&1; then
   echo "SBOM has no components; skipping collection" >&2
   exit 0
 fi
 
 # Collect the full SBOM
-cat "$tmp_sbom" | lunar collect -j ".sbom.auto.cyclonedx" -
+cat "$SBOM_FILE" | lunar collect -j ".sbom.auto.cyclonedx" -
