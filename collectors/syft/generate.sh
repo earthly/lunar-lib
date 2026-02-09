@@ -3,11 +3,6 @@ set -e
 
 echo "Running syft generate collector" >&2
 
-if ! command -v syft >/dev/null 2>&1; then
-  echo "syft not found in PATH; run the syft collector's install.sh first." >&2
-  exit 1
-fi
-
 # Record source metadata
 SYFT_VERSION=$(syft version -o json 2>/dev/null | jq -r '.version // empty' || syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
 lunar collect ".sbom.auto.source.tool" "syft"
