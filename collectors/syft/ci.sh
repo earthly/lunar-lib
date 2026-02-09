@@ -43,16 +43,26 @@ if [ -z "$OUTPUT_FILE" ]; then
   fi
 fi
 
-# Determine the SBOM format category
-# Determine the SBOM format category — only collect if format is known
+# Determine the SBOM format — only collect JSON formats we recognize
+# Syft formats: json (native), cyclonedx-json, cyclonedx-xml, spdx-json, spdx-tag-value,
+#               github-json, table, text, purls, template
 SBOM_PATH=""
 case "$OUTPUT_FORMAT" in
-  cyclonedx-json|cyclonedx*)
+  cyclonedx-json)
     SBOM_PATH=".sbom.cicd.cyclonedx"
     ;;
-  spdx-json|spdx*)
+  spdx-json)
     SBOM_PATH=".sbom.cicd.spdx"
     ;;
+  json)
+    # Syft native JSON format
+    SBOM_PATH=".sbom.cicd.native.syft"
+    ;;
+  github-json)
+    SBOM_PATH=".sbom.cicd.native.github"
+    ;;
+  # XML and text formats (cyclonedx-xml, spdx-tag-value, table, text, purls, template)
+  # are not collected — lunar collect requires JSON
 esac
 
 # If we found an output file AND know the format, collect it
