@@ -44,6 +44,7 @@ if [ -z "$OUTPUT_FILE" ]; then
 fi
 
 # Determine the SBOM format category
+# Determine the SBOM format category — only collect if format is known
 SBOM_PATH=""
 case "$OUTPUT_FORMAT" in
   cyclonedx-json|cyclonedx*)
@@ -52,15 +53,13 @@ case "$OUTPUT_FORMAT" in
   spdx-json|spdx*)
     SBOM_PATH=".sbom.cicd.spdx"
     ;;
-  *)
-    # Default to cyclonedx if format unclear
-    SBOM_PATH=".sbom.cicd.cyclonedx"
-    ;;
 esac
 
-# If we found an output file, collect it (lunar collect -j validates JSON internally)
-if [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
-  echo "Collecting SBOM from $OUTPUT_FILE" >&2
+# If we found an output file AND know the format, collect it
+if [ -n "$SBOM_PATH" ] && [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
+  echo "Collecting SBOM from $OUTPUT_FILE (format: $OUTPUT_FORMAT)" >&2
   cat "$OUTPUT_FILE" | lunar collect -j "$SBOM_PATH" - || \
     echo "Warning: Failed to collect SBOM from $OUTPUT_FILE" >&2
+elif [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
+  echo "Skipping SBOM file collection: unknown format '$OUTPUT_FORMAT'" >&2
 fi
