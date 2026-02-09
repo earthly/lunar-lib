@@ -16,6 +16,7 @@ This collector writes to the following Component JSON paths:
 | `.sbom.auto.cyclonedx` | object | Full CycloneDX JSON from auto-generation |
 | `.sbom.cicd.source` | object | Source metadata for CI-detected SBOMs |
 | `.sbom.cicd.cyclonedx` | object | CycloneDX JSON collected from CI output |
+| `.sbom.cicd.spdx` | object | SPDX JSON collected from CI output |
 
 ## Collectors
 
