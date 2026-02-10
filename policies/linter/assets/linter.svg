@@ -8,14 +8,14 @@
   </defs>
   <!-- Document with circle cutout -->
   <g mask="url(#doc-mask)">
-    <rect x="12" y="4" width="40" height="52" rx="3" fill="white" fill-opacity="0.37" stroke="white" stroke-width="2"/>
+    <rect x="12" y="4" width="40" height="52" rx="3" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
     <!-- Code lines -->
-    <rect x="18" y="14" width="20" height="2.5" rx="1.25" fill="white" fill-opacity="0.37"/>
-    <rect x="18" y="21" width="28" height="2.5" rx="1.25" fill="white" fill-opacity="0.37"/>
-    <rect x="18" y="28" width="16" height="2.5" rx="1.25" fill="white" fill-opacity="0.37"/>
-    <rect x="18" y="35" width="24" height="2.5" rx="1.25" fill="white" fill-opacity="0.37"/>
+    <rect x="18" y="14" width="20" height="2.5" rx="1.25" fill="white" fill-opacity="0.8"/>
+    <rect x="18" y="21" width="28" height="2.5" rx="1.25" fill="white" fill-opacity="0.5"/>
+    <rect x="18" y="28" width="16" height="2.5" rx="1.25" fill="white" fill-opacity="0.5"/>
+    <rect x="18" y="35" width="24" height="2.5" rx="1.25" fill="white" fill-opacity="0.5"/>
   </g>
   <!-- Checkmark circle (lint passed indicator) -->
-  <circle cx="48" cy="48" r="12" fill="white" fill-opacity="0.37" stroke="white" stroke-width="2"/>
+  <circle cx="48" cy="48" r="12" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
   <path d="M43 48 L46 51 L53 44" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
