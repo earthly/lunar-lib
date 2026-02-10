@@ -1,24 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
   <!-- Central package node -->
-  <rect x="22" y="8" width="20" height="16" rx="2" fill="#1D63ED"/>
+  <rect x="22" y="8" width="20" height="16" rx="2" fill="white" fill-opacity="0.37"/>
   <rect x="26" y="12" width="12" height="2" rx="1" fill="white"/>
   <rect x="26" y="16" width="8" height="2" rx="1" fill="white"/>
-  
   <!-- Left dependency -->
-  <rect x="4" y="40" width="16" height="14" rx="2" fill="#1D63ED"/>
+  <rect x="4" y="40" width="16" height="14" rx="2" fill="white" fill-opacity="0.37"/>
   <rect x="7" y="44" width="10" height="2" rx="1" fill="white"/>
   <rect x="7" y="48" width="6" height="2" rx="1" fill="white"/>
-  
   <!-- Center dependency -->
-  <rect x="24" y="40" width="16" height="14" rx="2" fill="#1D63ED"/>
+  <rect x="24" y="40" width="16" height="14" rx="2" fill="white" fill-opacity="0.37"/>
   <rect x="27" y="44" width="10" height="2" rx="1" fill="white"/>
   <rect x="27" y="48" width="6" height="2" rx="1" fill="white"/>
-  
   <!-- Right dependency -->
-  <rect x="44" y="40" width="16" height="14" rx="2" fill="#1D63ED"/>
+  <rect x="44" y="40" width="16" height="14" rx="2" fill="white" fill-opacity="0.37"/>
   <rect x="47" y="44" width="10" height="2" rx="1" fill="white"/>
   <rect x="47" y="48" width="6" height="2" rx="1" fill="white"/>
-  
   <!-- Connection lines -->
   <path d="M32 24 L32 32 L12 32 L12 40" stroke="#1D63ED" stroke-width="2" stroke-linecap="round"/>
   <path d="M32 32 L32 40" stroke="#1D63ED" stroke-width="2" stroke-linecap="round"/>

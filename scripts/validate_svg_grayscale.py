@@ -14,23 +14,35 @@ import re
 import sys
 
 
+def is_allowed_fill(value):
+    """Check if a fill value is allowed (white, black, none, currentColor, or url ref)."""
+    v = value.strip().lower()
+    return v in {"white", "black", "none", "currentcolor", "#fff", "#ffffff", "#000", "#000000"} or v.startswith("url(")
+
+
+def is_allowed_stop_color(value):
+    """Check if a gradient stop-color is allowed (must be white)."""
+    v = value.strip().lower()
+    return v in {"white", "#fff", "#ffffff"}
+
+
 def validate_svg(path):
     with open(path) as f:
         content = f.read()
 
     errors = []
 
-    # Check for rgb() in fill: properties
-    rgb_fills = re.findall(r"fill:rgb\(\d+,\s*\d+,\s*\d+\)", content)
-    if rgb_fills:
-        for fill in set(rgb_fills):
-            errors.append(f"  Non-grayscale fill found: {fill}")
+    # Match fill values in both style attributes (fill:X) and XML attributes (fill="X")
+    fill_values = re.findall(r'(?i)\bfill\s*[:=]\s*["\']?([^;"\'\s>]+)', content)
+    for value in set(fill_values):
+        if not is_allowed_fill(value):
+            errors.append(f"  Non-grayscale fill found: {value}")
 
-    # Check for rgb() in gradient stop-color: properties
-    rgb_stops = re.findall(r"stop-color:rgb\(\d+,\s*\d+,\s*\d+\)", content)
-    if rgb_stops:
-        for stop in set(rgb_stops):
-            errors.append(f"  Non-grayscale gradient stop: {stop}")
+    # Match stop-color values in both style and XML attributes
+    stop_values = re.findall(r'(?i)\bstop-color\s*[:=]\s*["\']?([^;"\'\s>]+)', content)
+    for value in set(stop_values):
+        if not is_allowed_stop_color(value):
+            errors.append(f"  Non-grayscale gradient stop: {value}")
 
     return errors
 

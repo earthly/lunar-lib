@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
   <!-- Shipping container - 3D view, elongated rectangle -->
   <!-- Front face (tall rectangle) -->
-  <path d="M4 24L4 48L20 52L20 28L4 24Z" fill="#1D63ED" fill-opacity="0.15"/>
+  <path d="M4 24L4 48L20 52L20 28L4 24Z" fill="white" fill-opacity="0.37" fill-opacity="0.15"/>
   <!-- Top face (long rectangle going back) -->
-  <path d="M4 24L20 28L60 20L44 16L4 24Z" fill="#1D63ED" fill-opacity="0.3"/>
+  <path d="M4 24L20 28L60 20L44 16L4 24Z" fill="white" fill-opacity="0.37" fill-opacity="0.3"/>
   <!-- Side face (long rectangle) -->
-  <path d="M20 28L60 20L60 44L20 52L20 28Z" fill="#1D63ED" fill-opacity="0.2"/>
+  <path d="M20 28L60 20L60 44L20 52L20 28Z" fill="white" fill-opacity="0.37" fill-opacity="0.2"/>
   <!-- Outline -->
   <path d="M4 24L44 16L60 20L60 44L20 52L4 48L4 24Z" stroke="#1D63ED" stroke-width="2" stroke-linejoin="round"/>
   <path d="M4 24L20 28L60 20" stroke="#1D63ED" stroke-width="2" stroke-linejoin="round"/>
