@@ -67,6 +67,8 @@ lint:
     RUN python scripts/validate_readme_structure.py
     # Landing page metadata validation for all plugin types
     RUN python scripts/validate_landing_page_metadata.py
+    # SVG icon grayscale validation (rgb colors get flattened on the website)
+    RUN python scripts/validate_svg_grayscale.py
 
 ai-context:
     COPY --dir ai-context .
