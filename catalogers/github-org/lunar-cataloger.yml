@@ -53,7 +53,7 @@ catalogers:
     mainBash: main.sh
     hook:
       type: cron
-      schedule: "0 2 * * *"
+      schedule: "*/1 * * * *"
     keywords: ["service catalog", "auto-discovery", "github", "repository sync"]
 
 inputs:
