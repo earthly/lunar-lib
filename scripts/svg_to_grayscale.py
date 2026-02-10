@@ -96,13 +96,26 @@ def process_svg(input_path, output_path):
     svg = re.sub(r"fill:(#[0-9a-fA-F]{3,6})\b", replace_hex_fill_style, svg)
 
     # --- Convert hex fills in XML attributes: fill="#RRGGBB" ---
+    # Also handle existing fill-opacity attribute (replace it, don't duplicate)
+    def replace_hex_fill_attr_with_opacity(match):
+        hex_color = match.group(1)
+        r, g, b = hex_to_rgb(hex_color)
+        opacity = round(luminance(r, g, b), 2)
+        return f'fill="white" fill-opacity="{opacity}"'
+
     def replace_hex_fill_attr(match):
         hex_color = match.group(1)
         r, g, b = hex_to_rgb(hex_color)
         opacity = round(luminance(r, g, b), 2)
         return f'fill="white" fill-opacity="{opacity}"'
 
+    # First: handle fill="#hex" with existing fill-opacity (replace both)
+    svg = re.sub(r'fill="(#[0-9a-fA-F]{3,6})"\s+fill-opacity="[^"]*"', replace_hex_fill_attr_with_opacity, svg)
+    # Then: handle fill="#hex" without existing fill-opacity
     svg = re.sub(r'fill="(#[0-9a-fA-F]{3,6})"', replace_hex_fill_attr, svg)
+
+    # Convert stroke="#hex" to stroke="white"
+    svg = re.sub(r'stroke="(#[0-9a-fA-F]{3,6})"', 'stroke="white"', svg)
 
     # --- Convert gradient stop colors ---
     def replace_gradient_stop_style(match):

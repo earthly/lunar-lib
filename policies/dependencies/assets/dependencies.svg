@@ -16,7 +16,7 @@
   <rect x="47" y="44" width="10" height="2" rx="1" fill="white"/>
   <rect x="47" y="48" width="6" height="2" rx="1" fill="white"/>
   <!-- Connection lines -->
-  <path d="M32 24 L32 32 L12 32 L12 40" stroke="#1D63ED" stroke-width="2" stroke-linecap="round"/>
-  <path d="M32 32 L32 40" stroke="#1D63ED" stroke-width="2" stroke-linecap="round"/>
-  <path d="M32 32 L52 32 L52 40" stroke="#1D63ED" stroke-width="2" stroke-linecap="round"/>
+  <path d="M32 24 L32 32 L12 32 L12 40" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M32 32 L32 40" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M32 32 L52 32 L52 40" stroke="white" stroke-width="2" stroke-linecap="round"/>
 </svg>

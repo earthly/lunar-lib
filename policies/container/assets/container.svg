@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
   <!-- Shipping container - 3D view, elongated rectangle -->
   <!-- Front face (tall rectangle) -->
-  <path d="M4 24L4 48L20 52L20 28L4 24Z" fill="white" fill-opacity="0.37" fill-opacity="0.15"/>
+  <path d="M4 24L4 48L20 52L20 28L4 24Z" fill="white" fill-opacity="0.37"/>
   <!-- Top face (long rectangle going back) -->
-  <path d="M4 24L20 28L60 20L44 16L4 24Z" fill="white" fill-opacity="0.37" fill-opacity="0.3"/>
+  <path d="M4 24L20 28L60 20L44 16L4 24Z" fill="white" fill-opacity="0.37"/>
   <!-- Side face (long rectangle) -->
-  <path d="M20 28L60 20L60 44L20 52L20 28Z" fill="white" fill-opacity="0.37" fill-opacity="0.2"/>
+  <path d="M20 28L60 20L60 44L20 52L20 28Z" fill="white" fill-opacity="0.37"/>
   <!-- Outline -->
-  <path d="M4 24L44 16L60 20L60 44L20 52L4 48L4 24Z" stroke="#1D63ED" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M4 24L20 28L60 20" stroke="#1D63ED" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M20 28L20 52" stroke="#1D63ED" stroke-width="2"/>
+  <path d="M4 24L44 16L60 20L60 44L20 52L4 48L4 24Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M4 24L20 28L60 20" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M20 28L20 52" stroke="white" stroke-width="2"/>
   <!-- Corrugated ridges on long side -->
-  <path d="M26 29L26 50" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
-  <path d="M32 28L32 49" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
-  <path d="M38 26.5L38 47.5" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
-  <path d="M44 25L44 46" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
-  <path d="M50 23.5L50 44.5" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
-  <path d="M56 22L56 43" stroke="#1D63ED" stroke-width="1" opacity="0.5"/>
+  <path d="M26 29L26 50" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M32 28L32 49" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M38 26.5L38 47.5" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M44 25L44 46" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M50 23.5L50 44.5" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M56 22L56 43" stroke="white" stroke-width="1" opacity="0.5"/>
   <!-- Door lines on front face -->
-  <path d="M12 26L12 50" stroke="#1D63ED" stroke-width="1.2" opacity="0.6"/>
+  <path d="M12 26L12 50" stroke="white" stroke-width="1.2" opacity="0.6"/>
 </svg>

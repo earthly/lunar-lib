@@ -12,6 +12,7 @@ No rgb() colors are allowed — they get flattened to white on the website.
 import glob
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 
 def is_allowed_fill(value):
@@ -32,6 +33,13 @@ def validate_svg(path):
 
     errors = []
 
+    # Validate XML structure
+    try:
+        ET.parse(path)
+    except ET.ParseError as e:
+        errors.append(f"  Invalid XML: {e}")
+        return errors  # Skip color checks if XML is broken
+
     # Match fill values in both style attributes (fill:X) and XML attributes (fill="X")
     fill_values = re.findall(r'(?i)\bfill\s*[:=]\s*["\']?([^;"\'\s>]+)', content)
     for value in set(fill_values):
@@ -43,6 +51,12 @@ def validate_svg(path):
     for value in set(stop_values):
         if not is_allowed_stop_color(value):
             errors.append(f"  Non-grayscale gradient stop: {value}")
+
+    # Match stroke values (style and attributes)
+    stroke_values = re.findall(r'(?i)\bstroke\s*[:=]\s*["\']?([^;"\'\s>]+)', content)
+    for value in set(stroke_values):
+        if not is_allowed_fill(value):
+            errors.append(f"  Non-grayscale stroke found: {value}")
 
     return errors
 
