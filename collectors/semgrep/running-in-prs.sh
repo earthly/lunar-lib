@@ -57,9 +57,12 @@ fi
 # TODO: Remove this once HUB_COLLECTOR_SECRETS or Docker networking is fixed.
 CONN_STRING="postgres://api3:secret@172.17.0.1:5432/hub?sslmode=disable"
 
-# Check if psql is available
+# Install psql if not available (base image may have a cached version without it)
 if ! command -v psql &> /dev/null; then
-    exit 0
+    apk add --no-cache postgresql-client >/dev/null 2>&1 || exit 0
+    if ! command -v psql &> /dev/null; then
+        exit 0
+    fi
 fi
 
 # Sanitize component ID to prevent SQL injection (escape single quotes)
