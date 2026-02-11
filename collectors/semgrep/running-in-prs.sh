@@ -29,17 +29,25 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
-# Get database connection string
-CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
-
-if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
-    # Fall back to secrets if lunar sql connection-string isn't available
-    if [ -n "$LUNAR_SECRET_PG_PASSWORD" ] && [ -n "$LUNAR_HUB_HOST" ]; then
-        PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
-        CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
-    else
-        # Cannot connect to database - skip silently
-        exit 0
+# Get database connection string.
+# Priority: explicit secret > lunar sql > constructed from env vars.
+# NOTE: Code collectors run in Docker containers on the default bridge network.
+# They cannot resolve Docker Compose hostnames (hub, postgres). The connection
+# string returned by `lunar sql connection-string` or constructed from
+# LUNAR_HUB_HOST may use internal hostnames. Pass PG_CONNECTION_STRING as a
+# secret with a host-reachable address to work around this.
+if [ -n "$LUNAR_SECRET_PG_CONNECTION_STRING" ]; then
+    CONN_STRING="$LUNAR_SECRET_PG_CONNECTION_STRING"
+else
+    CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
+    if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
+        if [ -n "$LUNAR_SECRET_PG_PASSWORD" ] && [ -n "$LUNAR_HUB_HOST" ]; then
+            PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
+            CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
+        else
+            # Cannot connect to database - skip silently
+            exit 0
+        fi
     fi
 fi
 
