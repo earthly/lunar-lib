@@ -55,7 +55,7 @@ fi
 # Collector containers are on the default bridge network and can reach the host
 # at 172.17.0.1 where postgres port 5432 is published.
 # TODO: Remove this once HUB_COLLECTOR_SECRETS or Docker networking is fixed.
-CONN_STRING="postgres://api3:secret@172.17.0.1:5432/hub?sslmode=disable"
+CONN_STRING="postgres://api3:secret@172.17.0.1:5432/hub?sslmode=disable&connect_timeout=5"
 
 # Install psql if not available (base image may have a cached version without it)
 if ! command -v psql &> /dev/null; then
@@ -63,6 +63,12 @@ if ! command -v psql &> /dev/null; then
     if ! command -v psql &> /dev/null; then
         exit 0
     fi
+fi
+
+# Quick connectivity check — bail fast if we can't reach the DB
+if ! timeout 10 psql "$CONN_STRING" -c "SELECT 1" >/dev/null 2>&1; then
+    echo "Cannot reach database, skipping" >&2
+    exit 0
 fi
 
 # Sanitize component ID to prevent SQL injection (escape single quotes)
@@ -79,7 +85,7 @@ for CATEGORY in sast sca; do
         ) AS semgrep_present;
     "
     
-    RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
+    RESULT=$(timeout 15 psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
     
     if [ "$RESULT" = "t" ]; then
         # pr_scanning_verified: proves PRs for this component are being scanned
