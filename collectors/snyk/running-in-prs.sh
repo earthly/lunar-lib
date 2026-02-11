@@ -36,7 +36,8 @@ fi
 SAFE_COMPONENT_ID=$(echo "$LUNAR_COMPONENT_ID" | sed "s/'/''/g")
 
 for CATEGORY in sca sast container_scan iac_scan; do
-    QUERY="SELECT EXISTS (SELECT 1 FROM components_latest pr WHERE pr.component_id = '$SAFE_COMPONENT_ID' AND pr.pr IS NOT NULL AND jsonb_path_exists(pr.component_json, '\$.$CATEGORY.native.snyk')) AS snyk_present;"
+    # Note: using components_latest2 due to temporary platform limitation with components_latest
+    QUERY="SELECT EXISTS (SELECT 1 FROM components_latest2 pr WHERE pr.component_id = '$SAFE_COMPONENT_ID' AND pr.pr IS NOT NULL AND jsonb_path_exists(pr.component_json, '\$.$CATEGORY.native.snyk')) AS snyk_present;"
 
     RESULT=$(timeout 15 psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
 
