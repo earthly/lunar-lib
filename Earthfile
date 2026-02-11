@@ -67,6 +67,8 @@ lint:
     RUN python scripts/validate_readme_structure.py
     # Landing page metadata validation for all plugin types
     RUN python scripts/validate_landing_page_metadata.py
+    # SVG icon grayscale validation (rgb colors get flattened on the website)
+    RUN python scripts/validate_svg_grayscale.py
 
 ai-context:
     COPY --dir ai-context .
@@ -74,13 +76,16 @@ ai-context:
 
 all:
     BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/ast-grep+image
     BUILD --pass-args ./collectors/dockerfile+image
     BUILD --pass-args ./collectors/golang+image
-    BUILD --pass-args ./collectors/ast-grep+image
+    BUILD --pass-args ./collectors/syft+image
     BUILD --pass-args ./catalogers/github-org+image
 
 base-image:
     ARG SCRIPTS_VERSION=main-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+    # Add postgresql-client for collectors that need to query the Hub database
+    RUN apk add --no-cache postgresql-client
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION

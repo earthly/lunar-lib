@@ -12,13 +12,13 @@ landing_page:
   long_description: |
     Automatically detect Codecov runs in CI and fetch coverage percentage and file-level
     details. Track test coverage trends across your organization.
-  category: "testing-and-quality"
+  categories: ["testing"]
   icon: "assets/codecov.svg"
   status: "stable"
   related:
-    - slug: "coverage"
+    - slug: "testing"
       type: "policy"
-      reason: "Vendor-agnostic coverage policies that work with Codecov data"
+      reason: "Testing guardrails including coverage checks that work with Codecov data"
 
 collectors:
   - name: ran

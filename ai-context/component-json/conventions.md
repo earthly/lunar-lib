@@ -425,6 +425,26 @@ When data is fundamentally tied to a particular programming language's ecosystem
 2. **Concepts translate cleanly** — Test coverage percentages, vulnerability counts, dependency totals
 3. **Dashboards compare languages** — "Go services vs Java services coverage"
 
+### Language Detection: Always Create the Object
+
+**When a collector detects a programming language, it MUST create the `.lang.<language>` object**, even if no additional data is collected yet. This signals to policies that the component is a project of that language.
+
+```bash
+# Example: Go collector detects go.mod exists
+# Even if no other data is collected, write the language object:
+echo '{"source": {"tool": "go", "integration": "code"}}' | lunar collect -j ".lang.go" -
+```
+
+**Why this matters:**
+- Policies can use `.lang.<language>` existence to determine applicability
+- Example: A "tests must pass" policy can skip repos that just happen to contain `.go` files but aren't Go projects
+- The testing policy checks `c.get_node(".lang.go").exists()` to know if this is a Go project
+
+**Pattern:** Language collectors should:
+1. Detect if the project is genuinely that language (e.g., `go.mod` exists)
+2. Write `.lang.<language>` with at least `source` metadata
+3. Add additional data (dependencies, build_systems, etc.) as available
+
 ### The `.lang.<language>` Pattern
 
 For language-specific data, use `.lang.<language_name>`:
@@ -538,6 +558,28 @@ Both capture dependency information, but serve different purposes:
    - Compliance requirements (many frameworks mandate SBOM)
 
 **Version comparison note:** Version strings remain language-native in both sources (`v1.2.3` for Go, `1.2.3-SNAPSHOT` for Maven). Policies checking minimum versions should normalize versions for comparison, handling prefixes (`v`), suffixes (`-SNAPSHOT`, `+incompatible`), and special formats (Go pseudo-versions, calendar versioning).
+
+---
+
+## CI Detection and Auto-Run Naming
+
+Collectors that detect a tool in CI or auto-run a tool themselves should use consistent sub-key naming to distinguish how data was produced.
+
+### `.cicd` — Tool Detected in CI
+
+Use a `.cicd` sub-key when a collector **detects a command running in the CI pipeline** (via `ci-after-command` or `ci-before-command` hooks). The `.cicd` object should contain a `cmds` array with every detected invocation, each including the command string and CLI version where possible. Collecting all invocations enables version assertions, discrepancy detection across CI jobs, and full audit trails. See `collectors/golang/cicd.sh` for a reference implementation.
+
+### `.auto` — Tool Auto-Run by Lunar
+
+Use an `.auto` sub-key when a collector **auto-runs a tool** itself (typically via `code` or `cron` hooks, using Strategy 5). The `.auto` object records execution metadata: version, exit code, and source. Auto-run collectors should **also** write to normalized category paths (e.g., `.sast.findings`, `.sbom.summary`) so that tool-agnostic policies work.
+
+### Summary
+
+| Sub-key | When to use | Contains | Example paths |
+|---------|-------------|----------|---------------|
+| `.cicd` | Detecting commands in CI | `cmds` array (command + version), `source` | `.lang.go.cicd`, `.containers.docker.cicd` |
+| `.auto` | Auto-running a tool | Execution metadata (version, exit_code), `source` | `.sast.semgrep.auto`, `.sbom.syft.auto` |
+| *(none)* | Normalized results | Tool-agnostic data for policies | `.sca.vulnerabilities`, `.testing.coverage` |
 
 ---
 

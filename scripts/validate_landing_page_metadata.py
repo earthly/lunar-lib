@@ -43,14 +43,29 @@ PLUGIN_CONFIGS = {
     },
 }
 
-# Valid categories from the plan
-VALID_CATEGORIES = {
+# Valid categories for policies (verification use-case aligned)
+VALID_POLICY_CATEGORIES = {
     "repository-and-ownership",
     "deployment-and-infrastructure",
     "testing-and-quality",
     "devex-build-and-ci",
     "security-and-compliance",
     "operational-readiness",
+}
+
+# Valid categories for collectors/catalogers (technology-aligned)
+VALID_INTEGRATION_CATEGORIES = {
+    "vcs",
+    "ci-cd",
+    "build",
+    "containers",
+    "orchestration",
+    "code-analysis",
+    "testing",
+    "security",
+    "languages",
+    "documentation",
+    "service-catalog",
 }
 
 # Valid status values
@@ -285,15 +300,27 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
                 line.strip() for line in desc_lines.split("\n")
             )
         
-        # Extract categories (array)
-        categories_match = re.search(
-            r'^  categories:\s*$\n((?:[ ]+- .*\n)*)',
+        # Extract categories (array) - supports both inline ["a", "b"] and block format
+        # Try inline array format first: categories: ["vcs", "build"]
+        categories_inline_match = re.search(
+            r'^  categories:\s*\[([^\]]+)\]',
             landing_section,
             re.MULTILINE
         )
-        if categories_match:
-            cats = re.findall(r'^\s+- ["\']?([^"\'\n]+)["\']?', categories_match.group(1), re.MULTILINE)
-            result["landing_page"]["categories"] = cats
+        if categories_inline_match:
+            cats = [c.strip().strip('"\'') for c in categories_inline_match.group(1).split(",")]
+            result["landing_page"]["categories"] = [c for c in cats if c]
+        else:
+            # Try block format: categories:\n  - vcs\n  - build
+            categories_match = re.search(
+                r'^  categories:\s*$\n((?:[ ]+- .*\n)*)',
+                landing_section,
+                re.MULTILINE
+            )
+            if categories_match:
+                cats = re.findall(r'^\s+- ["\']?([^"\'\n]+)["\']?', categories_match.group(1), re.MULTILINE)
+                result["landing_page"]["categories"] = cats
+        
         
         # Helper to extract relationship arrays (used for both 'related' and 'requires')
         def extract_relationship_array(field_name: str) -> list[dict]:
@@ -455,7 +482,7 @@ def validate_plugin(
     # Expected suffix based on plugin type
     display_name_suffix = {
         "collector": "Collector",
-        "policy": "Policies",
+        "policy": "Guardrails",
         "cataloger": "Cataloger",
     }.get(plugin_type, "")
     
@@ -484,6 +511,8 @@ def validate_plugin(
         )
     
     # Validate category/categories
+    # - Policies use verification use-case aligned categories (single value)
+    # - Collectors/Catalogers use technology-aligned categories (multi-value array)
     category = landing_page.get("category")
     categories = landing_page.get("categories", [])
     
@@ -493,10 +522,20 @@ def validate_plugin(
         )
     else:
         all_categories = categories if categories else [category]
+        
+        # Use different valid category sets based on plugin type
+        if plugin_type == "policy":
+            valid_cats = VALID_POLICY_CATEGORIES
+            cat_type = "policy"
+        else:
+            valid_cats = VALID_INTEGRATION_CATEGORIES
+            cat_type = "integration"
+        
         for cat in all_categories:
-            if cat not in VALID_CATEGORIES:
+            if cat not in valid_cats:
                 result.errors.append(
-                    f"Invalid category '{cat}'. Must be one of: {sorted(VALID_CATEGORIES)}"
+                    f"Invalid {cat_type} category '{cat}'. "
+                    f"Must be one of: {sorted(valid_cats)}"
                 )
     
     # Validate icon (required, file must exist)
@@ -751,8 +790,13 @@ def main():
         print(f"Validation failed: {total_errors} error(s), {total_warnings} warning(s)")
         print("\nRequired landing_page fields:")
         print(f"  display_name: max {DISPLAY_NAME_MAX_LENGTH} chars")
+        print(f"    - Collectors: must end with 'Collector'")
+        print(f"    - Catalogers: must end with 'Cataloger'")
+        print(f"    - Policies: must end with 'Guardrails'")
         print(f"  long_description: max {LONG_DESCRIPTION_MAX_LENGTH} chars")
-        print(f"  category: one of {sorted(VALID_CATEGORIES)}")
+        print(f"  category:")
+        print(f"    - Policies: one of {sorted(VALID_POLICY_CATEGORIES)}")
+        print(f"    - Collectors/Catalogers: array of {sorted(VALID_INTEGRATION_CATEGORIES)}")
         print(f"  icon: path to SVG file (must exist)")
         print(f"  status: one of {sorted(VALID_STATUSES)}")
         print(f"\nRequired for policies:")

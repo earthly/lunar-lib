@@ -10,7 +10,7 @@ landing_page:
   long_description: |
     Sync repositories from GitHub organizations into your Lunar catalog. Automatically
     track visibility, topics, and metadata across all repos with configurable filtering.
-  category: "repository-and-ownership"
+  categories: ["vcs", "service-catalog"]
   icon: "assets/github-org.svg"
   status: "stable"
   related:

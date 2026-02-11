@@ -55,7 +55,7 @@ PLUGIN_CONFIGS = {
     "policy": {
         "directory": "policies",
         "yaml_file": "lunar-policy.yml",
-        "title_suffix": "Policies",
+        "title_suffix": "Guardrails",
         "uses_path": "github://earthly/lunar-lib/policies",
         "item_list_name": "policies",
         "item_section_name": "Policies",

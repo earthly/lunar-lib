@@ -12,13 +12,13 @@ landing_page:
   long_description: |
     Analyze Go projects to collect module info, dependencies, test coverage, and
     golangci-lint results. Enforce Go-specific engineering standards.
-  category: "devex-build-and-ci"
+  categories: ["languages", "build"]
   icon: "assets/golang.svg"
   status: "stable"
   related:
-    - slug: "coverage"
+    - slug: "testing"
       type: "policy"
-      reason: "Enforces test coverage thresholds using collected coverage metrics"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
 
 collectors:
   - name: cicd

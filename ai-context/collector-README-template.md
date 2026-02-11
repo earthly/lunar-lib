@@ -1,6 +1,6 @@
 # Collector README Template
 
-Use this template when creating the `README.md` for a new collector plugin.
+Use this template when creating the `README.md` for a new collector.
 
 ---
 
@@ -19,11 +19,11 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.example.items[]` | array | List of Y found in the repository |
-| `.example.native.{tool}` | object | Raw tool output for advanced policy use |
+| `.example.native.{tool}` | object | Raw tool output for advanced guardrail use |
 
 ## Collectors
 
-This plugin provides the following collectors (use `include` to select a subset):
+This integration provides the following collectors (use `include` to select a subset):
 
 | Collector | Description |
 |--------|-------------|

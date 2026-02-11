@@ -1,6 +1,6 @@
 # Cataloger README Template
 
-Use this template when creating the `README.md` for a new cataloger plugin.
+Use this template when creating the `README.md` for a new cataloger.
 
 ---
 
@@ -28,7 +28,7 @@ This cataloger writes to the following Catalog JSON paths:
 
 ## Catalogers
 
-This plugin provides the following catalogers (use `include` to select a subset):
+This integration provides the following catalogers (use `include` to select a subset):
 
 | Cataloger | Description |
 |-----------|-------------|

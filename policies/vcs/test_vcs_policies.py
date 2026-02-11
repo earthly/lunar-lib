@@ -79,6 +79,22 @@ def make_branch_protection_data(
     }
 
 
+def make_disabled_protection_data(branch="main"):
+    """Helper to create disabled branch protection data.
+    
+    When branch protection is disabled, GitHub only returns enabled/branch
+    without the detailed settings. This tests the real-world scenario.
+    """
+    return {
+        "vcs": {
+            "branch_protection": {
+                "enabled": False,
+                "branch": branch,
+            }
+        }
+    }
+
+
 class TestBranchProtectionEnabled(unittest.TestCase):
     """Tests for branch-protection-enabled policy."""
 
@@ -131,6 +147,14 @@ class TestDisallowBranchDeletion(unittest.TestCase):
         check = check_disallow_branch_deletion(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
 
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_disallow_branch_deletion(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
+
 
 class TestDisallowForcePush(unittest.TestCase):
     """Tests for disallow-force-push policy."""
@@ -149,6 +173,14 @@ class TestDisallowForcePush(unittest.TestCase):
         check = check_disallow_force_push(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("force push", check.failure_reasons[0].lower())
+
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_disallow_force_push(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
 
 
 class TestDismissStaleReviews(unittest.TestCase):
@@ -169,6 +201,14 @@ class TestDismissStaleReviews(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("stale review", check.failure_reasons[0].lower())
 
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_dismiss_stale_reviews(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
+
 
 class TestRequireBranchesUpToDate(unittest.TestCase):
     """Tests for require-branches-up-to-date policy."""
@@ -186,6 +226,14 @@ class TestRequireBranchesUpToDate(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_require_branches_up_to_date(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_branches_up_to_date(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
 
 
 class TestRequireCodeownerReview(unittest.TestCase):
@@ -205,6 +253,14 @@ class TestRequireCodeownerReview(unittest.TestCase):
         check = check_require_codeowner_review(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
 
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_codeowner_review(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
+
 
 class TestRequireLinearHistory(unittest.TestCase):
     """Tests for require-linear-history policy."""
@@ -222,6 +278,14 @@ class TestRequireLinearHistory(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_require_linear_history(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_linear_history(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
 
 
 class TestRequirePullRequest(unittest.TestCase):
@@ -241,6 +305,14 @@ class TestRequirePullRequest(unittest.TestCase):
         check = check_require_pull_request(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
 
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_pull_request(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
+
 
 class TestRequireSignedCommits(unittest.TestCase):
     """Tests for require-signed-commits policy."""
@@ -259,6 +331,14 @@ class TestRequireSignedCommits(unittest.TestCase):
         check = check_require_signed_commits(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
 
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_signed_commits(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
+
 
 class TestRequireStatusChecks(unittest.TestCase):
     """Tests for require-status-checks policy."""
@@ -276,6 +356,14 @@ class TestRequireStatusChecks(unittest.TestCase):
         node = Node.from_component_json(data)
         check = check_require_status_checks(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_require_status_checks(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
 
 
 class TestRequirePrivate(unittest.TestCase):
@@ -359,6 +447,14 @@ class TestMinimumApprovals(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             check_minimum_approvals(node, min_approvals_override=None)
         self.assertIn("misconfiguration", str(context.exception))
+
+    def test_protection_disabled_minimal_data_fails(self):
+        """Disabled protection with minimal data should fail gracefully."""
+        data = make_disabled_protection_data()
+        node = Node.from_component_json(data)
+        check = check_minimum_approvals(node, min_approvals_override="2")
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("not enabled", check.failure_reasons[0])
 
 
 class TestAllowedMergeStrategies(unittest.TestCase):

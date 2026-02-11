@@ -1,10 +1,10 @@
 # Policy README Template
 
-Use this template when creating the `README.md` for a new policy plugin.
+Use this template when creating the `README.md` for a new policy (guardrails).
 
 ---
 
-# `{directory-name}` Policies
+# `{directory-name}` Guardrails
 
 {One-line description of what this policy enforces}
 
@@ -12,12 +12,12 @@ Use this template when creating the `README.md` for a new policy plugin.
 
 {2-3 sentences explaining what engineering standard this policy enforces, why it matters, and who should use it.}
 
-## Policies
+## Guardrails
 
-This plugin provides the following policies (use `include` to select a subset):
+This policy provides the following guardrails (use `include` to select a subset):
 
-| Policy | Description | Failure Meaning |
-|--------|-------------|-----------------|
+| Guardrail | Description | Failure Meaning |
+|-----------|-------------|-----------------|
 | `example-check-1` | Validates X exists | X is missing or invalid |
 | `example-check-2` | Ensures Y meets threshold | Y is below required threshold |
 
@@ -92,7 +92,7 @@ When this policy fails, you can resolve it by:
 When using this template:
 
 1. Replace all `{placeholders}` with actual values
-2. Be specific about check IDs - these appear in the Lunar UI
-3. Always document the required Component JSON paths and which collector provides them
+2. Be specific about guardrail IDs - these appear in the Lunar UI
+3. Always document the required Component JSON paths and which integration provides them
 4. Include remediation steps - help developers fix issues
 5. Remove this "Template Usage Notes" section from the final README

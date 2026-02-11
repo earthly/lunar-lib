@@ -5,7 +5,7 @@ description: Version control system (VCS) best practices and security policies
 author: earthly
 
 landing_page:
-  display_name: "VCS Policies"
+  display_name: "VCS Guardrails"
   long_description: |
     Enforce version control security standards including branch protection rules,
     required approvals, status checks, and merge strategies. Prevent unauthorized
