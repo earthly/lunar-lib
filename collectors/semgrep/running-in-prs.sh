@@ -3,10 +3,6 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
-# =============================================================================
-# DEFAULT BRANCH COMPLIANCE PROOF COLLECTOR
-# =============================================================================
-
 if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
@@ -46,12 +42,21 @@ echo "DEBUG: DB OK" >&2
 SAFE_COMPONENT_ID=$(echo "$LUNAR_COMPONENT_ID" | sed "s/'/''/g")
 echo "DEBUG: component=$SAFE_COMPONENT_ID" >&2
 
-# Diagnostic
+# Show errors from psql (don't redirect stderr)
 DIAG=$(timeout 15 psql "$CONN_STRING" -t -A -c "SELECT COUNT(*) FROM components_latest WHERE component_id = '$SAFE_COMPONENT_ID' AND pr IS NOT NULL" 2>&1) || true
-echo "DEBUG: PR row count=$DIAG" >&2
+echo "DEBUG: PR count query result='$DIAG'" >&2
+
+# Also try materialized_components (different view that may have data)
+DIAG2=$(timeout 15 psql "$CONN_STRING" -t -A -c "SELECT COUNT(*) FROM public.materialized_components WHERE component_id = '$SAFE_COMPONENT_ID' AND pr IS NOT NULL" 2>&1) || true
+echo "DEBUG: materialized_components PR count='$DIAG2'" >&2
+
+# Try querying with explicit schema
+DIAG3=$(timeout 15 psql "$CONN_STRING" -t -A -c "SELECT current_user, current_schemas(true)::text" 2>&1) || true
+echo "DEBUG: user/schemas=$DIAG3" >&2
 
 for CATEGORY in sast sca; do
-    QUERY="SELECT EXISTS (SELECT 1 FROM components_latest pr WHERE pr.component_id = '$SAFE_COMPONENT_ID' AND pr.pr IS NOT NULL AND jsonb_path_exists(pr.component_json, '\$.$CATEGORY.native.semgrep')) AS semgrep_present;"
+    # Use materialized_components instead of components_latest
+    QUERY="SELECT EXISTS (SELECT 1 FROM public.materialized_components pr WHERE pr.component_id = '$SAFE_COMPONENT_ID' AND pr.pr IS NOT NULL AND (pr.component_json->'$CATEGORY'->'native'->'semgrep') IS NOT NULL AND (pr.component_json->'$CATEGORY'->'native'->'semgrep')::text != 'null') AS semgrep_present;"
 
     echo "DEBUG: querying $CATEGORY..." >&2
     RESULT=$(timeout 15 psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
