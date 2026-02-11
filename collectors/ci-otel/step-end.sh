@@ -7,7 +7,7 @@ trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null 
 root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
 
 if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
-  echo "OTEL: No trace context found, skipping step span"
+  log_debug "No trace context found, skipping step span"
   # Use a temporary key for skipped events without trace_id
   skip_key="skipped_$(date +%s%N | head -c 13)_step_${LUNAR_CI_STEP_INDEX:-unknown}"
   debug_collect ".ci.debug.step_end.$skip_key.status" "skipped_no_context" \
@@ -19,7 +19,7 @@ step_file="/tmp/lunar-otel-step-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDE
 step_start_file="/tmp/lunar-otel-step-start-${LUNAR_CI_JOB_ID:-unknown}-${LUNAR_CI_STEP_INDEX}"
 
 if [ ! -f "$step_file" ] || [ ! -f "$step_start_file" ]; then
-  echo "OTEL: No step start found for step ${LUNAR_CI_STEP_INDEX}, skipping"
+  log_debug "No step start found for step ${LUNAR_CI_STEP_INDEX}, skipping"
   # Still try to mark the step as failed/not completed if we have trace context
   debug_collect ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.step_end.status" "skipped_no_start" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.step_end.step_index" "${LUNAR_CI_STEP_INDEX}"
@@ -31,7 +31,7 @@ start_time=$(cat "$step_start_file")
 end_time=$(nanoseconds)
 
 # Debug: Log trace context
-echo "OTEL: step-end: trace_id=$trace_id, root_span_id=$root_span_id, step_span_id=$step_span_id, step_index=${LUNAR_CI_STEP_INDEX:-}" >&2
+log_debug "step-end: trace_id=$trace_id, root_span_id=$root_span_id, step_span_id=$step_span_id, step_index=${LUNAR_CI_STEP_INDEX:-}"
 
 # Build step name with "Step" prefix, step index, then step name
 step_name="Step ${LUNAR_CI_STEP_INDEX}: ${LUNAR_CI_STEP_NAME}"
@@ -73,5 +73,5 @@ send_span \
 # Cleanup
 rm -f "$step_file" "$step_start_file"
 
-echo "OTEL: Completed step span $step_span_id for step ${LUNAR_CI_STEP_INDEX}"
+log_debug "Completed step span $step_span_id for step ${LUNAR_CI_STEP_INDEX}"
 

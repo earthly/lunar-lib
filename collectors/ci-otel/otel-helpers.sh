@@ -5,6 +5,13 @@
 # Send directly to Tempo (port 4318 is OTLP HTTP)
 OTEL_ENDPOINT="${LUNAR_VAR_otel_endpoint:-${LUNAR_VAR_OTEL_ENDPOINT:-http://tempo:4318}}"
 
+# Log a debug message to stderr (only when debug mode is enabled)
+log_debug() {
+  if [ "${LUNAR_VAR_debug:-${LUNAR_VAR_DEBUG:-false}}" = "true" ]; then
+    echo "OTEL: $*" >&2
+  fi
+}
+
 # Helper function to conditionally run debug collection
 # Usage: debug_collect "key1" "value1" "key2" "value2" ...
 debug_collect() {
@@ -370,7 +377,7 @@ send_span() {
   fi
   
   # Send to Tempo
-  echo "OTEL: Sending span '$name' (trace_id=$trace_id, span_id=$span_id, parent=$parent_span_id) to $OTEL_ENDPOINT" >&2
+  log_debug "Sending span '$name' (trace_id=$trace_id, span_id=$span_id, parent=$parent_span_id) to $OTEL_ENDPOINT"
   
   # Debug: Validate the span JSON structure before sending
   if ! echo "$span_json" | jq -e '.traceId and .spanId and .name and .startTimeUnixNano and .endTimeUnixNano' >/dev/null 2>&1; then
@@ -379,10 +386,10 @@ send_span() {
   fi
   
   # Debug: Log the span structure (gated to avoid leaking sensitive data)
-  if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
+  if [ "${LUNAR_VAR_debug:-${LUNAR_VAR_DEBUG:-false}}" = "true" ]; then
     local span_preview
     span_preview=$(echo "$span_json" | jq -c '.' 2>/dev/null | head -c 500)
-    echo "OTEL: Span JSON preview: $span_preview..." >&2
+    log_debug "Span JSON preview: $span_preview..."
   fi
   
   local response
@@ -403,7 +410,7 @@ send_span() {
   local body=$(echo "$response" | sed '$d')
   
   if [ "$http_code" = "200" ] || [ "$http_code" = "202" ]; then
-    echo "OTEL: Successfully sent span '$name' (HTTP $http_code, trace_id=$trace_id)" >&2
+    log_debug "Successfully sent span '$name' (HTTP $http_code, trace_id=$trace_id)"
     return 0
   else
     echo "OTEL: Failed to send span '$name' to $OTEL_ENDPOINT (HTTP $http_code, trace_id=$trace_id): $body" >&2

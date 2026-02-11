@@ -9,7 +9,7 @@ start_time=$(cat /tmp/lunar-otel-job-start-time-${LUNAR_CI_JOB_ID:-unknown} 2>/d
 end_time=$(nanoseconds)
 
 if [ -z "$trace_id" ] || [ -z "$root_span_id" ] || [ -z "$start_time" ]; then
-  echo "OTEL: No trace context or start time found, skipping job end span"
+  log_debug "No trace context or start time found, skipping job end span"
   # Use a temporary key for skipped events without trace_id
   skip_key="skipped_$(date +%s%N | head -c 13)"
   debug_collect ".ci.debug.job_end.$skip_key.status" "skipped_no_context" \
@@ -19,7 +19,7 @@ if [ -z "$trace_id" ] || [ -z "$root_span_id" ] || [ -z "$start_time" ]; then
 fi
 
 # Debug: Log trace context
-echo "OTEL: job-end: trace_id=$trace_id, root_span_id=$root_span_id, job_id=${LUNAR_CI_JOB_ID:-}" >&2
+log_debug "job-end: trace_id=$trace_id, root_span_id=$root_span_id, job_id=${LUNAR_CI_JOB_ID:-}"
 
 # Build and send the final root span
 span_name="$(build_job_span_name)"
