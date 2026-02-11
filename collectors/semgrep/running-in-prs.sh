@@ -51,6 +51,12 @@ else
     fi
 fi
 
+# TEMP TEST: Override with hardcoded connection string via Docker bridge gateway.
+# Collector containers are on the default bridge network and can reach the host
+# at 172.17.0.1 where postgres port 5432 is published.
+# TODO: Remove this once HUB_COLLECTOR_SECRETS or Docker networking is fixed.
+CONN_STRING="postgres://api3:secret@172.17.0.1:5432/hub?sslmode=disable"
+
 # Check if psql is available
 if ! command -v psql &> /dev/null; then
     exit 0
