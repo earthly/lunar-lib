@@ -59,11 +59,14 @@ secrets:
   - name: GH_TOKEN
     description: GitHub token for API access (required for github-app collector)
     required: false
+  - name: PG_CONNECTION_STRING
+    description: Direct PostgreSQL connection string (optional, overrides other PG_* secrets)
+    required: false
   - name: PG_PASSWORD
-    description: Database password for default-branch collector (optional, uses lunar sql connection-string if not set)
+    description: Database password for running-in-prs collector (optional, uses lunar sql connection-string if not set)
     required: false
   - name: PG_USER
-    description: Database user for default-branch collector (optional, defaults to api3)
+    description: Database user for running-in-prs collector (optional, defaults to api3)
     required: false
 
 example_component_json: |
