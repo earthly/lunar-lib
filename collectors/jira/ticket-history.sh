@@ -1,13 +1,19 @@
 #!/bin/bash
 set -e
 
+# Debug: write breadcrumb immediately to verify script runs at all.
+lunar collect -j ".jira.ticket_history_debug" '"script_started"' || true
+
 source "$(dirname "$0")/helpers.sh"
 
 # Only run in PR context.
 if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
+  lunar collect -j ".jira.ticket_history_debug" '"no_pr_context"' || true
   echo "Not in a PR context, skipping." >&2
   exit 0
 fi
+
+lunar collect -j ".jira.ticket_history_debug" '"has_pr_context"' || true
 
 # Require GH_TOKEN to fetch PR title.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
@@ -24,9 +30,6 @@ TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
 if [ -z "$TICKET_KEY" ]; then
   exit 0
 fi
-
-# Write debug breadcrumb so we can tell how far execution gets.
-lunar collect -j ".jira.ticket_history_debug" '"reached_sql_step"'
 
 # Get database connection string.
 CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
