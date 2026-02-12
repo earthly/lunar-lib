@@ -47,13 +47,15 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
 ```
 
-## Required Secrets
+## Secrets
 
-| Secret | Required For | Description |
-|--------|--------------|-------------|
-| `GH_TOKEN` | github-app | GitHub token for API access to query commit statuses |
+| Secret | Required | Used By | Description |
+|--------|----------|---------|-------------|
+| `GH_TOKEN` | Yes | github-app | GitHub token for API access to query commit statuses |
+| `PG_PASSWORD` | No | running-in-prs | Database password (uses `lunar sql connection-string` if not set) |
+| `PG_USER` | No | running-in-prs | Database user (defaults to `api3` if not set) |
 
-The `running-in-prs` and `cli` collectors do not require additional secrets. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database.
+The `cli` collector does not require any secrets.
 
 Configure secrets in your `lunar-config.yml`:
 
@@ -61,4 +63,7 @@ Configure secrets in your `lunar-config.yml`:
 secrets:
   GH_TOKEN:
     from_env: GITHUB_TOKEN
+  # Optional: only needed if lunar sql connection-string is not available
+  PG_PASSWORD:
+    from_env: LUNAR_DB_PASSWORD
 ```
