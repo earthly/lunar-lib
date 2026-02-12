@@ -8,18 +8,7 @@ if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
     exit 1
 fi
 
-if [ -z "$LUNAR_COMPONENT_GIT_SHA" ]; then
-    echo "LUNAR_COMPONENT_GIT_SHA is not set, skipping." >&2
-    exit 0
-fi
-
-# Extract repo from component ID (strip github.com/ prefix if present)
 REPO="${LUNAR_COMPONENT_ID#github.com/}"
-if [ -z "$REPO" ]; then
-    echo "LUNAR_COMPONENT_ID is not set, skipping." >&2
-    exit 0
-fi
-
 QUICK_ATTEMPTS=10
 LONG_ATTEMPTS=60
 SLEEP_SECONDS=2
@@ -49,7 +38,6 @@ done
 [ "$FOUND_CHECK" = "false" ] && exit 0
 
 # Process each Semgrep check (there may be multiple: Code, Supply Chain)
-# Using process substitution to avoid subshell issues with set -e
 while read -r CHECK; do
     NAME=$(echo "$CHECK" | jq -r '.name // ""')
     STATUS=$(echo "$CHECK" | jq -r '.status // ""')
@@ -87,7 +75,7 @@ while read -r CHECK; do
     # Write native data
     jq -n \
         --argjson results "$RESULT" \
-        '{github_app_results: $results}' | \
+        '{github_app: $results}' | \
         lunar collect -j ".$CATEGORY.native.semgrep" -
     
     # Write source metadata

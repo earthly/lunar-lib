@@ -43,7 +43,7 @@ collectors:
 
   - name: cli
     description: |
-      Detects Semgrep CLI executions in CI pipelines. Captures command, exit code,
+      Detects Semgrep CLI executions in CI pipelines. Captures the command
       and version. Categorizes based on flags (--supply-chain for SCA, default SAST).
     mainBash: cli.sh
     hook:
@@ -52,37 +52,30 @@ collectors:
     keywords: ["semgrep cli", "ci integration", "sast", "code scanning"]
 
 secrets:
-  - name: GH_TOKEN
+  GH_TOKEN:
     description: GitHub token for API access (required for github-app collector)
-    required: false
-  - name: PG_CONNECTION_STRING
-    description: |
-      Full PostgreSQL connection string for the running-in-prs collector (e.g.
-      postgres://user:pass@host:5432/hub?sslmode=disable). Use this when
-      collector containers cannot resolve internal Docker hostnames. Takes
-      priority over PG_PASSWORD and lunar sql connection-string.
-    required: false
-  - name: PG_PASSWORD
-    description: Database password for running-in-prs collector (optional, uses lunar sql connection-string if not set)
-    required: false
-  - name: PG_USER
-    description: Database user for running-in-prs collector (optional, defaults to api3)
-    required: false
 
 example_component_json: |
   {
     "sast": {
       "source": {
         "tool": "semgrep",
+        "version": "1.50.0",
         "integration": "github_app"
       },
       "native": {
         "semgrep": {
-          "github_app_results": {
+          "running_in_prs": true,
+          "github_app": {
             "id": 12345,
             "name": "Semgrep",
             "status": "completed",
             "conclusion": "success"
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "semgrep scan --config auto", "version": "1.50.0"}
+            ]
           }
         }
       }

@@ -38,16 +38,10 @@ fi
 
 # Detect category from command (SCA if --supply-chain flag, otherwise SAST)
 CMD_LOWER=$(echo "$CMD_STR" | tr '[:upper:]' '[:lower:]')
-if echo "$CMD_LOWER" | grep -qE "(--supply-chain|supply\.chain)"; then
+if echo "$CMD_LOWER" | grep -qE "(--supply-chain|supply-chain)"; then
     CATEGORY="sca"
 else
     CATEGORY="sast"
-fi
-
-# Capture exit code (ensure numeric)
-EXIT_CODE="${LUNAR_CI_COMMAND_EXIT_CODE:-0}"
-if ! [[ "$EXIT_CODE" =~ ^[0-9]+$ ]]; then
-    EXIT_CODE=0
 fi
 
 # Capture Semgrep CLI version
@@ -56,12 +50,14 @@ SEMGREP_VERSION=$(semgrep --version 2>/dev/null || echo "unknown")
 # Sanitize command to redact potential secrets
 CMD_SAFE=$(echo "$CMD_STR" | sed -E \
     -e 's/(--auth-token|--token)(=| )[^ ]+/\1=<redacted>/Ig' \
-    -e 's/(SEMGREP_APP_TOKEN=)[^ ]+/\1<redacted>/Ig')
+    -e 's/(SEMGREP_APP_TOKEN=)[^ ]+/\1=<redacted>/Ig')
 
-# Write results using individual field collection (no jq required)
-lunar collect ".$CATEGORY.native.semgrep.cli_command" "$CMD_SAFE"
-lunar collect -j ".$CATEGORY.native.semgrep.exit_code" "$EXIT_CODE"
-lunar collect ".$CATEGORY.native.semgrep.cli_version" "$SEMGREP_VERSION"
+# Escape quotes in command for JSON
+CMD_ESCAPED=$(echo "$CMD_SAFE" | sed 's/"/\\"/g')
+
+# Write cicd command entry (no jq required)
+echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$SEMGREP_VERSION\"}]}" | \
+    lunar collect -j ".$CATEGORY.native.semgrep.cicd" -
 
 # Write source metadata
 lunar collect ".$CATEGORY.source.tool" "semgrep"
