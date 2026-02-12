@@ -567,7 +567,46 @@ Collectors that detect a tool in CI or auto-run a tool themselves should use con
 
 ### `.cicd` — Tool Detected in CI
 
-Use a `.cicd` sub-key when a collector **detects a command running in the CI pipeline** (via `ci-after-command` or `ci-before-command` hooks). The `.cicd` object should contain a `cmds` array with every detected invocation, each including the command string and CLI version where possible. Collecting all invocations enables version assertions, discrepancy detection across CI jobs, and full audit trails. See `collectors/golang/cicd.sh` for a reference implementation.
+Use a `.cicd` sub-key when a collector **detects a command running in the CI pipeline** (via `ci-after-command` or `ci-before-command` hooks). The `.cicd` object should contain a `cmds` array with every detected invocation, each including the command string and CLI version where possible:
+
+```json
+{
+  "lang": {
+    "go": {
+      "cicd": {
+        "cmds": [
+          {"cmd": "go test ./...", "version": "1.22.0"},
+          {"cmd": "go build -o app", "version": "1.22.0"}
+        ]
+      }
+    }
+  }
+}
+```
+
+Collecting all invocations enables version assertions, discrepancy detection across CI jobs, and full audit trails. See `collectors/golang/cicd.sh` for a reference implementation.
+
+### `.github_app` — GitHub App Detection
+
+Use a `.github_app` sub-key when a collector **detects a GitHub App posting status checks** (typically via GitHub commit status API). This captures the raw status data from the GitHub App integration:
+
+```json
+{
+  "sca": {
+    "native": {
+      "snyk": {
+        "github_app": {
+          "state": "success",
+          "context": "security/snyk",
+          "target_url": "https://app.snyk.io/..."
+        }
+      }
+    }
+  }
+}
+```
+
+The `.github_app` object preserves the check state, context name, and any links to the tool's dashboard. This enables policies to verify that GitHub App integrations are configured and check their status.
 
 ### `.auto` — Tool Auto-Run by Lunar
 
@@ -577,7 +616,8 @@ Use an `.auto` sub-key when a collector **auto-runs a tool** itself (typically v
 
 | Sub-key | When to use | Contains | Example paths |
 |---------|-------------|----------|---------------|
-| `.cicd` | Detecting commands in CI | `cmds` array (command + version), `source` | `.lang.go.cicd`, `.containers.docker.cicd` |
+| `.cicd` | Detecting commands in CI | `cmds` array (command + version) | `.lang.go.cicd`, `.sca.native.snyk.cicd` |
+| `.github_app` | Detecting GitHub App checks | Status state, context, target URL | `.sca.native.snyk.github_app` |
 | `.auto` | Auto-running a tool | Execution metadata (version, exit_code), `source` | `.sast.semgrep.auto`, `.sbom.syft.auto` |
 | *(none)* | Normalized results | Tool-agnostic data for policies | `.sca.vulnerabilities`, `.testing.coverage` |
 

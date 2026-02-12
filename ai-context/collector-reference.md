@@ -266,8 +266,13 @@ For `ci-before-command` and `ci-after-command` hooks:
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
 # LUNAR_CI_COMMAND is a JSON array: ["docker","build","-t","myimage","."]
-# Use jq to parse it:
+
+# Container-based collectors can use jq (available in official image):
 echo "Hooked command: $(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')"
+
+# Native collectors should use pure bash (no jq dependency):
+CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
+echo "Hooked command: $CMD_STR"
 ```
 
 ## The lunar collect Command
@@ -733,6 +738,8 @@ collectors:
 ```
 
 **Do not use `native` for code or cron collectors.** These should always run in containers for consistency and isolation.
+
+**Writing CI collectors for maximum compatibility:** When writing CI collectors (especially those marked `native`), keep scripts as native-bash as possible. Avoid dependencies like `jq`, `yq`, or other tools that may not be present in all CI environments. If dependencies are absolutely necessary, they can be installed via an `install.sh` script, but this adds overhead and reduces compatibility. The goal is to run reliably across GitHub Actions, GitLab CI, CircleCI, BuildKite, and other CI providers without assumptions about the environment.
 
 ### Official Image: `earthly/lunar-scripts`
 
