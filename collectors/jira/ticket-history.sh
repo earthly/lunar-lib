@@ -34,15 +34,19 @@ fi
 
 # Get database connection string.
 echo "DEBUG: getting connection string..." >&2
-CONN_ERR=$(mktemp)
-CONN_STRING=$(lunar sql connection-string 2>"$CONN_ERR") || true
+CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 echo "DEBUG: CONN_STRING='${CONN_STRING:0:80}'" >&2
-echo "DEBUG: CONN_ERR='$(cat "$CONN_ERR" | head -3)'" >&2
-rm -f "$CONN_ERR"
 
-if [ -z "$CONN_STRING" ]; then
-  echo "DEBUG: connection string empty, skipping." >&2
-  exit 0
+if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
+  # Fall back to secrets if lunar sql connection-string isn't available.
+  if [ -n "${LUNAR_SECRET_PG_PASSWORD:-}" ] && [ -n "${LUNAR_HUB_HOST:-}" ]; then
+    PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
+    CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
+    echo "DEBUG: using fallback CONN_STRING from secrets" >&2
+  else
+    echo "DEBUG: no connection string and no fallback secrets, skipping." >&2
+    exit 0
+  fi
 fi
 
 # Verify psql is available.
