@@ -64,9 +64,9 @@ for CATEGORY in sca sast container_scan iac_scan; do
     RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
 
     if [ "$RESULT" = "t" ]; then
-        # pr_scanning_verified: proves PRs for this component are being scanned
+        # running_in_prs: proves PRs for this component are being scanned
         # (does not imply specific timing, just that scanning capability exists)
-        jq -n '{pr_scanning_verified: true}' | \
+        jq -n '{running_in_prs: true}' | \
             lunar collect -j ".$CATEGORY.native.snyk" -
 
         write_snyk_source "$CATEGORY" "github_app"
