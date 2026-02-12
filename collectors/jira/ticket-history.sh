@@ -30,9 +30,8 @@ CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 
 if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
   # Fall back to secrets if lunar sql connection-string isn't available.
-  if [ -n "${LUNAR_SECRET_PG_PASSWORD:-}" ] && [ -n "${LUNAR_HUB_HOST:-}" ]; then
-    PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
-    CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
+  if [ -n "${LUNAR_SECRET_PG_PASSWORD:-}" ] && [ -n "${LUNAR_SECRET_PG_USER:-}" ] && [ -n "${LUNAR_HUB_HOST:-}" ]; then
+    CONN_STRING="postgres://${LUNAR_SECRET_PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
   else
     echo "No database connection available, skipping ticket-history." >&2
     exit 0
