@@ -15,7 +15,7 @@ fi
 
 # Use command PID to look up span info
 if [ -z "${LUNAR_CI_COMMAND_PID:-}" ]; then
-  echo "OTEL: No command PID found, skipping command span"
+  log_debug "No command PID found, skipping command span"
   skip_key="skipped_$(date +%s%N | head -c 13)_no_pid"
   debug_collect ".ci.debug.cmd_end.$skip_key.status" "skipped_no_pid"
   exit 0
@@ -25,7 +25,7 @@ fi
 # Commands without step_index are internal CI runner processes (like git, sed, basename, etc.)
 # that don't map to user-defined CI workflow steps and should not be traced
 if [ -z "${LUNAR_CI_STEP_INDEX:-}" ]; then
-  echo "OTEL: Command does not belong to a step (no step_index), skipping internal CI runner process" >&2
+  log_debug "Command does not belong to a step (no step_index), skipping internal CI runner process"
   
   # Debug logging under internal_processes category
   debug_collect ".ci.traces.$trace_id.debug.internal_processes.${LUNAR_CI_COMMAND_PID}.cmd_end.status" "skipped_no_step_index" \
@@ -42,13 +42,11 @@ cmd_hash=$(echo -n "${LUNAR_CI_JOB_ID:-}-${LUNAR_CI_STEP_INDEX}-${LUNAR_CI_COMMA
 cmd_file="/tmp/lunar-otel-cmd-${cmd_hash}"
 
 # Debug logging (gated to avoid leaking secrets in CI logs)
-if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
-  echo "OTEL DEBUG: cmd_file=$cmd_file" >&2
-fi
+log_debug "cmd_file=$cmd_file"
 
 # Make sure the file exists and has content
 if ! head -n 1 "$cmd_file" >/dev/null 2>&1; then
-  echo "OTEL: No start time found for command hash ${cmd_hash}, skipping"
+  log_debug "No start time found for command hash ${cmd_hash}, skipping"
   debug_collect ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.status" "skipped_no_start" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.cmd_pid" "${LUNAR_CI_COMMAND_PID}" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.command" "${LUNAR_CI_COMMAND:-}"
@@ -67,7 +65,7 @@ end_time=$(nanoseconds)
 # Commands must be children of steps or other commands, never the root job span
 # If parent_span_id is empty, skip sending this command span
 if [ -z "$parent_span_id" ]; then
-  echo "OTEL: Warning - command parent span ID is empty, skipping command span" >&2
+  log_debug "Warning - command parent span ID is empty, skipping command span"
   debug_collect ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.status" "skipped_empty_parent" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.cmd_pid" "${LUNAR_CI_COMMAND_PID}" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.$cmd_hash.cmd_end.span_id" "$span_id" \

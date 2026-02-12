@@ -594,15 +594,16 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Data Management
 
-* **Tests do not use production data**: Tests must not connect to or use production databases/services.
+* `tests-do-not-use-production-data` **Tests do not use production data**: Tests must not connect to or use production databases/services.
   * Collector(s): Scan test code for production URLs, credentials, or connection strings
   * Component JSON:
     * `.testing.data.uses_production_data` - Boolean for production data usage
     * `.testing.data.production_references` - Array of production references found
   * Policy: Assert that no production data references exist in tests
   * Configuration: Production URL patterns to detect
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction) and Strategy 8 (File Parsing and Schema Extraction)
 
-* **Test fixtures are properly managed**: Test data fixtures should be in standard locations and formats.
+* `test-fixtures-are-properly-managed` **Test fixtures are properly managed**: Test data fixtures should be in standard locations and formats.
   * Collector(s): Scan for test fixture files and validate organization
   * Component JSON:
     * `.testing.data.fixtures_exist` - Boolean for fixture presence
@@ -610,48 +611,54 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.data.fixtures_organized` - Boolean for proper organization
   * Policy: Assert that test fixtures are properly organized
   * Configuration: Expected fixture locations
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
-* **Sensitive data is not in test fixtures**: Test fixtures should not contain real PII or sensitive data.
+* `sensitive-data-is-not-in-test-fixtures` **Sensitive data is not in test fixtures**: Test fixtures should not contain real PII or sensitive data.
   * Collector(s): Scan test fixtures for PII patterns (SSN, credit card, email patterns)
   * Component JSON:
     * `.testing.data.sensitive_data_detected` - Boolean for sensitive data presence
     * `.testing.data.sensitive_data_locations` - Array of files with sensitive data
   * Policy: Assert that no sensitive data exists in test fixtures
   * Configuration: Sensitive data patterns to detect
+  * Strategy: Strategy 5 (Auto-Running Scanners) and Strategy 8 (File Parsing and Schema Extraction)
 
-* **Test databases are isolated**: Tests using databases should use isolated test databases, not shared instances.
+* `test-databases-are-isolated` **Test databases are isolated**: Tests using databases should use isolated test databases, not shared instances.
   * Collector(s): Analyze test configuration for database connection settings
   * Component JSON:
     * `.testing.data.database_isolation` - Boolean for database isolation
     * `.testing.data.database_strategy` - Database strategy (in-memory, container, dedicated)
   * Policy: Assert that test databases are properly isolated
   * Configuration: Approved database isolation strategies
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ### Mocking Standards
 
-* **External services are mocked in unit tests**: Unit tests should mock external service calls, not make real requests.
+* `external-services-are-mocked-in-unit-tests` **External services are mocked in unit tests**: Unit tests should mock external service calls, not make real requests.
   * Collector(s): Static analysis to detect unmocked HTTP/gRPC calls in unit tests
   * Component JSON:
     * `.testing.mocking.external_services_mocked` - Boolean for proper mocking
     * `.testing.mocking.unmocked_external_calls` - Array of unmocked external calls
   * Policy: Assert that all external services are mocked in unit tests
   * Configuration: External service patterns to check
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Mocks verify interactions**: Mocks should verify expected interactions, not just stub responses.
+* `mocks-verify-interactions` **Mocks verify interactions**: Mocks should verify expected interactions, not just stub responses.
   * Collector(s): Static analysis to detect mock usage patterns
   * Component JSON:
     * `.testing.mocking.verification_used` - Boolean for mock verification
     * `.testing.mocking.verify_calls_percentage` - Percentage of mocks with verification
   * Policy: Assert that mocks include interaction verification
   * Configuration: Minimum verification percentage (default: 50%)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **No excessive mocking**: Tests should not mock so extensively that they don't test real behavior.
+* `no-excessive-mocking` **No excessive mocking**: Tests should not mock so extensively that they don't test real behavior.
   * Collector(s): Analyze mock-to-assertion ratio in tests
   * Component JSON:
     * `.testing.mocking.mock_count` - Total mocks in test suite
     * `.testing.mocking.mock_per_test_ratio` - Average mocks per test
   * Policy: Assert that mocking is not excessive
   * Configuration: Maximum mocks per test (default: 10)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
 ---
 
@@ -659,7 +666,7 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Security Test Coverage
 
-* **Security-focused tests exist**: Components handling sensitive data should have security-focused test cases.
+* `security-focused-tests-exist` **Security-focused tests exist**: Components handling sensitive data should have security-focused test cases.
   * Collector(s): Scan for security test files or security-tagged tests
   * Component JSON:
     * `.testing.security_tests.exist` - Boolean for security tests presence
@@ -667,48 +674,54 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.testing.security_tests.categories` - Array of security categories tested
   * Policy: Assert that security tests exist for components tagged as sensitive
   * Configuration: Tags requiring security tests (e.g., ["pci", "pii", "auth"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Authentication tests exist**: Components with authentication should have tests verifying auth behavior.
+* `authentication-tests-exist` **Authentication tests exist**: Components with authentication should have tests verifying auth behavior.
   * Collector(s): Detect auth-related tests from test names/patterns
   * Component JSON:
     * `.testing.security_tests.auth_tests_exist` - Boolean for auth tests
     * `.testing.security_tests.auth_scenarios_covered` - Array of auth scenarios tested
   * Policy: Assert that authentication tests exist for auth components
   * Configuration: Tags requiring auth tests (e.g., ["auth", "login", "identity"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Authorization tests exist**: Components with authorization should test permission boundaries.
+* `authorization-tests-exist` **Authorization tests exist**: Components with authorization should test permission boundaries.
   * Collector(s): Detect authorization-related tests from test names/patterns
   * Component JSON:
     * `.testing.security_tests.authz_tests_exist` - Boolean for authorization tests
     * `.testing.security_tests.authz_scenarios_covered` - Array of authorization scenarios tested
   * Policy: Assert that authorization tests exist for protected resources
   * Configuration: Tags requiring authorization tests
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Input validation tests exist**: APIs should have tests for input validation and rejection of malformed input.
+* `input-validation-tests-exist` **Input validation tests exist**: APIs should have tests for input validation and rejection of malformed input.
   * Collector(s): Detect validation-related tests from test names/patterns
   * Component JSON:
     * `.testing.security_tests.validation_tests_exist` - Boolean for validation tests
     * `.testing.security_tests.validation_test_count` - Number of validation tests
   * Policy: Assert that input validation tests exist for API components
   * Configuration: Tags requiring validation tests (e.g., ["api", "service"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 16 (AST-Based Code Pattern Extraction)
 
 ### Security Scanning in Tests
 
-* **SAST runs as part of test pipeline**: Static application security testing should run alongside tests.
+* `sast-runs-as-part-of-test-pipeline` **SAST runs as part of test pipeline**: Static application security testing should run alongside tests.
   * Collector(s): Check CI configuration for SAST tool execution
   * Component JSON:
     * `.sast` - SAST scan data (presence indicates execution)
     * `.ci.steps_executed.security_scan` - Boolean for security scan step
   * Policy: Assert that SAST is executed in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
-* **Dependency vulnerability scanning runs with tests**: SCA should run as part of the test pipeline.
+* `dependency-vulnerability-scanning-runs-with-tests` **Dependency vulnerability scanning runs with tests**: SCA should run as part of the test pipeline.
   * Collector(s): Check CI configuration for SCA tool execution
   * Component JSON:
     * `.sca` - SCA scan data (presence indicates execution)
     * `.ci.steps_executed.dependency_scan` - Boolean for dependency scan step
   * Policy: Assert that dependency scanning is executed in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection)
 
 ---
 
@@ -716,29 +729,32 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Test Documentation Standards
 
-* **Test purpose is documented**: Complex tests should have documentation explaining what they test and why.
+* `test-purpose-is-documented` **Test purpose is documented**: Complex tests should have documentation explaining what they test and why.
   * Collector(s): Parse test files for docstrings, comments, or description annotations
   * Component JSON:
     * `.testing.documentation.tests_with_docs` - Number of tests with documentation
     * `.testing.documentation.documentation_percentage` - Percentage of tests documented
   * Policy: Assert that test documentation meets minimum percentage
   * Configuration: Minimum documentation percentage (default: 50% for complex tests)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction) and Strategy 8 (File Parsing and Schema Extraction)
 
-* **Test naming is descriptive**: Test names should clearly describe what is being tested and expected outcome.
+* `test-naming-is-descriptive` **Test naming is descriptive**: Test names should clearly describe what is being tested and expected outcome.
   * Collector(s): Analyze test names for descriptive patterns (should_, when_, given_)
   * Component JSON:
     * `.testing.documentation.descriptive_names` - Number of descriptively named tests
     * `.testing.documentation.naming_score` - Score for naming quality
   * Policy: Assert that test naming follows descriptive conventions
   * Configuration: Required naming patterns
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Test README exists**: Test directory should contain documentation on running tests and test organization.
+* `test-readme-exists` **Test README exists**: Test directory should contain documentation on running tests and test organization.
   * Collector(s): Check for README in test directories
   * Component JSON:
     * `.testing.documentation.readme_exists` - Boolean for test README presence
     * `.testing.documentation.readme_path` - Path to test README
   * Policy: Assert that test README exists
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
 ---
 
@@ -746,40 +762,44 @@ This document specifies possible policies for the **Testing and Quality** catego
 
 ### Go Testing
 
-* **Go tests use table-driven pattern**: Go tests should use table-driven test patterns for comprehensive coverage.
+* `go-tests-use-table-driven-pattern` **Go tests use table-driven pattern**: Go tests should use table-driven test patterns for comprehensive coverage.
   * Collector(s): Static analysis of Go test files for table-driven patterns
   * Component JSON:
     * `.lang.go.testing.table_driven_tests` - Number of table-driven tests
     * `.lang.go.testing.table_driven_percentage` - Percentage using table-driven pattern
   * Policy: Assert that Go tests predominantly use table-driven patterns
   * Configuration: Minimum table-driven percentage (default: 70%)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Go tests use testify or standard assertions**: Go tests should use consistent assertion libraries.
+* `go-tests-use-testify-or-standard-assertions` **Go tests use testify or standard assertions**: Go tests should use consistent assertion libraries.
   * Collector(s): Analyze Go test imports for assertion libraries
   * Component JSON:
     * `.lang.go.testing.assertion_library` - Assertion library used (testify, standard)
     * `.lang.go.testing.uses_approved_assertions` - Boolean for approved library
   * Policy: Assert that Go tests use approved assertion library
   * Configuration: Approved Go assertion libraries
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction) and Strategy 12 (Dependency Manifest Analysis)
 
-* **Go test race detection is enabled in CI**: Go tests should run with race detection enabled.
+* `go-test-race-detection-is-enabled-in-ci` **Go test race detection is enabled in CI**: Go tests should run with race detection enabled.
   * Collector(s): Check CI configuration for -race flag in go test commands
   * Component JSON:
     * `.lang.go.testing.race_detection_enabled` - Boolean for race detection
   * Policy: Assert that race detection is enabled in CI
   * Configuration: None
+  * Strategy: Strategy 1 (CI Tool Execution Detection) and Strategy 8 (File Parsing and Schema Extraction)
 
 ### Python Testing
 
-* **Python tests use pytest**: Python projects should use pytest as the testing framework.
+* `python-tests-use-pytest` **Python tests use pytest**: Python projects should use pytest as the testing framework.
   * Collector(s): Check for pytest configuration and usage
   * Component JSON:
     * `.lang.python.testing.framework` - Testing framework detected
     * `.lang.python.testing.uses_pytest` - Boolean for pytest usage
   * Policy: Assert that Python tests use pytest
   * Configuration: Allowed Python testing frameworks
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 12 (Dependency Manifest Analysis)
 
-* **Python tests use appropriate fixtures**: Pytest fixtures should be properly scoped and organized.
+* `python-tests-use-appropriate-fixtures` **Python tests use appropriate fixtures**: Pytest fixtures should be properly scoped and organized.
   * Collector(s): Analyze conftest.py files and fixture usage
   * Component JSON:
     * `.lang.python.testing.fixtures_exist` - Boolean for fixture presence
@@ -787,65 +807,73 @@ This document specifies possible policies for the **Testing and Quality** catego
     * `.lang.python.testing.conftest_exists` - Boolean for conftest.py presence
   * Policy: Assert that fixtures are properly organized
   * Configuration: None
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction)
 
-* **Python tests use type hints**: Test function signatures should include type hints for clarity.
+* `python-tests-use-type-hints` **Python tests use type hints**: Test function signatures should include type hints for clarity.
   * Collector(s): Static analysis of Python test files for type annotations
   * Component JSON:
     * `.lang.python.testing.type_hints_percentage` - Percentage of tests with type hints
   * Policy: Assert that test type hint coverage meets minimum
   * Configuration: Minimum type hint percentage (default: 50%)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
 ### JavaScript/TypeScript Testing
 
-* **JS/TS tests use Jest or Vitest**: JavaScript/TypeScript projects should use approved test runners.
+* `js-ts-tests-use-jest-or-vitest` **JS/TS tests use Jest or Vitest**: JavaScript/TypeScript projects should use approved test runners.
   * Collector(s): Check package.json and test configuration for test runner
   * Component JSON:
     * `.lang.javascript.testing.framework` - Testing framework detected
     * `.lang.javascript.testing.uses_approved_framework` - Boolean for approved framework
   * Policy: Assert that JS/TS tests use approved framework
   * Configuration: Approved frameworks (default: ["jest", "vitest"])
+  * Strategy: Strategy 8 (File Parsing and Schema Extraction) and Strategy 12 (Dependency Manifest Analysis)
 
-* **React components have testing library tests**: React components should be tested with React Testing Library.
+* `react-components-have-testing-library-tests` **React components have testing library tests**: React components should be tested with React Testing Library.
   * Collector(s): Check for @testing-library/react usage in test files
   * Component JSON:
     * `.lang.javascript.testing.uses_testing_library` - Boolean for Testing Library usage
     * `.lang.javascript.testing.enzyme_detected` - Boolean for legacy Enzyme usage
   * Policy: Assert that React tests use Testing Library, not Enzyme
   * Configuration: None
+  * Strategy: Strategy 12 (Dependency Manifest Analysis) and Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Snapshot tests are minimized**: Snapshot testing should be limited to avoid brittle tests.
+* `snapshot-tests-are-minimized` **Snapshot tests are minimized**: Snapshot testing should be limited to avoid brittle tests.
   * Collector(s): Count snapshot assertions in test files
   * Component JSON:
     * `.lang.javascript.testing.snapshot_count` - Number of snapshot assertions
     * `.lang.javascript.testing.snapshot_percentage` - Percentage of tests using snapshots
   * Policy: Assert that snapshot usage is within limits
   * Configuration: Maximum snapshot percentage (default: 20%)
+  * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
 
 ### Java Testing
 
-* **Java tests use JUnit 5**: Java projects should use JUnit 5 (Jupiter) for testing.
+* `java-tests-use-junit-5` **Java tests use JUnit 5**: Java projects should use JUnit 5 (Jupiter) for testing.
   * Collector(s): Check for JUnit 5 dependencies and annotations
   * Component JSON:
     * `.lang.java.testing.framework` - Testing framework detected
     * `.lang.java.testing.junit_version` - JUnit version (4 or 5)
   * Policy: Assert that Java tests use JUnit 5
   * Configuration: Minimum JUnit version required
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
-* **Java tests use AssertJ or Hamcrest**: Java tests should use fluent assertion libraries.
+* `java-tests-use-assertj-or-hamcrest` **Java tests use AssertJ or Hamcrest**: Java tests should use fluent assertion libraries.
   * Collector(s): Check for assertion library imports
   * Component JSON:
     * `.lang.java.testing.assertion_library` - Assertion library detected
     * `.lang.java.testing.uses_fluent_assertions` - Boolean for fluent assertions
   * Policy: Assert that Java tests use fluent assertion library
   * Configuration: Approved assertion libraries (default: ["assertj", "hamcrest"])
+  * Strategy: Strategy 12 (Dependency Manifest Analysis) and Strategy 16 (AST-Based Code Pattern Extraction)
 
-* **Java integration tests use Spring Test or Testcontainers**: Java integration tests should use approved frameworks.
+* `java-integration-tests-use-spring-test-or-testcontainers` **Java integration tests use Spring Test or Testcontainers**: Java integration tests should use approved frameworks.
   * Collector(s): Check for integration testing framework dependencies
   * Component JSON:
     * `.lang.java.testing.integration_framework` - Integration test framework
     * `.lang.java.testing.uses_testcontainers` - Boolean for Testcontainers usage
   * Policy: Assert that approved integration testing patterns are used
   * Configuration: Approved integration testing frameworks
+  * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 ---
 
@@ -940,7 +968,7 @@ These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect t
 
 ## Summary Policies
 
-* **All required test types exist**: Aggregate check that all required test types (unit, integration, etc.) are present.
+* `all-required-test-types-exist` **All required test types exist**: Aggregate check that all required test types (unit, integration, etc.) are present.
   * Collector(s): Aggregate test type existence checks
   * Component JSON:
     * `.testing.unit_tests.exist` - Unit tests present
@@ -949,16 +977,18 @@ These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect t
     * `.testing.all_required_types_present` - Boolean for all required types
   * Policy: Assert that all required test types exist based on component tags
   * Configuration: Required test types per component tag
+  * Strategy: Meta-policy (aggregates data from underlying testing guardrails)
 
-* **Test suite health score**: Aggregate score reflecting overall test suite quality.
+* `test-suite-health-score` **Test suite health score**: Aggregate score reflecting overall test suite quality.
   * Collector(s): Calculate composite score from coverage, flaky tests, execution time, etc.
   * Component JSON:
     * `.testing.health_score` - Numeric score (0-100)
     * `.testing.health_factors` - Array of contributing factors
   * Policy: Assert that test suite health score meets minimum threshold
   * Configuration: Minimum health score (default: 70), factor weights
+  * Strategy: Meta-policy (composite score from underlying testing guardrails)
 
-* **Testing compliance is complete**: Meta-check that all applicable testing guardrails pass.
+* `testing-compliance-is-complete` **Testing compliance is complete**: Meta-check that all applicable testing guardrails pass.
   * Collector(s): Aggregate results from all testing-related policy checks
   * Component JSON:
     * `.testing.compliance.passing_checks` - Number of passing checks
@@ -966,3 +996,4 @@ These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect t
     * `.testing.compliance.percentage` - Compliance percentage
   * Policy: Assert that testing compliance percentage meets threshold
   * Configuration: Minimum compliance percentage (default: 90%)
+  * Strategy: Meta-policy (aggregates results from all testing guardrails)

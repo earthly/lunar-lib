@@ -1014,33 +1014,3 @@ These guardrails use Strategy 16 (AST-Based Code Pattern Extraction) to detect s
   * Policy: Assert that no stack trace exposure patterns are detected
   * Configuration: None
   * Strategy: Strategy 16 (AST-Based Code Pattern Extraction)
-
----
-
-## Implementation Notes
-
-### Multi-Vendor Collector Strategy
-
-Many policies in this category will require technology-specific collectors to support different tools:
-
-* **SAST**: Collectors for Semgrep, SonarQube, CodeQL, Checkmarx, Veracode, Fortify
-* **SCA**: Collectors for Snyk, Dependabot, Grype, OWASP Dependency-Check, WhiteSource/Mend
-* **Container Scanning**: Collectors for Trivy, Grype, Clair, Aqua, Prisma Cloud
-* **Secret Scanning**: Collectors for Gitleaks, TruffleHog, detect-secrets, GitHub Secret Scanning
-* **SBOM Generation**: Collectors for Syft, SPDX tools, CycloneDX tools
-* **Image Signing**: Collectors for Cosign, Notary, Docker Content Trust
-* **Vault Integration**: Collectors for HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager
-
-Each collector normalizes tool-specific output into the standard Component JSON schema, allowing policies to remain tool-agnostic.
-
-### Compliance Regime Tagging
-
-For compliance-focused guardrails, components should be tagged with applicable regimes:
-
-* `pci` - Components handling payment card data
-* `hipaa` - Components handling protected health information
-* `gdpr` - Components processing EU personal data
-* `soc2` - Components in SOC 2 audit scope
-* `iso27001` - Components in ISO 27001 scope
-
-Policies can then target specific tagged components rather than applying globally.
