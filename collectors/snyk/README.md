@@ -47,12 +47,5 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
 ```
 
-## Secrets
-
-| Secret | Required | Used By | Description |
-|--------|----------|---------|-------------|
-| `GH_TOKEN` | Yes | github-app | GitHub token for API access to query commit statuses |
-| `PG_PASSWORD` | No | running-in-prs | Database password (uses `lunar sql connection-string` if not set) |
-| `PG_USER` | No | running-in-prs | Database user (uses `lunar sql connection-string` if not set) |
-
-The `cli` collector does not require any secrets.
+Required secrets:
+- `GH_TOKEN` — GitHub token for API access (required for github-app collector)
