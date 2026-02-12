@@ -25,10 +25,10 @@ if [ -z "$TICKET_KEY" ]; then
   exit 0
 fi
 
-# Get database connection string.
-CONN_STRING=$(lunar sql connection-string 2>&1) || true
+# Get database connection string (discard stderr to avoid mixing logs).
+CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 
-if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"error"* ]] || [[ "$CONN_STRING" == *"Error"* ]]; then
+if [ -z "$CONN_STRING" ]; then
   echo "lunar sql connection-string failed, skipping ticket-history." >&2
   exit 0
 fi
@@ -57,7 +57,7 @@ REUSE_COUNT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
 
 # Validate result is a number.
 if ! [[ "$REUSE_COUNT" =~ ^[0-9]+$ ]]; then
-  echo "Failed to query ticket reuse count (result: '$REUSE_COUNT')." >&2
+  echo "Failed to query ticket reuse count (result: '${REUSE_COUNT:0:200}')." >&2
   exit 0
 fi
 
