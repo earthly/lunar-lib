@@ -1,19 +1,13 @@
 #!/bin/bash
 set -e
 
-# Debug: write breadcrumb immediately to verify script runs at all.
-lunar collect -j ".jira.ticket_history_debug" '"script_started"' || true
-
 source "$(dirname "$0")/helpers.sh"
 
 # Only run in PR context.
 if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
-  lunar collect -j ".jira.ticket_history_debug" '"no_pr_context"' || true
   echo "Not in a PR context, skipping." >&2
   exit 0
 fi
-
-lunar collect -j ".jira.ticket_history_debug" '"has_pr_context"' || true
 
 # Require GH_TOKEN to fetch PR title.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
@@ -53,7 +47,7 @@ SAFE_PR=$(echo "$LUNAR_COMPONENT_PR" | sed "s/'/''/g")
 # Query for other PRs using the same ticket.
 QUERY="
   SELECT COUNT(DISTINCT (component_id, pr))
-  FROM components_latest
+  FROM components_latest2
   WHERE pr IS NOT NULL
     AND component_json->'vcs'->'pr'->'ticket'->>'id' = '${SAFE_TICKET_KEY}'
     AND NOT (component_id = '${SAFE_COMPONENT_ID}' AND pr::text = '${SAFE_PR}')
