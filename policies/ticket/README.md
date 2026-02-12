@@ -47,6 +47,38 @@ policies:
       max_ticket_reuse: "3"
 ```
 
+## Examples
+
+### Passing — Valid ticket with acceptable status
+
+```json
+{
+  "vcs": {
+    "pr": {
+      "ticket": {
+        "id": "ENG-456",
+        "source": "jira",
+        "url": "https://acme.atlassian.net/browse/ENG-456",
+        "valid": true,
+        "status": "In Progress",
+        "type": "Story",
+        "summary": "Add payment validation",
+        "assignee": "jane@acme.com",
+        "reuse_count": 0
+      }
+    }
+  }
+}
+```
+
+### Failing — No ticket in PR title
+
+```json
+{}
+```
+
+**Failure message:** `"PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123])."`
+
 ## Remediation
 
 When this policy fails, you can resolve it by:
