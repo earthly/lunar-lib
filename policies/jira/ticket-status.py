@@ -19,7 +19,7 @@ def main(node=None):
 
         # If both lists are empty, nothing to check.
         if not allowed and not disallowed:
-            return c
+            c.skip("No status constraints configured")
 
         status = c.get_value_or_default(".jira.ticket.status", "")
         ticket_key = c.get_value_or_default(".jira.ticket.key", "unknown")
@@ -30,10 +30,11 @@ def main(node=None):
         if allowed and status not in allowed:
             c.fail(f"Ticket {ticket_key} has status '{status}' which is not in "
                    f"the allowed list: {', '.join(allowed)}.")
-
-        if disallowed and status in disallowed:
+        elif disallowed and status in disallowed:
             c.fail(f"Ticket {ticket_key} has status '{status}' which is in "
                    f"the disallowed list: {', '.join(disallowed)}.")
+        else:
+            c.assert_true(True, "")
     return c
 
 

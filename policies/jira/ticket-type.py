@@ -16,7 +16,7 @@ def main(node=None):
 
         # If the allowed list is empty, any type is acceptable.
         if not allowed:
-            return c
+            c.skip("No type constraints configured")
 
         issue_type = c.get_value_or_default(".jira.ticket.type", "")
         ticket_key = c.get_value_or_default(".jira.ticket.key", "unknown")

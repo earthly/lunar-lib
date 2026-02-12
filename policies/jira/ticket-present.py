@@ -14,9 +14,9 @@ def main(node=None):
             return c
 
         ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "")
-        if not ticket_id:
-            c.fail("PR does not reference a Jira ticket. "
-                   "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+        c.assert_true(bool(ticket_id),
+                      "PR does not reference a Jira ticket. "
+                      "Include a ticket ID in the PR title (e.g. [ABC-123]).")
     return c
 
 
