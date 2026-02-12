@@ -56,14 +56,3 @@ collectors:
 | `PG_USER` | No | running-in-prs | Database user (uses `lunar sql connection-string` if not set) |
 
 The `cli` collector does not require any secrets.
-
-Configure secrets in your `lunar-config.yml`:
-
-```yaml
-secrets:
-  GH_TOKEN:
-    from_env: GITHUB_TOKEN
-  # Optional: only needed if lunar sql connection-string is not available
-  PG_PASSWORD:
-    from_env: LUNAR_DB_PASSWORD
-```
