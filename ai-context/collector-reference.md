@@ -266,8 +266,13 @@ For `ci-before-command` and `ci-after-command` hooks:
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
 # LUNAR_CI_COMMAND is a JSON array: ["docker","build","-t","myimage","."]
-# Use jq to parse it:
+
+# Container-based collectors can use jq (available in official image):
 echo "Hooked command: $(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')"
+
+# Native collectors should use pure bash (no jq dependency):
+CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
+echo "Hooked command: $CMD_STR"
 ```
 
 ## The lunar collect Command
