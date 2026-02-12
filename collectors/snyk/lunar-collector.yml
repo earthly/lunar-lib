@@ -92,7 +92,6 @@ example_component_json: |
       "native": {
         "snyk": {
           "cli_command": "snyk code test",
-          "exit_code": 0,
           "cli_version": "1.1200.0"
         }
       }

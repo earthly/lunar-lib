@@ -43,12 +43,6 @@ else
     CATEGORY="sca"  # Default: snyk test = Open Source
 fi
 
-# Capture exit code (ensure numeric)
-EXIT_CODE="${LUNAR_CI_COMMAND_EXIT_CODE:-0}"
-if ! [[ "$EXIT_CODE" =~ ^[0-9]+$ ]]; then
-    EXIT_CODE=0
-fi
-
 # Capture Snyk CLI version
 SNYK_VERSION=$(snyk --version 2>/dev/null || echo "unknown")
 
@@ -60,7 +54,6 @@ CMD_SAFE=$(echo "$CMD_STR" | sed -E \
 
 # Write results using individual field collection (no jq required)
 lunar collect ".$CATEGORY.native.snyk.cli_command" "$CMD_SAFE"
-lunar collect -j ".$CATEGORY.native.snyk.exit_code" "$EXIT_CODE"
 lunar collect ".$CATEGORY.native.snyk.cli_version" "$SNYK_VERSION"
 
 # Write source metadata
