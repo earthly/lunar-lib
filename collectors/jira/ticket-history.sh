@@ -66,4 +66,4 @@ if ! [[ "$REUSE_COUNT" =~ ^[0-9]+$ ]]; then
   exit 0
 fi
 
-lunar collect -j ".jira.ticket_reuse_count" "$REUSE_COUNT"
+lunar collect -j ".vcs.pr.ticket.reuse_count" "$REUSE_COUNT"

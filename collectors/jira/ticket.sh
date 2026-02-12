@@ -73,24 +73,19 @@ if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
   exit 0
 fi
 
-# Ticket exists in Jira — write .vcs.pr.ticket.valid
+# Ticket exists — write normalized fields to generic paths.
 lunar collect -j ".vcs.pr.ticket.valid" true
 
-# Extract normalized ticket fields.
 TICKET_STATUS="$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name // empty')"
 TICKET_TYPE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.issuetype.name // empty')"
 TICKET_SUMMARY="$(echo "$JIRA_RESPONSE" | jq -r '.fields.summary // empty')"
 TICKET_ASSIGNEE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.assignee.emailAddress // empty')"
 
-# Build normalized .jira.ticket object.
-jq -n \
-  --arg key "$TICKET_KEY" \
-  --arg status "$TICKET_STATUS" \
-  --arg type "$TICKET_TYPE" \
-  --arg summary "$TICKET_SUMMARY" \
-  --arg assignee "$TICKET_ASSIGNEE" \
-  '{key: $key, status: $status, type: $type, summary: $summary, assignee: $assignee}' | \
-  lunar collect -j ".jira.ticket" -
+lunar collect \
+  ".vcs.pr.ticket.status" "$TICKET_STATUS" \
+  ".vcs.pr.ticket.type" "$TICKET_TYPE" \
+  ".vcs.pr.ticket.summary" "$TICKET_SUMMARY" \
+  ".vcs.pr.ticket.assignee" "$TICKET_ASSIGNEE"
 
-# Write full raw response as native data.
-echo "$JIRA_RESPONSE" | lunar collect -j ".jira.native" -
+# Write full raw response under native.jira.
+echo "$JIRA_RESPONSE" | lunar collect -j ".vcs.pr.ticket.native.jira" -

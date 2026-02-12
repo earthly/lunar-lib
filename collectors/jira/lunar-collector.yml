@@ -15,9 +15,9 @@ landing_page:
   icon: "assets/jira.svg"
   status: "stable"
   related:
-    - slug: "jira"
+    - slug: "ticket"
       type: "policy"
-      reason: "Enforces Jira ticket presence, validity, and reuse limits"
+      reason: "Enforces ticket presence, validity, status, type, and reuse limits"
 
 collectors:
   - name: ticket
@@ -77,19 +77,16 @@ example_component_json: |
           "id": "ABC-123",
           "source": "jira",
           "url": "https://acme.atlassian.net/browse/ABC-123",
-          "valid": true
+          "valid": true,
+          "status": "In Progress",
+          "type": "Story",
+          "summary": "Implement payment validation",
+          "assignee": "jane@acme.com",
+          "reuse_count": 0,
+          "native": {
+            "jira": { "...full Jira API response..." }
+          }
         }
       }
-    },
-    "jira": {
-      "ticket": {
-        "key": "ABC-123",
-        "status": "In Progress",
-        "type": "Story",
-        "summary": "Implement payment validation",
-        "assignee": "jane@acme.com"
-      },
-      "ticket_reuse_count": 0,
-      "native": { "...full Jira API response..." }
     }
   }
