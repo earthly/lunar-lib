@@ -1,13 +1,9 @@
 from lunar_policy import Check, variable_or_default
-from helpers import is_pr_context
 
 
 def main(node=None):
     c = Check("ticket-type", "Jira ticket should be an acceptable issue type", node=node)
     with c:
-        if not is_pr_context():
-            c.skip("Not in a PR context")
-
         if not c.exists(".jira.ticket"):
             c.skip("No Jira ticket data available")
 

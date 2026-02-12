@@ -1,13 +1,9 @@
 from lunar_policy import Check
-from helpers import is_pr_context
 
 
 def main(node=None):
     c = Check("ticket-present", "PRs should reference a Jira ticket", node=node)
     with c:
-        if not is_pr_context():
-            c.skip("Not in a PR context")
-
         if not c.exists(".vcs.pr.ticket"):
             c.fail("PR does not reference a Jira ticket. "
                    "Include a ticket ID in the PR title (e.g. [ABC-123]).")
