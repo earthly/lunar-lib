@@ -25,6 +25,9 @@ if [ -z "$TICKET_KEY" ]; then
   exit 0
 fi
 
+# Write debug breadcrumb so we can tell how far execution gets.
+lunar collect -j ".jira.ticket_history_debug" '"reached_sql_step"'
+
 # Get database connection string.
 CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 
