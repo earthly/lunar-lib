@@ -76,23 +76,16 @@ example_component_json: |
       "native": {
         "snyk": {
           "running_in_prs": true,
-          "github_app_results": {
+          "github_app": {
             "state": "success",
             "context": "security/snyk",
             "target_url": "https://app.snyk.io/..."
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "snyk test --all-projects", "version": "1.1200.0"}
+            ]
           }
-        }
-      }
-    },
-    "sast": {
-      "source": {
-        "tool": "snyk",
-        "integration": "ci"
-      },
-      "native": {
-        "snyk": {
-          "cli_command": "snyk code test",
-          "cli_version": "1.1200.0"
         }
       }
     }

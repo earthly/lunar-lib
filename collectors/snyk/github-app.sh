@@ -60,7 +60,7 @@ echo "$STATUSES" | jq -c '.[]' | while read -r STATUS; do
     # Write native data
     jq -n \
         --argjson results "$STATUS" \
-        '{github_app_results: $results}' | \
+        '{github_app: $results}' | \
         lunar collect -j ".$CATEGORY.native.snyk" -
     
     # Write source metadata

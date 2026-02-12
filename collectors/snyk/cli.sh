@@ -52,9 +52,13 @@ CMD_SAFE=$(echo "$CMD_STR" | sed -E \
     -e 's/(--client-id|--client-secret|--token|--auth-token)(=| )[^ ]+/\1=<redacted>/Ig' \
     -e 's/(SNYK_TOKEN|SNYK_OAUTH_TOKEN)=[^ ]+/\1=<redacted>/Ig')
 
-# Write results using individual field collection (no jq required)
-lunar collect ".$CATEGORY.native.snyk.cli_command" "$CMD_SAFE"
-lunar collect ".$CATEGORY.native.snyk.cli_version" "$SNYK_VERSION"
+# Escape quotes in command for JSON
+CMD_ESCAPED=$(echo "$CMD_SAFE" | sed 's/"/\\"/g')
+
+# Write cicd command entry (no jq required)
+# Note: multiple snyk commands in same CI run will each add to this structure
+echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$SNYK_VERSION\"}]}" | \
+    lunar collect -j ".$CATEGORY.native.snyk.cicd" -
 
 # Write source metadata
 lunar collect ".$CATEGORY.source.tool" "snyk"
