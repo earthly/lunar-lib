@@ -29,8 +29,8 @@ escape_string() {
 #   Returns 0 if found, 1 if not found.
 extract_ticket_id() {
   local pr_title="$1"
-  local prefix="${LUNAR_VAR_TICKET_PREFIX:-[}"
-  local suffix="${LUNAR_VAR_TICKET_SUFFIX:-]}"
+  local prefix="${LUNAR_VAR_TICKET_PREFIX:-}"
+  local suffix="${LUNAR_VAR_TICKET_SUFFIX:-}"
   local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
 
   local prefix_pattern suffix_pattern regex

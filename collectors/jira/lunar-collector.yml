@@ -44,11 +44,11 @@ collectors:
 
 inputs:
   ticket_prefix:
-    description: Character(s) before the ticket ID in PR titles
-    default: "["
+    description: Character(s) before the ticket ID in PR titles (empty = match anywhere)
+    default: ""
   ticket_suffix:
-    description: Character(s) after the ticket ID in PR titles
-    default: "]"
+    description: Character(s) after the ticket ID in PR titles (empty = match anywhere)
+    default: ""
   ticket_pattern:
     description: Regex pattern for ticket ID (without prefix/suffix)
     default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
