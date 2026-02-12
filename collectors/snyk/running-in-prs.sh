@@ -40,9 +40,9 @@ if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
     fi
 fi
 
-# Check if psql is available
+# Install psql if not available
 if ! command -v psql &> /dev/null; then
-    exit 0
+    apk add --no-cache postgresql-client >/dev/null 2>&1 || exit 0
 fi
 
 # Sanitize component ID to prevent SQL injection (escape single quotes)
