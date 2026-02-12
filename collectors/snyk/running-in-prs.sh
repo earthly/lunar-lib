@@ -27,22 +27,21 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
 fi
 
 # Get database connection string
-CONN_STRING=$(lunar sql connection-string 2>&1) || true
+CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 
-if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]] || [[ "$CONN_STRING" == *"error"* ]]; then
+if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
     # Fall back to secrets if lunar sql connection-string isn't available
     if [ -n "$LUNAR_SECRET_PG_PASSWORD" ] && [ -n "$LUNAR_HUB_HOST" ]; then
         PG_USER="${LUNAR_SECRET_PG_USER:-api3}"
         CONN_STRING="postgres://${PG_USER}:${LUNAR_SECRET_PG_PASSWORD}@${LUNAR_HUB_HOST}:5432/hub?sslmode=disable"
     else
-        echo "lunar sql connection-string failed: $CONN_STRING" >&2
         exit 0
     fi
 fi
 
 # Install psql if not available
 if ! command -v psql &> /dev/null; then
-    apk add --no-cache postgresql-client >/dev/null 2>&1 || { echo "Failed to install psql" >&2; exit 0; }
+    apk add --no-cache postgresql-client >/dev/null 2>&1 || exit 0
 fi
 
 # Sanitize component ID to prevent SQL injection (escape single quotes)
@@ -62,7 +61,7 @@ for CATEGORY in sca sast container_scan iac_scan; do
         ) AS snyk_present;
     "
 
-    RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
+    RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
 
     if [ "$RESULT" = "t" ]; then
         # pr_scanning_verified: proves PRs for this component are being scanned
