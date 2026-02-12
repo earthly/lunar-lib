@@ -59,10 +59,10 @@ secrets:
   GH_TOKEN:
     description: GitHub token for API access (required for github-app collector)
   PG_PASSWORD:
-    description: Database password for running-in-prs (only needed if lunar sql connection-string is unavailable)
+    description: Database password for running-in-prs (uses lunar sql connection-string if not set)
     required: false
   PG_USER:
-    description: Database user for running-in-prs (only needed with PG_PASSWORD)
+    description: Database user for running-in-prs (uses lunar sql connection-string if not set)
     required: false
 
 example_component_json: |
