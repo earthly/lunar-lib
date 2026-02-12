@@ -34,8 +34,11 @@ fi
 
 # Get database connection string.
 echo "DEBUG: getting connection string..." >&2
-CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
+CONN_ERR=$(mktemp)
+CONN_STRING=$(lunar sql connection-string 2>"$CONN_ERR") || true
 echo "DEBUG: CONN_STRING='${CONN_STRING:0:80}'" >&2
+echo "DEBUG: CONN_ERR='$(cat "$CONN_ERR" | head -3)'" >&2
+rm -f "$CONN_ERR"
 
 if [ -z "$CONN_STRING" ]; then
   echo "DEBUG: connection string empty, skipping." >&2
