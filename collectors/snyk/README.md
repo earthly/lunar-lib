@@ -52,8 +52,8 @@ collectors:
 | Secret | Required | Used By | Description |
 |--------|----------|---------|-------------|
 | `GH_TOKEN` | Yes | github-app | GitHub token for API access to query commit statuses |
-| `PG_PASSWORD` | No | running-in-prs | Database password (uses `lunar sql connection-string` if not set) |
-| `PG_USER` | No | running-in-prs | Database user (defaults to `api3` if not set) |
+| `PG_PASSWORD` | No | running-in-prs | Database password (only needed if `lunar sql connection-string` is unavailable) |
+| `PG_USER` | No | running-in-prs | Database user (only needed with PG_PASSWORD) |
 
 The `cli` collector does not require any secrets.
 
