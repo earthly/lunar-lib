@@ -19,6 +19,7 @@ This collector writes to the following Component JSON paths based on scan type:
 |------|------|-------------|
 | `.sca.source` | object | Source metadata when Snyk Open Source scan detected |
 | `.sca.native.snyk` | object | Raw Snyk results for SCA scans |
+| `.sca.native.snyk.running_in_prs` | boolean | Proves Snyk is scanning PRs (set on default branch) |
 | `.sast.source` | object | Source metadata when Snyk Code scan detected |
 | `.sast.native.snyk` | object | Raw Snyk results for SAST scans |
 | `.container_scan.source` | object | Source metadata when Snyk Container scan detected |
@@ -46,4 +47,18 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
 ```
 
-The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database (no additional secrets required).
+## Required Secrets
+
+| Secret | Required For | Description |
+|--------|--------------|-------------|
+| `GH_TOKEN` | github-app | GitHub token for API access to query commit statuses |
+
+The `running-in-prs` and `cli` collectors do not require additional secrets. The `running-in-prs` collector uses `lunar sql connection-string` to query the Lunar Hub database.
+
+Configure secrets in your `lunar-config.yml`:
+
+```yaml
+secrets:
+  GH_TOKEN:
+    from_env: GITHUB_TOKEN
+```
