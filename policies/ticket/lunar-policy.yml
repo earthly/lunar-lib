@@ -10,7 +10,7 @@ landing_page:
     Enforce ticket hygiene across your organization. Verify PRs reference
     valid issue tracker tickets, check ticket status and type, enforce a
     specific tracker, and detect ticket reuse across multiple PRs.
-    Works with any issue tracker (Jira, Linear, GitHub Issues, etc.).
+    Works with Jira by default; other issue trackers require a compatible ticket collector.
   category: "devex-build-and-ci"
   icon: "assets/jira.svg"
   status: "stable"

@@ -13,14 +13,16 @@ def main(node=None):
         if not allowed:
             c.skip("No source constraints configured")
 
-        source = c.get_value_or_default(".vcs.pr.ticket.source", "")
+        source = c.get_value_or_default(".vcs.pr.ticket.source.tool",
+                  c.get_value_or_default(".vcs.pr.ticket.source", ""))
         ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "unknown")
 
         if not source:
             c.skip("Ticket has no source information")
 
-        c.assert_true(source.lower() in allowed,
-                      f"Ticket {ticket_id} comes from '{source}' which is not in "
+        source_name = source if isinstance(source, str) else str(source)
+        c.assert_true(source_name.lower() in allowed,
+                      f"Ticket {ticket_id} comes from '{source_name}' which is not in "
                       f"the allowed list: {', '.join(allowed)}.")
     return c
 

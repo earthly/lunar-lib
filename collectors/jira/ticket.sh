@@ -32,9 +32,8 @@ if [ -n "$JIRA_BASE_URL" ]; then
   TICKET_URL="${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
 fi
 
-lunar collect \
-  ".vcs.pr.ticket.id" "$TICKET_KEY" \
-  ".vcs.pr.ticket.source" "jira"
+lunar collect ".vcs.pr.ticket.id" "$TICKET_KEY"
+jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j ".vcs.pr.ticket.source" -
 
 if [ -n "$TICKET_URL" ]; then
   lunar collect ".vcs.pr.ticket.url" "$TICKET_URL"
