@@ -62,12 +62,6 @@ secrets:
     description: Jira API token for authentication
   GH_TOKEN:
     description: GitHub token for reading PR metadata
-  PG_PASSWORD:
-    description: Database password for ticket-history (uses lunar sql connection-string if not set)
-    required: false
-  PG_USER:
-    description: Database user for ticket-history (uses lunar sql connection-string if not set)
-    required: false
 
 example_component_json: |
   {
