@@ -10,8 +10,8 @@ landing_page:
   display_name: "Compliance Documentation Guardrails"
   long_description: |
     Verify that required compliance documentation exists, is kept current, and
-    contains required sections. Currently covers disaster recovery exercises
-    with support for additional compliance document types planned.
+    contains required sections. Covers disaster recovery plans and exercise
+    records with support for additional compliance document types planned.
   category: "operational-readiness"
   icon: "assets/compliance-docs.svg"
   status: "stable"
@@ -22,41 +22,55 @@ landing_page:
   related: []
 
 policies:
-  - name: dr-plan-documented
+  - name: dr-plan-exists
     description: |
       Verifies that a disaster recovery plan exists in the repository.
       Every production service should have documented recovery procedures
       to ensure teams can respond effectively during outages.
-    mainPython: ./dr-plan-documented.py
+    mainPython: ./dr-plan-exists.py
     keywords: ["disaster recovery", "DR plan", "compliance", "documentation"]
+
+  - name: dr-plan-rto-rpo-defined
+    description: |
+      Requires that Recovery Time Objective (RTO) and Recovery Point Objective
+      (RPO) are defined in the DR plan. These targets establish clear
+      expectations for acceptable downtime and data loss during disasters.
+    mainPython: ./dr-plan-rto-rpo-defined.py
+    keywords: ["RTO", "RPO", "recovery objectives", "SLA"]
+
+  - name: dr-plan-required-sections
+    description: |
+      Ensures the DR plan contains required section headings covering key
+      recovery topics. Configurable via the plan_required_sections input.
+    mainPython: ./dr-plan-required-sections.py
+    keywords: ["DR plan", "required sections", "documentation structure"]
 
   - name: dr-exercise-recent
     description: |
       Ensures a DR exercise (tabletop, failover, or full) was conducted within
-      the configured threshold (default: 365 days). Regular exercises validate
-      that recovery procedures work and that the team is practiced.
+      the configured threshold (default: 365 days). Checks the most recent
+      exercise record in the exercises directory.
     mainPython: ./dr-exercise-recent.py
     keywords: ["DR exercise", "tabletop", "game day", "compliance"]
 
-  - name: dr-rto-rpo-defined
+  - name: dr-exercise-required-sections
     description: |
-      Requires that Recovery Time Objective (RTO) and Recovery Point Objective
-      (RPO) are defined in the DR documentation. These targets establish clear
-      expectations for acceptable downtime and data loss during disasters.
-    mainPython: ./dr-rto-rpo-defined.py
-    keywords: ["RTO", "RPO", "recovery objectives", "SLA"]
-
-  - name: dr-required-sections
-    description: |
-      Ensures the DR documentation contains required section headings covering
-      key recovery topics. Configurable via the required_sections input parameter.
-    mainPython: ./dr-required-sections.py
-    keywords: ["DR documentation", "required sections", "documentation structure"]
+      Ensures the most recent DR exercise record contains required section
+      headings documenting what was tested and the outcomes. Configurable
+      via the exercise_required_sections input.
+    mainPython: ./dr-exercise-required-sections.py
+    keywords: ["DR exercise", "required sections", "documentation structure"]
 
 inputs:
   max_days_since_exercise:
     description: Maximum number of days allowed since the last DR exercise
     default: 365
-  required_sections:
-    description: Comma-separated list of required sections in the DR documentation
+  plan_required_sections:
+    description: Comma-separated list of required sections in the DR plan
+    default: "Overview,Recovery Steps,Contact List"
+  exercise_required_sections:
+    description: Comma-separated list of required sections in the DR exercise record
     default: "Scenario,Recovery Steps Tested,Participants"
+  exercises_check_all:
+    description: Check required sections on all exercises (true) or only the latest (false)
+    default: "false"
