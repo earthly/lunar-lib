@@ -1,0 +1,8 @@
+# Various glob patterns
+* @acme/default
+*.go @acme/go-team
+*.js @acme/js-team
+/docs/*.md @acme/docs
+apps/ @acme/apps
+/scripts/**/*.sh @acme/devops
+!README.md @acme/docs

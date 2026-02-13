@@ -4,7 +4,7 @@ Collects README file information including existence, line count, and section he
 
 ## Overview
 
-This collector scans the repository root for a README file and extracts metadata about its contents, including existence, line count, and section headings. It runs on code changes and checks for common README variants (`README.md`, `README`, `README.txt`, `README.rst`) in order, which can be customized via the `path` input.
+This collector scans the repository root for a README file and extracts metadata about its contents, including existence, line count, and section headings. It runs on code changes and checks for common README variants (`README.md`, `README`, `README.txt`, `README.rst`) in order, which can be customized via the `paths` input.
 
 ## Collected Data
 
@@ -26,6 +26,6 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/readme@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
     # with:
-    #   path: "README.md,docs/README.md"  # Customize which files to check
+    #   paths: "README.md,docs/README.md"  # Customize which files to check
 ```
 

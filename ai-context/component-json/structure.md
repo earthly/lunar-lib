@@ -18,7 +18,10 @@ This table lists important sub-objects within each category. For full details, s
 | `.repo.license` | License info (`type`, `path`) |
 | `.repo.languages` | Detected languages (`primary`, `all`) |
 | **[`.ownership`](cat-ownership.md)** | **Code ownership, maintainers, team info** |
-| `.ownership.codeowners` | CODEOWNERS info (`exists`, `valid`, `has_default_rule`, `owners`) |
+| `.ownership.codeowners` | CODEOWNERS info (`exists`, `valid`, `path`, `owners`, `rules`) |
+| `.ownership.codeowners.rules[]` | Parsed rules (`pattern`, `owners`, `owner_count`, `line`) |
+| `.ownership.codeowners.team_owners` | Team owners (`@org/team`) |
+| `.ownership.codeowners.individual_owners` | Individual owners (`@user`, `email`) |
 | `.ownership.maintainers` | List of maintainer emails |
 | **[`.catalog`](cat-catalog.md)** | **Service catalog entries (Backstage, etc.)** |
 | `.catalog.entity` | Entity metadata (`name`, `type`, `owner`, `lifecycle`, `tags`) |

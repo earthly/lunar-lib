@@ -3,7 +3,7 @@
 set -e
 
 # Convert comma-separated paths input to array
-IFS=',' read -ra README_CANDIDATES <<< "$LUNAR_VAR_PATH"
+IFS=',' read -ra README_CANDIDATES <<< "$LUNAR_VAR_PATHS"
 
 # Find the first matching README file
 README_FILE=""
