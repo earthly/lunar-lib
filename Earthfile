@@ -59,6 +59,10 @@ guardrails-assets:
     
     SAVE ARTIFACT icons
 
+test:
+    BUILD ./collectors/codeowners+test
+    BUILD ./policies/codeowners+test
+
 lint:
     FROM python:3.12-alpine
     WORKDIR /workspace

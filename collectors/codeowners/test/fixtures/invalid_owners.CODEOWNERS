@@ -1,0 +1,4 @@
+# Mix of valid and invalid owners
+* @acme/platform
+/src/ not-an-owner @acme/backend also_bad
+docs/ @acme/docs

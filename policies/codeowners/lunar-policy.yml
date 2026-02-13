@@ -1,0 +1,91 @@
+version: 0
+
+name: codeowners
+description: Enforce code ownership standards via CODEOWNERS file validation
+author: earthly
+
+landing_page:
+  display_name: "CODEOWNERS Guardrails"
+  long_description: |
+    Enforce code ownership standards including CODEOWNERS file presence, syntax
+    validity, catch-all rules, minimum owner counts, and team-based ownership.
+    Ensure every file has a responsible owner.
+  category: "repository-and-ownership"
+  icon: "assets/codeowners.svg"
+  status: "stable"
+  requires:
+    - slug: "codeowners"
+      type: "collector"
+      reason: "Provides parsed CODEOWNERS file data"
+  related:
+    - slug: "codeowners"
+      type: "collector"
+      reason: "Collects the CODEOWNERS data that these policies evaluate"
+
+policies:
+  - name: exists
+    description: |
+      Requires a CODEOWNERS file to be present in the repository.
+      Checks standard locations: root, .github/, or docs/.
+    mainPython: exists.py
+    keywords: ["codeowners", "code ownership", "file exists"]
+
+  - name: valid
+    description: |
+      Validates that the CODEOWNERS file has correct syntax.
+      Checks that all owner references use valid formats
+      (@user, @org/team, or email).
+    mainPython: valid.py
+    keywords: ["codeowners", "syntax validation", "owner format"]
+
+  - name: catchall
+    description: |
+      Requires a default catch-all rule (*) in CODEOWNERS so that
+      every file in the repository has at least one owner.
+    mainPython: catchall.py
+    keywords: ["codeowners", "catch-all", "default owner", "coverage"]
+
+  - name: min-owners
+    description: |
+      Ensures each CODEOWNERS rule has a minimum number of owners
+      for redundancy. Configurable via the min_owners_per_rule input.
+    mainPython: min_owners.py
+    keywords: ["codeowners", "minimum owners", "bus factor", "redundancy"]
+
+  - name: team-owners
+    description: |
+      Requires at least one team-based owner (@org/team) in the
+      CODEOWNERS file for better ownership continuity.
+    mainPython: team_owners.py
+    keywords: ["codeowners", "team ownership", "org team"]
+
+  - name: no-individuals-only
+    description: |
+      Ensures each CODEOWNERS rule includes at least one team owner,
+      not just individual users. Stricter than team-owners which only
+      checks that teams exist somewhere in the file.
+    mainPython: no_individuals_only.py
+    keywords: ["codeowners", "team ownership", "individual owners"]
+
+  - name: no-empty-rules
+    description: |
+      Flags CODEOWNERS rules that have no owners assigned, which
+      effectively un-assigns ownership for matching files.
+    mainPython: no_empty_rules.py
+    keywords: ["codeowners", "empty rules", "unassigned ownership"]
+
+  - name: max-owners
+    description: |
+      Flags CODEOWNERS rules with too many owners. Excessive owners
+      often means diffused responsibility where nobody truly owns
+      the code. Configurable via the max_owners_per_rule input.
+    mainPython: max_owners.py
+    keywords: ["codeowners", "maximum owners", "diffused ownership"]
+
+inputs:
+  min_owners_per_rule:
+    description: Minimum number of owners required per CODEOWNERS rule (for min-owners check)
+    default: "2"
+  max_owners_per_rule:
+    description: Maximum number of owners allowed per CODEOWNERS rule (for max-owners check)
+    default: "10"

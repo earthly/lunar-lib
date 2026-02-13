@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    name: +test
+    runs-on: ubuntu-latest
+    env:
+      FORCE_COLOR: 1
+      EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
+      EARTHLY_INSTALL_ID: "earthly-lunar"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Earthly
+        uses: earthly/actions-setup@v1
+      - name: Test
+        run: earthly --ci +test
+
   lint:
     name: +lint
     runs-on: ubuntu-latest

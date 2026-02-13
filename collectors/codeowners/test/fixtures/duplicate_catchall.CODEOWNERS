@@ -1,0 +1,7 @@
+# First catch-all
+* @acme/old-team
+
+/src/ @acme/backend
+
+# Override catch-all
+* @acme/new-team @alice

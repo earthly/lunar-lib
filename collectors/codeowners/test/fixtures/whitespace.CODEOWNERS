@@ -1,0 +1,5 @@
+   # Indented comment
+
+  *    @acme/platform     @jane  
+
+   /src/    @acme/backend

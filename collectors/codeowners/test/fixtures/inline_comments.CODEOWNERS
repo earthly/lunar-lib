@@ -1,0 +1,3 @@
+* @acme/platform # Default catch-all
+/src/ @acme/backend @jane # Backend code
+docs/ @acme/docs # Documentation only
