@@ -20,7 +20,7 @@ while [ -z "$trace_id" ] || [ -z "$root_span_id" ]; do
   fi
   
   if [ $retry_count -ge $max_retries ]; then
-    echo "OTEL: No trace context found after ${max_retries} retries, skipping step span"
+    log_debug "No trace context found after ${max_retries} retries, skipping step span"
     # Use a temporary key for skipped events without trace_id
     skip_key="skipped_$(date +%s%N | head -c 13)_step_${LUNAR_CI_STEP_INDEX:-unknown}"
     debug_collect ".ci.debug.step_start.$skip_key.status" "skipped_no_context" \
@@ -50,5 +50,5 @@ debug_collect ".ci.traces.$trace_id.steps.${LUNAR_CI_STEP_INDEX}.step_index" "${
 
 # Don't send the span yet - OpenTelemetry spans are immutable
 # We'll send it once when the step completes in step-end.sh
-echo "OTEL: Started step span $step_span_id for step ${LUNAR_CI_STEP_INDEX} (span will be sent on completion)"
+log_debug "Started step span $step_span_id for step ${LUNAR_CI_STEP_INDEX} (span will be sent on completion)"
 

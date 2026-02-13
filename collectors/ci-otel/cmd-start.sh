@@ -7,7 +7,7 @@ trace_id=$(cat /tmp/lunar-otel-trace-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null 
 root_span_id=$(cat /tmp/lunar-otel-root-span-id-${LUNAR_CI_JOB_ID:-unknown} 2>/dev/null || echo "")
 
 if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
-  echo "OTEL: No trace context found, skipping command span (trace_id='$trace_id', root_span_id='$root_span_id')" >&2
+  log_debug "No trace context found, skipping command span (trace_id='$trace_id', root_span_id='$root_span_id')"
   # Use a temporary key for skipped events without trace_id
   skip_key="skipped_$(date +%s%N | head -c 13)_pid_${LUNAR_CI_COMMAND_PID:-unknown}"
   debug_collect ".ci.debug.cmd_start.$skip_key.status" "skipped_no_context"
@@ -15,11 +15,11 @@ if [ -z "$trace_id" ] || [ -z "$root_span_id" ]; then
 fi
 
 # Debug: Log trace context for troubleshooting
-echo "OTEL: cmd-start: trace_id=$trace_id, root_span_id=$root_span_id, step_index=${LUNAR_CI_STEP_INDEX:-}, cmd_pid=${LUNAR_CI_COMMAND_PID:-}" >&2
+log_debug "cmd-start: trace_id=$trace_id, root_span_id=$root_span_id, step_index=${LUNAR_CI_STEP_INDEX:-}, cmd_pid=${LUNAR_CI_COMMAND_PID:-}"
 
 # Use command PID for span ID (convert to hex)
 if [ -z "${LUNAR_CI_COMMAND_PID:-}" ]; then
-  echo "OTEL: No command PID found, skipping command span"
+  log_debug "No command PID found, skipping command span"
   skip_key="skipped_$(date +%s%N | head -c 13)_no_pid"
   debug_collect ".ci.debug.cmd_start.$skip_key.status" "skipped_no_pid"
   exit 0
@@ -29,7 +29,7 @@ fi
 # Commands without step_index are internal CI runner processes (like git, sed, basename, etc.)
 # that don't map to user-defined CI workflow steps and should not be traced
 if [ -z "${LUNAR_CI_STEP_INDEX:-}" ]; then
-  echo "OTEL: Command does not belong to a step (no step_index), skipping internal CI runner process: ${LUNAR_CI_COMMAND:-}" >&2
+  log_debug "Command does not belong to a step (no step_index), skipping internal CI runner process: ${LUNAR_CI_COMMAND:-}"
   
   # Collect internal processes for debugging purposes
   # Include job_id, step_id, PID, PPID, and command in hash to make each command instance unique
@@ -52,7 +52,7 @@ start_time=$(nanoseconds)
 # Commands must be children of steps or other commands, never the root job span
 # If we can't determine a valid parent (step or command), skip sending this command span
 if [ -z "$parent_span_id" ]; then
-  echo "OTEL: Warning - cannot determine step or command parent for command, skipping" >&2
+  log_debug "Warning - cannot determine step or command parent for command, skipping"
   debug_collect ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.${LUNAR_CI_COMMAND_PID}.cmd_start.status" "skipped_no_parent" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.${LUNAR_CI_COMMAND_PID}.cmd_start.cmd_pid" "${LUNAR_CI_COMMAND_PID}" \
     ".ci.traces.$trace_id.debug.steps.${LUNAR_CI_STEP_INDEX}.commands.${LUNAR_CI_COMMAND_PID}.cmd_start.step_index" "${LUNAR_CI_STEP_INDEX}" \
@@ -75,9 +75,7 @@ echo "$parent_span_id" >> "$cmd_file"
 echo "$LUNAR_CI_COMMAND" >> "$cmd_file"
 
 # Debug logging (gated to avoid leaking secrets in CI logs)
-if [ "${LUNAR_VAR_debug:-false}" = "true" ]; then
-  echo "OTEL DEBUG: cmd_file=$cmd_file" >&2
-fi
+log_debug "cmd_file=$cmd_file"
 
 # Also store PID -> span_id mapping for parent lookups
 # Use job_id-step_id-pid to ensure uniqueness across different jobs/steps (PIDs can be reused)

@@ -24,5 +24,5 @@ debug_collect ".ci.traces.$trace_id.trace_id" "$trace_id" \
   ".ci.traces.$trace_id.start_time" "$start_time" \
   ".ci.traces.$trace_id.status" "started"
 
-echo "OTEL: Started trace $trace_id for job"
+log_debug "Started trace $trace_id for job"
 

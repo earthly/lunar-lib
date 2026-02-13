@@ -1,0 +1,82 @@
+version: 0
+
+name: ticket
+description: Enforce issue tracker ticket hygiene in PRs
+author: support@earthly.dev
+
+landing_page:
+  display_name: "Ticket Guardrails"
+  long_description: |
+    Enforce ticket hygiene across your organization. Verify PRs reference
+    valid issue tracker tickets, check ticket status and type, enforce a
+    specific tracker, and detect ticket reuse across multiple PRs.
+    Works with Jira by default; other issue trackers require a compatible ticket collector.
+  category: "devex-build-and-ci"
+  icon: "assets/jira.svg"
+  status: "stable"
+  requires:
+    - slug: "jira"
+      type: "collector"
+      reason: "Provides ticket data (Jira implementation)"
+  related: []
+
+policies:
+  - name: ticket-present
+    description: |
+      Ensures PRs reference an issue tracker ticket in the title.
+    mainPython: ./ticket-present.py
+    runs_on: [prs]
+    keywords: ["ticket", "pr", "sdlc", "issue tracker"]
+
+  - name: ticket-valid
+    description: |
+      Ensures the referenced ticket exists and is valid in the issue tracker.
+    mainPython: ./ticket-valid.py
+    runs_on: [prs]
+    keywords: ["ticket", "validation", "issue tracker"]
+
+  - name: ticket-source
+    description: |
+      Ensures the ticket comes from an approved issue tracker.
+    mainPython: ./ticket-source.py
+    runs_on: [prs]
+    keywords: ["ticket", "source", "jira", "linear", "issue tracker"]
+
+  - name: ticket-status
+    description: |
+      Ensures the ticket is in an acceptable workflow status.
+    mainPython: ./ticket-status.py
+    runs_on: [prs]
+    keywords: ["ticket", "status", "workflow"]
+
+  - name: ticket-type
+    description: |
+      Ensures the ticket is an acceptable issue type.
+    mainPython: ./ticket-type.py
+    runs_on: [prs]
+    keywords: ["ticket", "type", "issue type"]
+
+  - name: ticket-reuse
+    description: |
+      Prevents teams from recycling the same ticket across
+      too many PRs.
+    mainPython: ./ticket-reuse.py
+    runs_on: [prs]
+    keywords: ["ticket reuse", "compliance", "audit"]
+
+inputs:
+  allowed_sources:
+    description: Comma-separated list of allowed ticket sources (e.g. "jira,linear"). Empty = any.
+    default: ""
+  allowed_statuses:
+    description: Comma-separated list of allowed ticket statuses (empty = any)
+    default: ""
+  disallowed_statuses:
+    description: Comma-separated list of disallowed ticket statuses (empty = none)
+    default: ""
+  allowed_types:
+    description: Comma-separated list of allowed issue types (empty = any)
+    default: ""
+  max_ticket_reuse:
+    description: Maximum number of other PRs allowed to reference the same ticket
+    default: "3"
