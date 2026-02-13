@@ -58,10 +58,8 @@ for CATEGORY in sast sca; do
     RESULT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>/dev/null) || true
 
     if [ "$RESULT" = "t" ]; then
-        # running_in_prs: proves PRs for this component are being scanned
-        # (does not imply specific timing, just that scanning capability exists)
-        jq -n '{running_in_prs: true}' | \
-            lunar collect -j ".$CATEGORY.native.semgrep" -
+        # running_in_prs at category level — tool-agnostic signal that PRs are scanned
+        lunar collect -j ".$CATEGORY.running_in_prs" "true"
 
         write_semgrep_source "$CATEGORY" "github_app"
     fi
