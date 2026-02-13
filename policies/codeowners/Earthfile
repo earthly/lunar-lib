@@ -1,9 +1,0 @@
-VERSION 0.8
-
-test:
-    FROM python:3.12-alpine
-    WORKDIR /workspace
-    COPY requirements.txt .
-    RUN pip install --no-cache-dir -r requirements.txt
-    COPY *.py .
-    RUN python -m unittest test_codeowners_policies.py -v

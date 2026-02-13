@@ -8,8 +8,8 @@ def main(node=None):
         node=node,
     )
     with c:
-        c.assert_exists(".ownership.codeowners.rules",
-            "No CODEOWNERS file found. Ensure the codeowners collector is configured.")
+        c.assert_true(c.get_value(".ownership.codeowners.exists"),
+            "No CODEOWNERS file found")
 
         for rule in c.get_node(".ownership.codeowners.rules"):
             pattern = rule.get_value(".pattern")

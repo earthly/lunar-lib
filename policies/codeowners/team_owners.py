@@ -8,8 +8,8 @@ def main(node=None):
         node=node,
     )
     with c:
-        c.assert_exists(".ownership.codeowners.team_owners",
-            "No CODEOWNERS file found. Ensure the codeowners collector is configured.")
+        c.assert_true(c.get_value(".ownership.codeowners.exists"),
+            "No CODEOWNERS file found")
 
         team_owners = c.get_value(".ownership.codeowners.team_owners")
         c.assert_true(
