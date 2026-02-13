@@ -36,14 +36,14 @@ extract_frontmatter() {
 parse_field() {
   local fm="$1" field="$2"
   if [ -z "$fm" ]; then echo ""; return; fi
-  echo "$fm" | yq -r ".$field // empty" 2>/dev/null || echo ""
+  echo "$fm" | yq -r ".$field // \"\"" 2>/dev/null || echo ""
 }
 
 # Extract markdown section headings from text (body content, not frontmatter).
 # Usage: extract_sections "$body_text"
 extract_sections() {
-  echo "$1" | grep -E '^#{1,6}\s+' \
-    | sed 's/^#\{1,6\}\s*//' \
+  echo "$1" | grep -E '^#{2,6}\s+' \
+    | sed 's/^#\{2,6\}\s*//' \
     | sed 's/^\s*//;s/\s*$//' \
     | jq -R . | jq -s . || echo '[]'
 }
