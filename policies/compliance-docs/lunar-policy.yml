@@ -1,0 +1,62 @@
+version: 0
+
+name: compliance-docs
+description: Compliance documentation verification policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Compliance Documentation Guardrails"
+  long_description: |
+    Verify that required compliance documentation exists, is kept current, and
+    contains required sections. Currently covers disaster recovery exercises
+    with support for additional compliance document types planned.
+  category: "operational-readiness"
+  icon: "assets/compliance-docs.svg"
+  status: "stable"
+  requires:
+    - slug: "dr-docs"
+      type: "collector"
+      reason: "Provides disaster recovery documentation metadata"
+  related: []
+
+policies:
+  - name: dr-plan-documented
+    description: |
+      Verifies that a disaster recovery plan exists in the repository.
+      Every production service should have documented recovery procedures
+      to ensure teams can respond effectively during outages.
+    mainPython: ./dr-plan-documented.py
+    keywords: ["disaster recovery", "DR plan", "compliance", "documentation"]
+
+  - name: dr-exercise-recent
+    description: |
+      Ensures a DR exercise (tabletop, failover, or full) was conducted within
+      the configured threshold (default: 365 days). Regular exercises validate
+      that recovery procedures work and that the team is practiced.
+    mainPython: ./dr-exercise-recent.py
+    keywords: ["DR exercise", "tabletop", "game day", "compliance"]
+
+  - name: dr-rto-rpo-defined
+    description: |
+      Requires that Recovery Time Objective (RTO) and Recovery Point Objective
+      (RPO) are defined in the DR documentation. These targets establish clear
+      expectations for acceptable downtime and data loss during disasters.
+    mainPython: ./dr-rto-rpo-defined.py
+    keywords: ["RTO", "RPO", "recovery objectives", "SLA"]
+
+  - name: dr-required-sections
+    description: |
+      Ensures the DR documentation contains required section headings covering
+      key recovery topics. Configurable via the required_sections input parameter.
+    mainPython: ./dr-required-sections.py
+    keywords: ["DR documentation", "required sections", "documentation structure"]
+
+inputs:
+  max_days_since_exercise:
+    description: Maximum number of days allowed since the last DR exercise
+    default: 365
+  required_sections:
+    description: Comma-separated list of required sections in the DR documentation
+    default: "Scenario,Recovery Steps Tested,Participants"

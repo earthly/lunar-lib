@@ -1,0 +1,69 @@
+version: 0
+
+name: dr-docs
+description: Collect disaster recovery exercise documentation
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "DR Documentation Collector"
+  long_description: |
+    Parse disaster recovery exercise documentation to extract exercise dates,
+    RTO/RPO targets, review timestamps, and section headings. Verify that teams
+    document and regularly practice recovery procedures.
+  categories: ["documentation"]
+  icon: "assets/dr-docs.svg"
+  status: "stable"
+  related:
+    - slug: "compliance-docs"
+      type: "policy"
+      reason: "Enforces DR readiness requirements based on collected data"
+
+default_image_non_ci_collectors: earthly/lunar-lib:base-main
+
+collectors:
+  - name: dr-docs
+    description: |
+      Scans the repository for a disaster recovery exercise document (default:
+      `docs/dr-exercise.md`). Expects
+      YAML frontmatter with structured fields (last_exercise_date, exercise_type,
+      rto_minutes, rpo_minutes, last_reviewed, approver) followed by Markdown body
+      documenting the exercise scenario and outcomes. Extracts frontmatter values
+      and section headings, computes days-since timestamps, and writes results to
+      `.oncall.disaster_recovery`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["disaster recovery", "DR", "tabletop exercise", "RTO", "RPO", "compliance", "operational readiness"]
+
+inputs:
+  path:
+    description: Comma-separated list of candidate paths to the DR exercise document (first match wins)
+    default: "docs/dr-exercise.md"
+
+example_component_json: |
+  {
+    "oncall": {
+      "disaster_recovery": {
+        "plan_exists": true,
+        "plan_path": "docs/dr-exercise.md",
+        "last_exercise_date": "2025-11-15",
+        "exercise_type": "tabletop",
+        "days_since_exercise": 89,
+        "rto_defined": true,
+        "rto_minutes": 60,
+        "rpo_defined": true,
+        "rpo_minutes": 15,
+        "last_reviewed": "2025-12-01",
+        "days_since_review": 73,
+        "approver": "jane.doe@company.com",
+        "sections": [
+          "Scenario",
+          "Recovery Steps Tested",
+          "Participants",
+          "Action Items",
+          "Lessons Learned"
+        ]
+      }
+    }
+  }
