@@ -667,76 +667,66 @@ This document specifies possible policies for the **Operational Readiness** cate
 
 ## Disaster Recovery & Resilience
 
-### Disaster Recovery Procedures
+### Disaster Recovery Plan
 
-* `dr-plan-documented` **Disaster recovery plan is documented**: Services must have documented disaster recovery procedures.
-  * Collector(s): Check for DR documentation in standard locations (docs/disaster-recovery.md) or catalog annotations
+* `dr-plan-exists` **Disaster recovery plan is documented**: Services must have a documented disaster recovery plan.
+  * Collector(s): Check for DR plan in standard locations (e.g., `docs/dr-plan.md`), parse YAML frontmatter for recovery objectives and review metadata
   * Component JSON:
-    * `.oncall.disaster_recovery.plan_exists` - Boolean for DR plan presence
-    * `.oncall.disaster_recovery.plan_path` - Path to DR documentation
-    * `.oncall.disaster_recovery.plan_url` - URL to external DR documentation
-  * Policy: Assert that DR plan is documented for production services
-  * Configuration: Expected DR documentation locations
+    * `.oncall.disaster_recovery.plan.exists` - Boolean for DR plan presence
+    * `.oncall.disaster_recovery.plan.path` - Path to DR plan document
+    * `.oncall.disaster_recovery.plan.sections` - Section headings found in the plan
+  * Policy: Assert that DR plan exists for production services
+  * Configuration: Candidate plan file paths
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
+
+* `dr-plan-rto-rpo-defined` **Recovery objectives (RTO/RPO) are defined**: The DR plan must define Recovery Time Objective and Recovery Point Objective.
+  * Collector(s): Parse DR plan frontmatter for `rto_minutes` and `rpo_minutes`
+  * Component JSON:
+    * `.oncall.disaster_recovery.plan.rto_defined` - Boolean for RTO definition
+    * `.oncall.disaster_recovery.plan.rto_minutes` - RTO in minutes
+    * `.oncall.disaster_recovery.plan.rpo_defined` - Boolean for RPO definition
+    * `.oncall.disaster_recovery.plan.rpo_minutes` - RPO in minutes
+  * Policy: Assert that both RTO and RPO are defined
+  * Configuration: Tags requiring RTO/RPO definition
+  * Strategy: Strategy 9 (Manual Process Documentation Verification)
+
+* `dr-plan-required-sections` **DR plan contains required sections**: The DR plan must include standard sections covering recovery procedures.
+  * Collector(s): Parse DR plan markdown and extract section headings
+  * Component JSON:
+    * `.oncall.disaster_recovery.plan.sections` - Array of section headings found
+  * Policy: Assert that all required sections are present (case-insensitive)
+  * Configuration: Required section names (default: "Overview,Recovery Steps,Contact List")
   * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 * `dr-plan-reviewed` **DR plan was reviewed recently**: Disaster recovery plans must be reviewed and updated periodically.
-  * Collector(s): Parse DR documentation for review date, or check file modification timestamp
+  * Collector(s): Parse DR plan frontmatter for `last_reviewed` date
   * Component JSON:
-    * `.oncall.disaster_recovery.last_reviewed` - ISO 8601 timestamp of last review
-    * `.oncall.disaster_recovery.days_since_review` - Days since last review
-    * `.oncall.disaster_recovery.review_is_current` - Boolean for current review
-  * Policy: Assert that DR plan was reviewed within threshold
+    * `.oncall.disaster_recovery.plan.last_reviewed` - ISO 8601 date of last review
+    * `.oncall.disaster_recovery.plan.approver` - Email of the plan approver
+  * Policy: Assert that plan was reviewed within threshold (compute freshness at evaluation time from `last_reviewed` date)
   * Configuration: Maximum days since review (default: 180)
   * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
-* `dr-rto-defined` **Recovery time objective (RTO) is defined**: Services must have a defined RTO indicating acceptable downtime.
-  * Collector(s): Parse DR documentation or catalog annotations for RTO
+### DR Exercise Records
+
+Exercises are stored as date-prefixed Markdown files in a directory (e.g., `docs/dr-exercises/2025-11-15.md`, `docs/dr-exercises/2025-05-20-database-failover.md`). The collector scans the directory, extracts metadata from each file, and provides the full exercise history.
+
+* `dr-exercise-recent` **DR exercise was conducted recently**: Teams must conduct DR exercises (tabletop, failover, or full) within the configured threshold.
+  * Collector(s): Scan exercise directory for date-prefixed `.md` files, parse frontmatter for `exercise_type`, extract section headings
   * Component JSON:
-    * `.oncall.disaster_recovery.rto_defined` - Boolean for RTO definition
-    * `.oncall.disaster_recovery.rto_minutes` - RTO in minutes
-  * Policy: Assert that RTO is defined for production services
-  * Configuration: Tags requiring RTO definition
+    * `.oncall.disaster_recovery.exercises[]` - Array of exercise records (date, path, exercise_type, sections)
+    * `.oncall.disaster_recovery.latest_exercise_date` - Date of most recent exercise
+    * `.oncall.disaster_recovery.exercise_count` - Total number of exercise records
+  * Policy: Assert that most recent exercise is within threshold (compute freshness at evaluation time from `latest_exercise_date`)
+  * Configuration: Maximum days since exercise (default: 365)
   * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
-* `dr-rpo-defined` **Recovery point objective (RPO) is defined**: Services with data persistence must have a defined RPO indicating acceptable data loss.
-  * Collector(s): Parse DR documentation or catalog annotations for RPO
+* `dr-exercise-required-sections` **DR exercise records contain required sections**: Exercise records must include standard sections documenting the scenario and outcomes.
+  * Collector(s): Parse exercise markdown and extract section headings
   * Component JSON:
-    * `.oncall.disaster_recovery.rpo_defined` - Boolean for RPO definition
-    * `.oncall.disaster_recovery.rpo_minutes` - RPO in minutes
-  * Policy: Assert that RPO is defined for services with persistent data
-  * Configuration: Tags requiring RPO definition (e.g., ["database", "stateful"])
-  * Strategy: Strategy 9 (Manual Process Documentation Verification)
-
-### Backup & Recovery Testing
-
-* `dr-backup-verified` **Backup verification is performed regularly**: Data backups must be tested periodically to ensure recoverability.
-  * Collector(s): Check for backup verification documentation with timestamps, or query backup system API
-  * Component JSON:
-    * `.oncall.backup.verification_documented` - Boolean for verification documentation
-    * `.oncall.backup.last_verification_date` - ISO 8601 timestamp of last verification
-    * `.oncall.backup.days_since_verification` - Days since last backup test
-  * Policy: Assert that backup verification was performed within threshold
-  * Configuration: Maximum days between verifications (default: 90)
-  * Strategy: Strategy 9 (Manual Process Documentation Verification)
-
-* `dr-recovery-tested` **Recovery procedures are tested regularly**: Disaster recovery procedures must be tested periodically through drills.
-  * Collector(s): Check for recovery drill documentation with timestamps
-  * Component JSON:
-    * `.oncall.disaster_recovery.drill_documented` - Boolean for drill documentation
-    * `.oncall.disaster_recovery.last_drill_date` - ISO 8601 timestamp of last drill
-    * `.oncall.disaster_recovery.days_since_drill` - Days since last DR drill
-  * Policy: Assert that DR drill was conducted within threshold
-  * Configuration: Maximum days between drills (default: 180)
-  * Strategy: Strategy 9 (Manual Process Documentation Verification)
-
-* `dr-gameday-exercises` **Game day exercises are conducted**: Teams should conduct game day exercises to practice incident response.
-  * Collector(s): Check for game day documentation with timestamps
-  * Component JSON:
-    * `.oncall.game_day.documented` - Boolean for game day documentation
-    * `.oncall.game_day.last_exercise_date` - ISO 8601 timestamp of last game day
-    * `.oncall.game_day.days_since_exercise` - Days since last game day
-  * Policy: Assert that game day was conducted within threshold
-  * Configuration: Maximum days between game days (default: 365)
+    * `.oncall.disaster_recovery.exercises[].sections` - Array of section headings per exercise
+  * Policy: Assert that required sections are present in latest exercise (or all exercises, configurable)
+  * Configuration: Required section names (default: "Scenario,Recovery Steps Tested,Participants"), check all exercises or latest only (default: latest)
   * Strategy: Strategy 9 (Manual Process Documentation Verification)
 
 ### Resilience Patterns

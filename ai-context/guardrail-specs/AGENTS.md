@@ -4,7 +4,9 @@ This directory contains detailed specifications for 500+ Lunar guardrails organi
 
 ## Purpose
 
-These specs define **what** guardrails to build—each entry includes:
+These specs are **rough guidelines only** — they provide ideas for what guardrails to build and a starting point for implementation. They are not maintained over time and will fall out of date. Do not treat them as the source of truth for Component JSON paths, policy logic, or collector behavior. When a spec conflicts with an existing implementation, the implementation wins.
+
+Each entry includes:
 - Summary and detailed description
 - Collector requirements (what data to collect)
 - Component JSON paths (where data lives)

@@ -960,8 +960,9 @@ landing_page:
 policies:
   - name: check-one                   # Required: Unique name for this check
     description: |                    # Required: Multi-line description
-      Validates X exists and is properly configured.
-      Checks for common misconfigurations.
+      Validates X exists and is properly configured.  # Describe WHAT is checked, not HOW.
+      Checks for common misconfigurations.             # Don't mention Component JSON paths
+                                                       # or implementation details.
     mainPython: checks/check_one.py
     keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 

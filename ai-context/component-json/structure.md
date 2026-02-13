@@ -82,6 +82,10 @@ This table lists important sub-objects within each category. For full details, s
 | `.oncall.escalation` | Escalation info (`exists`, `levels`) |
 | `.oncall.runbook` | Runbook info (`exists`, `path`, `url`) |
 | `.oncall.sla` | SLA info (`defined`, `response_minutes`, `uptime_percentage`) |
+| `.oncall.disaster_recovery.plan` | DR plan info (`exists`, `path`, `rto_minutes`, `rpo_minutes`, `last_reviewed`) |
+| `.oncall.disaster_recovery.exercises[]` | DR exercise records (`date`, `path`, `exercise_type`, `sections`) |
+| `.oncall.disaster_recovery.latest_exercise_date` | Date of most recent exercise |
+| `.oncall.disaster_recovery.exercise_count` | Total number of exercise records |
 | **[`.compliance`](cat-compliance.md)** | **Compliance regime data** |
 | `.compliance.regimes` | List of applicable regimes (e.g., `["soc2", "pci-dss"]`) |
 | `.compliance.data_classification` | Data classification (`level`, `contains_pii`, `contains_pci`) |

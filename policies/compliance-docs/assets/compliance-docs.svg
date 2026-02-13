@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Certificate body -->
+  <rect x="8" y="2" width="48" height="32" rx="2" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
+  <!-- Title line -->
+  <line x1="20" y1="10" x2="44" y2="10" stroke="white" stroke-width="2" opacity="0.6"/>
+  <!-- Body lines -->
+  <line x1="16" y1="16" x2="48" y2="16" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <line x1="16" y1="22" x2="48" y2="22" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <line x1="22" y1="28" x2="42" y2="28" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <!-- Seal circle -->
+  <circle cx="42" cy="46" r="10" fill="white" fill-opacity="0.25" stroke="white" stroke-width="2"/>
+  <!-- Star inside seal -->
+  <polygon points="42,38.5 44,43 48.5,43.5 45,46.5 46,51 42,48.5 38,51 39,46.5 35.5,43.5 40,43" fill="white" fill-opacity="0.5"/>
+  <!-- Ribbon tails -->
+  <path d="M34 53 L29 62 L36 58" stroke="white" stroke-width="2" fill="white" fill-opacity="0.15" stroke-linejoin="round"/>
+  <path d="M50 53 L55 62 L48 58" stroke="white" stroke-width="2" fill="white" fill-opacity="0.15" stroke-linejoin="round"/>
+</svg>
