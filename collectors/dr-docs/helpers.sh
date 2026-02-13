@@ -39,18 +39,6 @@ parse_field() {
   echo "$fm" | yq -r ".$field // empty" 2>/dev/null || echo ""
 }
 
-# Compute days elapsed since a date string (YYYY-MM-DD or ISO 8601).
-# Returns empty string if date is empty or unparseable.
-days_since() {
-  local date_str="$1"
-  if [ -z "$date_str" ]; then echo ""; return; fi
-  local epoch
-  epoch=$(date -d "$date_str" +%s 2>/dev/null) || { echo ""; return; }
-  local now
-  now=$(date +%s)
-  echo $(( (now - epoch) / 86400 ))
-}
-
 # Extract markdown section headings from text (body content, not frontmatter).
 # Usage: extract_sections "$body_text"
 extract_sections() {

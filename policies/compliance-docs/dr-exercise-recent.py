@@ -1,4 +1,12 @@
+from datetime import date, datetime
+
 from lunar_policy import Check, variable_or_default
+
+
+def _days_since(date_str):
+    """Compute days elapsed since a YYYY-MM-DD date string."""
+    d = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+    return (date.today() - d).days
 
 
 def main(node=None, max_days_override=None):
@@ -32,7 +40,8 @@ def main(node=None, max_days_override=None):
             c.fail("No DR exercise date could be determined")
             return c
 
-        days = dr.get_value(".days_since_latest_exercise")
+        # Compute freshness at evaluation time, not collection time
+        days = _days_since(latest)
         c.assert_less_or_equal(days, max_days,
             f"Last DR exercise was {days} days ago (maximum allowed: {max_days})")
     return c

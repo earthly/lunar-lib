@@ -58,16 +58,12 @@ done
 
 # Compute summary from the most recent exercise (first in sorted list)
 LATEST_DATE=$(echo "$EXERCISES" | jq -r '.[0].date')
-DAYS_SINCE=$(days_since "$LATEST_DATE")
 COUNT=$(echo "$EXERCISES" | jq 'length')
 
 # Build result
 jq -n \
   --argjson exercises "$EXERCISES" \
   --arg latest "$LATEST_DATE" \
-  --arg days "$DAYS_SINCE" \
   --argjson count "$COUNT" \
-  '{exercises: $exercises, latest_exercise_date: $latest}
-   + if $days != "" then {days_since_latest_exercise: ($days | tonumber)} else {} end
-   + {exercise_count: $count}' \
+  '{exercises: $exercises, latest_exercise_date: $latest, exercise_count: $count}' \
   | lunar collect -j ".oncall.disaster_recovery" -

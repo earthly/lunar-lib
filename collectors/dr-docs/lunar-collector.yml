@@ -63,7 +63,6 @@ example_component_json: |
           "rpo_defined": true,
           "rpo_minutes": 15,
           "last_reviewed": "2025-12-01",
-          "days_since_review": 73,
           "approver": "jane.doe@company.com",
           "sections": [
             "Overview",
@@ -97,7 +96,6 @@ example_component_json: |
           }
         ],
         "latest_exercise_date": "2025-11-15",
-        "days_since_latest_exercise": 89,
         "exercise_count": 2
       }
     }

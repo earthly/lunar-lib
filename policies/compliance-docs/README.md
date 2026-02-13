@@ -16,7 +16,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `dr-plan-rto-rpo-defined` | Ensures RTO and RPO values are documented in the plan | Recovery objectives missing from plan frontmatter |
 | `dr-plan-required-sections` | Ensures DR plan contains required sections | Plan is missing one or more required sections |
 | `dr-exercise-recent` | Ensures a DR exercise was conducted within threshold | No exercises found or last exercise is too old |
-| `dr-exercise-required-sections` | Ensures latest DR exercise contains required sections | Latest exercise is missing one or more required sections |
+| `dr-exercise-required-sections` | Ensures DR exercise records contain required sections (latest or all, via `exercises_check_all`) | Exercise is missing one or more required sections |
 
 ## Required Data
 
@@ -30,7 +30,6 @@ This policy reads from the following Component JSON paths:
 | `.oncall.disaster_recovery.plan.sections` | array | [`dr-docs`](https://github.com/earthly/lunar-lib/tree/main/collectors/dr-docs) collector |
 | `.oncall.disaster_recovery.exercises[]` | array | [`dr-docs`](https://github.com/earthly/lunar-lib/tree/main/collectors/dr-docs) collector |
 | `.oncall.disaster_recovery.latest_exercise_date` | string | [`dr-docs`](https://github.com/earthly/lunar-lib/tree/main/collectors/dr-docs) collector |
-| `.oncall.disaster_recovery.days_since_latest_exercise` | number | [`dr-docs`](https://github.com/earthly/lunar-lib/tree/main/collectors/dr-docs) collector |
 | `.oncall.disaster_recovery.exercise_count` | number | [`dr-docs`](https://github.com/earthly/lunar-lib/tree/main/collectors/dr-docs) collector |
 
 **Note:** Ensure the corresponding collector is configured before enabling this policy.
@@ -49,6 +48,7 @@ policies:
     #   max_days_since_exercise: "365"
     #   plan_required_sections: "Overview,Recovery Steps,Contact List"
     #   exercise_required_sections: "Scenario,Recovery Steps Tested,Participants"
+    #   exercises_check_all: "false"  # Check sections on all exercises (true) or latest only (false)
 ```
 
 ## Examples
@@ -77,7 +77,6 @@ policies:
         }
       ],
       "latest_exercise_date": "2025-11-15",
-      "days_since_latest_exercise": 89,
       "exercise_count": 1
     }
   }
@@ -151,7 +150,6 @@ This example passes all five policies with default configuration.
         }
       ],
       "latest_exercise_date": "2024-06-01",
-      "days_since_latest_exercise": 622,
       "exercise_count": 1
     }
   }
@@ -174,7 +172,6 @@ This example passes all five policies with default configuration.
         }
       ],
       "latest_exercise_date": "2025-11-15",
-      "days_since_latest_exercise": 89,
       "exercise_count": 1
     }
   }

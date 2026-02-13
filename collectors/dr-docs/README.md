@@ -70,7 +70,6 @@ This collector writes to the following Component JSON paths:
 | `.oncall.disaster_recovery.plan.rpo_defined` | boolean | Whether RPO is documented |
 | `.oncall.disaster_recovery.plan.rpo_minutes` | number | Recovery Point Objective in minutes |
 | `.oncall.disaster_recovery.plan.last_reviewed` | string | ISO 8601 date of last plan review |
-| `.oncall.disaster_recovery.plan.days_since_review` | number | Days since last plan review |
 | `.oncall.disaster_recovery.plan.approver` | string | Email of the plan approver |
 | `.oncall.disaster_recovery.plan.sections` | array | Section headings found in the plan |
 | `.oncall.disaster_recovery.exercises[]` | array | All exercise records, newest first |
@@ -79,7 +78,6 @@ This collector writes to the following Component JSON paths:
 | `.oncall.disaster_recovery.exercises[].exercise_type` | string | Type of exercise (tabletop, failover, full) |
 | `.oncall.disaster_recovery.exercises[].sections` | array | Section headings found in the exercise |
 | `.oncall.disaster_recovery.latest_exercise_date` | string | Date of the most recent exercise |
-| `.oncall.disaster_recovery.days_since_latest_exercise` | number | Days since the most recent exercise |
 | `.oncall.disaster_recovery.exercise_count` | number | Total number of exercise records |
 
 ## Collectors
