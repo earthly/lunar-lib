@@ -4,7 +4,7 @@ set -e
 source "$(dirname "$0")/helpers.sh"
 
 # Find the DR plan document
-if ! find_file "$LUNAR_VAR_PLAN_PATH"; then
+if ! find_file "$LUNAR_VAR_PLAN_PATHS"; then
   lunar collect -j ".oncall.disaster_recovery.plan" '{"exists": false}'
   exit 0
 fi

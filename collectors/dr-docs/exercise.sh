@@ -3,16 +3,26 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
-EXERCISE_DIR="$LUNAR_VAR_EXERCISE_DIR"
+# Find the first matching exercise directory from candidate list
+EXERCISE_DIR=""
+if [ -n "$LUNAR_VAR_EXERCISE_DIR_PATHS" ]; then
+  IFS=',' read -ra candidates <<< "$LUNAR_VAR_EXERCISE_DIR_PATHS"
+  for candidate in "${candidates[@]}"; do
+    candidate=$(echo "$candidate" | xargs)
+    if [ -n "$candidate" ] && [ -d "./$candidate" ]; then
+      EXERCISE_DIR="$candidate"
+      break
+    fi
+  done
+fi
 
-# Check if directory exists
-if [ ! -d "./$EXERCISE_DIR" ]; then
+if [ -z "$EXERCISE_DIR" ]; then
   lunar collect -j ".oncall.disaster_recovery" '{"exercise_count": 0, "exercises": []}'
   exit 0
 fi
 
-# Find all YYYY-MM-DD.md files, sorted newest first
-FILES=$(find "./$EXERCISE_DIR" -maxdepth 1 -type f -name '????-??-??.md' | sort -r)
+# Find all YYYY-MM-DD*.md files (allows date-arbitrary-text.md), sorted newest first
+FILES=$(find "./$EXERCISE_DIR" -maxdepth 1 -type f -name '????-??-??*.md' | sort -r)
 
 if [ -z "$FILES" ]; then
   lunar collect -j ".oncall.disaster_recovery" '{"exercise_count": 0, "exercises": []}'
@@ -25,18 +35,13 @@ for file in $FILES; do
   path="${file#./}"
   filename=$(basename "$file" .md)
 
-  # Date is the filename itself (YYYY-MM-DD)
-  date="$filename"
+  # Extract date prefix (YYYY-MM-DD) from filename
+  date="${filename:0:10}"
 
   FM=$(extract_frontmatter "$file")
   BODY=$(extract_body "$file")
   SECTIONS=$(extract_sections "$BODY")
 
-  # Frontmatter can override date or add exercise_type
-  fm_date=$(parse_field "$FM" "date")
-  if [ -n "$fm_date" ]; then
-    date="$fm_date"
-  fi
   exercise_type=$(parse_field "$FM" "exercise_type")
 
   ENTRY=$(jq -n \

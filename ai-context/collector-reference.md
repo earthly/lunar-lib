@@ -616,9 +616,9 @@ landing_page:
 collectors:
   - name: main-collector              # Required: Unique within plugin
     description: |                    # Required: Multi-line description for landing page
-      Collects XYZ data including:
-      - Feature A
-      - Feature B
+      Collects XYZ data including:    # Describe WHAT is collected, not HOW.
+      - Feature A                     # Don't mention Component JSON paths or
+      - Feature B                     # implementation details.
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
       type: code                      # Or: cron, ci-before-command, etc.

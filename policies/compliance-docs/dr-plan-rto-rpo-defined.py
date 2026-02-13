@@ -4,10 +4,10 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("dr-plan-rto-rpo-defined", "Recovery objectives (RTO/RPO) should be defined in DR plan", node=node)
     with c:
-        c.assert_exists(".oncall.disaster_recovery.plan",
-            "DR plan data not found. Ensure the dr-docs collector is configured and has run.")
-
         plan = c.get_node(".oncall.disaster_recovery.plan")
+        if not plan.exists():
+            c.fail("DR plan data not found. Ensure the dr-docs collector is configured and has run.")
+            return c
 
         if not plan.get_value_or_default(".exists", False):
             c.fail("DR plan not found — cannot verify recovery objectives")

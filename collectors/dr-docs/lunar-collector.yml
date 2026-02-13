@@ -19,16 +19,13 @@ landing_page:
       type: "policy"
       reason: "Enforces DR readiness requirements based on collected data"
 
-default_image_non_ci_collectors: earthly/lunar-lib:base-main
-
 collectors:
   - name: dr-plan
     description: |
-      Scans the repository for a disaster recovery plan document (default:
-      `docs/dr-plan.md`). Expects YAML frontmatter with recovery objectives
-      (rto_minutes, rpo_minutes), review metadata (last_reviewed, approver),
-      and a Markdown body with sections covering recovery procedures. Writes
-      results to `.oncall.disaster_recovery.plan`.
+      Collects the disaster recovery plan document (default: `docs/dr-plan.md`).
+      Expects YAML frontmatter with recovery objectives (rto_minutes, rpo_minutes),
+      review metadata (last_reviewed, approver), and a Markdown body with sections
+      covering recovery procedures.
     mainBash: plan.sh
     hook:
       type: code
@@ -36,23 +33,22 @@ collectors:
 
   - name: dr-exercise
     description: |
-      Scans a directory of DR exercise records (default: `docs/dr-exercises/`).
-      Each exercise is a date-named Markdown file (YYYY-MM-DD.md) with optional
-      YAML frontmatter (exercise_type) and body sections documenting the scenario,
-      steps tested, and outcomes. Collects all exercises into an array and
-      computes summary fields (latest date, days since, count). Writes results
-      to `.oncall.disaster_recovery.exercises[]`.
+      Collects DR exercise records from a directory (default: `docs/dr-exercises/`).
+      Each exercise is a date-prefixed Markdown file (e.g., `2025-11-15.md` or
+      `2025-11-15-database-failover.md`) with optional YAML frontmatter for
+      exercise type and body sections documenting the scenario and outcomes.
+      Provides full exercise history and summary metrics.
     mainBash: exercise.sh
     hook:
       type: code
     keywords: ["DR exercise", "tabletop exercise", "game day", "compliance", "operational readiness"]
 
 inputs:
-  plan_path:
+  plan_paths:
     description: Comma-separated list of candidate paths to the DR plan document (first match wins)
     default: "docs/dr-plan.md"
-  exercise_dir:
-    description: Directory containing DR exercise records (YYYY-MM-DD.md files)
+  exercise_dir_paths:
+    description: Comma-separated list of candidate directories for DR exercise records (first match wins)
     default: "docs/dr-exercises"
 
 example_component_json: |

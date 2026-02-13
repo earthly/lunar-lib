@@ -16,8 +16,9 @@ def main(node=None, required_sections_override=None, check_all_override=None):
         check_all = check_all_str.lower() == "true"
 
         dr = c.get_node(".oncall.disaster_recovery")
-        c.assert_exists(".oncall.disaster_recovery",
-            "DR data not found. Ensure the dr-docs collector is configured and has run.")
+        if not dr.exists():
+            c.fail("DR data not found. Ensure the dr-docs collector is configured and has run.")
+            return c
 
         exercises = dr.get_node(".exercises")
         if not exercises.exists() or dr.get_value_or_default(".exercise_count", 0) == 0:

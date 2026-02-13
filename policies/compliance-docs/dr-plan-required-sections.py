@@ -11,10 +11,10 @@ def main(node=None, required_sections_override=None):
 
         required_sections = [s.strip() for s in required_str.split(",") if s.strip()]
 
-        c.assert_exists(".oncall.disaster_recovery.plan",
-            "DR plan data not found. Ensure the dr-docs collector is configured and has run.")
-
         plan = c.get_node(".oncall.disaster_recovery.plan")
+        if not plan.exists():
+            c.fail("DR plan data not found. Ensure the dr-docs collector is configured and has run.")
+            return c
 
         if not plan.get_value_or_default(".exists", False):
             c.fail("DR plan not found — cannot verify sections")

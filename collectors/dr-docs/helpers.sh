@@ -22,9 +22,13 @@ find_file() {
 }
 
 # Extract YAML frontmatter (text between first two --- markers).
+# Only considers frontmatter if the file's first line is exactly ---.
 # Usage: extract_frontmatter "$filepath"
 extract_frontmatter() {
-  awk '/^---$/{if(n++)exit;next}n' "$1"
+  local first_line
+  first_line=$(head -n1 "$1")
+  if [ "$first_line" != "---" ]; then echo ""; return; fi
+  awk 'NR==1{next} /^---$/{exit} {print}' "$1"
 }
 
 # Parse a single field from frontmatter YAML.
@@ -57,14 +61,14 @@ extract_sections() {
 }
 
 # Extract the markdown body after YAML frontmatter.
-# If no frontmatter exists, returns the whole file.
+# Only strips frontmatter if the file begins with ---.
 # Usage: extract_body "$filepath"
 extract_body() {
-  local fm
-  fm=$(extract_frontmatter "$1")
-  if [ -z "$fm" ]; then
+  local first_line
+  first_line=$(head -n1 "$1")
+  if [ "$first_line" != "---" ]; then
     cat "$1"
   else
-    awk '/^---$/{n++; next} n>=2' "$1"
+    awk 'NR==1{next} /^---$/{found=1; next} found{print}' "$1"
   fi
 }
