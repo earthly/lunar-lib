@@ -1,0 +1,55 @@
+version: 0
+
+name: sast
+description: Static Application Security Testing (SAST) policies
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "SAST Guardrails"
+  long_description: |
+    Enforces Static Application Security Testing standards. Ensures SAST scanners
+    run and validates finding thresholds for code security.
+  category: "security-and-compliance"
+  icon: "assets/sast.svg"
+  status: "stable"
+  requires:
+    - slug: "github"
+      type: "collector"
+      reason: "Provides SAST data via GitHub App integrations (Semgrep, CodeQL)"
+  related: []
+
+policies:
+  - name: executed
+    description: |
+      Verifies that SAST scanning was executed on the component.
+      Fails if no scanner has written to .sast.
+    mainPython: executed.py
+    keywords: ["sast", "security", "scanning", "compliance", "code analysis"]
+
+  - name: no-critical
+    description: |
+      Ensures no critical severity code findings exist.
+    mainPython: no_critical.py
+    keywords: ["sast", "critical", "findings", "security", "code analysis"]
+
+  - name: no-high
+    description: |
+      Ensures no high severity code findings exist.
+    mainPython: no_high.py
+    keywords: ["sast", "high", "findings", "security", "code analysis"]
+
+  - name: max-total
+    description: |
+      Ensures total code findings are under a configurable threshold.
+    mainPython: max_total.py
+    keywords: ["sast", "threshold", "findings", "code analysis"]
+
+inputs:
+  enforce_no_high:
+    description: "Whether to enforce no high severity findings"
+    default: "true"
+  max_total_threshold:
+    description: "Maximum total findings allowed (0 = no limit)"
+    default: "0"

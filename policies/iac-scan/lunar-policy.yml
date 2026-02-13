@@ -1,0 +1,55 @@
+version: 0
+
+name: iac-scan
+description: Infrastructure as Code (IaC) security scanning policies
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "IaC Scan Guardrails"
+  long_description: |
+    Enforces Infrastructure as Code security scanning standards. Ensures IaC
+    scanners run and validates finding thresholds for infrastructure security.
+  category: "security-and-compliance"
+  icon: "assets/iac-scan.svg"
+  status: "stable"
+  requires:
+    - slug: "github"
+      type: "collector"
+      reason: "Provides IaC data via GitHub App integrations or CI collectors"
+  related: []
+
+policies:
+  - name: executed
+    description: |
+      Verifies that IaC scanning was executed on the component.
+      Fails if no scanner has written to .iac_scan.
+    mainPython: executed.py
+    keywords: ["iac", "security", "scanning", "compliance", "infrastructure"]
+
+  - name: no-critical
+    description: |
+      Ensures no critical severity infrastructure security findings exist.
+    mainPython: no_critical.py
+    keywords: ["iac", "critical", "findings", "security", "infrastructure"]
+
+  - name: no-high
+    description: |
+      Ensures no high severity infrastructure security findings exist.
+    mainPython: no_high.py
+    keywords: ["iac", "high", "findings", "security", "infrastructure"]
+
+  - name: max-total
+    description: |
+      Ensures total infrastructure security findings are under a configurable threshold.
+    mainPython: max_total.py
+    keywords: ["iac", "threshold", "findings", "infrastructure"]
+
+inputs:
+  enforce_no_high:
+    description: "Whether to enforce no high severity findings"
+    default: "true"
+  max_total_threshold:
+    description: "Maximum total findings allowed (0 = no limit)"
+    default: "0"

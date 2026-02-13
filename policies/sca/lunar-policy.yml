@@ -1,0 +1,55 @@
+version: 0
+
+name: sca
+description: Software Composition Analysis (SCA) security policies
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "SCA Guardrails"
+  long_description: |
+    Enforces Software Composition Analysis scanning standards. Ensures SCA scanners
+    run and validates vulnerability thresholds for dependency security.
+  category: "security-and-compliance"
+  icon: "assets/sca.svg"
+  status: "stable"
+  requires:
+    - slug: "github"
+      type: "collector"
+      reason: "Provides SCA data via GitHub App integrations (Snyk, Dependabot)"
+  related: []
+
+policies:
+  - name: executed
+    description: |
+      Verifies that SCA scanning was executed on the component.
+      Fails if no scanner has written to .sca.
+    mainPython: executed.py
+    keywords: ["sca", "security", "scanning", "compliance", "dependencies"]
+
+  - name: no-critical
+    description: |
+      Ensures no critical severity vulnerabilities exist in dependencies.
+    mainPython: no_critical.py
+    keywords: ["sca", "critical", "vulnerabilities", "security", "dependencies"]
+
+  - name: no-high
+    description: |
+      Ensures no high severity vulnerabilities exist in dependencies.
+    mainPython: no_high.py
+    keywords: ["sca", "high", "vulnerabilities", "security", "dependencies"]
+
+  - name: max-total
+    description: |
+      Ensures total vulnerabilities are under a configurable threshold.
+    mainPython: max_total.py
+    keywords: ["sca", "threshold", "vulnerabilities", "dependencies"]
+
+inputs:
+  enforce_no_high:
+    description: "Whether to enforce no high severity findings"
+    default: "true"
+  max_total_threshold:
+    description: "Maximum total findings allowed (0 = no limit)"
+    default: "0"
