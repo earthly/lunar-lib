@@ -62,6 +62,7 @@ secrets:
 example_component_json: |
   {
     "sca": {
+      "running_in_prs": true,
       "source": {
         "tool": "snyk",
         "version": "1.1200.0",
@@ -69,7 +70,6 @@ example_component_json: |
       },
       "native": {
         "snyk": {
-          "running_in_prs": true,
           "github_app": {
             "state": "success",
             "context": "security/snyk",
