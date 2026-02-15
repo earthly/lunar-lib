@@ -89,7 +89,7 @@ collectors:
 inputs:
   md_find_command:
     description: Command to find agent instruction files (must output one file path per line)
-    default: "find . -type f \\( -name AGENTS.md -o -name CLAUDE.md -o -name GEMINI.md -o -name CODEX.md \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
+    default: "find . \\( -type f -o -type l \\) \\( -name AGENTS.md -o -name CLAUDE.md -o -name GEMINI.md -o -name CODEX.md \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
   plans_dir_paths:
     description: Comma-separated list of candidate paths for the plans directory (first match wins)
     default: ".agents/plans,.ai/plans"
