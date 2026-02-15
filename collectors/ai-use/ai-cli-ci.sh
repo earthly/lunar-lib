@@ -7,6 +7,11 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
+# Exit early if not in CI context (no command to detect)
+if [ -z "$LUNAR_CI_COMMAND" ]; then
+  exit 0
+fi
+
 CMD_STR=$(parse_cmd_str)
 TOOL=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\["//; s/".*$//')
 VERSION=$(get_tool_version "$TOOL")
