@@ -718,14 +718,14 @@ The recommended approach is to define each check as a separate policy entry in `
 policies:
   - name: readme-exists
     description: README should exist
-    mainPython: checks/readme_exists.py
+    mainPython: ./readme_exists.py
 
   - name: readme-length
     description: README should be substantial
-    mainPython: checks/readme_length.py
+    mainPython: ./readme_length.py
 ```
 
-**checks/readme_exists.py:**
+**readme_exists.py:**
 ```python
 from lunar_policy import Check
 
@@ -739,7 +739,7 @@ if __name__ == "__main__":
     main()
 ```
 
-**checks/readme_length.py:**
+**readme_length.py:**
 ```python
 from lunar_policy import Check
 
@@ -899,16 +899,15 @@ def test_my_policy():
 
 ## Plugin Structure
 
-The recommended structure is **one check per policy entry**, with each check in its own file under a `checks/` subdirectory. This allows users to selectively enable/disable individual checks via the `include` mechanism.
+The recommended structure is **one check per policy entry**, with each check in its own file in the plugin root. This allows users to selectively enable/disable individual checks via the `include` mechanism.
 
 ```
 my-policy/
 ├── lunar-policy.yml       # Required: Plugin configuration
-├── checks/                # Recommended: One file per check
-│   ├── check_one.py
-│   ├── check_two.py
-│   ├── check_three.py
-│   └── helpers.py         # Optional: Shared helpers
+├── check_one.py           # One file per check
+├── check_two.py
+├── check_three.py
+├── helpers.py             # Optional: Shared helpers
 ├── requirements.txt       # Must include lunar-policy
 ├── Dockerfile             # For policies with additional dependencies
 └── README.md              # Documentation
@@ -963,12 +962,12 @@ policies:
       Validates X exists and is properly configured.  # Describe WHAT is checked, not HOW.
       Checks for common misconfigurations.             # Don't mention Component JSON paths
                                                        # or implementation details.
-    mainPython: checks/check_one.py
+    mainPython: check_one.py
     keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
   - name: check-two
     description: Ensures Y meets requirements
-    mainPython: checks/check_two.py
+    mainPython: check_two.py
     keywords: ["keyword3", "keyword4"]
 
 # === Inputs (optional) ===
@@ -1171,10 +1170,10 @@ Each check should focus on a single concern and be defined as a separate policy 
 # lunar-policy.yml - Good: separate policy entries
 policies:
   - name: dockerfile-exists
-    mainPython: checks/dockerfile_exists.py
+    mainPython: dockerfile_exists.py
 
   - name: dockerfile-no-latest  
-    mainPython: checks/no_latest.py
+    mainPython: no_latest.py
 ```
 
 See [Plugin Structure](#plugin-structure) for the recommended file organization.

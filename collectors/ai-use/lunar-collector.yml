@@ -1,0 +1,174 @@
+version: 0
+
+name: ai-use
+description: Collect AI coding assistant usage data from repositories and CI pipelines
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "AI Use Collector"
+  long_description: |
+    Track AI coding assistant usage across your organization. Collect agent
+    instruction files (AGENTS.md, CLAUDE.md, GEMINI.md), plans directories,
+    CI tool invocations, and AI authorship annotations from commits.
+  categories: ["code-analysis", "ci-cd"]
+  icon: "assets/ai-use.svg"
+  status: "experimental"
+  related:
+    - slug: "ai-use"
+      type: "policy"
+      reason: "Enforces AI usage standards based on collected metadata"
+
+collectors:
+  - name: instruction-files
+    description: |
+      Discovers all agent instruction files (AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md) across
+      the repository using a configurable find command. Records each file's path, line count,
+      byte size, markdown section headings, and symlink status. Groups files by directory for
+      per-directory policy checks.
+    mainBash: instruction-files.sh
+    hook:
+      type: code
+    keywords: ["agents.md", "claude.md", "ai instructions", "agent context", "coding assistant"]
+
+  - name: plans-dir
+    description: |
+      Checks whether a dedicated plans directory exists for AI agent task planning.
+      Tries candidate paths in order (first match wins). Records the directory path
+      and file count.
+    mainBash: plans-dir.sh
+    hook:
+      type: code
+    keywords: ["ai plans", "agent planning", "task management"]
+
+  - name: ai-cli-ci-claude
+    description: |
+      Detects Claude Code CLI invocations in CI pipelines. Records the command
+      string and version for policy-level flag analysis.
+    mainBash: ai-cli-ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: claude
+    keywords: ["claude", "claude code", "ai ci", "ci safety"]
+
+  - name: ai-cli-ci-codex
+    description: |
+      Detects OpenAI Codex CLI invocations in CI pipelines. Records the command
+      string and version for policy-level flag analysis.
+    mainBash: ai-cli-ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: codex
+    keywords: ["codex", "openai", "ai ci", "ci safety"]
+
+  - name: ai-cli-ci-gemini
+    description: |
+      Detects Google Gemini CLI invocations in CI pipelines. Records the command
+      string and version for policy-level flag analysis.
+    mainBash: ai-cli-ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: gemini
+    keywords: ["gemini", "google", "ai ci", "ci safety"]
+
+  - name: ai-authorship
+    description: |
+      Collects AI authorship annotation data from commits. Supports the Git AI standard
+      (refs/notes/ai) for line-level tracking and git trailers (AI-model, AI-tokens) as
+      a lightweight fallback. Records annotation coverage across commits in scope.
+    mainBash: ai-authorship.sh
+    hook:
+      type: code
+    keywords: ["ai authorship", "git ai", "code attribution", "ai tracking", "git notes"]
+
+inputs:
+  md_find_command:
+    description: Command to find agent instruction files (must output one file path per line)
+    default: "find . -type f \\( -name AGENTS.md -o -name CLAUDE.md -o -name GEMINI.md -o -name CODEX.md \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
+  plans_dir_paths:
+    description: Comma-separated list of candidate paths for the plans directory (first match wins)
+    default: ".agents/plans,.ai/plans"
+  annotation_prefix:
+    description: Prefix for git trailer-based AI annotations
+    default: "AI-"
+  default_branch_window:
+    description: Number of recent commits to scan on the default branch
+    default: "50"
+
+example_component_json: |
+  {
+    "ai_use": {
+      "instructions": {
+        "root": {
+          "exists": true,
+          "filename": "AGENTS.md",
+          "lines": 85,
+          "bytes": 3200,
+          "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"]
+        },
+        "all": [
+          {
+            "path": "AGENTS.md",
+            "dir": ".",
+            "filename": "AGENTS.md",
+            "lines": 85,
+            "bytes": 3200,
+            "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"],
+            "is_symlink": false,
+            "symlink_target": null
+          },
+          {
+            "path": "CLAUDE.md",
+            "dir": ".",
+            "filename": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"],
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          }
+        ],
+        "count": 2,
+        "total_bytes": 3200,
+        "directories": [
+          {
+            "dir": ".",
+            "files": [
+              { "filename": "AGENTS.md", "is_symlink": false },
+              { "filename": "CLAUDE.md", "is_symlink": true, "symlink_target": "AGENTS.md" }
+            ]
+          }
+        ],
+        "source": { "tool": "find", "integration": "code" }
+      },
+      "plans_dir": {
+        "exists": true,
+        "path": ".agents/plans",
+        "file_count": 3
+      },
+      "cicd": {
+        "cmds": [
+          {
+            "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
+            "tool": "claude",
+            "version": "1.0.20",
+            "allowed_tools": "Bash(git*) Read"
+          }
+        ]
+      },
+      "authorship": {
+        "provider": "git-ai",
+        "total_commits": 12,
+        "annotated_commits": 8,
+        "git_ai": {
+          "notes_ref_exists": true,
+          "commits_with_notes": 8
+        }
+      }
+    }
+  }

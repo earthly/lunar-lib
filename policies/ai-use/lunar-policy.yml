@@ -1,0 +1,122 @@
+version: 0
+
+name: ai-use
+description: Enforce AI coding assistant usage standards
+author: earthly
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "AI Use Guardrails"
+  long_description: |
+    Enforce AI coding assistant standards across your organization. Validate
+    instruction files, naming conventions, plans directories, CI safety flags,
+    structured output usage, and AI authorship annotations.
+  category: "devex-build-and-ci"
+  icon: "assets/ai-use.svg"
+  status: "experimental"
+  requires:
+    - slug: "ai-use"
+      type: "collector"
+      reason: "Provides AI usage metadata from repos and CI pipelines"
+  related: []
+
+policies:
+  - name: instruction-file-exists
+    description: |
+      Verifies that an agent instruction file exists at the repository root.
+      Passes if any recognized file is found (AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md).
+    mainPython: instruction_file_exists.py
+    keywords: ["agents.md", "claude.md", "ai instructions", "agent context"]
+
+  - name: canonical-naming
+    description: |
+      Verifies the root instruction file uses the canonical vendor-neutral name (AGENTS.md by
+      default). Repos with only CLAUDE.md pass the existence check but fail this naming check.
+    mainPython: canonical_naming.py
+    keywords: ["agents.md", "naming convention", "vendor neutral"]
+
+  - name: instruction-file-length
+    description: |
+      Validates that the root instruction file is within reasonable length bounds. Too short
+      means insufficient context; too long wastes context window budget and can reduce AI
+      task success rates.
+    mainPython: instruction_file_length.py
+    keywords: ["agents.md length", "context window", "token budget"]
+
+  - name: instruction-file-sections
+    description: |
+      Ensures the root instruction file contains required section headings. Validates that
+      essential information like project overview and build commands is documented for AI agents.
+    mainPython: instruction_file_sections.py
+    keywords: ["agents.md sections", "documentation structure", "agent context"]
+
+  - name: symlinked-aliases
+    description: |
+      Verifies that CLAUDE.md symlinks exist alongside AGENTS.md files. Claude Code does not
+      support the AGENTS.md filename natively, so a symlink is required for compatibility.
+      Other tools (Gemini, Codex) support AGENTS.md directly.
+    mainPython: symlinked_aliases.py
+    keywords: ["claude.md symlink", "agents.md", "compatibility"]
+
+  - name: plans-dir-exists
+    description: |
+      Verifies that a dedicated plans directory exists for AI agent task planning.
+      A dedicated directory keeps AI-generated plans organized and reviewable.
+    mainPython: plans_dir_exists.py
+    keywords: ["ai plans", "agent planning", "task management"]
+
+  - name: ai-cli-safe-flags
+    description: |
+      Ensures AI CLI tools running in CI do not use dangerous permission-bypassing flags.
+      Flags like --dangerously-skip-permissions (Claude), --yolo (Codex/Gemini), and
+      --sandbox danger-full-access (Codex) remove safety guardrails.
+    mainPython: ai_cli_safe_flags.py
+    keywords: ["ci safety", "dangerous flags", "permissions", "sandbox"]
+
+  - name: ai-cli-structured-output
+    description: |
+      Ensures AI CLI tools in CI headless mode use structured JSON output instead of
+      plain text. JSON output makes AI automation deterministic and parseable.
+    mainPython: ai_cli_structured_output.py
+    keywords: ["json output", "structured output", "ci automation"]
+
+  - name: ai-authorship-annotated
+    description: |
+      Verifies that commits include AI authorship annotations. Supports the Git AI standard
+      (usegitai.com) for automated line-level tracking and git trailers as a lightweight
+      manual alternative.
+    mainPython: ai_authorship_annotated.py
+    keywords: ["ai authorship", "git ai", "code attribution", "ai tracking"]
+
+inputs:
+  canonical_filename:
+    description: The canonical (vendor-neutral) instruction filename
+    default: "AGENTS.md"
+  required_symlinks:
+    description: Comma-separated list of symlinks required alongside the canonical file
+    default: "CLAUDE.md"
+  min_lines:
+    description: Minimum number of lines for the root instruction file (0 to disable)
+    default: "10"
+  max_lines:
+    description: Maximum number of lines for the root instruction file (0 to disable)
+    default: "300"
+  max_total_bytes:
+    description: Maximum combined bytes across all instruction files (0 to disable)
+    default: "32768"
+  required_sections:
+    description: Comma-separated required section heading substrings (case-insensitive)
+    default: "Project Overview,Build Commands"
+  dangerous_flags_claude:
+    description: Comma-separated dangerous flags for Claude CLI
+    default: "--dangerously-skip-permissions,--allow-dangerously-skip-permissions"
+  dangerous_flags_codex:
+    description: Comma-separated dangerous flags for Codex CLI
+    default: "--dangerously-bypass-approvals-and-sandbox,--yolo,--full-auto"
+  dangerous_flags_gemini:
+    description: Comma-separated dangerous flags for Gemini CLI
+    default: "--yolo,-y"
+  min_annotation_percentage:
+    description: Minimum percentage of commits that should have AI annotations (0 = awareness mode)
+    default: "0"
