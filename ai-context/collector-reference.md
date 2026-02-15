@@ -134,26 +134,111 @@ hook:
 
 Run during CI pipeline execution, with access to the CI environment.
 
-| Hook Type | Trigger Point | Pattern Matches |
-|-----------|---------------|-----------------|
-| `ci-before-job` | Before a CI job starts | Job name |
-| `ci-after-job` | After a CI job completes | Job name |
-| `ci-before-step` | Before a CI step runs | Step name |
-| `ci-after-step` | After a CI step completes | Step name |
-| `ci-before-command` | Before a command executes | Full command line |
-| `ci-after-command` | After a command executes | Full command line |
+| Hook Type | Trigger Point | Matching |
+|-----------|---------------|----------|
+| `ci-before-job` | Before a CI job starts | Job name regex |
+| `ci-after-job` | After a CI job completes | Job name regex |
+| `ci-before-step` | Before a CI step runs | Step name regex |
+| `ci-after-step` | After a CI step completes | Step name regex |
+| `ci-before-command` | Before a command executes | Structured binary/args/envs matching |
+| `ci-after-command` | After a command executes | Structured binary/args/envs matching |
+
+#### Job and Step Hooks
+
+Job and step hooks use a `pattern` field to match job or step names by regex:
+
+```yaml
+hook:
+  type: ci-after-job
+  pattern: ^build$         # Regex matching the job name
+```
+
+If no pattern is specified, the hook triggers on every job/step.
+
+#### Command Hooks
+
+Command hooks (`ci-before-command` / `ci-after-command`) use **structured matching** to target specific commands. This is more precise and less error-prone than regex matching against the full command line.
+
+**Simple form** — match by binary name and positional/flag arguments:
 
 ```yaml
 hook:
   type: ci-after-command
-  pattern: ^docker.*build.*   # Regex pattern
+  binary:
+    name: docker
+  args:
+    - value: build
+```
+
+**Advanced form** — add regex patterns, environment variable matchers, and process depth control:
+
+```yaml
+hook:
+  type: ci-after-command
+  binary:
+    name_pattern: python[0-9]*    # Regex on binary name
+    dir: /usr/local/bin            # Exact dir match (or dir_pattern for regex)
+    use_path_dirs: true            # Restrict to PATH directories
+  args:
+    - value: build                 # Positional arg (order matters)
+    - flag: --tag                  # Flag (order-independent)
+      value_pattern: ^v[0-9]+      # Regex on flag value
+  args_pattern: .*--verbose.*     # Regex on full args string (alternative/complement to args array)
+  envs:
+    - name: DEBUG
+      value: "1"
+  max_process_depth: 1             # Only top-level processes
+  include_children_depth: 1        # Also trigger on direct children
+```
+
+**Matching rules:**
+- All specified matchers (`binary`, `args`, `envs`) must match (AND logic)
+- For OR logic, use regex alternation (e.g., `flag_pattern: ^(-f|--file)$`)
+- `name` vs `name_pattern`: exact match vs regex (mutually exclusive); same for `dir`/`dir_pattern`, `flag`/`flag_pattern`, `value`/`value_pattern`
+- `args` positional matchers (value-only, no flag) must appear in order; flag matchers can be in any order
+- A flag matcher with no `value`/`value_pattern` matches boolean flags (flags that take no value)
+
+> **Deprecated:** The old `pattern: <regex>` form for command hooks (regex against the full command line) is deprecated. Use the structured `binary`/`args` form instead.
+
+**Common examples:**
+
+```yaml
+# Match "go test" commands
+hook:
+  type: ci-after-command
+  binary:
+    name: go
+  args:
+    - value: test
+
+# Match "docker build" with any tag
+hook:
+  type: ci-after-command
+  binary:
+    name: docker
+  args:
+    - value: build
+    - flag_pattern: ^(-t|--tag)$
+      value_pattern: .*
+
+# Match "npm run", "npm test", or "npm build"
+hook:
+  type: ci-after-command
+  binary:
+    name: npm
+  args:
+    - value_pattern: ^(run|test|build)$
+
+# Match any command (all processes in CI)
+hook:
+  type: ci-after-command
 ```
 
 **Context:** Inside the CI pipeline, with access to:
 - Build artifacts
 - Test results
 - Environment variables
-- The `LUNAR_CI_COMMAND` variable (for command hooks)
+- The `LUNAR_CI_COMMAND` variable (JSON array of the command and its arguments)
 
 **Use cases:**
 - Capturing test coverage after test runs
@@ -173,7 +258,10 @@ collectors:
     hooks:
       - type: code
       - type: ci-after-command
-        pattern: ^go test.*
+        binary:
+          name: go
+        args:
+          - value: test
 ```
 
 ### Hook Options
@@ -500,6 +588,7 @@ Collect data from CI artifacts after a command runs.
 set -e
 
 # This runs after "go test" via ci-after-command hook
+# Hook config: binary.name: go, args: [{value: test}]
 if [ -f coverage.out ]; then
   COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
   lunar collect -j ".testing.coverage.percentage" "$COVERAGE"
@@ -732,8 +821,7 @@ collectors:
   - runBash: lunar collect .ci-info "$CI_JOB_ID"
     image: native  # CI collector needs access to CI environment
     hook:
-      type: ci-after-command
-      pattern: ^.*
+      type: ci-after-command  # No binary/args = matches all commands
     on: [my-tag]
 ```
 
