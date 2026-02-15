@@ -23,7 +23,12 @@ extract_flag_value() {
   for flag in "$@"; do
     # Match "--flag value" or "--flag=value"
     local val
-    val=$(echo "$cmd" | grep -oP "(?<=${flag}[= ])[^ ]+" | head -1 2>/dev/null || true)
+    val=$(awk -v f="$flag" '{
+      for (i=1; i<=NF; i++) {
+        if ($i == f && (i+1) <= NF) { print $(i+1); exit }
+        if (index($i, f "=") == 1) { sub(f "=", "", $i); print $i; exit }
+      }
+    }' <<< "$cmd" 2>/dev/null || true)
     if [ -n "$val" ]; then
       echo "$val"
       return

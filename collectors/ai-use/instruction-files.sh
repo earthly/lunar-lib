@@ -30,18 +30,19 @@ while IFS= read -r file; do
   dirpath=$(dirname "$filepath")
   filename=$(basename "$filepath")
 
-  # Line count
-  lines=$(wc -l < "$file" | tr -d ' ')
-
-  # Byte size
-  bytes=$(wc -c < "$file" | tr -d ' ')
-
-  # Extract markdown section headings
-  sections=$(grep -E '^#{1,6}\s+' "$file" 2>/dev/null \
-    | sed 's/^#\{1,6\}\s*//' \
-    | sed 's/\s*\[.*$//' \
-    | sed 's/^\s*//;s/\s*$//' \
-    | jq -R . | jq -s . || echo '[]')
+  if [ -r "$file" ]; then
+    lines=$(wc -l < "$file" | tr -d ' ')
+    bytes=$(wc -c < "$file" | tr -d ' ')
+    sections=$(grep -E '^#{1,6}\s+' "$file" 2>/dev/null \
+      | sed 's/^#\{1,6\}\s*//' \
+      | sed 's/\s*\[.*$//' \
+      | sed 's/^\s*//;s/\s*$//' \
+      | jq -R . | jq -s . || echo '[]')
+  else
+    lines=0
+    bytes=0
+    sections='[]'
+  fi
 
   # Check if symlink
   is_symlink=false

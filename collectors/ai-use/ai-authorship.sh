@@ -104,9 +104,6 @@ while IFS= read -r sha; do
 done <<< "$COMMITS"
 
 PROVIDER="trailers"
-if [ "$GIT_AI_REF_EXISTS" = true ]; then
-  PROVIDER="git-ai"
-fi
 
 jq -n \
   --arg provider "$PROVIDER" \

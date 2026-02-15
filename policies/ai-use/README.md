@@ -109,7 +109,7 @@ A repository with a properly configured AGENTS.md, CLAUDE.md symlink, and plans 
 }
 ```
 
-**Failure message:** `"No agent instruction file found at repository root (expected AGENTS.md, CLAUDE.md, GEMINI.md, or CODEX.md)"`
+**Failure message:** `"No agent instruction file found at repository root (e.g. AGENTS.md, CLAUDE.md, GEMINI.md)"`
 
 #### Only CLAUDE.md at root, no AGENTS.md (fails `canonical-naming`)
 
