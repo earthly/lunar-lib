@@ -1114,6 +1114,37 @@ default_image: earthly/lunar-scripts:1.0.0
 
 **Important:** Always bake dependencies into the image rather than relying on runtime installation. This provides faster startup, reproducible builds, and eliminates network dependencies at runtime.
 
+## Test Locally
+
+Use `lunar policy dev` to test policies in development mode. Run from your config directory (where `lunar-config.yml` lives).
+
+```bash
+# Pipe collector output directly into policy
+lunar collector dev <collector-name> --component-dir <path> | \
+  lunar policy dev <policy-name> --component-json - --verbose
+
+# Run against a saved JSON file
+lunar policy dev <policy-name> --component-json path/to/component.json --verbose
+
+# Run against a remote component's latest data from Hub
+lunar policy dev <policy-name> --component github.com/org/repo --verbose
+
+# Pass input overrides
+lunar collector dev <collector-name> --component-dir <path> | \
+  lunar policy dev <policy-name> --component-json - --verbose --with "min_lines=50,max_lines=200"
+```
+
+| Flag | Description |
+|------|-------------|
+| `--component-json <path-or->` | Component JSON file, or `-` for stdin |
+| `--component <id>` | Remote component (fetches latest data from Hub) |
+| `--verbose` | Show detailed check results |
+| `--with <args>` | Override policy inputs (comma-separated key=value) |
+| `--output <format>` | `list` (default, human-readable) or `json` (raw) |
+| `--pr <num>` | Simulate PR context |
+
+**Note:** The name argument uses prefix matching — `my-policy` runs all sub-policies named `my-policy.*`.
+
 ## Best Practices
 
 ### 1. Write Descriptive Check Names and Messages

@@ -918,11 +918,37 @@ One collector should collect one type of data. Create separate collectors for di
 
 ### 6. Test Locally
 
-Use `lunar collect --component <id>` to test collectors locally:
+Use `lunar collector dev` to test collectors in development mode. Run from your config directory (where `lunar-config.yml` lives).
 
 ```bash
-LUNAR_COMPONENT_ID="github.com/acme/api" ./main.sh
+# Run all subcollectors in a plugin against a local repo
+lunar collector dev <plugin-name> --component-dir <path> --verbose
+
+# Run a specific subcollector
+lunar collector dev <plugin-name>.<subcollector> --component-dir <path> --verbose
+
+# Run against a remote component (fetches from GitHub)
+lunar collector dev <plugin-name> --component github.com/org/repo --verbose
+
+# Test CI hooks by simulating a CI command
+lunar collector dev <plugin-name> --component-dir <path> --fake-ci-cmd "go test ./..."
+
+# Pipe output into a policy for end-to-end testing
+lunar collector dev <plugin-name> --component-dir <path> | \
+  lunar policy dev <policy-name> --component-json - --verbose
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--component-dir <path>` | Local repo directory (mutually exclusive with `--component`) |
+| `--component <id>` | Remote component (e.g. `github.com/org/repo`) |
+| `--verbose` | Show detailed execution output |
+| `--fake-ci-cmd <cmd>` | Simulate a CI command for testing CI hooks |
+| `--pr <num>` | Simulate PR context |
+| `--git-sha <sha>` | Run against a specific commit |
+| `--merge` | Merge all diffs into a single JSON blob (default: true) |
+
+**Note:** The name argument uses prefix matching — `my-plugin` runs all subcollectors named `my-plugin.*`.
 
 ### 7. Document Component JSON Schema
 
