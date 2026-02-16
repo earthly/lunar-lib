@@ -9,6 +9,8 @@ CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 version=$(node -v 2>/dev/null | sed 's/^v//' || echo "")
 
 if [[ -n "$version" ]]; then
-    lunar collect -j ".lang.nodejs.cicd.cmds" "[{\"cmd\": \"$CMD_STR\", \"version\": \"$version\"}]"
+    # Escape backslashes and quotes in CMD_STR for safe JSON embedding
+    ESCAPED_CMD=$(printf '%s' "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    lunar collect -j ".lang.nodejs.cicd.cmds" "[{\"cmd\": \"$ESCAPED_CMD\", \"version\": \"$version\"}]"
     lunar collect -j ".lang.nodejs.cicd.source" "{\"tool\": \"node\", \"integration\": \"ci\"}"
 fi

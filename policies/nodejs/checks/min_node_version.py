@@ -22,7 +22,8 @@ def check_min_node_version(min_version=None, node=None):
 
         def parse_major(v):
             """Extract major version number from a version string."""
-            return int(str(v).split(".")[0])
+            s = str(v).strip().lstrip("vV")
+            return int(s.split(".")[0])
 
         try:
             actual_major = parse_major(actual_version)
