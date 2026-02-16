@@ -11,12 +11,10 @@ def main(node=None):
             c.skip("High severity check disabled via inputs")
             return c
 
-        c.assert_exists(
-            ".sast",
-            "No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.",
-        )
-
         sast_node = c.get_node(".sast")
+        if not sast_node.exists():
+            c.fail("No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.")
+            return c
 
         # Check summary first (preferred)
         summary = sast_node.get_node(".summary.has_high")

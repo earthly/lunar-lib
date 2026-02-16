@@ -6,12 +6,10 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("no-critical", "No critical container vulnerability findings", node=node)
     with c:
-        c.assert_exists(
-            ".container_scan",
-            "No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.",
-        )
-
         scan_node = c.get_node(".container_scan")
+        if not scan_node.exists():
+            c.fail("No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
+            return c
 
         # Check summary first (preferred)
         summary = scan_node.get_node(".summary.has_critical")

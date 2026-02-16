@@ -6,12 +6,10 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("no-critical", "No critical code findings", node=node)
     with c:
-        c.assert_exists(
-            ".sast",
-            "No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.",
-        )
-
         sast_node = c.get_node(".sast")
+        if not sast_node.exists():
+            c.fail("No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.")
+            return c
 
         # Check summary first (preferred)
         summary = sast_node.get_node(".summary.has_critical")

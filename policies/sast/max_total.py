@@ -23,12 +23,10 @@ def main(node=None):
             c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")
             return c
 
-        c.assert_exists(
-            ".sast",
-            "No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.",
-        )
-
         sast_node = c.get_node(".sast")
+        if not sast_node.exists():
+            c.fail("No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.")
+            return c
         total_node = sast_node.get_node(".findings.total")
         if not total_node.exists():
             c.skip("Total findings count not available yet. Collectors need to report .sast.findings.total.")

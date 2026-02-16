@@ -6,12 +6,10 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("no-critical", "No critical infrastructure security findings", node=node)
     with c:
-        c.assert_exists(
-            ".iac_scan",
-            "No IaC scanning data found. Ensure a scanner (Trivy, Checkov, etc.) is configured.",
-        )
-
         scan_node = c.get_node(".iac_scan")
+        if not scan_node.exists():
+            c.fail("No IaC scanning data found. Ensure a scanner (Trivy, Checkov, etc.) is configured.")
+            return c
 
         # Check summary first (preferred)
         summary = scan_node.get_node(".summary.has_critical")
