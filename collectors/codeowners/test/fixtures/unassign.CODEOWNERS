@@ -1,0 +1,5 @@
+# Default
+* @acme/platform
+
+# Unassign vendor directory (no owners)
+/vendor/

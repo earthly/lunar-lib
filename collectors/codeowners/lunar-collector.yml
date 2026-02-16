@@ -1,0 +1,67 @@
+version: 0
+
+name: codeowners
+description: Parse CODEOWNERS files and collect ownership data
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "CODEOWNERS Collector"
+  long_description: |
+    Parse CODEOWNERS files to collect structured ownership data including rules,
+    owner types, and catch-all coverage. Enables enforcement of code ownership
+    standards across your organization.
+  categories: ["vcs"]
+  icon: "assets/codeowners.svg"
+  status: "stable"
+  related:
+    - slug: "codeowners"
+      type: "policy"
+      reason: "Enforces code ownership standards based on collected CODEOWNERS data"
+
+collectors:
+  - name: codeowners
+    description: |
+      Scans the repository for a CODEOWNERS file in standard locations
+      (`CODEOWNERS`, `.github/CODEOWNERS`, `docs/CODEOWNERS`) and parses
+      its contents. Extracts ownership rules, validates syntax, classifies
+      owners as teams vs individuals, and detects catch-all rules. Writes
+      structured data to `.ownership.codeowners`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["codeowners", "code ownership", "repository ownership", "team ownership", "file ownership", "pull request reviewers"]
+
+inputs:
+  paths:
+    description: Comma-separated list of CODEOWNERS file paths to check (first match wins)
+    default: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
+
+example_component_json: |
+  {
+    "ownership": {
+      "codeowners": {
+        "exists": true,
+        "valid": true,
+        "path": ".github/CODEOWNERS",
+        "errors": [],
+        "owners": ["@acme/backend-team", "@acme/platform-team", "@jdoe"],
+        "team_owners": ["@acme/backend-team", "@acme/platform-team"],
+        "individual_owners": ["@jdoe"],
+        "rules": [
+          {
+            "pattern": "*",
+            "owners": ["@acme/platform-team"],
+            "owner_count": 1,
+            "line": 3
+          },
+          {
+            "pattern": "/src/backend/",
+            "owners": ["@acme/backend-team", "@jdoe"],
+            "owner_count": 2,
+            "line": 6
+          }
+        ]
+      }
+    }
+  }

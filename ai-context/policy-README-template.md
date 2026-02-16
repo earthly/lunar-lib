@@ -12,14 +12,14 @@ Use this template when creating the `README.md` for a new policy (guardrails).
 
 {2-3 sentences explaining what engineering standard this policy enforces, why it matters, and who should use it.}
 
-## Guardrails
+## Policies
 
-This policy provides the following guardrails (use `include` to select a subset):
+This plugin provides the following policies (use `include` to select a subset):
 
-| Guardrail | Description | Failure Meaning |
-|-----------|-------------|-----------------|
-| `example-check-1` | Validates X exists | X is missing or invalid |
-| `example-check-2` | Ensures Y meets threshold | Y is below required threshold |
+| Policy | Description |
+|--------|-------------|
+| `example-check-1` | Validates X exists |
+| `example-check-2` | Ensures Y meets threshold |
 
 ## Required Data
 

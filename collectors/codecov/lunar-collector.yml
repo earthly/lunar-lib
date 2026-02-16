@@ -16,9 +16,9 @@ landing_page:
   icon: "assets/codecov.svg"
   status: "stable"
   related:
-    - slug: "coverage"
+    - slug: "testing"
       type: "policy"
-      reason: "Vendor-agnostic coverage policies that work with Codecov data"
+      reason: "Testing guardrails including coverage checks that work with Codecov data"
 
 collectors:
   - name: ran

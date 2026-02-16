@@ -1,0 +1,4 @@
+* @acme/platform-team
+/src/api/ @acme/api-team
+/src/web/ @acme/web-team
+/infra/ @acme/infra-team

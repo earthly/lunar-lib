@@ -24,6 +24,7 @@ Detect when a binary or tool runs in CI and optionally extract additional inform
 **Tips:** 
 * Use the `ci-after-command` hook type in most cases, as the command results are available at that point
 * Use the `ci-before-command` only if you need to modify the command before it is run
+* **Collect every invocation in an array, with versions.** Don't just record a boolean "tool ran"—collect each detected command into an array (Lunar auto-concatenates arrays at the same path). Include the CLI version when possible. This gives maximum visibility: policies can assert on minimum versions, and version discrepancies across different CI jobs or steps become immediately apparent. See "Naming Convention: `.cicd` vs `.auto` Sub-Keys for CI-Detected and Auto-Run Collectors" in the [collector reference](collector-reference.md).
 
 ---
 

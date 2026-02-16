@@ -1,0 +1,12 @@
+# Default owners
+* @acme/platform-team
+
+# Frontend
+/src/frontend/ @acme/frontend-team @jane
+*.js @acme/frontend-team
+
+# Backend
+/src/backend/ @acme/backend-team @john
+
+# Docs
+docs/ @acme/docs-team

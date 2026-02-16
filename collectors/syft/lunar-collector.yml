@@ -1,0 +1,69 @@
+version: 0
+
+name: syft
+description: |
+  Generate or detect CycloneDX/SPDX SBOMs using Anchore Syft.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:syft-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Syft SBOM Collector"
+  long_description: |
+    Generate Software Bill of Materials automatically or detect existing
+    Syft SBOM generation in CI pipelines. Supports CycloneDX and SPDX formats
+    with license detection for Go, Java, Node.js, and Python.
+  categories: ["security"]
+  icon: "assets/syft.svg"
+  status: "stable"
+  related:
+    - slug: "sbom"
+      type: "policy"
+      reason: "Enforces SBOM existence and license compliance"
+
+collectors:
+  - name: generate
+    description: |
+      Auto-generates a CycloneDX SBOM using Syft. Enables remote license
+      lookups for Go, Java, Node.js, and Python. Writes full SBOM to
+      .sbom.auto.cyclonedx with source metadata.
+    mainBash: generate.sh
+    hook:
+      type: code
+    keywords: ["sbom", "syft", "cyclonedx", "software bill of materials", "license detection"]
+
+  - name: ci
+    description: |
+      Detects Syft execution in CI pipelines. Records source metadata to
+      .sbom.cicd and optionally collects the generated SBOM file if the
+      output path can be determined from command flags.
+    mainBash: ci.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\bsyft\b.*
+    keywords: ["sbom", "syft", "ci detection", "cyclonedx", "spdx"]
+
+example_component_json: |
+  {
+    "sbom": {
+      "auto": {
+        "source": { "tool": "syft", "integration": "code", "version": "1.41.2" },
+        "cyclonedx": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "1.5",
+          "components": [
+            {
+              "name": "github.com/sirupsen/logrus",
+              "version": "v1.9.3",
+              "licenses": [{ "license": { "id": "MIT" } }]
+            }
+          ]
+        }
+      },
+      "cicd": {
+        "source": { "tool": "syft", "integration": "ci", "version": "1.41.2" },
+        "cyclonedx": { "bomFormat": "CycloneDX", "specVersion": "1.5", "components": [] }
+      }
+    }
+  }

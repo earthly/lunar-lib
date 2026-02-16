@@ -1,0 +1,86 @@
+version: 0
+
+name: snyk
+description: Detects Snyk security scans via GitHub App or CLI integration
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Snyk Collector"
+  long_description: |
+    Detects Snyk security scanning via GitHub App or CLI integration.
+    Automatically categorizes results (SCA, SAST, Container, IaC) based on
+    scan type and writes to normalized Component JSON paths.
+  category: "security"
+  icon: "assets/snyk.svg"
+  status: "stable"
+  related:
+    - slug: "dependencies"
+      type: "policy"
+      reason: "Enforces dependency version requirements using Snyk data"
+
+collectors:
+  - name: github-app
+    description: |
+      Detects Snyk GitHub App scans on pull requests by querying GitHub
+      commit status API. Waits for scan completion and captures results.
+      Categorizes by scan type (Open Source, Code, Container, IaC).
+    mainBash: github-app.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["snyk", "github app", "security scanning", "vulnerabilities"]
+
+  - name: running-in-prs
+    description: |
+      Proves Snyk is running on PRs by querying Lunar Hub for Snyk data
+      from recent PRs. Used on the default branch to provide compliance proof
+      that PR scanning is happening (since Snyk GitHub App only posts checks
+      on PRs, not directly on the default branch).
+    mainBash: running-in-prs.sh
+    hook:
+      type: code
+      runs_on: [default-branch]
+    keywords: ["snyk", "pr scanning", "compliance proof", "default branch"]
+
+  - name: cli
+    description: |
+      Detects Snyk CLI executions in CI pipelines. Captures the command
+      and exit code, then categorizes by subcommand (test, code, container, iac).
+    mainBash: cli.sh
+    hook:
+      type: ci-after-command
+      pattern: .*\bsnyk\b.*
+    keywords: ["snyk cli", "ci integration", "security scanning"]
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for github-app collector)
+
+example_component_json: |
+  {
+    "sca": {
+      "running_in_prs": true,
+      "source": {
+        "tool": "snyk",
+        "version": "1.1200.0",
+        "integration": "github_app"
+      },
+      "native": {
+        "snyk": {
+          "github_app": {
+            "state": "success",
+            "context": "security/snyk",
+            "target_url": "https://app.snyk.io/..."
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "snyk test --all-projects", "version": "1.1200.0"}
+            ]
+          }
+        }
+      }
+    }
+  }

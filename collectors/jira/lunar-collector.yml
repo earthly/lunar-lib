@@ -1,0 +1,86 @@
+version: 0
+
+name: jira
+description: Collect Jira ticket metadata from PR titles and validate against Jira API
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Jira Collector"
+  long_description: |
+    Extract Jira ticket references from pull request titles, validate them
+    against the Jira REST API, and detect ticket reuse across PRs.
+  categories: ["vcs"]
+  icon: "assets/jira.svg"
+  status: "stable"
+  related:
+    - slug: "ticket"
+      type: "policy"
+      reason: "Enforces ticket presence, validity, status, type, and reuse limits"
+
+collectors:
+  - name: ticket
+    description: |
+      Extracts Jira ticket ID from PR title, fetches issue metadata from
+      the Jira REST API, and writes normalized ticket data to
+      .vcs.pr.ticket and native Jira data to .vcs.pr.ticket.native.jira.
+    mainBash: ticket.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["jira", "ticket", "pr", "issue tracking"]
+
+  - name: ticket-history
+    description: |
+      Queries the Lunar SQL database to count how many other PRs reference
+      the same ticket. Writes .vcs.pr.ticket.reuse_count for policy
+      evaluation. Detects ticket recycling abuse.
+    mainBash: ticket-history.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["jira", "ticket reuse", "compliance", "audit"]
+
+inputs:
+  ticket_prefix:
+    description: Character(s) before the ticket ID in PR titles (empty = match anywhere)
+    default: ""
+  ticket_suffix:
+    description: Character(s) after the ticket ID in PR titles (empty = match anywhere)
+    default: ""
+  ticket_pattern:
+    description: Regex pattern for ticket ID (without prefix/suffix)
+    default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
+  jira_base_url:
+    description: Jira instance base URL (e.g. https://acme.atlassian.net)
+  jira_user:
+    description: Jira user email for API authentication
+
+secrets:
+  JIRA_TOKEN:
+    description: Jira API token for authentication
+  GH_TOKEN:
+    description: GitHub token for reading PR metadata
+
+example_component_json: |
+  {
+    "vcs": {
+      "pr": {
+        "ticket": {
+          "id": "ABC-123",
+          "source": { "tool": "jira", "integration": "api" },
+          "url": "https://acme.atlassian.net/browse/ABC-123",
+          "valid": true,
+          "status": "In Progress",
+          "type": "Story",
+          "summary": "Implement payment validation",
+          "assignee": "jane@acme.com",
+          "reuse_count": 0,
+          "native": {
+            "jira": { "...full Jira API response..." }
+          }
+        }
+      }
+    }
+  }

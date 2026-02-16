@@ -32,7 +32,7 @@ collectors:
     keywords: ["readme", "documentation", "repository docs", "markdown"]
 
 inputs:
-  path:
+  paths:
     description: Comma-separated list of README paths to check (first match wins)
     default: "README.md,README,README.txt,README.rst"
 

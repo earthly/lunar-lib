@@ -2,16 +2,13 @@ name: Claude Auto-Approve
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, ready_for_review]
     branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 
 jobs:
   claude-review:
     name: claude-review
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -128,38 +125,14 @@ jobs:
           ERROR_MSG=$(echo "$RESPONSE" | jq -r '.result // empty' 2>/dev/null || echo "")
           
           if [ "$IS_ERROR" = "true" ] || [ -z "$RESPONSE" ] || ! echo "$RESPONSE" | jq -e '.' > /dev/null 2>&1; then
-            echo "Claude CLI error detected"
-            echo "has_error=true" >> $GITHUB_OUTPUT
-            echo "should_approve=false" >> $GITHUB_OUTPUT
-            
-            # Build error comment
-            {
-              echo "## Claude Auto-Approve Review"
-              echo ""
-              echo "⚠️ **Error:** Claude analysis failed"
-              echo ""
-              if [ -n "$ERROR_MSG" ]; then
-                echo "$ERROR_MSG"
-              else
-                echo "No response received from Claude CLI."
-              fi
-              echo ""
-              if [ -n "$RESPONSE" ]; then
-                echo "<details>"
-                echo "<summary>Raw response</summary>"
-                echo ""
-                echo "\`\`\`json"
-                echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
-                echo "\`\`\`"
-                echo "</details>"
-                echo ""
-              fi
-              echo "---"
-              echo "Conclusion: 👀 **Manual review needed** (auto-review failed)"
-            } > /tmp/comment.txt
-            
-            cat /tmp/comment.txt
-            echo "parse_failed=true" >> $GITHUB_OUTPUT
+            echo "::error::Claude CLI error detected"
+            if [ -n "$ERROR_MSG" ]; then
+              echo "$ERROR_MSG"
+            fi
+            if [ -n "$RESPONSE" ]; then
+              echo "Raw response:"
+              echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            fi
             exit 1
           fi
           
@@ -184,33 +157,11 @@ jobs:
           
           # Validate we have the expected fields
           if ! echo "$ANALYSIS" | jq -e '.recommendation' > /dev/null 2>&1; then
-            echo "Invalid analysis format - missing required fields"
-            echo "has_error=true" >> $GITHUB_OUTPUT
-            echo "should_approve=false" >> $GITHUB_OUTPUT
-            
-            {
-              echo "## Claude Auto-Approve Review"
-              echo ""
-              echo "⚠️ **Error:** Could not parse Claude's response"
-              echo ""
-              echo "<details>"
-              echo "<summary>Raw response</summary>"
-              echo ""
-              echo "\`\`\`json"
-              echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
-              echo "\`\`\`"
-              echo "</details>"
-              echo ""
-              echo "---"
-              echo "Conclusion: 👀 **Manual review needed** (auto-review failed)"
-            } > /tmp/comment.txt
-            
-            cat /tmp/comment.txt
-            echo "parse_failed=true" >> $GITHUB_OUTPUT
+            echo "::error::Invalid analysis format - missing required fields"
+            echo "Raw response:"
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
             exit 1
           fi
-          
-          echo "has_error=false" >> $GITHUB_OUTPUT
           
           # Extract fields
           RECOMMENDATION=$(echo "$ANALYSIS" | jq -r '.recommendation // "REVIEW_NEEDED"')
@@ -227,63 +178,32 @@ jobs:
             echo "should_approve=true" >> $GITHUB_OUTPUT
           else
             echo "should_approve=false" >> $GITHUB_OUTPUT
+            echo "Review needed: $SUMMARY"
           fi
           
-          # Build comment body
-          {
-            echo "## Claude Auto-Approve Review"
-            echo ""
-            echo "**Summary:** $SUMMARY"
-            echo ""
-            echo "**Scope:** $SCOPE"
-            echo "> $SCOPE_REASONING"
-            echo ""
-            if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
-              echo "**Major Issues Found:** $MAJOR_ISSUES_COUNT"
+          # Build comment only for approvals
+          if [ "$RECOMMENDATION" = "APPROVE" ]; then
+            {
+              echo "## Claude Auto-Approve Review"
               echo ""
-              echo "$MAJOR_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
-            else
-              echo "**Major Issues Found:** None"
-            fi
-            echo ""
-            if [ "$MEDIUM_ISSUES_COUNT" -gt 0 ]; then
-              echo "**Medium Issues Found:** $MEDIUM_ISSUES_COUNT"
+              echo "**Summary:** $SUMMARY"
               echo ""
-              echo "$MEDIUM_ISSUES" | jq -r '.[] | "- **\(.file):\(.line // "N/A")** - \(.issue)"'
-            else
-              echo "**Medium Issues Found:** None"
-            fi
-            echo ""
-            echo "---"
-            if [ "$RECOMMENDATION" = "APPROVE" ]; then
+              echo "**Scope:** $SCOPE"
+              echo "> $SCOPE_REASONING"
+              echo ""
+              echo "---"
               echo "Conclusion: ✅ **Auto-approved** (isolated changes, no issues)"
-            else
-              echo "👀 **Manual review needed**"
-            fi
-          } > /tmp/comment.txt
-          
-          cat /tmp/comment.txt
+            } > /tmp/comment.txt
+            
+            cat /tmp/comment.txt
+          fi
 
-      - name: Post or update review comment
-        if: always()
+      - name: Post approval comment
+        if: steps.analyze.outputs.should_approve == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          
-          # Find existing comment by searching for our title (GitHub strips HTML comments)
-          EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select(.body | startswith("## Claude Auto-Approve Review")) | .id' | head -1)
-          
-          if [ -n "$EXISTING_COMMENT_ID" ]; then
-            echo "Updating existing comment: $EXISTING_COMMENT_ID"
-            gh api "repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT_ID}" \
-              -X PATCH \
-              -f body="$(cat /tmp/comment.txt)"
-          else
-            echo "Creating new comment"
-            gh pr comment "$PR_NUMBER" --body "$(cat /tmp/comment.txt)"
-          fi
+          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat /tmp/comment.txt)"
 
       - name: Auto-approve PR
         if: steps.analyze.outputs.should_approve == 'true'

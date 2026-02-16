@@ -1,0 +1,8 @@
+VERSION 0.8
+
+test:
+    FROM python:3.12-alpine
+    WORKDIR /workspace
+    COPY parse_codeowners.py .
+    COPY --dir test .
+    RUN python -m unittest test/test_parse_codeowners.py -v
