@@ -1,39 +1,48 @@
 #!/bin/bash
 set -e
 
-# Extract the coverage profile path from -coverprofile argument
-# Hook pattern guarantees -coverprofile is present in LUNAR_CI_COMMAND (JSON array)
-index=$(echo "$LUNAR_CI_COMMAND" | jq -r 'index("-coverprofile")')
-coverprofile_path=$(echo "$LUNAR_CI_COMMAND" | jq -r --argjson idx "$index" '.[$idx + 1]')
+# CI collector - runs native on CI runner, avoid jq and heavy dependencies
 
-if [[ -z "$coverprofile_path" || "$coverprofile_path" == "null" ]]; then
-  echo "Could not extract coverprofile path from command"
-  exit 1
+# Convert LUNAR_CI_COMMAND from JSON array to string if needed
+CMD_RAW="$LUNAR_CI_COMMAND"
+if [[ "$CMD_RAW" == "["* ]]; then
+    CMD_STR=$(echo "$CMD_RAW" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
+else
+    CMD_STR="$CMD_RAW"
 fi
 
-# Check if coverage file exists
-if [[ ! -f "$coverprofile_path" ]]; then
-  echo "Coverage profile not found: $coverprofile_path"
-  exit 1
+# Extract -coverprofile path from command args using native bash
+coverprofile_path=""
+prev=""
+for arg in $CMD_STR; do
+  if [[ "$prev" == "-coverprofile" ]]; then
+    coverprofile_path="$arg"
+    break
+  fi
+  # Also handle -coverprofile=path format
+  if [[ "$arg" == -coverprofile=* ]]; then
+    coverprofile_path="${arg#-coverprofile=}"
+    break
+  fi
+  prev="$arg"
+done
+
+if [[ -z "$coverprofile_path" || ! -f "$coverprofile_path" ]]; then
+  exit 0
 fi
 
 # Extract total percentage
-coverage_pct=$(go tool cover -func="$coverprofile_path" 2>/dev/null | awk '/^total:/ {print $NF}' | sed 's/%$//' || echo "0")
+coverage_pct=$(go tool cover -func="$coverprofile_path" 2>/dev/null | awk '/^total:/ {print $NF}' | sed 's/%$//' || echo "")
 
-# Collect to .lang.go.tests.coverage only (language-specific)
-# Normalized .testing.coverage should come from CodeCov or similar cross-language tools
-jq -n \
-  --argjson percentage "$coverage_pct" \
-  --arg profile_path "$coverprofile_path" \
-  --rawfile raw_profile "$coverprofile_path" \
-  '{
-    percentage: $percentage,
-    profile_path: $profile_path,
-    native: {
-      profile: $raw_profile
-    },
-    source: {
-      tool: "go cover",
-      integration: "ci"
-    }
-  }' | lunar collect -j ".lang.go.tests.coverage" -
+if [[ -n "$coverage_pct" ]]; then
+  # Collect coverage percentage and profile path as individual fields
+  lunar collect -j ".lang.go.tests.coverage.percentage" "$coverage_pct"
+  lunar collect ".lang.go.tests.coverage.profile_path" "$coverprofile_path"
+
+  # Collect raw profile content as a string via stdin
+  cat "$coverprofile_path" | lunar collect ".lang.go.tests.coverage.native.profile" -
+
+  # Source metadata
+  lunar collect ".lang.go.tests.coverage.source.tool" "go cover" \
+               ".lang.go.tests.coverage.source.integration" "ci"
+fi
