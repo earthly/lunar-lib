@@ -1,0 +1,58 @@
+version: 0
+
+name: python
+description: Enforces Python project structure and standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Python Project Guardrails"
+  long_description: |
+    Enforce Python-specific project standards including lockfile presence,
+    linter configuration, and Python version requirements.
+  category: "devex-build-and-ci"
+  icon: "assets/python.svg"
+  status: "beta"
+  requires:
+    - slug: "python"
+      type: "collector"
+      reason: "Provides Python project metadata"
+  related: []
+
+policies:
+  - name: lockfile-exists
+    description: |
+      Ensures the project has a dependency lockfile (poetry.lock, Pipfile.lock,
+      or pinned requirements.txt) for reproducible builds.
+    mainPython: ./lockfile_exists.py
+    keywords: ["lockfile", "poetry.lock", "Pipfile.lock", "reproducibility"]
+
+  - name: linter-configured
+    description: |
+      Ensures a Python linter is configured (ruff, flake8, or pylint).
+      Linters catch bugs and enforce consistent code style.
+    mainPython: ./linter_configured.py
+    keywords: ["linter", "ruff", "flake8", "pylint", "code quality"]
+
+  - name: min-python-version
+    description: |
+      Ensures the project uses at least the minimum required Python version.
+      Helps maintain security and compatibility standards.
+    mainPython: ./min_python_version.py
+    keywords: ["python version", "compatibility", "security"]
+
+  - name: min-python-version-cicd
+    description: |
+      Ensures the Python version used in CI/CD commands meets the minimum
+      required version for build environments.
+    mainPython: ./min_python_version_cicd.py
+    keywords: ["python version", "ci/cd", "compatibility", "security"]
+
+inputs:
+  min_python_version:
+    description: Minimum required Python version (e.g., "3.9", "3.11")
+    default: "3.9"
+  min_python_version_cicd:
+    description: Minimum required Python version for CI/CD commands
+    default: "3.9"
