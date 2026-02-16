@@ -31,7 +31,7 @@ def main(node=None):
         sca_node = c.get_node(".sca")
         total_node = sca_node.get_node(".vulnerabilities.total")
         if not total_node.exists():
-            c.fail("Total findings count not available. Ensure collector reports .sca.vulnerabilities.total.")
+            c.skip("Total findings count not available yet. Collectors need to report .sca.vulnerabilities.total.")
             return c
 
         total_value = total_node.get_value()

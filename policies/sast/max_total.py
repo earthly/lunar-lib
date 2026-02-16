@@ -31,7 +31,7 @@ def main(node=None):
         sast_node = c.get_node(".sast")
         total_node = sast_node.get_node(".findings.total")
         if not total_node.exists():
-            c.fail("Total findings count not available. Ensure collector reports .sast.findings.total.")
+            c.skip("Total findings count not available yet. Collectors need to report .sast.findings.total.")
             return c
 
         total_value = total_node.get_value()

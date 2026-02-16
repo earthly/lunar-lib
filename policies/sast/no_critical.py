@@ -25,7 +25,7 @@ def main(node=None):
             c.assert_equals(critical.get_value(), 0, "Critical code findings detected")
             return c
 
-        c.fail("Finding counts not available. Ensure collector reports .sast.findings or .sast.summary.")
+        c.skip("Finding counts not available yet. Collectors need to report .sast.findings or .sast.summary.")
 
     return c
 

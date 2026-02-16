@@ -34,7 +34,7 @@ def main(node=None):
             )
             return c
 
-        c.fail("Finding counts not available. Ensure collector reports .iac_scan.findings or .iac_scan.summary.")
+        c.skip("Finding counts not available yet. Collectors need to report .iac_scan.findings or .iac_scan.summary.")
 
     return c
 

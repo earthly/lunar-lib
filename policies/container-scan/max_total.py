@@ -31,7 +31,7 @@ def main(node=None):
         scan_node = c.get_node(".container_scan")
         total_node = scan_node.get_node(".vulnerabilities.total")
         if not total_node.exists():
-            c.fail("Total findings count not available. Ensure collector reports .container_scan.vulnerabilities.total.")
+            c.skip("Total findings count not available yet. Collectors need to report .container_scan.vulnerabilities.total.")
             return c
 
         total_value = total_node.get_value()

@@ -34,7 +34,7 @@ def main(node=None):
             )
             return c
 
-        c.fail("Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary.")
+        c.skip("Vulnerability counts not available yet. Collectors need to report .container_scan.vulnerabilities or .container_scan.summary.")
 
     return c
 

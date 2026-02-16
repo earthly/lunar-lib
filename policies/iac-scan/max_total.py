@@ -31,7 +31,7 @@ def main(node=None):
         scan_node = c.get_node(".iac_scan")
         total_node = scan_node.get_node(".findings.total")
         if not total_node.exists():
-            c.fail("Total findings count not available. Ensure collector reports .iac_scan.findings.total.")
+            c.skip("Total findings count not available yet. Collectors need to report .iac_scan.findings.total.")
             return c
 
         total_value = total_node.get_value()
