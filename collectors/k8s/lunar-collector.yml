@@ -1,20 +1,23 @@
 version: 0
 
 name: k8s
-description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata. Enforces K8s best practices.
+description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata
 author: earthly
 
-image: +image
+default_image: earthly/lunar-lib:k8s-main
 
 landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
     Parse Kubernetes YAML manifests to extract workloads, containers, resource limits,
-    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. Enforces K8s best practices.
+    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers.
   categories: ["orchestration", "containers"]
   icon: "assets/k8s.svg"
   status: "stable"
   related:
+    - slug: "k8s"
+      type: "policy"
+      reason: "Enforces K8s best practices using this collector's data"
     - slug: "dockerfile"
       type: "collector"
       reason: "Collects container definitions that K8s workloads reference"
@@ -28,7 +31,6 @@ collectors:
       - Container specs with resource requests/limits and probes
       - PodDisruptionBudgets (PDBs)
       - HorizontalPodAutoscalers (HPAs)
-      - Summary flags for policy enforcement
     mainBash: main.sh
     hook:
       type: code
@@ -100,14 +102,7 @@ example_component_json: |
           "min_replicas": 3,
           "max_replicas": 10
         }
-      ],
-      "summary": {
-        "all_valid": true,
-        "all_have_resources": true,
-        "all_have_probes": true,
-        "all_non_root": true,
-        "all_have_pdb": true
-      }
+      ]
     }
   }
 

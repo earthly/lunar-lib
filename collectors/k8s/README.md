@@ -1,6 +1,6 @@
 # Kubernetes Collector
 
-Parses Kubernetes manifests and collects workload, PodDisruptionBudget, and HorizontalPodAutoscaler metadata. 
+Parses Kubernetes manifests and collects workload, PodDisruptionBudget, and HorizontalPodAutoscaler metadata.
 
 ## Overview
 
@@ -17,7 +17,6 @@ This collector writes to the following Component JSON paths:
 | `.k8s.workloads[]` | array | Workload resources with container specs |
 | `.k8s.pdbs[]` | array | PodDisruptionBudgets |
 | `.k8s.hpas[]` | array | HorizontalPodAutoscalers |
-| `.k8s.summary` | object | Aggregated boolean flags for policy checks |
 
 ## Collectors
 

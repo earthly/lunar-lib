@@ -13,7 +13,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | Policy | Description | Failure Meaning |
 |-----------|-------------|-----------------|
 | `valid` | Validates K8s manifest syntax | Manifest has YAML or schema errors |
-| `resources` | Checks CPU/memory requests and limits | Container missing resource specs |
+| `requests-and-limits` | Checks CPU/memory requests and limits | Container missing resource specs |
 | `probes` | Requires liveness and readiness probes | Container missing health probes |
 | `min-replicas` | Enforces minimum HPA replicas | HPA minReplicas below threshold |
 | `pdb` | Requires PodDisruptionBudgets | Deployment/StatefulSet missing PDB |
@@ -45,7 +45,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/k8s@v1.0.0
     on: [kubernetes]
     enforcement: report-pr
-    # include: [valid, resources, probes]  # Only run specific checks
+    # include: [valid, requests-and-limits, probes]  # Only run specific checks
     # with:
     #   min_replicas: "3"
     #   max_limit_to_request_ratio: "4"
@@ -130,7 +130,7 @@ A component missing resources, probes, and security configuration:
 When this policy fails, resolve it by:
 
 1. **For `valid` failures:** Fix YAML syntax errors or invalid K8s fields in the manifest
-2. **For `resources` failures:** Add `resources.requests` and `resources.limits` for CPU and memory
+2. **For `requests-and-limits` failures:** Add `resources.requests` and `resources.limits` for CPU and memory
 3. **For `probes` failures:** Add `livenessProbe` and `readinessProbe` to each container
 4. **For `min-replicas` failures:** Increase `spec.minReplicas` in your HPA to meet the threshold
 5. **For `pdb` failures:** Create a PodDisruptionBudget that selects your workload's pods

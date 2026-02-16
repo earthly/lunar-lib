@@ -79,7 +79,7 @@ def parse_mem_bytes(value) -> Optional[float]:
         return float(value)
 
     s = str(value).strip()
-    match = re.fullmatch(r"([0-9]*\.?[0-9]+)\s*([KMGTP]i|[KMGTPE])?B?", s)
+    match = re.fullmatch(r"([0-9]*\.?[0-9]+)\s*([KMGTPE]i|[KMGTPE])?B?", s)
     if not match:
         return None
 

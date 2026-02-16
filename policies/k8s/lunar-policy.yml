@@ -27,11 +27,11 @@ policies:
     mainPython: valid.py
     keywords: ["kubernetes", "manifest validation", "yaml", "kubeconform"]
 
-  - name: resources
+  - name: requests-and-limits
     description: |
       Ensures all containers have CPU and memory requests and limits defined.
       Missing resource specs can cause scheduling failures and noisy neighbor issues.
-    mainPython: resources.py
+    mainPython: requests_and_limits.py
     keywords: ["resources", "cpu limits", "memory limits", "requests", "qos"]
 
   - name: probes

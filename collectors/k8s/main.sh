@@ -1,5 +1,5 @@
 #!/bin/bash
-# Collects Kubernetes manifests and workload, PDB, and HPA metadata. Enforces K8s best practices.
+# Collects Kubernetes manifests and workload, PDB, and HPA metadata.
 set -e
 
 # Source helper function for helm template detection
@@ -187,21 +187,8 @@ results=$(eval "$FIND_CMD" 2>/dev/null | \
         hpas: [.[].hpas[] | select(. != null)]
     }')
 
-# Calculate summary
-summary=$(echo "$results" | jq '{
-    all_valid: ([.manifests[].valid] | all),
-    all_have_resources: ([.workloads[].containers[].has_resources] | if length == 0 then true else all end),
-    all_have_probes: ([.workloads[].containers[] | (.has_liveness_probe and .has_readiness_probe)] | if length == 0 then true else all end),
-    all_non_root: ([.workloads[].containers[].runs_as_non_root] | if length == 0 then true else all end),
-    all_have_pdb: (
-        [.workloads[] | "\(.namespace)/\(.name)"] as $workload_keys |
-        [.pdbs[] | "\(.namespace)/\(.target_workload)"] as $pdb_keys |
-        ($workload_keys | length == 0) or ($workload_keys | all(. as $w | $pdb_keys | contains([$w])))
-    )
-}')
-
-# Combine and collect
-echo "$results" | jq --argjson summary "$summary" '. + {summary: $summary}' | lunar collect -j ".k8s" -
+# Collect results
+echo "$results" | lunar collect -j ".k8s" -
 
 # Submit source metadata
 TOOL_VERSION=$(kubeconform -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")

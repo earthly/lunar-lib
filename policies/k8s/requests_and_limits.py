@@ -4,7 +4,7 @@ from helpers import parse_cpu_millicores, parse_mem_bytes
 
 def main(node=None):
     """Ensures all containers have CPU and memory requests and limits."""
-    c = Check("resources", "Containers should have CPU/memory requests and limits", node=node)
+    c = Check("requests-and-limits", "Containers should have CPU/memory requests and limits", node=node)
     with c:
         workloads = c.get_node(".k8s.workloads")
         if not workloads.exists():
