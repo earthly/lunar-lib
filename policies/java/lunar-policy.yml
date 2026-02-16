@@ -1,0 +1,69 @@
+version: 0
+
+name: java
+description: Enforces Java project structure and build tool standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Java Project Guardrails"
+  long_description: |
+    Enforce Java-specific project standards including build tool wrappers,
+    Java version requirements, Maven/Gradle version minimums, and test scope.
+  category: "devex-build-and-ci"
+  icon: "assets/java.svg"
+  status: "beta"
+  requires:
+    - slug: "java"
+      type: "collector"
+      reason: "Provides Java project metadata"
+  related: []
+
+policies:
+  - name: wrapper-exists
+    description: |
+      Ensures a build tool wrapper exists (mvnw for Maven projects, gradlew for
+      Gradle projects). Wrappers ensure reproducible builds without requiring
+      a pre-installed build tool.
+    mainPython: ./wrapper_exists.py
+    keywords: ["maven wrapper", "gradle wrapper", "mvnw", "gradlew", "reproducible builds"]
+
+  - name: min-java-version
+    description: |
+      Ensures the Java version configured in the build file meets the minimum
+      requirement. Checks pom.xml or build.gradle for the target Java version.
+    mainPython: ./min_java_version.py
+    keywords: ["java version", "compatibility", "security", "LTS"]
+
+  - name: min-maven-version
+    description: |
+      Ensures the Maven version used in CI/CD commands meets the minimum
+      requirement. Helps maintain build tool security and compatibility.
+    mainPython: ./min_maven_version.py
+    keywords: ["maven version", "ci/cd", "build tool", "compatibility"]
+
+  - name: min-gradle-version
+    description: |
+      Ensures the Gradle version used in CI/CD commands meets the minimum
+      requirement. Helps maintain build tool security and compatibility.
+    mainPython: ./min_gradle_version.py
+    keywords: ["gradle version", "ci/cd", "build tool", "compatibility"]
+
+  - name: tests-all-modules
+    description: |
+      Ensures tests run across all modules rather than a subset. Prevents
+      accidentally skipping tests in multi-module projects.
+    mainPython: ./tests_all_modules.py
+    keywords: ["java test", "test scope", "all modules", "multi-module"]
+
+inputs:
+  min_java_version:
+    description: Minimum required Java version (e.g., "17", "21")
+    default: "17"
+  min_maven_version:
+    description: Minimum required Maven version (e.g., "3.9.0")
+    default: "3.9.0"
+  min_gradle_version:
+    description: Minimum required Gradle version (e.g., "8.0.0")
+    default: "8.0.0"
