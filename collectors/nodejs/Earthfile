@@ -3,8 +3,16 @@ VERSION 0.8
 image:
     FROM --pass-args ../../+base-image
 
-    # Node.js is included in the base Alpine image via apk
-    RUN apk add --no-cache nodejs npm
+    # Install Node.js (download from official source for latest LTS)
+    ARG NODE_VERSION=22.14.0
+    ARG TARGETARCH
+    LET NODE_ARCH = "x64"
+    IF [ "$TARGETARCH" = "arm64" ]
+        SET NODE_ARCH = "arm64"
+    END
+    RUN wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" -O node.tar.gz && \
+        tar -xzf node.tar.gz -C /usr/local --strip-components=1 && \
+        rm node.tar.gz
 
     # Verify installation
     RUN node --version && npm --version
