@@ -99,21 +99,21 @@ jq -n \
     --arg monorepo_type "$monorepo_type" \
     '{
         build_systems: $build_systems,
-        native: {
+        native: ({
             package_json: { exists: $package_json_exists },
             package_lock: { exists: $package_lock_exists },
             yarn_lock: { exists: $yarn_lock_exists },
             pnpm_lock: { exists: $pnpm_lock_exists },
             tsconfig: { exists: $tsconfig_exists },
             eslint_configured: $eslint_configured,
-            prettier_configured: $prettier_configured
-        },
+            prettier_configured: $prettier_configured,
+            engines_node: (if $engines_node != "" then $engines_node else null end),
+            monorepo: (if $monorepo_type != "" then {type: $monorepo_type} else null end)
+        } | with_entries(select(.value != null))),
         source: {
             tool: "node",
             integration: "code"
         }
     }
-    * (if $version != "" then {version: $version} else {} end)
-    * (if $engines_node != "" then {native: {engines_node: $engines_node}} else {} end)
-    * (if $monorepo_type != "" then {native: {monorepo: {type: $monorepo_type}}} else {} end)
+    + (if $version != "" then {version: $version} else {} end)
     ' | lunar collect -j ".lang.nodejs" -
