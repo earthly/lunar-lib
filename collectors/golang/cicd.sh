@@ -15,8 +15,8 @@ fi
 version=$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "")
 
 if [[ -n "$version" ]]; then
-  # Escape quotes in command for JSON safety
-  CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/"/\\"/g')
+  # Escape backslashes first, then quotes, for valid JSON
+  CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
   # Write cicd command entry (no jq required)
   # Multiple go commands in same CI run will each append to the cmds array
