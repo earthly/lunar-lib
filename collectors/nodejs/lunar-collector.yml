@@ -4,7 +4,7 @@ name: nodejs
 description: Collect Node.js project information, CI/CD commands, test coverage, and dependencies
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:nodejs-main
 default_image_ci_collectors: native
 
 landing_page:
