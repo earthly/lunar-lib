@@ -35,8 +35,12 @@ echo "maven-cicd: MVN_CMD=$MVN_CMD" >&2
 # Get Maven version (best effort, multiple methods)
 version=""
 
-# Method 1: Extract from installation path
-if [[ -n "$MVN_CMD" ]] && [[ "$MVN_CMD" =~ /maven/([0-9]+\.[0-9]+\.[0-9]+)/ ]]; then
+# Method 1: Extract from installation path (matches /maven/3.9.6/ or /apache-maven-3.9.6/)
+if [[ -n "$MVN_CMD" ]] && [[ "$MVN_CMD" =~ maven[-/]([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    version="${BASH_REMATCH[1]}"
+fi
+# Also try extracting from CMD_STR (the CI command may contain the full path)
+if [[ -z "$version" ]] && [[ "$CMD_STR" =~ maven[-/]([0-9]+\.[0-9]+\.[0-9]+) ]]; then
     version="${BASH_REMATCH[1]}"
 fi
 
