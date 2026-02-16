@@ -1,0 +1,13 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Node.js is included in the base Alpine image via apk
+    RUN apk add --no-cache nodejs npm
+
+    # Verify installation
+    RUN node --version && npm --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:nodejs-$VERSION
