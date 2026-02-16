@@ -10,10 +10,10 @@ def main(node=None):
         max_days_str = variable_or_default("max_days", "90")
         try:
             max_days = int(max_days_str)
-        except ValueError:
+        except ValueError as err:
             raise ValueError(
                 f"Policy misconfiguration: 'max_days' must be an integer, got '{max_days_str}'"
-            )
+            ) from err
 
         # Get feature flags from the collected data
         feature_flags_node = c.get_node(".code_patterns.feature_flags")

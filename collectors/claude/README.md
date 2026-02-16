@@ -38,7 +38,7 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: ["domain:your-domain"]
     with:
-      path: ".claude.feature_flags"
+      path: ".code_patterns.feature_flags"
       prompt: "Find all feature flags in this repository and return them as a list"
 ```
 
@@ -51,7 +51,7 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
     on: [backend]
     with:
-      path: ".claude.graceful_shutdown"
+      path: ".code_patterns.lifecycle"
       prompt: "Analyze this codebase for graceful shutdown handling. Check if SIGTERM signals are properly handled."
       json_schema: |
         {
