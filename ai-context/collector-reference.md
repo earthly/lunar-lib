@@ -438,59 +438,18 @@ lunar collect -j ".builds" '[{"image": "app2"}]'
 
 ## Installing Dependencies
 
-Collectors can install dependencies via `install.sh`:
+**Prefer containers.** Non-CI collectors should bake dependencies into a Docker image via `default_image` (see [Container Images](#container-images)). This eliminates installation concerns entirely.
 
-### Basic install.sh
+For native CI collectors, prefer tools already present in CI environments (`curl`, `git`, `bash` builtins) and avoid installing binaries when possible. When a specialized tool is genuinely required, provide a minimal `install.sh`:
 
 ```bash
 #!/bin/bash
 set -e
-
-# Download and install a binary
 curl -L "https://example.com/tool.tar.gz" | tar xz
 mv tool "$LUNAR_BIN_DIR/"
 ```
 
-### Platform-Specific Installation
-
-Use platform-specific scripts for cross-platform support:
-
-```
-my-collector/
-├── install.sh              # Fallback
-├── install-linux.sh        # Linux (any arch)
-├── install-linux-amd64.sh  # Linux x86_64
-├── install-linux-arm64.sh  # Linux ARM64
-├── install-darwin.sh       # macOS (any arch)
-└── install-darwin-arm64.sh # macOS ARM64 (Apple Silicon)
-```
-
-**Resolution order:** `install-<os>-<arch>.sh` → `install-<os>.sh` → `install.sh`
-
-### Example: Cross-Platform Binary Installation
-
-```bash
-#!/bin/bash
-set -e
-
-OS=$(uname -s)
-ARCH=$(uname -m)
-
-case "$OS" in
-  Linux)  PLATFORM="linux" ;;
-  Darwin) PLATFORM="darwin" ;;
-  *)      echo "Unsupported OS: $OS"; exit 1 ;;
-esac
-
-case "$ARCH" in
-  x86_64)       ARCHITECTURE="amd64" ;;
-  arm64|aarch64) ARCHITECTURE="arm64" ;;
-  *)            echo "Unsupported arch: $ARCH"; exit 1 ;;
-esac
-
-curl -L "https://example.com/tool-${PLATFORM}-${ARCHITECTURE}.tar.gz" | tar xz
-mv tool "$LUNAR_BIN_DIR/"
-```
+Platform-specific variants are supported: `install-<os>-<arch>.sh` → `install-<os>.sh` → `install.sh`.
 
 ## File Inclusion Configuration
 
@@ -513,23 +472,30 @@ inputs:
 - Exclude paths: `find . -type f -name '*.yaml' ! -path './vendor/*'`
 - Use alternative tools: `git ls-files '*.yaml'` (respects .gitignore)
 
-### Pattern B: Single File with Multiple Possible Names (ordered path list)
+### Pattern B: Single Item with Multiple Candidate Paths (ordered path list)
 
-When a collector expects exactly one file but it may have different possible names (e.g., README.md, README.txt, readme.md), expose a comma-separated list of candidate paths. The collector tries each path in order and uses the first one found.
+When a collector expects exactly one file or directory but it may exist at different paths, expose a comma-separated list of candidate paths. The collector tries each path in order and uses the first one found.
 
 **lunar-collector.yml:**
 ```yaml
 inputs:
+  # For a file with multiple possible names
   paths:
     description: Comma-separated list of paths to try (first match wins)
     default: "README.md,README.txt,README,readme.md,readme.txt"
+
+  # For a directory with multiple possible locations
+  plans_dir_paths:
+    description: Comma-separated list of candidate directory paths (first match wins)
+    default: ".agents/plans,.ai/plans"
 ```
 
 **Why ordered paths?** This pattern:
-- Supports naming conventions (README.md vs README.rst)
+- Supports naming conventions (README.md vs README.rst, `.agents/plans` vs `.ai/plans`)
 - Allows priority (prefer README.md over readme.txt)
 - Handles case sensitivity differences across filesystems
-- Is simpler than a find command for the single-file case
+- Is simpler than a find command for the single-item case
+- Works for both files and directories
 
 ### Choosing Between Patterns
 
@@ -538,9 +504,11 @@ inputs:
 | All Dockerfiles in repo | find command | `find_command` |
 | All K8s manifests | find command | `find_command` |
 | All Terraform files | find command | `find_command` |
+| All AGENTS.md/CLAUDE.md files | find command | `find_command` |
 | The README file | ordered paths | `paths` |
 | The CODEOWNERS file | ordered paths | `paths` |
 | Main config file | ordered paths | `paths` |
+| Plans directory | ordered paths | `paths` |
 
 ## Common Patterns
 
@@ -950,11 +918,37 @@ One collector should collect one type of data. Create separate collectors for di
 
 ### 6. Test Locally
 
-Use `lunar collect --component <id>` to test collectors locally:
+Use `lunar collector dev` to test collectors in development mode. Run from your config directory (where `lunar-config.yml` lives).
 
 ```bash
-LUNAR_COMPONENT_ID="github.com/acme/api" ./main.sh
+# Run all subcollectors in a plugin against a local repo
+lunar collector dev <plugin-name> --component-dir <path> --verbose
+
+# Run a specific subcollector
+lunar collector dev <plugin-name>.<subcollector> --component-dir <path> --verbose
+
+# Run against a remote component (fetches from GitHub)
+lunar collector dev <plugin-name> --component github.com/org/repo --verbose
+
+# Test CI hooks by simulating a CI command
+lunar collector dev <plugin-name> --component-dir <path> --fake-ci-cmd "go test ./..."
+
+# Pipe output into a policy for end-to-end testing
+lunar collector dev <plugin-name> --component-dir <path> | \
+  lunar policy dev <policy-name> --component-json - --verbose
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--component-dir <path>` | Local repo directory (mutually exclusive with `--component`) |
+| `--component <id>` | Remote component (e.g. `github.com/org/repo`) |
+| `--verbose` | Show detailed execution output |
+| `--fake-ci-cmd <cmd>` | Simulate a CI command for testing CI hooks |
+| `--pr <num>` | Simulate PR context |
+| `--git-sha <sha>` | Run against a specific commit |
+| `--merge` | Merge all diffs into a single JSON blob (default: true) |
+
+**Note:** The name argument uses prefix matching — `my-plugin` runs all subcollectors named `my-plugin.*`.
 
 ### 7. Document Component JSON Schema
 

@@ -111,6 +111,17 @@ This table lists important sub-objects within each category. For full details, s
 | `.code_patterns.health` | Health check impl (`endpoint_implemented`, `dependency_checks`) |
 | `.code_patterns.config` | Config patterns (`env_vars[]`, `missing_defaults`) |
 | `.code_patterns.testing` | Test quality (`tests_without_assertions`, `empty_catch_blocks`) |
+| **[`.ai_use`](cat-ai-use.md)** | **AI coding assistant usage (instruction files, CI tools, authorship)** |
+| `.ai_use.instructions.root` | Root instruction file info (`exists`, `filename`, `lines`, `bytes`, `sections[]`) |
+| `.ai_use.instructions.all[]` | All instruction files (`path`, `dir`, `filename`, `lines`, `bytes`, `sections[]`, `is_symlink`) |
+| `.ai_use.instructions.count` | Total instruction files found |
+| `.ai_use.instructions.total_bytes` | Combined size of non-symlink files (context window budget) |
+| `.ai_use.instructions.directories[]` | Per-directory view (`dir`, `files[]` with symlink status) |
+| `.ai_use.plans_dir` | Plans directory info (`exists`, `path`, `file_count`) |
+| `.ai_use.cicd.cmds[]` | AI CLI invocations in CI (`cmd`, `tool`, `version`, plus tool-specific config flags) |
+| `.ai_use.authorship` | AI authorship annotations (`provider`, `total_commits`, `annotated_commits`) |
+| `.ai_use.authorship.git_ai` | Git AI notes data (`notes_ref_exists`, `commits_with_notes`) |
+| `.ai_use.authorship.trailers` | Git trailer data (per-commit `sha`, `model`, `tokens`, `has_annotation`) |
 | **`.lang.<language>`** | **Language-specific data (Go, Rust, Java, etc.)** — see [Language-Specific Data](conventions.md#language-specific-data) |
 | `.lang.<language>.version` | Language/runtime version (e.g., `"17"` for Java, `"1.21"` for Go) |
 | `.lang.<language>.build_systems` | Build tools array (`["maven"]`, `["gradle", "maven"]`, `["go"]`) |
@@ -150,4 +161,5 @@ Each category has its own detailed documentation:
 - [`.compliance`](cat-compliance.md) — Compliance regime data
 - [`.api`](cat-api.md) — API specifications and documentation
 - [`.code_patterns`](cat-code-patterns.md) — AST-based code pattern analysis
+- [`.ai_use`](cat-ai-use.md) — AI coding assistant usage (instruction files, CI tools, authorship)
 
