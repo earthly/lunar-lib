@@ -19,7 +19,11 @@ with open("pyproject.toml", "rb") as f:
 # Check [project.dependencies] (PEP 621)
 project_deps = data.get("project", {}).get("dependencies", [])
 for dep in project_deps:
-    m = re.match(r"^([A-Za-z0-9_.-]+)\s*(?:[><=!~]+\s*(.+?))?(?:;.*)?$", dep.strip())
+    m = re.match(
+        r"^([A-Za-z0-9_.-]+)(?:\[[^\]]+\])?\s*(?:@[^;]+)?\s*"
+        r"(?:[><=!~]+\s*(.+?))?(?:;.*)?$",
+        dep.strip(),
+    )
     if m:
         name = m.group(1)
         version = m.group(2) or ""
