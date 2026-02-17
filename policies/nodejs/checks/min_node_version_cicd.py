@@ -1,4 +1,11 @@
+"""Check that Node.js version used in CI/CD meets minimum requirement."""
 from lunar_policy import Check, variable_or_default
+
+
+def parse_major(v):
+    """Extract major version number from a version string."""
+    s = str(v).strip().lstrip("vV")
+    return int(s.split(".")[0])
 
 
 def check_min_node_version_cicd(min_version=None, node=None):
@@ -17,11 +24,6 @@ def check_min_node_version_cicd(min_version=None, node=None):
             c.skip("No CI/CD Node.js commands recorded")
 
         cmds = cmds_node.get_value()
-
-        def parse_major(v):
-            """Extract major version number from a version string."""
-            s = str(v).strip().lstrip("vV")
-            return int(s.split(".")[0])
 
         try:
             min_major = parse_major(min_version)
