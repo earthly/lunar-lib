@@ -27,9 +27,14 @@ collectors:
       The presence of this object signals that codecov was executed. Also captures
       the Codecov CLI version when available via the codecov --version command.
     mainBash: ran.sh
-    hook:
-      type: ci-after-command
-      pattern: codecov(cli)?|bash.*codecov
+    hooks:
+      - type: ci-after-command
+        binary:
+          name_pattern: ^codecov(cli)?$
+      - type: ci-after-command
+        binary:
+          name: bash
+        args_pattern: codecov\.io/bash
     keywords: ["codecov", "coverage detection", "ci integration"]
 
   - name: results
@@ -39,9 +44,14 @@ collectors:
       calls the Codecov API with the commit SHA, and writes coverage percentage to
       .testing.coverage.percentage with full API response in .testing.coverage.native.codecov.
     mainBash: results.sh
-    hook:
-      type: ci-after-command
-      pattern: codecov(cli)?|bash.*codecov
+    hooks:
+      - type: ci-after-command
+        binary:
+          name_pattern: ^codecov(cli)?$
+      - type: ci-after-command
+        binary:
+          name: bash
+        args_pattern: codecov\.io/bash
     keywords: ["code coverage", "coverage percentage", "codecov api", "test coverage"]
 
 inputs:

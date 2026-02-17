@@ -29,7 +29,8 @@ collectors:
     mainBash: cicd.sh
     hook:
       type: ci-before-command
-      pattern: .*\bgo\b .*
+      binary:
+        name: go
     keywords: ["go ci", "go version", "ci commands", "build tracking"]
 
   - name: test-scope
@@ -40,7 +41,10 @@ collectors:
     mainBash: test-scope.sh
     hook:
       type: ci-before-command
-      pattern: .*\bgo\b test.*
+      binary:
+        name: go
+      args:
+        - value: test
     keywords: ["go test", "test scope", "recursive tests", "package tests"]
 
   - name: test-coverage
@@ -51,7 +55,12 @@ collectors:
     mainBash: test-coverage.sh
     hook:
       type: ci-after-command
-      pattern: .*\bgo\b test.*-coverprofile.*
+      binary:
+        name: go
+      args:
+        - value: test
+        - flag: -coverprofile
+          value_pattern: .*
     keywords: ["code coverage", "go test coverage", "coverprofile", "coverage metrics"]
 
   - name: project
