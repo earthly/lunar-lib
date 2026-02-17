@@ -8,7 +8,6 @@ def main(node=None):
         manifests = c.get_node(".k8s.manifests")
         if not manifests.exists():
             c.skip("No Kubernetes manifests found in this repository")
-            return c
 
         for manifest in manifests:
             path = manifest.get_value_or_default(".path", "<unknown>")

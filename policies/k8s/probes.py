@@ -8,7 +8,6 @@ def main(node=None):
         workloads = c.get_node(".k8s.workloads")
         if not workloads.exists():
             c.skip("No Kubernetes workloads found in this repository")
-            return c
 
         for workload in workloads:
             kind = workload.get_value_or_default(".kind", "")

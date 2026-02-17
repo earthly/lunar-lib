@@ -8,7 +8,6 @@ def main(node=None):
         hpas = c.get_node(".k8s.hpas")
         if not hpas.exists():
             c.skip("No HorizontalPodAutoscalers found in this repository")
-            return c
 
         try:
             min_required = int(variable_or_default("min_replicas", "3"))

@@ -9,7 +9,6 @@ def main(node=None):
         workloads = c.get_node(".k8s.workloads")
         if not workloads.exists():
             c.skip("No Kubernetes workloads found in this repository")
-            return c
 
         try:
             max_ratio = float(variable_or_default("max_limit_to_request_ratio", "4"))
