@@ -36,11 +36,12 @@ def check_coverage_reported(node=None):
             ".testing.coverage",
             "Coverage data not collected. Configure a coverage tool to run in your CI pipeline."
         )
-        # Then check that percentage is reported
-        c.assert_exists(
-            ".testing.coverage.percentage",
-            "Coverage percentage not reported. Ensure your coverage tool is configured to report metrics."
-        )
+        # Only check percentage if coverage data exists (avoid error when parent path is missing)
+        if c.get_node(".testing.coverage").exists():
+            c.assert_exists(
+                ".testing.coverage.percentage",
+                "Coverage percentage not reported. Ensure your coverage tool is configured to report metrics."
+            )
     return c
 
 
