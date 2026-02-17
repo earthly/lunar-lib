@@ -1,0 +1,72 @@
+version: 0
+
+name: k8s
+description: Kubernetes configuration and resource policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Kubernetes Guardrails"
+  long_description: |
+    Enforce Kubernetes best practices including manifest validation, resource limits,
+    probes, PodDisruptionBudgets, and HPA configurations for production readiness.
+  category: "deployment-and-infrastructure"
+  icon: "assets/k8s.svg"
+  status: "stable"
+  requires:
+    - slug: "k8s"
+      type: "collector"
+      reason: "Provides parsed K8s manifest data that these policies evaluate"
+
+policies:
+  - name: valid
+    description: |
+      Validates that all Kubernetes manifests in the repository are syntactically correct
+      and conform to K8s schema. Invalid manifests will fail deployment.
+    mainPython: valid.py
+    keywords: ["kubernetes", "manifest validation", "yaml", "kubeconform"]
+
+  - name: requests-and-limits
+    description: |
+      Ensures all containers have CPU and memory requests and limits defined.
+      Missing resource specs can cause scheduling failures and noisy neighbor issues.
+    mainPython: requests_and_limits.py
+    keywords: ["resources", "cpu limits", "memory limits", "requests", "qos"]
+
+  - name: probes
+    description: |
+      Requires liveness and readiness probes on all containers.
+      Probes enable Kubernetes to detect unhealthy pods and route traffic correctly.
+    mainPython: probes.py
+    keywords: ["liveness probe", "readiness probe", "health checks", "pod health"]
+
+  - name: min-replicas
+    description: |
+      Enforces minimum replica counts on HorizontalPodAutoscalers.
+      Ensures services maintain capacity during scaling events and failures.
+    mainPython: min_replicas.py
+    keywords: ["hpa", "replicas", "high availability", "autoscaling"]
+
+  - name: pdb
+    description: |
+      Requires PodDisruptionBudgets for Deployments and StatefulSets.
+      PDBs protect availability during voluntary disruptions like node drains.
+    mainPython: pdb.py
+    keywords: ["pdb", "pod disruption budget", "availability", "node drain"]
+
+  - name: non-root
+    description: |
+      Requires containers to run as non-root users via securityContext.
+      Running as root inside containers violates least privilege principles.
+    mainPython: non_root.py
+    keywords: ["security context", "non-root", "runAsNonRoot", "least privilege"]
+
+inputs:
+  min_replicas:
+    description: Minimum replicas required for HPAs (default 3)
+    default: "3"
+  max_limit_to_request_ratio:
+    description: Maximum ratio of limits to requests for CPU/memory (default 4)
+    default: "4"
+
