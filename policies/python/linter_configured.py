@@ -9,11 +9,13 @@ def check_linter_configured(node=None):
         if not python.exists():
             c.skip("Not a Python project")
 
-        linter_node = python.get_node(".native.linter")
-        if not linter_node.exists():
-            c.skip("Linter data not available - ensure python collector has run")
+        native = python.get_node(".native")
+        if not native.exists():
+            c.skip("Python project data not available - ensure python collector has run")
 
-        linter = linter_node.get_value()
+        # linter is null when no linter detected, string when detected
+        linter_node = native.get_node(".linter")
+        linter = linter_node.get_value() if linter_node.exists() else None
         c.assert_true(
             linter is not None and linter != "",
             "No Python linter configured. Set up one of:\n"
