@@ -41,7 +41,8 @@ collectors:
     mainBash: ci.sh
     hook:
       type: ci-after-command
-      pattern: .*\bsyft\b.*
+      binary:
+        name: syft
     keywords: ["sbom", "syft", "ci detection", "cyclonedx", "spdx"]
 
 example_component_json: |

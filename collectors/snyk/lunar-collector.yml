@@ -52,7 +52,8 @@ collectors:
     mainBash: cli.sh
     hook:
       type: ci-after-command
-      pattern: .*\bsnyk\b.*
+      binary:
+        name: snyk
     keywords: ["snyk cli", "ci integration", "security scanning"]
 
 secrets:
