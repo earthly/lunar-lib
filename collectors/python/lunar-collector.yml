@@ -19,6 +19,9 @@ landing_page:
     - slug: "python"
       type: "policy"
       reason: "Python project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
 
 collectors:
   - name: cicd
@@ -29,7 +32,8 @@ collectors:
     mainBash: cicd.sh
     hook:
       type: ci-before-command
-      pattern: .*\b(python|python3|pip|pip3|poetry|pipenv|uv)\b.*
+      binary:
+        name_pattern: ^(python3?|pip3?|poetry|pipenv|uv)$
     keywords: ["python ci", "pip", "poetry", "ci commands", "build tracking"]
 
   - name: test-coverage
@@ -40,7 +44,8 @@ collectors:
     mainBash: test-coverage.sh
     hook:
       type: ci-after-command
-      pattern: .*\b(pytest|python.*-m.*pytest|python.*test)\b.*
+      binary:
+        name_pattern: ^(pytest|python3?)$
     keywords: ["pytest", "coverage", "test coverage", "coverage.xml"]
 
   - name: project
@@ -99,5 +104,12 @@ example_component_json: |
           "source": { "tool": "pip", "integration": "code" }
         }
       }
+    },
+    "testing": {
+      "coverage": {
+        "percentage": 85.5,
+        "source": { "tool": "coverage", "integration": "ci" }
+      },
+      "source": { "tool": "pytest", "integration": "ci" }
     }
   }

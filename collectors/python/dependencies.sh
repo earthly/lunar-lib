@@ -14,46 +14,7 @@ source_tool="pip"
 
 # Try pyproject.toml first (richer metadata)
 if [[ -f "pyproject.toml" ]]; then
-    # Use Python's tomllib to parse dependencies from pyproject.toml
-    pyproject_deps=$(python3 -c '
-import sys
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        sys.exit(0)
-
-with open("pyproject.toml", "rb") as f:
-    data = tomllib.load(f)
-
-# Check [project.dependencies]
-project_deps = data.get("project", {}).get("dependencies", [])
-for dep in project_deps:
-    # Parse PEP 508 dependency specifier: "name>=version" or "name==version" etc.
-    import re
-    m = re.match(r"^([A-Za-z0-9_.-]+)\s*(?:[><=!~]+\s*(.+?))?(?:;.*)?$", dep.strip())
-    if m:
-        name = m.group(1)
-        version = m.group(2) or ""
-        # Clean trailing specifiers (e.g. ">=3.0,<4" -> "3.0")
-        version = version.split(",")[0].strip() if version else ""
-        print(f"{name}=={version}" if version else name)
-
-# Check [tool.poetry.dependencies]
-poetry_deps = data.get("tool", {}).get("poetry", {}).get("dependencies", {})
-if poetry_deps and not project_deps:
-    for name, spec in poetry_deps.items():
-        if name.lower() == "python":
-            continue
-        version = ""
-        if isinstance(spec, str):
-            version = spec.lstrip("^~>=<!")
-        elif isinstance(spec, dict):
-            version = spec.get("version", "").lstrip("^~>=<!")
-        print(f"{name}=={version}" if version else name)
-' 2>/dev/null || true)
+    pyproject_deps=$(python3 "$(dirname "$0")/parse_pyproject.py" 2>/dev/null || true)
 
     if [[ -n "$pyproject_deps" ]]; then
         # Check if it's a poetry project
