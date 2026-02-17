@@ -25,9 +25,13 @@ This policy reads from the following Component JSON paths:
 | `.container_scan` | object | Any container scanner collector (Trivy, Grype, etc.) |
 | `.container_scan.vulnerabilities.critical` | number | Container scanner collector |
 | `.container_scan.vulnerabilities.high` | number | Container scanner collector |
+| `.container_scan.vulnerabilities.medium` | number | Container scanner collector |
+| `.container_scan.vulnerabilities.low` | number | Container scanner collector |
 | `.container_scan.vulnerabilities.total` | number | Container scanner collector |
 | `.container_scan.summary.has_critical` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_high` | boolean | Container scanner collector (preferred) |
+| `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
+| `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 

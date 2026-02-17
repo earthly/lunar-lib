@@ -25,9 +25,13 @@ This policy reads from the following Component JSON paths:
 | `.sast` | object | Any SAST collector (Semgrep, CodeQL, etc.) |
 | `.sast.findings.critical` | number | SAST collector |
 | `.sast.findings.high` | number | SAST collector |
+| `.sast.findings.medium` | number | SAST collector |
+| `.sast.findings.low` | number | SAST collector |
 | `.sast.findings.total` | number | SAST collector |
 | `.sast.summary.has_critical` | boolean | SAST collector (preferred) |
 | `.sast.summary.has_high` | boolean | SAST collector (preferred) |
+| `.sast.summary.has_medium` | boolean | SAST collector (preferred) |
+| `.sast.summary.has_low` | boolean | SAST collector (preferred) |
 
 **Note:** If collectors don't yet write finding counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 

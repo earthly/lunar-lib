@@ -25,9 +25,13 @@ This policy reads from the following Component JSON paths:
 | `.iac_scan` | object | Any IaC scanner collector (Checkov, tfsec, etc.) |
 | `.iac_scan.findings.critical` | number | IaC scanner collector |
 | `.iac_scan.findings.high` | number | IaC scanner collector |
+| `.iac_scan.findings.medium` | number | IaC scanner collector |
+| `.iac_scan.findings.low` | number | IaC scanner collector |
 | `.iac_scan.findings.total` | number | IaC scanner collector |
 | `.iac_scan.summary.has_critical` | boolean | IaC scanner collector (preferred) |
 | `.iac_scan.summary.has_high` | boolean | IaC scanner collector (preferred) |
+| `.iac_scan.summary.has_medium` | boolean | IaC scanner collector (preferred) |
+| `.iac_scan.summary.has_low` | boolean | IaC scanner collector (preferred) |
 
 **Note:** If collectors don't yet write finding counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 

@@ -25,9 +25,13 @@ This policy reads from the following Component JSON paths:
 | `.sca` | object | Any SCA collector (Snyk, Semgrep, etc.) |
 | `.sca.vulnerabilities.critical` | number | SCA collector |
 | `.sca.vulnerabilities.high` | number | SCA collector |
+| `.sca.vulnerabilities.medium` | number | SCA collector |
+| `.sca.vulnerabilities.low` | number | SCA collector |
 | `.sca.vulnerabilities.total` | number | SCA collector |
 | `.sca.summary.has_critical` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_high` | boolean | SCA collector (preferred) |
+| `.sca.summary.has_medium` | boolean | SCA collector (preferred) |
+| `.sca.summary.has_low` | boolean | SCA collector (preferred) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
