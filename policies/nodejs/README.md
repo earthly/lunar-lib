@@ -10,13 +10,13 @@ This policy validates Node.js projects against best practices for package manage
 
 This plugin provides the following policies (use `include` to select a subset):
 
-| Policy | Description | Failure Meaning |
-|--------|-------------|-----------------|
-| `lockfile-exists` | Validates a lockfile exists | No package-lock.json, yarn.lock, or pnpm-lock.yaml |
-| `typescript-configured` | Validates tsconfig.json exists | TypeScript not configured |
-| `engines-pinned` | Ensures engines.node is set in package.json | Node.js version not pinned |
-| `min-node-version` | Ensures minimum Node.js version | Node.js version too old |
-| `min-node-version-cicd` | Ensures minimum Node.js version in CI/CD | CI/CD Node.js version too old |
+| Policy | Description |
+|--------|-------------|
+| `lockfile-exists` | Validates a lockfile exists (package-lock.json, yarn.lock, or pnpm-lock.yaml) |
+| `typescript-configured` | Validates tsconfig.json exists |
+| `engines-pinned` | Ensures engines.node is set in package.json |
+| `min-node-version` | Ensures minimum Node.js version |
+| `min-node-version-cicd` | Ensures minimum Node.js version in CI/CD |
 
 ## Required Data
 
@@ -32,6 +32,8 @@ This policy reads from the following Component JSON paths:
 | `.lang.nodejs.native.engines_node` | string | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
 | `.lang.nodejs.version` | string | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
 | `.lang.nodejs.cicd.cmds` | array | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+
+**Note:** Ensure the corresponding collector(s) are configured before enabling this policy.
 
 ## Installation
 
@@ -93,23 +95,10 @@ policies:
 
 ## Remediation
 
-### lockfile-exists
-1. Run `npm install`, `yarn install`, or `pnpm install` to generate a lockfile
-2. Commit the lockfile to version control
+When this policy fails, you can resolve it by:
 
-### typescript-configured
-1. Run `npx tsc --init` to generate a tsconfig.json
-2. Configure compiler options for your project
-
-### engines-pinned
-1. Add an `engines` field to your package.json: `"engines": { "node": ">=18" }`
-2. This communicates the required Node.js version to all developers and CI systems
-
-### min-node-version
-1. Update your project's Node.js version to meet the minimum
-2. Update `.nvmrc`, `.node-version`, or `engines.node` accordingly
-
-### min-node-version-cicd
-1. Update your CI/CD pipeline to use a newer Node.js version
-2. For GitHub Actions: update `node-version` in your workflow
-3. For Docker-based builds: update your base Node image version
+1. **lockfile-exists**: Run `npm install`, `yarn install`, or `pnpm install` to generate a lockfile and commit it to version control.
+2. **typescript-configured**: Run `npx tsc --init` to generate a tsconfig.json and configure compiler options.
+3. **engines-pinned**: Add `"engines": { "node": ">=18" }` to package.json to communicate the required version.
+4. **min-node-version**: Update your project's Node.js version and `.nvmrc`, `.node-version`, or `engines.node`.
+5. **min-node-version-cicd**: Update your CI/CD pipeline (GitHub Actions `node-version` or Docker base image).
