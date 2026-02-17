@@ -39,7 +39,7 @@ process_file() {
     content="$(cat "$f")"
     
     # Skip files that don't look like K8s manifests: require top-level .apiVersion and .kind
-    if ! yq -e -s 'map(select(.apiVersion and .kind)) | length > 0' "$f" >/dev/null 2>&1; then
+    if ! yq -e 'select(.apiVersion and .kind)' "$f" >/dev/null 2>&1; then
         return 0
     fi
     
@@ -58,8 +58,9 @@ process_file() {
         validation_error="$validation_output"
     fi
     
-    # Parse YAML to JSON (handle multi-document YAML)
-    docs=$(echo "$content" | yq -o=json -s '.' 2>/dev/null || echo '[]')
+    # Parse YAML to JSON array (handle multi-document YAML)
+    # yq outputs one JSON doc per YAML doc; jq -s slurps them into an array
+    docs=$(echo "$content" | yq -o=json '.' 2>/dev/null | jq -s '.' || echo '[]')
     
     # Extract resources from the file
     resources=$(echo "$docs" | jq '[.[] | select(.kind != null) | {kind: .kind, name: .metadata.name, namespace: (.metadata.namespace // "default")}]')
