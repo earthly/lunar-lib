@@ -41,8 +41,12 @@ if props_elem is not None:
         properties[tag] = (child.text or "").strip()
 
 deps = []
-# Only scan direct <dependencies> block, skip dependencyManagement and plugin deps
+# Prefer direct <dependencies> block; fall back to <dependencyManagement> for parent POMs
 deps_elem = root.find(f"./{prefix}dependencies", ns)
+if deps_elem is None:
+    dm = root.find(f"./{prefix}dependencyManagement", ns)
+    if dm is not None:
+        deps_elem = dm.find(f"./{prefix}dependencies", ns)
 dep_list = deps_elem.findall(f"{prefix}dependency", ns) if deps_elem is not None else []
 for dep in dep_list:
     group = dep.findtext(f"{prefix}groupId", default="", namespaces=ns)
