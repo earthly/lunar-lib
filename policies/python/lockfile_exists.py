@@ -27,10 +27,11 @@ def check_lockfile_exists(node=None):
         req_txt = native.get_node(".requirements_txt.exists")
         if req_txt.exists() and req_txt.get_value():
             deps_node = python.get_node(".dependencies.direct")
-            if deps_node.exists():
-                deps = deps_node.get_value()
-                if deps and all(d.get("version") for d in deps):
-                    return c
+            if not deps_node.exists():
+                c.skip("Dependency data not available - ensure python dependencies collector has run")
+            deps = deps_node.get_value()
+            if deps and all(d.get("version") for d in deps):
+                return c
 
         c.fail(
             "No dependency lockfile found. Use one of:\n"

@@ -104,7 +104,7 @@ jq -n \
     --arg linter "$linter" \
     --arg type_checker "$type_checker" \
     '{
-        version: ($version | select(. != "")),
+        version: $version,
         build_systems: $build_systems,
         native: {
             pyproject: { exists: $pyproject },
@@ -121,4 +121,4 @@ jq -n \
             tool: "python",
             integration: "code"
         }
-    }' | lunar collect -j ".lang.python" -
+    } | if .version == "" then del(.version) else . end' | lunar collect -j ".lang.python" -

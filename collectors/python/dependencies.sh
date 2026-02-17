@@ -69,7 +69,8 @@ if poetry_deps and not project_deps:
                 version="${line#*==}"
             fi
             deps+=("$(jq -n --arg path "$name" --arg version "$version" \
-                '{path: $path, version: ($version | select(. != "")), indirect: false}')")
+                'if $version != "" then {path: $path, version: $version, indirect: false}
+                 else {path: $path, indirect: false} end')")
         done <<< "$pyproject_deps"
     fi
 fi
@@ -95,7 +96,8 @@ if [[ ${#deps[@]} -eq 0 ]] && [[ -f "requirements.txt" ]]; then
             version="${version%%,*}"
         fi
         deps+=("$(jq -n --arg path "$name" --arg version "$version" \
-            '{path: $path, version: ($version | select(. != "")), indirect: false}')")
+            'if $version != "" then {path: $path, version: $version, indirect: false}
+             else {path: $path, indirect: false} end')")
     done < requirements.txt
 fi
 
@@ -116,10 +118,11 @@ if [[ ${#deps[@]} -eq 0 ]] && [[ -f "Pipfile" ]]; then
         if [[ "$in_packages" == true ]] && [[ -n "$line" ]]; then
             name=$(echo "$line" | cut -d= -f1 | tr -d '[:space:]')
             [[ -z "$name" ]] && continue
-            version=$(echo "$line" | grep -oP '"\K[^"]+' | head -1 || echo "")
+            version=$(echo "$line" | sed -n 's/.*"\([^"]*\)".*/\1/p' | head -1)
             [[ "$version" == "*" ]] && version=""
             deps+=("$(jq -n --arg path "$name" --arg version "$version" \
-                '{path: $path, version: ($version | select(. != "")), indirect: false}')")
+                'if $version != "" then {path: $path, version: $version, indirect: false}
+                 else {path: $path, indirect: false} end')")
         fi
     done < Pipfile
 fi

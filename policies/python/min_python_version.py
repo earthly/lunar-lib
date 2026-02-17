@@ -26,8 +26,13 @@ def check_min_python_version(min_version=None, node=None):
             actual = parse_version(actual_version)
             minimum = parse_version(min_version)
 
+            # Pad to same length for correct comparison
+            cmp_len = max(len(actual), len(minimum))
+            actual_padded = actual + (0,) * (cmp_len - len(actual))
+            minimum_padded = minimum + (0,) * (cmp_len - len(minimum))
+
             c.assert_true(
-                actual[:len(minimum)] >= minimum,
+                actual_padded >= minimum_padded,
                 f"Python version {actual_version} is below minimum {min_version}. "
                 f"Update to Python {min_version} or higher."
             )

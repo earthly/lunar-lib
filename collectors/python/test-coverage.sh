@@ -22,7 +22,7 @@ if [[ ! -f "$COVERAGE_FILE" ]]; then
 fi
 
 # Extract line-rate from the coverage XML (Cobertura format)
-line_rate=$(grep -oP 'line-rate="\K[^"]+' "$COVERAGE_FILE" | head -1 || echo "")
+line_rate=$(sed -n 's/.*line-rate="\([^"]*\)".*/\1/p' "$COVERAGE_FILE" | head -1)
 
 if [[ -z "$line_rate" ]]; then
     echo "Could not extract line-rate from $COVERAGE_FILE"
@@ -31,7 +31,7 @@ fi
 
 # Convert to percentage (line-rate is 0.0-1.0)
 # Use awk for floating point math (available in all environments)
-coverage_pct=$(awk "BEGIN {printf \"%.2f\", $line_rate * 100}")
+coverage_pct=$(awk -v rate="$line_rate" 'BEGIN {printf "%.2f", rate * 100}')
 
 # Write to language-specific path
 lunar collect -j ".lang.python.tests.coverage.percentage" "$coverage_pct"

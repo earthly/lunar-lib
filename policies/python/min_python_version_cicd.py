@@ -41,7 +41,11 @@ def check_min_python_version_cicd(min_version=None, node=None):
                 continue
             try:
                 actual = parse_version(version)
-                if actual[:len(minimum)] < minimum:
+                # Pad to same length for correct comparison
+                cmp_len = max(len(actual), len(minimum))
+                actual_padded = actual + (0,) * (cmp_len - len(actual))
+                minimum_padded = minimum + (0,) * (cmp_len - len(minimum))
+                if actual_padded < minimum_padded:
                     violations.append(f"'{cmd_name}' used Python {version}")
             except (ValueError, TypeError):
                 violations.append(
