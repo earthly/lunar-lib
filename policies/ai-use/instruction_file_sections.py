@@ -29,7 +29,7 @@ def main(node=None):
         sections = c.get_value_or_default(".ai_use.instructions.root.sections", [])
         sections_lower = [s.lower() for s in sections]
 
-        missing = [r for r in required if r.lower() not in sections_lower]
+        missing = [r for r in required if not any(r.lower() in s for s in sections_lower)]
 
         if missing:
             c.fail(

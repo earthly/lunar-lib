@@ -38,8 +38,9 @@ def main(node=None):
             cmd = entry.get_value(".cmd")
             flags_to_check = dangerous_flags.get(tool, [])
 
+            padded = f" {cmd} "
             for flag in flags_to_check:
-                if f" {flag}" in f" {cmd}" or f" {flag}=" in f" {cmd}":
+                if f" {flag} " in padded or f" {flag}=" in padded:
                     c.fail(f"{tool} CI invocation uses dangerous flag: {flag}")
     return c
 

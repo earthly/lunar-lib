@@ -77,7 +77,7 @@ while IFS= read -r sha; do
   MODEL=""
   TOKENS=""
 
-  if echo "$TRAILERS" | grep -qi "^${ANNOTATION_PREFIX}" 2>/dev/null; then
+  if [ -n "$ANNOTATION_PREFIX" ] && echo "$TRAILERS" | grep -qi "^${ANNOTATION_PREFIX}" 2>/dev/null; then
     HAS_ANNOTATION=true
     TRAILER_COUNT=$((TRAILER_COUNT + 1))
 
