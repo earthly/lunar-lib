@@ -41,7 +41,10 @@ if props_elem is not None:
         properties[tag] = (child.text or "").strip()
 
 deps = []
-for dep in root.findall(f".//{prefix}dependency", ns):
+# Only scan direct <dependencies> block, skip dependencyManagement and plugin deps
+deps_elem = root.find(f"./{prefix}dependencies", ns)
+dep_list = deps_elem.findall(f"{prefix}dependency", ns) if deps_elem is not None else []
+for dep in dep_list:
     group = dep.findtext(f"{prefix}groupId", default="", namespaces=ns)
     artifact = dep.findtext(f"{prefix}artifactId", default="", namespaces=ns)
     version = dep.findtext(f"{prefix}version", default="", namespaces=ns) or ""

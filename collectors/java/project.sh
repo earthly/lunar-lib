@@ -65,15 +65,16 @@ if [[ "$gradle_exists" == true || "$gradlew_exists" == true ]]; then
 fi
 
 # Extract Java version from build config (static analysis, no runtime dependency)
+# Supports: 17, 1.8, 17.0.2
 java_version=""
 if [[ "$pom_exists" == true ]]; then
-    # Try <java.version>17</java.version>
-    java_version=$(grep -oE '<java\.version>[0-9]+</java\.version>' pom.xml 2>/dev/null | sed 's/<java\.version>//;s/<\/java\.version>//' | head -n1 || true)
-    # Try <maven.compiler.source>17</maven.compiler.source>
+    # Try <java.version>17</java.version> or <java.version>1.8</java.version>
+    java_version=$(grep -oE '<java\.version>[0-9]+(\.[0-9]+)*</java\.version>' pom.xml 2>/dev/null | sed 's/<java\.version>//;s/<\/java\.version>//' | head -n1 || true)
+    # Try <maven.compiler.source>
     if [[ -z "$java_version" ]]; then
-        java_version=$(grep -oE '<maven\.compiler\.source>[0-9]+</maven\.compiler\.source>' pom.xml 2>/dev/null | sed 's/<maven\.compiler\.source>//;s/<\/maven\.compiler\.source>//' | head -n1 || true)
+        java_version=$(grep -oE '<maven\.compiler\.source>[0-9]+(\.[0-9]+)*</maven\.compiler\.source>' pom.xml 2>/dev/null | sed 's/<maven\.compiler\.source>//;s/<\/maven\.compiler\.source>//' | head -n1 || true)
     fi
-    # Try <maven.compiler.release>17</maven.compiler.release>
+    # Try <maven.compiler.release>
     if [[ -z "$java_version" ]]; then
         java_version=$(grep -oE '<maven\.compiler\.release>[0-9]+</maven\.compiler\.release>' pom.xml 2>/dev/null | sed 's/<maven\.compiler\.release>//;s/<\/maven\.compiler\.release>//' | head -n1 || true)
     fi
@@ -86,11 +87,11 @@ if [[ -z "$java_version" && "$gradle_exists" == true ]]; then
         gradle_file="build.gradle.kts"
     fi
     if [[ -n "$gradle_file" ]]; then
-        # Try sourceCompatibility = '17' or sourceCompatibility = 17
-        java_version=$(grep -oE "sourceCompatibility\s*=\s*['\"]?([0-9]+)['\"]?" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+' | head -n1 || true)
-        # Try JavaVersion.VERSION_17
+        # Try sourceCompatibility = '17' or '1.8' or 17
+        java_version=$(grep -oE "sourceCompatibility\s*=\s*['\"]?[0-9]+(\.[0-9]+)*['\"]?" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -n1 || true)
+        # Try JavaVersion.VERSION_17 or VERSION_1_8
         if [[ -z "$java_version" ]]; then
-            java_version=$(grep -oE "JavaVersion\.VERSION_([0-9]+)" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+' | head -n1 || true)
+            java_version=$(grep -oE "JavaVersion\.VERSION_([0-9]+(_[0-9]+)*)" "$gradle_file" 2>/dev/null | sed 's/JavaVersion\.VERSION_//' | tr '_' '.' | head -n1 || true)
         fi
     fi
 fi
@@ -98,7 +99,7 @@ fi
 # Build and collect JSON
 jq -n \
     --arg version "$java_version" \
-    --argjson build_systems "$(printf '%s\n' "${build_systems[@]}" | jq -R . | jq -s .)" \
+    --argjson build_systems "$(if [[ ${#build_systems[@]} -gt 0 ]]; then printf '%s\n' "${build_systems[@]}" | jq -R . | jq -s .; else echo '[]'; fi)" \
     --argjson pom_exists "$pom_exists" \
     --argjson gradle_exists "$gradle_exists" \
     --argjson mvnw_exists "$mvnw_exists" \
