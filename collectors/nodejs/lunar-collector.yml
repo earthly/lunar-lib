@@ -1,0 +1,109 @@
+version: 0
+
+name: nodejs
+description: Collect Node.js project information, CI/CD commands, test coverage, and dependencies
+author: earthly
+
+default_image: earthly/lunar-lib:nodejs-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Node.js Collector"
+  long_description: |
+    Analyze Node.js projects to collect package metadata, dependencies, test coverage,
+    and CI/CD command tracking. Enforce Node.js-specific engineering standards.
+  categories: ["languages", "build"]
+  icon: "assets/nodejs.svg"
+  status: "stable"
+  related:
+    - slug: "nodejs"
+      type: "policy"
+      reason: "Enforces Node.js project standards using collected metadata"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Node.js project structure by detecting package.json, lockfiles,
+      TypeScript configuration, ESLint, Prettier, monorepo setup, and engines.node.
+      Writes project metadata to .lang.nodejs with build system info.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["nodejs", "package.json", "project structure", "npm", "yarn", "pnpm"]
+
+  - name: dependencies
+    description: |
+      Extracts direct and dev dependencies from package.json.
+      Captures package names and version ranges for dependency tracking
+      and policy enforcement.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["nodejs dependencies", "npm packages", "package.json", "supply chain"]
+
+  - name: cicd
+    description: |
+      Records every npm, yarn, or pnpm command executed in CI pipelines along
+      with the Node.js version. Writes command strings and version info to
+      .lang.nodejs.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(npm|npx|yarn|pnpm)$
+    keywords: ["nodejs ci", "npm ci", "yarn ci", "pnpm ci", "ci commands"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from existing test coverage output after
+      tests complete. Parses coverage-summary.json to calculate total coverage
+      and writes results to .lang.nodejs.tests.coverage and .testing.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(npm|npx|yarn|pnpm)$
+      args:
+        - value_pattern: ^(test|jest|vitest)$
+    keywords: ["code coverage", "jest coverage", "vitest coverage", "test metrics"]
+
+example_component_json: |
+  {
+    "lang": {
+      "nodejs": {
+        "version": "20.11.0",
+        "build_systems": ["npm"],
+        "native": {
+          "package_json": { "exists": true },
+          "package_lock": { "exists": true },
+          "yarn_lock": { "exists": false },
+          "pnpm_lock": { "exists": false },
+          "tsconfig": { "exists": true },
+          "eslint_configured": true,
+          "prettier_configured": false,
+          "engines_node": ">=18",
+          "monorepo": { "type": "workspaces" }
+        },
+        "source": { "tool": "node", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "npm test", "version": "20.11.0" }],
+          "source": { "tool": "node", "integration": "ci" }
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 85.5,
+            "source": { "tool": "jest", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "express", "version": "^4.18.2" }
+          ],
+          "dev": [
+            { "path": "jest", "version": "^29.7.0" }
+          ],
+          "source": { "tool": "npm", "integration": "code" }
+        }
+      }
+    }
+  }

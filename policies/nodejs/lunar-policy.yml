@@ -1,0 +1,66 @@
+version: 0
+
+name: nodejs
+description: Enforces Node.js project structure and standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Node.js Project Guardrails"
+  long_description: |
+    Enforce Node.js-specific project standards including lockfile presence,
+    TypeScript configuration, engine version pinning, and minimum Node.js
+    version requirements for code and CI environments.
+  category: "devex-build-and-ci"
+  icon: "assets/nodejs.svg"
+  status: "stable"
+  requires:
+    - slug: "nodejs"
+      type: "collector"
+      reason: "Provides Node.js project metadata"
+  related: []
+
+policies:
+  - name: lockfile-exists
+    description: |
+      Ensures a package lockfile exists (package-lock.json, yarn.lock, or pnpm-lock.yaml).
+      Lockfiles are essential for reproducible builds and dependency integrity.
+    mainPython: checks/lockfile_exists.py
+    keywords: ["lockfile", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "reproducibility"]
+
+  - name: typescript-configured
+    description: |
+      Ensures TypeScript is configured via tsconfig.json.
+      TypeScript provides type safety and improved developer experience.
+    mainPython: checks/typescript_configured.py
+    keywords: ["typescript", "tsconfig.json", "type safety"]
+
+  - name: engines-pinned
+    description: |
+      Ensures the engines.node field is set in package.json.
+      Pinning the Node.js engine version prevents compatibility issues across environments.
+    mainPython: checks/engines_pinned.py
+    keywords: ["engines", "node version", "package.json", "compatibility"]
+
+  - name: min-node-version
+    description: |
+      Ensures the Node.js version detected in the project meets the minimum required version.
+      Helps maintain security and compatibility standards.
+    mainPython: checks/min_node_version.py
+    keywords: ["node version", "compatibility", "security"]
+
+  - name: min-node-version-cicd
+    description: |
+      Ensures the Node.js version used in CI/CD commands meets the minimum required version.
+      Helps maintain security and compatibility standards for build environments.
+    mainPython: checks/min_node_version_cicd.py
+    keywords: ["node version", "ci/cd", "compatibility", "security"]
+
+inputs:
+  min_node_version:
+    description: Minimum required Node.js major version (e.g., "18", "20")
+    default: "18"
+  min_node_version_cicd:
+    description: Minimum required Node.js major version for CI/CD commands (e.g., "18", "20")
+    default: "18"
