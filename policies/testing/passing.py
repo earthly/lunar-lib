@@ -38,16 +38,18 @@ def check_passing(node=None):
             ".testing",
             "No test execution data found. Ensure tests are configured to run in CI."
         )
-        c.assert_exists(
-            ".testing.all_passing",
-            "Test pass/fail data not available. Configure your test runner to report results."
-        )
 
-        # Assert tests are passing
-        c.assert_true(
-            c.get_value(".testing.all_passing"),
-            "Tests are failing. Check CI logs for test failure details."
-        )
+        # Only check pass/fail if testing data exists (avoid ValueError)
+        if c.get_node(".testing").exists():
+            c.assert_exists(
+                ".testing.all_passing",
+                "Test pass/fail data not available. Configure your test runner to report results."
+            )
+            if c.get_node(".testing.all_passing").exists():
+                c.assert_true(
+                    c.get_value(".testing.all_passing"),
+                    "Tests are failing. Check CI logs for test failure details."
+                )
     return c
 
 

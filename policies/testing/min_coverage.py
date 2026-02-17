@@ -37,18 +37,21 @@ def check_min_coverage(node=None):
             ".testing.coverage",
             "No coverage data collected. Configure a coverage tool to run in your CI pipeline."
         )
-        c.assert_exists(
-            ".testing.coverage.percentage",
-            "Coverage percentage not reported. Ensure your coverage tool reports metrics."
-        )
-        
-        min_coverage = float(variable_or_default("min_coverage", "80"))
-        coverage = c.get_value(".testing.coverage.percentage")
-        c.assert_greater_or_equal(
-            coverage,
-            min_coverage,
-            f"Coverage {coverage}% is below minimum {min_coverage}%"
-        )
+
+        # Only check percentage if coverage data exists (avoid ValueError)
+        if c.get_node(".testing.coverage").exists():
+            c.assert_exists(
+                ".testing.coverage.percentage",
+                "Coverage percentage not reported. Ensure your coverage tool reports metrics."
+            )
+            if c.get_node(".testing.coverage.percentage").exists():
+                min_coverage = float(variable_or_default("min_coverage", "80"))
+                coverage = c.get_value(".testing.coverage.percentage")
+                c.assert_greater_or_equal(
+                    coverage,
+                    min_coverage,
+                    f"Coverage {coverage}% is below minimum {min_coverage}%"
+                )
     return c
 
 
