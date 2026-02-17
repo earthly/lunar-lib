@@ -1,0 +1,12 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Claude CLI from official source
+    RUN curl -fsSL https://claude.ai/install.sh | bash && \
+        echo "Claude CLI installed at ~/.local/bin/claude"
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:claude-$VERSION
+

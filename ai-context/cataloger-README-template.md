@@ -53,7 +53,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/{path-to-cataloger}@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/{path-to-cataloger}@v1.0.0
     with:
       org_name: "your-org"
 ```
