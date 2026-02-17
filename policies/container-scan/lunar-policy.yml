@@ -9,47 +9,41 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Container Scan Guardrails"
   long_description: |
-    Enforces container image vulnerability scanning standards. Ensures container
-    scanners run and validates vulnerability thresholds for image security.
+    Enforces container image vulnerability scanning standards. Ensures container scanners
+    run and validates vulnerability thresholds for container security.
   category: "security-and-compliance"
   icon: "assets/container-scan.svg"
   status: "stable"
   requires:
-    - slug: "dockerfile"
+    - slug: "github"
       type: "collector"
-      reason: "Provides container definition data; scanning requires CI integration"
+      reason: "Provides container scan data via GitHub App integrations"
   related: []
 
 policies:
   - name: executed
     description: |
-      Verifies that container image scanning was executed on the component.
+      Verifies that container scanning was executed on the component.
       Fails if no scanner has written to .container_scan.
     mainPython: executed.py
-    keywords: ["container", "security", "scanning", "compliance", "image vulnerabilities"]
+    keywords: ["container", "security", "scanning", "compliance", "docker", "image"]
 
-  - name: no-critical
+  - name: max-severity
     description: |
-      Ensures no critical severity container vulnerabilities exist.
-    mainPython: no_critical.py
-    keywords: ["container", "critical", "vulnerabilities", "security", "image scanning"]
-
-  - name: no-high
-    description: |
-      Ensures no high severity container vulnerabilities exist.
-    mainPython: no_high.py
-    keywords: ["container", "high", "vulnerabilities", "security", "image scanning"]
+      Ensures no findings at or above the configured severity threshold.
+      Configure min_severity to set the threshold (critical, high, medium, low).
+    mainPython: max_severity.py
+    keywords: ["container", "critical", "high", "vulnerabilities", "security", "docker"]
 
   - name: max-total
     description: |
       Ensures total container vulnerabilities are under a configurable threshold.
     mainPython: max_total.py
-    keywords: ["container", "threshold", "vulnerabilities", "image scanning"]
+    keywords: ["container", "threshold", "vulnerabilities", "docker"]
 
 inputs:
-  enforce_no_high:
-    description: "Whether to enforce no high severity findings"
-    default: "true"
+  min_severity:
+    description: "Minimum severity to fail on (critical, high, medium, low)"
+    default: "high"
   max_total_threshold:
-    description: "Maximum total findings allowed (0 = no limit)"
-    default: "0"
+    description: "Maximum total findings allowed (must be configured)"

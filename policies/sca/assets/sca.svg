@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Shield with package/dependency icon -->
-  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-  <path d="M8 10h8"/>
-  <path d="M8 14h8"/>
-  <path d="M12 10v4"/>
+  <!-- Package/dependency box with magnifying glass -->
+  <rect x="3" y="3" width="12" height="12" rx="1"/>
+  <path d="M7 7h4"/>
+  <path d="M7 10h4"/>
+  <circle cx="17" cy="17" r="4"/>
+  <path d="M21 21l-2-2"/>
 </svg>

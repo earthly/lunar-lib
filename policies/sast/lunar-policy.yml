@@ -1,7 +1,7 @@
 version: 0
 
 name: sast
-description: Static Application Security Testing (SAST) policies
+description: Static Application Security Testing (SAST) security policies
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -26,30 +26,24 @@ policies:
       Verifies that SAST scanning was executed on the component.
       Fails if no scanner has written to .sast.
     mainPython: executed.py
-    keywords: ["sast", "security", "scanning", "compliance", "code analysis"]
+    keywords: ["sast", "security", "scanning", "compliance", "code"]
 
-  - name: no-critical
+  - name: max-severity
     description: |
-      Ensures no critical severity code findings exist.
-    mainPython: no_critical.py
-    keywords: ["sast", "critical", "findings", "security", "code analysis"]
-
-  - name: no-high
-    description: |
-      Ensures no high severity code findings exist.
-    mainPython: no_high.py
-    keywords: ["sast", "high", "findings", "security", "code analysis"]
+      Ensures no findings at or above the configured severity threshold.
+      Configure min_severity to set the threshold (critical, high, medium, low).
+    mainPython: max_severity.py
+    keywords: ["sast", "critical", "high", "findings", "security", "code"]
 
   - name: max-total
     description: |
       Ensures total code findings are under a configurable threshold.
     mainPython: max_total.py
-    keywords: ["sast", "threshold", "findings", "code analysis"]
+    keywords: ["sast", "threshold", "findings", "code"]
 
 inputs:
-  enforce_no_high:
-    description: "Whether to enforce no high severity findings"
-    default: "true"
+  min_severity:
+    description: "Minimum severity to fail on (critical, high, medium, low)"
+    default: "high"
   max_total_threshold:
-    description: "Maximum total findings allowed (0 = no limit)"
-    default: "0"
+    description: "Maximum total findings allowed (must be configured)"

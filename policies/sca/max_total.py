@@ -14,14 +14,10 @@ def main(node=None):
                 f"Policy misconfiguration: 'max_total_threshold' must be an integer, got '{threshold_str}'"
             )
 
-        if threshold < 0:
+        if threshold <= 0:
             raise ValueError(
-                f"Policy misconfiguration: 'max_total_threshold' must be non-negative, got '{threshold}'"
+                f"Policy misconfiguration: 'max_total_threshold' must be a positive integer, got '{threshold}'"
             )
-
-        if threshold == 0:
-            c.skip("No maximum threshold configured (set max_total_threshold > 0 to enable)")
-            return c
 
         sca_node = c.get_node(".sca")
         if not sca_node.exists():
@@ -29,7 +25,7 @@ def main(node=None):
             return c
         total_node = sca_node.get_node(".vulnerabilities.total")
         if not total_node.exists():
-            c.skip("Total findings count not available yet. Collectors need to report .sca.vulnerabilities.total.")
+            c.fail("Total findings count not available. Ensure collector reports .sca.vulnerabilities.total.")
             return c
 
         total_value = total_node.get_value()

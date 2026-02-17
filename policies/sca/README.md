@@ -13,8 +13,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `executed` | Verifies SCA scanning ran | No scanner has written to `.sca` |
-| `no-critical` | No critical severity vulnerabilities | Critical vulnerabilities found in dependencies |
-| `no-high` | No high severity vulnerabilities | High vulnerabilities found (configurable) |
+| `max-severity` | No findings at or above severity threshold | Findings found at configured severity or higher |
 | `max-total` | Total vulnerabilities under threshold | Total count exceeds configured limit |
 
 ## Required Data
@@ -30,7 +29,7 @@ This policy reads from the following Component JSON paths:
 | `.sca.summary.has_critical` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_high` | boolean | SCA collector (preferred) |
 
-**Note:** If collectors don't yet write vulnerability counts, the `no-critical`, `no-high`, and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
+**Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
 ## Installation
 
@@ -41,10 +40,10 @@ policies:
   - uses: github://earthly/lunar-lib/policies/sca@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, no-critical]  # Only run specific checks
-    # with:
-    #   enforce_no_high: "true"
-    #   max_total_threshold: "10"
+    # include: [executed, max-severity]  # Only run specific checks
+    with:
+      min_severity: "high"        # Fail on critical and high findings
+      max_total_threshold: "10"   # Fail if more than 10 total findings
 ```
 
 ## Examples
@@ -75,8 +74,7 @@ policies:
 
 **Failure messages:**
 - `executed`: "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured."
-- `no-critical`: "Critical vulnerability findings detected"
-- `no-high`: "High severity vulnerability findings detected"
+- `max-severity`: "Critical vulnerability findings detected (2 found)"
 - `max-total`: "Total vulnerability findings (25) exceeds threshold (10)"
 
 ## Remediation
@@ -84,5 +82,5 @@ policies:
 When this policy fails, you can resolve it by:
 
 1. **`executed` failure:** Configure an SCA scanner (Snyk, Semgrep Supply Chain, Dependabot) in your CI pipeline or as a GitHub App integration.
-2. **`no-critical`/`no-high` failure:** Review and remediate the flagged vulnerabilities by updating to patched versions or using your scanner's ignore feature for accepted risks.
-3. **`max-total` failure:** Reduce total vulnerability count by updating dependencies or adjusting the threshold if the current level is acceptable.
+2. **`max-severity` failure:** Review and remediate the flagged vulnerabilities by updating to patched versions or using your scanner's ignore feature for accepted risks.
+3. **`max-total` failure:** Reduce total vulnerability count by updating dependencies.
