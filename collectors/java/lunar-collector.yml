@@ -1,0 +1,142 @@
+version: 0
+
+name: java
+description: Collect Java project information, CI/CD commands, dependencies, and test coverage
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Java Collector"
+  long_description: |
+    Analyze Java projects to collect build tool info, dependencies, CI/CD command
+    tracking, test scope, and JaCoCo coverage. Supports Maven and Gradle.
+  categories: ["languages", "build"]
+  icon: "assets/java.svg"
+  status: "beta"
+  related:
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Detects Java project structure including build tools (Maven/Gradle), Java version
+      from build config, wrapper scripts, and static analysis tool configuration.
+      Writes project metadata to .lang.java.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["java project", "maven", "gradle", "pom.xml", "build.gradle"]
+
+  - name: dependencies
+    description: |
+      Extracts direct dependencies from pom.xml (using Python XML parsing with property
+      resolution) or gradle.lockfile. Writes dependency data to .lang.java.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["java dependencies", "maven dependencies", "gradle dependencies", "supply chain"]
+
+  - name: java-cicd
+    description: |
+      Records java/javac commands executed in CI pipelines along with the Java version.
+      Writes command strings and version info to .lang.java.cicd.cmds.
+    mainBash: java-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(java|javac)$
+    keywords: ["java ci", "java version", "ci commands", "build tracking"]
+
+  - name: maven-cicd
+    description: |
+      Records Maven commands executed in CI pipelines along with the Maven version.
+      Detects version from installation path, wrapper properties, or mvn --version.
+      Writes to .lang.java.cicd.cmds.
+    mainBash: maven-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(mvn|mvnw)$
+    keywords: ["maven ci", "mvn version", "maven wrapper", "build tracking"]
+
+  - name: gradle-cicd
+    description: |
+      Records Gradle commands executed in CI pipelines along with the Gradle version.
+      Writes to .lang.java.cicd.cmds.
+    mainBash: gradle-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(gradle|gradlew)$
+    keywords: ["gradle ci", "gradle version", "gradle wrapper", "build tracking"]
+
+  - name: test-scope
+    description: |
+      Determines whether Maven/Gradle test commands run all modules or a subset.
+      Writes scope to .lang.java.tests.scope as "all" or "module" and signals
+      test execution via .testing.source.
+    mainBash: test-scope.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+      args:
+        - value_pattern: ^test.*
+    keywords: ["java test", "test scope", "maven test", "gradle test"]
+
+  - name: test-coverage
+    description: |
+      Extracts JaCoCo coverage percentage from XML reports after test runs.
+      Parses coverage from standard Maven/Gradle report locations and writes
+      results to both .lang.java.tests.coverage and .testing.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+      args:
+        - value_pattern: ^test.*
+    keywords: ["code coverage", "jacoco", "test coverage", "coverage metrics"]
+
+example_component_json: |
+  {
+    "lang": {
+      "java": {
+        "version": "17",
+        "build_systems": ["maven"],
+        "pom_xml_exists": true,
+        "build_gradle_exists": false,
+        "mvnw_exists": true,
+        "gradlew_exists": false,
+        "gradle_lockfile_exists": false,
+        "checkstyle_configured": true,
+        "spotbugs_configured": false,
+        "source": { "tool": "java", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "java -jar app.jar", "version": "17.0.2", "tool": "java" },
+            { "cmd": "mvn clean install", "version": "3.9.6", "tool": "maven" }
+          ],
+          "source": { "tool": "java", "integration": "ci" }
+        },
+        "tests": {
+          "scope": "all",
+          "coverage": {
+            "percentage": 72.5,
+            "source": { "tool": "jacoco", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "org.springframework:spring-core", "version": "6.1.3", "indirect": false }
+          ],
+          "transitive": [],
+          "source": { "tool": "maven", "integration": "code" }
+        }
+      }
+    }
+  }
