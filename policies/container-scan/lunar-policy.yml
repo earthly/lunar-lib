@@ -1,0 +1,49 @@
+version: 0
+
+name: container-scan
+description: Container image vulnerability scanning policies
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Container Scan Guardrails"
+  long_description: |
+    Enforces container image vulnerability scanning standards. Ensures container scanners
+    run and validates vulnerability thresholds for container security.
+  category: "security-and-compliance"
+  icon: "assets/container-scan.svg"
+  status: "stable"
+  requires:
+    - slug: "github"
+      type: "collector"
+      reason: "Provides container scan data via GitHub App integrations"
+  related: []
+
+policies:
+  - name: executed
+    description: |
+      Verifies that container scanning was executed on the component.
+      Fails if no scanner has written to .container_scan.
+    mainPython: executed.py
+    keywords: ["container", "security", "scanning", "compliance", "docker", "image"]
+
+  - name: max-severity
+    description: |
+      Ensures no findings at or above the configured severity threshold.
+      Configure min_severity to set the threshold (critical, high, medium, low).
+    mainPython: max_severity.py
+    keywords: ["container", "critical", "high", "vulnerabilities", "security", "docker"]
+
+  - name: max-total
+    description: |
+      Ensures total container vulnerabilities are under a configurable threshold.
+    mainPython: max_total.py
+    keywords: ["container", "threshold", "vulnerabilities", "docker"]
+
+inputs:
+  min_severity:
+    description: "Minimum severity to fail on (critical, high, medium, low)"
+    default: "high"
+  max_total_threshold:
+    description: "Maximum total findings allowed (must be configured)"
