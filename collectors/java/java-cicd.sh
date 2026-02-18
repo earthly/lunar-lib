@@ -17,7 +17,7 @@ if command -v java >/dev/null 2>&1; then
 fi
 
 # Always collect the command, version may be empty
-lunar collect -j ".lang.java.native.java.cicd.cmds" \
-    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\"}]"
+lunar collect -j ".lang.java.cicd.cmds" \
+    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\", \"tool\": \"java\"}]"
 lunar collect -j ".lang.java.cicd.source" \
     '{"tool": "java", "integration": "ci"}'

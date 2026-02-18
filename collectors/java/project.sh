@@ -35,7 +35,6 @@ if [[ -f "gradle.lockfile" ]]; then
 fi
 
 # Detect static analysis tools
-# Checkstyle: config file or plugin in build config
 if [[ -f "checkstyle.xml" ]] || [[ -f "config/checkstyle/checkstyle.xml" ]]; then
     checkstyle_configured=true
 elif [[ "$pom_exists" == true ]] && grep -q 'maven-checkstyle-plugin' pom.xml 2>/dev/null; then
@@ -46,7 +45,6 @@ elif [[ -f "build.gradle.kts" ]] && grep -q "checkstyle" build.gradle.kts 2>/dev
     checkstyle_configured=true
 fi
 
-# SpotBugs: plugin in build config
 if [[ "$pom_exists" == true ]] && grep -q 'spotbugs-maven-plugin' pom.xml 2>/dev/null; then
     spotbugs_configured=true
 elif [[ -f "build.gradle" ]] && grep -q "spotbugs" build.gradle 2>/dev/null; then
@@ -68,13 +66,10 @@ fi
 # Supports: 17, 1.8, 17.0.2
 java_version=""
 if [[ "$pom_exists" == true ]]; then
-    # Try <java.version>17</java.version> or <java.version>1.8</java.version>
     java_version=$(grep -oE '<java\.version>[0-9]+(\.[0-9]+)*</java\.version>' pom.xml 2>/dev/null | sed 's/<java\.version>//;s/<\/java\.version>//' | head -n1 || true)
-    # Try <maven.compiler.source>
     if [[ -z "$java_version" ]]; then
         java_version=$(grep -oE '<maven\.compiler\.source>[0-9]+(\.[0-9]+)*</maven\.compiler\.source>' pom.xml 2>/dev/null | sed 's/<maven\.compiler\.source>//;s/<\/maven\.compiler\.source>//' | head -n1 || true)
     fi
-    # Try <maven.compiler.release>
     if [[ -z "$java_version" ]]; then
         java_version=$(grep -oE '<maven\.compiler\.release>[0-9]+</maven\.compiler\.release>' pom.xml 2>/dev/null | sed 's/<maven\.compiler\.release>//;s/<\/maven\.compiler\.release>//' | head -n1 || true)
     fi
@@ -87,16 +82,14 @@ if [[ -z "$java_version" && "$gradle_exists" == true ]]; then
         gradle_file="build.gradle.kts"
     fi
     if [[ -n "$gradle_file" ]]; then
-        # Try sourceCompatibility = '17' or '1.8' or 17
         java_version=$(grep -oE "sourceCompatibility\s*=\s*['\"]?[0-9]+(\.[0-9]+)*['\"]?" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -n1 || true)
-        # Try JavaVersion.VERSION_17 or VERSION_1_8
         if [[ -z "$java_version" ]]; then
             java_version=$(grep -oE "JavaVersion\.VERSION_([0-9]+(_[0-9]+)*)" "$gradle_file" 2>/dev/null | sed 's/JavaVersion\.VERSION_//' | tr '_' '.' | head -n1 || true)
         fi
     fi
 fi
 
-# Build and collect JSON
+# Build and collect JSON — file existence at .lang.java level (not .native)
 jq -n \
     --arg version "$java_version" \
     --argjson build_systems "$(if [[ ${#build_systems[@]} -gt 0 ]]; then printf '%s\n' "${build_systems[@]}" | jq -R . | jq -s .; else echo '[]'; fi)" \
@@ -109,15 +102,13 @@ jq -n \
     --argjson spotbugs_configured "$spotbugs_configured" \
     '{
         build_systems: $build_systems,
-        native: {
-            pom_xml: { exists: $pom_exists },
-            build_gradle: { exists: $gradle_exists },
-            mvnw: { exists: $mvnw_exists },
-            gradlew: { exists: $gradlew_exists },
-            gradle_lockfile: { exists: $gradle_lock_exists },
-            checkstyle_configured: $checkstyle_configured,
-            spotbugs_configured: $spotbugs_configured
-        },
+        pom_xml_exists: $pom_exists,
+        build_gradle_exists: $gradle_exists,
+        mvnw_exists: $mvnw_exists,
+        gradlew_exists: $gradlew_exists,
+        gradle_lockfile_exists: $gradle_lock_exists,
+        checkstyle_configured: $checkstyle_configured,
+        spotbugs_configured: $spotbugs_configured,
         source: {
             tool: "java",
             integration: "code"

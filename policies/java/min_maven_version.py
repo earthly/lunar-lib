@@ -31,18 +31,21 @@ def check_min_maven_version(min_version=None, node=None):
         if not java.exists():
             c.skip("Not a Java project")
 
-        cmds_node = java.get_node(".native.maven.cicd.cmds")
+        cmds_node = java.get_node(".cicd.cmds")
         if not cmds_node.exists():
-            c.skip("No Maven CI/CD commands recorded")
+            c.skip("No CI/CD commands recorded")
 
         cmds = cmds_node.get_value()
+        maven_cmds = [cmd for cmd in cmds if cmd.get("tool") == "maven"]
+        if not maven_cmds:
+            c.skip("No Maven CI/CD commands recorded")
 
         violations = []
-        for cmd_info in cmds:
+        for cmd_info in maven_cmds:
             cmd_name = cmd_info.get("cmd", "unknown")
             version = cmd_info.get("version")
             if not version:
-                continue  # Skip entries without version
+                continue
             try:
                 if not _compare_versions(version, min_version):
                     violations.append(f"'{cmd_name}' used Maven {version}")

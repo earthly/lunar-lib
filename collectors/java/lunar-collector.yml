@@ -43,33 +43,35 @@ collectors:
   - name: java-cicd
     description: |
       Records java/javac commands executed in CI pipelines along with the Java version.
-      Writes command strings and version info to .lang.java.native.java.cicd for audit
-      trails and build reproducibility analysis.
+      Writes command strings and version info to .lang.java.cicd.cmds.
     mainBash: java-cicd.sh
     hook:
       type: ci-before-command
-      pattern: .*\b(java|javac)\b.*
+      binary:
+        name_pattern: ^(java|javac)$
     keywords: ["java ci", "java version", "ci commands", "build tracking"]
 
   - name: maven-cicd
     description: |
       Records Maven commands executed in CI pipelines along with the Maven version.
       Detects version from installation path, wrapper properties, or mvn --version.
-      Writes to .lang.java.native.maven.cicd.
+      Writes to .lang.java.cicd.cmds.
     mainBash: maven-cicd.sh
     hook:
       type: ci-before-command
-      pattern: .*\b(mvn|mvnw)\b.*
+      binary:
+        name_pattern: ^(mvn|mvnw)$
     keywords: ["maven ci", "mvn version", "maven wrapper", "build tracking"]
 
   - name: gradle-cicd
     description: |
       Records Gradle commands executed in CI pipelines along with the Gradle version.
-      Writes to .lang.java.native.gradle.cicd.
+      Writes to .lang.java.cicd.cmds.
     mainBash: gradle-cicd.sh
     hook:
       type: ci-before-command
-      pattern: .*\b(gradle|gradlew)\b.*
+      binary:
+        name_pattern: ^(gradle|gradlew)$
     keywords: ["gradle ci", "gradle version", "gradle wrapper", "build tracking"]
 
   - name: test-scope
@@ -80,7 +82,10 @@ collectors:
     mainBash: test-scope.sh
     hook:
       type: ci-before-command
-      pattern: .*\b(mvn|mvnw|gradle|gradlew)\b.*test.*
+      binary:
+        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+      args:
+        - value_pattern: ^test.*
     keywords: ["java test", "test scope", "maven test", "gradle test"]
 
   - name: test-coverage
@@ -91,7 +96,10 @@ collectors:
     mainBash: test-coverage.sh
     hook:
       type: ci-after-command
-      pattern: .*\b(mvn|mvnw|gradle|gradlew)\b.*test.*
+      binary:
+        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+      args:
+        - value_pattern: ^test.*
     keywords: ["code coverage", "jacoco", "test coverage", "coverage metrics"]
 
 example_component_json: |
@@ -100,27 +108,19 @@ example_component_json: |
       "java": {
         "version": "17",
         "build_systems": ["maven"],
+        "pom_xml_exists": true,
+        "build_gradle_exists": false,
+        "mvnw_exists": true,
+        "gradlew_exists": false,
+        "gradle_lockfile_exists": false,
+        "checkstyle_configured": true,
+        "spotbugs_configured": false,
         "source": { "tool": "java", "integration": "code" },
-        "native": {
-          "pom_xml": { "exists": true },
-          "build_gradle": { "exists": false },
-          "mvnw": { "exists": true },
-          "gradlew": { "exists": false },
-          "gradle_lockfile": { "exists": false },
-          "checkstyle_configured": false,
-          "spotbugs_configured": false,
-          "java": {
-            "cicd": {
-              "cmds": [{ "cmd": "java -jar app.jar", "version": "17.0.2" }]
-            }
-          },
-          "maven": {
-            "cicd": {
-              "cmds": [{ "cmd": "mvn clean install", "version": "3.9.6" }]
-            }
-          }
-        },
         "cicd": {
+          "cmds": [
+            { "cmd": "java -jar app.jar", "version": "17.0.2", "tool": "java" },
+            { "cmd": "mvn clean install", "version": "3.9.6", "tool": "maven" }
+          ],
           "source": { "tool": "java", "integration": "ci" }
         },
         "tests": {

@@ -14,12 +14,10 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.lang.java` | object | Java project metadata (version, build systems) |
+| `.lang.java` | object | Java project metadata (version, build systems, file existence) |
 | `.lang.java.dependencies` | object | Direct dependencies from pom.xml or gradle.lockfile |
+| `.lang.java.cicd` | object | CI/CD command tracking with tool and version |
 | `.lang.java.tests` | object | Test scope and JaCoCo coverage information |
-| `.lang.java.native.java.cicd` | object | Java runtime CI/CD command tracking |
-| `.lang.java.native.maven.cicd` | object | Maven CI/CD command tracking with version |
-| `.lang.java.native.gradle.cicd` | object | Gradle CI/CD command tracking with version |
 | `.testing.coverage` | object | Normalized cross-language coverage (dual-write from JaCoCo) |
 | `.testing.source` | object | Normalized testing indicator |
 

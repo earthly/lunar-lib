@@ -21,7 +21,7 @@ landing_page:
   related: []
 
 policies:
-  - name: wrapper-exists
+  - name: build-tool-wrapper-exists
     description: |
       Ensures a build tool wrapper exists (mvnw for Maven projects, gradlew for
       Gradle projects). Wrappers ensure reproducible builds without requiring

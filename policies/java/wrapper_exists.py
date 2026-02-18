@@ -3,15 +3,11 @@ from lunar_policy import Check
 
 def check_wrapper_exists(node=None):
     """Check that a build tool wrapper exists (mvnw or gradlew)."""
-    c = Check("wrapper-exists", "Ensures build tool wrapper exists", node=node)
+    c = Check("build-tool-wrapper-exists", "Ensures build tool wrapper exists", node=node)
     with c:
         java = c.get_node(".lang.java")
         if not java.exists():
             c.skip("Not a Java project")
-
-        native = java.get_node(".native")
-        if not native.exists():
-            c.skip("Java native data not available")
 
         build_systems_node = java.get_node(".build_systems")
         if not build_systems_node.exists():
@@ -19,15 +15,14 @@ def check_wrapper_exists(node=None):
 
         build_systems = build_systems_node.get_value()
 
-        # Check wrapper for each detected build system
         missing = []
         if "maven" in build_systems:
-            mvnw_node = native.get_node(".mvnw.exists")
+            mvnw_node = java.get_node(".mvnw_exists")
             if not mvnw_node.exists() or not mvnw_node.get_value():
                 missing.append("mvnw (Maven wrapper)")
 
         if "gradle" in build_systems:
-            gradlew_node = native.get_node(".gradlew.exists")
+            gradlew_node = java.get_node(".gradlew_exists")
             if not gradlew_node.exists() or not gradlew_node.get_value():
                 missing.append("gradlew (Gradle wrapper)")
 
