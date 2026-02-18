@@ -55,7 +55,9 @@ def main(node=None):
                 break
         
         if not has_any_data:
-            c.fail("Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary.")
+            raise ValueError(
+                "Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary."
+            )
 
     return c
 

@@ -55,7 +55,9 @@ def main(node=None):
                 break
         
         if not has_any_data:
-            c.fail("Finding counts not available. Ensure collector reports .sast.findings or .sast.summary.")
+            raise ValueError(
+                "Finding counts not available. Ensure collector reports .sast.findings or .sast.summary."
+            )
 
     return c
 

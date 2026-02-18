@@ -55,7 +55,9 @@ def main(node=None):
                 break
         
         if not has_any_data:
-            c.fail("Finding counts not available. Ensure collector reports .iac_scan.findings or .iac_scan.summary.")
+            raise ValueError(
+                "Finding counts not available. Ensure collector reports .iac_scan.findings or .iac_scan.summary."
+            )
 
     return c
 

@@ -7,15 +7,15 @@
   </defs>
   <!-- Code file with shield cutout -->
   <g mask="url(#code-mask)">
-    <rect x="8" y="4" width="38" height="50" rx="3" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
+    <rect x="8" y="4" width="38" height="50" rx="3" fill="black" fill-opacity="0.15" stroke="black" stroke-width="2"/>
     <!-- Code brackets -->
-    <path d="M20 18L14 26L20 34" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M34 18L40 26L34 34" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M20 18L14 26L20 34" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M34 18L40 26L34 34" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     <!-- Code lines -->
-    <rect x="14" y="40" width="22" height="2.5" rx="1" fill="white" fill-opacity="0.5"/>
-    <rect x="14" y="46" width="14" height="2.5" rx="1" fill="white" fill-opacity="0.5"/>
+    <rect x="14" y="40" width="22" height="2.5" rx="1" fill="black" fill-opacity="0.5"/>
+    <rect x="14" y="46" width="14" height="2.5" rx="1" fill="black" fill-opacity="0.5"/>
   </g>
   <!-- Shield badge -->
-  <path d="M58 33L58 47C58 54 47 58 47 58C47 58 36 54 36 47L36 33L47 28L58 33Z" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
-  <path d="M43 44L46 47L52 40" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M58 33L58 47C58 54 47 58 47 58C47 58 36 54 36 47L36 33L47 28L58 33Z" fill="black" fill-opacity="0.15" stroke="black" stroke-width="2"/>
+  <path d="M43 44L46 47L52 40" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

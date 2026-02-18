@@ -55,7 +55,9 @@ def main(node=None):
                 break
         
         if not has_any_data:
-            c.fail("Vulnerability counts not available. Ensure collector reports .sca.vulnerabilities or .sca.summary.")
+            raise ValueError(
+                "Vulnerability counts not available. Ensure collector reports .sca.vulnerabilities or .sca.summary."
+            )
 
     return c
 
