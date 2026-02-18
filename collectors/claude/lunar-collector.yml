@@ -43,9 +43,8 @@ inputs:
     description: Optional JSON schema for structured output. If provided, Claude will return results conforming to this schema.
 
 secrets:
-  - name: ANTHROPIC_API_KEY
+  ANTHROPIC_API_KEY:
     description: Anthropic API key for Claude authentication
-    required: true
 
 example_component_json: |
   {

@@ -437,6 +437,103 @@ def get_readme_title(readme_path: Path) -> Optional[str]:
         return None
 
 
+def validate_template_compat(yaml_path: Path, result: ValidationResult) -> None:
+    """
+    Validate YAML schema against what the website Nunjucks templates expect.
+
+    The templates access these fields directly — wrong types, missing values,
+    or wrong container types (list vs dict) crash the Eleventy build.
+    """
+    import yaml
+
+    data = yaml.safe_load(yaml_path.read_text())
+    if not isinstance(data, dict):
+        result.errors.append("YAML root must be a mapping")
+        return
+
+    def require(obj, key, expected_type, prefix):
+        """Check obj[key] exists and has the right type. Returns the value or None."""
+        val = obj.get(key)
+        if val is None:
+            result.errors.append(f"{prefix}.{key}: required")
+            return None
+        if not isinstance(val, expected_type):
+            result.errors.append(
+                f"{prefix}.{key}: expected {expected_type.__name__}, "
+                f"got {type(val).__name__}"
+            )
+            return None
+        return val
+
+    # --- landing_page ---
+    lp = require(data, "landing_page", dict, "root")
+    if lp:
+        require(lp, "display_name", str, "landing_page")
+        require(lp, "long_description", str, "landing_page")
+        require(lp, "status", str, "landing_page")
+
+        if "categories" in lp:
+            cats = lp["categories"]
+            if not isinstance(cats, list) or not all(isinstance(c, str) for c in cats):
+                result.errors.append("landing_page.categories: must be a list of strings")
+        elif "category" not in lp:
+            result.errors.append("landing_page: missing category or categories")
+
+        for i, rel in enumerate(lp.get("related") or []):
+            pfx = f"landing_page.related[{i}]"
+            if isinstance(rel, dict):
+                require(rel, "slug", str, pfx)
+                require(rel, "type", str, pfx)
+            else:
+                result.errors.append(f"{pfx}: expected mapping, got {type(rel).__name__}")
+
+        for i, req in enumerate(lp.get("requires") or []):
+            pfx = f"landing_page.requires[{i}]"
+            if isinstance(req, dict):
+                require(req, "slug", str, pfx)
+                require(req, "type", str, pfx)
+            else:
+                result.errors.append(f"{pfx}: expected mapping, got {type(req).__name__}")
+
+    # --- sub-items (collectors/policies/catalogers): name, description, keywords ---
+    for item_type in ("collectors", "policies", "catalogers"):
+        for item in data.get(item_type) or []:
+            name = item.get("name", "?") if isinstance(item, dict) else "?"
+            pfx = f"{item_type}.{name}"
+            if not isinstance(item, dict):
+                result.errors.append(f"{pfx}: expected mapping")
+                continue
+            require(item, "name", str, pfx)
+            require(item, "description", str, pfx)
+            kw = item.get("keywords")
+            if not isinstance(kw, list) or not kw:
+                result.errors.append(f"{pfx}.keywords: must be a non-empty list")
+            elif not all(isinstance(k, str) for k in kw):
+                result.errors.append(f"{pfx}.keywords: all entries must be strings")
+
+    # --- secrets / inputs: must be dicts keyed by name, each with a description ---
+    for field in ("secrets", "inputs"):
+        section = data.get(field)
+        if section is None:
+            continue
+        if not isinstance(section, dict):
+            result.errors.append(
+                f"{field}: must be a dict keyed by name, "
+                f"got {type(section).__name__}"
+            )
+            continue
+        for key, val in section.items():
+            if not isinstance(val, dict) or "description" not in val:
+                result.errors.append(f"{field}.{key}: missing description")
+
+    # --- example_component_json (used with | trim in templates) ---
+    ecj = data.get("example_component_json")
+    if ecj is not None and not isinstance(ecj, str):
+        result.errors.append(
+            f"example_component_json: expected string, got {type(ecj).__name__}"
+        )
+
+
 def validate_plugin(
     plugin_dir: Path,
     plugin_type: str,
@@ -666,6 +763,9 @@ def validate_plugin(
                 f"README title '{readme_title}' doesn't match expected "
                 f"'{display_name}' (from display_name)"
             )
+    
+    # Website template compatibility (secrets/inputs must be dicts, etc.)
+    validate_template_compat(yaml_path, result)
     
     return result
 
