@@ -75,13 +75,9 @@ example_component_json: |
         "version": "3.12.1",
         "build_systems": ["poetry"],
         "native": {
-          "pyproject": { "exists": true },
-          "requirements_txt": { "exists": false },
-          "setup_py": { "exists": false },
-          "pipfile": { "exists": false },
-          "poetry_lock": { "exists": true },
-          "pipfile_lock": { "exists": false },
-          "python_version_file": { "exists": true },
+          "pyproject": {},
+          "poetry_lock": {},
+          "python_version_file": {},
           "linter": "ruff",
           "type_checker": "mypy"
         },

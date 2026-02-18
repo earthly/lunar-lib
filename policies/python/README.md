@@ -24,9 +24,9 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.python` | object | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.poetry_lock.exists` | boolean | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.pipfile_lock.exists` | boolean | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.linter` | string | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.native.poetry_lock` | object (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.native.pipfile_lock` | object (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.native.linter` | string (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 | `.lang.python.version` | string | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 | `.lang.python.cicd.cmds` | array | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 
@@ -56,8 +56,8 @@ policies:
       "version": "3.12.1",
       "build_systems": ["poetry"],
       "native": {
-        "pyproject": { "exists": true },
-        "poetry_lock": { "exists": true },
+        "pyproject": {},
+        "poetry_lock": {},
         "linter": "ruff",
         "type_checker": "mypy"
       }
@@ -75,10 +75,7 @@ policies:
       "version": "3.8.5",
       "build_systems": ["pip"],
       "native": {
-        "requirements_txt": { "exists": true },
-        "poetry_lock": { "exists": false },
-        "pipfile_lock": { "exists": false },
-        "linter": null
+        "requirements_txt": {}
       }
     }
   }

@@ -13,11 +13,9 @@ def check_linter_configured(node=None):
         if not native.exists():
             c.skip("Python project data not available - ensure python collector has run")
 
-        # linter is null when no linter detected, string when detected
-        linter_node = native.get_node(".linter")
-        linter = linter_node.get_value() if linter_node.exists() else None
+        # linter key is only present when a linter is detected (presence = signal)
         c.assert_true(
-            linter is not None and linter != "",
+            native.get_node(".linter").exists(),
             "No Python linter configured. Set up one of:\n"
             "  - Ruff: add [tool.ruff] to pyproject.toml or create .ruff.toml\n"
             "  - Flake8: create .flake8 or add [flake8] to setup.cfg\n"

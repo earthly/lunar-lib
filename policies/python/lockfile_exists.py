@@ -13,19 +13,16 @@ def check_lockfile_exists(node=None):
         if not native.exists():
             c.skip("Python project data not available - ensure python collector has run")
 
-        # Check for poetry.lock
-        poetry_lock = native.get_node(".poetry_lock.exists")
-        if poetry_lock.exists() and poetry_lock.get_value():
+        # Check for poetry.lock (presence = exists)
+        if native.get_node(".poetry_lock").exists():
             return c
 
-        # Check for Pipfile.lock
-        pipfile_lock = native.get_node(".pipfile_lock.exists")
-        if pipfile_lock.exists() and pipfile_lock.get_value():
+        # Check for Pipfile.lock (presence = exists)
+        if native.get_node(".pipfile_lock").exists():
             return c
 
         # For requirements.txt projects, check if dependencies have pinned versions
-        req_txt = native.get_node(".requirements_txt.exists")
-        if req_txt.exists() and req_txt.get_value():
+        if native.get_node(".requirements_txt").exists():
             deps_node = python.get_node(".dependencies.direct")
             if not deps_node.exists():
                 c.skip("Dependency data not available - ensure python dependencies collector has run")
