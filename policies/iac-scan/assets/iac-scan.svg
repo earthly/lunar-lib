@@ -1,6 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Cloud/infrastructure with magnifying glass -->
-  <path d="M4 14.5A3.5 3.5 0 0 1 7.5 11a5 5 0 0 1 9.2-1.5A3.5 3.5 0 0 1 15 15H7a3 3 0 0 1-3-3.5z"/>
-  <circle cx="17" cy="17" r="4"/>
-  <path d="M21 21l-2-2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <mask id="cloud-mask">
+      <rect width="64" height="64" fill="white"/>
+      <path d="M56 31L56 45C56 53 45 58 45 58C45 58 34 53 34 45L34 31L45 26L56 31Z" fill="black"/>
+    </mask>
+  </defs>
+  <!-- Cloud with shield cutout -->
+  <g mask="url(#cloud-mask)">
+    <path d="M16 38C10 38 4 33 4 26C4 19 10 14 16 14C17 7 24 2 33 2C41 2 47 7 49 14C55 14 60 19 60 26C60 33 55 38 49 38Z" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
+    <!-- Config lines inside cloud -->
+    <rect x="16" y="18" width="22" height="2.5" rx="1" fill="white" fill-opacity="0.6"/>
+    <rect x="16" y="24" width="16" height="2.5" rx="1" fill="white" fill-opacity="0.5"/>
+    <rect x="16" y="30" width="19" height="2.5" rx="1" fill="white" fill-opacity="0.5"/>
+  </g>
+  <!-- Shield badge -->
+  <path d="M56 31L56 45C56 53 45 58 45 58C45 58 34 53 34 45L34 31L45 26L56 31Z" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
+  <path d="M41 42L44 45L50 38" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

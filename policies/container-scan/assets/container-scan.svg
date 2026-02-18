@@ -1,9 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Container/box with magnifying glass -->
-  <rect x="2" y="4" width="12" height="10" rx="1"/>
-  <path d="M5 4V2"/>
-  <path d="M11 4V2"/>
-  <path d="M5 8h6"/>
-  <circle cx="17" cy="17" r="4"/>
-  <path d="M21 21l-2-2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <mask id="ctr-mask">
+      <rect width="64" height="64" fill="white"/>
+      <path d="M56 29L56 43C56 51 45 56 45 56C45 56 34 51 34 43L34 29L45 24L56 29Z" fill="black"/>
+    </mask>
+  </defs>
+  <!-- Container with shield cutout -->
+  <g mask="url(#ctr-mask)">
+    <!-- Front face -->
+    <path d="M4 20L4 46L18 50L18 24L4 20Z" fill="white" fill-opacity="0.15"/>
+    <!-- Top face -->
+    <path d="M4 20L18 24L56 16L42 12L4 20Z" fill="white" fill-opacity="0.3"/>
+    <!-- Side face -->
+    <path d="M18 24L56 16L56 42L18 50L18 24Z" fill="white" fill-opacity="0.2"/>
+    <!-- Outline -->
+    <path d="M4 20L42 12L56 16L56 42L18 50L4 46L4 20Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M4 20L18 24L56 16" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M18 24L18 50" stroke="white" stroke-width="2"/>
+    <!-- Corrugated ridges -->
+    <path d="M24 25L24 48" stroke="white" stroke-width="1" opacity="0.4"/>
+    <path d="M30 24L30 46" stroke="white" stroke-width="1" opacity="0.4"/>
+    <path d="M36 22.5L36 44.5" stroke="white" stroke-width="1" opacity="0.4"/>
+    <path d="M42 21L42 43" stroke="white" stroke-width="1" opacity="0.4"/>
+    <path d="M48 20L48 41" stroke="white" stroke-width="1" opacity="0.4"/>
+  </g>
+  <!-- Shield badge -->
+  <path d="M56 29L56 43C56 51 45 56 45 56C45 56 34 51 34 43L34 29L45 24L56 29Z" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2"/>
+  <path d="M41 40L44 43L50 36" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
