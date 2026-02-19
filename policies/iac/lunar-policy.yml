@@ -10,7 +10,7 @@ landing_page:
   display_name: "IaC Guardrails"
   long_description: |
     Enforce Infrastructure as Code best practices including configuration validity,
-    WAF protection for internet-facing services, and datastore deletion protection.
+    WAF protection, datastore durability, and infrastructure availability.
     Works with any IaC collector that writes to the .iac schema.
   category: "deployment-and-infrastructure"
   icon: "assets/iac.svg"
@@ -41,12 +41,21 @@ policies:
     mainPython: waf_protection.py
     keywords: ["iac", "waf", "security", "internet facing", "load balancer"]
 
-  - name: datastore-protection
+  - name: datastore-durability
     description: |
-      Requires deletion protection on datastores (databases, storage, caches).
-      Prevents accidental data loss from destroy operations or resource replacement.
-    mainPython: datastore_protection.py
-    keywords: ["iac", "datastores", "deletion protection", "data safety", "prevent_destroy"]
+      Ensures datastores (databases, storage, caches) have deletion protection
+      enabled via lifecycle { prevent_destroy = true }. Prevents accidental data
+      loss from destroy operations or resource replacement.
+    mainPython: datastore_durability.py
+    keywords: ["iac", "datastores", "deletion protection", "durability", "prevent_destroy"]
+
+  - name: infra-availability
+    description: |
+      Ensures infrastructure resources like EC2 instances, load balancers, and
+      networking components have availability best practices such as multi-AZ
+      deployment and auto-scaling configured.
+    mainPython: infra_availability.py
+    keywords: ["iac", "availability", "multi-az", "auto-scaling", "high availability"]
 
 inputs:
   extra_datastore_types:
