@@ -1,10 +1,10 @@
 # Container Guardrails
 
-Enforces best practices for container definitions including tag stability, registry allowlists, required labels, and security configurations.
+Enforces best practices for container definitions and builds including tag stability, registry allowlists, required labels, build traceability, and security configurations.
 
 ## Overview
 
-This policy plugin validates container definitions (Dockerfiles, Containerfiles) against common best practices and security requirements. It helps ensure consistent, secure, and reproducible container builds across your organization.
+This policy plugin validates container definitions (Dockerfiles) and CI build commands against common best practices and security requirements. It helps ensure consistent, secure, and reproducible container builds across your organization.
 
 ## Policies
 
@@ -15,9 +15,11 @@ This plugin provides the following policies (use `include` to select a subset):
 | `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
 | `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Image uses unstable tag (partial version, branch name, etc.) |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
-| `required-labels` | Required labels must be present | Dockerfile missing one or more required labels |
+| `required-labels` | Required labels must be present in Dockerfiles | Dockerfile missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
 | `user` | USER instruction must be present | Final stage missing USER instruction |
+| `build-tagged` | Container builds must use explicit `-t`/`--tag` | Build command missing image tag |
+| `build-required-labels` | Container builds must include required labels | Build command missing required `--label` flags |
 
 ## Required Data
 
@@ -25,7 +27,8 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.containers.definitions[]` | array | [`dockerfile`](https://github.com/earthly/lunar-lib/tree/main/collectors/dockerfile) collector |
+| `.containers.definitions[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (dockerfile sub-collector) |
+| `.containers.builds[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (build-cicd sub-collector) |
 
 ## Installation
 
@@ -36,10 +39,11 @@ policies:
   - uses: github://earthly/lunar-lib/policies/container@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [no-latest, stable-tags]  # Only include specific policies
+    # include: [no-latest, stable-tags, build-tagged]  # Only include specific policies
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
     #   required_labels: "org.opencontainers.image.source"
+    #   required_build_labels: "git_sha"
 ```
 
 ## Examples
@@ -164,4 +168,20 @@ Add a USER instruction to run as non-root:
 USER nonroot
 # or
 USER 1000:1000
+```
+
+### build-tagged
+
+Add an explicit `-t`/`--tag` flag to your `docker build` command:
+
+```bash
+docker build -t myregistry.io/app:v1.2.3 .
+```
+
+### build-required-labels
+
+Add the required labels to your `docker build` command:
+
+```bash
+docker build -t app:v1 --label git_sha=$GITHUB_SHA --label version=$VERSION .
 ```
