@@ -15,13 +15,11 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
-        c.assert_exists(
-            ".iac_scan",
-            "No IaC scan data found. Ensure a scanner (Checkov, tfsec, etc.) is configured.",
-        )
-
         scan_node = c.get_node(".iac_scan")
-        
+        if not scan_node.exists():
+            c.fail("No IaC scan data found. Ensure a scanner (Checkov, tfsec, etc.) is configured.")
+            return c
+
         # Get the index of min_severity to know which severities to check
         severity_index = SEVERITY_ORDER.index(min_severity)
         severities_to_check = SEVERITY_ORDER[:severity_index + 1]
@@ -44,7 +42,7 @@ def main(node=None):
                     c.fail(f"{severity.capitalize()} IaC misconfigurations detected ({count} found)")
                     return c
 
-        # If we get here with no data found, fail
+        # If we get here with no data found, fail gracefully
         has_any_data = False
         for severity in severities_to_check:
             if scan_node.get_node(f".summary.has_{severity}").exists():
@@ -53,11 +51,9 @@ def main(node=None):
             if scan_node.get_node(f".findings.{severity}").exists():
                 has_any_data = True
                 break
-        
+
         if not has_any_data:
-            raise ValueError(
-                "Finding counts not available. Ensure collector reports .iac_scan.findings or .iac_scan.summary."
-            )
+            c.fail("Finding counts not available. Ensure collector reports .iac_scan.findings or .iac_scan.summary.")
 
     return c
 
