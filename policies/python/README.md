@@ -24,9 +24,9 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.python` | object | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.poetry_lock` | object (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.pipfile_lock` | object (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
-| `.lang.python.native.linter` | string (presence) | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.poetry_lock_exists` | boolean | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.pipfile_lock_exists` | boolean | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
+| `.lang.python.linter_configured` | boolean | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 | `.lang.python.version` | string | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 | `.lang.python.cicd.cmds` | array | [`python`](https://github.com/earthly/lunar-lib/tree/main/collectors/python) collector |
 
@@ -55,12 +55,12 @@ policies:
     "python": {
       "version": "3.12.1",
       "build_systems": ["poetry"],
-      "native": {
-        "pyproject": {},
-        "poetry_lock": {},
-        "linter": "ruff",
-        "type_checker": "mypy"
-      }
+      "pyproject_exists": true,
+      "poetry_lock_exists": true,
+      "linter_configured": true,
+      "linter": "ruff",
+      "type_checker_configured": true,
+      "type_checker": "mypy"
     }
   }
 }
@@ -74,9 +74,10 @@ policies:
     "python": {
       "version": "3.8.5",
       "build_systems": ["pip"],
-      "native": {
-        "requirements_txt": {}
-      }
+      "requirements_txt_exists": true,
+      "poetry_lock_exists": false,
+      "pipfile_lock_exists": false,
+      "linter_configured": false
     }
   }
 }

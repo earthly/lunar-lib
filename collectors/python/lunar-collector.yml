@@ -74,13 +74,17 @@ example_component_json: |
       "python": {
         "version": "3.12.1",
         "build_systems": ["poetry"],
-        "native": {
-          "pyproject": {},
-          "poetry_lock": {},
-          "python_version_file": {},
-          "linter": "ruff",
-          "type_checker": "mypy"
-        },
+        "pyproject_exists": true,
+        "requirements_txt_exists": false,
+        "setup_py_exists": false,
+        "pipfile_exists": false,
+        "poetry_lock_exists": true,
+        "pipfile_lock_exists": false,
+        "python_version_file_exists": true,
+        "linter_configured": true,
+        "linter": "ruff",
+        "type_checker_configured": true,
+        "type_checker": "mypy",
         "source": { "tool": "python", "integration": "code" },
         "cicd": {
           "cmds": [{ "cmd": "pytest --cov=src", "version": "3.12.1" }],
