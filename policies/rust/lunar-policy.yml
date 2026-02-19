@@ -1,0 +1,94 @@
+version: 0
+
+name: rust
+description: Enforces Rust project structure, safety, and toolchain standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-scripts:1.0.0
+
+landing_page:
+  display_name: "Rust Project Guardrails"
+  long_description: |
+    Enforce Rust-specific project standards including Cargo manifest presence,
+    lockfile requirements, edition and MSRV minimums, unsafe block limits,
+    and clippy compliance.
+  category: "devex-build-and-ci"
+  icon: "assets/rust.svg"
+  status: "beta"
+  requires:
+    - slug: "rust"
+      type: "collector"
+      reason: "Provides Rust project metadata"
+  related: []
+
+policies:
+  - name: cargo-toml-exists
+    description: |
+      Ensures the project has a Cargo.toml file for crate configuration.
+      Required for all Rust projects.
+    mainPython: cargo_toml_exists.py
+    keywords: ["Cargo.toml", "rust project", "crate manifest"]
+
+  - name: cargo-lock-exists
+    description: |
+      Ensures the project has a Cargo.lock file for dependency pinning.
+      By default required for applications, skipped for libraries
+      (following Cargo conventions). Configurable via lock_mode.
+    mainPython: cargo_lock_exists.py
+    keywords: ["Cargo.lock", "dependencies", "reproducibility", "lockfile"]
+
+  - name: min-rust-edition
+    description: |
+      Ensures the project uses at least the minimum required Rust edition.
+      Editions enable new language features while preserving backward
+      compatibility.
+    mainPython: min_rust_edition.py
+    keywords: ["rust edition", "2021", "2024", "language features"]
+
+  - name: min-rust-version-cicd
+    description: |
+      Ensures the Rust toolchain version used in CI/CD commands meets
+      the minimum required version. Helps maintain security and
+      compatibility standards for build environments.
+    mainPython: min_rust_version_cicd.py
+    keywords: ["rust version", "ci/cd", "toolchain", "compatibility"]
+
+  - name: clippy-clean
+    description: |
+      Ensures clippy reports no warnings (or fewer than the configured
+      threshold). Clippy catches common mistakes and enforces idiomatic
+      Rust patterns.
+    mainPython: clippy_clean.py
+    keywords: ["clippy", "lint", "code quality", "idiomatic rust"]
+
+  - name: max-unsafe-blocks
+    description: |
+      Limits the number of unsafe blocks in the codebase. Unsafe code
+      bypasses Rust's safety guarantees and should be minimized and
+      carefully reviewed.
+    mainPython: max_unsafe_blocks.py
+    keywords: ["unsafe", "safety", "memory safety", "code review"]
+
+inputs:
+  lock_mode:
+    description: |
+      Cargo.lock enforcement mode. The "auto" mode detects whether the
+      crate is a library or application and applies the Cargo convention
+      (required for apps, skipped for libs).
+      - "auto": Require for applications, skip for libraries (default)
+      - "required": Always require Cargo.lock
+      - "forbidden": Fail if Cargo.lock exists
+      - "none": Skip the check entirely
+    default: "auto"
+  min_rust_edition:
+    description: Minimum required Rust edition (e.g., "2021", "2024")
+    default: "2021"
+  min_rust_version_cicd:
+    description: Minimum required Rust toolchain version for CI/CD (e.g., "1.75.0")
+    default: "1.75.0"
+  max_clippy_warnings:
+    description: Maximum allowed clippy warnings (0 = must be clean)
+    default: "0"
+  max_unsafe_blocks:
+    description: Maximum allowed unsafe blocks (0 = no unsafe allowed)
+    default: "0"

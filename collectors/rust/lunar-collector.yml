@@ -1,0 +1,156 @@
+version: 0
+
+name: rust
+description: Collect Rust project information, CI/CD commands, test coverage, dependencies, and clippy results
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:rust-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Rust Collector"
+  long_description: |
+    Analyze Rust projects to collect crate metadata, dependencies, unsafe block
+    usage, test coverage, and clippy lint results. Supports Cargo workspaces.
+  categories: ["languages", "build"]
+  icon: "assets/rust.svg"
+  status: "beta"
+  related:
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Rust project structure by detecting Cargo.toml, Cargo.lock,
+      rust-toolchain.toml, clippy and rustfmt configuration, workspace members,
+      edition, MSRV, and crate type (library vs binary). Counts unsafe blocks
+      and records their locations. Writes project metadata to .lang.rust.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["rust", "cargo", "Cargo.toml", "project structure", "unsafe", "edition", "workspace"]
+
+  - name: dependencies
+    description: |
+      Extracts direct, dev, and build dependencies from Cargo.toml. When
+      Cargo.lock is present, also extracts resolved transitive dependency
+      versions. Writes dependency data to .lang.rust.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["rust dependencies", "cargo dependencies", "crates", "supply chain"]
+
+  - name: clippy
+    description: |
+      Runs cargo clippy with JSON output and collects structured lint warnings.
+      Parses each diagnostic into file, line, message, and lint name. Writes
+      normalized warnings to .lang.rust.lint and raw output to
+      .lang.rust.native.clippy.
+    mainBash: clippy.sh
+    hook:
+      type: code
+    keywords: ["clippy", "rust linting", "static analysis", "code quality"]
+
+  - name: cicd
+    description: |
+      Records every cargo command executed in CI pipelines along with the Rust
+      toolchain version. Writes command strings and version info to
+      .lang.rust.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: cargo
+    keywords: ["rust ci", "cargo version", "ci commands", "build tracking"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from cargo-tarpaulin or cargo-llvm-cov output
+      after tests complete. Parses coverage reports and writes results to
+      .lang.rust.tests.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: cargo
+      args:
+        - value_pattern: ^(tarpaulin|llvm-cov|test)$
+    keywords: ["code coverage", "tarpaulin", "llvm-cov", "test coverage", "coverage metrics"]
+
+inputs:
+  clippy_args:
+    description: Additional arguments to pass to cargo clippy (e.g., "-- -W clippy::pedantic")
+    default: ""
+
+example_component_json: |
+  {
+    "lang": {
+      "rust": {
+        "edition": "2021",
+        "version": "1.75.0",
+        "msrv": "1.70.0",
+        "build_systems": ["cargo"],
+        "cargo_toml_exists": true,
+        "cargo_lock_exists": true,
+        "rust_toolchain_exists": true,
+        "clippy_configured": true,
+        "rustfmt_configured": true,
+        "is_application": true,
+        "is_library": false,
+        "workspace": null,
+        "unsafe_blocks": {
+          "count": 2,
+          "locations": [
+            {"file": "src/ffi.rs", "line": 42},
+            {"file": "src/ffi.rs", "line": 87}
+          ]
+        },
+        "source": { "tool": "cargo", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "cargo test --all-features", "version": "1.77.0" },
+            { "cmd": "cargo build --release", "version": "1.77.0" }
+          ],
+          "source": { "tool": "cargo", "integration": "ci" }
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 74.3,
+            "source": { "tool": "cargo-tarpaulin", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "serde", "version": "1.0.197", "features": ["derive"] },
+            { "path": "tokio", "version": "1.36.0", "features": ["full"] }
+          ],
+          "dev": [
+            { "path": "criterion", "version": "0.5.1" }
+          ],
+          "build": [
+            { "path": "prost-build", "version": "0.12.3" }
+          ],
+          "transitive": [
+            { "path": "serde_derive", "version": "1.0.197" },
+            { "path": "proc-macro2", "version": "1.0.78" }
+          ],
+          "source": { "tool": "cargo", "integration": "code" }
+        },
+        "lint": {
+          "warnings": [
+            { "file": "src/main.rs", "line": 15, "column": 5, "message": "unused variable: `x`", "lint": "unused_variables" }
+          ],
+          "linters": ["clippy"],
+          "source": { "tool": "clippy", "integration": "code" }
+        },
+        "native": {
+          "clippy": {
+            "passed": true,
+            "exit_code": 0
+          }
+        }
+      }
+    }
+  }
