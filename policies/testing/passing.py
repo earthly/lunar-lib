@@ -32,22 +32,18 @@ def check_passing(node=None):
             if not c.get_node(".lang").exists():
                 c.skip("No language project detected")
         
-        # Assert test data exists - fail (not skip) if missing
-        # This ensures the score correctly reflects missing test data
-        c.assert_exists(
-            ".testing",
-            "No test execution data found. Ensure tests are configured to run in CI."
-        )
-        c.assert_exists(
-            ".testing.all_passing",
-            "Test pass/fail data not available. Configure your test runner to report results."
-        )
-
-        # Assert tests are passing
-        c.assert_true(
-            c.get_value(".testing.all_passing"),
-            "Tests are failing. Check CI logs for test failure details."
-        )
+        # Use exists() to check for test pass/fail data:
+        # - Before collectors finish: exists() raises NoDataError -> pending
+        # - After collectors finish, no data: exists() returns False -> fail
+        # - After collectors finish, has data: exists() returns True -> use real value
+        n = c.get_node(".testing.all_passing")
+        if n.exists():
+            c.assert_true(
+                n.get_value(),
+                "Tests are failing. Check CI logs for test failure details."
+            )
+        else:
+            c.fail("Test pass/fail data not available. Configure your test runner to report results.")
     return c
 
 
