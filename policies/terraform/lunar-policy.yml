@@ -9,8 +9,8 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Terraform Guardrails"
   long_description: |
-    Enforce Terraform-specific best practices including provider version pinning,
-    module version pinning, and remote backend configuration for state management.
+    Enforce Terraform-specific best practices including provider version pinning, minimum provider versions,
+    module version pinning, and remote backend configuration.
   category: "deployment-and-infrastructure"
   icon: "assets/terraform.svg"
   status: "beta"
