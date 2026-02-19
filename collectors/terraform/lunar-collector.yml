@@ -15,7 +15,13 @@ landing_page:
   categories: ["security", "orchestration"]
   icon: "assets/terraform.svg"
   status: "beta"
-  related: []
+  related:
+    - slug: "iac"
+      type: "policy"
+      reason: "Generic IaC guardrails using this collector's data"
+    - slug: "terraform"
+      type: "policy"
+      reason: "Terraform-specific guardrails using this collector's data"
 
 collectors:
   - name: terraform

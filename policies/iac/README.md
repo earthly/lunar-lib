@@ -4,7 +4,7 @@ Enforces Infrastructure as Code configuration best practices.
 
 ## Overview
 
-This policy validates IaC configurations against best practices including file validity, WAF protection for internet-facing services, datastore durability, and infrastructure availability. It analyzes parsed IaC data from the `.iac` category and works across IaC frameworks (Terraform, Pulumi, CloudFormation).
+This policy validates IaC configurations against best practices including file validity, WAF protection for internet-facing services, and destroy protection for both stateful (datastores) and stateless (compute, networking) resources. It analyzes parsed IaC data from the `.iac` category and works across IaC frameworks (Terraform, Pulumi, CloudFormation).
 
 ## Policies
 
@@ -14,8 +14,8 @@ This policy provides the following guardrails (use `include` to select a subset)
 |--------|-------------|-----------------|
 | `valid` | All IaC files parse successfully | File has syntax errors |
 | `waf-protection` | Internet-facing services have WAF | Public service without WAF protection |
-| `datastore-durability` | Datastores have deletion protection | Datastore missing `lifecycle { prevent_destroy = true }` |
-| `infra-availability` | Infrastructure has availability best practices | Missing multi-AZ or auto-scaling configuration |
+| `datastore-destroy-protection` | Stateful resources have destroy protection | Datastore missing `lifecycle { prevent_destroy = true }` |
+| `resource-destroy-protection` | Stateless resources have destroy protection | Infrastructure resource missing `lifecycle { prevent_destroy = true }` |
 
 ## Required Data
 
@@ -41,16 +41,17 @@ policies:
   - uses: github://earthly/lunar-lib/policies/iac@main
     on: [infra]
     enforcement: report-pr
-    # include: [valid, waf-protection, datastore-durability]  # Only run specific checks
+    # include: [valid, waf-protection, datastore-destroy-protection]  # Only run specific checks
     # with:
-    #   extra_datastore_types: "aws_redshift_cluster,aws_neptune_cluster"  # Add custom types
+    #   extra_datastore_types: "aws_redshift_cluster,aws_neptune_cluster"
+    #   extra_stateless_types: "aws_ecs_cluster,aws_eks_cluster"
 ```
 
 ## Examples
 
 ### Passing Example
 
-A component with valid Terraform, WAF-protected internet services, and protected datastores:
+A component with valid Terraform, WAF-protected internet services, and protected resources:
 
 ```json
 {
@@ -70,7 +71,7 @@ A component with valid Terraform, WAF-protected internet services, and protected
                   "main": [{"lifecycle": [{"prevent_destroy": true}]}]
                 },
                 "aws_lb": {
-                  "api": [{"internal": false}]
+                  "api": [{"internal": false, "lifecycle": [{"prevent_destroy": true}]}]
                 },
                 "aws_wafv2_web_acl": {"main": [{}]},
                 "aws_wafv2_web_acl_association": {"api": [{}]}
@@ -86,7 +87,7 @@ A component with valid Terraform, WAF-protected internet services, and protected
 
 ### Failing Example
 
-A component with an internet-facing load balancer but no WAF, and unprotected datastores:
+A component with an internet-facing load balancer but no WAF, and unprotected resources:
 
 ```json
 {
@@ -104,6 +105,9 @@ A component with an internet-facing load balancer but no WAF, and unprotected da
                 "aws_db_instance": {
                   "payments_db": [{"engine": "postgres"}]
                 },
+                "aws_instance": {
+                  "web": [{"instance_type": "t3.micro"}]
+                },
                 "aws_lb": {
                   "api": [{"internal": false}]
                 }
@@ -119,8 +123,8 @@ A component with an internet-facing load balancer but no WAF, and unprotected da
 
 **Failure messages:**
 - `Service has internet-facing resources but no WAF protection configured`
-- `Datastores without deletion protection: aws_db_instance.payments_db. Add lifecycle { prevent_destroy = true } to protect against accidental deletion.`
-- `Infrastructure resource aws_db_instance.main is not configured for multi-AZ deployment`
+- `Stateful resources without destroy protection: aws_db_instance.payments_db`
+- `Stateless resources without destroy protection: aws_instance.web, aws_lb.api`
 
 ## Remediation
 
@@ -128,5 +132,5 @@ When this policy fails, resolve it by:
 
 1. **For `valid` failures:** Fix HCL syntax errors in the flagged `.tf` files
 2. **For `waf-protection` failures:** Add `aws_wafv2_web_acl` and `aws_wafv2_web_acl_association` resources to protect internet-facing load balancers and API gateways
-3. **For `datastore-durability` failures:** Add `lifecycle { prevent_destroy = true }` to database, storage, and cache resources to prevent accidental deletion
-4. **For `infra-availability` failures:** Enable multi-AZ deployment, configure auto-scaling groups, or add redundancy for critical infrastructure resources
+3. **For `datastore-destroy-protection` failures:** Add `lifecycle { prevent_destroy = true }` to database, storage, and cache resources
+4. **For `resource-destroy-protection` failures:** Add `lifecycle { prevent_destroy = true }` to critical infrastructure resources like EC2 instances, load balancers, and networking components

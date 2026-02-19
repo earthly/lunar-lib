@@ -10,7 +10,7 @@ landing_page:
   display_name: "IaC Guardrails"
   long_description: |
     Enforce Infrastructure as Code best practices including configuration validity,
-    WAF protection, datastore durability, and infrastructure availability.
+    WAF protection, and destroy protection for stateful and stateless resources.
     Works with any IaC collector that writes to the .iac schema.
   category: "deployment-and-infrastructure"
   icon: "assets/iac.svg"
@@ -41,27 +41,32 @@ policies:
     mainPython: waf_protection.py
     keywords: ["iac", "waf", "security", "internet facing", "load balancer"]
 
-  - name: datastore-durability
+  - name: datastore-destroy-protection
     description: |
-      Ensures datastores (databases, storage, caches) have deletion protection
-      enabled via lifecycle { prevent_destroy = true }. Prevents accidental data
-      loss from destroy operations or resource replacement.
-    mainPython: datastore_durability.py
-    keywords: ["iac", "datastores", "deletion protection", "durability", "prevent_destroy"]
+      Ensures stateful resources (databases, storage buckets, caches) have
+      lifecycle { prevent_destroy = true } to prevent accidental data loss.
+    mainPython: datastore_destroy_protection.py
+    keywords: ["iac", "datastores", "prevent_destroy", "stateful", "data safety"]
 
-  - name: infra-availability
+  - name: resource-destroy-protection
     description: |
-      Ensures infrastructure resources like EC2 instances, load balancers, and
-      networking components have availability best practices such as multi-AZ
-      deployment and auto-scaling configured.
-    mainPython: infra_availability.py
-    keywords: ["iac", "availability", "multi-az", "auto-scaling", "high availability"]
+      Ensures stateless infrastructure resources (EC2 instances, load balancers,
+      networking) have lifecycle { prevent_destroy = true } to prevent accidental
+      destruction of critical infrastructure.
+    mainPython: resource_destroy_protection.py
+    keywords: ["iac", "infrastructure", "prevent_destroy", "stateless", "ec2"]
 
 inputs:
   extra_datastore_types:
     description: |
-      Comma-separated list of additional Terraform resource types to treat as datastores,
+      Comma-separated list of additional resource types to treat as datastores,
       beyond the built-in defaults (aws_s3_bucket, aws_db_instance, aws_dynamodb_table,
       aws_elasticache_cluster, aws_elasticache_replication_group, aws_ebs_volume,
       aws_efs_file_system).
+    default: ""
+  extra_stateless_types:
+    description: |
+      Comma-separated list of additional resource types to treat as stateless
+      infrastructure, beyond the built-in defaults (aws_instance, aws_lb,
+      aws_autoscaling_group, aws_ecs_service, aws_lambda_function).
     default: ""
