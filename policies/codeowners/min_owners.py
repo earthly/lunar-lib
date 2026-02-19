@@ -8,8 +8,11 @@ def main(node=None, min_owners_override=None):
         node=node,
     )
     with c:
-        c.assert_true(c.get_value(".ownership.codeowners.exists"),
-            "No CODEOWNERS file found")
+        # Check if CODEOWNERS exists - return early if not
+        # (get_value handles nodata properly -> PENDING if collector not done)
+        if not c.get_value(".ownership.codeowners.exists"):
+            c.fail("No CODEOWNERS file found")
+            return c
 
         min_owners = (
             min_owners_override
