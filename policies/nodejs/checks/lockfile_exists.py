@@ -9,13 +9,9 @@ def check_lockfile_exists(node=None):
         if not nodejs.exists():
             c.skip("Not a Node.js project")
 
-        native = nodejs.get_node(".native")
-        if not native.exists():
-            c.skip("Node.js project data not available")
-
-        package_lock = native.get_value_or_default(".package_lock.exists", False)
-        yarn_lock = native.get_value_or_default(".yarn_lock.exists", False)
-        pnpm_lock = native.get_value_or_default(".pnpm_lock.exists", False)
+        package_lock = nodejs.get_value_or_default(".package_lock_exists", False)
+        yarn_lock = nodejs.get_value_or_default(".yarn_lock_exists", False)
+        pnpm_lock = nodejs.get_value_or_default(".pnpm_lock_exists", False)
 
         c.assert_true(
             package_lock or yarn_lock or pnpm_lock,

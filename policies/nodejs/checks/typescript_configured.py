@@ -9,7 +9,7 @@ def check_typescript_configured(node=None):
         if not nodejs.exists():
             c.skip("Not a Node.js project")
 
-        tsconfig = nodejs.get_node(".native.tsconfig.exists")
+        tsconfig = nodejs.get_node(".tsconfig_exists")
         if not tsconfig.exists():
             c.skip("TypeScript detection data not available")
 

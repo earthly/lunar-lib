@@ -25,11 +25,11 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.nodejs` | object | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
-| `.lang.nodejs.native.package_lock.exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
-| `.lang.nodejs.native.yarn_lock.exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
-| `.lang.nodejs.native.pnpm_lock.exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
-| `.lang.nodejs.native.tsconfig.exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
-| `.lang.nodejs.native.engines_node` | string | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+| `.lang.nodejs.package_lock_exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+| `.lang.nodejs.yarn_lock_exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+| `.lang.nodejs.pnpm_lock_exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+| `.lang.nodejs.tsconfig_exists` | boolean | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
+| `.lang.nodejs.engines_node` | string | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
 | `.lang.nodejs.version` | string | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
 | `.lang.nodejs.cicd.cmds` | array | [`nodejs`](https://github.com/earthly/lunar-lib/tree/main/collectors/nodejs) collector |
 
@@ -59,11 +59,9 @@ policies:
   "lang": {
     "nodejs": {
       "version": "20.11.0",
-      "native": {
-        "package_lock": { "exists": true },
-        "tsconfig": { "exists": true },
-        "engines_node": ">=18"
-      }
+      "package_lock_exists": true,
+      "tsconfig_exists": true,
+      "engines_node": ">=18"
     }
   }
 }
@@ -76,12 +74,10 @@ policies:
   "lang": {
     "nodejs": {
       "version": "16.20.0",
-      "native": {
-        "package_lock": { "exists": false },
-        "yarn_lock": { "exists": false },
-        "pnpm_lock": { "exists": false },
-        "tsconfig": { "exists": false }
-      }
+      "package_lock_exists": false,
+      "yarn_lock_exists": false,
+      "pnpm_lock_exists": false,
+      "tsconfig_exists": false
     }
   }
 }

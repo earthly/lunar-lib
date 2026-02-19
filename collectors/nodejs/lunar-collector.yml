@@ -73,17 +73,15 @@ example_component_json: |
       "nodejs": {
         "version": "20.11.0",
         "build_systems": ["npm"],
-        "native": {
-          "package_json": { "exists": true },
-          "package_lock": { "exists": true },
-          "yarn_lock": { "exists": false },
-          "pnpm_lock": { "exists": false },
-          "tsconfig": { "exists": true },
-          "eslint_configured": true,
-          "prettier_configured": false,
-          "engines_node": ">=18",
-          "monorepo": { "type": "workspaces" }
-        },
+        "package_json_exists": true,
+        "package_lock_exists": true,
+        "yarn_lock_exists": false,
+        "pnpm_lock_exists": false,
+        "tsconfig_exists": true,
+        "eslint_configured": true,
+        "prettier_configured": false,
+        "engines_node": ">=18",
+        "monorepo": { "type": "workspaces" },
         "source": { "tool": "node", "integration": "code" },
         "cicd": {
           "cmds": [{ "cmd": "npm test", "version": "20.11.0" }],
