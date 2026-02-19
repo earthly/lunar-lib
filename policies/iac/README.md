@@ -42,7 +42,7 @@ policies:
     enforcement: report-pr
     # include: [valid, waf-protection]  # Only run specific checks
     # with:
-    #   datastore_types: "aws_s3_bucket,aws_db_instance,aws_dynamodb_table"
+    #   extra_datastore_types: "aws_redshift_cluster,aws_neptune_cluster"  # Add custom types
 ```
 
 ## Examples

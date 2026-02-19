@@ -45,7 +45,10 @@ policies:
     keywords: ["iac", "datastores", "deletion protection", "data safety", "prevent_destroy"]
 
 inputs:
-  datastore_types:
+  extra_datastore_types:
     description: |
-      Comma-separated list of Terraform resource types considered datastores.
-    default: "aws_s3_bucket,aws_db_instance,aws_dynamodb_table,aws_elasticache_cluster,aws_elasticache_replication_group,aws_ebs_volume,aws_efs_file_system"
+      Comma-separated list of additional Terraform resource types to treat as datastores,
+      beyond the built-in defaults (aws_s3_bucket, aws_db_instance, aws_dynamodb_table,
+      aws_elasticache_cluster, aws_elasticache_replication_group, aws_ebs_volume,
+      aws_efs_file_system).
+    default: ""
