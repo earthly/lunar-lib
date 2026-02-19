@@ -4,12 +4,20 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("ai-authorship-annotated", "Commits should include AI authorship annotations", node=node)
     with c:
-        total = c.get_value(".ai_use.authorship.total_commits")
+        authorship = c.get_node(".ai_use.authorship")
+        if not authorship.exists():
+            c.fail(
+                "AI authorship data not collected — ensure the ai-use collector "
+                "is configured and has run for this component"
+            )
+            return c
+
+        total = authorship.get_value(".total_commits")
 
         if total == 0:
             return c
 
-        annotated = c.get_value(".ai_use.authorship.annotated_commits")
+        annotated = authorship.get_value(".annotated_commits")
         min_pct = int(variable_or_default("min_annotation_percentage", "0"))
 
         actual_pct = (annotated / total) * 100

@@ -4,7 +4,15 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("symlinked-aliases", "CLAUDE.md symlinks should exist alongside AGENTS.md files", node=node)
     with c:
-        exists = c.get_value(".ai_use.instructions.root.exists")
+        instructions = c.get_node(".ai_use.instructions")
+        if not instructions.exists():
+            c.fail(
+                "AI instruction file data not collected — ensure the ai-use collector "
+                "is configured and has run for this component"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
 
         if not exists:
             return c
@@ -16,7 +24,7 @@ def main(node=None):
         if not required_symlinks:
             return c
 
-        directories = c.get_node(".ai_use.instructions.directories")
+        directories = instructions.get_node(".directories")
         if not directories.exists():
             return c
 

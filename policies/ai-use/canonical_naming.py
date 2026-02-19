@@ -4,13 +4,21 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("canonical-naming", "Root instruction file should use canonical vendor-neutral name", node=node)
     with c:
-        exists = c.get_value(".ai_use.instructions.root.exists")
+        instructions = c.get_node(".ai_use.instructions")
+        if not instructions.exists():
+            c.fail(
+                "AI instruction file data not collected — ensure the ai-use collector "
+                "is configured and has run for this component"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
 
         if not exists:
             return c
 
         canonical = variable_or_default("canonical_filename", "AGENTS.md")
-        actual = c.get_value(".ai_use.instructions.root.filename")
+        actual = instructions.get_value(".root.filename")
 
         if actual != canonical:
             if actual == "CLAUDE.md":
