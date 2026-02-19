@@ -26,12 +26,12 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.go` | object | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
-| `.lang.go.native.go_mod.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
-| `.lang.go.native.go_sum.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.go_mod_exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.go_sum_exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
 | `.lang.go.version` | string | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
 | `.lang.go.tests.scope` | string | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
 | `.lang.go.cicd.cmds` | array | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
-| `.lang.go.native.vendor.exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
+| `.lang.go.vendor_exists` | boolean | [`golang`](https://github.com/earthly/lunar-lib/tree/main/collectors/golang) collector |
 
 ## Installation
 
@@ -59,11 +59,9 @@ policies:
     "go": {
       "module": "github.com/acme/myproject",
       "version": "1.22",
-      "native": {
-        "go_mod": { "exists": true },
-        "go_sum": { "exists": true },
-        "vendor": { "exists": false }
-      },
+      "go_mod_exists": true,
+      "go_sum_exists": true,
+      "vendor_exists": false,
       "tests": {
         "scope": "recursive"
       }
@@ -79,10 +77,8 @@ policies:
   "lang": {
     "go": {
       "version": "1.19",
-      "native": {
-        "go_mod": { "exists": false },
-        "go_sum": { "exists": false }
-      }
+      "go_mod_exists": false,
+      "go_sum_exists": false
     }
   }
 }

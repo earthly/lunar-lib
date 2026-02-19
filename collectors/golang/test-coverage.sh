@@ -40,7 +40,7 @@ if [[ -n "$coverage_pct" ]]; then
   lunar collect ".lang.go.tests.coverage.profile_path" "$coverprofile_path"
 
   # Collect raw profile content as a string via stdin
-  cat "$coverprofile_path" | lunar collect ".lang.go.tests.coverage.native.profile" -
+  cat "$coverprofile_path" | lunar collect ".lang.go.tests.coverage.profile" -
 
   # Source metadata
   lunar collect ".lang.go.tests.coverage.source.tool" "go cover" \

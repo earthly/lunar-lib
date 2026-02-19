@@ -20,7 +20,7 @@ This collector writes to the following Component JSON paths:
 | `.lang.go.tests` | object | Test scope and coverage information |
 | `.lang.go.dependencies` | object | Direct and transitive dependencies |
 | `.lang.go.lint` | object | Normalized lint warnings from golangci-lint |
-| `.lang.go.native.golangci_lint` | object | Raw golangci-lint output and status |
+| `.lang.go.golangci_lint` | object | Raw golangci-lint output and status |
 
 **Note:** This collector writes Go-native coverage data to `.lang.go.tests.coverage`. For normalized cross-language coverage at `.testing.coverage`, use a dedicated coverage tool collector (CodeCov, Coveralls, etc.).
 

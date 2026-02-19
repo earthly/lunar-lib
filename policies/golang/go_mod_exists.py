@@ -9,7 +9,7 @@ def check_go_mod_exists(node=None):
         if not go.exists():
             c.skip("Not a Go project")
 
-        go_mod = go.get_node(".native.go_mod.exists")
+        go_mod = go.get_node(".go_mod_exists")
         if not go_mod.exists():
             c.skip("Go module data not available - ensure golang collector has run")
 

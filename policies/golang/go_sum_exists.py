@@ -9,7 +9,7 @@ def check_go_sum_exists(node=None):
         if not go.exists():
             c.skip("Not a Go project")
 
-        go_sum = go.get_node(".native.go_sum.exists")
+        go_sum = go.get_node(".go_sum_exists")
         if not go_sum.exists():
             c.skip("Go module data not available - ensure golang collector has run")
 
