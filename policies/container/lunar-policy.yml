@@ -44,10 +44,11 @@ policies:
 
   - name: required-labels
     description: |
-      Ensures Dockerfiles include required OCI labels for traceability.
-      Common labels: org.opencontainers.image.source, version, maintainer.
+      Ensures containers have required labels, checking both Dockerfile LABEL
+      instructions and docker build --label flags. A label present in either
+      source satisfies the requirement.
     mainPython: required_labels.py
-    keywords: ["dockerfile labels", "oci labels", "image metadata"]
+    keywords: ["container labels", "oci labels", "build labels", "image metadata", "git sha"]
 
   - name: healthcheck
     description: |
@@ -70,20 +71,10 @@ policies:
     mainPython: build_tagged.py
     keywords: ["docker build", "image tags", "container registry", "build tagging"]
 
-  - name: build-required-labels
-    description: |
-      Ensures container build commands include required labels for traceability.
-      Checks --label flags on docker build commands against a configurable list.
-    mainPython: build_labels.py
-    keywords: ["build labels", "git sha", "image provenance", "build traceability"]
-
 inputs:
   allowed_registries:
     description: Comma-separated list of allowed registries
     default: "docker.io"
   required_labels:
-    description: Comma-separated list of required Dockerfile labels (empty = no requirement)
-    default: ""
-  required_build_labels:
-    description: Comma-separated list of required build command labels (empty = no requirement)
+    description: Comma-separated list of required labels checked across Dockerfile and build commands (empty = no requirement)
     default: ""

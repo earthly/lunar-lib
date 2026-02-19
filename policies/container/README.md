@@ -15,11 +15,10 @@ This plugin provides the following policies (use `include` to select a subset):
 | `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
 | `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Image uses unstable tag (partial version, branch name, etc.) |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
-| `required-labels` | Required labels must be present in Dockerfiles | Dockerfile missing one or more required labels |
+| `required-labels` | Required labels must be present (Dockerfile or build command) | Missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
 | `user` | USER instruction must be present | Final stage missing USER instruction |
 | `build-tagged` | Container builds must use explicit `-t`/`--tag` | Build command missing image tag |
-| `build-required-labels` | Container builds must include required labels | Build command missing required `--label` flags |
 
 ## Required Data
 
@@ -42,8 +41,7 @@ policies:
     # include: [no-latest, stable-tags, build-tagged]  # Only include specific policies
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
-    #   required_labels: "org.opencontainers.image.source"
-    #   required_build_labels: "git_sha"
+    #   required_labels: "org.opencontainers.image.source,git_sha"
 ```
 
 ## Examples
@@ -178,10 +176,16 @@ Add an explicit `-t`/`--tag` flag to your `docker build` command:
 docker build -t myregistry.io/app:v1.2.3 .
 ```
 
-### build-required-labels
+### required-labels
 
-Add the required labels to your `docker build` command:
+Labels can be added in either the Dockerfile or the build command:
+
+```dockerfile
+# In Dockerfile (static labels)
+LABEL org.opencontainers.image.source="https://github.com/org/repo"
+```
 
 ```bash
-docker build -t app:v1 --label git_sha=$GITHUB_SHA --label version=$VERSION .
+# In build command (dynamic labels)
+docker build -t app:v1 --label git_sha=$GITHUB_SHA .
 ```
