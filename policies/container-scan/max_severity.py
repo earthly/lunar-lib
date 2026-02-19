@@ -42,7 +42,8 @@ def main(node=None):
                     c.fail(f"{severity.capitalize()} container vulnerabilities detected ({count} found)")
                     return c
 
-        # If we get here with no data found, fail gracefully
+        # If scan data exists but has no findings/summary, that's a collector
+        # bug — raise ValueError deliberately so it surfaces as a crash.
         has_any_data = False
         for severity in severities_to_check:
             if scan_node.get_node(f".summary.has_{severity}").exists():
@@ -53,7 +54,9 @@ def main(node=None):
                 break
 
         if not has_any_data:
-            c.fail("Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary.")
+            raise ValueError(
+                "Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary."
+            )
 
     return c
 

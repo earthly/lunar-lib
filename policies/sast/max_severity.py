@@ -42,7 +42,8 @@ def main(node=None):
                     c.fail(f"{severity.capitalize()} SAST findings detected ({count} found)")
                     return c
 
-        # If we get here with no data found, fail gracefully
+        # If scan data exists but has no findings/summary, that's a collector
+        # bug — raise ValueError deliberately so it surfaces as a crash.
         has_any_data = False
         for severity in severities_to_check:
             if sast_node.get_node(f".summary.has_{severity}").exists():
@@ -53,7 +54,9 @@ def main(node=None):
                 break
 
         if not has_any_data:
-            c.fail("Finding counts not available. Ensure collector reports .sast.findings or .sast.summary.")
+            raise ValueError(
+                "Finding counts not available. Ensure collector reports .sast.findings or .sast.summary."
+            )
 
     return c
 
