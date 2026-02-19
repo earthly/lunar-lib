@@ -4,8 +4,6 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("valid", "CODEOWNERS file should have valid syntax", node=node)
     with c:
-        # Check if CODEOWNERS exists - return early if not
-        # (get_value handles nodata properly -> PENDING if collector not done)
         if not c.get_value(".ownership.codeowners.exists"):
             c.fail("No CODEOWNERS file found")
             return c

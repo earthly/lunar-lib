@@ -8,8 +8,6 @@ def main(node=None, max_owners_override=None):
         node=node,
     )
     with c:
-        # Check if CODEOWNERS exists - return early if not
-        # (get_value handles nodata properly -> PENDING if collector not done)
         if not c.get_value(".ownership.codeowners.exists"):
             c.fail("No CODEOWNERS file found")
             return c
