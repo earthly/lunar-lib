@@ -1,0 +1,118 @@
+version: 0
+
+name: terraform
+description: Parses Terraform HCL files and collects IaC configuration data
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:terraform-main
+
+landing_page:
+  display_name: "Terraform Collector"
+  long_description: |
+    Parse Terraform HCL files to extract configuration data. Writes file validity
+    and full parsed HCL JSON for downstream policy analysis of providers, modules,
+    backends, resources, and infrastructure security posture.
+  categories: ["security", "orchestration"]
+  icon: "assets/terraform.svg"
+  status: "beta"
+  related: []
+
+collectors:
+  - name: terraform
+    description: |
+      Parses all Terraform (.tf) files in the repository using hcl2json and collects:
+      - File validity and parse errors (.iac.files[])
+      - Full parsed HCL JSON for policy analysis (.iac.native.terraform.files[])
+      - Source tool metadata (.iac.source)
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["terraform", "iac", "infrastructure", "hcl", "aws", "providers", "modules", "backend"]
+
+example_component_json: |
+  {
+    "iac": {
+      "source": {
+        "tool": "hcl2json",
+        "version": "0.6.4"
+      },
+      "files": [
+        {"path": "main.tf", "valid": true},
+        {"path": "variables.tf", "valid": true},
+        {"path": "broken.tf", "valid": false, "error": "unexpected token at line 12"}
+      ],
+      "native": {
+        "terraform": {
+          "files": [
+            {
+              "path": "main.tf",
+              "hcl": {
+                "terraform": [
+                  {
+                    "required_providers": [
+                      {
+                        "aws": {
+                          "source": "hashicorp/aws",
+                          "version": "~> 5.0"
+                        }
+                      }
+                    ],
+                    "backend": [
+                      {
+                        "s3": {
+                          "bucket": "my-terraform-state",
+                          "key": "state.tfstate",
+                          "region": "us-east-1"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "resource": {
+                  "aws_db_instance": {
+                    "main": [
+                      {
+                        "engine": "postgres",
+                        "instance_class": "db.t3.micro",
+                        "lifecycle": [{"prevent_destroy": true}]
+                      }
+                    ]
+                  },
+                  "aws_lb": {
+                    "api": [
+                      {
+                        "internal": false,
+                        "load_balancer_type": "application"
+                      }
+                    ]
+                  },
+                  "aws_wafv2_web_acl": {
+                    "main": [{}]
+                  },
+                  "aws_wafv2_web_acl_association": {
+                    "api": [{}]
+                  }
+                },
+                "module": {
+                  "vpc": [
+                    {
+                      "source": "terraform-aws-modules/vpc/aws",
+                      "version": "5.1.0"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "path": "variables.tf",
+              "hcl": {
+                "variable": {
+                  "region": [{"default": "us-east-1"}]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
