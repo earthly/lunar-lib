@@ -4,7 +4,7 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("instruction-file-sections", "Root instruction file should contain required sections", node=node)
     with c:
-        exists = c.get_value(".ai_use.instructions.root.exists")
+        instructions = c.get_node(".ai_use.instructions")
 
         required_str = variable_or_default("required_sections", "Project Overview,Build Commands")
         if not required_str:
@@ -20,13 +20,20 @@ def main(node=None):
                 "Configure required sections or exclude this check."
             )
 
+        if not instructions.exists():
+            c.fail(
+                f"No instruction file at root — missing required sections: {', '.join(required)}"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
         if not exists:
             c.fail(
                 f"No instruction file at root — missing required sections: {', '.join(required)}"
             )
             return c
 
-        sections = c.get_value_or_default(".ai_use.instructions.root.sections", [])
+        sections = instructions.get_value_or_default(".root.sections", [])
         sections_lower = [s.lower() for s in sections]
 
         missing = [r for r in required if not any(r.lower() in s for s in sections_lower)]

@@ -4,13 +4,20 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("instruction-file-length", "Root instruction file should be within reasonable length bounds", node=node)
     with c:
-        exists = c.get_value(".ai_use.instructions.root.exists")
+        instructions = c.get_node(".ai_use.instructions")
+        if not instructions.exists():
+            c.fail(
+                "No agent instruction file found at repository root"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
 
         min_lines = int(variable_or_default("min_lines", "10"))
         max_lines = int(variable_or_default("max_lines", "300"))
         max_total_bytes = int(variable_or_default("max_total_bytes", "32768"))
 
-        lines = c.get_value_or_default(".ai_use.instructions.root.lines", 0) if exists else 0
+        lines = instructions.get_value_or_default(".root.lines", 0) if exists else 0
 
         if min_lines > 0:
             c.assert_greater_or_equal(
@@ -27,7 +34,7 @@ def main(node=None):
             )
 
         if max_total_bytes > 0:
-            total_bytes = c.get_value_or_default(".ai_use.instructions.total_bytes", 0)
+            total_bytes = instructions.get_value_or_default(".total_bytes", 0)
             c.assert_less_or_equal(
                 total_bytes, max_total_bytes,
                 f"Combined instruction files are {total_bytes} bytes "
