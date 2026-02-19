@@ -1,0 +1,115 @@
+version: 0
+
+name: python
+description: Collect Python project information, CI/CD commands, dependencies, and test coverage
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Python Collector"
+  long_description: |
+    Analyze Python projects to collect build tool info, dependencies, test coverage,
+    and CI/CD command tracking. Enforce Python-specific engineering standards.
+  categories: ["languages", "build"]
+  icon: "assets/python.svg"
+  status: "beta"
+  related:
+    - slug: "python"
+      type: "policy"
+      reason: "Python project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: cicd
+    description: |
+      Records every Python/pip/poetry/uv command executed in CI pipelines along
+      with the Python version. Writes command strings and version info to
+      .lang.python.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(python3?|pip3?|poetry|pipenv|uv)$
+    keywords: ["python ci", "pip", "poetry", "ci commands", "build tracking"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from coverage.xml (pytest-cov output) after
+      test runs complete. Parses the XML coverage report and writes results to
+      .lang.python.tests.coverage and .testing.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(pytest|python3?)$
+    keywords: ["pytest", "coverage", "test coverage", "coverage.xml"]
+
+  - name: project
+    description: |
+      Analyzes Python project structure by detecting pyproject.toml, requirements.txt,
+      setup.py, Pipfile, lockfiles, and linter/type-checker configuration. Extracts
+      the Python version and build systems. Writes project metadata to .lang.python.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["python project", "pyproject.toml", "requirements.txt", "poetry", "pip"]
+
+  - name: dependencies
+    description: |
+      Extracts direct dependencies from requirements.txt and pyproject.toml.
+      Captures package name and version for each dependency. Writes the dependency
+      list to .lang.python.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["python dependencies", "pip", "poetry", "supply chain", "packages"]
+
+example_component_json: |
+  {
+    "lang": {
+      "python": {
+        "version": "3.12.1",
+        "build_systems": ["poetry"],
+        "pyproject_exists": true,
+        "requirements_txt_exists": false,
+        "setup_py_exists": false,
+        "pipfile_exists": false,
+        "poetry_lock_exists": true,
+        "pipfile_lock_exists": false,
+        "python_version_file_exists": true,
+        "linter_configured": true,
+        "linter": "ruff",
+        "type_checker_configured": true,
+        "type_checker": "mypy",
+        "source": { "tool": "python", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "pytest --cov=src", "version": "3.12.1" }],
+          "source": { "tool": "python", "integration": "ci" }
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 85.5,
+            "source": { "tool": "coverage", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "flask", "version": "3.0.0", "indirect": false }
+          ],
+          "transitive": [],
+          "source": { "tool": "pip", "integration": "code" }
+        }
+      }
+    },
+    "testing": {
+      "coverage": {
+        "percentage": 85.5,
+        "source": { "tool": "coverage", "integration": "ci" }
+      },
+      "source": { "tool": "pytest", "integration": "ci" }
+    }
+  }
