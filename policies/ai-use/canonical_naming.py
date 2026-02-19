@@ -5,14 +5,7 @@ def main(node=None):
     c = Check("canonical-naming", "Root instruction file should use canonical vendor-neutral name", node=node)
     with c:
         instructions = c.get_node(".ai_use.instructions")
-        if not instructions.exists():
-            c.fail(
-                "AI instruction file data not collected — ensure the ai-use collector "
-                "is configured and has run for this component"
-            )
-            return c
-
-        exists = instructions.get_value(".root.exists")
+        exists = instructions.get_value(".root.exists") if instructions.exists() else False
 
         if not exists:
             return c

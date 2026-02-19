@@ -6,10 +6,7 @@ def main(node=None):
     with c:
         authorship = c.get_node(".ai_use.authorship")
         if not authorship.exists():
-            c.fail(
-                "AI authorship data not collected — ensure the ai-use collector "
-                "is configured and has run for this component"
-            )
+            c.fail("No AI authorship annotation data found for this component")
             return c
 
         total = authorship.get_value(".total_commits")

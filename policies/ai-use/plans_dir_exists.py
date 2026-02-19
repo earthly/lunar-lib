@@ -5,14 +5,7 @@ def main(node=None):
     c = Check("plans-dir-exists", "Dedicated plans directory should exist for AI agent task planning", node=node)
     with c:
         plans_dir = c.get_node(".ai_use.plans_dir")
-        if not plans_dir.exists():
-            c.fail(
-                "AI plans directory data not collected — ensure the ai-use collector "
-                "is configured and has run for this component"
-            )
-            return c
-
-        exists = plans_dir.get_value(".exists")
+        exists = plans_dir.get_value(".exists") if plans_dir.exists() else False
         c.assert_true(
             exists,
             "No plans directory found (e.g. .agents/plans/). "

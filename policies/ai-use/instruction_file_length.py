@@ -5,14 +5,7 @@ def main(node=None):
     c = Check("instruction-file-length", "Root instruction file should be within reasonable length bounds", node=node)
     with c:
         instructions = c.get_node(".ai_use.instructions")
-        if not instructions.exists():
-            c.fail(
-                "AI instruction file data not collected — ensure the ai-use collector "
-                "is configured and has run for this component"
-            )
-            return c
-
-        exists = instructions.get_value(".root.exists")
+        exists = instructions.get_value(".root.exists") if instructions.exists() else False
 
         min_lines = int(variable_or_default("min_lines", "10"))
         max_lines = int(variable_or_default("max_lines", "300"))
