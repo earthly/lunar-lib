@@ -19,7 +19,11 @@ landing_page:
     - slug: "terraform"
       type: "collector"
       reason: "Provides parsed IaC configuration data"
-  related: []
+
+  related:
+    - slug: "terraform"
+      type: "policy"
+      reason: "Terraform-specific guardrails (providers, modules, backend)"
 
 policies:
   - name: valid

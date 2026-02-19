@@ -18,7 +18,11 @@ landing_page:
     - slug: "terraform"
       type: "collector"
       reason: "Provides parsed Terraform HCL data"
-  related: []
+
+  related:
+    - slug: "iac"
+      type: "policy"
+      reason: "Generic IaC guardrails (validity, WAF, datastores)"
 
 policies:
   - name: provider-versions-pinned
