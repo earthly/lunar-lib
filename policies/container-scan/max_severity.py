@@ -18,13 +18,11 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
-        c.assert_exists(
-            ".container_scan",
-            "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured.",
-        )
-
         scan_node = c.get_node(".container_scan")
-        
+        if not scan_node.exists():
+            c.fail("No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
+            return c
+
         # Get the index of min_severity to know which severities to check
         severity_index = SEVERITY_ORDER.index(min_severity)
         severities_to_check = SEVERITY_ORDER[:severity_index + 1]
@@ -47,7 +45,8 @@ def main(node=None):
                     c.fail(f"{severity.capitalize()} container vulnerabilities detected ({count} found)")
                     return c
 
-        # If we get here with no data found, fail
+        # If scan data exists but has no findings/summary, that's a collector
+        # bug — raise ValueError deliberately so it surfaces as a crash.
         has_any_data = False
         for severity in severities_to_check:
             if scan_node.get_node(f".summary.has_{severity}").exists():
@@ -56,7 +55,7 @@ def main(node=None):
             if scan_node.get_node(f".vulnerabilities.{severity}").exists():
                 has_any_data = True
                 break
-        
+
         if not has_any_data:
             raise ValueError(
                 "Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary."
