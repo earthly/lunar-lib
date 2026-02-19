@@ -1,0 +1,48 @@
+version: 0
+
+name: terraform
+description: Terraform-specific configuration and best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Terraform Guardrails"
+  long_description: |
+    Enforce Terraform-specific best practices including provider version pinning,
+    module version pinning, and remote backend configuration for state management.
+  category: "deployment-and-infrastructure"
+  icon: "assets/terraform.svg"
+  status: "beta"
+  requires:
+    - slug: "terraform"
+      type: "collector"
+      reason: "Provides parsed Terraform HCL data"
+  related: []
+
+policies:
+  - name: provider-versions-pinned
+    description: |
+      Requires Terraform providers to specify version constraints in required_providers.
+      Unpinned providers can introduce breaking changes unexpectedly.
+    mainPython: provider_versions_pinned.py
+    keywords: ["terraform", "providers", "version pinning", "reproducibility", "required_providers"]
+
+  - name: module-versions-pinned
+    description: |
+      Requires Terraform modules to use pinned versions or commit SHAs.
+      Unpinned modules make infrastructure deployments non-reproducible.
+    mainPython: module_versions_pinned.py
+    keywords: ["terraform", "modules", "version pinning", "reproducibility"]
+
+  - name: remote-backend
+    description: |
+      Requires Terraform to use a remote backend for state management.
+      Local state files are fragile and cannot be shared across teams.
+    mainPython: remote_backend.py
+    keywords: ["terraform", "backend", "state management", "s3", "gcs", "terraform cloud"]
+
+inputs:
+  required_backend_types:
+    description: Comma-separated list of approved backend types (empty = any remote backend)
+    default: ""

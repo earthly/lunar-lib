@@ -1,0 +1,51 @@
+version: 0
+
+name: iac
+description: Infrastructure as Code configuration and best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "IaC Guardrails"
+  long_description: |
+    Enforce Infrastructure as Code best practices including configuration validity,
+    WAF protection for internet-facing services, and datastore deletion protection.
+    Works with any IaC collector that writes to the .iac schema.
+  category: "deployment-and-infrastructure"
+  icon: "assets/iac.svg"
+  status: "beta"
+  requires:
+    - slug: "terraform"
+      type: "collector"
+      reason: "Provides parsed IaC configuration data"
+  related: []
+
+policies:
+  - name: valid
+    description: |
+      Validates that all IaC configuration files are syntactically correct.
+      Invalid configurations will fail deployment.
+    mainPython: valid.py
+    keywords: ["iac", "terraform", "syntax", "validation", "hcl"]
+
+  - name: waf-protection
+    description: |
+      Requires WAF protection for internet-facing services. Analyzes IaC resources
+      to detect public load balancers, API gateways, and CloudFront distributions,
+      then verifies WAF association.
+    mainPython: waf_protection.py
+    keywords: ["iac", "waf", "security", "internet facing", "load balancer"]
+
+  - name: datastore-protection
+    description: |
+      Requires deletion protection on datastores (databases, storage, caches).
+      Prevents accidental data loss from destroy operations or resource replacement.
+    mainPython: datastore_protection.py
+    keywords: ["iac", "datastores", "deletion protection", "data safety", "prevent_destroy"]
+
+inputs:
+  datastore_types:
+    description: |
+      Comma-separated list of Terraform resource types considered datastores.
+    default: "aws_s3_bucket,aws_db_instance,aws_dynamodb_table,aws_elasticache_cluster,aws_elasticache_replication_group,aws_ebs_volume,aws_efs_file_system"

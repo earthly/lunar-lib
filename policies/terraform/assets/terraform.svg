@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Terraform logo: three parallelogram blocks arranged in the classic T shape -->
+  <!-- Top-right block -->
+  <path d="M24.5 4L40.5 13.2V31.7L24.5 22.5V4Z" fill="white" fill-opacity="0.41"/>
+  <!-- Bottom-right block -->
+  <path d="M24.5 35.5L40.5 44.7V63.2L24.5 54V35.5Z" fill="white" fill-opacity="0.41"/>
+  <!-- Right block -->
+  <path d="M43 14.9L59 24.1V42.6L43 33.4V14.9Z" fill="white" fill-opacity="0.41"/>
+  <!-- Left block -->
+  <path d="M5 13.2L21 22.4V40.9L5 31.7V13.2Z" fill="white" fill-opacity="0.41"/>
+</svg>
