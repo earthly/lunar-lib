@@ -15,6 +15,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
+        if not c.get_node(".iac").exists():
+            c.skip("No infrastructure as code detected in this component")
+
         c.assert_exists(
             ".iac_scan",
             "No IaC scan data found. Ensure a scanner (Checkov, tfsec, etc.) is configured.",

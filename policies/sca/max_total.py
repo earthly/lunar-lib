@@ -19,6 +19,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'max_total_threshold' must be a positive integer, got '{threshold}'"
             )
 
+        if not c.get_node(".lang").exists():
+            c.skip("No programming language detected in this component")
+
         sca_node = c.get_node(".sca")
         if not sca_node.exists():
             c.fail("No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured.")

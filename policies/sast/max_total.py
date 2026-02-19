@@ -19,6 +19,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'max_total_threshold' must be a positive integer, got '{threshold}'"
             )
 
+        if not c.get_node(".lang").exists():
+            c.skip("No programming language detected in this component")
+
         sast_node = c.get_node(".sast")
         if not sast_node.exists():
             c.fail("No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.")

@@ -15,6 +15,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
+        if not c.get_node(".containers").exists():
+            c.skip("No container definitions detected in this component")
+
         c.assert_exists(
             ".container_scan",
             "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured.",

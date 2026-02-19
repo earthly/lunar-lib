@@ -15,6 +15,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
+        if not c.get_node(".lang").exists():
+            c.skip("No programming language detected in this component")
+
         c.assert_exists(
             ".sast",
             "No SAST scanning data found. Ensure a scanner (Semgrep, CodeQL, etc.) is configured.",

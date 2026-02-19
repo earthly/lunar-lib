@@ -19,6 +19,9 @@ def main(node=None):
                 f"Policy misconfiguration: 'max_total_threshold' must be a positive integer, got '{threshold}'"
             )
 
+        if not c.get_node(".containers").exists():
+            c.skip("No container definitions detected in this component")
+
         scan_node = c.get_node(".container_scan")
         if not scan_node.exists():
             c.fail("No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
