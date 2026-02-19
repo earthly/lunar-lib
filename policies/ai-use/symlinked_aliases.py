@@ -5,9 +5,18 @@ def main(node=None):
     c = Check("symlinked-aliases", "CLAUDE.md symlinks should exist alongside AGENTS.md files", node=node)
     with c:
         instructions = c.get_node(".ai_use.instructions")
-        exists = instructions.get_value(".root.exists") if instructions.exists() else False
+        if not instructions.exists():
+            c.fail(
+                "No agent instruction file found at repository root"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
 
         if not exists:
+            c.fail(
+                "No agent instruction file found at repository root"
+            )
             return c
 
         canonical = variable_or_default("canonical_filename", "AGENTS.md")

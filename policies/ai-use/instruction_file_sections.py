@@ -20,7 +20,13 @@ def main(node=None):
                 "Configure required sections or exclude this check."
             )
 
-        exists = instructions.get_value(".root.exists") if instructions.exists() else False
+        if not instructions.exists():
+            c.fail(
+                f"No instruction file at root — missing required sections: {', '.join(required)}"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
         if not exists:
             c.fail(
                 f"No instruction file at root — missing required sections: {', '.join(required)}"

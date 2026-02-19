@@ -5,7 +5,13 @@ def main(node=None):
     c = Check("instruction-file-length", "Root instruction file should be within reasonable length bounds", node=node)
     with c:
         instructions = c.get_node(".ai_use.instructions")
-        exists = instructions.get_value(".root.exists") if instructions.exists() else False
+        if not instructions.exists():
+            c.fail(
+                "No agent instruction file found at repository root"
+            )
+            return c
+
+        exists = instructions.get_value(".root.exists")
 
         min_lines = int(variable_or_default("min_lines", "10"))
         max_lines = int(variable_or_default("max_lines", "300"))
