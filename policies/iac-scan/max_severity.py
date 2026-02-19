@@ -8,6 +8,9 @@ SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 def main(node=None):
     c = Check("max-severity", "No findings at or above severity threshold", node=node)
     with c:
+        if not c.get_node(".iac").exists():
+            c.skip("No infrastructure as code detected in this component")
+
         min_severity = variable_or_default("min_severity", "high").lower()
         
         if min_severity not in SEVERITY_ORDER:
