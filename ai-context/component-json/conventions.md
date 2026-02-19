@@ -283,6 +283,8 @@ While normalization is ideal, sometimes it's impractical or lossy. Use the `.nat
 3. **Raw data is valuable** — Policies may need tool-specific fields
 4. **Incremental adoption** — Collect raw now, normalize later
 
+> **Note:** `.native` is for tool-specific output. Simple file detection booleans (e.g., `pom_xml_exists`, `requirements_txt_exists`) are not tool-specific output and belong directly on their parent object, not under `.native`.
+
 ### The `.native` Pattern
 
 Place normalized data at the category level, raw data under `.native.<format>` or `.native.<tool>`:
