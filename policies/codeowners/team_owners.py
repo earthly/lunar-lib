@@ -8,8 +8,9 @@ def main(node=None):
         node=node,
     )
     with c:
-        c.assert_true(c.get_value(".ownership.codeowners.exists"),
-            "No CODEOWNERS file found")
+        if not c.get_value(".ownership.codeowners.exists"):
+            c.fail("No CODEOWNERS file found")
+            return c
 
         team_owners = c.get_value(".ownership.codeowners.team_owners")
         c.assert_true(

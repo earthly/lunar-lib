@@ -8,8 +8,9 @@ def main(node=None, min_owners_override=None):
         node=node,
     )
     with c:
-        c.assert_true(c.get_value(".ownership.codeowners.exists"),
-            "No CODEOWNERS file found")
+        if not c.get_value(".ownership.codeowners.exists"):
+            c.fail("No CODEOWNERS file found")
+            return c
 
         min_owners = (
             min_owners_override
