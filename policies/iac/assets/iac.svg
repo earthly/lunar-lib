@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <!-- Cloud shape representing infrastructure -->
-  <path d="M16 40C10 40 5 35 5 29C5 23 10 18 16 18C17 11 24 6 32 6C40 6 47 11 48 18C54 18 59 23 59 29C59 35 54 40 48 40Z" fill="black" fill-opacity="0.35"/>
-  <!-- Code brackets representing "as Code" -->
-  <path d="M18 48L12 54L18 60" stroke="black" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M46 48L52 54L46 60" stroke="black" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Gear inside cloud -->
-  <circle cx="32" cy="29" r="6" stroke="black" stroke-opacity="0.6" stroke-width="2"/>
-  <circle cx="32" cy="29" r="2.5" fill="black" fill-opacity="0.5"/>
+  <!-- Large cloud -->
+  <path d="M16 48C9 48 4 42.5 4 36C4 29.5 9 24 16 24C17 15 24.5 8 34 8C43.5 8 51 15 52 24C57.5 24.5 62 29.5 62 36C62 42.5 57 48 50 48H16Z" stroke="black" stroke-width="2.5" fill="none"/>
+  <!-- Left bracket < inside cloud -->
+  <path d="M20 30L13 36L20 42" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right bracket > inside cloud -->
+  <path d="M48 30L55 36L48 42" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Slash / between brackets -->
+  <line x1="30" y1="43" x2="38" y2="29" stroke="black" stroke-width="2" stroke-linecap="round"/>
 </svg>
