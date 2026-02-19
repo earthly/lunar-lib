@@ -99,17 +99,15 @@ jq -n \
     --arg monorepo_type "$monorepo_type" \
     '{
         build_systems: $build_systems,
-        native: ({
-            package_json: { exists: $package_json_exists },
-            package_lock: { exists: $package_lock_exists },
-            yarn_lock: { exists: $yarn_lock_exists },
-            pnpm_lock: { exists: $pnpm_lock_exists },
-            tsconfig: { exists: $tsconfig_exists },
-            eslint_configured: $eslint_configured,
-            prettier_configured: $prettier_configured,
-            engines_node: (if $engines_node != "" then $engines_node else null end),
-            monorepo: (if $monorepo_type != "" then {type: $monorepo_type} else null end)
-        } | with_entries(select(.value != null))),
+        package_json_exists: $package_json_exists,
+        package_lock_exists: $package_lock_exists,
+        yarn_lock_exists: $yarn_lock_exists,
+        pnpm_lock_exists: $pnpm_lock_exists,
+        tsconfig_exists: $tsconfig_exists,
+        eslint_configured: $eslint_configured,
+        prettier_configured: $prettier_configured,
+        engines_node: (if $engines_node != "" then $engines_node else null end),
+        monorepo: (if $monorepo_type != "" then {type: $monorepo_type} else null end),
         source: {
             tool: "node",
             integration: "code"

@@ -9,7 +9,7 @@ def check_engines_pinned(node=None):
         if not nodejs.exists():
             c.skip("Not a Node.js project")
 
-        engines_node = nodejs.get_node(".native.engines_node")
+        engines_node = nodejs.get_node(".engines_node")
         if not engines_node.exists():
             c.fail(
                 "engines.node is not set in package.json. "
