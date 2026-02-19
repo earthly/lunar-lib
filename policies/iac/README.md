@@ -4,7 +4,7 @@ Enforces Infrastructure as Code configuration best practices.
 
 ## Overview
 
-This policy validates IaC configurations against best practices including file validity, WAF protection for internet-facing services, and datastore deletion protection. It reads from `.iac.native.terraform.files[]` (full parsed HCL) to perform analysis in Python. The checks are conceptually generic across IaC tools — when additional collectors (Pulumi, CloudFormation) are added, this policy can be extended to support them.
+This policy validates IaC configurations against best practices including file validity, WAF protection for internet-facing services, and datastore deletion protection. It analyzes parsed IaC data from the `.iac` category and works across IaC frameworks (Terraform, Pulumi, CloudFormation).
 
 ## Policies
 
