@@ -3,82 +3,53 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
-check_go_files() {
-    local go_mod_exists=false
-    local go_sum_exists=false
-    local vendor_exists=false
-    local goreleaser_exists=false
-    local go_mod_version=""
-    local go_module_path=""
-
-    # Check for go.mod
-    if [[ -f "go.mod" ]]; then
-        go_mod_exists=true
-        # Extract Go version using go list (preferred over grep)
-        go_mod_version=$(go list -m -f '{{.GoVersion}}' 2>/dev/null || true)
-        # Extract module path
-        go_module_path=$(go list -m -f '{{.Path}}' 2>/dev/null || true)
-    fi
-
-    # Check for go.sum
-    if [[ -f "go.sum" ]]; then
-        go_sum_exists=true
-    fi
-
-    # Check for vendor directory (Go-specific: vendor/modules.txt)
-    if [[ -f "vendor/modules.txt" ]]; then
-        vendor_exists=true
-    fi
-
-    # Check for goreleaser config
-    if [[ -f ".goreleaser.yml" ]] || [[ -f ".goreleaser.yaml" ]]; then
-        goreleaser_exists=true
-    fi
-
-    # Output results
-    jq -n \
-        --argjson go_mod_exists "$go_mod_exists" \
-        --argjson go_sum_exists "$go_sum_exists" \
-        --argjson vendor_exists "$vendor_exists" \
-        --argjson goreleaser_exists "$goreleaser_exists" \
-        --arg go_mod_version "$go_mod_version" \
-        --arg go_module_path "$go_module_path" \
-        '{
-            module_path: ($go_module_path | select(. != "")),
-            go_mod: {
-                exists: $go_mod_exists,
-                version: ($go_mod_version | select(. != ""))
-            },
-            go_sum: {
-                exists: $go_sum_exists
-            },
-            vendor: {
-                exists: $vendor_exists
-            },
-            goreleaser: {
-                exists: $goreleaser_exists
-            }
-        }'
-}
-
 # Check if this is a Go project
 if ! is_go_project; then
     echo "No Go project detected, exiting"
     exit 0
 fi
 
-# Check for Go files and structure
-go_files_info=$(check_go_files || echo '{}')
+go_mod_exists=false
+go_sum_exists=false
+vendor_exists=false
+goreleaser_exists=false
+go_mod_version=""
+go_module_path=""
 
-# Collect module, version, build_systems at top level and native info under native key
-echo "$go_files_info" | jq '{
-    module: (.module_path // null),
-    version: (.go_mod.version // ""),
-    build_systems: ["go"],
-    native: (del(.module_path)),
-    source: {
-        tool: "go",
-        integration: "code"
+# Check for go.mod
+if [[ -f "go.mod" ]]; then
+    go_mod_exists=true
+    go_mod_version=$(go list -m -f '{{.GoVersion}}' 2>/dev/null || true)
+    go_module_path=$(go list -m -f '{{.Path}}' 2>/dev/null || true)
+fi
+
+# Check for go.sum
+[[ -f "go.sum" ]] && go_sum_exists=true
+
+# Check for vendor directory
+[[ -f "vendor/modules.txt" ]] && vendor_exists=true
+
+# Check for goreleaser config
+[[ -f ".goreleaser.yml" ]] || [[ -f ".goreleaser.yaml" ]] && goreleaser_exists=true
+
+# Build and collect — flat booleans at .lang.go level (no native wrapper)
+jq -n \
+    --arg module "$go_module_path" \
+    --arg version "$go_mod_version" \
+    --argjson go_mod_exists "$go_mod_exists" \
+    --argjson go_sum_exists "$go_sum_exists" \
+    --argjson vendor_exists "$vendor_exists" \
+    --argjson goreleaser_exists "$goreleaser_exists" \
+    '{
+        build_systems: ["go"],
+        go_mod_exists: $go_mod_exists,
+        go_sum_exists: $go_sum_exists,
+        vendor_exists: $vendor_exists,
+        goreleaser_exists: $goreleaser_exists,
+        source: {
+            tool: "go",
+            integration: "code"
+        }
     }
-}' | lunar collect -j ".lang.go" -
-
+    | if $module != "" then .module = $module else . end
+    | if $version != "" then .version = $version else . end' | lunar collect -j ".lang.go" -

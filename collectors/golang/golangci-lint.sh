@@ -92,4 +92,4 @@ jq -n \
     config_exists: $config_exists,
     exit_code: $exit_code,
     output: $output
-  }' | lunar collect -j ".lang.go.native.golangci_lint" -
+  }' | lunar collect -j ".lang.go.golangci_lint" -

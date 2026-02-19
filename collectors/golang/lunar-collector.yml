@@ -105,17 +105,15 @@ example_component_json: |
         "module": "github.com/acme/myproject",
         "version": "1.21",
         "build_systems": ["go"],
-        "native": {
-          "go_mod": { "exists": true, "version": "1.21" },
-          "go_sum": { "exists": true },
-          "vendor": { "exists": false },
-          "goreleaser": { "exists": true },
-          "golangci_lint": {
-            "passed": false,
-            "config_exists": true,
-            "exit_code": 1,
-            "output": "main.go:42:5: unused variable 'x' (unused)"
-          }
+        "go_mod_exists": true,
+        "go_sum_exists": true,
+        "vendor_exists": false,
+        "goreleaser_exists": true,
+        "golangci_lint": {
+          "passed": false,
+          "config_exists": true,
+          "exit_code": 1,
+          "output": "main.go:42:5: unused variable 'x' (unused)"
         },
         "source": { "tool": "go", "integration": "code" },
         "cicd": {

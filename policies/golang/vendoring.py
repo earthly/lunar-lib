@@ -15,7 +15,7 @@ def check_vendoring(mode=None, node=None):
         if mode == "none":
             c.skip("Vendoring check disabled (vendoring_mode=none)")
 
-        vendor_node = go.get_node(".native.vendor.exists")
+        vendor_node = go.get_node(".vendor_exists")
         vendor_exists = vendor_node.get_value() if vendor_node.exists() else False
 
         if mode == "required":
