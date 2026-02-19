@@ -5,61 +5,39 @@ Infrastructure as Code. Normalized across Terraform, Pulumi, CloudFormation, etc
 ```json
 {
   "iac": {
-    "tool": "terraform",
+    "source": {
+      "tool": "hcl2json",
+      "version": "0.6.4"
+    },
     "files": [
-      {
-        "path": "infrastructure/main.tf",
-        "valid": true
-      }
+      {"path": "main.tf", "valid": true},
+      {"path": "variables.tf", "valid": true}
     ],
-    "resources": [
-      {
-        "type": "database",
-        "provider": "aws",
-        "resource_type": "aws_db_instance",
-        "name": "payments_db",
-        "path": "infrastructure/database.tf",
-        "deletion_protected": true,
-        "encrypted": true,
-        "backup_enabled": true,
-        "multi_az": true
-      },
-      {
-        "type": "storage",
-        "provider": "aws",
-        "resource_type": "aws_s3_bucket",
-        "name": "payment_logs",
-        "path": "infrastructure/storage.tf",
-        "deletion_protected": true,
-        "versioning_enabled": true,
-        "encrypted": true
-      },
-      {
-        "type": "load_balancer",
-        "provider": "aws",
-        "resource_type": "aws_alb",
-        "name": "api_lb",
-        "path": "infrastructure/network.tf",
-        "internet_facing": true,
-        "waf_enabled": true,
-        "ssl_policy": "ELBSecurityPolicy-TLS-1-2-2017-01"
+    "native": {
+      "terraform": {
+        "files": [
+          {
+            "path": "main.tf",
+            "hcl": {
+              "terraform": [
+                {
+                  "required_providers": [{"aws": {"version": "~> 5.0"}}],
+                  "backend": [{"s3": {"bucket": "my-state"}}]
+                }
+              ],
+              "resource": {
+                "aws_db_instance": {"main": [{"engine": "postgres", "lifecycle": [{"prevent_destroy": true}]}]},
+                "aws_lb": {"api": [{"internal": false}]},
+                "aws_wafv2_web_acl": {"main": [{}]},
+                "aws_wafv2_web_acl_association": {"api": [{}]}
+              },
+              "module": {
+                "vpc": [{"source": "terraform-aws-modules/vpc/aws", "version": "5.1.0"}]
+              }
+            }
+          }
+        ]
       }
-    ],
-    "analysis": {
-      "has_backend": true,
-      "versions_pinned": true,
-      "internet_accessible": true,
-      "has_waf": true
-    },
-    "datastores": {
-      "count": 2,
-      "all_deletion_protected": true,
-      "all_encrypted": true,
-      "unprotected": []
-    },
-    "summary": {
-      "all_valid": true,
-      "resource_count": 15
     }
   }
 }
@@ -68,8 +46,7 @@ Infrastructure as Code. Normalized across Terraform, Pulumi, CloudFormation, etc
 ## Key Policy Paths
 
 - `.iac.files[].valid` — Config files valid
-- `.iac.analysis.internet_accessible` — Public resources
-- `.iac.analysis.has_waf` — WAF configured
-- `.iac.datastores.all_deletion_protected` — Delete protection
-- `.iac.datastores.all_encrypted` — Encryption at rest
-- `.iac.resources[].type` — Normalized resource type for queries
+- `.iac.native.terraform.files[].hcl` — Full parsed HCL for policy analysis
+- `.iac.native.terraform.files[].hcl.resource` — Terraform resources (WAF, datastores, etc.)
+- `.iac.native.terraform.files[].hcl.terraform` — Provider versions, backend config
+- `.iac.native.terraform.files[].hcl.module` — Module sources and versions

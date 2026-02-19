@@ -15,6 +15,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `provider-versions-pinned` | Providers specify version constraints | Provider in `required_providers` has no `version` field |
 | `module-versions-pinned` | Modules use pinned versions | Module missing `version` or `?ref=` in source |
 | `remote-backend` | Remote backend configured | No `terraform { backend {} }` block found |
+| `min-provider-versions` | Providers meet minimum version requirements | Provider version constraint below required minimum |
 
 ## Required Data
 
@@ -42,6 +43,7 @@ policies:
     # include: [provider-versions-pinned, remote-backend]  # Only run specific checks
     # with:
     #   required_backend_types: "s3,gcs,remote"  # Restrict allowed backend types
+    #   min_provider_versions: '{"aws": "5.0", "random": "3.0"}'  # Enforce minimum versions
 ```
 
 ## Examples

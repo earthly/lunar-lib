@@ -44,11 +44,12 @@ This table lists important sub-objects within each category. For full details, s
 | `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`) |
 | `.k8s.summary` | Aggregated checks (`all_have_resources`, `all_have_probes`, `all_have_pdb`) |
 | **[`.iac`](cat-iac.md)** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |
-| `.iac.files[]` | IaC files (`path`, `valid`) |
-| `.iac.resources[]` | Resources (`type`, `provider`, `resource_type`, `encrypted`, `deletion_protected`) |
-| `.iac.analysis` | Analysis results (`has_backend`, `internet_accessible`, `has_waf`) |
-| `.iac.datastores` | Datastore summary (`count`, `all_deletion_protected`, `all_encrypted`) |
-| `.iac.summary` | Aggregated checks (`all_valid`, `resource_count`) |
+| `.iac.source` | Tool metadata (`tool`, `version`) |
+| `.iac.files[]` | IaC files (`path`, `valid`, `error?`) |
+| `.iac.native.terraform.files[]` | Full parsed HCL per file (`path`, `hcl`) |
+| `.iac.native.terraform.files[].hcl.resource` | Terraform resources (for WAF, datastore analysis) |
+| `.iac.native.terraform.files[].hcl.terraform` | Provider versions, backend configuration |
+| `.iac.native.terraform.files[].hcl.module` | Module sources and versions |
 | **[`.ci`](cat-ci.md)** | **CI/CD pipeline execution and configuration** |
 | `.ci.run` | Current run info (`id`, `status`, `duration_seconds`) |
 | `.ci.jobs[]` | Job details (`name`, `status`, `duration_seconds`) |

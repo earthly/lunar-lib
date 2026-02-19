@@ -42,7 +42,17 @@ policies:
     mainPython: remote_backend.py
     keywords: ["terraform", "backend", "state management", "s3", "gcs", "terraform cloud"]
 
+  - name: min-provider-versions
+    description: |
+      Enforces minimum version requirements for Terraform providers.
+      Ensures providers meet security and compatibility baselines.
+    mainPython: min_provider_versions.py
+    keywords: ["terraform", "providers", "minimum version", "security", "semver"]
+
 inputs:
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
     default: ""
+  min_provider_versions:
+    description: 'JSON object mapping provider names to minimum versions (e.g., {"aws": "5.0", "random": "3.0"})'
+    default: "{}"
