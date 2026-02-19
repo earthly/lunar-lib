@@ -6,6 +6,9 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("max-total", "Total infrastructure security findings within threshold", node=node)
     with c:
+        if not c.get_node(".iac").exists():
+            c.skip("No infrastructure as code detected in this component")
+
         threshold_str = variable_or_default("max_total_threshold", "0")
         try:
             threshold = int(threshold_str)
@@ -18,9 +21,6 @@ def main(node=None):
             raise ValueError(
                 f"Policy misconfiguration: 'max_total_threshold' must be a positive integer, got '{threshold}'"
             )
-
-        if not c.get_node(".iac").exists():
-            c.skip("No infrastructure as code detected in this component")
 
         scan_node = c.get_node(".iac_scan")
         if not scan_node.exists():
