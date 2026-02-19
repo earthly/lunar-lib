@@ -76,7 +76,7 @@ collectors:
       binary:
         name: cargo
       args:
-        - value_pattern: ^(tarpaulin|llvm-cov|test)$
+        - value_pattern: ^(tarpaulin|llvm-cov)$
     keywords: ["code coverage", "tarpaulin", "llvm-cov", "test coverage", "coverage metrics"]
 
 inputs:

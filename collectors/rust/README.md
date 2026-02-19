@@ -15,12 +15,18 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.lang.rust` | object | Rust project metadata (edition, MSRV, build systems) |
+| `.lang.rust.build_systems` | array | Build systems detected (e.g., `["cargo"]`) |
+| `.lang.rust.cargo_toml_exists` | boolean | Cargo.toml detected |
+| `.lang.rust.cargo_lock_exists` | boolean | Cargo.lock detected |
+| `.lang.rust.rust_toolchain_exists` | boolean | rust-toolchain.toml detected |
+| `.lang.rust.clippy_configured` | boolean | Clippy config file detected |
+| `.lang.rust.rustfmt_configured` | boolean | Rustfmt config file detected |
 | `.lang.rust.edition` | string | Rust edition (`"2021"`, `"2024"`) |
 | `.lang.rust.version` | string | Rust toolchain version |
 | `.lang.rust.msrv` | string | Minimum Supported Rust Version from Cargo.toml |
-| `.lang.rust.workspace` | object/null | Workspace info (`is_workspace`, `members[]`) or null |
 | `.lang.rust.is_application` | boolean | Crate has binary targets |
 | `.lang.rust.is_library` | boolean | Crate has a library target |
+| `.lang.rust.workspace` | object/null | Workspace info (`is_workspace`, `members[]`) or null |
 | `.lang.rust.unsafe_blocks` | object | Unsafe block count and locations |
 | `.lang.rust.cicd` | object | CI/CD command tracking with Rust version |
 | `.lang.rust.tests` | object | Test coverage information |

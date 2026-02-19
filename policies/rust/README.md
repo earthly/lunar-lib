@@ -129,7 +129,7 @@ policies:
 ### cargo-lock-exists
 1. Run `cargo generate-lockfile` to create Cargo.lock
 2. Commit it to version control (for applications)
-3. For libraries, set `lock_mode: "none"` to skip this check
+3. For libraries, keep `lock_mode: "auto"` (default) — it already skips the check for library crates. Use `lock_mode: "none"` to disable the check entirely regardless of crate type
 
 ### min-rust-edition
 1. Update `edition` in Cargo.toml: `edition = "2021"`
