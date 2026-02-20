@@ -10,33 +10,47 @@ fi
 
 REPO_SLUG=$(get_repo_slug)
 
+# Retry config: poll for up to 5 minutes (10 attempts × 30s)
+MAX_ATTEMPTS=10
+SLEEP_SECONDS=30
+
 # ------------------------------------------------------------------
-# Find the asset in Manifest Cyber matching this component
-# The API endpoint and matching logic may need adjustment once we have
-# a real account to test against. Manifest may key assets by repo URL,
-# product name, or an internal ID.
+# Find the asset in Manifest Cyber matching this component.
+# Retry to allow time for Manifest to process the SBOM after push.
+# The API endpoint and matching logic may need adjustment once we
+# have a real account to test against.
 # ------------------------------------------------------------------
 
-# Try to find the asset by repository name
-ASSET=$(manifest_api GET "/assets?search=${REPO_SLUG}" 2>/dev/null || echo "")
+ASSET_DATA=""
+for i in $(seq 1 $MAX_ATTEMPTS); do
+    ASSET=$(manifest_api GET "/assets?search=${REPO_SLUG}" 2>/dev/null || echo "")
 
-if [ -z "$ASSET" ] || [ "$ASSET" = "null" ] || [ "$ASSET" = "[]" ]; then
-    echo "No Manifest Cyber asset found for ${REPO_SLUG}, skipping." >&2
-    exit 0
-fi
+    if [ -n "$ASSET" ] && [ "$ASSET" != "null" ] && [ "$ASSET" != "[]" ]; then
+        ASSET_DATA=$(echo "$ASSET" | jq -c '
+            if type == "array" then .[0]
+            elif .data? then .data[0]
+            else .
+            end // empty
+        ' 2>/dev/null || echo "")
 
-# Extract the first matching asset
-# NOTE: The actual response structure may differ — adjust jq paths
-# after testing with a real Manifest account
-ASSET_DATA=$(echo "$ASSET" | jq -c '
-    if type == "array" then .[0]
-    elif .data? then .data[0]
-    else .
-    end // empty
-' 2>/dev/null || echo "")
+        if [ -n "$ASSET_DATA" ]; then
+            # TODO: Once we know the API shape, compare updated_at against
+            # the current commit timestamp to verify this SBOM is fresh
+            # (not stale from a previous push). For now, any asset found
+            # is treated as valid.
+            echo "Found Manifest asset for ${REPO_SLUG} on attempt ${i}." >&2
+            break
+        fi
+    fi
+
+    if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+        echo "No Manifest asset yet for ${REPO_SLUG}, retrying in ${SLEEP_SECONDS}s (attempt ${i}/${MAX_ATTEMPTS})..." >&2
+        sleep "$SLEEP_SECONDS"
+    fi
+done
 
 if [ -z "$ASSET_DATA" ]; then
-    echo "Could not parse Manifest asset data for ${REPO_SLUG}, skipping." >&2
+    echo "No Manifest Cyber asset found for ${REPO_SLUG} after ${MAX_ATTEMPTS} attempts, skipping." >&2
     exit 0
 fi
 

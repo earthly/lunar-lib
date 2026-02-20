@@ -14,7 +14,7 @@ landing_page:
   long_description: |
     Integrates with Manifest Cyber's SBOM management platform to collect
     vulnerability enrichment, license compliance, and SBOM lifecycle data.
-    Supports API, GitHub App, and CI CLI integration methods.
+    Supports API and CI CLI integration methods.
   categories: ["security"]
   icon: "assets/manifest.svg"
   status: "experimental"
@@ -26,25 +26,13 @@ landing_page:
 collectors:
   - name: api
     description: |
-      Queries the Manifest Cyber REST API for SBOM metadata, vulnerability
-      enrichment, and license data. Writes to .sbom.summary and
-      .sbom.native.manifest.
+      Queries the Manifest Cyber REST API on each commit to verify the SBOM
+      has been uploaded and enriched. Retries for up to 5 minutes to allow
+      for processing delay. Writes to .sbom.summary and .sbom.native.manifest.
     mainBash: api.sh
     hook:
-      type: cron
-      schedule: "0 */6 * * *"
-    keywords: ["manifest cyber", "sbom", "vulnerability enrichment", "license compliance", "supply chain"]
-
-  - name: github-app
-    description: |
-      Detects Manifest Cyber GitHub App status checks on pull requests by
-      querying the GitHub commit status API. Captures SBOM generation status
-      and writes to .sbom.native.manifest.github_app.
-    mainBash: github-app.sh
-    hook:
       type: code
-      runs_on: [prs]
-    keywords: ["manifest cyber", "github app", "sbom generation", "pull request"]
+    keywords: ["manifest cyber", "sbom", "vulnerability enrichment", "license compliance", "supply chain"]
 
   - name: ci
     description: |
@@ -60,8 +48,6 @@ collectors:
 secrets:
   MANIFEST_API_KEY:
     description: Manifest Cyber API key for REST API access (required for api collector)
-  GH_TOKEN:
-    description: GitHub token for API access (required for github-app collector)
 
 example_component_json: |
   {
