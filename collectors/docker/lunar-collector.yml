@@ -32,19 +32,17 @@ collectors:
       type: code
     keywords: ["dockerfile", "docker", "container images", "base images", "multi-stage builds"]
 
-  - name: build-cicd
+  - name: cicd
     description: |
-      Intercepts docker build commands in CI and collects build metadata including
-      image tags, labels, platform targeting, and Dockerfile paths. Writes normalized
-      data for tool-agnostic policy evaluation.
-    mainBash: build-cicd.sh
+      Tracks all docker commands executed in CI pipelines. Records every invocation
+      for audit trails. For build commands, also parses image tags, labels, platform,
+      and Dockerfile paths into normalized build metadata.
+    mainBash: cicd.sh
     hook:
       type: ci-after-command
       binary:
         name: docker
-      args:
-        - value: build
-    keywords: ["docker build", "container build", "image tags", "build labels", "ci builds"]
+    keywords: ["docker build", "docker push", "container build", "image tags", "build labels", "ci builds"]
 
 inputs:
   find_command:

@@ -24,7 +24,7 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |-----------|-------------|
 | `dockerfile` | Parses Dockerfiles to extract base images, users, healthchecks, and labels |
-| `build-cicd` | Intercepts `docker build` commands in CI and collects build metadata |
+| `cicd` | Tracks all docker commands in CI; parses build metadata for `docker build` |
 
 ## Installation
 
