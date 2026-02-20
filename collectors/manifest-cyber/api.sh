@@ -110,7 +110,7 @@ if [ -n "$VULN_DATA" ] && [ "$VULN_DATA" != "null" ]; then
             vulnerabilities: $vulns,
             exploitability: {kev_count: $kev, epss_high_count: $epss_high},
             sbom_format: $sbom_format
-        }' | lunar collect -j ".sbom.native.manifest" -
+        }' | lunar collect -j ".sbom.native.manifest_cyber" -
 else
     # No vulnerability data — still write asset metadata
     jq -n \
@@ -118,7 +118,7 @@ else
         --arg asset_name "$ASSET_NAME" \
         --arg sbom_format "$SBOM_FORMAT" \
         '{asset_id: $asset_id, asset_name: $asset_name, sbom_format: $sbom_format}' | \
-        lunar collect -j ".sbom.native.manifest" -
+        lunar collect -j ".sbom.native.manifest_cyber" -
 fi
 
 # ------------------------------------------------------------------
@@ -134,5 +134,5 @@ if [ -n "$LICENSE_DATA" ] && [ "$LICENSE_DATA" != "null" ]; then
 
     # Write detailed license breakdown to native data
     LICENSE_BREAKDOWN=$(echo "$LICENSE_DATA" | jq -c '[.[] | {id: (.id // .license_id // .name), package_count: (.count // .package_count // 1)}]' 2>/dev/null || echo '[]')
-    echo "$LICENSE_BREAKDOWN" | jq -c '{licenses: .}' | lunar collect -j ".sbom.native.manifest" -
+    echo "$LICENSE_BREAKDOWN" | jq -c '{licenses: .}' | lunar collect -j ".sbom.native.manifest_cyber" -
 fi

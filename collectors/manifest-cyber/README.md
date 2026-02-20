@@ -16,9 +16,9 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.sbom.source` | object | Source metadata (tool: manifest, integration method) |
 | `.sbom.summary` | object | Normalized SBOM summary (package count, licenses, freshness) |
-| `.sbom.native.manifest` | object | Raw Manifest Cyber API data (asset info, SBOM format) |
-| `.sbom.native.manifest.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
-| `.sbom.native.manifest.exploitability` | object | CISA KEV and EPSS exploitability data |
+| `.sbom.native.manifest_cyber` | object | Raw Manifest Cyber API data (asset info, SBOM format) |
+| `.sbom.native.manifest_cyber.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
+| `.sbom.native.manifest_cyber.exploitability` | object | CISA KEV and EPSS exploitability data |
 | `.sbom.cicd` | object | CI CLI detection metadata and commands |
 
 ## Collectors
@@ -36,7 +36,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/manifest@main
+  - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
 ```
 
@@ -52,7 +52,7 @@ collectors:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/manifest@main
+  - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
     include: [api]
 ```
@@ -61,6 +61,6 @@ collectors:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/manifest@main
+  - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
 ```

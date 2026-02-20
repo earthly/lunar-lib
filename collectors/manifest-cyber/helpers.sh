@@ -29,6 +29,6 @@ write_source() {
     local integration="$2"
     jq -n \
         --arg integration "$integration" \
-        '{tool: "manifest", integration: $integration}' | \
+        '{tool: "manifest-cyber", integration: $integration}' | \
         lunar collect -j "${path}.source" -
 }
