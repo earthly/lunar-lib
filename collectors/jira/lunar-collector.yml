@@ -26,9 +26,9 @@ collectors:
       the Jira REST API, and writes normalized ticket data to
       .vcs.pr.ticket and native Jira data to .vcs.pr.ticket.native.jira.
     mainBash: ticket.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["jira", "ticket", "pr", "issue tracking"]
 
   - name: ticket-history
@@ -37,9 +37,9 @@ collectors:
       the same ticket. Writes .vcs.pr.ticket.reuse_count for policy
       evaluation. Detects ticket recycling abuse.
     mainBash: ticket-history.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["jira", "ticket reuse", "compliance", "audit"]
 
 inputs:
