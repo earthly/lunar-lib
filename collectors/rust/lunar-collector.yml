@@ -46,8 +46,7 @@ collectors:
     description: |
       Runs cargo clippy with JSON output and collects structured lint warnings.
       Parses each diagnostic into file, line, message, and lint name. Writes
-      normalized warnings to .lang.rust.lint and raw output to
-      .lang.rust.native.clippy.
+      pass/fail status and normalized warnings to .lang.rust.lint.
     mainBash: clippy.sh
     hook:
       type: code
@@ -139,17 +138,12 @@ example_component_json: |
           "source": { "tool": "cargo", "integration": "code" }
         },
         "lint": {
+          "passed": true,
           "warnings": [
             { "file": "src/main.rs", "line": 15, "column": 5, "message": "unused variable: `x`", "lint": "unused_variables" }
           ],
           "linters": ["clippy"],
           "source": { "tool": "clippy", "integration": "code" }
-        },
-        "native": {
-          "clippy": {
-            "passed": true,
-            "exit_code": 0
-          }
         }
       }
     }

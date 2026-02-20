@@ -31,8 +31,8 @@ This collector writes to the following Component JSON paths:
 | `.lang.rust.cicd` | object | CI/CD command tracking with Rust version |
 | `.lang.rust.tests` | object | Test coverage information |
 | `.lang.rust.dependencies` | object | Direct, dev, build, and transitive dependencies |
-| `.lang.rust.lint` | object | Normalized lint warnings from clippy |
-| `.lang.rust.native.clippy` | object | Raw clippy output and status |
+| `.lang.rust.lint` | object | Clippy lint results (passed, warnings) |
+| `.lang.rust.lint.passed` | boolean | Whether clippy passed with no warnings |
 
 **Note:** This collector writes Rust-native coverage data to `.lang.rust.tests.coverage`. For normalized cross-language coverage at `.testing.coverage`, use a dedicated coverage tool collector (CodeCov, Coveralls, etc.).
 
