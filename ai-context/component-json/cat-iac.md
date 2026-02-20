@@ -5,37 +5,28 @@ Infrastructure as Code. Normalized across Terraform, Pulumi, CloudFormation, etc
 ```json
 {
   "iac": {
-    "source": {
-      "tool": "hcl2json",
-      "version": "0.6.4"
-    },
+    "source": {"tool": "hcl2json", "version": "0.6.8"},
     "files": [
-      {"path": "main.tf", "valid": true},
-      {"path": "variables.tf", "valid": true}
+      {"path": "infra/main.tf", "valid": true}
+    ],
+    "modules": [
+      {
+        "path": "infra",
+        "resources": [
+          {"type": "aws_db_instance", "name": "main", "category": "datastore", "has_prevent_destroy": true},
+          {"type": "aws_lb", "name": "api", "category": "network", "has_prevent_destroy": false, "internet_facing": true},
+          {"type": "aws_wafv2_web_acl", "name": "main", "category": "security"}
+        ],
+        "analysis": {
+          "internet_accessible": true,
+          "has_waf": true
+        }
+      }
     ],
     "native": {
       "terraform": {
         "files": [
-          {
-            "path": "main.tf",
-            "hcl": {
-              "terraform": [
-                {
-                  "required_providers": [{"aws": {"version": "~> 5.0"}}],
-                  "backend": [{"s3": {"bucket": "my-state"}}]
-                }
-              ],
-              "resource": {
-                "aws_db_instance": {"main": [{"engine": "postgres", "lifecycle": [{"prevent_destroy": true}]}]},
-                "aws_lb": {"api": [{"internal": false}]},
-                "aws_wafv2_web_acl": {"main": [{}]},
-                "aws_wafv2_web_acl_association": {"api": [{}]}
-              },
-              "module": {
-                "vpc": [{"source": "terraform-aws-modules/vpc/aws", "version": "5.1.0"}]
-              }
-            }
-          }
+          {"path": "infra/main.tf", "hcl": {}}
         ]
       }
     }
@@ -46,7 +37,8 @@ Infrastructure as Code. Normalized across Terraform, Pulumi, CloudFormation, etc
 ## Key Policy Paths
 
 - `.iac.files[].valid` — Config files valid
-- `.iac.native.terraform.files[].hcl` — Full parsed HCL for policy analysis
-- `.iac.native.terraform.files[].hcl.resource` — Terraform resources (WAF, datastores, etc.)
-- `.iac.native.terraform.files[].hcl.terraform` — Provider versions, backend config
-- `.iac.native.terraform.files[].hcl.module` — Module sources and versions
+- `.iac.modules[].path` — Module directory path
+- `.iac.modules[].resources[]` — Normalized resources with `type`, `name`, `category`, `has_prevent_destroy`
+- `.iac.modules[].analysis.internet_accessible` — Module has public resources
+- `.iac.modules[].analysis.has_waf` — Module has WAF protection
+- `.iac.native.terraform.files[].hcl` — Full parsed HCL (for terraform-specific policy)

@@ -1,27 +1,30 @@
 """Ensure stateless infrastructure resources have lifecycle { prevent_destroy = true }."""
 
-from lunar_policy import Check, variable_or_default
-from helpers import check_destroy_protection, DEFAULT_STATELESS_TYPES
+from lunar_policy import Check
+from helpers import get_modules, get_unprotected
 
 
 def main(node=None):
     c = Check("resource-destroy-protection", "Stateless resources have destroy protection", node=node)
     with c:
-        native = c.get_node(".iac.native.terraform.files")
-        if not native.exists():
-            c.skip("No Terraform data found")
+        modules = get_modules(c)
 
-        extra = variable_or_default("extra_stateless_types", "")
-        types = list(DEFAULT_STATELESS_TYPES)
-        if extra:
-            types.extend(t.strip() for t in extra.split(",") if t.strip())
+        total_compute = 0
+        for mod in modules:
+            path = mod.get_value_or_default(".path", ".")
+            unprotected = get_unprotected(mod, "compute")
+            unprotected += get_unprotected(mod, "network")
+            resources = mod.get_node(".resources")
+            if resources.exists():
+                total_compute += sum(
+                    1 for r in resources
+                    if r.get_value_or_default(".category", "") in ("compute", "network")
+                )
+            if unprotected:
+                c.fail(f"Module '{path}': stateless resources without destroy protection: {', '.join(unprotected)}")
 
-        count, unprotected = check_destroy_protection(native, set(types))
-        if count == 0:
+        if total_compute == 0:
             c.skip("No stateless infrastructure resources found")
-
-        if unprotected:
-            c.fail(f"Stateless resources without destroy protection: {', '.join(unprotected)}")
     return c
 
 

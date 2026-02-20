@@ -46,10 +46,10 @@ This table lists important sub-objects within each category. For full details, s
 | **[`.iac`](cat-iac.md)** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |
 | `.iac.source` | Tool metadata (`tool`, `version`) |
 | `.iac.files[]` | IaC files (`path`, `valid`, `error?`) |
-| `.iac.native.terraform.files[]` | Full parsed HCL per file (`path`, `hcl`) |
-| `.iac.native.terraform.files[].hcl.resource` | Terraform resources (for WAF, datastore analysis) |
-| `.iac.native.terraform.files[].hcl.terraform` | Provider versions, backend configuration |
-| `.iac.native.terraform.files[].hcl.module` | Module sources and versions |
+| `.iac.modules[]` | IaC modules (`path`, `resources[]`, `analysis`) |
+| `.iac.modules[].resources[]` | Normalized resources (`type`, `name`, `category`, `has_prevent_destroy`) |
+| `.iac.modules[].analysis` | Per-module analysis (`internet_accessible`, `has_waf`) |
+| `.iac.native.terraform.files[]` | Full parsed HCL per file (`path`, `hcl`) — for terraform-specific policy |
 | **[`.ci`](cat-ci.md)** | **CI/CD pipeline execution and configuration** |
 | `.ci.run` | Current run info (`id`, `status`, `duration_seconds`) |
 | `.ci.jobs[]` | Job details (`name`, `status`, `duration_seconds`) |

@@ -14,6 +14,7 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.iac.source` | object | Tool metadata (`tool`, `version`) |
 | `.iac.files[]` | array | File validity: `{path, valid, error?}` |
+| `.iac.modules[]` | array | Normalized modules: `{path, resources[], analysis}` |
 | `.iac.native.terraform.files[]` | array | Full parsed HCL per file: `{path, hcl}` |
 
 ## Collectors

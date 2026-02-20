@@ -1,21 +1,25 @@
 """Require WAF protection for internet-facing services."""
 
 from lunar_policy import Check
-from helpers import is_internet_accessible, has_waf_protection
+from helpers import get_modules
 
 
 def main(node=None):
     c = Check("waf-protection", "Internet-facing services have WAF", node=node)
     with c:
-        native = c.get_node(".iac.native.terraform.files")
-        if not native.exists():
-            c.skip("No Terraform data found")
+        modules = get_modules(c)
 
-        if is_internet_accessible(native):
-            c.assert_true(
-                has_waf_protection(native),
-                "Service has internet-facing resources but no WAF protection configured",
-            )
+        for mod in modules:
+            path = mod.get_value_or_default(".path", ".")
+            analysis = mod.get_node(".analysis")
+            if not analysis.exists():
+                continue
+
+            internet_accessible = analysis.get_value_or_default(".internet_accessible", False)
+            if internet_accessible:
+                has_waf = analysis.get_value_or_default(".has_waf", False)
+                if not has_waf:
+                    c.fail(f"Module '{path}': internet-facing resources without WAF protection")
     return c
 
 
