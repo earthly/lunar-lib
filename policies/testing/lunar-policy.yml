@@ -4,7 +4,7 @@ name: testing
 description: Validates that tests are executed, pass, and meet coverage thresholds
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "Testing Guardrails"

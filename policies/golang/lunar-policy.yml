@@ -4,7 +4,7 @@ name: golang
 description: Enforces Go project structure and standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "Go Project Guardrails"

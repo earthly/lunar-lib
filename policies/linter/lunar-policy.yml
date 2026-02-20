@@ -4,7 +4,7 @@ name: linter
 description: Checks that linting ran and passes with acceptable warning count
 author: earthly
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "Linter Guardrails"
