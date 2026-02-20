@@ -15,9 +15,12 @@ landing_page:
   icon: "assets/container-scan.svg"
   status: "stable"
   requires:
-    - slug: "github"
+    - slug: "dockerfile"
       type: "collector"
-      reason: "Provides container scan data via GitHub App integrations"
+      reason: "Provides container definitions used as the applicability gate"
+    - slug: "snyk"
+      type: "collector"
+      reason: "Provides container scan results via Snyk Container"
   related: []
 
 policies:
