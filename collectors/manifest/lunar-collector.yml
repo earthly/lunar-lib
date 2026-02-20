@@ -15,7 +15,7 @@ landing_page:
     Integrates with Manifest Cyber's SBOM management platform to collect
     vulnerability enrichment, license compliance, and SBOM lifecycle data.
     Supports API, GitHub App, and CI CLI integration methods.
-  categories: ["security-and-compliance"]
+  categories: ["security"]
   icon: "assets/manifest.svg"
   status: "experimental"
   related:
