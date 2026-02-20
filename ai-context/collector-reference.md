@@ -266,13 +266,13 @@ collectors:
 
 ### `runs_on`
 
-Controls when the collector triggers. This is a **snippet-level** property (not inside the `hook` block):
+Controls when the collector triggers:
 
 ```yaml
 collectors:
   - name: my-collector
     mainBash: main.sh
-    runs_on: [prs]          # Snippet-level, not inside hook
+    runs_on: [prs, default-branch]  # Default: runs on both
     hook:
       type: code
 ```
