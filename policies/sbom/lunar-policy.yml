@@ -4,7 +4,7 @@ name: sbom
 description: Enforces SBOM existence, license compliance, completeness, and format
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "SBOM Guardrails"

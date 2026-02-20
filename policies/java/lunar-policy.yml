@@ -4,7 +4,7 @@ name: java
 description: Enforces Java project structure and build tool standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-scripts:1.0.0
+default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "Java Project Guardrails"

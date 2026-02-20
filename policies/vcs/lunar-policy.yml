@@ -4,6 +4,8 @@ name: vcs
 description: Version control system (VCS) best practices and security policies
 author: earthly
 
+default_image: earthly/lunar-lib:base-main
+
 landing_page:
   display_name: "VCS Guardrails"
   long_description: |
