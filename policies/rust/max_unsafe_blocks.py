@@ -27,7 +27,7 @@ def check_max_unsafe_blocks(max_unsafe=None, node=None):
             locations = unsafe_blocks.get_node(".locations")
             if locations.exists() and locations.get_value():
                 locs = locations.get_value()[:5]
-                loc_strs = [f"{l.get('file', '?')}:{l.get('line', '?')}" for l in locs]
+                loc_strs = [f"{loc.get('file', '?')}:{loc.get('line', '?')}" for loc in locs]
                 loc_summary = f" Found in: {', '.join(loc_strs)}"
                 if count > 5:
                     loc_summary += f" (and {count - 5} more)"

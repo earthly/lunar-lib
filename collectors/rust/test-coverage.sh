@@ -38,14 +38,10 @@ if [[ "$CMD_STR" == *"llvm-cov"* ]]; then
     # Check for lcov.info
     if [[ -z "$coverage_pct" ]] && [[ -f "lcov.info" ]]; then
         # Parse lcov format: sum of LH (lines hit) / LF (lines found)
-        lh=$(grep -c '^LH:' lcov.info 2>/dev/null || echo "0")
-        lf=$(grep -c '^LF:' lcov.info 2>/dev/null || echo "0")
-        if [[ "$lf" -gt 0 ]]; then
-            lh_sum=$(grep '^LH:' lcov.info | awk -F: '{s+=$2} END {print s}')
-            lf_sum=$(grep '^LF:' lcov.info | awk -F: '{s+=$2} END {print s}')
-            if [[ "$lf_sum" -gt 0 ]]; then
-                coverage_pct=$(awk "BEGIN {printf \"%.1f\", ($lh_sum / $lf_sum) * 100}")
-            fi
+        lh_sum=$(grep '^LH:' lcov.info 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+        lf_sum=$(grep '^LF:' lcov.info 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+        if [[ "$lf_sum" -gt 0 ]]; then
+            coverage_pct=$(awk "BEGIN {printf \"%.1f\", ($lh_sum / $lf_sum) * 100}")
         fi
     fi
 fi
