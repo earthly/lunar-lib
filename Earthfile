@@ -87,6 +87,7 @@ all:
     BUILD --pass-args ./collectors/nodejs+image
     BUILD --pass-args ./collectors/syft+image
     BUILD --pass-args ./catalogers/github-org+image
+    BUILD --pass-args ./policies/dependencies+image
 
 base-image:
     ARG SCRIPTS_VERSION=main-alpine

@@ -4,7 +4,7 @@ name: dependencies
 description: Dependency version and security policies
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:policy-dependencies-main
 
 landing_page:
   display_name: "Dependency Guardrails"
