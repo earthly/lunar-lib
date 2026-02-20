@@ -15,9 +15,12 @@ landing_page:
   icon: "assets/sast.svg"
   status: "stable"
   requires:
-    - slug: "github"
+    - slug: "semgrep"
       type: "collector"
-      reason: "Provides SAST data via GitHub App integrations (Semgrep, CodeQL)"
+      reason: "Provides SAST scan results via Semgrep Code"
+    - slug: "snyk"
+      type: "collector"
+      reason: "Provides SAST scan results via Snyk Code"
   related: []
 
 policies:
