@@ -1,7 +1,5 @@
 from lunar_policy import Check, variable_or_default
 
-EDITION_ORDER = ["2015", "2018", "2021", "2024"]
-
 
 def check_min_rust_edition(min_edition=None, node=None):
     """Check that Rust edition meets minimum requirement."""
@@ -20,13 +18,13 @@ def check_min_rust_edition(min_edition=None, node=None):
 
         edition = str(edition_node.get_value())
 
-        if edition not in EDITION_ORDER:
-            c.fail(f"Unknown Rust edition '{edition}'")
+        try:
+            actual = int(edition)
+            minimum = int(min_edition)
+        except (ValueError, TypeError):
+            c.fail(f"Could not parse edition: '{edition}' or minimum: '{min_edition}'")
 
-        if min_edition not in EDITION_ORDER:
-            c.fail(f"Unknown minimum edition '{min_edition}'")
-
-        if EDITION_ORDER.index(edition) < EDITION_ORDER.index(min_edition):
+        if actual < minimum:
             c.fail(
                 f"Rust edition {edition} is below minimum {min_edition}. "
                 f"Update edition in Cargo.toml to '{min_edition}' or later."
