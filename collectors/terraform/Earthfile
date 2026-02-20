@@ -1,0 +1,15 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install hcl2json for Terraform HCL parsing
+    ARG TARGETARCH
+    ARG HCL2JSON_VERSION=0.6.4
+    RUN curl -fsSL -o /usr/local/bin/hcl2json \
+        "https://github.com/tmccombs/hcl2json/releases/download/v${HCL2JSON_VERSION}/hcl2json_linux_${TARGETARCH}" && \
+        chmod +x /usr/local/bin/hcl2json && \
+        echo "${HCL2JSON_VERSION}" > /usr/local/bin/hcl2json.version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:terraform-$VERSION
