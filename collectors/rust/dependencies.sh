@@ -50,8 +50,8 @@ parse_toml_deps() {
 
         if [[ "$value" == "{"* ]]; then
             # Table form: { version = "1.0", features = ["derive"] }
-            version=$(echo "$value" | grep -oP 'version\s*=\s*"\K[^"]+' 2>/dev/null || true)
-            local feat_raw=$(echo "$value" | grep -oP 'features\s*=\s*\[\K[^\]]+' 2>/dev/null || true)
+            version=$(echo "$value" | sed -n 's/.*version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p')
+            local feat_raw=$(echo "$value" | sed -n 's/.*features[[:space:]]*=[[:space:]]*\[\([^]]*\)\].*/\1/p')
             if [[ -n "$feat_raw" ]]; then
                 features=$(echo "$feat_raw" | sed 's/"//g; s/[[:space:]]//g' | awk -F, '{
                     printf "["

@@ -26,13 +26,13 @@ version=""
 [[ -f "clippy.toml" ]] || [[ -f ".clippy.toml" ]] && clippy_configured=true
 [[ -f "rustfmt.toml" ]] || [[ -f ".rustfmt.toml" ]] && rustfmt_configured=true
 
-# Parse Cargo.toml for metadata
+# Parse Cargo.toml for metadata (POSIX-compatible, no grep -P)
 if [[ "$cargo_toml_exists" == "true" ]]; then
-    # Edition
-    edition=$(grep -oP '^\s*edition\s*=\s*"\K[^"]+' Cargo.toml 2>/dev/null || true)
+    # Edition: edition = "2021"
+    edition=$(sed -n 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
 
-    # MSRV (rust-version field)
-    msrv=$(grep -oP '^\s*rust-version\s*=\s*"\K[^"]+' Cargo.toml 2>/dev/null || true)
+    # MSRV: rust-version = "1.70.0"
+    msrv=$(sed -n 's/^[[:space:]]*rust-version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
 
     # Detect binary targets: [[bin]] section or src/main.rs
     if grep -q '^\[\[bin\]\]' Cargo.toml 2>/dev/null || [[ -f "src/main.rs" ]]; then
@@ -56,32 +56,34 @@ fi
 
 # Get Rust version from rust-toolchain.toml or rustc
 if [[ -f "rust-toolchain.toml" ]]; then
-    version=$(grep -oP '^\s*channel\s*=\s*"\K[^"]+' rust-toolchain.toml 2>/dev/null || true)
+    version=$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' rust-toolchain.toml | head -1)
 elif [[ -f "rust-toolchain" ]]; then
     version=$(cat rust-toolchain | tr -d '[:space:]')
 fi
 if [[ -z "$version" ]]; then
-    version=$(rustc --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || true)
+    version=$(rustc --version 2>/dev/null | sed -n 's/.*[[:space:]]\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' || true)
 fi
 
 # Detect workspace
 workspace_json="null"
 if grep -q '^\[workspace\]' Cargo.toml 2>/dev/null; then
-    # Extract workspace members
-    members_json=$(grep -A 50 '^\[workspace\]' Cargo.toml | \
-        grep -oP '^\s*members\s*=\s*\[.*?\]' | \
-        grep -oP '"[^"]+"' | \
-        sed 's/"//g' | \
+    # Extract workspace members using sed
+    members_json=$(sed -n '/^\[workspace\]/,/^\[/{ /members/{ s/.*\[//; s/\].*//; p; } }' Cargo.toml | \
+        tr ',' '\n' | sed 's/[[:space:]]*//g; s/"//g' | grep -v '^$' | \
         jq -R -s 'split("\n") | map(select(length > 0))' 2>/dev/null || echo '[]')
     workspace_json=$(jq -n --argjson members "$members_json" '{is_workspace: true, members: $members}')
 fi
 
-# Count unsafe blocks in .rs files
-unsafe_json=$(grep -rn 'unsafe\s*{' --include='*.rs' src/ 2>/dev/null | \
-    grep -v '^\s*//' | \
-    jq -R -s 'split("\n") | map(select(length > 0)) |
-    map(capture("^(?<file>[^:]+):(?<line>[0-9]+):")) |
-    {count: length, locations: map({file: .file, line: (.line | tonumber)})}' 2>/dev/null || echo '{"count": 0, "locations": []}')
+# Count unsafe blocks in .rs files (BusyBox-compatible — no --include)
+unsafe_json='{"count": 0, "locations": []}'
+if [[ -d "src" ]]; then
+    unsafe_lines=$(find src -name '*.rs' -exec grep -Hn 'unsafe *{' {} \; 2>/dev/null | grep -v '^ *//' || true)
+    if [[ -n "$unsafe_lines" ]]; then
+        unsafe_json=$(echo "$unsafe_lines" | \
+            sed 's/^\([^:]*\):\([0-9]*\):.*/{"file":"\1","line":\2}/' | \
+            jq -s '{count: length, locations: .}')
+    fi
+fi
 
 # Build and collect
 jq -n \
