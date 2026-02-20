@@ -264,16 +264,17 @@ collectors:
           - value: test
 ```
 
-### Hook Options
+### `runs_on`
 
-#### `runs_on`
-
-Controls when the hook triggers:
+Controls when the collector triggers:
 
 ```yaml
-hook:
-  type: code
-  runs_on: [prs, default-branch]  # Default: runs on both
+collectors:
+  - name: my-collector
+    mainBash: main.sh
+    runs_on: [prs, default-branch]  # Default: runs on both
+    hook:
+      type: code
 ```
 
 | Value | Meaning |
