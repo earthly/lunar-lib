@@ -1,0 +1,125 @@
+version: 0
+
+name: manifest
+description: |
+  Collects SBOM management, vulnerability enrichment, and license compliance
+  data from Manifest Cyber.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Manifest Cyber Collector"
+  long_description: |
+    Integrates with Manifest Cyber's SBOM management platform to collect
+    vulnerability enrichment, license compliance, and SBOM lifecycle data.
+    Supports API, GitHub App, and CI CLI integration methods.
+  categories: ["security-and-compliance"]
+  icon: "assets/manifest.svg"
+  status: "experimental"
+  related:
+    - slug: "sbom"
+      type: "policy"
+      reason: "Enforces SBOM existence and license compliance"
+
+collectors:
+  - name: api
+    description: |
+      Queries the Manifest Cyber REST API for SBOM metadata, vulnerability
+      enrichment, and license data. Writes normalized summaries to .sbom and
+      .sca, plus raw Manifest data to .sbom.native.manifest.
+    mainBash: api.sh
+    hook:
+      type: cron
+      schedule: "0 */6 * * *"
+    keywords: ["manifest cyber", "sbom", "vulnerability enrichment", "license compliance", "supply chain"]
+
+  - name: github-app
+    description: |
+      Detects Manifest Cyber GitHub App status checks on pull requests by
+      querying the GitHub commit status API. Captures SBOM generation status
+      and writes to .sbom.native.manifest.github_app.
+    mainBash: github-app.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["manifest cyber", "github app", "sbom generation", "pull request"]
+
+  - name: ci
+    description: |
+      Detects Manifest CLI (manifest-cli) executions in CI pipelines.
+      Records the command and version to .sbom.cicd.
+    mainBash: ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: "^manifest(-cli)?$"
+    keywords: ["manifest cyber", "manifest cli", "ci detection", "sbom", "pipeline"]
+
+secrets:
+  MANIFEST_API_KEY:
+    description: Manifest Cyber API key for REST API access (required for api collector)
+  GH_TOKEN:
+    description: GitHub token for API access (required for github-app collector)
+
+example_component_json: |
+  {
+    "sbom": {
+      "source": {
+        "tool": "manifest",
+        "integration": "api"
+      },
+      "summary": {
+        "packages": 156,
+        "licenses": ["MIT", "Apache-2.0", "BSD-3-Clause"],
+        "last_updated": "2026-02-19T10:30:00Z"
+      },
+      "native": {
+        "manifest": {
+          "asset_id": "abc123",
+          "asset_name": "acme/api",
+          "vulnerabilities": {
+            "critical": 0,
+            "high": 2,
+            "medium": 5,
+            "low": 12,
+            "total": 19
+          },
+          "exploitability": {
+            "kev_count": 0,
+            "epss_high_count": 1
+          },
+          "licenses": [
+            {"id": "MIT", "package_count": 80},
+            {"id": "Apache-2.0", "package_count": 45}
+          ],
+          "sbom_format": "cyclonedx",
+          "sbom_spec_version": "1.5"
+        }
+      },
+      "cicd": {
+        "source": {
+          "tool": "manifest-cli",
+          "integration": "ci",
+          "version": "2.1.0"
+        },
+        "cmds": [
+          {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
+        ]
+      }
+    },
+    "sca": {
+      "source": {
+        "tool": "manifest",
+        "integration": "api"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 2,
+        "medium": 5,
+        "low": 12,
+        "total": 19
+      }
+    }
+  }
