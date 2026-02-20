@@ -78,10 +78,6 @@ if [ -n "$VULN_DATA" ] && [ "$VULN_DATA" != "null" ]; then
         } | . + {total: (.critical + .high + .medium + .low)}
     ' 2>/dev/null || echo '{"critical":0,"high":0,"medium":0,"low":0,"total":0}')
 
-    # Write normalized SCA vulnerability counts
-    write_source ".sca" "api"
-    echo "$VULN_SUMMARY" | lunar collect -j ".sca.vulnerabilities" -
-
     # Count CISA KEV and high-EPSS vulns for exploitability data
     KEV_COUNT=$(echo "$VULN_DATA" | jq '[.[] | select(.kev == true or .in_kev == true)] | length' 2>/dev/null || echo 0)
     EPSS_HIGH=$(echo "$VULN_DATA" | jq '[.[] | select((.epss_score // 0) > 0.5)] | length' 2>/dev/null || echo 0)

@@ -27,8 +27,8 @@ collectors:
   - name: api
     description: |
       Queries the Manifest Cyber REST API for SBOM metadata, vulnerability
-      enrichment, and license data. Writes normalized summaries to .sbom and
-      .sca, plus raw Manifest data to .sbom.native.manifest.
+      enrichment, and license data. Writes to .sbom.summary and
+      .sbom.native.manifest.
     mainBash: api.sh
     hook:
       type: cron
@@ -107,19 +107,6 @@ example_component_json: |
         "cmds": [
           {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
         ]
-      }
-    },
-    "sca": {
-      "source": {
-        "tool": "manifest",
-        "integration": "api"
-      },
-      "vulnerabilities": {
-        "critical": 0,
-        "high": 2,
-        "medium": 5,
-        "low": 12,
-        "total": 19
       }
     }
   }

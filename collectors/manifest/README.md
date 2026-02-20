@@ -17,10 +17,10 @@ This collector writes to the following Component JSON paths:
 | `.sbom.source` | object | Source metadata (tool: manifest, integration method) |
 | `.sbom.summary` | object | Normalized SBOM summary (package count, licenses, freshness) |
 | `.sbom.native.manifest` | object | Raw Manifest Cyber API data (vulns, exploitability, licenses) |
+| `.sbom.native.manifest.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
+| `.sbom.native.manifest.exploitability` | object | CISA KEV and EPSS exploitability data |
 | `.sbom.native.manifest.github_app` | object | GitHub App status check data |
 | `.sbom.cicd` | object | CI CLI detection metadata and commands |
-| `.sca.source` | object | SCA source metadata from Manifest enrichment |
-| `.sca.vulnerabilities` | object | Normalized vulnerability counts from enrichment |
 
 ## Collectors
 
