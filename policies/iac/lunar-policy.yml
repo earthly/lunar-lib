@@ -1,0 +1,56 @@
+version: 0
+
+name: iac
+description: Infrastructure as Code configuration and best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "IaC Guardrails"
+  long_description: |
+    Enforce Infrastructure as Code best practices including configuration validity,
+    WAF protection, and destroy protection for stateful and stateless resources.
+    Works with any IaC collector that writes to the .iac schema.
+  category: "deployment-and-infrastructure"
+  icon: "assets/iac.svg"
+  status: "beta"
+  requires:
+    - slug: "terraform"
+      type: "collector"
+      reason: "Provides parsed IaC configuration data"
+
+  related:
+    - slug: "terraform"
+      type: "policy"
+      reason: "Terraform-specific guardrails (providers, modules, backend)"
+
+policies:
+  - name: valid
+    description: |
+      Validates that all IaC configuration files are syntactically correct.
+      Invalid configurations will fail deployment.
+    mainPython: valid.py
+    keywords: ["iac", "terraform", "syntax", "validation", "hcl"]
+
+  - name: waf-protection
+    description: |
+      Requires WAF protection for internet-facing services. Checks each IaC module
+      for public resources and verifies WAF is configured.
+    mainPython: waf_protection.py
+    keywords: ["iac", "waf", "security", "internet facing", "load balancer"]
+
+  - name: datastore-destroy-protection
+    description: |
+      Ensures stateful resources (databases, storage buckets, caches) have
+      lifecycle { prevent_destroy = true } to prevent accidental data loss.
+    mainPython: datastore_destroy_protection.py
+    keywords: ["iac", "datastores", "prevent_destroy", "stateful", "data safety"]
+
+  - name: resource-destroy-protection
+    description: |
+      Ensures stateless infrastructure resources (EC2 instances, load balancers,
+      networking) have lifecycle { prevent_destroy = true } to prevent accidental
+      destruction of critical infrastructure.
+    mainPython: resource_destroy_protection.py
+    keywords: ["iac", "infrastructure", "prevent_destroy", "stateless", "ec2"]

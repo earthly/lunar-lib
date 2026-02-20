@@ -334,14 +334,10 @@ When multiple tools contribute to the same category:
 ```json
 {
   "iac": {
-    "tool": "terraform",
-    "analysis": {
-      "internet_accessible": true,
-      "has_waf": true,
-      "datastores": {
-        "all_deletion_protected": true
-      }
-    },
+    "source": {"tool": "hcl2json", "version": "0.6.4"},
+    "files": [
+      {"path": "main.tf", "valid": true}
+    ],
     "native": {
       "terraform": {
         "files": [
@@ -349,9 +345,7 @@ When multiple tools contribute to the same category:
             "path": "main.tf",
             "hcl": { /* parsed HCL as JSON */ }
           }
-        ],
-        "providers": ["aws", "random"],
-        "modules": ["vpc", "rds"]
+        ]
       }
     }
   }

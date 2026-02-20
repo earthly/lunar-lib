@@ -1,0 +1,78 @@
+version: 0
+
+name: terraform
+description: Parses Terraform HCL files and collects IaC configuration data
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:terraform-main
+
+landing_page:
+  display_name: "Terraform Collector"
+  long_description: |
+    Parse Terraform HCL files to extract configuration data. Writes file validity
+    and full parsed HCL JSON for downstream policy analysis of providers, modules,
+    backends, resources, and infrastructure security posture.
+  categories: ["security", "orchestration"]
+  icon: "assets/terraform.svg"
+  status: "beta"
+  related:
+    - slug: "iac"
+      type: "policy"
+      reason: "Generic IaC guardrails using this collector's data"
+    - slug: "terraform"
+      type: "policy"
+      reason: "Terraform-specific guardrails using this collector's data"
+
+collectors:
+  - name: terraform
+    description: |
+      Parses all Terraform (.tf) files in the repository using hcl2json and collects:
+      - File validity and parse errors (.iac.files[])
+      - Normalized modules with resources and analysis (.iac.modules[])
+      - Full parsed HCL JSON for terraform-specific policy (.iac.native.terraform.files[])
+      - Source tool metadata (.iac.source)
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["terraform", "iac", "infrastructure", "hcl", "aws", "providers", "modules", "backend"]
+
+example_component_json: |
+  {
+    "iac": {
+      "source": {"tool": "hcl2json", "version": "0.6.8"},
+      "files": [
+        {"path": "deploy/terraform/main.tf", "valid": true},
+        {"path": "deploy/terraform/variables.tf", "valid": true}
+      ],
+      "modules": [
+        {
+          "path": "deploy/terraform",
+          "resources": [
+            {"type": "aws_db_instance", "name": "main", "category": "datastore", "has_prevent_destroy": true},
+            {"type": "aws_s3_bucket", "name": "logs", "category": "datastore", "has_prevent_destroy": false},
+            {"type": "aws_lb", "name": "api", "category": "network", "has_prevent_destroy": false, "internet_facing": true},
+            {"type": "aws_instance", "name": "web", "category": "compute", "has_prevent_destroy": false},
+            {"type": "aws_wafv2_web_acl", "name": "main", "category": "security"},
+            {"type": "aws_wafv2_web_acl_association", "name": "api", "category": "security"}
+          ],
+          "analysis": {
+            "internet_accessible": true,
+            "has_waf": true
+          }
+        }
+      ],
+      "native": {
+        "terraform": {
+          "files": [
+            {
+              "path": "deploy/terraform/main.tf",
+              "hcl": {
+                "terraform": [{"required_providers": [{"aws": {"source": "hashicorp/aws", "version": "~> 5.0"}}]}],
+                "resource": {"aws_db_instance": {"main": [{"engine": "postgres"}]}}
+              }
+            }
+          ]
+        }
+      }
+    }
+  }

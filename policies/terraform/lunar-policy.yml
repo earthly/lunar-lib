@@ -1,0 +1,62 @@
+version: 0
+
+name: terraform
+description: Terraform-specific configuration and best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Terraform Guardrails"
+  long_description: |
+    Enforce Terraform-specific best practices including provider version pinning, minimum provider versions,
+    module version pinning, and remote backend configuration.
+  category: "deployment-and-infrastructure"
+  icon: "assets/terraform.svg"
+  status: "beta"
+  requires:
+    - slug: "terraform"
+      type: "collector"
+      reason: "Provides parsed Terraform HCL data"
+
+  related:
+    - slug: "iac"
+      type: "policy"
+      reason: "Generic IaC guardrails (validity, WAF, datastores)"
+
+policies:
+  - name: provider-versions-pinned
+    description: |
+      Requires Terraform providers to specify version constraints in required_providers.
+      Unpinned providers can introduce breaking changes unexpectedly.
+    mainPython: provider_versions_pinned.py
+    keywords: ["terraform", "providers", "version pinning", "reproducibility", "required_providers"]
+
+  - name: module-versions-pinned
+    description: |
+      Requires Terraform modules to use pinned versions or commit SHAs.
+      Unpinned modules make infrastructure deployments non-reproducible.
+    mainPython: module_versions_pinned.py
+    keywords: ["terraform", "modules", "version pinning", "reproducibility"]
+
+  - name: remote-backend
+    description: |
+      Requires Terraform to use a remote backend for state management.
+      Local state files are fragile and cannot be shared across teams.
+    mainPython: remote_backend.py
+    keywords: ["terraform", "backend", "state management", "s3", "gcs", "terraform cloud"]
+
+  - name: min-provider-versions
+    description: |
+      Enforces minimum version requirements for Terraform providers.
+      Ensures providers meet security and compatibility baselines.
+    mainPython: min_provider_versions.py
+    keywords: ["terraform", "providers", "minimum version", "security", "semver"]
+
+inputs:
+  required_backend_types:
+    description: Comma-separated list of approved backend types (empty = any remote backend)
+    default: ""
+  min_provider_versions:
+    description: 'JSON object mapping provider names to minimum versions (e.g., {"aws": "5.0", "random": "3.0"})'
+    default: "{}"
