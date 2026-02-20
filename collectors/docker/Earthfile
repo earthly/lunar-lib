@@ -12,4 +12,4 @@ image:
         echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
 
     ARG VERSION=main
-    SAVE IMAGE --push earthly/lunar-lib:dockerfile-$VERSION
+    SAVE IMAGE --push earthly/lunar-lib:docker-$VERSION

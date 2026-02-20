@@ -18,7 +18,7 @@ landing_page:
     - slug: "k8s"
       type: "policy"
       reason: "Enforces K8s best practices using this collector's data"
-    - slug: "dockerfile"
+    - slug: "docker"
       type: "collector"
       reason: "Collects container definitions that K8s workloads reference"
 

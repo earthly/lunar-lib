@@ -1,7 +1,7 @@
 version: 0
 
 name: container
-description: Container definition policies
+description: Container definition and build policies
 author: earthly
 
 default_image: earthly/lunar-lib:base-main
@@ -10,14 +10,14 @@ landing_page:
   display_name: "Container Guardrails"
   long_description: |
     Enforce container best practices including tag stability, registry allowlists,
-    required labels, and security configurations for Dockerfiles.
+    required labels, build traceability, and security configurations.
   category: "devex-build-and-ci"
   icon: "assets/container.svg"
   status: "stable"
   requires:
-    - slug: "dockerfile"
+    - slug: "docker"
       type: "collector"
-      reason: "Provides Dockerfile data that these policies evaluate"
+      reason: "Provides Dockerfile and build data that these policies evaluate"
   related: []
 
 policies:
@@ -44,10 +44,11 @@ policies:
 
   - name: required-labels
     description: |
-      Ensures Dockerfiles include required OCI labels for traceability.
-      Common labels: org.opencontainers.image.source, version, maintainer.
+      Ensures containers have required labels, checking both Dockerfile LABEL
+      instructions and docker build --label flags. A label present in either
+      source satisfies the requirement.
     mainPython: required_labels.py
-    keywords: ["dockerfile labels", "oci labels", "image metadata"]
+    keywords: ["container labels", "oci labels", "build labels", "image metadata", "git sha"]
 
   - name: healthcheck
     description: |
@@ -63,10 +64,17 @@ policies:
     mainPython: user.py
     keywords: ["non-root", "container security", "least privilege", "USER instruction"]
 
+  - name: build-tagged
+    description: |
+      Requires container builds to use an explicit image tag via -t/--tag.
+      Untagged builds produce anonymous images that cannot be tracked or deployed.
+    mainPython: build_tagged.py
+    keywords: ["docker build", "image tags", "container registry", "build tagging"]
+
 inputs:
   allowed_registries:
     description: Comma-separated list of allowed registries
     default: "docker.io"
   required_labels:
-    description: Comma-separated list of required labels (empty = no requirement)
+    description: Comma-separated list of required labels checked across Dockerfile and build commands (empty = no requirement)
     default: ""
