@@ -8,56 +8,67 @@ if [[ ! -f "Cargo.toml" ]]; then
     exit 0
 fi
 
-# Parse dependencies from Cargo.toml sections using awk
-# Extracts name and version requirement from [dependencies], [dev-dependencies], [build-dependencies]
+# Parse dependencies from a Cargo.toml section into JSON lines
+# Uses grep+sed for reliable parsing across awk implementations
 parse_toml_deps() {
     local section="$1"
-    awk -v section="$section" '
-        BEGIN { in_section=0 }
-        /^\[/ {
-            if ($0 ~ "^\\[" section "\\]") { in_section=1; next }
-            else if ($0 ~ "^\\[" section "\\.") { in_section=1; next }
-            else { in_section=0 }
-        }
-        in_section && /^[a-zA-Z_-]/ {
-            # Handle: name = "version" or name = { version = "..." }
-            split($0, parts, "=")
-            name = parts[1]
-            gsub(/^[ \t]+|[ \t]+$/, "", name)
-            rest = substr($0, index($0, "=") + 1)
-            gsub(/^[ \t]+|[ \t]+$/, "", rest)
+    local in_section=false
+    local line
 
-            version = ""
-            features = "[]"
-            if (rest ~ /^\{/) {
-                # Table form: extract version and features
-                if (match(rest, /version[ \t]*=[ \t]*"([^"]*)"/, m)) {
-                    version = m[1]
-                }
-                if (match(rest, /features[ \t]*=[ \t]*\[([^\]]*)\]/, m)) {
-                    # Parse features array
-                    feat = m[1]
-                    gsub(/"/, "", feat)
-                    gsub(/[ \t]+/, "", feat)
-                    n = split(feat, fa, ",")
-                    features = "["
-                    for (i=1; i<=n; i++) {
-                        if (fa[i] != "") {
-                            if (i > 1) features = features ","
-                            features = features "\"" fa[i] "\""
-                        }
+    while IFS= read -r line; do
+        # Detect section headers
+        if [[ "$line" == "[$section]" ]]; then
+            in_section=true
+            continue
+        elif [[ "$line" == "[$section."* ]]; then
+            # Sub-table like [dependencies.serde] — skip (handle inline only)
+            in_section=false
+            continue
+        elif [[ "$line" == "["* ]]; then
+            in_section=false
+            continue
+        fi
+
+        if [[ "$in_section" != "true" ]]; then
+            continue
+        fi
+
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" == "#"* ]] && continue
+
+        # Extract dependency name (before first =)
+        local name="${line%%=*}"
+        name="$(echo "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$name" ]] && continue
+
+        # Extract the value part (after first =)
+        local value="${line#*=}"
+        value="$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+        local version=""
+        local features="[]"
+
+        if [[ "$value" == "{"* ]]; then
+            # Table form: { version = "1.0", features = ["derive"] }
+            version=$(echo "$value" | grep -oP 'version\s*=\s*"\K[^"]+' 2>/dev/null || true)
+            local feat_raw=$(echo "$value" | grep -oP 'features\s*=\s*\[\K[^\]]+' 2>/dev/null || true)
+            if [[ -n "$feat_raw" ]]; then
+                features=$(echo "$feat_raw" | sed 's/"//g; s/[[:space:]]//g' | awk -F, '{
+                    printf "["
+                    for(i=1;i<=NF;i++) {
+                        if(i>1) printf ","
+                        printf "\"%s\"", $i
                     }
-                    features = features "]"
-                }
-            } else {
-                # Simple form: name = "version"
-                gsub(/"/, "", rest)
-                version = rest
-            }
+                    printf "]"
+                }')
+            fi
+        elif [[ "$value" == '"'* ]]; then
+            # Simple form: "1.0"
+            version=$(echo "$value" | sed 's/"//g')
+        fi
 
-            printf "{\"path\":\"%s\",\"version\":\"%s\",\"features\":%s}\n", name, version, features
-        }
-    ' Cargo.toml
+        printf '{"path":"%s","version":"%s","features":%s}\n' "$name" "$version" "$features"
+    done < Cargo.toml
 }
 
 # Parse each section
