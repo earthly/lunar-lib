@@ -1,0 +1,18 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Rust via rustup (minimal profile + clippy)
+    ENV RUSTUP_HOME="/usr/local/rustup"
+    ENV CARGO_HOME="/usr/local/cargo"
+    ENV PATH="/usr/local/cargo/bin:$PATH"
+    RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+        sh -s -- -y --default-toolchain stable --profile minimal \
+        --component clippy
+
+    # Verify installations
+    RUN rustc --version && cargo --version && cargo clippy --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:rust-$VERSION
