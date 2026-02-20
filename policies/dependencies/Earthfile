@@ -1,0 +1,11 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Python dependencies
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:policy-dependencies-$VERSION
