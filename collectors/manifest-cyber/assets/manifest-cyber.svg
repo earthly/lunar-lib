@@ -1,0 +1,10 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Manifest Cyber M mark: 5 dots connected by lines -->
+  <!-- Dots: bottom-left, top-left, center-bottom, top-right, bottom-right -->
+  <polyline points="8,56 8,8 32,36 56,8 56,56" fill="none" stroke="black" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="8" cy="56" r="5" fill="black"/>
+  <circle cx="8" cy="8" r="5" fill="black"/>
+  <circle cx="32" cy="36" r="5" fill="black"/>
+  <circle cx="56" cy="8" r="5" fill="black"/>
+  <circle cx="56" cy="56" r="5" fill="black"/>
+</svg>
