@@ -11,11 +11,10 @@ else
     CMD_STR="$CMD_RAW"
 fi
 
-# Use the exact traced binary for version extraction
-TRACED_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-rustc}"
-
-# Get version from the traced binary (cargo or rustc)
-version=$("$TRACED_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+# Get Rust version — always use "rustc" (the hook fires on cargo, but we want the language version)
+# rustc is in the same BIN_DIR as cargo
+RUSTC_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}rustc"
+version=$("$RUSTC_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
 
 if [[ -n "$version" ]]; then
     CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
