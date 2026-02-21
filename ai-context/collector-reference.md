@@ -351,6 +351,11 @@ For `ci-before-command` and `ci-after-command` hooks:
 | Variable | Description |
 |----------|-------------|
 | `LUNAR_CI_COMMAND` | Command and arguments of the hooked command (JSON array of strings, e.g., `["go","test","./..."]`) |
+| `LUNAR_CI_COMMAND_BIN` | Binary name only, without directory (e.g., `go`, `java`, `mvn`) |
+| `LUNAR_CI_COMMAND_BIN_DIR` | Directory containing the binary (e.g., `/opt/actions-runner/_work/_tool/go/1.22.12/x64/bin`) |
+| `LUNAR_CI_COMMAND_ARGS` | Command arguments excluding the binary, as a JSON array |
+| `LUNAR_CI_COMMAND_PID` | PID of the command that triggered the collector |
+| `LUNAR_CI_COMMAND_PPID` | For inner commands, the PID of the parent step command |
 
 ```bash
 # For ci-after-command hook on "docker build -t myimage ."
@@ -363,6 +368,14 @@ echo "Hooked command: $(echo "$LUNAR_CI_COMMAND" | jq -r 'join(" ")')"
 CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 echo "Hooked command: $CMD_STR"
 ```
+
+> **Best practice: use the traced binary path for version extraction.** Don't assume the binary is on PATH — CI runners may install tools to non-standard locations. Use `LUNAR_CI_COMMAND_BIN_DIR` and `LUNAR_CI_COMMAND_BIN` to construct the absolute path to the exact binary that was traced:
+>
+> ```bash
+> # Build the absolute path to the traced binary
+> TOOL_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-tool}"
+> version=$("$TOOL_BIN" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+[.0-9]*' || echo "")
+> ```
 
 ## The lunar collect Command
 

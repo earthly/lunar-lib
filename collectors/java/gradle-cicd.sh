@@ -10,14 +10,11 @@ CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 # Escape for safe JSON embedding (backslashes then double quotes)
 json_cmd=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-# Get Gradle version (best effort)
-version=""
+# Use the exact traced binary for version extraction
+GRADLE_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-gradle}"
 
-if [[ -f "./gradlew" ]] && [[ -x "./gradlew" ]]; then
-    version=$(./gradlew --version 2>&1 | grep -i "Gradle" | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)
-elif command -v gradle >/dev/null 2>&1; then
-    version=$(gradle --version 2>&1 | grep -i "Gradle" | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)
-fi
+# Get Gradle version (best effort)
+version=$("$GRADLE_BIN" --version 2>&1 | grep -i "Gradle" | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)
 
 # Fallback: check gradle wrapper properties
 if [[ -z "$version" ]] && [[ -f "gradle/wrapper/gradle-wrapper.properties" ]]; then

@@ -7,12 +7,11 @@ CMD="$LUNAR_CI_COMMAND"
 lunar collect ".sbom.cicd.source.tool" "syft"
 lunar collect ".sbom.cicd.source.integration" "ci"
 
-# Try to get syft version (no jq — CI runners may not have it)
-if command -v syft &>/dev/null; then
-  VERSION=$(syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
-  if [ -n "$VERSION" ]; then
-    lunar collect ".sbom.cicd.source.version" "$VERSION"
-  fi
+# Get syft version using the exact traced binary
+SYFT_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-syft}"
+VERSION=$("$SYFT_BIN" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
+if [ -n "$VERSION" ]; then
+  lunar collect ".sbom.cicd.source.version" "$VERSION"
 fi
 
 # Parse the command to find output file and format
