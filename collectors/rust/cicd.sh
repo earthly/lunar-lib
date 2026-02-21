@@ -11,8 +11,11 @@ else
     CMD_STR="$CMD_RAW"
 fi
 
-# Get Rust version
-version=$(rustc --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || echo "")
+# Use the exact traced binary for version extraction
+TRACED_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-rustc}"
+
+# Get version from the traced binary (cargo or rustc)
+version=$("$TRACED_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
 
 if [[ -n "$version" ]]; then
     CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')

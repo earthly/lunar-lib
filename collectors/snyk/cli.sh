@@ -43,8 +43,9 @@ else
     CATEGORY="sca"  # Default: snyk test = Open Source
 fi
 
-# Capture Snyk CLI version
-SNYK_VERSION=$(snyk --version 2>/dev/null || echo "unknown")
+# Capture Snyk CLI version using the exact traced binary
+SNYK_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-snyk}"
+SNYK_VERSION=$("$SNYK_BIN" --version 2>/dev/null || echo "unknown")
 
 # Sanitize command to redact potential secrets (tokens, credentials)
 CMD_SAFE=$(echo "$CMD_STR" | sed -E \

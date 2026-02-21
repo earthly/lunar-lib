@@ -9,8 +9,11 @@ set -e
 # Complex arguments with embedded quotes are uncommon in practice.
 CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 
-# Get Python version if available
-version=$(python3 --version 2>/dev/null | awk '{print $2}' || python --version 2>/dev/null | awk '{print $2}' || echo "")
+# Use the exact traced binary for version extraction
+PYTHON_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-python3}"
+
+# Get Python version
+version=$("$PYTHON_BIN" --version 2>/dev/null | awk '{print $2}' || echo "")
 
 if [[ -n "$version" ]]; then
     # Escape special characters for safe JSON embedding
