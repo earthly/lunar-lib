@@ -3,9 +3,9 @@
 # Shared helpers for AI CLI CI collectors.
 # These run native (no jq) — must use pure bash.
 
-# Get tool version by running "<tool> --version" and extracting first version-like string.
+# Get tool version using the exact traced binary path.
 get_tool_version() {
-  local tool="$1"
+  local tool="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-$1}"
   "$tool" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+[.0-9]*' | head -1 || echo ""
 }
 
