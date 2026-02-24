@@ -11,6 +11,10 @@ image:
         mv kubeconform /usr/local/bin/ && \
         chmod +x /usr/local/bin/kubeconform
 
+    # Install GNU parallel for parallel file processing
+    RUN apk add --no-cache parallel && \
+        mkdir -p ~/.parallel && touch ~/.parallel/will-cite
+
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:k8s-$VERSION
 

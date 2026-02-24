@@ -91,10 +91,16 @@ export -f process_file
 FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name Dockerfile -o -name '*.Dockerfile' -o -name 'Dockerfile.*' \)}"
 
 # Process all Dockerfiles in parallel, collect results
-eval "$FIND_CMD" 2>/dev/null | parallel -j 4 process_file | jq -s '.' | lunar collect -j ".containers.definitions" -
+results=$(eval "$FIND_CMD" 2>/dev/null | parallel -j 4 process_file | jq -s '.')
 
-# Submit source metadata
-# dockerfile-json doesn't have a --version flag, so we read from the marker file
-TOOL_VERSION=$(cat /usr/local/bin/dockerfile-json.version 2>/dev/null || echo "unknown")
-jq -n --arg tool "dockerfile-json" --arg version "$TOOL_VERSION" \
-    '{tool: $tool, version: $version}' | lunar collect -j ".containers.source" -
+# Only collect if we found at least one Dockerfile
+result_count=$(echo "$results" | jq 'length' 2>/dev/null || echo 0)
+if [ "$result_count" -gt 0 ]; then
+    echo "$results" | lunar collect -j ".containers.definitions" -
+
+    # Submit source metadata
+    # dockerfile-json doesn't have a --version flag, so we read from the marker file
+    TOOL_VERSION=$(cat /usr/local/bin/dockerfile-json.version 2>/dev/null || echo "unknown")
+    jq -n --arg tool "dockerfile-json" --arg version "$TOOL_VERSION" \
+        '{tool: $tool, version: $version}' | lunar collect -j ".containers.source" -
+fi
