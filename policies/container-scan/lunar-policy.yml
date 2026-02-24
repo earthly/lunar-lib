@@ -15,7 +15,7 @@ landing_page:
   icon: "assets/container-scan.svg"
   status: "stable"
   requires:
-    - slug: "dockerfile"
+    - slug: "docker"
       type: "collector"
       reason: "Provides container definitions used as the applicability gate"
     - slug: "snyk"
