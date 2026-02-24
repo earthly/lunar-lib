@@ -13,7 +13,7 @@ def _normalize_path(path):
 def main():
     with Check("required-labels", "Containers should have required labels") as c:
         required_str = variable_or_default("required_labels", "")
-        required = [l.strip() for l in required_str.split(",") if l.strip()]
+        required = [label.strip() for label in required_str.split(",") if label.strip()]
 
         if not required:
             return
@@ -44,7 +44,9 @@ def main():
                 if not definition.get_value_or_default(".valid", False):
                     continue
 
-                path = _normalize_path(definition.get_value(".path"))
+                path = _normalize_path(
+                    definition.get_value_or_default(".path", "Dockerfile")
+                ) or "Dockerfile"
                 checked_dockerfiles.add(path)
 
                 # Labels from this Dockerfile's LABEL instructions
@@ -56,7 +58,7 @@ def main():
                 # Union of both sources for this Dockerfile
                 all_labels = {**def_labels, **matching_build_labels}
 
-                missing = [l for l in required if l not in all_labels]
+                missing = [label for label in required if label not in all_labels]
                 if missing:
                     c.fail(
                         f"'{path}' missing required labels: {', '.join(missing)}"
@@ -65,7 +67,7 @@ def main():
         # Check builds that don't match any Dockerfile definition
         for df_path, labels in build_labels_by_dockerfile.items():
             if df_path not in checked_dockerfiles:
-                missing = [l for l in required if l not in labels]
+                missing = [label for label in required if label not in labels]
                 if missing:
                     c.fail(
                         f"Build for '{df_path}' missing required labels: "
