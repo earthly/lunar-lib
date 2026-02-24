@@ -81,7 +81,6 @@ example_component_json: |
             {"id": "Apache-2.0", "package_count": 45}
           ],
           "sbom_format": "cyclonedx",
-          "sbom_spec_version": "1.5",
           "cicd": {
             "cmds": [
               {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}

@@ -59,6 +59,12 @@ fi
 # ------------------------------------------------------------------
 
 ASSET_ID=$(echo "$ASSET_DATA" | jq -r '.id // .asset_id // ""')
+
+if [ -z "$ASSET_ID" ]; then
+    echo "Could not determine asset ID for ${REPO_SLUG}, skipping." >&2
+    exit 0
+fi
+
 ASSET_NAME=$(echo "$ASSET_DATA" | jq -r '.name // .asset_name // ""')
 PACKAGE_COUNT=$(echo "$ASSET_DATA" | jq -r '.component_count // .package_count // 0')
 SBOM_FORMAT=$(echo "$ASSET_DATA" | jq -r '.sbom_format // .format // "unknown"')
@@ -129,7 +135,7 @@ LICENSE_DATA=$(manifest_api GET "/assets/${ASSET_ID}/licenses" 2>/dev/null || ec
 
 if [ -n "$LICENSE_DATA" ] && [ "$LICENSE_DATA" != "null" ]; then
     # Extract unique license IDs for the normalized summary
-    LICENSES=$(echo "$LICENSE_DATA" | jq -c '[.[].id // .[].license_id // .[].name] | unique' 2>/dev/null || echo '[]')
+    LICENSES=$(echo "$LICENSE_DATA" | jq -c '[.[] | .id // .license_id // .name] | unique' 2>/dev/null || echo '[]')
     echo "$LICENSES" | jq -c '{licenses: .}' | lunar collect -j ".sbom.summary" -
 
     # Write detailed license breakdown to native data

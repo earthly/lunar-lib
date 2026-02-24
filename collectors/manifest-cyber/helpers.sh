@@ -15,6 +15,8 @@ manifest_api() {
     local endpoint="$2"
     shift 2
     curl -fsS \
+        --connect-timeout 10 \
+        --max-time 25 \
         -X "$method" \
         -H "Authorization: Bearer $LUNAR_SECRET_MANIFEST_API_KEY" \
         -H "Content-Type: application/json" \
