@@ -28,7 +28,8 @@ collectors:
     description: |
       Queries the Manifest Cyber REST API on each commit to verify the SBOM
       has been uploaded and enriched. Retries for up to 5 minutes to allow
-      for processing delay. Writes to .sbom.summary and .sbom.native.manifest_cyber.
+      for processing delay. Pulls the SBOM content to .sbom.auto.cyclonedx
+      (or .spdx), enrichment data to .sbom.native.manifest_cyber.
     mainBash: api.sh
     hook:
       type: code
@@ -60,6 +61,13 @@ example_component_json: |
         "packages": 156,
         "licenses": ["MIT", "Apache-2.0", "BSD-3-Clause"],
         "last_updated": "2026-02-19T10:30:00Z"
+      },
+      "auto": {
+        "cyclonedx": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "1.5",
+          "components": []
+        }
       },
       "native": {
         "manifest_cyber": {

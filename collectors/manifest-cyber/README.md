@@ -16,6 +16,7 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.sbom.source` | object | Source metadata (tool: manifest, integration method) |
 | `.sbom.summary` | object | Normalized SBOM summary (package count, licenses, freshness) |
+| `.sbom.auto.cyclonedx` / `.spdx` | object | Full SBOM content pulled from Manifest API (normalized path) |
 | `.sbom.native.manifest_cyber` | object | Raw Manifest Cyber API data (asset info, SBOM format) |
 | `.sbom.native.manifest_cyber.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
 | `.sbom.native.manifest_cyber.exploitability` | object | CISA KEV and EPSS exploitability data |

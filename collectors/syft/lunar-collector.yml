@@ -35,9 +35,9 @@ collectors:
 
   - name: ci
     description: |
-      Detects Syft execution in CI pipelines. Records source metadata to
-      .sbom.cicd and optionally collects the generated SBOM file if the
-      output path can be determined from command flags.
+      Detects Syft execution in CI pipelines. Records command metadata to
+      .sbom.native.syft.cicd and collects the generated SBOM to normalized
+      .sbom.cicd.cyclonedx/.spdx if the output path can be determined.
     mainBash: ci.sh
     hook:
       type: ci-after-command
@@ -63,8 +63,14 @@ example_component_json: |
         }
       },
       "cicd": {
-        "source": { "tool": "syft", "integration": "ci", "version": "1.41.2" },
         "cyclonedx": { "bomFormat": "CycloneDX", "specVersion": "1.5", "components": [] }
+      },
+      "native": {
+        "syft": {
+          "cicd": {
+            "cmds": [{ "cmd": "syft . -o cyclonedx-json=sbom.json", "version": "1.41.2" }]
+          }
+        }
       }
     }
   }

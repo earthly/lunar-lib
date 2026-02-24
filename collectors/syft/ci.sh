@@ -3,16 +3,22 @@ set -e
 
 CMD="$LUNAR_CI_COMMAND"
 
-# Record source metadata - presence signals syft ran in CI
-lunar collect ".sbom.cicd.source.tool" "syft"
-lunar collect ".sbom.cicd.source.integration" "ci"
+# Extract command string for cmds array
+CMD_STR=$(echo "$CMD" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
+CMD_STR=$(printf '%s' "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Try to get syft version (no jq — CI runners may not have it)
+VERSION=""
 if command -v syft &>/dev/null; then
   VERSION=$(syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
-  if [ -n "$VERSION" ]; then
-    lunar collect ".sbom.cicd.source.version" "$VERSION"
-  fi
+fi
+
+# Write tool-specific CI metadata under .sbom.native.syft.cicd
+# This follows the .native.{tool}.cicd convention (matching Snyk, manifest-cyber)
+if [ -n "$VERSION" ]; then
+  lunar collect -j ".sbom.native.syft.cicd.cmds" "[{\"cmd\":\"$CMD_STR\",\"version\":\"$VERSION\"}]"
+else
+  lunar collect -j ".sbom.native.syft.cicd.cmds" "[{\"cmd\":\"$CMD_STR\"}]"
 fi
 
 # Parse the command to find output file and format
@@ -44,6 +50,7 @@ if [ -z "$OUTPUT_FILE" ]; then
 fi
 
 # Determine the SBOM format — only collect JSON formats we recognize
+# SBOM content goes to normalized .sbom.cicd paths (tool-agnostic)
 # Syft formats: json (native), cyclonedx-json, cyclonedx-xml, spdx-json, spdx-tag-value,
 #               github-json, table, text, purls, template
 SBOM_PATH=""
@@ -55,11 +62,11 @@ case "$OUTPUT_FORMAT" in
     SBOM_PATH=".sbom.cicd.spdx"
     ;;
   json)
-    # Syft native JSON format
-    SBOM_PATH=".sbom.cicd.native.syft"
+    # Syft native JSON format — tool-specific, goes under native
+    SBOM_PATH=".sbom.native.syft.cicd.raw"
     ;;
   github-json)
-    SBOM_PATH=".sbom.cicd.native.github"
+    SBOM_PATH=".sbom.native.syft.cicd.github"
     ;;
   # XML and text formats (cyclonedx-xml, spdx-tag-value, table, text, purls, template)
   # are not collected — lunar collect requires JSON
