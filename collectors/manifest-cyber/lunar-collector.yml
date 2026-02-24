@@ -37,7 +37,7 @@ collectors:
   - name: ci
     description: |
       Detects Manifest CLI (manifest-cli) executions in CI pipelines.
-      Records the command and version to .sbom.cicd.
+      Records the command and version to .sbom.native.manifest_cyber.cicd.cmds.
     mainBash: ci.sh
     hook:
       type: ci-after-command
@@ -81,18 +81,13 @@ example_component_json: |
             {"id": "Apache-2.0", "package_count": 45}
           ],
           "sbom_format": "cyclonedx",
-          "sbom_spec_version": "1.5"
+          "sbom_spec_version": "1.5",
+          "cicd": {
+            "cmds": [
+              {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
+            ]
+          }
         }
-      },
-      "cicd": {
-        "source": {
-          "tool": "manifest-cli",
-          "integration": "ci",
-          "version": "2.1.0"
-        },
-        "cmds": [
-          {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
-        ]
       }
     }
   }

@@ -19,7 +19,7 @@ This collector writes to the following Component JSON paths:
 | `.sbom.native.manifest_cyber` | object | Raw Manifest Cyber API data (asset info, SBOM format) |
 | `.sbom.native.manifest_cyber.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
 | `.sbom.native.manifest_cyber.exploitability` | object | CISA KEV and EPSS exploitability data |
-| `.sbom.cicd` | object | CI CLI detection metadata and commands |
+| `.sbom.native.manifest_cyber.cicd.cmds` | array | CI CLI detection (command + version) |
 
 ## Collectors
 
