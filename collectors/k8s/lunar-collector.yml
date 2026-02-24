@@ -4,7 +4,7 @@ name: k8s
 description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:k8s-main
 
 landing_page:
   display_name: "Kubernetes Collector"
@@ -39,7 +39,7 @@ collectors:
 inputs:
   find_command:
     description: Command to find K8s manifest files (must output one file path per line)
-    default: "git ls-files '*.yaml' '*.yml'"
+    default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
 
 example_component_json: |
   {

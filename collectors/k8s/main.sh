@@ -170,7 +170,7 @@ export -f is_helm_template
 export WORKLOAD_KINDS
 
 # Command to find K8s manifests (from input or default)
-FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-git ls-files '*.yaml' '*.yml'}"
+FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name '*.yaml' -o -name '*.yml' \)}"
 
 # Build exclusion pattern for directories
 DIR_PATTERN="(^|/)($(IFS='|'; echo "${IGNORE_DIRS[*]}"))(/|$)"
@@ -188,11 +188,14 @@ results=$(eval "$FIND_CMD" 2>/dev/null | \
         hpas: [.[].hpas[] | select(. != null)]
     }')
 
-# Collect results
-echo "$results" | lunar collect -j ".k8s" -
+# Only collect if we found at least one manifest
+manifest_count=$(echo "$results" | jq '.manifests | length' 2>/dev/null || echo 0)
+if [ "$manifest_count" -gt 0 ]; then
+    echo "$results" | lunar collect -j ".k8s" -
 
-# Submit source metadata
-TOOL_VERSION=$(kubeconform -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
-jq -n --arg tool "kubeconform" --arg version "$TOOL_VERSION" \
-    '{tool: $tool, version: $version}' | lunar collect -j ".k8s.source" -
+    # Submit source metadata
+    TOOL_VERSION=$(kubeconform -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+    jq -n --arg tool "kubeconform" --arg version "$TOOL_VERSION" \
+        '{tool: $tool, version: $version}' | lunar collect -j ".k8s.source" -
+fi
 
