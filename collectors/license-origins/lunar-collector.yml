@@ -1,0 +1,84 @@
+version: 0
+
+name: license-origins
+description: |
+  Scans dependency license files for geographic origin mentions (country names,
+  jurisdictions). Helps identify supply chain provenance for compliance audits.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "License Origin Scanner"
+  long_description: |
+    Scans LICENSE, COPYING, and NOTICE files across your dependency tree for
+    mentions of country names and jurisdictions. Produces a report of which
+    dependencies reference which countries in their license text, enabling
+    compliance teams to review supply chain provenance before audits flag them.
+  categories: ["security"]
+  icon: "assets/license-origins.svg"
+  status: "experimental"
+  related:
+    - slug: "syft"
+      type: "collector"
+      reason: "Provides SBOM data; this collector enriches it with origin signals"
+    - slug: "sbom"
+      type: "policy"
+      reason: "The blocked-origins policy check consumes this data"
+
+collectors:
+  - name: scan
+    description: |
+      Walks dependency directories (node_modules, vendor, site-packages, etc.)
+      and scans LICENSE/COPYING/NOTICE files for country name mentions.
+      Writes per-package origin mentions to .sbom.license_origins.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords:
+      - license
+      - origin
+      - country
+      - jurisdiction
+      - compliance
+      - sanctions
+      - provenance
+      - supply chain
+
+example_component_json: |
+  {
+    "sbom": {
+      "license_origins": {
+        "source": {
+          "tool": "license-origins",
+          "integration": "code",
+          "version": "0.1.0"
+        },
+        "packages": [
+          {
+            "name": "scheduler-lib",
+            "version": "2.1.0",
+            "license_file": "node_modules/scheduler-lib/LICENSE",
+            "countries": ["Germany"],
+            "excerpts": [
+              "Copyright 2024 Hans Mueller, Berlin, Germany"
+            ]
+          },
+          {
+            "name": "date-utils",
+            "version": "1.0.3",
+            "license_file": "node_modules/date-utils/LICENSE",
+            "countries": ["Netherlands"],
+            "excerpts": [
+              "Licensed under the laws of the Netherlands"
+            ]
+          }
+        ],
+        "summary": {
+          "files_scanned": 185,
+          "packages_with_mentions": 2,
+          "countries_found": ["Germany", "Netherlands"]
+        }
+      }
+    }
+  }
