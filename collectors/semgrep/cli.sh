@@ -44,8 +44,9 @@ else
     CATEGORY="sast"
 fi
 
-# Capture Semgrep CLI version
-SEMGREP_VERSION=$(semgrep --version 2>/dev/null || echo "unknown")
+# Capture Semgrep CLI version using the exact traced binary
+SEMGREP_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-semgrep}"
+SEMGREP_VERSION=$("$SEMGREP_BIN" --version 2>/dev/null || echo "unknown")
 
 # Sanitize command to redact potential secrets
 CMD_SAFE=$(echo "$CMD_STR" | sed -E \

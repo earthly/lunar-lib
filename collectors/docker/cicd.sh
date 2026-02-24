@@ -16,7 +16,8 @@ fi
 CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # --- Always: record every docker command to cicd.cmds ---
-VERSION=$(docker version --format '{{.Client.Version}}' 2>/dev/null || echo "")
+DOCKER_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-docker}"
+VERSION=$("$DOCKER_BIN" version --format '{{.Client.Version}}' 2>/dev/null || echo "")
 VERSION_ESCAPED=$(echo "$VERSION" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 if [[ -n "$VERSION_ESCAPED" ]]; then

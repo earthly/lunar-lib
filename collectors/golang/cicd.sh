@@ -11,8 +11,11 @@ else
     CMD_STR="$CMD_RAW"
 fi
 
+# Use the exact traced binary for version extraction
+GO_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-go}"
+
 # Collect Go CI/CD command information
-version=$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "")
+version=$("$GO_BIN" version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "")
 
 if [[ -n "$version" ]]; then
   # Escape backslashes first, then quotes, for valid JSON

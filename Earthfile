@@ -59,6 +59,13 @@ guardrails-assets:
     
     SAVE ARTIFACT icons
 
+# Export collector and policy source code
+plugin-source:
+    WORKDIR /build
+    COPY --dir collectors policies .
+    SAVE ARTIFACT collectors
+    SAVE ARTIFACT policies
+
 test:
     BUILD ./collectors/codeowners+test
 

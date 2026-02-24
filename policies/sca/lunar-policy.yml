@@ -15,9 +15,12 @@ landing_page:
   icon: "assets/sca.svg"
   status: "stable"
   requires:
-    - slug: "github"
+    - slug: "snyk"
       type: "collector"
-      reason: "Provides SCA data via GitHub App integrations (Snyk, Dependabot)"
+      reason: "Provides SCA scan results via Snyk Open Source"
+    - slug: "semgrep"
+      type: "collector"
+      reason: "Provides SCA scan results via Semgrep Supply Chain"
   related: []
 
 policies:

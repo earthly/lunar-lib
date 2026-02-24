@@ -7,11 +7,9 @@ CMD="$LUNAR_CI_COMMAND"
 CMD_STR=$(echo "$CMD" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 CMD_STR=$(printf '%s' "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-# Try to get syft version (no jq — CI runners may not have it)
-VERSION=""
-if command -v syft &>/dev/null; then
-  VERSION=$(syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
-fi
+# Get syft version using the exact traced binary
+SYFT_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-syft}"
+VERSION=$("$SYFT_BIN" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
 
 # Write tool-specific CI metadata under .sbom.native.syft.cicd
 # This follows the .native.{tool}.cicd convention (matching Snyk, manifest-cyber)
