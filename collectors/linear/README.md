@@ -43,17 +43,4 @@ Required secrets:
 - `LINEAR_API_KEY` — Linear personal API key (Settings → API → Personal API keys)
 - `GH_TOKEN` — GitHub token for reading PR metadata
 
-## Inputs
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `ticket_prefix` | `""` | Character(s) before the ticket ID in PR titles |
-| `ticket_suffix` | `""` | Character(s) after the ticket ID in PR titles |
-| `ticket_pattern` | `[A-Za-z][A-Za-z0-9]+-[0-9]+` | Regex pattern for ticket ID |
-| `type_labels` | `""` | Comma-separated label names to treat as issue types |
-
-## Notes
-
-- **Issue types:** Linear has no native "issue type" field. The `type_labels` input lets you specify label names (e.g. `bug,feature,chore`) that should be treated as types. If a matching label is found on the issue, it is written to `.vcs.pr.ticket.type`.
-- **Ticket URL:** The Linear GraphQL API returns the full issue URL, so no base URL input is needed (unlike the Jira collector).
-- **Ticket ID format:** Linear uses `TEAM-NUMBER` identifiers (e.g. `ENG-123`), which match the same default regex as Jira.
+Linear has no native "issue type" field. The `type_labels` input lets you specify label names (e.g. `bug,feature,chore`) that should be treated as types. If a matching label is found on the issue, it is written to `.vcs.pr.ticket.type`. The Linear GraphQL API returns the full issue URL, so no base URL input is needed (unlike the Jira collector). Linear uses `TEAM-NUMBER` identifiers (e.g. `ENG-123`), which match the same default regex as Jira.
