@@ -1,4 +1,4 @@
-# `linear` Collector
+# Linear Collector
 
 Extract Linear ticket references from pull request titles and validate them against the Linear GraphQL API.
 
