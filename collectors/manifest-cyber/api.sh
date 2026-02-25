@@ -10,8 +10,8 @@ fi
 
 REPO_SLUG=$(get_repo_slug)
 
-# Retry config: poll for up to 5 minutes (10 attempts × 30s)
-MAX_ATTEMPTS=10
+# Retry config: configurable attempts × 30s sleep
+MAX_ATTEMPTS="${LUNAR_VAR_RETRY_ATTEMPTS:-10}"
 SLEEP_SECONDS=30
 
 # ------------------------------------------------------------------

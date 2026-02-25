@@ -27,24 +27,32 @@ collectors:
   - name: api
     description: |
       Queries the Manifest Cyber REST API on each commit to verify the SBOM
-      has been uploaded and enriched. Retries for up to 5 minutes to allow
-      for processing delay. Pulls the SBOM content to .sbom.auto.cyclonedx
+      has been uploaded and enriched. Retries with configurable attempts to
+      allow for processing delay. Pulls the SBOM content to .sbom.auto.cyclonedx
       (or .spdx), enrichment data to .sbom.native.manifest_cyber.
     mainBash: api.sh
     hook:
       type: code
     keywords: ["manifest cyber", "sbom", "vulnerability enrichment", "license compliance", "supply chain"]
 
-  - name: ci
+  - name: cicd
     description: |
       Detects Manifest CLI (manifest-cli) executions in CI pipelines.
       Records the command and version to .sbom.native.manifest_cyber.cicd.cmds.
-    mainBash: ci.sh
+      Note: manifest-cli calls an external generator (syft by default) as a
+      subprocess, so the underlying generator's collector will capture the
+      actual SBOM content separately.
+    mainBash: cicd.sh
     hook:
       type: ci-after-command
       binary:
         name_pattern: "^manifest(-cli)?$"
     keywords: ["manifest cyber", "manifest cli", "ci detection", "sbom", "pipeline"]
+
+inputs:
+  retry_attempts:
+    description: Number of retry attempts when polling the Manifest API for SBOM data
+    default: "10"
 
 secrets:
   MANIFEST_API_KEY:
