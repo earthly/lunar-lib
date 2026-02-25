@@ -4,11 +4,9 @@ Collects SBOM management, vulnerability enrichment, and license compliance data 
 
 ## Overview
 
-This collector integrates with Manifest Cyber's SBOM management platform to provide visibility into SBOM lifecycle, vulnerability enrichment, and license compliance. It supports two integration methods: REST API verification on each commit (with configurable retry for processing delay) and CLI detection in CI pipelines.
+This collector integrates with Manifest Cyber's SBOM management platform to provide visibility into SBOM lifecycle, vulnerability enrichment, and license compliance. It supports REST API verification on each commit (with configurable retry) and CLI detection in CI pipelines.
 
-Unlike raw SBOM generators (e.g., Syft), Manifest Cyber acts as the **SBOM management layer** — it ingests, enriches, and tracks SBOMs over time. This collector answers questions like "is our SBOM actively managed?" and "what does the enriched vulnerability picture look like?" that generation-only tools cannot.
-
-Note: `manifest-cli sbom` calls an external SBOM generator (syft by default) as a subprocess. If you also have the Syft collector configured, it will independently capture the raw SBOM generation, while this collector captures Manifest Cyber's management and enrichment layer.
+Unlike raw SBOM generators, Manifest Cyber acts as the **SBOM management layer** — it ingests, enriches, and tracks SBOMs over time. Note that `manifest-cli sbom` delegates to an external generator (syft by default), so the underlying generator's collector captures the raw SBOM independently.
 
 ## Collected Data
 
