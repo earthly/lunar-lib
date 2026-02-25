@@ -1,0 +1,94 @@
+version: 0
+
+name: manifest-cyber
+description: |
+  Collects SBOM management, vulnerability enrichment, and license compliance
+  data from Manifest Cyber.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Manifest Cyber Collector"
+  long_description: |
+    Integrates with Manifest Cyber's SBOM management platform to collect
+    vulnerability enrichment, license compliance, and SBOM lifecycle data.
+    Supports API and CI CLI integration methods.
+  categories: ["security"]
+  icon: "assets/manifest-cyber.svg"
+  status: "experimental"
+  related:
+    - slug: "sbom"
+      type: "policy"
+      reason: "Enforces SBOM existence and license compliance"
+
+collectors:
+  - name: api
+    description: |
+      Queries the Manifest Cyber REST API on each commit to verify the SBOM
+      has been uploaded and enriched. Retries with configurable attempts to
+      allow for processing delay. Verifies SBOM upload and pulls enrichment
+      data (vulnerabilities, licenses, exploitability) to .sbom.native.manifest_cyber.
+    mainBash: api.sh
+    hook:
+      type: code
+    keywords: ["manifest cyber", "sbom", "vulnerability enrichment", "license compliance", "supply chain"]
+
+  - name: cicd
+    description: |
+      Detects Manifest CLI (manifest-cli) executions in CI pipelines.
+      Records the command and version to .sbom.native.manifest_cyber.cicd.cmds.
+      Note: manifest-cli calls an external generator (syft by default) as a
+      subprocess, so the underlying generator's collector will capture the
+      actual SBOM content separately.
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: "^manifest(-cli)?$"
+    keywords: ["manifest cyber", "manifest cli", "ci detection", "sbom", "pipeline"]
+
+inputs:
+  retry_attempts:
+    description: Number of retry attempts when polling the Manifest API for SBOM data
+    default: "10"
+
+secrets:
+  MANIFEST_API_KEY:
+    description: Manifest Cyber API key for REST API access (required for api collector)
+
+example_component_json: |
+  {
+    "sbom": {
+      "native": {
+        "manifest_cyber": {
+          "asset_id": "abc123",
+          "asset_name": "acme/api",
+          "packages": 156,
+          "last_updated": "2026-02-19T10:30:00Z",
+          "sbom_format": "cyclonedx",
+          "vulnerabilities": {
+            "critical": 0,
+            "high": 2,
+            "medium": 5,
+            "low": 12,
+            "total": 19
+          },
+          "exploitability": {
+            "kev_count": 0,
+            "epss_high_count": 1
+          },
+          "licenses": [
+            {"id": "MIT", "package_count": 80},
+            {"id": "Apache-2.0", "package_count": 45}
+          ],
+          "cicd": {
+            "cmds": [
+              {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
+            ]
+          }
+        }
+      }
+    }
+  }

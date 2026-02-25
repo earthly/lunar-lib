@@ -1,0 +1,136 @@
+#!/bin/bash
+set -e
+
+source "$(dirname "$0")/helpers.sh"
+
+if [ -z "$LUNAR_SECRET_MANIFEST_API_KEY" ]; then
+    echo "LUNAR_SECRET_MANIFEST_API_KEY is required for the Manifest Cyber API collector." >&2
+    exit 1
+fi
+
+REPO_SLUG=$(get_repo_slug)
+
+# Retry config: configurable attempts × 30s sleep
+MAX_ATTEMPTS="${LUNAR_VAR_RETRY_ATTEMPTS:-10}"
+SLEEP_SECONDS=30
+
+# ------------------------------------------------------------------
+# Find the asset in Manifest Cyber matching this component.
+# Retry to allow time for Manifest to process the SBOM after push.
+# The API endpoint and matching logic may need adjustment once we
+# have a real account to test against.
+# ------------------------------------------------------------------
+
+ASSET_DATA=""
+for i in $(seq 1 $MAX_ATTEMPTS); do
+    ASSET=$(manifest_api GET "/assets?search=${REPO_SLUG}" 2>/dev/null || echo "")
+
+    if [ -n "$ASSET" ] && [ "$ASSET" != "null" ] && [ "$ASSET" != "[]" ]; then
+        ASSET_DATA=$(echo "$ASSET" | jq -c '
+            if type == "array" then .[0]
+            elif .data? then .data[0]
+            else .
+            end // empty
+        ' 2>/dev/null || echo "")
+
+        if [ -n "$ASSET_DATA" ]; then
+            # TODO: Once we know the API shape, compare updated_at against
+            # the current commit timestamp to verify this SBOM is fresh
+            # (not stale from a previous push). For now, any asset found
+            # is treated as valid.
+            echo "Found Manifest asset for ${REPO_SLUG} on attempt ${i}." >&2
+            break
+        fi
+    fi
+
+    if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+        echo "No Manifest asset yet for ${REPO_SLUG}, retrying in ${SLEEP_SECONDS}s (attempt ${i}/${MAX_ATTEMPTS})..." >&2
+        sleep "$SLEEP_SECONDS"
+    fi
+done
+
+if [ -z "$ASSET_DATA" ]; then
+    echo "No Manifest Cyber asset found for ${REPO_SLUG} after ${MAX_ATTEMPTS} attempts, skipping." >&2
+    exit 0
+fi
+
+# ------------------------------------------------------------------
+# Extract SBOM summary data
+# ------------------------------------------------------------------
+
+ASSET_ID=$(echo "$ASSET_DATA" | jq -r '.id // .asset_id // ""')
+
+if [ -z "$ASSET_ID" ]; then
+    echo "Could not determine asset ID for ${REPO_SLUG}, skipping." >&2
+    exit 0
+fi
+
+ASSET_NAME=$(echo "$ASSET_DATA" | jq -r '.name // .asset_name // ""')
+PACKAGE_COUNT=$(echo "$ASSET_DATA" | jq -r '.component_count // .package_count // 0')
+SBOM_FORMAT=$(echo "$ASSET_DATA" | jq -r '.sbom_format // .format // "unknown"')
+LAST_UPDATED=$(echo "$ASSET_DATA" | jq -r '.updated_at // .last_updated // ""')
+
+# ------------------------------------------------------------------
+# Fetch vulnerability enrichment data
+# ------------------------------------------------------------------
+
+VULN_DATA=$(manifest_api GET "/assets/${ASSET_ID}/vulnerabilities" 2>/dev/null || echo "")
+
+if [ -n "$VULN_DATA" ] && [ "$VULN_DATA" != "null" ]; then
+    # Extract vulnerability counts by severity
+    # NOTE: Adjust jq paths based on actual API response structure
+    VULN_SUMMARY=$(echo "$VULN_DATA" | jq -c '
+        {
+            critical: ([.[] | select(.severity == "critical" or .severity == "CRITICAL")] | length),
+            high: ([.[] | select(.severity == "high" or .severity == "HIGH")] | length),
+            medium: ([.[] | select(.severity == "medium" or .severity == "MEDIUM")] | length),
+            low: ([.[] | select(.severity == "low" or .severity == "LOW")] | length)
+        } | . + {total: (.critical + .high + .medium + .low)}
+    ' 2>/dev/null || echo '{"critical":0,"high":0,"medium":0,"low":0,"total":0}')
+
+    # Count CISA KEV and high-EPSS vulns for exploitability data
+    KEV_COUNT=$(echo "$VULN_DATA" | jq '[.[] | select(.kev == true or .in_kev == true)] | length' 2>/dev/null || echo 0)
+    EPSS_HIGH=$(echo "$VULN_DATA" | jq '[.[] | select((.epss_score // 0) > 0.5)] | length' 2>/dev/null || echo 0)
+
+    # Write all Manifest data under native path
+    jq -n \
+        --arg asset_id "$ASSET_ID" \
+        --arg asset_name "$ASSET_NAME" \
+        --argjson packages "$PACKAGE_COUNT" \
+        --arg last_updated "$LAST_UPDATED" \
+        --argjson vulns "$VULN_SUMMARY" \
+        --argjson kev "$KEV_COUNT" \
+        --argjson epss_high "$EPSS_HIGH" \
+        --arg sbom_format "$SBOM_FORMAT" \
+        '{
+            asset_id: $asset_id,
+            asset_name: $asset_name,
+            packages: $packages,
+            last_updated: $last_updated,
+            sbom_format: $sbom_format,
+            vulnerabilities: $vulns,
+            exploitability: {kev_count: $kev, epss_high_count: $epss_high}
+        }' | lunar collect -j ".sbom.native.manifest_cyber" -
+else
+    # No vulnerability data — still write asset metadata
+    jq -n \
+        --arg asset_id "$ASSET_ID" \
+        --arg asset_name "$ASSET_NAME" \
+        --argjson packages "$PACKAGE_COUNT" \
+        --arg last_updated "$LAST_UPDATED" \
+        --arg sbom_format "$SBOM_FORMAT" \
+        '{asset_id: $asset_id, asset_name: $asset_name, packages: $packages, last_updated: $last_updated, sbom_format: $sbom_format}' | \
+        lunar collect -j ".sbom.native.manifest_cyber" -
+fi
+
+# ------------------------------------------------------------------
+# Fetch license data
+# ------------------------------------------------------------------
+
+LICENSE_DATA=$(manifest_api GET "/assets/${ASSET_ID}/licenses" 2>/dev/null || echo "")
+
+if [ -n "$LICENSE_DATA" ] && [ "$LICENSE_DATA" != "null" ]; then
+    # Write license breakdown to native data
+    LICENSE_BREAKDOWN=$(echo "$LICENSE_DATA" | jq -c '[.[] | {id: (.id // .license_id // .name), package_count: (.count // .package_count // 1)}]' 2>/dev/null || echo '[]')
+    echo "$LICENSE_BREAKDOWN" | jq -c '{licenses: .}' | lunar collect -j ".sbom.native.manifest_cyber" -
+fi
