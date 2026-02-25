@@ -80,7 +80,18 @@ example_component_json: |
           "assignee": "jane@acme.com",
           "reuse_count": 0,
           "native": {
-            "linear": { "...full Linear GraphQL response..." }
+            "linear": {
+              "id": "abc123",
+              "identifier": "ENG-123",
+              "title": "Add payment validation",
+              "url": "https://linear.app/acme/issue/ENG-123/add-payment-validation",
+              "state": { "name": "In Progress", "type": "started" },
+              "assignee": { "email": "jane@acme.com", "displayName": "Jane" },
+              "labels": { "nodes": [{ "name": "bug" }] },
+              "priority": 2,
+              "priorityLabel": "High",
+              "team": { "key": "ENG", "name": "Engineering" }
+            }
           }
         }
       }
