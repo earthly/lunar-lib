@@ -16,8 +16,7 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.sbom.source` | object | Source metadata (tool: manifest-cyber, integration method) |
 | `.sbom.summary` | object | Normalized SBOM summary (package count, licenses, freshness) |
-| `.sbom.auto.cyclonedx` / `.spdx` | object | Full SBOM content pulled from Manifest API (normalized path) |
-| `.sbom.native.manifest_cyber` | object | Raw Manifest Cyber API data (asset info, SBOM format) |
+| `.sbom.native.manifest_cyber` | object | Manifest Cyber API data (asset info, SBOM format) |
 | `.sbom.native.manifest_cyber.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
 | `.sbom.native.manifest_cyber.exploitability` | object | CISA KEV and EPSS exploitability data |
 | `.sbom.native.manifest_cyber.cicd.cmds` | array | CI CLI detection (command + version) |
@@ -28,7 +27,7 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
-| `api` | code | Queries Manifest Cyber REST API on each commit to verify SBOM upload. Retries with configurable attempts. |
+| `api` | code | Verifies SBOM upload to Manifest Cyber and pulls enrichment data (vulns, licenses, exploitability). Retries with configurable attempts. |
 | `cicd` | ci-after-command | Detects `manifest-cli` executions in CI pipelines |
 
 ## Installation

@@ -128,26 +128,6 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Fetch the actual SBOM content
-# Write to normalized .sbom.auto path so it merges cleanly with
-# SBOMs from other generators (Syft, Trivy, etc.)
-# ------------------------------------------------------------------
-
-SBOM_CONTENT=$(manifest_api GET "/assets/${ASSET_ID}/sbom" 2>/dev/null || echo "")
-
-if [ -n "$SBOM_CONTENT" ] && [ "$SBOM_CONTENT" != "null" ]; then
-    # Detect format from content
-    # NOTE: Adjust detection once we know the actual API response shape
-    if echo "$SBOM_CONTENT" | jq -e '.bomFormat == "CycloneDX"' >/dev/null 2>&1; then
-        echo "$SBOM_CONTENT" | lunar collect -j ".sbom.auto.cyclonedx" -
-    elif echo "$SBOM_CONTENT" | jq -e '.spdxVersion' >/dev/null 2>&1; then
-        echo "$SBOM_CONTENT" | lunar collect -j ".sbom.auto.spdx" -
-    else
-        echo "Unknown SBOM format from Manifest API, skipping SBOM content." >&2
-    fi
-fi
-
-# ------------------------------------------------------------------
 # Fetch license data
 # ------------------------------------------------------------------
 
