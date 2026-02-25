@@ -44,14 +44,20 @@ if [ -z "$TEAM_KEY" ] || [ -z "$ISSUE_NUM" ]; then
   exit 0
 fi
 
+if ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+  echo "Issue number '${ISSUE_NUM}' is not numeric, skipping Linear validation." >&2
+  exit 0
+fi
+
 # Build GraphQL query — filter by team key + issue number.
 QUERY='query($num: Float!, $teamKey: String!) { issues(filter: { number: { eq: $num }, team: { key: { eq: $teamKey } } }, first: 1) { nodes { id identifier title url state { name type } assignee { email displayName } labels { nodes { name } } priority priorityLabel team { key name } } } }'
 
-PAYLOAD=$(jq -n --arg q "$QUERY" --argjson num "$ISSUE_NUM" --arg tk "$TEAM_KEY" \
-  '{"query": $q, "variables": {"num": $num, "teamKey": $tk}}')
+PAYLOAD=$(jq -n --arg q "$QUERY" --arg num "$ISSUE_NUM" --arg tk "$TEAM_KEY" \
+  '{"query": $q, "variables": {"num": ($num|tonumber), "teamKey": $tk}}') || exit 0
 
 set +e
-RESPONSE=$(curl -fsS -X POST https://api.linear.app/graphql \
+RESPONSE=$(curl -fsS --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 1 \
+  -X POST https://api.linear.app/graphql \
   -H "Content-Type: application/json" \
   -H "Authorization: ${LUNAR_SECRET_LINEAR_API_KEY}" \
   -d "$PAYLOAD")
