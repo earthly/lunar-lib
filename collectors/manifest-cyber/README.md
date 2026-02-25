@@ -14,11 +14,10 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.sbom.source` | object | Source metadata (tool: manifest-cyber, integration method) |
-| `.sbom.summary` | object | Normalized SBOM summary (package count, licenses, freshness) |
-| `.sbom.native.manifest_cyber` | object | Manifest Cyber API data (asset info, SBOM format) |
+| `.sbom.native.manifest_cyber` | object | Asset info (id, name, packages, format, freshness) |
 | `.sbom.native.manifest_cyber.vulnerabilities` | object | Vulnerability counts from SBOM enrichment (critical/high/medium/low) |
 | `.sbom.native.manifest_cyber.exploitability` | object | CISA KEV and EPSS exploitability data |
+| `.sbom.native.manifest_cyber.licenses` | array | License breakdown with package counts |
 | `.sbom.native.manifest_cyber.cicd.cmds` | array | CI CLI detection (command + version) |
 
 ## Collectors

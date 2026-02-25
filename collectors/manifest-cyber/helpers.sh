@@ -23,14 +23,3 @@ manifest_api() {
         "${MANIFEST_API_BASE}${endpoint}" \
         "$@"
 }
-
-# Write source metadata for a given category
-# Usage: write_source ".sbom" "api"
-write_source() {
-    local path="$1"
-    local integration="$2"
-    jq -n \
-        --arg integration "$integration" \
-        '{tool: "manifest-cyber", integration: $integration}' | \
-        lunar collect -j "${path}.source" -
-}

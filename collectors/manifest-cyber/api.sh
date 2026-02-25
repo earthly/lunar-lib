@@ -70,16 +70,6 @@ PACKAGE_COUNT=$(echo "$ASSET_DATA" | jq -r '.component_count // .package_count /
 SBOM_FORMAT=$(echo "$ASSET_DATA" | jq -r '.sbom_format // .format // "unknown"')
 LAST_UPDATED=$(echo "$ASSET_DATA" | jq -r '.updated_at // .last_updated // ""')
 
-# Write source metadata
-write_source ".sbom" "api"
-
-# Write normalized SBOM summary
-jq -n \
-    --argjson packages "$PACKAGE_COUNT" \
-    --arg last_updated "$LAST_UPDATED" \
-    '{packages: $packages, last_updated: $last_updated}' | \
-    lunar collect -j ".sbom.summary" -
-
 # ------------------------------------------------------------------
 # Fetch vulnerability enrichment data
 # ------------------------------------------------------------------
@@ -102,10 +92,12 @@ if [ -n "$VULN_DATA" ] && [ "$VULN_DATA" != "null" ]; then
     KEV_COUNT=$(echo "$VULN_DATA" | jq '[.[] | select(.kev == true or .in_kev == true)] | length' 2>/dev/null || echo 0)
     EPSS_HIGH=$(echo "$VULN_DATA" | jq '[.[] | select((.epss_score // 0) > 0.5)] | length' 2>/dev/null || echo 0)
 
-    # Write native Manifest data (vulns + exploitability)
+    # Write all Manifest data under native path
     jq -n \
         --arg asset_id "$ASSET_ID" \
         --arg asset_name "$ASSET_NAME" \
+        --argjson packages "$PACKAGE_COUNT" \
+        --arg last_updated "$LAST_UPDATED" \
         --argjson vulns "$VULN_SUMMARY" \
         --argjson kev "$KEV_COUNT" \
         --argjson epss_high "$EPSS_HIGH" \
@@ -113,17 +105,21 @@ if [ -n "$VULN_DATA" ] && [ "$VULN_DATA" != "null" ]; then
         '{
             asset_id: $asset_id,
             asset_name: $asset_name,
+            packages: $packages,
+            last_updated: $last_updated,
+            sbom_format: $sbom_format,
             vulnerabilities: $vulns,
-            exploitability: {kev_count: $kev, epss_high_count: $epss_high},
-            sbom_format: $sbom_format
+            exploitability: {kev_count: $kev, epss_high_count: $epss_high}
         }' | lunar collect -j ".sbom.native.manifest_cyber" -
 else
     # No vulnerability data — still write asset metadata
     jq -n \
         --arg asset_id "$ASSET_ID" \
         --arg asset_name "$ASSET_NAME" \
+        --argjson packages "$PACKAGE_COUNT" \
+        --arg last_updated "$LAST_UPDATED" \
         --arg sbom_format "$SBOM_FORMAT" \
-        '{asset_id: $asset_id, asset_name: $asset_name, sbom_format: $sbom_format}' | \
+        '{asset_id: $asset_id, asset_name: $asset_name, packages: $packages, last_updated: $last_updated, sbom_format: $sbom_format}' | \
         lunar collect -j ".sbom.native.manifest_cyber" -
 fi
 
@@ -134,11 +130,7 @@ fi
 LICENSE_DATA=$(manifest_api GET "/assets/${ASSET_ID}/licenses" 2>/dev/null || echo "")
 
 if [ -n "$LICENSE_DATA" ] && [ "$LICENSE_DATA" != "null" ]; then
-    # Extract unique license IDs for the normalized summary
-    LICENSES=$(echo "$LICENSE_DATA" | jq -c '[.[] | .id // .license_id // .name] | unique' 2>/dev/null || echo '[]')
-    echo "$LICENSES" | jq -c '{licenses: .}' | lunar collect -j ".sbom.summary" -
-
-    # Write detailed license breakdown to native data
+    # Write license breakdown to native data
     LICENSE_BREAKDOWN=$(echo "$LICENSE_DATA" | jq -c '[.[] | {id: (.id // .license_id // .name), package_count: (.count // .package_count // 1)}]' 2>/dev/null || echo '[]')
     echo "$LICENSE_BREAKDOWN" | jq -c '{licenses: .}' | lunar collect -j ".sbom.native.manifest_cyber" -
 fi

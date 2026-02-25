@@ -28,8 +28,8 @@ collectors:
     description: |
       Queries the Manifest Cyber REST API on each commit to verify the SBOM
       has been uploaded and enriched. Retries with configurable attempts to
-      allow       for processing delay. Verifies SBOM upload and pulls enrichment data
-      (vulnerabilities, licenses, exploitability) to .sbom.native.manifest_cyber.
+      allow for processing delay. Verifies SBOM upload and pulls enrichment
+      data (vulnerabilities, licenses, exploitability) to .sbom.native.manifest_cyber.
     mainBash: api.sh
     hook:
       type: code
@@ -61,19 +61,13 @@ secrets:
 example_component_json: |
   {
     "sbom": {
-      "source": {
-        "tool": "manifest-cyber",
-        "integration": "api"
-      },
-      "summary": {
-        "packages": 156,
-        "licenses": ["MIT", "Apache-2.0", "BSD-3-Clause"],
-        "last_updated": "2026-02-19T10:30:00Z"
-      },
       "native": {
         "manifest_cyber": {
           "asset_id": "abc123",
           "asset_name": "acme/api",
+          "packages": 156,
+          "last_updated": "2026-02-19T10:30:00Z",
+          "sbom_format": "cyclonedx",
           "vulnerabilities": {
             "critical": 0,
             "high": 2,
@@ -89,7 +83,6 @@ example_component_json: |
             {"id": "MIT", "package_count": 80},
             {"id": "Apache-2.0", "package_count": 45}
           ],
-          "sbom_format": "cyclonedx",
           "cicd": {
             "cmds": [
               {"cmd": "manifest-cli sbom --name acme-api", "version": "2.1.0"}
