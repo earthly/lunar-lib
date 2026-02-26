@@ -1,0 +1,112 @@
+version: 0
+
+name: license-origins
+description: |
+  Scans dependency license files for geographic origin mentions (country names,
+  jurisdictions). Uses a configurable Postgres cache to avoid re-scanning
+  known packages across components.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:license-origins-main
+
+landing_page:
+  display_name: "License Origin Scanner"
+  long_description: |
+    Scans LICENSE, COPYING, and NOTICE files across your dependency tree for
+    mentions of country names and jurisdictions. Results are cached in a
+    configurable Postgres database so repeat scans across components are instant.
+    Helps compliance teams review supply chain provenance before audits flag them.
+  categories: ["security"]
+  icon: "assets/license-origins.svg"
+  status: "experimental"
+  related:
+    - slug: "syft"
+      type: "collector"
+      reason: "Provides SBOM data; future versions will read PURLs from Component JSON instead of re-generating"
+    - slug: "sbom"
+      type: "policy"
+      reason: "The blocked-origins policy check consumes this data"
+
+collectors:
+  - name: scan
+    description: |
+      Generates an SBOM (via bundled syft) to discover dependencies, then scans
+      their LICENSE/COPYING/NOTICE files for country name mentions. Results are
+      cached in a configurable Postgres database keyed by PURL@version so future
+      scans across any component reuse prior results.
+
+      NOTE: This collector currently bundles syft internally to generate the
+      dependency list. When collector dependencies are supported by the platform,
+      this will instead read PURLs from .sbom.auto.cyclonedx.components written
+      by the syft collector, eliminating the redundant SBOM generation.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords:
+      - license
+      - origin
+      - country
+      - jurisdiction
+      - compliance
+      - sanctions
+      - provenance
+      - supply chain
+
+inputs:
+  cache_db_host:
+    description: Postgres host for the origin cache. Omit to disable caching.
+    default: ""
+  cache_db_port:
+    description: Postgres port for the origin cache.
+    default: "5432"
+  cache_db_name:
+    description: Postgres database name for the origin cache.
+    default: "hub"
+  cache_db_user:
+    description: Postgres user for the origin cache. Needs CREATE TABLE, INSERT, SELECT.
+    default: ""
+  cache_db_password:
+    description: Postgres password for the origin cache.
+    default: ""
+
+example_component_json: |
+  {
+    "sbom": {
+      "license_origins": {
+        "source": {
+          "tool": "license-origins",
+          "integration": "code",
+          "version": "0.1.0"
+        },
+        "packages": [
+          {
+            "purl": "pkg:npm/scheduler-lib@2.1.0",
+            "name": "scheduler-lib",
+            "license_file": "node_modules/scheduler-lib/LICENSE",
+            "countries": ["Germany"],
+            "excerpts": [
+              "Copyright 2024 Hans Mueller, Berlin, Germany"
+            ],
+            "cached": false
+          },
+          {
+            "purl": "pkg:npm/date-utils@1.0.3",
+            "name": "date-utils",
+            "license_file": "node_modules/date-utils/LICENSE",
+            "countries": ["Netherlands"],
+            "excerpts": [
+              "Licensed under the laws of the Netherlands"
+            ],
+            "cached": true
+          }
+        ],
+        "summary": {
+          "files_scanned": 185,
+          "packages_with_mentions": 2,
+          "countries_found": ["Germany", "Netherlands"],
+          "cache_hits": 140,
+          "cache_misses": 45
+        }
+      }
+    }
+  }
