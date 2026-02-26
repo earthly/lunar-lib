@@ -27,5 +27,6 @@ The `structure.md` file links to individual category files (`cat-repo.md`, `cat-
 
 ## Implementation Guides
 
+* **[LUNAR-PLUGIN-PLAYBOOK-AI.md](ai-context/LUNAR-PLUGIN-PLAYBOOK-AI.md): Read this first for new PRs.** End-to-end playbook for AI agents creating new collectors and policies — covers the full PR lifecycle (spec → go-ahead → implementation → approval → merge), testing requirements, common mistakes, and reviewer workflow.
 * [guardrail-specs](ai-context/guardrail-specs): Guardrail specifications for the AI to implement. This contains the specifications for each guardrail, together with suggested approach to implement it.
 * [strategies.md](ai-context/strategies.md): Common strategies to be used for implementing the guardrails (policy and collector plugins).
