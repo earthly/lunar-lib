@@ -36,8 +36,15 @@ git checkout main && git pull origin main
 
 ### 2. Build and install the latest Lunar CLI
 
+Clone the `earthly/lunar` repo locally (the remote earthly target syntax `earthly github.com/earthly/lunar+build-cli` requires GitHub auth in buildkit, which cloud agents typically don't have):
+
 ```bash
-earthly github.com/earthly/lunar+build-cli
+# Clone once (skip if already cloned)
+git clone https://github.com/earthly/lunar.git /path/to/lunar
+
+# Build from the local clone
+cd /path/to/lunar && git pull origin main
+earthly +build-cli
 sudo cp dist/lunar-linux-amd64 /usr/local/bin/lunar
 ```
 
@@ -190,7 +197,7 @@ Test before pushing. All `lunar` commands must be run from the `pantalasa-cronos
 git clone https://github.com/pantalasa-cronos/lunar.git
 ```
 
-Run all `lunar collector dev` and `lunar policy dev` commands from inside this repo.
+Run all `lunar collector dev` and `lunar policy dev` commands from inside this repo. The `--config-dir` flag defaults to `.` so make sure you `cd` into the cronos lunar repo before running commands.
 
 **`LUNAR_HUB_TOKEN` must be set.** The Lunar CLI requires this environment variable to communicate with the hub. It should already be provided in your environment as a secret — if it's not set, `lunar` commands will fail. Do not hardcode it anywhere.
 
