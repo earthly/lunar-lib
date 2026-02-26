@@ -192,6 +192,8 @@ git clone git@github.com:pantalasa-cronos/lunar.git
 
 Run all `lunar collector dev` and `lunar policy dev` commands from inside this repo.
 
+**`LUNAR_HUB_TOKEN` must be set.** The Lunar CLI requires this environment variable to communicate with the hub. It should already be provided in your environment as a secret — if it's not set, `lunar` commands will fail. Do not hardcode it anywhere.
+
 #### 1. Test collectors
 
 ```bash
