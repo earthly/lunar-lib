@@ -8,7 +8,7 @@ Step-by-step playbook for cloud-based AI agents (Devin, etc.) to create lunar-li
 
 Every lunar-lib plugin PR follows this lifecycle on a **single PR**:
 
-```
+```text
 Spec → Review & iterate → "Go ahead" → Implement → Review & iterate → Approval → Merge
 ```
 
@@ -76,7 +76,7 @@ Find the most similar existing collector or policy and read every file. Understa
 
 Three files (no implementation code):
 
-```
+```text
 collectors/<name>/
 ├── lunar-collector.yml    # Plugin manifest
 ├── README.md              # Documentation
@@ -86,7 +86,7 @@ collectors/<name>/
 
 Or for policies:
 
-```
+```text
 policies/<name>/
 ├── lunar-policy.yml       # Plugin manifest
 ├── README.md              # Documentation
@@ -187,7 +187,7 @@ The actual scripts referenced in the YAML manifest:
 Test before pushing. All `lunar` commands must be run from the `pantalasa-cronos/lunar` repo — clone it first if you haven't:
 
 ```bash
-git clone git@github.com:pantalasa-cronos/lunar.git
+git clone https://github.com/pantalasa-cronos/lunar.git
 ```
 
 Run all `lunar collector dev` and `lunar policy dev` commands from inside this repo.
@@ -228,24 +228,9 @@ Test each check against:
 Chain them: run the collector, capture its output, feed to the policy:
 
 ```bash
-# Capture collector output as JSON
+# Capture collector output and merge JSON lines
 lunar collector dev <plugin>.<sub> --component <component> 2>&1 | \
-  python3 -c "
-import json, sys
-merged = {}
-for line in sys.stdin:
-    line = line.strip()
-    if not line.startswith('{'): continue
-    try:
-        d = json.loads(line)
-        def dm(b, o):
-            for k, v in o.items():
-                if k in b and isinstance(b[k], dict) and isinstance(v, dict): dm(b[k], v)
-                else: b[k] = v
-        dm(merged, d)
-    except: pass
-json.dump(merged, sys.stdout)
-" > /tmp/collected.json
+  grep '^{' | jq -s 'reduce .[] as $item ({}; . * $item)' > /tmp/collected.json
 
 # Feed to policy
 lunar policy dev <plugin>.<check> --component-json /tmp/collected.json
