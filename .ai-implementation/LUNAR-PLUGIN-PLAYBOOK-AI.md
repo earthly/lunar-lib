@@ -124,6 +124,18 @@ Follow the template in `collector-README-template.md` or `policy-README-template
 - Strip `<title>` tags and `role="img"`. Add `fill="black"` to all `<path>` elements.
 - Wrap in a clean `<svg xmlns="http://www.w3.org/2000/svg" viewBox="...">` container.
 
+### Status: experimental vs beta
+
+The `status` field in the YAML manifest depends on how thoroughly the plugin can be tested:
+
+| Status | When to use |
+|--------|-------------|
+| `experimental` | Plugin requires a 3rd-party vendor, API, or account that you don't have access to. You can only test the logic without real integration. |
+| `beta` | Plugin can be fully tested end-to-end — no missing vendor access or untestable integrations. |
+| `stable` | Proven in production over time. You won't set this on a new plugin. |
+
+**Call this out in the PR description at spec time.** If the plugin needs vendor access you don't have, explain what you can and can't test, and what secrets/accounts would be needed to fully validate it. Reviewers may decide to set up an account and provide secrets so it can be tested properly.
+
 ### PR description
 
 The PR description must include:
@@ -131,7 +143,7 @@ The PR description must include:
 1. **What's included** — list the files
 2. **Design summary** — which Component JSON paths are written, why, and how they relate to existing paths
 3. **Relationship to existing plugins** — does this reuse an existing policy? Does it write to the same normalized paths as another collector?
-4. **Testing plan** — what components you'll test against, expected results per component, edge cases
+4. **Testing plan** — what components you'll test against, expected results per component, edge cases. **If vendor access is missing**, explain what can be tested without it and what would be needed for full integration testing.
 5. **Open questions** — anything you're unsure about (architecture, naming, path choices)
 
 ### Open the PR
@@ -250,7 +262,18 @@ lunar policy dev <plugin>.<check> --component-json /tmp/collected.json
 - **Skip** — Component where the guardrail category doesn't apply (e.g. a Go policy on a Python repo). Check should SKIP gracefully.
 - **Edge cases** — Missing fields, unexpected values, empty data. Should not crash.
 
-#### 5. CI collectors must be tested on cronos
+#### 5. What you can do in cronos
+
+The `pantalasa-cronos` environment is a sandbox — you have full freedom to:
+- **Add files or dependencies to existing components** (e.g. add a `go.mod`, Terraform files, Dockerfiles, GitHub Actions workflows)
+- **Create entirely new components** if none of the existing ones fit your testing needs
+- **Install any open-source software** needed to test the plugin thoroughly
+- **Create PRs on component repos** to test PR-context collectors/policies
+- **Modify GitHub Actions workflows** to add CI steps (e.g. SBOM generation, security scans)
+
+Don't worry about breaking things — cronos exists specifically for this. Clean up test branches when done.
+
+#### 6. CI collectors must be tested on cronos
 
 If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-after-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment. Local `lunar collector dev` is not sufficient — CI hooks only fire during actual CI runs. Push the collector config to `pantalasa-cronos/lunar`, trigger a build on a component repo, and verify the collected data on the hub.
 
