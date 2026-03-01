@@ -1,0 +1,99 @@
+version: 0
+
+name: linear
+description: Collect Linear ticket metadata from PR titles and validate against Linear API
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Linear Collector"
+  long_description: |
+    Extract Linear ticket references from pull request titles, validate them
+    against the Linear GraphQL API, and detect ticket reuse across PRs.
+  categories: ["vcs"]
+  icon: "assets/linear.svg"
+  status: "stable"
+  related:
+    - slug: "ticket"
+      type: "policy"
+      reason: "Enforces ticket presence, validity, status, type, and reuse limits"
+
+collectors:
+  - name: ticket
+    description: |
+      Extracts Linear ticket ID from PR title, fetches issue metadata from
+      the Linear GraphQL API, and writes normalized ticket data to
+      .vcs.pr.ticket and native Linear data to .vcs.pr.ticket.native.linear.
+    mainBash: ticket.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["linear", "ticket", "pr", "issue tracking"]
+
+  - name: ticket-history
+    description: |
+      Queries the Lunar SQL database to count how many other PRs reference
+      the same ticket. Writes .vcs.pr.ticket.reuse_count for policy
+      evaluation. Detects ticket recycling abuse.
+    mainBash: ticket-history.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["linear", "ticket reuse", "compliance", "audit"]
+
+inputs:
+  ticket_prefix:
+    description: Character(s) before the ticket ID in PR titles (empty = match anywhere)
+    default: ""
+  ticket_suffix:
+    description: Character(s) after the ticket ID in PR titles (empty = match anywhere)
+    default: ""
+  ticket_pattern:
+    description: Regex pattern for ticket ID (without prefix/suffix)
+    default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
+  type_labels:
+    description: >
+      Comma-separated label names to treat as issue types (e.g. "bug,feature,chore").
+      If the Linear issue has a matching label, it is written as .vcs.pr.ticket.type.
+      Empty means no type extraction from labels.
+    default: ""
+
+secrets:
+  LINEAR_API_KEY:
+    description: Linear personal API key for authentication
+  GH_TOKEN:
+    description: GitHub token for reading PR metadata
+
+example_component_json: |
+  {
+    "vcs": {
+      "pr": {
+        "ticket": {
+          "id": "ENG-123",
+          "source": { "tool": "linear", "integration": "api" },
+          "url": "https://linear.app/acme/issue/ENG-123/add-payment-validation",
+          "valid": true,
+          "status": "In Progress",
+          "type": "bug",
+          "summary": "Add payment validation",
+          "assignee": "jane@acme.com",
+          "reuse_count": 0,
+          "native": {
+            "linear": {
+              "id": "abc123",
+              "identifier": "ENG-123",
+              "title": "Add payment validation",
+              "url": "https://linear.app/acme/issue/ENG-123/add-payment-validation",
+              "state": { "name": "In Progress", "type": "started" },
+              "assignee": { "email": "jane@acme.com", "displayName": "Jane" },
+              "labels": { "nodes": [{ "name": "bug" }] },
+              "priority": 2,
+              "priorityLabel": "High",
+              "team": { "key": "ENG", "name": "Engineering" }
+            }
+          }
+        }
+      }
+    }
+  }

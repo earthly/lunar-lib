@@ -20,6 +20,9 @@ landing_page:
     - slug: "jira"
       type: "collector"
       reason: "Provides ticket data (Jira implementation)"
+    - slug: "linear"
+      type: "collector"
+      reason: "Provides ticket data (Linear implementation)"
   related: []
 
 policies:
