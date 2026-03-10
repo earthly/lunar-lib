@@ -30,58 +30,58 @@ This is what every customer gets on day one. Items marked 🆕 need to be built.
 
 ### Collectors (21)
 
-| # | Plugin | Category | Class | Notes |
-|---|--------|----------|-------|-------|
-| 1 | `readme` | Repo health | 🟢 | Every repo |
-| 2 | `codeowners` | Ownership | 🟢 | Every repo |
-| 3 | `github` | VCS settings | 🟢 | Branch protection, repo settings |
-| 4 | `docker` | Containers | 🟢 | Skips if no Dockerfiles |
-| 5 | `k8s` | Infrastructure | 🟢 | Skips if no K8s manifests |
-| 6 | `terraform` | Infrastructure | 🟢 | Skips if no `.tf` files |
-| 7 | `syft` | SBOM | 🟢 | Auto-generates SBOM for any repo |
-| 8 | `semgrep` | SAST | 🟢 | Detects Semgrep usage, skips if absent |
-| 9 | `ast-grep` | Code patterns | 🟢 | Auto-runs pattern analysis |
-| 10 | `golang` | Language | 🟢 | Skips if not Go |
-| 11 | `java` | Language | 🟢 | Skips if not Java |
-| 12 | `nodejs` | Language | 🟢 | Skips if not Node |
-| 13 | `python` | Language | 🟢 | Skips if not Python |
-| 14 | `rust` | Language | 🟢 | Skips if not Rust |
-| 15 | 🆕 `php` | Language | 🟢 | Skips if not PHP |
-| 16 | 🆕 `dotnet` | Language | 🟢 | Skips if not .NET |
-| 17 | 🆕 `gitleaks` | Secret scanning | 🟢 | Auto-runs on every repo |
-| 18 | 🆕 `trivy` | SCA + container | 🟢 | Auto-runs free vuln scanning |
-| 19 | 🆕 `gha-security` | CI security | 🟢 | Skips if no `.github/workflows/` |
-| 20 | 🆕 `api-docs` | API specs | 🟢 | Detects OpenAPI/Swagger specs, skips if none |
-| 21 | 🆕 `repo-hygiene` | Repo health | 🟢 | Scans for standard files (.gitignore, LICENSE, CI config, .dockerignore, SECURITY.md, CONTRIBUTING.md, .editorconfig) |
+| # | Plugin | Category | Notes |
+|---|--------|----------|-------|
+| 1 | `readme` | Repo health | Every repo |
+| 2 | `codeowners` | Ownership | Every repo |
+| 3 | `github` | VCS settings | Branch protection, repo settings |
+| 4 | `docker` | Containers | Skips if no Dockerfiles |
+| 5 | `k8s` | Infrastructure | Skips if no K8s manifests |
+| 6 | `terraform` | Infrastructure | Skips if no `.tf` files |
+| 7 | `syft` | SBOM | Auto-generates SBOM for any repo |
+| 8 | `semgrep` | SAST | Detects Semgrep usage, skips if absent |
+| 9 | `ast-grep` | Code patterns | Auto-runs pattern analysis |
+| 10 | `golang` | Language | Skips if not Go |
+| 11 | `java` | Language | Skips if not Java |
+| 12 | `nodejs` | Language | Skips if not Node |
+| 13 | `python` | Language | Skips if not Python |
+| 14 | `rust` | Language | Skips if not Rust |
+| 15 | 🆕 `php` | Language | Skips if not PHP |
+| 16 | 🆕 `dotnet` | Language | Skips if not .NET |
+| 17 | 🆕 `gitleaks` | Secret scanning | Auto-runs on every repo |
+| 18 | 🆕 `trivy` | SCA + container | Auto-runs free vuln scanning |
+| 19 | 🆕 `gha-security` | CI security | Skips if no `.github/workflows/` |
+| 20 | 🆕 `api-docs` | API specs | Detects OpenAPI/Swagger specs, skips if none |
+| 21 | 🆕 `repo-hygiene` | Repo health | Scans for standard files (.gitignore, LICENSE, CI config, .dockerignore, SECURITY.md, CONTRIBUTING.md, .editorconfig) |
 
 ### Policies (24)
 
-| # | Plugin | Checks in Universal Pack | Class | Notes |
-|---|--------|--------------------------|-------|-------|
-| 22 | 🆕 `repo-hygiene` | `readme-exists`, `readme-min-length`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `gitignore-exists`, `license-exists`, `ci-config-exists`, `dockerignore-exists`, `security-md-exists`, `contributing-md-exists`, `editorconfig-exists` | 🟡 | Consolidates `readme` + `codeowners` + new standard file checks. Uses data from `repo-hygiene` collector. Aspirational — fails intentionally when files missing. |
-| 22 | `vcs` | Branch protection, approvals, no force push | 🟡 | Aspirational — you should have branch protection |
-| 23 | `container` | Dockerfile best practices | 🟢 | Skips if no Dockerfiles |
-| 24 | `container-scan` | No critical image vulns | 🟢 | Skips if no scan data |
-| 25 | `k8s` | Resource limits, probes, PDBs | 🟢 | Skips if no K8s manifests |
-| 26 | `terraform` | Provider pinning, state backend | 🟢 | Skips if no `.tf` files |
-| 27 | `iac` | General IaC standards | 🟢 | Skips if no IaC data |
-| 28 | `iac-scan` | No critical IaC misconfigs | 🟢 | Skips if no scan data |
-| 29 | `sbom` | SBOM exists, license compliance | 🟢 | Skips if no SBOM data |
-| 30 | `sast` | SAST scan executed | 🟢 | Skips if no SAST data |
-| 31 | `sca` | No critical vulns | 🟢 | Skips if no SCA data |
-| 32 | `dependencies` | Lock files, versions | 🟢 | Skips per language |
-| 33 | `linter` | Lint configured | 🟢 | Skips if not detected |
-| 34 | `testing` | `executed`, `passing` only | 🟢 | Skips if no `.lang.*`; coverage checks NOT in universal |
-| 35 | `golang` | Go-specific checks | 🟢 | Skips if not Go |
-| 36 | `java` | Java-specific checks | 🟢 | Skips if not Java |
-| 37 | `nodejs` | Node-specific checks | 🟢 | Skips if not Node |
-| 38 | `python` | Python-specific checks | 🟢 | Skips if not Python |
-| 39 | `rust` | Rust-specific checks | 🟢 | Skips if not Rust |
-| 40 | 🆕 `php` | PHP-specific checks | 🟢 | Skips if not PHP |
-| 41 | 🆕 `dotnet` | .NET-specific checks | 🟢 | Skips if not .NET |
-| 42 | 🆕 `secrets` | No secrets in code | 🟢 | On Gitleaks data; skips if no scan data |
-| 43 | 🆕 `ci-security` | Pinned actions, minimal permissions | 🟢 | Skips if no GHA workflows |
-| 44 | 🆕 `api-docs` | OpenAPI/Swagger spec exists, valid | 🟢 | Skips if no API spec detected; Swagger is ubiquitous |
+| # | Plugin | Checks in Universal Pack | Notes |
+|---|--------|--------------------------|-------|
+| 22 | 🆕 `repo-hygiene` | `readme-exists`, `readme-min-length`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `gitignore-exists`, `license-exists`, `ci-config-exists`, `dockerignore-exists`, `security-md-exists`, `contributing-md-exists`, `editorconfig-exists` | Consolidates `readme` + `codeowners` + new standard file checks. Uses data from `repo-hygiene` collector. |
+| 23 | `vcs` | Branch protection, approvals, no force push | You should have branch protection |
+| 24 | `container` | Dockerfile best practices | Skips if no Dockerfiles |
+| 25 | `container-scan` | No critical image vulns | Skips if no scan data |
+| 26 | `k8s` | Resource limits, probes, PDBs | Skips if no K8s manifests |
+| 27 | `terraform` | Provider pinning, state backend | Skips if no `.tf` files |
+| 28 | `iac` | General IaC standards | Skips if no IaC data |
+| 29 | `iac-scan` | No critical IaC misconfigs | Skips if no scan data |
+| 30 | `sbom` | SBOM exists, license compliance | Skips if no SBOM data |
+| 31 | `sast` | SAST scan executed | Skips if no SAST data |
+| 32 | `sca` | No critical vulns | Skips if no SCA data |
+| 33 | `dependencies` | Lock files, versions | Skips per language |
+| 34 | `linter` | Lint configured | Skips if not detected |
+| 35 | `testing` | `executed`, `passing` only | Skips if no `.lang.*`; coverage checks NOT in universal |
+| 36 | `golang` | Go-specific checks | Skips if not Go |
+| 37 | `java` | Java-specific checks | Skips if not Java |
+| 38 | `nodejs` | Node-specific checks | Skips if not Node |
+| 39 | `python` | Python-specific checks | Skips if not Python |
+| 40 | `rust` | Rust-specific checks | Skips if not Rust |
+| 41 | 🆕 `php` | PHP-specific checks | Skips if not PHP |
+| 42 | 🆕 `dotnet` | .NET-specific checks | Skips if not .NET |
+| 43 | 🆕 `secrets` | No secrets in code | On Gitleaks data; skips if no scan data |
+| 44 | 🆕 `ci-security` | Pinned actions, minimal permissions | Skips if no GHA workflows |
+| 45 | 🆕 `api-docs` | OpenAPI/Swagger spec exists, valid | Skips if no API spec detected |
 
 ### Planned change: `repo-hygiene` consolidation
 
