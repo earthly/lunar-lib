@@ -53,7 +53,8 @@ QUERY="
     AND NOT (component_id = '${SAFE_COMPONENT_ID}' AND pr::text = '${SAFE_PR}')
 "
 
-REUSE_COUNT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
+REUSE_COUNT=$(PGCONNECT_TIMEOUT=10 PGOPTIONS='-c statement_timeout=30000' \
+  psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
 
 # Validate result is a number.
 if ! [[ "$REUSE_COUNT" =~ ^[0-9]+$ ]]; then

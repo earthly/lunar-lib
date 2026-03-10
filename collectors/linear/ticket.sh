@@ -106,7 +106,7 @@ if [ -n "$TYPE_LABELS" ]; then
   IFS=',' read -ra TYPES <<< "$TYPE_LABELS"
   for t in "${TYPES[@]}"; do
     t=$(echo "$t" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    if echo "$ISSUE_LABELS" | grep -qix "$t"; then
+    if echo "$ISSUE_LABELS" | grep -qFix "$t"; then
       lunar collect ".vcs.pr.ticket.type" "$t"
       break
     fi
