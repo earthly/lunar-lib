@@ -210,12 +210,12 @@ Customers pick from this list based on their stack to reach ~50 total.
 | 🆕 `checkov` collector | IaC security scanning | +1 |
 | 🆕 `sonarqube` collector | Code quality gate | +1 |
 | 🆕 `helm` collector + policy | Helm chart validation | +2 |
-| 🆕 `openssf` collector + policy | Supply chain scoring for auditors | +2 |
 | 🆕 `pagerduty` + `oncall` policy | On-call verification | +2 |
 | 🆕 `cosign` + `signing` policy | Image signing verification | +2 |
+| 🆕 `dependabot-renovate` collector + policy | Dep update tracking | +2 |
 | **Total** | | **~61** |
 
-**What the CISO gets:** Secret scanning, vulnerability scanning (Snyk + Trivy), SBOM + license compliance, IaC security (Checkov), supply chain scoring (OpenSSF Scorecard), branch protection, ticket traceability, DR docs, on-call verification, image signing. Pre-packaged SOC2/NIST controls. Regulated companies will often exceed ~50 because they need more controls.
+**What the CISO gets:** Secret scanning, vulnerability scanning (Snyk + Trivy), SBOM + license compliance, IaC security (Checkov), branch protection, ticket traceability, DR docs, on-call verification, image signing. Pre-packaged SOC2/NIST controls. Regulated companies will often exceed ~50 because they need more controls.
 
 ---
 
@@ -269,12 +269,12 @@ Customers pick from this list based on their stack to reach ~50 total.
 | `feature-flags` policy | Flag lifecycle | +1 |
 | 🆕 `checkov` collector | IaC scanning | +1 |
 | 🆕 `helm` collector + policy | Helm validation | +2 |
-| 🆕 `openssf` collector + policy | OSS project scoring | +2 |
 | 🆕 `dependabot-renovate` collector + policy | Dep updates | +2 |
 | 🆕 `cosign` + `signing` policy | Image signing | +2 |
+| 🆕 `pre-commit` collector + policy | Pre-commit hook enforcement | +2 |
 | **Total** | | **~57** |
 
-**What the Head of Platform gets:** Deep infrastructure coverage (K8s + Terraform + Helm validated at every commit), Go/Rust code quality and language-specific checks from universal, supply chain scoring for their OSS projects, image signing verification, operational readiness docs.
+**What the Head of Platform gets:** Deep infrastructure coverage (K8s + Terraform + Helm validated at every commit), Go/Rust code quality and language-specific checks from universal, image signing verification, operational readiness docs, pre-commit hook enforcement for code quality gates.
 
 ---
 
@@ -301,8 +301,8 @@ Based on the starter pack model, the build order is:
 | P8 | **Checkov collector** | A, C, D | 2–3 |
 | P9 | **Helm collector + policy** | A, C, D | 2–3 |
 | P10 | **Dependabot/Renovate collector + policy** | B, C, D | 1.5–2 |
-| P11 | **OpenSSF Scorecard collector + policy** | A, D | 2–3 |
-| P12 | **SonarQube collector** | A | 2–3 |
+| P11 | **SonarQube collector** | A | 2–3 |
+| P12 | **PagerDuty collector + oncall policy** | A | 3 |
 
 **Phase 3: Expanding the conditional menu** (Batch 2–4 items)
 
@@ -681,31 +681,7 @@ A single `repo-hygiene` policy that replaces the separate `readme` and `codeowne
 
 ---
 
-### P11. OpenSSF Scorecard — Supply Chain Security Scoring
-
-**Type:** Collector + Policy  
-**Class:** 🔵 Conditional (enterprise/compliance-focused)  
-**Est. Dev Time:** 2–3 days  
-**Tool:** [OpenSSF Scorecard](https://github.com/ossf/scorecard) — free, backed by Google/OSSF  
-**Strategy:** Strategy 5 (Auto-Running Scanners) — code hook or cron
-
-**What to build:**
-
-- **Collector:** Run `scorecard --repo=<component-url> --format=json`. Parses 18+ checks (branch protection, CI tests, dependency review, fuzzing, signed releases, etc.). Writes aggregate score and per-check results.
-- **Policy checks:**
-  - `scorecard-minimum-score` — Aggregate score ≥ configurable threshold (default: 5/10)
-  - `scorecard-critical-checks` — Specific checks must pass (e.g., `Branch-Protection`, `Token-Permissions`)
-
-**Testing:**
-
-- **Collector:** Run against a public GitHub repo (e.g., `pantalasa-cronos/backend` if public). Scorecard requires repo to be on a supported platform (GitHub, GitLab) and may need `GITHUB_TOKEN` for rate limits.
-- **Policy:** Feed JSON with score 7 (threshold 5) → PASS. Feed JSON with score 3 → FAIL.
-- **Note:** Scorecard CLI needs network access to query GitHub API. This means it works as a `cron` collector or `code` collector with network. Test with `--local` flag where possible for offline testing.
-- **Note:** Lunar already provides some of these checks natively (branch protection via `github` collector + `vcs` policy). The value of Scorecard is the industry-standard score that procurement teams ask for, plus checks we don't cover yet (signed releases, fuzzing, SAST).
-
----
-
-### P12. SonarQube/SonarCloud Integration
+### P11. SonarQube/SonarCloud Integration
 
 **Type:** Collector  
 **Class:** 🔵 Conditional (SonarQube users)  
@@ -728,6 +704,43 @@ A single `repo-hygiene` policy that replaces the separate `readme` and `codeowne
 
 ---
 
+### P12. PagerDuty — On-Call Verification
+
+**Type:** Collector + Policy  
+**Class:** 🔵 Conditional (PagerDuty users)  
+**Est. Dev Time:** 3 days  
+**Tool:** PagerDuty API (free tier available for testing)  
+**Strategy:** Strategy 10 (External Vendor API Integration) — cron hook
+
+**What to build:**
+
+- **Collector (cron hook):** Query PagerDuty API using service ID from component metadata. Check on-call schedule existence, participant count, escalation policy.
+- **Policy checks:**
+  - `oncall-schedule-exists` — On-call schedule is configured
+  - `oncall-min-participants` — Rotation has at least N people (default: 4)
+  - `oncall-escalation-exists` — Escalation policy is configured
+
+**Component JSON output:**
+
+```json
+{
+  "oncall": {
+    "schedule": { "exists": true, "participants": 5, "rotation": "weekly" },
+    "escalation": { "exists": true, "levels": 3 },
+    "source": { "tool": "pagerduty" }
+  }
+}
+```
+
+**Testing:**
+
+- Create a free PagerDuty account. Set up a service with an on-call schedule and escalation policy.
+- **Collector:** Run with `PAGERDUTY_API_KEY` secret → verify schedule data extracted. Run without key → verify graceful exit with stderr message.
+- **Policy:** Feed JSON with 5 participants (min 4) → PASS. Feed JSON with 2 participants → FAIL. Feed JSON with no `.oncall` → SKIP.
+- **Note:** The `.oncall` schema already exists in Component JSON. Follow its conventions.
+
+---
+
 ## Remaining Batch Items (Phase 3)
 
 ### Batch 2: Items 13–25 (High Impact)
@@ -736,7 +749,7 @@ A single `repo-hygiene` policy that replaces the separate `readme` and `codeowne
 |---|------|------|---------------|-----------|-------------|-------|
 | 13 | **GitLab CI security** | Collector + Policy | File parsing `.gitlab-ci.yml` | 2–3 | 8/10 | Same concept as P3 but for GitLab. Parse for image pinning, secret exposure. |
 | 14 | **Backstage catalog-info.yaml** | Collector + Policy | File parsing `catalog-info.yaml` | 2 | 8/10 | Service catalog standard. Check entity fields, annotations, dependencies. |
-| 15 | **PagerDuty on-call** | Collector + Policy | PagerDuty API (free tier available) | 3 | 7/10 | Verify on-call schedules, min participants, escalation. |
+| 15 | **OpenSSF Scorecard** | Collector + Policy | scorecard CLI (free, OSS) | 2–3 | 5/10 | Supply chain scoring. Niche but valued in compliance/procurement contexts. Needs network access. |
 | 16 | **Datadog/Grafana dashboards** | Collector + Policy | Vendor API | 3 | 7/10 | Verify monitoring dashboards exist per service. |
 | 17 | **OWASP ZAP** | Collector | ZAP CLI (free, OSS) | 3 | 7/10 | Dynamic security scanning for web apps. |
 | 18 | **Gradle** (enhance Java) | Collector | File parsing `build.gradle` | 2 | 7/10 | Gradle-specific build parsing. |
