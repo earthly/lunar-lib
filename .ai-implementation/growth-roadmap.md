@@ -162,11 +162,11 @@ Customers pick from this list based on their stack to reach ~50 total.
 | C26 | 🆕 `editorconfig` collector + policy | Both | Wants formatting consistency |
 | C27 | 🆕 `docker-compose` collector + policy | Both | Wants local dev environment checks |
 
-**CI platforms (beyond GHA):**
+**VCS & CI platforms (beyond GitHub):**
 
 | # | Item | Type | Trigger |
 |---|------|------|---------|
-| C28 | 🆕 `gitlab-ci` collector | Collector | Uses GitLab CI |
+| C28 | 🆕 `gitlab` collector (VCS settings + CI security) | Collector | Uses GitLab — branch protection, merge request settings, CI pipeline security. Mirrors what `github` collector does for GitHub. |
 | C29 | 🆕 `jenkins` collector | Collector | Uses Jenkins |
 | C30 | 🆕 `circleci` collector | Collector | Uses CircleCI |
 | C31 | 🆕 `azure-devops` collector | Collector | Uses Azure DevOps |
@@ -305,7 +305,7 @@ Items from the conditional menu above, prioritized by customer demand.
 
 | # | Item | Type | Tool/Strategy | Est. Days | Mass Appeal | Notes |
 |---|------|------|---------------|-----------|-------------|-------|
-| 13 | **GitLab CI security** | Collector + Policy | File parsing `.gitlab-ci.yml` | 2–3 | 8/10 | Same concept as P3 but for GitLab. Parse for image pinning, secret exposure. |
+| 13 | **GitLab collector** (VCS + CI security) | Collector | GitLab API + file parsing | 3–4 | 8/10 | Mirrors `github` collector: branch protection, merge request settings, repo config. Also parses `.gitlab-ci.yml` for CI security (image pinning, secret exposure). |
 | 14 | **Backstage catalog-info.yaml** | Collector + Policy | File parsing `catalog-info.yaml` | 2 | 8/10 | Service catalog standard. Check entity fields, annotations, dependencies. |
 | 15 | **OpenSSF Scorecard** | Collector + Policy | scorecard CLI (free, OSS) | 2–3 | 5/10 | Supply chain scoring. Niche but valued in compliance/procurement contexts. Needs network access. |
 | 16 | **Datadog/Grafana dashboards** | Collector + Policy | Vendor API | 3 | 7/10 | Verify monitoring dashboards exist per service. |
