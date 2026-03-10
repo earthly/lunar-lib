@@ -10,15 +10,9 @@ Prioritized plan for expanding lunar-lib with high-mass-appeal, free/OSS-friendl
 
 ## Product Model: The "Starter Pack"
 
-Every Lunar customer gets a **universal baseline** of ~30 items that "just works" — collectors skip gracefully when a technology isn't present, policies skip when underlying data is absent. No noise, no false positives for missing tech.
+Every Lunar customer gets a **universal baseline** (~45 items) that provides a solid foundation for any initial installation and should be safe to run on any account. Collectors skip gracefully when a technology isn't present, and policies skip when underlying data is absent — no noise, no false positives for missing tech. Baseline items can also be removed if a customer doesn't want them, but they're designed to "just work" out of the box.
 
-Customers then add **~20 more items** from the conditional menu based on their stack (Jira, PagerDuty, Snyk, etc.) to reach their ~50-item starter pack.
-
-### Item classification:
-
-- 🟢 **Universal** — Safe for every customer. Collectors skip if tech not detected; policies skip if data absent. Auto-enable for all accounts.
-- 🟡 **Aspirational** — Universal in spirit (every company _should_ do this), fails intentionally when missing. In universal pack. All policies should be imported at `score` level initially; customers can promote to `report-pr` or `block-pr` later.
-- 🔵 **Conditional** — Customer opts in based on their stack/practices.
+Customers then add items from the **conditional menu** based on their stack (Jira, PagerDuty, Snyk, etc.) to reach their ~50-item starter pack. All policies should be imported at `score` level initially; customers can promote to `report-pr` or `block-pr` later.
 
 ---
 
@@ -27,16 +21,6 @@ Customers then add **~20 more items** from the conditional menu based on their s
 **21 collectors:** ai-use, ast-grep, ci-otel, claude, codecov, codeowners, docker, dr-docs, github, golang, java, jira, k8s, nodejs, python, readme, rust, semgrep, snyk, syft, terraform
 
 **24 policies:** ai-use, codeowners, compliance-docs, container, container-scan, dependencies, feature-flags, golang, iac, iac-scan, java, k8s, linter, nodejs, python, readme, rust, sast, sbom, sca, terraform, testing, ticket, vcs
-
----
-
-## How to Use This Document
-
-1. **Pick an item** from the prioritized list below.
-2. **Read the playbook** at `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md` — it covers the full PR lifecycle.
-3. **Read the ai-context docs** — especially `collector-reference.md`, `policy-reference.md`, and `strategies.md`.
-4. **Follow the spec-first PR flow** — YAML manifest + README first, then implementation after review.
-5. **Test thoroughly** using the patterns described in each item's "Testing" section.
 
 ---
 
@@ -55,26 +39,26 @@ This is what every customer gets on day one. Items marked 🆕 need to be built.
 | 5 | `k8s` | Infrastructure | 🟢 | Skips if no K8s manifests |
 | 6 | `terraform` | Infrastructure | 🟢 | Skips if no `.tf` files |
 | 7 | `syft` | SBOM | 🟢 | Auto-generates SBOM for any repo |
-| 8 | `codecov` | Coverage | 🟢 | Skips if no coverage tool |
-| 9 | `semgrep` | SAST | 🟢 | Detects Semgrep usage, skips if absent |
-| 10 | `ast-grep` | Code patterns | 🟢 | Auto-runs pattern analysis |
-| 11 | `golang` | Language | 🟢 | Skips if not Go |
-| 12 | `java` | Language | 🟢 | Skips if not Java |
-| 13 | `nodejs` | Language | 🟢 | Skips if not Node |
-| 14 | `python` | Language | 🟢 | Skips if not Python |
-| 15 | `rust` | Language | 🟢 | Skips if not Rust |
-| 16 | 🆕 `php` | Language | 🟢 | Skips if not PHP |
-| 17 | 🆕 `dotnet` | Language | 🟢 | Skips if not .NET |
-| 18 | 🆕 `gitleaks` | Secret scanning | 🟢 | Auto-runs on every repo |
-| 19 | 🆕 `trivy` | SCA + container | 🟢 | Auto-runs free vuln scanning |
-| 20 | 🆕 `gha-security` | CI security | 🟢 | Skips if no `.github/workflows/` |
-| 21 | 🆕 `api-docs` | API specs | 🟢 | Detects OpenAPI/Swagger specs, skips if none |
+| 8 | `semgrep` | SAST | 🟢 | Detects Semgrep usage, skips if absent |
+| 9 | `ast-grep` | Code patterns | 🟢 | Auto-runs pattern analysis |
+| 10 | `golang` | Language | 🟢 | Skips if not Go |
+| 11 | `java` | Language | 🟢 | Skips if not Java |
+| 12 | `nodejs` | Language | 🟢 | Skips if not Node |
+| 13 | `python` | Language | 🟢 | Skips if not Python |
+| 14 | `rust` | Language | 🟢 | Skips if not Rust |
+| 15 | 🆕 `php` | Language | 🟢 | Skips if not PHP |
+| 16 | 🆕 `dotnet` | Language | 🟢 | Skips if not .NET |
+| 17 | 🆕 `gitleaks` | Secret scanning | 🟢 | Auto-runs on every repo |
+| 18 | 🆕 `trivy` | SCA + container | 🟢 | Auto-runs free vuln scanning |
+| 19 | 🆕 `gha-security` | CI security | 🟢 | Skips if no `.github/workflows/` |
+| 20 | 🆕 `api-docs` | API specs | 🟢 | Detects OpenAPI/Swagger specs, skips if none |
+| 21 | 🆕 `repo-hygiene` | Repo health | 🟢 | Scans for standard files (.gitignore, LICENSE, CI config, .dockerignore, SECURITY.md, CONTRIBUTING.md, .editorconfig) |
 
 ### Policies (24)
 
 | # | Plugin | Checks in Universal Pack | Class | Notes |
 |---|--------|--------------------------|-------|-------|
-| 21 | 🆕 `repo-hygiene` | `readme-exists`, `readme-min-length`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `gitignore-exists`, `license-exists`, `ci-config-exists` | 🟡 | Consolidates `readme` + `codeowners` + new standard file checks. Aspirational — fails intentionally when files missing. |
+| 22 | 🆕 `repo-hygiene` | `readme-exists`, `readme-min-length`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `gitignore-exists`, `license-exists`, `ci-config-exists`, `dockerignore-exists`, `security-md-exists`, `contributing-md-exists`, `editorconfig-exists` | 🟡 | Consolidates `readme` + `codeowners` + new standard file checks. Uses data from `repo-hygiene` collector. Aspirational — fails intentionally when files missing. |
 | 22 | `vcs` | Branch protection, approvals, no force push | 🟡 | Aspirational — you should have branch protection |
 | 23 | `container` | Dockerfile best practices | 🟢 | Skips if no Dockerfiles |
 | 24 | `container-scan` | No critical image vulns | 🟢 | Skips if no scan data |
@@ -101,14 +85,19 @@ This is what every customer gets on day one. Items marked 🆕 need to be built.
 
 ### Planned change: `repo-hygiene` consolidation
 
-When building the `repo-hygiene` policy, fold the existing `readme` and `codeowners` policies into it. The new policy includes all their existing checks plus:
+The `repo-hygiene` plugin is a new collector + policy pair that consolidates the existing `readme` and `codeowners` policies and adds standard file checks:
+
+**Collector** scans for standard files and writes presence data. **Policy** folds existing `readme` + `codeowners` policy checks and adds:
 
 - `gitignore-exists` — `.gitignore` file present
 - `license-exists` — `LICENSE` or `LICENSE.md` present
-- `ci-config-exists` — `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, or similar
-- `dockerignore-exists` — `.dockerignore` present when Dockerfiles exist (conditional check)
+- `ci-config-exists` — `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/`, or `buildkite/` detected
+- `dockerignore-exists` — `.dockerignore` present when Dockerfiles exist (conditional)
+- `security-md-exists` — `SECURITY.md` present
+- `contributing-md-exists` — `CONTRIBUTING.md` present
+- `editorconfig-exists` — `.editorconfig` present
 
-The existing `readme` and `codeowners` collector plugins remain separate (they collect different data). Only the policies merge.
+The existing `readme` and `codeowners` collector plugins remain separate (they collect different data). Only the policies merge into `repo-hygiene`.
 
 ---
 
@@ -304,440 +293,9 @@ Based on the starter pack model, the build order is:
 | P11 | **SonarQube collector** | A | 2–3 |
 | P12 | **PagerDuty collector + oncall policy** | A | 3 |
 
-**Phase 3: Expanding the conditional menu** (Batch 2–4 items)
+**Phase 3: Expanding the conditional menu**
 
-Items 13–50 from the original batch lists. See detailed specs below.
-
----
-
-## Detailed Specs: Phase 1 & 2 Items
-
-### P1. Gitleaks — Secret Scanning
-
-**Type:** Collector + Policy  
-**Class:** 🟢 Universal  
-**Est. Dev Time:** 2–3 days  
-**Tool:** [Gitleaks](https://github.com/gitleaks/gitleaks) — 100% free, OSS, 18k+ stars, single Go binary  
-**Strategy:** Strategy 5 (Auto-Running Scanners) — code hook  
-**Schema Gap:** `.secrets` category is defined in Component JSON but has zero collectors feeding it
-
-**What to build:**
-
-- **Collector (code hook):** Auto-run `gitleaks detect --source . --report-format json` on every commit. Parse JSON output. Write findings to `.secrets`.
-- **Policy checks:**
-  - `secret-scan-executed` — Assert `.secrets` data exists (scan ran)
-  - `no-secrets-in-code` — Assert `.secrets.findings.total == 0`
-
-**Component JSON output:**
-
-```json
-{
-  "secrets": {
-    "source": { "tool": "gitleaks", "version": "8.x" },
-    "findings": { "total": 0 },
-    "clean": true,
-    "issues": []
-  }
-}
-```
-
-**Testing:**
-
-- **Collector tests:**
-  - Create a test repo with a known secret (e.g., `AWS_SECRET_ACCESS_KEY=AKIA...` in a file) → verify collector detects it and writes correct JSON
-  - Clean repo → verify collector writes `{"secrets": {"clean": true, "findings": {"total": 0}}}`
-  - Repo with `.gitleaksignore` → verify allowlisted secrets are excluded
-- **Policy tests:**
-  - Feed clean component JSON → expect PASS
-  - Feed component JSON with findings → expect FAIL with descriptive message
-  - Feed component JSON with no `.secrets` key → expect SKIP (no scanner ran)
-- **Integration:** Run collector on `pantalasa-cronos/backend`, then feed output to policy. Backend is a clean Go repo so should PASS.
-
-**Docker image note:** Gitleaks is a single static binary. Add it to a custom image based on `earthly/lunar-lib:base-main`, or download in `install.sh`. Prefer adding to image for speed.
-
----
-
-### P2. Trivy — Container & Filesystem Vulnerability Scanning
-
-**Type:** Collector (multi-sub-collector) + feeds existing policies  
-**Class:** 🟢 Universal  
-**Est. Dev Time:** 3–4 days  
-**Tool:** [Trivy](https://github.com/aquasecurity/trivy) — 100% free, OSS, 24k+ stars  
-**Strategy:** Strategy 5 (Auto-Running Scanners) — code hook  
-**Schema Gap:** `.container_scan` policy exists but no free scanner feeds it data
-
-**What to build:**
-
-- **Sub-collector `filesystem`:** Run `trivy fs --format json .` to scan source code dependencies for known vulns. Write to `.sca` (feeds existing `sca` policy). This gives every Lunar user free SCA without Snyk.
-- **Sub-collector `image`:** If Dockerfiles exist, run `trivy image --format json <image>` against built images. Write to `.container_scan` (feeds existing `container-scan` policy).
-- **Sub-collector `config`:** Run `trivy config --format json .` to scan IaC misconfigurations. Write to `.iac` scan data (feeds existing `iac-scan` policy).
-
-**Component JSON output (filesystem sub-collector):**
-
-```json
-{
-  "sca": {
-    "source": { "tool": "trivy", "version": "0.x", "integration": "auto" },
-    "vulnerabilities": { "critical": 0, "high": 2, "medium": 5, "low": 10, "total": 17 },
-    "findings": [
-      { "severity": "high", "package": "lodash", "version": "4.17.20", "cve": "CVE-2021-23337", "fix_version": "4.17.21", "fixable": true }
-    ],
-    "summary": { "has_critical": false, "has_high": true, "all_fixable": true }
-  }
-}
-```
-
-**Testing:**
-
-- **Filesystem sub-collector:** Run on `pantalasa-cronos/frontend` (Node.js) — should detect known npm vulns. Run on `pantalasa-cronos/backend` (Go) — may or may not have vulns; verify JSON shape is correct either way.
-- **Config sub-collector:** Run on a repo with Terraform files → verify IaC misconfigs detected. Run on a repo without IaC → verify no data written (don't write empty objects).
-- **Policy integration:** Capture Trivy filesystem output → feed to existing `sca` policy → verify pass/fail behavior matches expectations.
-- **Edge case:** Repo with no lock files or dependencies → Trivy should find nothing, collector should write nothing.
-
-**Docker image note:** Trivy is ~50MB binary. Must be in a custom Docker image. Consider a shared `earthly/lunar-lib:security-scanners-main` image with Gitleaks + Trivy to amortize image size.
-
----
-
-### P3. GitHub Actions Security — Workflow File Analysis
-
-**Type:** Collector + Policy  
-**Class:** 🟢 Universal (skips if no GHA)  
-**Est. Dev Time:** 2–3 days  
-**Tool:** None required — pure YAML parsing  
-**Strategy:** Strategy 8 (File Parsing and Schema Extraction) — code hook
-
-**What to build:**
-
-- **Collector (code hook):** Parse all `.github/workflows/*.yml` files. For each workflow, extract:
-  - Actions used and whether they're pinned to SHA vs tag
-  - `permissions:` block (present? broad? minimal?)
-  - Use of `pull_request_target` (dangerous trigger)
-  - Secrets passed via `env:` to third-party actions
-- **Policy checks:**
-  - `actions-pinned` — All third-party actions pinned to full SHA (not `@v1`)
-  - `actions-permissions-set` — `permissions:` block is explicitly set (not relying on defaults)
-  - `actions-minimal-permissions` — No `write-all` or overly broad permissions
-
-**Component JSON output:**
-
-```json
-{
-  "ci": {
-    "github_actions": {
-      "workflows": [
-        {
-          "path": ".github/workflows/ci.yml",
-          "permissions_set": true,
-          "permissions_minimal": true,
-          "actions": [
-            { "uses": "actions/checkout@v4", "pinned_to_sha": false, "is_official": true },
-            { "uses": "docker/build-push-action@abc123def", "pinned_to_sha": true, "is_official": false }
-          ],
-          "uses_pull_request_target": false
-        }
-      ],
-      "summary": {
-        "all_pinned": false,
-        "all_permissions_set": true,
-        "unpinned_count": 1
-      }
-    }
-  }
-}
-```
-
-**Testing:**
-
-- **Collector:** Run on `pantalasa-cronos/backend` (has GHA workflows) → verify actions are extracted correctly. Create a test workflow with intentionally unpinned actions and broad permissions → verify detection.
-- **Policy:** Feed JSON with all-pinned actions → PASS. Feed JSON with unpinned third-party action → FAIL. Feed JSON with no `.ci.github_actions` → SKIP (not a GHA user).
-- **Edge case:** Workflow with `uses: ./local-action` (local actions don't need SHA pinning). Workflow with reusable workflow calls (`uses: org/repo/.github/workflows/x.yml@main`).
-- **No external dependencies needed** — this is pure shell + yq/jq parsing. Can test entirely locally.
-
----
-
-### P4. Repo Hygiene — Consolidated Standard File Checks
-
-**Type:** Policy (consolidates existing `readme` + `codeowners` policies + new checks)  
-**Class:** 🟡 Aspirational-Universal  
-**Est. Dev Time:** 2–3 days  
-**Tool:** None — uses existing collector data + file existence checks  
-**Strategy:** Strategy 8 (File Parsing)
-
-**What to build:**
-
-A single `repo-hygiene` policy that replaces the separate `readme` and `codeowners` policies, adding new standard file checks:
-
-- **Checks from existing `readme` policy:** `readme-exists`, `readme-min-length`, `readme-required-sections` (if applicable)
-- **Checks from existing `codeowners` policy:** `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`
-- **New checks:**
-  - `gitignore-exists` — `.gitignore` file present
-  - `license-exists` — `LICENSE` or `LICENSE.md` present
-  - `ci-config-exists` — `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/`, or `buildkite/` detected
-  - `dockerignore-exists` — `.dockerignore` present when Dockerfiles exist (conditional)
-  - `security-md-exists` — `SECURITY.md` present (optional/aspirational)
-
-**Data sources:** Reads from existing `.repo.readme.*`, `.ownership.codeowners.*`, and adds new file existence checks (may need minor collector changes or can use the existing `readme` collector's file scanning).
-
-**Testing:**
-
-- **Policy:** Test with various repos — one with all standard files → all PASS. One missing `.gitignore` → that check FAIL, others PASS. Repo with Dockerfiles but no `.dockerignore` → `dockerignore-exists` FAIL.
-- **Migration:** Ensure the new policy produces identical results to the old `readme` and `codeowners` policies for their existing checks. Run both old and new against the same component JSON and compare.
-- **No new collector needed** — the `readme` and `codeowners` collectors already gather the data. For `.gitignore`/`LICENSE` checks, either extend the `readme` collector (it already scans the repo root) or check file existence directly in the policy.
-
----
-
-### P5. PHP Language Support
-
-**Type:** Collector + Policy  
-**Class:** 🟢 Universal (skip-safe)  
-**Est. Dev Time:** 2–3 days  
-**Tool:** None (file parsing) + PHPUnit for CI detection  
-**Strategy:** Strategy 8 (File Parsing) + Strategy 1 (CI Detection)
-
-**What to build:**
-
-- **Collector (code hook):** Parse `composer.json` / `composer.lock`. Extract: PHP version requirement, dependencies (require/require-dev), scripts.
-- **Collector (CI hook):** Detect `phpunit`, `composer test`, `php artisan test` execution. Capture test results and coverage.
-- **Policy checks:** `php-version-minimum`, `php-tests-exist`, `php-lock-file-exists`, `php-coverage-threshold`
-
-**Component JSON paths:** `.lang.php.*` (following `.lang.<language>` convention)
-
-**Testing:**
-
-- Fork a minimal Laravel or Symfony project to `pantalasa-cronos`, or create a simple `composer.json` project.
-- **Collector:** Run on PHP project → verify composer.json parsing, dependency extraction. Run on Go project → verify nothing written.
-- **Policy:** Feed JSON with PHP 8.2 (min 8.0) → PASS. Feed JSON with PHP 7.4 (EOL) → FAIL.
-- **CI hook:** Add PHPUnit CI workflow, push to cronos, verify test results captured.
-
----
-
-### P6. .NET/C# Language Support
-
-**Type:** Collector + Policy  
-**Class:** 🟢 Universal (skip-safe)  
-**Est. Dev Time:** 3–4 days  
-**Tool:** None (file parsing) + `dotnet` CLI for CI detection  
-**Strategy:** Strategy 8 (File Parsing) + Strategy 1 (CI Detection)
-
-**What to build:**
-
-- **Collector (code hook):** Parse `.csproj`, `.sln`, `Directory.Build.props`. Extract: target framework, NuGet dependencies, package versions.
-- **Collector (CI hook):** Detect `dotnet test`, `dotnet build` execution. Capture test results and coverage from Coverlet.
-- **Policy checks:** `dotnet-version-minimum`, `dotnet-tests-exist`, `dotnet-coverage-threshold`, `dotnet-lock-file-exists`
-
-**Component JSON paths:** `.lang.dotnet.*` (following the existing `.lang.<language>` convention)
-
-**Testing:**
-
-- Create a minimal .NET project in `pantalasa-cronos` (or fork an existing open-source .NET repo).
-- **Collector:** Run on .NET project → verify .csproj parsing, dependency extraction. Run on Python project → verify nothing written.
-- **Policy:** Feed JSON with .NET 8 (minimum 6) → PASS. Feed JSON with .NET 5 (EOL) → FAIL.
-- **CI hook:** Set up a GHA workflow with `dotnet test` on the test repo, push to cronos, verify CI collector captures test results.
-
----
-
-### P7. API Documentation (OpenAPI/Swagger)
-
-**Type:** Collector + Policy  
-**Class:** 🟢 Universal (skips if no API spec detected)  
-**Est. Dev Time:** 2 days  
-**Tool:** None (YAML/JSON file detection and parsing)  
-**Strategy:** Strategy 8 (File Parsing) — code hook
-
-**What to build:**
-
-- **Collector (code hook):** Find OpenAPI/Swagger spec files (`openapi.yaml`, `openapi.json`, `swagger.yaml`, `swagger.json`, `api-spec.*`). Validate syntax (valid YAML/JSON, has `openapi` or `swagger` key). Extract version, endpoint count, info metadata.
-- **Policy checks:**
-  - `api-spec-exists` — At least one API spec file found (skips if no spec-like files detected at all)
-  - `api-spec-valid` — All found specs parse without errors
-
-**Component JSON output:**
-
-```json
-{
-  "api": {
-    "specs": [
-      { "path": "api/openapi.yaml", "type": "openapi", "version": "3.1.0", "valid": true, "endpoint_count": 15 }
-    ],
-    "summary": { "spec_exists": true, "all_valid": true, "total_endpoints": 15 }
-  }
-}
-```
-
-**Testing:**
-
-- **Collector:** Add an OpenAPI spec to `pantalasa-cronos/backend` → verify detection and parsing. Run on repo with no API spec → verify nothing written. Add an invalid YAML file named `openapi.yaml` → verify `valid: false`.
-- **Policy:** Feed JSON with valid spec → PASS. Feed JSON with invalid spec → FAIL. Feed JSON with no `.api` key → SKIP.
-- **Note:** Swagger (OpenAPI 2.0) is extremely common in legacy codebases. Supporting both Swagger 2.0 and OpenAPI 3.x is important for mass appeal. Start with Swagger/OpenAPI detection; we can add more API doc formats (GraphQL introspection, AsyncAPI, etc.) later.
-- **No external dependencies** — pure shell + yq. Fast to develop.
-
----
-
-### P8. Checkov — IaC Security Scanning
-
-**Type:** Collector  
-**Class:** 🔵 Conditional (IaC users)  
-**Est. Dev Time:** 2–3 days  
-**Tool:** [Checkov](https://github.com/bridgecrewio/checkov) — free, OSS, 7k+ stars, Python-based  
-**Strategy:** Strategy 5 (Auto-Running Scanners) — code hook  
-**Feeds:** Existing `iac-scan` policy
-
-**What to build:**
-
-- **Collector (code hook):** Auto-run `checkov -d . --output json --compact` on repos with IaC files (Terraform, CloudFormation, K8s manifests, Dockerfiles). Parse JSON results. Write to `.iac` scan paths that the existing `iac-scan` policy reads.
-
-**Component JSON output:**
-
-```json
-{
-  "iac": {
-    "scan": {
-      "source": { "tool": "checkov", "version": "3.x" },
-      "findings": {
-        "critical": 0, "high": 3, "medium": 8, "low": 2, "total": 13
-      },
-      "issues": [
-        { "severity": "high", "check_id": "CKV_AWS_18", "check_name": "Ensure the S3 bucket has access logging enabled", "file": "main.tf", "resource": "aws_s3_bucket.data" }
-      ],
-      "summary": { "passed": 45, "failed": 13, "skipped": 2 }
-    }
-  }
-}
-```
-
-**Testing:**
-
-- **Collector:** Run on a repo with Terraform files → verify findings are detected. Run on repo with no IaC → verify nothing is written.
-- **Policy integration:** Capture Checkov output → feed to existing `iac-scan` policy → verify pass/fail.
-- **Docker image note:** Checkov is Python-based (~200MB). Needs its own image or a `security-scanners` image.
-- **Important:** Check what the existing `iac-scan` policy expects as input paths. The Checkov collector must write data in the format the existing policy reads.
-
----
-
-### P9. Helm Chart Support
-
-**Type:** Collector + Policy  
-**Class:** 🔵 Conditional (Helm users) — but skip-safe, could be universal  
-**Est. Dev Time:** 2–3 days  
-**Tool:** `helm` CLI for template rendering/linting  
-**Strategy:** Strategy 8 (File Parsing) — code hook
-
-**What to build:**
-
-- **Collector (code hook):** Find `Chart.yaml` files. Parse chart metadata (name, version, appVersion, dependencies). Optionally run `helm lint` and `helm template` for validation. Detect deprecated K8s APIs in rendered templates.
-- **Policy checks:**
-  - `helm-chart-valid` — Chart passes `helm lint`
-  - `helm-no-deprecated-apis` — No deprecated K8s APIs in templates
-  - `helm-values-documented` — `values.yaml` has comments or a `values.schema.json` exists
-
-**Component JSON paths:** `.k8s.helm.*` (extends existing `.k8s` category)
-
-**Testing:**
-
-- Add a Helm chart to a `pantalasa-cronos` component, or fork an open-source Helm chart repo.
-- **Collector:** Run on chart → verify metadata extracted. Run on non-Helm repo → verify nothing written. Run `helm lint` → verify warnings captured.
-- **Policy:** Feed JSON with clean chart → PASS. Feed JSON with deprecated API → FAIL. Feed JSON with no `.k8s.helm` → SKIP.
-- **Docker image:** `helm` binary needs to be in the image. Small binary, easy to add.
-
----
-
-### P10. Dependabot/Renovate — Dependency Update Automation
-
-**Type:** Collector + Policy  
-**Class:** 🔵 Conditional (aspirational — "you should have dep updates")  
-**Est. Dev Time:** 1.5–2 days  
-**Tool:** None — file existence checks  
-**Strategy:** Strategy 8 (File Parsing and Schema Extraction) — code hook
-
-**What to build:**
-
-- **Collector (code hook):** Check for dependency update configuration:
-  - `.github/dependabot.yml` → parse ecosystems, update frequency, target branch
-  - `renovate.json` / `renovate.json5` / `.renovaterc` / `.renovaterc.json` → parse config
-- **Policy checks:**
-  - `dependency-updates-configured` — At least one update tool is configured
-  - `all-ecosystems-covered` — Every detected package ecosystem (npm, go, pip, docker, github-actions) has a corresponding update config entry
-
-**Component JSON output:**
-
-```json
-{
-  "repo": {
-    "dependency_updates": {
-      "configured": true,
-      "tool": "dependabot",
-      "ecosystems": ["npm", "docker", "github-actions"],
-      "update_frequency": "weekly"
-    }
-  }
-}
-```
-
-**Testing:**
-
-- **Collector:** Run on `pantalasa-cronos/backend` — check if dependabot.yml or renovate config exists. If not, add one for testing. Run on a repo with both dependabot and renovate → verify correct detection.
-- **Policy:** Feed JSON with full ecosystem coverage → PASS. Feed JSON with `npm` project but only `docker` in dependabot config → FAIL (missing ecosystem). Feed JSON with no config → FAIL.
-- **Edge case:** Monorepo with multiple directories in dependabot config. Renovate with `extends: ["config:base"]` (presets).
-
----
-
-### P11. SonarQube/SonarCloud Integration
-
-**Type:** Collector  
-**Class:** 🔵 Conditional (SonarQube users)  
-**Est. Dev Time:** 2–3 days  
-**Tool:** SonarCloud free tier (for testing) or status check detection  
-**Strategy:** Strategy 2 (GitHub App Status Check) + Strategy 1 (CI Detection)
-
-**What to build:**
-
-- **Sub-collector `github-app`:** Detect SonarCloud GitHub App status checks on PRs (like semgrep/snyk pattern). Extract quality gate status.
-- **Sub-collector `cicd`:** Detect `sonar-scanner` or `sonarqube` CLI execution in CI. Extract analysis results.
-- **Feeds:** Existing `sast` policy (code quality findings) and `testing` policy (coverage metrics from SonarQube)
-
-**Testing:**
-
-- **GitHub App sub-collector:** Install SonarCloud free tier on a `pantalasa-cronos` public repo. Open a PR → verify status check is detected and parsed.
-- **CI sub-collector:** Add a SonarScanner step to a GHA workflow → verify CI detection.
-- **Note:** SonarCloud is free for open-source repos. For testing, fork a public repo to `pantalasa-cronos` and connect SonarCloud to it.
-- **Follows the exact same pattern as `semgrep` and `snyk` collectors** — use those as templates.
-
----
-
-### P12. PagerDuty — On-Call Verification
-
-**Type:** Collector + Policy  
-**Class:** 🔵 Conditional (PagerDuty users)  
-**Est. Dev Time:** 3 days  
-**Tool:** PagerDuty API (free tier available for testing)  
-**Strategy:** Strategy 10 (External Vendor API Integration) — cron hook
-
-**What to build:**
-
-- **Collector (cron hook):** Query PagerDuty API using service ID from component metadata. Check on-call schedule existence, participant count, escalation policy.
-- **Policy checks:**
-  - `oncall-schedule-exists` — On-call schedule is configured
-  - `oncall-min-participants` — Rotation has at least N people (default: 4)
-  - `oncall-escalation-exists` — Escalation policy is configured
-
-**Component JSON output:**
-
-```json
-{
-  "oncall": {
-    "schedule": { "exists": true, "participants": 5, "rotation": "weekly" },
-    "escalation": { "exists": true, "levels": 3 },
-    "source": { "tool": "pagerduty" }
-  }
-}
-```
-
-**Testing:**
-
-- Create a free PagerDuty account. Set up a service with an on-call schedule and escalation policy.
-- **Collector:** Run with `PAGERDUTY_API_KEY` secret → verify schedule data extracted. Run without key → verify graceful exit with stderr message.
-- **Policy:** Feed JSON with 5 participants (min 4) → PASS. Feed JSON with 2 participants → FAIL. Feed JSON with no `.oncall` → SKIP.
-- **Note:** The `.oncall` schema already exists in Component JSON. Follow its conventions.
+Items from the conditional menu above, prioritized by customer demand.
 
 ---
 
