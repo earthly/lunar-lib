@@ -162,24 +162,23 @@ Customers pick from this list based on their stack to reach ~50 total.
 | C26 | 🆕 `editorconfig` collector + policy | Both | Wants formatting consistency |
 | C27 | 🆕 `docker-compose` collector + policy | Both | Wants local dev environment checks |
 
-**VCS & CI platforms (beyond GitHub):**
+**CI platforms (beyond GHA):**
 
 | # | Item | Type | Trigger |
 |---|------|------|---------|
-| C28 | 🆕 `gitlab` collector (VCS settings + CI security) | Collector | Uses GitLab — branch protection, merge request settings, CI pipeline security. Mirrors what `github` collector does for GitHub. |
-| C29 | 🆕 `jenkins` collector | Collector | Uses Jenkins |
-| C30 | 🆕 `circleci` collector | Collector | Uses CircleCI |
-| C31 | 🆕 `azure-devops` collector | Collector | Uses Azure DevOps |
-| C32 | 🆕 `buildkite` collector | Collector | Uses Buildkite |
+| C28 | 🆕 `jenkins` collector | Collector | Uses Jenkins |
+| C29 | 🆕 `circleci` collector | Collector | Uses CircleCI |
+| C30 | 🆕 `azure-devops` collector | Collector | Uses Azure DevOps |
+| C31 | 🆕 `buildkite` collector | Collector | Uses Buildkite |
 
 **Specialized:**
 
 | # | Item | Type | Trigger |
 |---|------|------|---------|
-| C33 | `ci-otel` | Collector | Wants OpenTelemetry CI traces |
-| C34 | `claude` | Collector | Wants LLM-assisted code analysis |
-| C35 | 🆕 `ruby` collector + policy | Both | Uses Ruby/Rails |
-| C36 | 🆕 `swift-kotlin` collector | Collector | Mobile development |
+| C32 | `ci-otel` | Collector | Wants OpenTelemetry CI traces |
+| C33 | `claude` | Collector | Wants LLM-assisted code analysis |
+| C34 | 🆕 `ruby` collector + policy | Both | Uses Ruby/Rails |
+| C35 | 🆕 `swift-kotlin` collector | Collector | Mobile development |
 
 ---
 
@@ -305,19 +304,18 @@ Items from the conditional menu above, prioritized by customer demand.
 
 | # | Item | Type | Tool/Strategy | Est. Days | Mass Appeal | Notes |
 |---|------|------|---------------|-----------|-------------|-------|
-| 13 | **GitLab collector** (VCS + CI security) | Collector | GitLab API + file parsing | 3–4 | 8/10 | Mirrors `github` collector: branch protection, merge request settings, repo config. Also parses `.gitlab-ci.yml` for CI security (image pinning, secret exposure). |
-| 14 | **Backstage catalog-info.yaml** | Collector + Policy | File parsing `catalog-info.yaml` | 2 | 8/10 | Service catalog standard. Check entity fields, annotations, dependencies. |
-| 15 | **OpenSSF Scorecard** | Collector + Policy | scorecard CLI (free, OSS) | 2–3 | 5/10 | Supply chain scoring. Niche but valued in compliance/procurement contexts. Needs network access. |
-| 16 | **Datadog/Grafana dashboards** | Collector + Policy | Vendor API | 3 | 7/10 | Verify monitoring dashboards exist per service. |
-| 17 | **OWASP ZAP** | Collector | ZAP CLI (free, OSS) | 3 | 7/10 | Dynamic security scanning for web apps. |
-| 18 | **Gradle** (enhance Java) | Collector | File parsing `build.gradle` | 2 | 7/10 | Gradle-specific build parsing. |
-| 19 | **Code complexity** | Collector + Policy | radon (Python), gocyclo (Go) | 2 | 7/10 | McCabe/cognitive complexity. |
-| 20 | **Makefile/build-script** | Collector + Policy | File parsing | 1.5 | 7/10 | Check for `make build/test/lint` targets. |
-| 21 | **Pre-commit hooks** | Collector + Policy | File parsing | 1.5 | 6/10 | Detect `.pre-commit-config.yaml`, husky, lefthook. |
-| 22 | **EditorConfig + formatter** | Collector + Policy | File parsing | 1 | 6/10 | `.editorconfig`, prettier, black config exists. |
-| 23 | **Docker Compose** | Collector + Policy | File parsing | 1.5 | 6/10 | `docker-compose.yml` for local dev. |
-| 24 | **GitHub repo settings expansion** | Collector | GitHub API | 2 | 7/10 | Topics, visibility, description, vulnerability alerts. |
-| 25 | **endoflife.date EOL checking** | Collector + Policy | endoflife.date API (free) | 2–3 | 8/10 | Cross-reference runtime/framework versions. |
+| 13 | **Backstage catalog-info.yaml** | Collector + Policy | File parsing `catalog-info.yaml` | 2 | 8/10 | Service catalog standard. Check entity fields, annotations, dependencies. |
+| 14 | **OpenSSF Scorecard** | Collector + Policy | scorecard CLI (free, OSS) | 2–3 | 5/10 | Supply chain scoring. Niche but valued in compliance/procurement contexts. Needs network access. |
+| 15 | **Datadog/Grafana dashboards** | Collector + Policy | Vendor API | 3 | 7/10 | Verify monitoring dashboards exist per service. |
+| 16 | **OWASP ZAP** | Collector | ZAP CLI (free, OSS) | 3 | 7/10 | Dynamic security scanning for web apps. |
+| 17 | **Gradle** (enhance Java) | Collector | File parsing `build.gradle` | 2 | 7/10 | Gradle-specific build parsing. |
+| 18 | **Code complexity** | Collector + Policy | radon (Python), gocyclo (Go) | 2 | 7/10 | McCabe/cognitive complexity. |
+| 19 | **Makefile/build-script** | Collector + Policy | File parsing | 1.5 | 7/10 | Check for `make build/test/lint` targets. |
+| 20 | **Pre-commit hooks** | Collector + Policy | File parsing | 1.5 | 6/10 | Detect `.pre-commit-config.yaml`, husky, lefthook. |
+| 21 | **EditorConfig + formatter** | Collector + Policy | File parsing | 1 | 6/10 | `.editorconfig`, prettier, black config exists. |
+| 22 | **Docker Compose** | Collector + Policy | File parsing | 1.5 | 6/10 | `docker-compose.yml` for local dev. |
+| 23 | **GitHub repo settings expansion** | Collector | GitHub API | 2 | 7/10 | Topics, visibility, description, vulnerability alerts. |
+| 24 | **endoflife.date EOL checking** | Collector + Policy | endoflife.date API (free) | 2–3 | 8/10 | Cross-reference runtime/framework versions. |
 
 ### Batch 3: Items 26–38 (Broader Platform Coverage)
 
@@ -331,8 +329,7 @@ Items from the conditional menu above, prioritized by customer demand.
 | 31 | **ArgoCD/Flux GitOps** | Collector + Policy | File parsing | 2 | GitOps deployment detection. |
 | 32 | **Cosign image signing** | Collector + Policy | cosign CLI (free) | 2 | Container image signing verification. |
 | 33 | **Renovate detailed** | Collector | File parsing | 2 | Deep Renovate config analysis. |
-| 34 | **BitBucket support** | Collector | BitBucket API | 3 | Third major git platform. |
-| 35 | **Jenkins pipeline** | Collector | File parsing `Jenkinsfile` | 2 | Still very common in enterprise. |
+| 34 | **Jenkins pipeline** | Collector | File parsing `Jenkinsfile` | 2 | Still very common in enterprise. |
 | 36 | **CircleCI** | Collector | File parsing `.circleci/config.yml` | 2 | Popular hosted CI. |
 | 37 | **Azure DevOps** | Collector | File parsing + API | 3 | Major enterprise CI/CD. |
 | 38 | **Buildkite** | Collector | File parsing `.buildkite/pipeline.yml` | 2 | Modern CI. |
@@ -353,4 +350,16 @@ Items from the conditional menu above, prioritized by customer demand.
 | 48 | **Runtime EOL via endoflife.date** | Collector | endoflife.date API | 2 | Language runtime EOL checking. |
 | 49 | **Ruby** | Collector + Policy | File parsing | 2 | Ruby/Rails support. |
 | 50 | **Gradle detailed** | Collector | File parsing | 2 | Gradle-specific enhancements. |
+
+---
+
+## Later (Requires Platform Support)
+
+These items are blocked on platform-level features (e.g., GitLab App support, BitBucket App support). Build when the platform support ships.
+
+| Item | Type | Blocked On | Notes |
+|------|------|------------|-------|
+| **GitLab collector** (VCS + CI security) | Collector | GitLab App support | Mirrors `github` collector: branch protection, merge request settings, repo config. Also parses `.gitlab-ci.yml` for CI security. |
+| **GitLab CI agent integration** | Collector | GitLab App support | CI hook collectors for GitLab pipelines (equivalent to GHA CI agent). |
+| **BitBucket collector** (VCS settings) | Collector | BitBucket App support | Branch permissions, PR settings, repo config. |
 
