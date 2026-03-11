@@ -1,0 +1,89 @@
+version: 0
+
+name: php
+description: Collect PHP project information, CI/CD commands, and dependencies
+author: earthly
+
+default_image: earthly/lunar-lib:php-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "PHP Collector"
+  long_description: |
+    Analyze PHP projects to collect Composer metadata, dependencies, test
+    configuration, static analysis tools, and code style settings.
+    Enforce PHP-specific engineering standards.
+  categories: ["languages", "build"]
+  icon: "assets/php.svg"
+  status: "beta"
+  related:
+    - slug: "php"
+      type: "policy"
+      reason: "Enforces PHP project standards using collected metadata"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes PHP project structure by detecting composer.json, composer.lock,
+      vendor directory, PHPUnit configuration, static analysis tools (PHPStan,
+      Psalm), and code style tools (PHP-CS-Fixer, PHP_CodeSniffer). Extracts
+      project name and PHP version constraint. Writes project metadata to .lang.php.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["php", "composer", "project structure", "phpunit", "phpstan"]
+
+  - name: dependencies
+    description: |
+      Extracts direct and dev dependencies from composer.json. Captures package
+      name and version constraint for each dependency. Writes the dependency
+      list to .lang.php.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["php dependencies", "composer", "packagist", "supply chain"]
+
+  - name: cicd
+    description: |
+      Records every PHP or Composer command executed in CI pipelines along
+      with the PHP version. Writes command strings and version info to
+      .lang.php.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(php|composer)$
+    keywords: ["php ci", "composer ci", "ci commands", "build tracking"]
+
+example_component_json: |
+  {
+    "lang": {
+      "php": {
+        "name": "acme/my-project",
+        "php_version": "^8.2",
+        "build_systems": ["composer"],
+        "composer_json_exists": true,
+        "composer_lock_exists": true,
+        "vendor_exists": true,
+        "phpunit_configured": true,
+        "static_analysis_configured": true,
+        "static_analysis": "phpstan",
+        "code_style_configured": true,
+        "code_style": "php-cs-fixer",
+        "source": { "tool": "php", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "composer test", "version": "8.2.15" }],
+          "source": { "tool": "php", "integration": "ci" }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "laravel/framework", "version": "^11.0", "indirect": false }
+          ],
+          "dev": [
+            { "path": "phpunit/phpunit", "version": "^11.0" }
+          ],
+          "source": { "tool": "composer", "integration": "code" }
+        }
+      }
+    }
+  }
