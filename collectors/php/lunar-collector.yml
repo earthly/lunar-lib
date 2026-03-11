@@ -71,6 +71,22 @@ collectors:
       type: code
     keywords: ["php dependencies", "composer", "supply chain", "packages"]
 
+  - name: test-coverage
+    description: |
+      Extracts test coverage percentage from PHPUnit's Clover XML output after
+      tests complete. Parses coverage-clover report and writes results to
+      .lang.php.tests.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: php
+      args:
+        - value: vendor/bin/phpunit
+        - flag: --coverage-clover
+          value_pattern: .*
+    keywords: ["code coverage", "phpunit coverage", "clover", "coverage metrics"]
+
 inputs: {}
 
 example_component_json: |
@@ -101,10 +117,10 @@ example_component_json: |
           },
           "dependencies": {
             "direct": [
-              { "path": "laravel/framework", "version": "^11.0", "indirect": false }
+              { "path": "laravel/framework", "version": "^11.0" }
             ],
             "dev": [
-              { "path": "phpunit/phpunit", "version": "^11.0", "indirect": false }
+              { "path": "phpunit/phpunit", "version": "^11.0" }
             ],
             "source": { "tool": "composer", "integration": "code" }
           }

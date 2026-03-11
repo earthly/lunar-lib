@@ -18,6 +18,7 @@ This collector writes to the following Component JSON paths:
 | `.lang.php.composer` | object | Composer metadata (json/lock exists, vendor, cicd, dependencies) |
 | `.lang.php.composer.cicd` | object | Composer CI/CD command tracking with version |
 | `.lang.php.composer.dependencies` | object | Direct and dev dependencies from composer.json |
+| `.lang.php.tests.coverage` | object | Test coverage metrics from PHPUnit Clover XML output |
 
 ## Collectors
 
@@ -29,6 +30,7 @@ This integration provides the following collectors (use `include` to select a su
 | `dependencies` | code | Collects Composer dependency graph |
 | `cicd` | ci-before-command | Tracks PHP commands run in CI with PHP runtime version |
 | `composer-cicd` | ci-before-command | Tracks Composer commands run in CI with Composer version |
+| `test-coverage` | ci-after-command | Extracts coverage from PHPUnit Clover XML reports |
 
 ## Installation
 

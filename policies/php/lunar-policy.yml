@@ -63,6 +63,13 @@ policies:
     mainPython: ./min_version.py
     keywords: ["php version", "compatibility", "security"]
 
+  - name: min-version-cicd
+    description: |
+      Ensures the PHP runtime version observed in CI meets the minimum required
+      version. Reads from .lang.php.cicd.cmds version entries.
+    mainPython: ./min_version_cicd.py
+    keywords: ["php version", "ci/cd", "compatibility", "security"]
+
   - name: min-composer-version
     description: |
       Ensures CI pipelines use at least the minimum Composer version.
@@ -74,6 +81,9 @@ policies:
 inputs:
   min_version:
     description: Minimum required PHP version (e.g., "8.1", "8.2")
+    default: "8.1"
+  min_version_cicd:
+    description: Minimum required PHP CI runtime version (e.g., "8.1", "8.2")
     default: "8.1"
   min_composer_version:
     description: Minimum required Composer version (e.g., "2.6", "2.7")
