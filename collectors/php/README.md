@@ -14,7 +14,8 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.lang.php` | object | PHP project metadata (name, version constraint, build systems) |
+| `.lang.php` | object | PHP project metadata (name, version, build systems) |
+| `.lang.php.version` | string | PHP version constraint from composer.json require.php |
 | `.lang.php.composer_json_exists` | boolean | Whether composer.json is present |
 | `.lang.php.composer_lock_exists` | boolean | Whether composer.lock is present |
 | `.lang.php.phpunit_configured` | boolean | Whether PHPUnit is configured |

@@ -17,14 +17,14 @@ phpstan_configured=false
 psalm_configured=false
 php_cs_fixer_configured=false
 phpcs_configured=false
-php_version=""
+version=""
 project_name=""
 
 # Check for composer.json
 if [[ -f "composer.json" ]]; then
     composer_json_exists=true
     project_name=$(jq -r '.name // ""' composer.json 2>/dev/null || echo "")
-    php_version=$(jq -r '.require.php // ""' composer.json 2>/dev/null || echo "")
+    version=$(jq -r '.require.php // ""' composer.json 2>/dev/null || echo "")
 fi
 
 # Check for composer.lock
@@ -109,7 +109,7 @@ jq -n \
     --argjson code_style_configured "$code_style_configured" \
     --arg code_style "$code_style" \
     --arg name "$project_name" \
-    --arg php_version "$php_version" \
+    --arg version "$version" \
     '{
         build_systems: $build_systems,
         composer_json_exists: $composer_json_exists,
@@ -126,4 +126,4 @@ jq -n \
         }
     }
     | if $name != "" then .name = $name else . end
-    | if $php_version != "" then .php_version = $php_version else . end' | lunar collect -j ".lang.php" -
+    | if $version != "" then .version = $version else . end' | lunar collect -j ".lang.php" -

@@ -31,7 +31,7 @@ This policy reads from the following Component JSON paths:
 | `.lang.php.phpunit_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.static_analysis_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.code_style_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
-| `.lang.php.php_version` | string | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
+| `.lang.php.version` | string | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 
 ## Installation
 

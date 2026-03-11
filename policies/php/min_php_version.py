@@ -12,7 +12,7 @@ def check_min_php_version(min_version=None, node=None):
         if not php.exists():
             c.skip("Not a PHP project")
 
-        version_node = php.get_node(".php_version")
+        version_node = php.get_node(".version")
         if not version_node.exists():
             c.skip("PHP version constraint not detected in composer.json")
 
