@@ -6,7 +6,7 @@ Collects PHP project information, CI/CD commands, and dependencies.
 
 This collector gathers metadata about PHP projects including Composer configuration, dependency graphs, tool configuration (PHPUnit, PHPStan, Psalm, PHP-CS-Fixer, PHP_CodeSniffer), and CI/CD command tracking. It runs on both code changes (for static analysis) and CI hooks (to capture runtime metrics).
 
-**Note:** The CI-hook collectors (`cicd-php`, `cicd-composer`) don't run PHP/Composer commands — they observe and collect data from commands that your CI pipeline already runs.
+**Note:** The CI-hook collectors (`cicd`, `composer-cicd`) don't run PHP/Composer commands — they observe and collect data from commands that your CI pipeline already runs.
 
 ## Collected Data
 
@@ -27,8 +27,8 @@ This integration provides the following collectors (use `include` to select a su
 |-----------|-----------|-------------|
 | `project` | code | Collects PHP project structure (composer.json, composer.lock, vendor, tool config) |
 | `dependencies` | code | Collects Composer dependency graph |
-| `cicd-php` | ci-before-command | Tracks PHP commands run in CI with PHP runtime version |
-| `cicd-composer` | ci-before-command | Tracks Composer commands run in CI with Composer version |
+| `cicd` | ci-before-command | Tracks PHP commands run in CI with PHP runtime version |
+| `composer-cicd` | ci-before-command | Tracks Composer commands run in CI with Composer version |
 
 ## Installation
 
