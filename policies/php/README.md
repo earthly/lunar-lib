@@ -27,12 +27,12 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.php` | object | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
-| `.lang.php.composer_json_exists` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
-| `.lang.php.composer_lock_exists` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
+| `.lang.php.version` | string | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.phpunit_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.static_analysis_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.code_style_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
-| `.lang.php.version` | string | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
+| `.lang.php.composer.json_exists` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
+| `.lang.php.composer.lock_exists` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.composer.cicd` | object | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 
 ## Installation
@@ -59,11 +59,13 @@ policies:
   "lang": {
     "php": {
       "version": "^8.2",
-      "composer_json_exists": true,
-      "composer_lock_exists": true,
       "phpunit_configured": true,
       "static_analysis_configured": true,
-      "code_style_configured": true
+      "code_style_configured": true,
+      "composer": {
+        "json_exists": true,
+        "lock_exists": true
+      }
     }
   }
 }
@@ -76,11 +78,13 @@ policies:
   "lang": {
     "php": {
       "version": "^7.4",
-      "composer_json_exists": true,
-      "composer_lock_exists": false,
       "phpunit_configured": false,
       "static_analysis_configured": false,
-      "code_style_configured": false
+      "code_style_configured": false,
+      "composer": {
+        "json_exists": true,
+        "lock_exists": false
+      }
     }
   }
 }

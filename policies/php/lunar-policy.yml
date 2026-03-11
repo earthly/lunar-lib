@@ -24,14 +24,14 @@ policies:
   - name: composer-json-exists
     description: |
       Ensures the project has a composer.json file for dependency management.
-      Required for all PHP projects using Composer.
+      Reads from .lang.php.composer.json_exists.
     mainPython: ./composer_json_exists.py
     keywords: ["composer", "composer.json", "project structure"]
 
   - name: composer-lock-exists
     description: |
       Ensures the project has a composer.lock file for reproducible builds.
-      Required for deterministic dependency resolution.
+      Reads from .lang.php.composer.lock_exists.
     mainPython: ./composer_lock_exists.py
     keywords: ["composer.lock", "dependencies", "reproducibility"]
 
