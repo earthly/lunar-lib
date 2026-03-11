@@ -63,7 +63,18 @@ policies:
     mainPython: ./min_php_version.py
     keywords: ["php version", "compatibility", "security"]
 
+  - name: min-composer-version
+    description: |
+      Ensures CI pipelines use at least the minimum Composer version.
+      Older Composer versions may lack security fixes and modern dependency
+      resolution features.
+    mainPython: ./min_composer_version.py
+    keywords: ["composer version", "dependency management", "security"]
+
 inputs:
   min_php_version:
     description: Minimum required PHP version (e.g., "8.1", "8.2")
     default: "8.1"
+  min_composer_version:
+    description: Minimum required Composer version (e.g., "2.6", "2.7")
+    default: "2.6"
