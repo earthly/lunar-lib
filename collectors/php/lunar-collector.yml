@@ -1,0 +1,93 @@
+version: 0
+
+name: php
+description: Collect PHP project information, CI/CD commands, and dependencies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "PHP Collector"
+  long_description: |
+    Analyze PHP projects to collect Composer metadata, dependencies, tool
+    configuration (PHPUnit, PHPStan, Psalm, PHP-CS-Fixer, PHPCS), and CI/CD
+    command tracking. Enforce PHP-specific engineering standards.
+  categories: ["languages", "build"]
+  icon: "assets/php.svg"
+  status: "beta"
+  related:
+    - slug: "php"
+      type: "policy"
+      reason: "PHP project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: cicd
+    description: |
+      Records every PHP and Composer command executed in CI pipelines along
+      with the PHP version. Writes command strings and version info to
+      .lang.php.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(php|composer)$
+    keywords: ["php ci", "composer", "ci commands", "build tracking"]
+
+  - name: project
+    description: |
+      Analyzes PHP project structure by detecting composer.json, composer.lock,
+      vendor directory, and tool configuration (PHPUnit, PHPStan, Psalm,
+      PHP-CS-Fixer, PHP_CodeSniffer). Extracts the PHP version constraint and
+      build systems. Writes project metadata to .lang.php.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["php project", "composer.json", "project structure", "phpunit", "phpstan"]
+
+  - name: dependencies
+    description: |
+      Extracts direct and dev dependencies from composer.json. Captures package
+      name and version constraint for each dependency. Writes the dependency
+      list to .lang.php.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["php dependencies", "composer", "supply chain", "packages"]
+
+inputs: {}
+
+example_component_json: |
+  {
+    "lang": {
+      "php": {
+        "version": "^8.2",
+        "build_systems": ["composer"],
+        "composer_json_exists": true,
+        "composer_lock_exists": true,
+        "vendor_exists": false,
+        "phpunit_configured": true,
+        "static_analysis_configured": true,
+        "static_analysis_tool": "phpstan",
+        "code_style_configured": true,
+        "code_style_tool": "php-cs-fixer",
+        "source": { "tool": "php", "integration": "code" },
+        "cicd": {
+          "cmds": [{ "cmd": "composer install --no-dev", "version": "8.2.15" }],
+          "source": { "tool": "php", "integration": "ci" }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "laravel/framework", "version": "^11.0", "indirect": false }
+          ],
+          "dev": [
+            { "path": "phpunit/phpunit", "version": "^11.0", "indirect": false }
+          ],
+          "source": { "tool": "composer", "integration": "code" }
+        }
+      }
+    }
+  }

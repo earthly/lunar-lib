@@ -1,0 +1,69 @@
+version: 0
+
+name: php
+description: Enforces PHP project structure and standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "PHP Project Guardrails"
+  long_description: |
+    Enforce PHP-specific project standards including Composer lockfile presence,
+    static analysis and code style tool configuration, and PHP version requirements.
+  category: "devex-build-and-ci"
+  icon: "assets/php.svg"
+  status: "beta"
+  requires:
+    - slug: "php"
+      type: "collector"
+      reason: "Provides PHP project metadata"
+  related: []
+
+policies:
+  - name: composer-json-exists
+    description: |
+      Ensures the project has a composer.json file for dependency management.
+      Required for all PHP projects using Composer.
+    mainPython: ./composer_json_exists.py
+    keywords: ["composer", "composer.json", "project structure"]
+
+  - name: composer-lock-exists
+    description: |
+      Ensures the project has a composer.lock file for reproducible builds.
+      Required for deterministic dependency resolution.
+    mainPython: ./composer_lock_exists.py
+    keywords: ["composer.lock", "dependencies", "reproducibility"]
+
+  - name: phpunit-configured
+    description: |
+      Ensures a test framework (PHPUnit) is configured for the project.
+      Testing is essential for maintaining code quality.
+    mainPython: ./phpunit_configured.py
+    keywords: ["phpunit", "testing", "test framework"]
+
+  - name: static-analysis-configured
+    description: |
+      Ensures a static analysis tool (PHPStan or Psalm) is configured.
+      Static analysis catches bugs and type errors before runtime.
+    mainPython: ./static_analysis_configured.py
+    keywords: ["phpstan", "psalm", "static analysis", "type safety"]
+
+  - name: code-style-configured
+    description: |
+      Ensures a code style tool (PHP-CS-Fixer or PHP_CodeSniffer) is configured.
+      Consistent code style reduces cognitive load and merge conflicts.
+    mainPython: ./code_style_configured.py
+    keywords: ["php-cs-fixer", "phpcs", "code style", "formatting"]
+
+  - name: min-php-version
+    description: |
+      Ensures the project requires at least the minimum PHP version.
+      Helps maintain security and compatibility standards.
+    mainPython: ./min_php_version.py
+    keywords: ["php version", "compatibility", "security"]
+
+inputs:
+  min_php_version:
+    description: Minimum required PHP version (e.g., "8.1", "8.2")
+    default: "8.1"
