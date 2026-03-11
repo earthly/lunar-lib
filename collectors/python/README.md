@@ -6,7 +6,7 @@ Collects Python project information, CI/CD commands, dependencies, and test cove
 
 This collector gathers metadata about Python projects including build tool detection, dependency lists, test coverage metrics, and CI/CD command tracking. It runs on both code changes (for static analysis of project structure) and CI hooks (to capture runtime metrics like test coverage and command versions).
 
-**Note:** The CI-hook collectors (`test-coverage`, `cicd`) don't run tests—they observe and collect data from `pytest`/`python` commands that your CI pipeline already runs.
+**Note:** The CI-hook collectors (`test-coverage`, `cicd`, `pip-cicd`, `poetry-cicd`, `uv-cicd`) don't run tests—they observe and collect data from commands that your CI pipeline already runs.
 
 ## Collected Data
 
@@ -15,7 +15,10 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.lang.python` | object | Python project metadata (version, build systems, native file detection) |
-| `.lang.python.cicd` | object | CI/CD command tracking with Python version |
+| `.lang.python.cicd` | object | Python runtime CI/CD command tracking with version |
+| `.lang.python.pip.cicd` | object | pip CI/CD command tracking with version |
+| `.lang.python.poetry.cicd` | object | Poetry CI/CD command tracking with version |
+| `.lang.python.uv.cicd` | object | uv CI/CD command tracking with version |
 | `.lang.python.tests` | object | Test coverage information |
 | `.lang.python.dependencies` | object | Direct dependencies |
 | `.testing.coverage` | object | Normalized cross-language coverage data |
@@ -29,7 +32,10 @@ This plugin provides the following collectors (use `include` to select a subset)
 |-----------|-----------|-------------|
 | `project` | code | Collects Python project structure (pyproject.toml, requirements.txt, lockfiles, linter config) |
 | `dependencies` | code | Collects Python dependency list from requirements.txt or pyproject.toml |
-| `cicd` | ci-before-command | Tracks Python/pip/poetry commands run in CI with version info |
+| `cicd` | ci-before-command | Tracks Python commands run in CI with Python runtime version |
+| `pip-cicd` | ci-before-command | Tracks pip commands run in CI with pip version |
+| `poetry-cicd` | ci-before-command | Tracks Poetry commands run in CI with Poetry version |
+| `uv-cicd` | ci-before-command | Tracks uv commands run in CI with uv version |
 | `test-coverage` | ci-after-command | Extracts coverage from coverage.xml after pytest runs |
 
 ## Installation

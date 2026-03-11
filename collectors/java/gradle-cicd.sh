@@ -24,7 +24,5 @@ if [[ -z "$version" ]] && [[ -f "gradle/wrapper/gradle-wrapper.properties" ]]; t
 fi
 
 # Always collect the command, version may be empty
-lunar collect -j ".lang.java.cicd.cmds" \
-    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\", \"tool\": \"gradle\"}]"
-lunar collect -j ".lang.java.cicd.source" \
-    '{"tool": "java", "integration": "ci"}'
+lunar collect -j ".lang.java.gradle.cicd.cmds" \
+    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\"}]"
