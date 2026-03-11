@@ -18,6 +18,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `static-analysis-configured` | Ensures PHPStan or Psalm is configured | No static analysis tool detected |
 | `code-style-configured` | Ensures PHP-CS-Fixer or PHPCS is configured | No code style tool detected |
 | `min-php-version` | Ensures minimum PHP version in composer.json | PHP version too old |
+| `min-composer-version` | Ensures minimum Composer version in CI | Composer version too old |
 
 ## Required Data
 
@@ -32,6 +33,7 @@ This policy reads from the following Component JSON paths:
 | `.lang.php.static_analysis_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.code_style_configured` | boolean | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 | `.lang.php.version` | string | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
+| `.lang.php.composer.cicd` | object | [`php`](https://github.com/earthly/lunar-lib/tree/main/collectors/php) collector |
 
 ## Installation
 
@@ -45,6 +47,7 @@ policies:
     # include: [composer-json-exists, composer-lock-exists]  # Only run specific checks
     with:
       min_php_version: "8.1"  # Minimum required PHP version (default: "8.1")
+      min_composer_version: "2.6"  # Minimum required Composer version (default: "2.6")
 ```
 
 ## Examples
@@ -89,6 +92,7 @@ policies:
 - `"No static analysis tool configured. Add PHPStan or Psalm to your project."`
 - `"No code style tool configured. Add PHP-CS-Fixer or PHP_CodeSniffer to your project."`
 - `"PHP version 7.4 is below minimum 8.1. Update the PHP constraint in composer.json."`
+- `"Composer version 2.4.1 is below minimum 2.6. Update Composer in your CI pipeline."`
 
 ## Remediation
 
@@ -121,3 +125,8 @@ policies:
 1. Update the `require.php` constraint in composer.json: `"php": ">=8.1"`
 2. Run `composer update` to verify compatibility
 3. Test your code with the new PHP version
+
+### min-composer-version
+1. Update Composer in your CI pipeline: `composer self-update`
+2. Pin a minimum version in your CI config (e.g., `composer self-update --2.6`)
+3. Consider using the official Composer Docker image with a specific version tag
