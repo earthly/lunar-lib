@@ -30,6 +30,8 @@ This policy reads from the following Component JSON paths:
 | `.lang.java.mvnw_exists` | boolean | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.gradlew_exists` | boolean | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.cicd.cmds` | array | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
+| `.lang.java.maven.cicd.cmds` | array | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
+| `.lang.java.gradle.cicd.cmds` | array | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.tests.scope` | string | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 
 ## Installation
@@ -58,8 +60,10 @@ policies:
       "version": "21",
       "build_systems": ["maven"],
       "mvnw_exists": true,
-      "cicd": {
-        "cmds": [{ "cmd": "mvn clean install", "version": "3.9.6", "tool": "maven" }]
+      "maven": {
+        "cicd": {
+          "cmds": [{ "cmd": "mvn clean install", "version": "3.9.6" }]
+        }
       },
       "tests": { "scope": "all" }
     }
