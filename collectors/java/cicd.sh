@@ -16,6 +16,4 @@ version=$("$JAVA_BIN" -version 2>&1 | head -n1 | sed -n 's/.*version "\([^"]*\)"
 
 # Always collect the command, version may be empty
 lunar collect -j ".lang.java.cicd.cmds" \
-    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\", \"tool\": \"java\"}]"
-lunar collect -j ".lang.java.cicd.source" \
-    '{"tool": "java", "integration": "ci"}'
+    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\"}]"

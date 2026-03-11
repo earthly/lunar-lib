@@ -43,15 +43,51 @@ collectors:
 
   - name: cicd
     description: |
-      Records every npm, yarn, or pnpm command executed in CI pipelines along
-      with the Node.js version. Writes command strings and version info to
+      Records every node command executed in CI pipelines along with the
+      Node.js runtime version. Writes command strings and version info to
       .lang.nodejs.cicd for audit trails and build reproducibility analysis.
     mainBash: cicd.sh
     hook:
       type: ci-before-command
       binary:
-        name_pattern: ^(npm|npx|yarn|pnpm)$
-    keywords: ["nodejs ci", "npm ci", "yarn ci", "pnpm ci", "ci commands"]
+        name: node
+    keywords: ["nodejs ci", "node version", "ci commands", "build tracking"]
+
+  - name: npm-cicd
+    description: |
+      Records every npm/npx command executed in CI pipelines along with the
+      npm version. Writes command strings and version info to
+      .lang.nodejs.npm.cicd.
+    mainBash: npm-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(npm|npx)$
+    keywords: ["npm ci", "npm version", "ci commands", "dependency management"]
+
+  - name: yarn-cicd
+    description: |
+      Records every Yarn command executed in CI pipelines along with the
+      Yarn version. Writes command strings and version info to
+      .lang.nodejs.yarn.cicd.
+    mainBash: yarn-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: yarn
+    keywords: ["yarn ci", "yarn version", "ci commands", "dependency management"]
+
+  - name: pnpm-cicd
+    description: |
+      Records every pnpm command executed in CI pipelines along with the
+      pnpm version. Writes command strings and version info to
+      .lang.nodejs.pnpm.cicd.
+    mainBash: pnpm-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: pnpm
+    keywords: ["pnpm ci", "pnpm version", "ci commands", "dependency management"]
 
   - name: test-coverage
     description: |
@@ -84,8 +120,12 @@ example_component_json: |
         "monorepo": { "type": "workspaces" },
         "source": { "tool": "node", "integration": "code" },
         "cicd": {
-          "cmds": [{ "cmd": "npm test", "version": "20.11.0" }],
-          "source": { "tool": "node", "integration": "ci" }
+          "cmds": [{ "cmd": "node server.js", "version": "20.11.0" }]
+        },
+        "npm": {
+          "cicd": {
+            "cmds": [{ "cmd": "npm test", "version": "10.2.4" }]
+          }
         },
         "tests": {
           "coverage": {

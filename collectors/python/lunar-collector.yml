@@ -26,15 +26,49 @@ landing_page:
 collectors:
   - name: cicd
     description: |
-      Records every Python/pip/poetry/uv command executed in CI pipelines along
-      with the Python version. Writes command strings and version info to
+      Records every Python command executed in CI pipelines along with the
+      Python runtime version. Writes command strings and version info to
       .lang.python.cicd for audit trails and build reproducibility analysis.
     mainBash: cicd.sh
     hook:
       type: ci-before-command
       binary:
-        name_pattern: ^(python3?|pip3?|poetry|pipenv|uv)$
-    keywords: ["python ci", "pip", "poetry", "ci commands", "build tracking"]
+        name_pattern: ^(python3?)$
+    keywords: ["python ci", "python version", "ci commands", "build tracking"]
+
+  - name: pip-cicd
+    description: |
+      Records every pip command executed in CI pipelines along with the pip
+      version. Writes command strings and version info to .lang.python.pip.cicd.
+    mainBash: pip-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(pip3?)$
+    keywords: ["pip ci", "pip version", "ci commands", "dependency management"]
+
+  - name: poetry-cicd
+    description: |
+      Records every Poetry command executed in CI pipelines along with the
+      Poetry version. Writes command strings and version info to
+      .lang.python.poetry.cicd.
+    mainBash: poetry-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: poetry
+    keywords: ["poetry ci", "poetry version", "ci commands", "dependency management"]
+
+  - name: uv-cicd
+    description: |
+      Records every uv command executed in CI pipelines along with the uv
+      version. Writes command strings and version info to .lang.python.uv.cicd.
+    mainBash: uv-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: uv
+    keywords: ["uv ci", "uv version", "ci commands", "dependency management"]
 
   - name: test-coverage
     description: |
@@ -87,8 +121,12 @@ example_component_json: |
         "type_checker": "mypy",
         "source": { "tool": "python", "integration": "code" },
         "cicd": {
-          "cmds": [{ "cmd": "pytest --cov=src", "version": "3.12.1" }],
-          "source": { "tool": "python", "integration": "ci" }
+          "cmds": [{ "cmd": "pytest --cov=src", "version": "3.12.1" }]
+        },
+        "poetry": {
+          "cicd": {
+            "cmds": [{ "cmd": "poetry install --no-root", "version": "1.8.3" }]
+          }
         },
         "tests": {
           "coverage": {

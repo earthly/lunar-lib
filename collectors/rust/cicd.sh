@@ -19,6 +19,6 @@ version=$("$RUSTC_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
 if [[ -n "$version" ]]; then
     CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-    echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$version\"}],\"source\":{\"tool\":\"cargo\",\"integration\":\"ci\"}}" | \
-        lunar collect -j ".lang.rust.cicd" -
+    lunar collect -j ".lang.rust.cicd.cmds" \
+        "[{\"cmd\": \"$CMD_ESCAPED\", \"version\": \"$version\"}]"
 fi

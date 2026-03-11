@@ -24,7 +24,5 @@ if [[ -z "$version" ]] && [[ -f ".mvn/wrapper/maven-wrapper.properties" ]]; then
 fi
 
 # Always collect the command, version may be empty
-lunar collect -j ".lang.java.cicd.cmds" \
-    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\", \"tool\": \"maven\"}]"
-lunar collect -j ".lang.java.cicd.source" \
-    '{"tool": "java", "integration": "ci"}'
+lunar collect -j ".lang.java.maven.cicd.cmds" \
+    "[{\"cmd\": \"$json_cmd\", \"version\": \"$version\"}]"
