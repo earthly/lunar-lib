@@ -25,17 +25,29 @@ landing_page:
       reason: "Testing guardrails including coverage thresholds using collected metrics"
 
 collectors:
-  - name: cicd
+  - name: cicd-php
     description: |
-      Records every PHP and Composer command executed in CI pipelines along
-      with the PHP version. Writes command strings and version info to
+      Records every PHP command executed in CI pipelines along with the PHP
+      runtime version. Writes command strings and version info to
       .lang.php.cicd for audit trails and build reproducibility analysis.
-    mainBash: cicd.sh
+    mainBash: cicd-php.sh
     hook:
       type: ci-before-command
       binary:
-        name_pattern: ^(php|composer)$
-    keywords: ["php ci", "composer", "ci commands", "build tracking"]
+        name: php
+    keywords: ["php ci", "php version", "ci commands", "build tracking"]
+
+  - name: cicd-composer
+    description: |
+      Records every Composer command executed in CI pipelines along with the
+      Composer version. Writes command strings and version info to
+      .lang.php.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd-composer.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: composer
+    keywords: ["composer ci", "composer version", "ci commands", "dependency management"]
 
   - name: project
     description: |
@@ -76,7 +88,10 @@ example_component_json: |
         "code_style_tool": "php-cs-fixer",
         "source": { "tool": "php", "integration": "code" },
         "cicd": {
-          "cmds": [{ "cmd": "composer install --no-dev", "version": "8.2.15" }],
+          "cmds": [
+            { "cmd": "php artisan migrate", "version": "8.2.15" },
+            { "cmd": "composer install --no-dev", "version": "2.7.1" }
+          ],
           "source": { "tool": "php", "integration": "ci" }
         },
         "dependencies": {
