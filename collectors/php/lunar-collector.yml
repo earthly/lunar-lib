@@ -89,8 +89,8 @@ example_component_json: |
         "source": { "tool": "php", "integration": "code" },
         "cicd": {
           "cmds": [
-            { "cmd": "php artisan migrate", "version": "8.2.15" },
-            { "cmd": "composer install --no-dev", "version": "2.7.1" }
+            { "cmd": "php artisan migrate", "version": "8.2.15", "tool": "php" },
+            { "cmd": "composer install --no-dev", "version": "2.7.1", "tool": "composer" }
           ],
           "source": { "tool": "php", "integration": "ci" }
         },
