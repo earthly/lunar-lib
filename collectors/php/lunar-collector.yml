@@ -41,7 +41,7 @@ collectors:
     description: |
       Records every Composer command executed in CI pipelines along with the
       Composer version. Writes command strings and version info to
-      .lang.php.cicd for audit trails and build reproducibility analysis.
+      .lang.php.composer.cicd for audit trails and dependency management.
     mainBash: composer-cicd.sh
     hook:
       type: ci-before-command
@@ -89,10 +89,17 @@ example_component_json: |
         "source": { "tool": "php", "integration": "code" },
         "cicd": {
           "cmds": [
-            { "cmd": "php artisan migrate", "version": "8.2.15", "tool": "php" },
-            { "cmd": "composer install --no-dev", "version": "2.7.1", "tool": "composer" }
+            { "cmd": "php artisan migrate", "version": "8.2.15" }
           ],
           "source": { "tool": "php", "integration": "ci" }
+        },
+        "composer": {
+          "cicd": {
+            "cmds": [
+              { "cmd": "composer install --no-dev", "version": "2.7.1" }
+            ],
+            "source": { "tool": "composer", "integration": "ci" }
+          }
         },
         "dependencies": {
           "direct": [
