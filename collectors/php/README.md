@@ -14,7 +14,8 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.lang.php` | object | PHP project metadata (version, build systems, tool config) |
 | `.lang.php.version` | string | PHP version constraint from composer.json |
-| `.lang.php.cicd` | object | CI/CD command tracking with PHP and Composer versions |
+| `.lang.php.cicd` | object | PHP runtime CI/CD command tracking with version |
+| `.lang.php.composer.cicd` | object | Composer CI/CD command tracking with version |
 | `.lang.php.dependencies` | object | Direct and dev dependencies from composer.json |
 
 ## Collectors
