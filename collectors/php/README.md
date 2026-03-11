@@ -15,9 +15,9 @@ This collector writes to the following Component JSON paths:
 | `.lang.php` | object | PHP project metadata (version, tool config) |
 | `.lang.php.version` | string | PHP version constraint from composer.json |
 | `.lang.php.cicd` | object | PHP runtime CI/CD command tracking with version |
-| `.lang.php.composer` | object | Composer metadata (json/lock exists, vendor, cicd, dependencies) |
+| `.lang.php.dependencies` | object | Direct and dev dependencies from composer.json |
+| `.lang.php.composer` | object | Composer metadata (json/lock exists, vendor, cicd) |
 | `.lang.php.composer.cicd` | object | Composer CI/CD command tracking with version |
-| `.lang.php.composer.dependencies` | object | Direct and dev dependencies from composer.json |
 | `.lang.php.tests.coverage` | object | Test coverage metrics from PHPUnit Clover XML output |
 
 ## Collectors

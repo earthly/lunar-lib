@@ -65,7 +65,7 @@ collectors:
     description: |
       Extracts direct and dev dependencies from composer.json. Captures package
       name and version constraint for each dependency. Writes the dependency
-      list to .lang.php.composer.dependencies.
+      list to .lang.php.dependencies.
     mainBash: dependencies.sh
     hook:
       type: code
@@ -106,6 +106,15 @@ example_component_json: |
             { "cmd": "php artisan migrate", "version": "8.2.15" }
           ]
         },
+        "dependencies": {
+          "direct": [
+            { "path": "laravel/framework", "version": "^11.0" }
+          ],
+          "dev": [
+            { "path": "phpunit/phpunit", "version": "^11.0" }
+          ],
+          "source": { "tool": "composer", "integration": "code" }
+        },
         "composer": {
           "json_exists": true,
           "lock_exists": true,
@@ -114,15 +123,6 @@ example_component_json: |
             "cmds": [
               { "cmd": "composer install --no-dev", "version": "2.7.1" }
             ]
-          },
-          "dependencies": {
-            "direct": [
-              { "path": "laravel/framework", "version": "^11.0" }
-            ],
-            "dev": [
-              { "path": "phpunit/phpunit", "version": "^11.0" }
-            ],
-            "source": { "tool": "composer", "integration": "code" }
           }
         }
       }
