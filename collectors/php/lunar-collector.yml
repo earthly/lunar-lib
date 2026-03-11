@@ -90,15 +90,13 @@ example_component_json: |
         "cicd": {
           "cmds": [
             { "cmd": "php artisan migrate", "version": "8.2.15" }
-          ],
-          "source": { "tool": "php", "integration": "ci" }
+          ]
         },
         "composer": {
           "cicd": {
             "cmds": [
               { "cmd": "composer install --no-dev", "version": "2.7.1" }
-            ],
-            "source": { "tool": "composer", "integration": "ci" }
+            ]
           }
         },
         "dependencies": {
