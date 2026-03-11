@@ -17,7 +17,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `phpunit-configured` | Ensures PHPUnit is configured | No test framework detected |
 | `static-analysis-configured` | Ensures PHPStan or Psalm is configured | No static analysis tool detected |
 | `code-style-configured` | Ensures PHP-CS-Fixer or PHPCS is configured | No code style tool detected |
-| `min-php-version` | Ensures minimum PHP version in composer.json | PHP version too old |
+| `min-version` | Ensures minimum PHP version in composer.json | PHP version too old |
 | `min-composer-version` | Ensures minimum Composer version in CI | Composer version too old |
 
 ## Required Data
@@ -46,7 +46,7 @@ policies:
     enforcement: report-pr
     # include: [composer-json-exists, composer-lock-exists]  # Only run specific checks
     with:
-      min_php_version: "8.1"  # Minimum required PHP version (default: "8.1")
+      min_version: "8.1"  # Minimum required PHP version (default: "8.1")
       min_composer_version: "2.6"  # Minimum required Composer version (default: "2.6")
 ```
 
@@ -125,7 +125,7 @@ policies:
    - PHPCS: `composer require --dev squizlabs/php_codesniffer` and create `phpcs.xml`
 2. Add to your CI pipeline for automated checking
 
-### min-php-version
+### min-version
 1. Update the `require.php` constraint in composer.json: `"php": ">=8.1"`
 2. Run `composer update` to verify compatibility
 3. Test your code with the new PHP version

@@ -56,11 +56,11 @@ policies:
     mainPython: ./code_style_configured.py
     keywords: ["php-cs-fixer", "phpcs", "code style", "formatting"]
 
-  - name: min-php-version
+  - name: min-version
     description: |
       Ensures the project requires at least the minimum PHP version.
       Helps maintain security and compatibility standards.
-    mainPython: ./min_php_version.py
+    mainPython: ./min_version.py
     keywords: ["php version", "compatibility", "security"]
 
   - name: min-composer-version
@@ -72,7 +72,7 @@ policies:
     keywords: ["composer version", "dependency management", "security"]
 
 inputs:
-  min_php_version:
+  min_version:
     description: Minimum required PHP version (e.g., "8.1", "8.2")
     default: "8.1"
   min_composer_version:
