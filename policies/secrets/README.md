@@ -13,8 +13,8 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `executed` | Verifies secret scanning ran | No scanner has written to `.secrets` |
-| `no-secrets` | No hardcoded secrets detected | Secrets found in codebase |
-| `max-total` | Total findings under threshold | Total count exceeds configured limit |
+| `no-hardcoded-secrets` | No hardcoded secrets detected | Secrets found in codebase |
+| `max-issues` | Issue count under threshold | Issue count exceeds configured limit |
 
 ## Required Data
 
@@ -34,9 +34,9 @@ policies:
   - uses: github://earthly/lunar-lib/policies/secrets@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, no-secrets]  # Only run specific checks
+    # include: [executed, no-hardcoded-secrets]  # Only run specific checks
     with:
-      max_total_threshold: "5"   # Fail if more than 5 total findings
+      max_issues_threshold: "5"   # Fail if more than 5 issues
 ```
 
 ## Examples
@@ -67,13 +67,13 @@ policies:
 
 **Failure messages:**
 - `executed`: "No secret scanning data found. Ensure a scanner (Gitleaks, TruffleHog, etc.) is configured."
-- `no-secrets`: "Hardcoded secrets detected in code. Review .secrets.issues for details."
-- `max-total`: "Total secret findings (3) exceeds threshold (5)"
+- `no-hardcoded-secrets`: "Hardcoded secrets detected in code. Review .secrets.issues for details."
+- `max-issues`: "Secret issues (3) exceeds threshold (5)"
 
 ## Remediation
 
 When this policy fails, you can resolve it by:
 
 1. **`executed` failure:** Configure a secret scanner (Gitleaks, TruffleHog) in your CI pipeline or use the Gitleaks auto-scan collector.
-2. **`no-secrets` failure:** Remove hardcoded secrets from your codebase. Use environment variables, secret managers, or vault systems instead.
-3. **`max-total` failure:** Reduce total finding count by remediating detected secrets. Increase the threshold temporarily for gradual remediation.
+2. **`no-hardcoded-secrets` failure:** Remove hardcoded secrets from your codebase. Use environment variables, secret managers, or vault systems instead.
+3. **`max-issues` failure:** Reduce issue count by remediating detected secrets. Increase the threshold temporarily for gradual remediation.
