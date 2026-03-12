@@ -27,7 +27,7 @@ collectors:
     description: |
       Auto-runs Gitleaks against the repository source code. Parses the
       JSON report and writes normalized findings to .secrets with source
-      metadata. Writes nothing if Gitleaks is not installed.
+      metadata.
     mainBash: scan.sh
     hook:
       type: code
