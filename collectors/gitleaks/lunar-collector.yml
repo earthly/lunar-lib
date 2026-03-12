@@ -1,0 +1,84 @@
+version: 0
+
+name: gitleaks
+description: Auto-runs Gitleaks secret scanning on every repository
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:gitleaks-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Gitleaks Collector"
+  long_description: |
+    Automatically scans repositories for hardcoded secrets using Gitleaks.
+    Detects API keys, passwords, tokens, and other credentials in code.
+    Zero configuration required — runs on every repo and writes normalized
+    results to the .secrets Component JSON category.
+  category: "security"
+  icon: "assets/gitleaks.svg"
+  status: "beta"
+  related:
+    - slug: "secrets"
+      type: "policy"
+      reason: "Enforces secret scanning standards using Gitleaks data"
+
+collectors:
+  - name: scan
+    description: |
+      Auto-runs Gitleaks against the repository source code. Parses the
+      JSON report and writes normalized findings to .secrets with source
+      metadata. Writes nothing if Gitleaks is not installed.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords: ["gitleaks", "secrets", "credentials", "api keys", "secret scanning"]
+
+  - name: ci
+    description: |
+      Detects Gitleaks execution in CI pipelines. Captures the command
+      and version. Records source metadata to .secrets.
+    mainBash: ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: gitleaks
+    keywords: ["gitleaks", "ci detection", "secret scanning", "ci"]
+
+example_component_json: |
+  {
+    "secrets": {
+      "source": {
+        "tool": "gitleaks",
+        "version": "8.21.2",
+        "integration": "code"
+      },
+      "findings": {
+        "total": 2
+      },
+      "clean": false,
+      "issues": [
+        {
+          "rule": "generic-api-key",
+          "file": "config/settings.py",
+          "line": 42,
+          "secret_type": "Generic API Key",
+          "commit": "abc1234"
+        }
+      ],
+      "native": {
+        "gitleaks": {
+          "auto": {
+            "report": [
+              {
+                "RuleID": "generic-api-key",
+                "File": "config/settings.py",
+                "StartLine": 42,
+                "Commit": "abc1234",
+                "Description": "Generic API Key"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
