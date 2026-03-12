@@ -15,9 +15,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.secrets.source` | object | Source metadata (tool, version, integration) |
-| `.secrets.findings.total` | number | Total number of secrets detected |
-| `.secrets.clean` | boolean | `true` if no secrets detected, `false` otherwise |
-| `.secrets.issues[]` | array | Normalized findings with rule, file, line, type |
+| `.secrets.issues[]` | array | Normalized findings with rule, file, line, type (empty = clean) |
 | `.secrets.native.gitleaks.auto` | object | Raw Gitleaks report (auto-scan) |
 | `.secrets.native.gitleaks.cicd` | object | CI detection metadata |
 

@@ -23,8 +23,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.secrets` | object | Any secret scanner collector (Gitleaks, TruffleHog, etc.) |
-| `.secrets.clean` | boolean | Secret scanner collector |
-| `.secrets.findings.total` | number | Secret scanner collector |
+| `.secrets.issues[]` | array | Secret scanner collector (empty = clean) |
 
 ## Installation
 
@@ -48,8 +47,6 @@ policies:
 {
   "secrets": {
     "source": { "tool": "gitleaks", "integration": "code" },
-    "findings": { "total": 0 },
-    "clean": true,
     "issues": []
   }
 }
@@ -61,8 +58,6 @@ policies:
 {
   "secrets": {
     "source": { "tool": "gitleaks", "integration": "code" },
-    "findings": { "total": 3 },
-    "clean": false,
     "issues": [
       { "rule": "generic-api-key", "file": "config.py", "line": 10 }
     ]

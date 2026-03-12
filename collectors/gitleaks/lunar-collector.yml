@@ -52,10 +52,6 @@ example_component_json: |
         "version": "8.21.2",
         "integration": "code"
       },
-      "findings": {
-        "total": 2
-      },
-      "clean": false,
       "issues": [
         {
           "rule": "generic-api-key",
