@@ -1,3 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <path fill="black" d="M12 1C8.676 1 6 3.676 6 7v4H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v4H8V7c0-2.276 1.724-4 4-4zm0 10a2 2 0 0 1 2 2c0 .738-.405 1.376-1 1.723V18a1 1 0 1 1-2 0v-1.277A1.99 1.99 0 0 1 10 15a2 2 0 0 1 2-2z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+  <!-- Page outline -->
+  <rect x="10" y="5" width="80" height="100" rx="4" fill="none" stroke="black" stroke-width="6"/>
+  <!-- Top circle (keyhole top) -->
+  <circle cx="50" cy="18" r="7" fill="none" stroke="black" stroke-width="5"/>
+  <!-- Left diagonal line -->
+  <line x1="38" y1="28" x2="30" y2="55" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <!-- Right diagonal line -->
+  <line x1="62" y1="28" x2="54" y2="55" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <!-- Center vertical line -->
+  <line x1="50" y1="25" x2="50" y2="55" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <!-- Bottom left circle -->
+  <circle cx="30" cy="68" r="6" fill="none" stroke="black" stroke-width="4"/>
+  <!-- Bottom right circle -->
+  <circle cx="58" cy="68" r="6" fill="none" stroke="black" stroke-width="4"/>
+  <!-- Left drip dots -->
+  <circle cx="30" cy="82" r="3" fill="black"/>
+  <circle cx="30" cy="90" r="2.5" fill="black"/>
+  <circle cx="30" cy="97" r="2" fill="black"/>
+  <!-- Right drip dots -->
+  <circle cx="58" cy="82" r="3" fill="black"/>
+  <circle cx="58" cy="90" r="2.5" fill="black"/>
+  <circle cx="58" cy="97" r="2" fill="black"/>
+  <circle cx="66" cy="82" r="2.5" fill="black"/>
+  <circle cx="66" cy="90" r="2" fill="black"/>
+  <circle cx="74" cy="82" r="2" fill="black"/>
 </svg>
