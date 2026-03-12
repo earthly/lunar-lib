@@ -26,7 +26,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
 | `scan` | code | Auto-runs Gitleaks against repository source code |
-| `ci` | ci-after-command | Detects Gitleaks CLI executions in CI pipelines |
+| `cicd` | ci-after-command | Detects Gitleaks CLI executions in CI pipelines |
 
 ## Installation
 

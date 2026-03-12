@@ -33,11 +33,11 @@ collectors:
       type: code
     keywords: ["gitleaks", "secrets", "credentials", "api keys", "secret scanning"]
 
-  - name: ci
+  - name: cicd
     description: |
       Detects Gitleaks execution in CI pipelines. Captures the command
       and version. Records source metadata to .secrets.
-    mainBash: ci.sh
+    mainBash: cicd.sh
     hook:
       type: ci-after-command
       binary:
