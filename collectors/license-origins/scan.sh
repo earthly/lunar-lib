@@ -103,20 +103,24 @@ fetch_rust_deps() {
   fi
   if [[ ! -f "Cargo.lock" ]]; then
     echo "No Cargo.lock found; generating lockfile..." >&2
-    cargo generate-lockfile 2>/dev/null || {
+    if ! cargo generate-lockfile 2>&1; then
       echo "Warning: cargo generate-lockfile failed; Rust license scanning may be incomplete" >&2
       return
-    }
+    fi
   fi
   echo "Fetching Rust dependencies (cargo fetch)..." >&2
-  cargo fetch --quiet 2>/dev/null || {
+  if ! cargo fetch 2>&1; then
     echo "Warning: cargo fetch failed; Rust license scanning may be incomplete" >&2
     return
-  }
+  fi
   local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   if [ -d "$cargo_home/registry/src" ]; then
     LICENSE_SEARCH_DIRS+=("$cargo_home/registry/src")
-    echo "Rust deps fetched to $cargo_home/registry/src" >&2
+    local lic_count
+    lic_count=$(find "$cargo_home/registry/src" -maxdepth 6 -iname "LICENSE*" -type f 2>/dev/null | wc -l)
+    echo "Rust deps fetched to $cargo_home/registry/src ($lic_count license files found)" >&2
+  else
+    echo "Warning: $cargo_home/registry/src does not exist after cargo fetch" >&2
   fi
 }
 
