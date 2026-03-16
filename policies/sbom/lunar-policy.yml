@@ -1,7 +1,7 @@
 version: 0
 
 name: sbom
-description: Enforces SBOM existence, license compliance, completeness, and format
+description: Enforces SBOM existence, license compliance, completeness, format, and origin policies
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -11,7 +11,8 @@ landing_page:
   long_description: |
     Enforce Software Bill of Materials standards across your organization.
     Verify SBOMs are generated, contain license data, use approved formats,
-    and do not include disallowed licenses.
+    do not include disallowed licenses, and flag dependencies with blocked
+    geographic origins or disallowed package patterns.
   category: "security-and-compliance"
   icon: "assets/sbom.svg"
   status: "stable"
@@ -19,6 +20,9 @@ landing_page:
     - slug: "syft"
       type: "collector"
       reason: "Provides SBOM data for policy evaluation"
+    - slug: "license-origins"
+      type: "collector"
+      reason: "Provides license origin data for blocked-origins check"
 
 policies:
   - name: sbom-exists
@@ -55,6 +59,22 @@ policies:
     mainPython: ./standard-format.py
     keywords: ["sbom", "cyclonedx", "spdx", "format"]
 
+  - name: blocked-origins
+    description: |
+      Checks for dependencies with license origin mentions from blocked
+      countries. Supports blocklist or allowlist mode. Requires the
+      license-origins collector.
+    mainPython: ./blocked-origins.py
+    keywords: ["sbom", "license origins", "country of origin", "export control", "compliance", "supply chain"]
+
+  - name: disallowed-packages
+    description: |
+      Checks for disallowed packages by matching PURL, name, or group
+      against configurable regex patterns (e.g. "ru\\.yandex\\..*",
+      "com\\.alibaba\\..*").
+    mainPython: ./disallowed-packages.py
+    keywords: ["sbom", "disallowed packages", "package blocklist", "supply chain", "compliance"]
+
 inputs:
   disallowed_licenses:
     description: Comma-separated regex patterns of disallowed licenses (e.g. "GPL.*,AGPL.*")
@@ -66,4 +86,13 @@ inputs:
     default: "1"
   allowed_formats:
     description: Comma-separated list of allowed SBOM formats (e.g. "cyclonedx,spdx"). Empty means any.
+    default: ""
+  blocked_countries:
+    description: Comma-separated list of blocked countries for license origin checks (e.g. "Russia,China,Iran,North Korea")
+    default: ""
+  allowed_countries:
+    description: Comma-separated allowlist of countries (stricter alternative to blocked_countries — any country NOT on this list triggers a failure)
+    default: ""
+  disallowed_packages:
+    description: Comma-separated regex patterns for disallowed packages (matched against PURL, name, and group; e.g. "ru\\.yandex\\..*,com\\.alibaba\\..*")
     default: ""

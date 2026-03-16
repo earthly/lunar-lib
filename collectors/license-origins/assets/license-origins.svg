@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Globe with magnifying glass over a document -->
+  <circle cx="28" cy="28" r="18" stroke="black" stroke-width="2.5" fill="none"/>
+  <ellipse cx="28" cy="28" rx="18" ry="7" stroke="black" stroke-width="1.5" fill="none"/>
+  <path d="M28 10 V46" stroke="black" stroke-width="1.5"/>
+  <path d="M10 28 H46" stroke="black" stroke-width="1.5"/>
+  <path d="M13.5 18 Q28 22 42.5 18" stroke="black" stroke-width="1.2" fill="none"/>
+  <path d="M13.5 38 Q28 34 42.5 38" stroke="black" stroke-width="1.2" fill="none"/>
+  <!-- Magnifying glass -->
+  <circle cx="42" cy="42" r="10" stroke="black" stroke-width="2.5" fill="none"/>
+  <line x1="49" y1="49" x2="60" y2="60" stroke="black" stroke-width="3" stroke-linecap="round"/>
+  <!-- Document lines inside magnifier -->
+  <line x1="36" y1="39" x2="48" y2="39" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="36" y1="42" x2="46" y2="42" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="36" y1="45" x2="44" y2="45" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
