@@ -94,12 +94,19 @@ purl_to_name() {
 LICENSE_SEARCH_DIRS=()
 
 fetch_rust_deps() {
-  if [[ ! -f "Cargo.lock" ]] && [[ ! -f "Cargo.toml" ]]; then
+  if [[ ! -f "Cargo.toml" ]]; then
     return
   fi
   if ! command -v cargo >/dev/null 2>&1; then
     echo "Rust project detected but cargo not available; skipping Rust license scan" >&2
     return
+  fi
+  if [[ ! -f "Cargo.lock" ]]; then
+    echo "No Cargo.lock found; generating lockfile..." >&2
+    cargo generate-lockfile 2>/dev/null || {
+      echo "Warning: cargo generate-lockfile failed; Rust license scanning may be incomplete" >&2
+      return
+    }
   fi
   echo "Fetching Rust dependencies (cargo fetch)..." >&2
   cargo fetch --quiet 2>/dev/null || {
@@ -276,7 +283,7 @@ if [ -n "$SYFT_VERSION" ]; then
   lunar collect ".sbom.auto.source.version" "$SYFT_VERSION"
 fi
 
-export SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES="${SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES:-false}"
+export SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES="${SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES:-true}"
 export SYFT_GOLANG_SEARCH_REMOTE_LICENSES="${SYFT_GOLANG_SEARCH_REMOTE_LICENSES:-true}"
 export SYFT_JAVA_USE_NETWORK="${SYFT_JAVA_USE_NETWORK:-true}"
 export SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES="${SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES:-true}"
