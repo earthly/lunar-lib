@@ -277,7 +277,7 @@ Requires significant configuration, custom rules, or is for very specific use ca
 | P6 | **ShellCheck / shell collector** | Auto-run shell script linting + bash language detection | 2 |
 | P7 | **Checkov collector** | Auto-run IaC scanning, feeds existing `iac-scan` policy | 2–3 |
 | P8 | **actionlint collector** | Auto-run GHA workflow linting (catches bugs, not just security) | 1–2 |
-| P9 | **PHP collector + policy** | Language detection, skip-safe | 2–3 |
+| P9 | ~~**PHP collector + policy**~~ | Language detection, skip-safe | ✅ Done |
 | P10 | **.NET/C# collector + policy** | Language detection, skip-safe | 3–4 |
 | P11 | **Ruby collector + policy** | Language detection, skip-safe | 2–3 |
 | P12 | **C/C++ collector** | Language detection, skip-safe. Optional cppcheck integration. | 2 |

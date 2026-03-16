@@ -1,0 +1,44 @@
+# PHP Collector
+
+Collects PHP project information, CI/CD commands, and dependencies.
+
+## Overview
+
+This collector gathers metadata about PHP projects including Composer configuration, dependency graphs, tool configuration (PHPUnit, PHPStan, Psalm, PHP-CS-Fixer, PHP_CodeSniffer), and CI/CD command tracking. It runs on both code changes (for static analysis) and CI hooks (to capture runtime metrics).
+
+## Collected Data
+
+This collector writes to the following Component JSON paths:
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.lang.php` | object | PHP project metadata (version, tool config) |
+| `.lang.php.version` | string | PHP version constraint from composer.json |
+| `.lang.php.cicd` | object | PHP runtime CI/CD command tracking with version |
+| `.lang.php.dependencies` | object | Direct and dev dependencies from composer.json |
+| `.lang.php.composer` | object | Composer metadata (json/lock exists, vendor, cicd) |
+| `.lang.php.composer.cicd` | object | Composer CI/CD command tracking with version |
+| `.lang.php.tests.coverage` | object | Test coverage metrics from PHPUnit Clover XML output |
+
+## Collectors
+
+This integration provides the following collectors (use `include` to select a subset):
+
+| Collector | Hook Type | Description |
+|-----------|-----------|-------------|
+| `project` | code | Collects PHP project structure (composer.json, composer.lock, vendor, tool config) |
+| `dependencies` | code | Collects Composer dependency graph |
+| `cicd` | ci-before-command | Tracks PHP commands run in CI with PHP runtime version |
+| `composer-cicd` | ci-before-command | Tracks Composer commands run in CI with Composer version |
+| `test-coverage` | ci-after-command | Extracts coverage from PHPUnit Clover XML reports |
+
+## Installation
+
+Add to your `lunar-config.yml`:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/php@v1.0.0
+    on: [php]  # Or use domain: ["domain:your-domain"]
+    # include: [project, dependencies]  # Only include specific subcollectors
+```
