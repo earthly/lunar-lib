@@ -196,7 +196,7 @@ find_license_for_package() {
   for search_dir in "${LICENSE_SEARCH_DIRS[@]}"; do
     [ -d "$search_dir" ] || continue
     local found
-    found=$(find "$search_dir" -maxdepth 4 -path "*${pkg_name}*" \
+    found=$(find "$search_dir" -maxdepth 6 -path "*${pkg_name}*" \
       \( -iname "LICENSE" -o -iname "LICENSE.*" -o -iname "LICENCE" -o -iname "LICENCE.*" \
          -o -iname "COPYING" -o -iname "COPYING.*" -o -iname "NOTICE" -o -iname "NOTICE.*" \) \
       -type f 2>/dev/null | head -1)
@@ -229,7 +229,10 @@ scan_file_for_countries() {
 
   for country in "${COUNTRY_NAMES[@]}"; do
     local matching_line
-    matching_line=$(echo "$content" | grep -i -m 1 -F "$country" 2>/dev/null || true)
+    # Use word-boundary matching to avoid substrings (e.g. "Oman" in "Roman")
+    local pattern
+    pattern=$(echo "$country" | sed 's/[.[\*^$()+?{|]/\\&/g')
+    matching_line=$(echo "$content" | grep -i -m 1 -w "$pattern" 2>/dev/null || true)
     if [ -n "$matching_line" ]; then
       local already_found=false
       for c in "${found_countries[@]}"; do
