@@ -4,9 +4,21 @@ Generate SBOMs and scan dependency license files for country-of-origin mentions.
 
 ## Overview
 
-This collector generates a CycloneDX SBOM using syft (with remote license lookups for Go, Java, Node.js, and Python), writes it to `.sbom.auto`, then scans each dependency's license files (LICENSE, COPYING, NOTICE) for geographic origin signals — country names in copyright holder lines, governing law clauses, and author addresses. It greps each license file against ~200 country names. Scan results are optionally cached in Postgres keyed by PURL@version (immutable, never invalidates), so repeated scans across projects are fast.
+This collector generates a CycloneDX SBOM using syft, then fetches dependencies per language ecosystem so their license files are available on disk, and scans each license file (LICENSE, COPYING, NOTICE) for geographic origin signals — country names in copyright holder lines, governing law clauses, and author addresses. It greps each license file against ~200 country names. Scan results are optionally cached in Postgres keyed by PURL@version (immutable, never invalidates), so repeated scans across projects are fast.
 
 **Note:** This collector fully replaces the `syft` collector — use it *instead of* `syft` on the same component. In the future, when collector dependency ordering is supported, the SBOM generation will move back to the `syft` collector and this collector will depend on it.
+
+## Supported Languages
+
+| Language | How license files are obtained | Tool required |
+|----------|-------------------------------|---------------|
+| Rust | `cargo fetch` populates `$CARGO_HOME/registry/src/` | `cargo` |
+| Go | `go mod download` populates `$GOPATH/pkg/mod/` | `go` |
+| Node.js | `npm install --ignore-scripts` populates `node_modules/` | `npm` |
+| Python | `pip install --target` populates `.python-packages-scan/` | `python3` + `pip` |
+| Java | Not supported in v1 | - |
+
+The Docker image (`earthly/lunar-lib:license-origins-main`) includes all supported language runtimes. If a tool is not available, that language is skipped gracefully.
 
 ## Collected Data
 

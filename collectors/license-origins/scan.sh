@@ -60,8 +60,8 @@ cache_lookup() {
 
 cache_store() {
   local purl="$1"
-  local countries_pg="$2"     # Postgres array literal: {Germany,Netherlands}
-  local excerpts_json="$3"    # JSON array
+  local countries_pg="$2"
+  local excerpts_json="$3"
   local escaped_purl
   escaped_purl="$(echo "$purl" | sed "s/'/''/g")"
 
@@ -89,33 +89,124 @@ purl_to_name() {
   echo "$purl" | sed -E 's|^pkg:[^/]+/([^@]+).*|\1|; s|.*/||'
 }
 
-# --- License file scanning ---
+# --- Per-language dependency fetching ---
 
-find_license_files() {
-  find . -maxdepth 5 \
-    \( -iname "LICENSE" -o -iname "LICENSE.*" -o -iname "LICENCE" -o -iname "LICENCE.*" \
-       -o -iname "COPYING" -o -iname "COPYING.*" -o -iname "NOTICE" -o -iname "NOTICE.*" \) \
-    -not -path "./.git/*" \
-    -type f 2>/dev/null || true
+LICENSE_SEARCH_DIRS=()
+
+fetch_rust_deps() {
+  if [[ ! -f "Cargo.lock" ]] && [[ ! -f "Cargo.toml" ]]; then
+    return
+  fi
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "Rust project detected but cargo not available; skipping Rust license scan" >&2
+    return
+  fi
+  echo "Fetching Rust dependencies (cargo fetch)..." >&2
+  cargo fetch --quiet 2>/dev/null || {
+    echo "Warning: cargo fetch failed; Rust license scanning may be incomplete" >&2
+    return
+  }
+  local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  if [ -d "$cargo_home/registry/src" ]; then
+    LICENSE_SEARCH_DIRS+=("$cargo_home/registry/src")
+    echo "Rust deps fetched to $cargo_home/registry/src" >&2
+  fi
 }
+
+fetch_go_deps() {
+  if [[ ! -f "go.mod" ]]; then
+    return
+  fi
+  if ! command -v go >/dev/null 2>&1; then
+    echo "Go project detected but go not available; skipping Go license scan" >&2
+    return
+  fi
+  echo "Fetching Go dependencies (go mod download)..." >&2
+  go mod download 2>/dev/null || {
+    echo "Warning: go mod download failed; Go license scanning may be incomplete" >&2
+    return
+  }
+  local gopath="${GOPATH:-$HOME/go}"
+  if [ -d "$gopath/pkg/mod" ]; then
+    LICENSE_SEARCH_DIRS+=("$gopath/pkg/mod")
+    echo "Go deps fetched to $gopath/pkg/mod" >&2
+  fi
+}
+
+fetch_node_deps() {
+  if [[ ! -f "package-lock.json" ]] && [[ ! -f "yarn.lock" ]] && [[ ! -f "pnpm-lock.yaml" ]]; then
+    return
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Node.js project detected but npm not available; skipping Node license scan" >&2
+    return
+  fi
+  echo "Fetching Node.js dependencies (npm install)..." >&2
+  npm install --ignore-scripts --no-audit --no-fund --no-optional >/dev/null 2>&1 || {
+    echo "Warning: npm install failed; Node license scanning may be incomplete" >&2
+    return
+  }
+  if [ -d "node_modules" ]; then
+    LICENSE_SEARCH_DIRS+=("node_modules")
+    echo "Node deps installed to node_modules/" >&2
+  fi
+}
+
+fetch_python_deps() {
+  if [[ ! -f "requirements.txt" ]] && [[ ! -f "pyproject.toml" ]] && [[ ! -f "Pipfile" ]] && [[ ! -f "setup.py" ]]; then
+    return
+  fi
+  local python_cmd=""
+  if command -v python3 >/dev/null 2>&1; then
+    python_cmd="python3"
+  elif command -v python >/dev/null 2>&1; then
+    python_cmd="python"
+  else
+    echo "Python project detected but python not available; skipping Python license scan" >&2
+    return
+  fi
+
+  local target_dir=".python-packages-scan"
+  echo "Fetching Python dependencies (pip install)..." >&2
+  "$python_cmd" -m pip install --quiet --upgrade pip >/dev/null 2>&1 || true
+
+  if [[ -f "requirements.txt" ]]; then
+    "$python_cmd" -m pip install --quiet --target "$target_dir" -r requirements.txt >/dev/null 2>&1 || {
+      echo "Warning: pip install failed; Python license scanning may be incomplete" >&2
+      return
+    }
+  elif [[ -f "pyproject.toml" ]]; then
+    "$python_cmd" -m pip install --quiet --target "$target_dir" . >/dev/null 2>&1 || {
+      echo "Warning: pip install from pyproject.toml failed; Python license scanning may be incomplete" >&2
+      return
+    }
+  fi
+
+  if [ -d "$target_dir" ]; then
+    LICENSE_SEARCH_DIRS+=("$target_dir")
+    echo "Python deps installed to $target_dir/" >&2
+  fi
+}
+
+# --- License file scanning ---
 
 find_license_for_package() {
   local pkg_name="$1"
-  local found=""
 
-  for search_dir in "node_modules/${pkg_name}" "vendor" ".python-packages" "target" ".gradle"; do
-    if [ -d "$search_dir" ]; then
-      found=$(find "$search_dir" -maxdepth 3 \
-        \( -iname "LICENSE" -o -iname "LICENSE.*" -o -iname "LICENCE" -o -iname "LICENCE.*" \
-           -o -iname "COPYING" -o -iname "COPYING.*" -o -iname "NOTICE" -o -iname "NOTICE.*" \) \
-        -type f 2>/dev/null | head -1)
-      if [ -n "$found" ]; then
-        echo "$found"
-        return 0
-      fi
+  for search_dir in "${LICENSE_SEARCH_DIRS[@]}"; do
+    [ -d "$search_dir" ] || continue
+    local found
+    found=$(find "$search_dir" -maxdepth 4 -path "*${pkg_name}*" \
+      \( -iname "LICENSE" -o -iname "LICENSE.*" -o -iname "LICENCE" -o -iname "LICENCE.*" \
+         -o -iname "COPYING" -o -iname "COPYING.*" -o -iname "NOTICE" -o -iname "NOTICE.*" \) \
+      -type f 2>/dev/null | head -1)
+    if [ -n "$found" ]; then
+      echo "$found"
+      return 0
     fi
   done
 
+  # Fallback: search repo root for any matching license files
   find . -maxdepth 4 -path "*${pkg_name}*" \
     \( -iname "LICENSE" -o -iname "LICENSE.*" -o -iname "LICENCE" -o -iname "LICENCE.*" \
        -o -iname "COPYING" -o -iname "COPYING.*" -o -iname "NOTICE" -o -iname "NOTICE.*" \) \
@@ -187,32 +278,13 @@ export SYFT_GOLANG_SEARCH_REMOTE_LICENSES="${SYFT_GOLANG_SEARCH_REMOTE_LICENSES:
 export SYFT_JAVA_USE_NETWORK="${SYFT_JAVA_USE_NETWORK:-true}"
 export SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES="${SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES:-true}"
 
-python_packages_dir=""
-if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
-  PYTHON_CMD=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-  if [[ -f "requirements.txt" ]] || [[ -f "pyproject.toml" ]] || [[ -f "Pipfile" ]] || [[ -f "setup.py" ]]; then
-    python_packages_dir=".python-packages-sbom"
-    echo "Detected Python project; installing packages for license detection..." >&2
-    if [[ -f "requirements.txt" ]]; then
-      "$PYTHON_CMD" -m pip install --quiet --upgrade pip >/dev/null 2>&1 || true
-      "$PYTHON_CMD" -m pip install --quiet --target "$python_packages_dir" -r requirements.txt >/dev/null 2>&1 || \
-        echo "Warning: Some Python packages failed to install; license detection may be incomplete" >&2
-    elif [[ -f "pyproject.toml" ]]; then
-      "$PYTHON_CMD" -m pip install --quiet --upgrade pip >/dev/null 2>&1 || true
-      "$PYTHON_CMD" -m pip install --quiet --target "$python_packages_dir" . >/dev/null 2>&1 || \
-        echo "Warning: Installation from pyproject.toml failed; license detection may be incomplete" >&2
-    fi
-  fi
-fi
-
-# Install Node.js dependencies so license files are on disk for scanning
-if [[ -f "package-lock.json" ]] || [[ -f "yarn.lock" ]] || [[ -f "pnpm-lock.yaml" ]]; then
-  if command -v npm >/dev/null 2>&1; then
-    echo "Detected Node.js project; installing packages for license scanning..." >&2
-    npm install --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 || \
-      echo "Warning: npm install failed; license file scanning may be incomplete" >&2
-  fi
-fi
+# Step 3: Fetch dependencies per language so license files are on disk
+echo "Detecting project languages and fetching dependencies..." >&2
+fetch_rust_deps
+fetch_go_deps
+fetch_node_deps
+fetch_python_deps
+echo "License search directories: ${LICENSE_SEARCH_DIRS[*]:-"(repo root only)"}" >&2
 
 echo "Generating SBOM with syft..." >&2
 if ! syft dir:. -o cyclonedx-json > "$SBOM_FILE" 2>/dev/null; then
@@ -229,13 +301,13 @@ echo "SBOM generated: $(jq '.components | length' "$SBOM_FILE") components" >&2
 
 cat "$SBOM_FILE" | lunar collect -j ".sbom.auto.cyclonedx" -
 
-# Step 3: Initialize cache
+# Step 4: Initialize cache
 if [ "$CACHE_ENABLED" = "true" ]; then
   echo "Initializing cache table..." >&2
   init_cache_table
 fi
 
-# Step 4: Scan each dependency
+# Step 5: Scan each dependency
 PURLS=$(get_sbom_purls "$SBOM_FILE")
 PURL_COUNT=$(echo "$PURLS" | grep -c . || true)
 
@@ -292,7 +364,6 @@ while IFS= read -r purl; do
   # Find license file for this package
   license_file=$(find_license_for_package "$pkg_name")
   if [ -z "$license_file" ]; then
-    # Store empty result in cache so we don't re-scan
     if [ "$CACHE_ENABLED" = "true" ]; then
       cache_store "$purl" "{}" "[]"
     fi
@@ -326,13 +397,11 @@ while IFS= read -r purl; do
     PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq --argjson entry "$pkg_entry" '. + [$entry]')
     ALL_COUNTRIES_FOUND=$(jq -n --argjson existing "$ALL_COUNTRIES_FOUND" --argjson new "$countries_json" '$existing + $new | unique')
 
-    # Store in cache
     if [ "$CACHE_ENABLED" = "true" ]; then
       pg_countries=$(echo "$countries_json" | jq -r 'join(",")')
       cache_store "$purl" "{${pg_countries}}" "$excerpts_json"
     fi
   else
-    # No countries found — cache the empty result
     if [ "$CACHE_ENABLED" = "true" ]; then
       cache_store "$purl" "{}" "[]"
     fi
@@ -340,7 +409,7 @@ while IFS= read -r purl; do
 
 done <<< "$PURLS"
 
-# Step 5: Write results to Component JSON
+# Step 6: Write results to Component JSON
 RESULT=$(jq -n \
   --argjson packages "$PACKAGES_JSON" \
   --argjson countries_found "$ALL_COUNTRIES_FOUND" \
@@ -361,4 +430,4 @@ RESULT=$(jq -n \
 
 echo "$RESULT" | lunar collect -j ".sbom.license_origins" -
 
-echo "License origin scan complete: ${PACKAGES_WITH_MENTIONS} packages with country mentions, ${CACHE_HITS} cache hits, ${CACHE_MISSES} cache misses" >&2
+echo "License origin scan complete: ${PACKAGES_WITH_MENTIONS} packages with country mentions, ${FILES_SCANNED} files scanned, ${CACHE_HITS} cache hits, ${CACHE_MISSES} cache misses" >&2
