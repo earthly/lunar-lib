@@ -114,14 +114,20 @@ fetch_rust_deps() {
     return
   fi
   local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  local diag_registry_ls=$(ls "$cargo_home/registry/" 2>&1 || echo "NOT_FOUND")
+  local diag_src_ls=$(ls "$cargo_home/registry/src/" 2>&1 || echo "NOT_FOUND")
+  local diag_lic_count=0
   if [ -d "$cargo_home/registry/src" ]; then
     LICENSE_SEARCH_DIRS+=("$cargo_home/registry/src")
-    local lic_count
-    lic_count=$(find "$cargo_home/registry/src" -maxdepth 6 -iname "LICENSE*" -type f 2>/dev/null | wc -l)
-    echo "Rust deps fetched to $cargo_home/registry/src ($lic_count license files found)" >&2
+    diag_lic_count=$(find "$cargo_home/registry/src" -maxdepth 6 -iname "LICENSE*" -type f 2>/dev/null | wc -l)
+    echo "Rust deps: $diag_lic_count license files in $cargo_home/registry/src" >&2
   else
     echo "Warning: $cargo_home/registry/src does not exist after cargo fetch" >&2
   fi
+  lunar collect ".sbom.license_origins._debug_rust.cargo_home" "$cargo_home"
+  lunar collect ".sbom.license_origins._debug_rust.registry_ls" "$diag_registry_ls"
+  lunar collect ".sbom.license_origins._debug_rust.src_ls" "$diag_src_ls"
+  lunar collect ".sbom.license_origins._debug_rust.license_file_count" "$diag_lic_count"
 }
 
 fetch_go_deps() {
