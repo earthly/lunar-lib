@@ -21,7 +21,7 @@ TRIVY_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COM
 TRIVY_VERSION=$("$TRIVY_BIN" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "unknown")
 
 # Escape quotes in command for JSON
-CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/"/\\"/g')
+CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Write cicd command entry (no jq required)
 echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$TRIVY_VERSION\"}]}" | \
