@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Shield shape -->
+  <path d="M32 4L8 16v20c0 14 10.5 24.5 24 28 13.5-3.5 24-14 24-28V16L32 4z" fill="white" fill-opacity="0.9"/>
+  <!-- Magnifying glass circle -->
+  <circle cx="30" cy="30" r="11" stroke="black" stroke-width="3.5" fill="none"/>
+  <!-- Magnifying glass handle -->
+  <line x1="38" y1="38" x2="48" y2="48" stroke="black" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Bug/vuln indicator inside glass -->
+  <path d="M26 28l3 4 6-8" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

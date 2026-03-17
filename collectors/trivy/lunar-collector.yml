@@ -1,0 +1,69 @@
+version: 0
+
+name: trivy
+description: |
+  Scan source code dependencies for known vulnerabilities using Trivy.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:trivy-main
+
+landing_page:
+  display_name: "Trivy Vulnerability Scanner Collector"
+  long_description: |
+    Automatically scans repository dependencies for known CVEs using Trivy.
+    Supports Go, Node.js, Python, Java, Rust, and many other ecosystems.
+    Writes normalized vulnerability data to .sca for use with the SCA policy.
+    No secrets or vendor accounts required.
+  categories: ["security"]
+  icon: "assets/trivy.svg"
+  status: "beta"
+  related:
+    - slug: "sca"
+      type: "policy"
+      reason: "Enforces SCA vulnerability thresholds"
+
+collectors:
+  - name: scan
+    description: |
+      Scans the repository filesystem for dependency vulnerabilities.
+      Writes normalized findings to .sca with severity counts, CVE IDs,
+      affected packages, and fix versions.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords: ["trivy", "vulnerability", "cve", "sca", "dependency scanning"]
+
+example_component_json: |
+  {
+    "sca": {
+      "source": {
+        "tool": "trivy",
+        "version": "0.69.3",
+        "integration": "code"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 2,
+        "medium": 5,
+        "low": 3,
+        "total": 10
+      },
+      "findings": [
+        {
+          "severity": "high",
+          "package": "golang.org/x/net",
+          "version": "0.7.0",
+          "ecosystem": "gomod",
+          "cve": "CVE-2023-44487",
+          "title": "HTTP/2 Rapid Reset Attack",
+          "fix_version": "0.17.0",
+          "fixable": true
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true,
+        "all_fixable": true
+      }
+    }
+  }

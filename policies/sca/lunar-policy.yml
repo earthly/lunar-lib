@@ -21,6 +21,10 @@ landing_page:
     - slug: "semgrep"
       type: "collector"
       reason: "Provides SCA scan results via Semgrep Supply Chain"
+
+    - slug: "trivy"
+      type: "collector"
+      reason: "Provides SCA scan results via Trivy vulnerability scanning"
   related: []
 
 policies:
