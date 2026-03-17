@@ -1,6 +1,6 @@
 # About Earthly Lunar
 
-Earthly Lunar is a **guardrails engine** for your engineering stack. It automatically enforces your organization's engineering standards across all code repositories and CI/CD pipelines.
+Earthly Lunar is a **guardrails engine for the AI era**. It automatically enforces your organization's engineering standards across all code repositories, CI/CD pipelines, and AI coding workflows.
 
 ## The Problem Lunar Solves
 
@@ -19,7 +19,7 @@ These messages get lost in the noise. Tickets get buried in backlogs. Quarters p
 
 ## How Lunar Works
 
-Lunar takes a fundamentally different approach: instead of broadcasting standards to every engineer, it delivers **contextual feedback exactly where and when it matters**—in pull requests.
+Lunar takes a fundamentally different approach: instead of broadcasting standards to every engineer, it delivers **contextual feedback exactly where and when it matters** — in AI agent dev-test loops, in pull requests, and at deploy gates.
 
 ### Integration Points
 
@@ -93,7 +93,23 @@ This allows teams to roll out guardrails progressively—starting with visibilit
 
 ### Contextual Feedback
 
-Instead of broadcasting every standard to every engineer, Lunar shows developers only the standards relevant to their specific pull request. This eliminates context-switching and ensures engineers see requirements exactly when they need to act on them.
+Instead of broadcasting every standard to every engineer, Lunar shows developers only the standards relevant to their specific code change. This eliminates context-switching and ensures engineers see requirements exactly when they need to act on them.
+
+### AI Agent Hooks
+
+AI coding tools (Claude Code, Cursor, Codex) generate code fast, but can't reliably follow organizational standards. Context appends (AGENTS.md, CLAUDE.md, cursor rules) are token-expensive, non-deterministic, and scattered across repos.
+
+Lunar's **agent hooks** fire on every file edit inside an AI agent's workflow, evaluate the same policies that run at PR time, and feed back failures in real time. The agent self-corrects before a PR is even created — completely transparent to the human.
+
+How this works technically:
+
+1. An agent platform hook (e.g., Claude Code's `PostToolUse`, Cursor's `afterFileEdit`) fires after each file edit
+2. The hook calls `lunar verify --file <path>`, which matches the file against collectors with `file` hook patterns
+3. Only matching collectors run — producing a Component JSON delta scoped to that file
+4. Policies with `runs_on` including `ai` evaluate against the merged Component JSON
+5. Failures are fed back to the agent as structured feedback
+
+This means **collectors and policies you write in lunar-lib may run in AI agent workflows**, not just in PRs. Collectors and policies with `runs_on` including `ai` are eligible. The same code, same assertions, same Component JSON contract — just triggered by a file edit instead of a PR event.
 
 ### Executive Visibility
 
