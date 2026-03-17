@@ -6,6 +6,7 @@ description: |
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:trivy-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Trivy Vulnerability Scanner Collector"
@@ -23,15 +24,26 @@ landing_page:
       reason: "Enforces SCA vulnerability thresholds"
 
 collectors:
-  - name: scan
+  - name: auto
     description: |
-      Scans the repository filesystem for dependency vulnerabilities.
-      Writes normalized findings to .sca with severity counts, CVE IDs,
-      affected packages, and fix versions.
-    mainBash: scan.sh
+      Auto-scans the repository filesystem for dependency vulnerabilities
+      using Trivy. Writes normalized findings to .sca with severity counts,
+      CVE IDs, affected packages, and fix versions.
+    mainBash: auto.sh
     hook:
       type: code
-    keywords: ["trivy", "vulnerability", "cve", "sca", "dependency scanning"]
+    keywords: ["trivy", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
+
+  - name: cicd
+    description: |
+      Detects Trivy executions in CI pipelines. Captures the command,
+      version, and input arguments for audit and compliance tracking.
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: trivy
+    keywords: ["trivy", "ci", "cicd", "command detection", "audit"]
 
 example_component_json: |
   {
@@ -64,6 +76,15 @@ example_component_json: |
         "has_critical": false,
         "has_high": true,
         "all_fixable": true
+      },
+      "native": {
+        "trivy": {
+          "cicd": {
+            "cmds": [
+              {"cmd": "trivy fs --scanners vuln .", "version": "0.69.3"}
+            ]
+          }
+        }
       }
     }
   }

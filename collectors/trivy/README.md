@@ -6,7 +6,7 @@ Scans source code dependencies for known vulnerabilities using Trivy.
 
 This collector runs Trivy filesystem scans against repository source code to detect known CVEs in dependencies. It supports all ecosystems Trivy covers (Go, Node.js, Python, Java, Rust, Ruby, PHP, .NET, etc.) and writes normalized vulnerability data to `.sca` in the Component JSON, making results immediately consumable by the existing SCA policy.
 
-No secrets or vendor accounts are required — Trivy's vulnerability database is bundled in the Docker image.
+No secrets or vendor accounts are required — Trivy's vulnerability database is downloaded at scan time to ensure the latest CVE data.
 
 ## Collected Data
 
@@ -18,14 +18,16 @@ This collector writes to the following Component JSON paths:
 | `.sca.vulnerabilities` | object | Severity counts (critical, high, medium, low, total) |
 | `.sca.findings[]` | array | Individual vulnerability findings with CVE, package, fix info |
 | `.sca.summary` | object | Summary booleans (has_critical, has_high, all_fixable) |
+| `.sca.native.trivy.cicd` | object | CI command detection data (command, version) |
 
 ## Collectors
 
-This integration provides the following collectors:
+This integration provides the following collectors (use `include` to select a subset):
 
-| Collector | Description |
-|-----------|-------------|
-| `scan` | Scans the repository filesystem for dependency vulnerabilities |
+| Collector | Hook Type | Description |
+|-----------|-----------|-------------|
+| `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities |
+| `cicd` | ci-after-command | Detects Trivy executions in CI and captures command metadata |
 
 ## Installation
 
