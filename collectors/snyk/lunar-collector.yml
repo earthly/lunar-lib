@@ -28,9 +28,9 @@ collectors:
       commit status API. Waits for scan completion and captures results.
       Categorizes by scan type (Open Source, Code, Container, IaC).
     mainBash: github-app.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["snyk", "github app", "security scanning", "vulnerabilities"]
 
   - name: running-in-prs
@@ -40,9 +40,9 @@ collectors:
       that PR scanning is happening (since Snyk GitHub App only posts checks
       on PRs, not directly on the default branch).
     mainBash: running-in-prs.sh
+    runs_on: [default-branch]
     hook:
       type: code
-      runs_on: [default-branch]
     keywords: ["snyk", "pr scanning", "compliance proof", "default branch"]
 
   - name: cli
