@@ -56,25 +56,28 @@ if [ "$SCAN_OK" != "true" ]; then
   exit 0
 fi
 
-# Record source metadata only after successful scan
-lunar collect ".sca.source.tool" "trivy"
-lunar collect ".sca.source.integration" "code"
-[ -n "$TRIVY_VERSION" ] && lunar collect ".sca.source.version" "$TRIVY_VERSION"
+# Build source metadata JSON
+SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" '{
+  tool: "trivy",
+  integration: "code"
+} + (if $version != "" then {version: $version} else {} end)')
 
 # Check if any vulnerabilities found
 VULN_COUNT=$(jq '[.Results[]? | .Vulnerabilities[]?] | length' "$RESULTS_FILE")
 if [ "$VULN_COUNT" = "0" ] || [ -z "$VULN_COUNT" ]; then
   echo "No vulnerabilities found" >&2
-  # Write zero counts so policies can verify scan ran
-  jq -n '{
+  # Write everything in a single collect call to avoid merge fragmentation
+  jq -n --argjson source "$SOURCE_JSON" '{
+    source: $source,
     vulnerabilities: {critical: 0, high: 0, medium: 0, low: 0, total: 0},
     summary: {has_critical: false, has_high: false, all_fixable: true}
   }' | lunar collect -j ".sca" -
   exit 0
 fi
 
-# Build normalized findings and counts
-jq -c '{
+# Build normalized findings, counts, and source in a single JSON blob
+jq -c --argjson source "$SOURCE_JSON" '{
+  source: $source,
   vulnerabilities: {
     critical: [.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length,
     high:     [.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")]     | length,
