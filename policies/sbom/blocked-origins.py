@@ -9,9 +9,8 @@ def check_blocked_origins(node=None):
     )
     with c:
         blocked_str = variable_or_default("blocked_countries", "")
-        allowed_str = variable_or_default("allowed_countries", "")
 
-        if not blocked_str and not allowed_str:
+        if not blocked_str:
             pass  # No countries configured — auto-pass
         else:
             origins = c.get_node(".sbom.license_origins")
@@ -22,61 +21,37 @@ def check_blocked_origins(node=None):
             if not packages.exists():
                 pass  # No packages with country mentions — pass
             else:
-                if blocked_str:
-                    blocked = {
-                        s.strip().lower()
-                        for s in blocked_str.split(",")
-                        if s.strip()
-                    }
-                    seen = set()
-                    for pkg in packages:
-                        purl = pkg.get_value_or_default(".purl", "<unknown>")
-                        if purl in seen:
-                            continue
-                        countries_node = pkg.get_node(".countries")
-                        if not countries_node.exists():
-                            continue
-                        for country_node in countries_node:
-                            country = country_node.get_value()
-                            if country.lower() in blocked:
-                                excerpts_node = pkg.get_node(".excerpts")
-                                excerpt = ""
-                                if excerpts_node.exists():
-                                    for e in excerpts_node:
-                                        excerpt = e.get_value()
-                                        break
-                                msg = (
-                                    f"Package '{purl}' has license origin mention "
-                                    f"for blocked country '{country}'"
-                                )
-                                if excerpt:
-                                    msg += f": \"{excerpt}\""
-                                c.fail(msg)
-                                seen.add(purl)
-                                break
-                elif allowed_str:
-                    allowed = {
-                        s.strip().lower()
-                        for s in allowed_str.split(",")
-                        if s.strip()
-                    }
-                    seen = set()
-                    for pkg in packages:
-                        purl = pkg.get_value_or_default(".purl", "<unknown>")
-                        if purl in seen:
-                            continue
-                        countries_node = pkg.get_node(".countries")
-                        if not countries_node.exists():
-                            continue
-                        for country_node in countries_node:
-                            country = country_node.get_value()
-                            if country.lower() not in allowed:
-                                c.fail(
-                                    f"Package '{purl}' has license origin mention "
-                                    f"for non-allowed country '{country}'"
-                                )
-                                seen.add(purl)
-                                break
+                blocked = {
+                    s.strip().lower()
+                    for s in blocked_str.split(",")
+                    if s.strip()
+                }
+                seen = set()
+                for pkg in packages:
+                    purl = pkg.get_value_or_default(".purl", "<unknown>")
+                    if purl in seen:
+                        continue
+                    countries_node = pkg.get_node(".countries")
+                    if not countries_node.exists():
+                        continue
+                    for country_node in countries_node:
+                        country = country_node.get_value()
+                        if country.lower() in blocked:
+                            excerpts_node = pkg.get_node(".excerpts")
+                            excerpt = ""
+                            if excerpts_node.exists():
+                                for e in excerpts_node:
+                                    excerpt = e.get_value()
+                                    break
+                            msg = (
+                                f"Package '{purl}' has license origin mention "
+                                f"for blocked country '{country}'"
+                            )
+                            if excerpt:
+                                msg += f": \"{excerpt}\""
+                            c.fail(msg)
+                            seen.add(purl)
+                            break
     return c
 
 

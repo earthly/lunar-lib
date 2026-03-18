@@ -90,9 +90,6 @@ inputs:
   blocked_countries:
     description: Comma-separated list of blocked countries for license origin checks (e.g. "Russia,China,Iran,North Korea")
     default: ""
-  allowed_countries:
-    description: Comma-separated allowlist of countries (stricter alternative to blocked_countries — any country NOT on this list triggers a failure)
-    default: ""
   disallowed_packages:
     description: Comma-separated regex patterns for disallowed packages (matched against PURL, name, and group; e.g. "ru\\.yandex\\..*,com\\.alibaba\\..*")
     default: ""

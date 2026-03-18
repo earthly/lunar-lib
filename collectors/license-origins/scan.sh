@@ -62,19 +62,21 @@ cache_store() {
   local purl="$1"
   local countries_pg="$2"
   local excerpts_json="$3"
-  local escaped_purl
+  local escaped_purl escaped_countries escaped_excerpts
   escaped_purl="$(echo "$purl" | sed "s/'/''/g")"
+  escaped_countries="$(echo "$countries_pg" | sed "s/'/''/g")"
+  escaped_excerpts="$(echo "$excerpts_json" | sed "s/'/''/g")"
 
   psql_cmd -c "
     INSERT INTO ${CACHE_TABLE} (purl, countries, excerpts, source)
     VALUES (
       '${escaped_purl}',
-      '${countries_pg}',
-      '${excerpts_json}'::jsonb,
+      '${escaped_countries}',
+      '${escaped_excerpts}'::jsonb,
       'local'
     )
     ON CONFLICT (purl) DO NOTHING;
-  "
+  " || echo "Warning: cache write failed for $purl" >&2
 }
 
 # --- SBOM helpers ---
@@ -142,7 +144,7 @@ fetch_go_deps() {
 }
 
 fetch_node_deps() {
-  if [[ ! -f "package-lock.json" ]] && [[ ! -f "yarn.lock" ]] && [[ ! -f "pnpm-lock.yaml" ]]; then
+  if [[ ! -f "package-lock.json" ]] && [[ ! -f "package.json" ]]; then
     return
   fi
   if ! command -v npm >/dev/null 2>&1; then
@@ -161,7 +163,7 @@ fetch_node_deps() {
 }
 
 fetch_python_deps() {
-  if [[ ! -f "requirements.txt" ]] && [[ ! -f "pyproject.toml" ]] && [[ ! -f "Pipfile" ]] && [[ ! -f "setup.py" ]]; then
+  if [[ ! -f "requirements.txt" ]] && [[ ! -f "pyproject.toml" ]]; then
     return
   fi
   local python_cmd=""
