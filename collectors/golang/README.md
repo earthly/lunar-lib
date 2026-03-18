@@ -44,7 +44,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/golang@v1.0.0
-    on: [go]  # Or use domain: ["domain:your-domain"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     # include: [project, golangci-lint]  # Only include specific subcollectors
     # with:
     #   lint_timeout: "10m"

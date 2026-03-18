@@ -42,6 +42,6 @@ Add to your `lunar-config.yml`:
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/java@v1.0.0
-    on: [java]  # Or use domain: ["domain:your-domain"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     # include: [project, dependencies]  # Only include specific subcollectors
 ```

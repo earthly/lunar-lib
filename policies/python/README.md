@@ -37,7 +37,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/python@v1.0.0
-    on: [python]  # Or use tags like ["domain:backend"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # include: [lockfile-exists, linter-configured]  # Only run specific checks
     with:

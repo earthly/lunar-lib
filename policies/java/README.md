@@ -39,7 +39,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/java@v1.0.0
-    on: [java]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     with:
       min_java_version: "17"

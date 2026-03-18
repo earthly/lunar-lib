@@ -42,7 +42,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/rust@main
-    on: [rust]  # Or use tags like ["domain:backend"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # include: [cargo-toml-exists, cargo-lock-exists]  # Only run specific checks
     with:
