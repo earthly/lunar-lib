@@ -32,15 +32,7 @@ collectors:
     mainBash: scan.sh
     hook:
       type: code
-    keywords:
-      - "license origins"
-      - "country of origin"
-      - "geographic origin"
-      - "license scanning"
-      - "compliance"
-      - "supply chain"
-      - "export control"
-      - "sbom"
+    keywords: ["license origins", "country of origin", "geographic origin", "license scanning", "compliance", "supply chain", "export control", "sbom"]
 
 inputs:
   cache_enabled:
