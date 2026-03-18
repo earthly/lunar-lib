@@ -4,11 +4,7 @@ Generate SBOMs and scan dependency license files for country-of-origin mentions.
 
 ## Overview
 
-This collector generates a CycloneDX SBOM using syft, then fetches dependencies per language ecosystem so their license files are available on disk, and scans each license file (LICENSE, COPYING, NOTICE) for geographic origin signals — country names in copyright holder lines, governing law clauses, and author addresses. It greps each license file against ~200 country names. Scan results are optionally cached in Postgres keyed by PURL@version (immutable, never invalidates), so repeated scans across projects are fast.
-
-**Note:** This collector fully replaces the `syft` collector — use it *instead of* `syft` on the same component. In the future, when collector dependency ordering is supported, the SBOM generation will move back to the `syft` collector and this collector will depend on it.
-
-Dependencies are fetched per language: Rust (`cargo fetch`), Go (`go mod download`), Node.js (`npm install`), and Python (`pip install`). Java is not supported in v1. The Docker image includes all supported language runtimes; if a tool is not available, that language is skipped gracefully.
+This collector generates a CycloneDX SBOM using syft, fetches dependencies per language ecosystem (Rust, Go, Node.js, Python), and scans each dependency's license files for country-of-origin mentions. Results are cached in Postgres keyed by PURL@version. Replaces the `syft` collector — use it *instead of* `syft` on the same component.
 
 ## Collected Data
 
