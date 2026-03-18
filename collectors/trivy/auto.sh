@@ -8,11 +8,51 @@ TRIVY_VERSION=$(trivy version -f json 2>/dev/null | jq -r '.Version // empty' ||
 
 # Run Trivy filesystem scan (vuln scanner only, JSON output)
 RESULTS_FILE="/tmp/trivy-results.json"
-if ! trivy fs --scanners vuln --format json . > "$RESULTS_FILE" 2>/tmp/trivy-stderr.log; then
-  echo "Trivy scan could not complete (this can happen with complex multi-module projects):" >&2
-  # Show a brief summary of the error, not the full stack trace
-  tail -3 /tmp/trivy-stderr.log | head -2 >&2
-  echo "Skipping vulnerability collection for this component" >&2
+SCAN_OK=false
+
+if trivy fs --scanners vuln --format json . > "$RESULTS_FILE" 2>/tmp/trivy-stderr.log; then
+  SCAN_OK=true
+else
+  echo "Full repo scan failed — falling back to individual manifest scanning" >&2
+
+  # Find dependency manifests and scan each individually, merging results.
+  # This handles multi-module repos where one bad pom.xml would kill the whole scan.
+  MANIFESTS=$(find . -maxdepth 4 -type f \( \
+    -name "go.sum" -o -name "package-lock.json" -o -name "yarn.lock" -o -name "pnpm-lock.yaml" \
+    -o -name "requirements.txt" -o -name "Pipfile.lock" -o -name "poetry.lock" \
+    -o -name "Gemfile.lock" -o -name "Cargo.lock" \
+    -o -name "pom.xml" -o -name "build.gradle" -o -name "build.gradle.kts" \
+    -o -name "composer.lock" -o -name "packages.lock.json" \
+  \) ! -path "*/vendor/*" ! -path "*/node_modules/*" 2>/dev/null)
+
+  if [ -z "$MANIFESTS" ]; then
+    echo "No dependency manifests found — nothing to scan" >&2
+    exit 0
+  fi
+
+  # Scan each manifest, collect all results
+  echo '{"Results":[]}' > "$RESULTS_FILE"
+  SCANNED=0
+  while IFS= read -r manifest; do
+    echo "  Scanning $manifest..." >&2
+    if trivy fs --scanners vuln --format json "$manifest" > /tmp/trivy-single.json 2>/dev/null; then
+      # Merge Results arrays
+      jq -s '.[0].Results += (.[1].Results // []) | .[0]' "$RESULTS_FILE" /tmp/trivy-single.json > /tmp/trivy-merged.json
+      mv /tmp/trivy-merged.json "$RESULTS_FILE"
+      SCANNED=$((SCANNED + 1))
+    fi
+  done <<< "$MANIFESTS"
+
+  if [ "$SCANNED" -gt 0 ]; then
+    SCAN_OK=true
+    echo "Scanned $SCANNED manifests individually" >&2
+  else
+    echo "No manifests could be scanned — skipping vulnerability collection" >&2
+    exit 0
+  fi
+fi
+
+if [ "$SCAN_OK" != "true" ]; then
   exit 0
 fi
 
