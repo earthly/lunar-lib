@@ -5,7 +5,7 @@ description: |
   Scan source code dependencies for known vulnerabilities using Trivy.
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:trivy-main
+default_image: earthly/lunar-lib:trivy-brandon-trivy
 default_image_ci_collectors: native
 
 landing_page:
