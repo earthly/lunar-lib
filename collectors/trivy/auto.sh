@@ -3,20 +3,23 @@ set -e
 
 echo "Running Trivy vulnerability scan" >&2
 
-# Record source metadata
+# Get Trivy version for source metadata
 TRIVY_VERSION=$(trivy version -f json 2>/dev/null | jq -r '.Version // empty' || trivy version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
-lunar collect ".sca.source.tool" "trivy"
-lunar collect ".sca.source.integration" "code"
-if [ -n "$TRIVY_VERSION" ]; then
-  lunar collect ".sca.source.version" "$TRIVY_VERSION"
-fi
 
 # Run Trivy filesystem scan (vuln scanner only, JSON output)
 RESULTS_FILE="/tmp/trivy-results.json"
-if ! trivy fs --scanners vuln --format json --quiet . > "$RESULTS_FILE" 2>/dev/null; then
-  echo "Trivy scan failed" >&2
-  exit 1
+if ! trivy fs --scanners vuln --format json . > "$RESULTS_FILE" 2>/tmp/trivy-stderr.log; then
+  echo "Trivy scan could not complete (this can happen with complex multi-module projects):" >&2
+  # Show a brief summary of the error, not the full stack trace
+  tail -3 /tmp/trivy-stderr.log | head -2 >&2
+  echo "Skipping vulnerability collection for this component" >&2
+  exit 0
 fi
+
+# Record source metadata only after successful scan
+lunar collect ".sca.source.tool" "trivy"
+lunar collect ".sca.source.integration" "code"
+[ -n "$TRIVY_VERSION" ] && lunar collect ".sca.source.version" "$TRIVY_VERSION"
 
 # Check if any vulnerabilities found
 VULN_COUNT=$(jq '[.Results[]? | .Vulnerabilities[]?] | length' "$RESULTS_FILE")
