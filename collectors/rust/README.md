@@ -55,7 +55,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/rust@main
-    on: [rust]  # Or use domain: ["domain:your-domain"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     # include: [project, dependencies]  # Only include specific subcollectors
     # with:
     #   clippy_args: "-- -W clippy::pedantic"

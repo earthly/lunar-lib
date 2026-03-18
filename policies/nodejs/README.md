@@ -42,7 +42,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/nodejs@v1.0.0
-    on: [nodejs]  # Or use tags like ["domain:frontend"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # include: [lockfile-exists, typescript-configured]  # Only run specific checks
     with:

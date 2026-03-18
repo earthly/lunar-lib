@@ -33,7 +33,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/linter@v1.0.0
-    on: [go]  # Or use domain: ["domain:your-domain"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     with:
       language: "go"
@@ -45,7 +45,7 @@ policies:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/linter@v1.0.0
-    on: [go]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: block-pr
     with:
       language: "go"

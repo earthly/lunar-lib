@@ -40,7 +40,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 policies:
   - uses: github://earthly/lunar-lib/policies/golang@v1.0.0
-    on: [go]  # Or use tags like ["domain:backend"]
+    on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # include: [go-mod-exists, go-sum-exists]  # Only run specific checks
     with:
