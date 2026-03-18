@@ -28,20 +28,30 @@ def check_disallowed_packages(node=None):
             if not has_sbom:
                 c.skip("No SBOM data available")
 
+            seen = set()
             for component in components:
                 name = component.get_value_or_default(".name", "")
                 purl = component.get_value_or_default(".purl", "")
                 group = component.get_value_or_default(".group", "")
 
+                key = purl or name
+                if key in seen:
+                    continue
+
                 targets = [t for t in [purl, name, group] if t]
+                matched = False
 
                 for target in targets:
+                    if matched:
+                        break
                     for regex in regexes:
                         if regex.search(target):
                             c.fail(
                                 f"Package '{name or purl}' matches disallowed "
                                 f"pattern '{regex.pattern}'"
                             )
+                            seen.add(key)
+                            matched = True
                             break
     return c
 

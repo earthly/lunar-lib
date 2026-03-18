@@ -28,8 +28,11 @@ def check_blocked_origins(node=None):
                         for s in blocked_str.split(",")
                         if s.strip()
                     }
+                    seen = set()
                     for pkg in packages:
                         purl = pkg.get_value_or_default(".purl", "<unknown>")
+                        if purl in seen:
+                            continue
                         countries_node = pkg.get_node(".countries")
                         if not countries_node.exists():
                             continue
@@ -49,14 +52,19 @@ def check_blocked_origins(node=None):
                                 if excerpt:
                                     msg += f": \"{excerpt}\""
                                 c.fail(msg)
+                                seen.add(purl)
+                                break
                 elif allowed_str:
                     allowed = {
                         s.strip().lower()
                         for s in allowed_str.split(",")
                         if s.strip()
                     }
+                    seen = set()
                     for pkg in packages:
                         purl = pkg.get_value_or_default(".purl", "<unknown>")
+                        if purl in seen:
+                            continue
                         countries_node = pkg.get_node(".countries")
                         if not countries_node.exists():
                             continue
@@ -67,6 +75,8 @@ def check_blocked_origins(node=None):
                                     f"Package '{purl}' has license origin mention "
                                     f"for non-allowed country '{country}'"
                                 )
+                                seen.add(purl)
+                                break
     return c
 
 
