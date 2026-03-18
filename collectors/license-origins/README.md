@@ -8,17 +8,7 @@ This collector generates a CycloneDX SBOM using syft, then fetches dependencies 
 
 **Note:** This collector fully replaces the `syft` collector — use it *instead of* `syft` on the same component. In the future, when collector dependency ordering is supported, the SBOM generation will move back to the `syft` collector and this collector will depend on it.
 
-## Supported Languages
-
-| Language | How license files are obtained | Tool required |
-|----------|-------------------------------|---------------|
-| Rust | `cargo fetch` populates `$CARGO_HOME/registry/src/` | `cargo` |
-| Go | `go mod download` populates `$GOPATH/pkg/mod/` | `go` |
-| Node.js | `npm install --ignore-scripts` populates `node_modules/` | `npm` |
-| Python | `pip install --target` populates `.python-packages-scan/` | `python3` + `pip` |
-| Java | Not supported in v1 | - |
-
-The Docker image (`earthly/lunar-lib:license-origins-main`) includes all supported language runtimes. If a tool is not available, that language is skipped gracefully.
+Dependencies are fetched per language: Rust (`cargo fetch`), Go (`go mod download`), Node.js (`npm install`), and Python (`pip install`). Java is not supported in v1. The Docker image includes all supported language runtimes; if a tool is not available, that language is skipped gracefully.
 
 ## Collected Data
 

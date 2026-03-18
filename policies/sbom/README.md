@@ -17,6 +17,8 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `disallowed-licenses` | Checks for disallowed license patterns | Component uses a disallowed license |
 | `min-components` | Verifies minimum component count | SBOM has too few components |
 | `standard-format` | Validates SBOM format | SBOM uses a non-approved format |
+| `blocked-origins` | Checks for license origin mentions from blocked countries | Dependency has country mention from blocklist |
+| `disallowed-packages` | Checks for disallowed packages by PURL/name/group pattern | Package matches a disallowed pattern |
 
 ## Required Data
 
@@ -24,12 +26,13 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.sbom.auto` | object | `syft` collector (generate sub-collector) |
+| `.sbom.auto` | object | `syft` or `license-origins` collector |
 | `.sbom.cicd` | object | `syft` collector (ci sub-collector) |
-| `.sbom.auto.cyclonedx.components` | array | `syft` collector |
+| `.sbom.auto.cyclonedx.components` | array | `syft` or `license-origins` collector |
 | `.sbom.cicd.cyclonedx.components` | array | `syft` collector |
+| `.sbom.license_origins.packages` | array | `license-origins` collector (for `blocked-origins` check) |
 
-**Note:** Ensure the `syft` collector is configured before enabling this policy.
+**Note:** Ensure the `syft` or `license-origins` collector is configured before enabling this policy. The `blocked-origins` check requires the `license-origins` collector.
 
 ## Installation
 
@@ -107,3 +110,5 @@ When this policy fails, you can resolve it by:
 3. **`disallowed-licenses` failure:** Replace the disallowed dependency with an alternative that uses an approved license, or update the `disallowed_licenses` input
 4. **`min-components` failure:** Verify Syft can detect your project's package manager and dependencies are declared correctly
 5. **`standard-format` failure:** Configure Syft to output in an approved format (e.g., `cyclonedx-json`) or update the `allowed_formats` input
+6. **`blocked-origins` failure:** Review the flagged package's license file to confirm the country mention is genuine (not a false positive), then either replace the dependency or update the `blocked_countries`/`allowed_countries` inputs
+7. **`disallowed-packages` failure:** Replace the disallowed dependency or update the `disallowed_packages` regex patterns
