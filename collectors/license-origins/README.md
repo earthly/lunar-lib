@@ -4,7 +4,7 @@ Scan dependency license files for country-of-origin mentions.
 
 ## Overview
 
-This collector fetches dependencies per language ecosystem (Rust, Go, Node.js, Python), generates an internal SBOM to enumerate them, then scans each dependency's license files for country-of-origin mentions. Results are cached in Postgres keyed by PURL@version. Use alongside the `syft` collector for full SBOM + origin coverage.
+This collector fetches dependencies per language ecosystem (Rust, Go, Node.js, Python), generates an internal SBOM to enumerate them, then scans each dependency's license files for country-of-origin mentions. Results are cached in Postgres keyed by PURL@version. Use alongside the `syft` collector for full SBOM + origin coverage. When collector dependency features are available, this will run after the syft collector instead of generating its own SBOM.
 
 ## Collected Data
 
@@ -26,31 +26,15 @@ This integration provides the following collectors (use `include` to select a su
 
 ## Installation
 
-Add to your `lunar-config.yml`. The defaults match the standard Lunar hub database, so you only need to provide the password:
+Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/license-origins@main
     on: ["domain:engineering"]
-    secrets:
-      CACHE_DB_PASSWORD: "your-db-password"
 ```
 
-To use a different database, override the connection inputs:
-
-```yaml
-collectors:
-  - uses: github://earthly/lunar-lib/collectors/license-origins@main
-    on: ["domain:engineering"]
-    with:
-      cache_db_host: "my-rds-instance.amazonaws.com"
-      cache_db_user: "cache_user"
-      cache_db_name: "mydb"
-    secrets:
-      CACHE_DB_PASSWORD: "your-db-password"
-```
-
-To disable caching entirely (scan fresh every time):
+To disable caching (scan fresh every time):
 
 ```yaml
 collectors:
@@ -60,6 +44,5 @@ collectors:
       cache_enabled: "false"
 ```
 
-### Why Cache?
-
-A dependency at a specific version (e.g., `lodash@4.17.21`) has an immutable license file. Once scanned, the result never changes. The cache warms up quickly across projects since most packages are shared (lodash, express, react, etc.), reaching 95%+ hit rates after a few components.
+Optional secrets (for Postgres caching):
+- `CACHE_DB_PASSWORD` — Postgres password for the cache database. If not set, caching is disabled and every scan runs fresh. The connection defaults (`postgres:5432/hub`, user `lunar`) match the standard Lunar hub database. Override with `cache_db_host`, `cache_db_port`, `cache_db_name`, `cache_db_user` inputs if needed.
