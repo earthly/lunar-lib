@@ -94,6 +94,7 @@ all:
     BUILD --pass-args ./collectors/golang+image
     BUILD --pass-args ./collectors/nodejs+image
     BUILD --pass-args ./collectors/syft+image
+    BUILD --pass-args ./collectors/license-origins+image
     BUILD --pass-args ./collectors/terraform+image
     BUILD --pass-args ./collectors/trivy+image
     BUILD --pass-args ./catalogers/github-org+image

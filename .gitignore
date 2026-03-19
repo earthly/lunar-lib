@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 *.pyo
 
+pkg-install.lock
+pkg-install.log

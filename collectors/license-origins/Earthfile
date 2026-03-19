@@ -1,0 +1,45 @@
+VERSION 0.8
+
+image:
+    # Use Debian variant for glibc compatibility (required by Node.js binaries)
+    ARG SCRIPTS_VERSION=main-debian
+    FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+
+    RUN apt-get update -qq && \
+        apt-get install -y --no-install-recommends postgresql-client gcc libc6-dev && \
+        rm -rf /var/lib/apt/lists/*
+
+    ARG TARGETARCH
+
+    # Install Syft
+    ARG SYFT_VERSION=1.41.2
+    RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
+        chmod +x /usr/local/bin/syft
+
+    # Install Go
+    ARG GO_VERSION=1.23.4
+    RUN wget -q "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
+        tar -C /usr/local -xzf "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
+        rm "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz"
+    ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
+
+    # Install Rust via rustup (minimal profile, no clippy needed — just cargo fetch)
+    ENV RUSTUP_HOME="/usr/local/rustup"
+    ENV CARGO_HOME="/usr/local/cargo"
+    ENV PATH="/usr/local/cargo/bin:$PATH"
+    RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+        sh -s -- -y --default-toolchain stable --profile minimal
+
+    # Install Node.js (amd64 -> x64 for Node naming, arm64 stays arm64)
+    ARG NODE_VERSION=22.14.0
+    RUN case "${TARGETARCH}" in amd64) ARCH=x64;; *) ARCH="${TARGETARCH}";; esac && \
+        wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz" -O node.tar.gz && \
+        tar -xzf node.tar.gz -C /usr/local --strip-components=1 && \
+        rm node.tar.gz
+
+    # Verify all tools
+    RUN syft version && go version && rustc --version && cargo --version && \
+        node --version && npm --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:license-origins-$VERSION
