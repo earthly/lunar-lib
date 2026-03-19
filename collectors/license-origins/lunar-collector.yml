@@ -23,12 +23,12 @@ landing_page:
 collectors:
   - name: scan
     description: |
-      Generates a CycloneDX SBOM using bundled syft and writes it to
-      .sbom.auto.cyclonedx, fully replacing the syft collector. Then fetches
-      dependencies (Rust, Go, Node.js, Python) and scans each dependency's
-      license files for country name mentions. Scan results are cached in a
+      Fetches dependencies (Rust, Go, Node.js, Python) and generates an
+      internal SBOM to enumerate them, then scans each dependency's license
+      files for country name mentions. Scan results are cached in a
       configurable Postgres database keyed by PURL@version. Writes origin
-      results to .sbom.license_origins in Component JSON.
+      results to .sbom.license_origins in Component JSON. Use alongside
+      the syft collector for full SBOM + origin coverage.
     mainBash: scan.sh
     hook:
       type: code

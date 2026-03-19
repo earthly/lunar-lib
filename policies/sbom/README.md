@@ -26,13 +26,13 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.sbom.auto` | object | `syft` or `license-origins` collector |
+| `.sbom.auto` | object | `syft` collector (generate sub-collector) |
 | `.sbom.cicd` | object | `syft` collector (ci sub-collector) |
-| `.sbom.auto.cyclonedx.components` | array | `syft` or `license-origins` collector |
+| `.sbom.auto.cyclonedx.components` | array | `syft` collector |
 | `.sbom.cicd.cyclonedx.components` | array | `syft` collector |
 | `.sbom.license_origins.packages` | array | `license-origins` collector (for `blocked-origins` check) |
 
-**Note:** Ensure the `syft` or `license-origins` collector is configured before enabling this policy. The `blocked-origins` check requires the `license-origins` collector.
+**Note:** Ensure the `syft` collector is configured before enabling this policy. The `blocked-origins` check additionally requires the `license-origins` collector.
 
 ## Installation
 

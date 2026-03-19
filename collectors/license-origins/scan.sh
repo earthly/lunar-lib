@@ -276,28 +276,21 @@ lunar collect ".sbom.license_origins.source.tool" "license-origins"
 lunar collect ".sbom.license_origins.source.integration" "code"
 lunar collect ".sbom.license_origins.source.version" "$COLLECTOR_VERSION"
 
-# Step 2: Generate SBOM with syft and write to .sbom.auto (replaces syft collector)
-SBOM_FILE="/tmp/license-origins-sbom.json"
-
-SYFT_VERSION=$(syft version -o json 2>/dev/null | jq -r '.version // empty' || syft version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
-lunar collect ".sbom.auto.source.tool" "syft"
-lunar collect ".sbom.auto.source.integration" "code"
-if [ -n "$SYFT_VERSION" ]; then
-  lunar collect ".sbom.auto.source.version" "$SYFT_VERSION"
-fi
-
-export SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES="${SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES:-true}"
-export SYFT_GOLANG_SEARCH_REMOTE_LICENSES="${SYFT_GOLANG_SEARCH_REMOTE_LICENSES:-true}"
-export SYFT_JAVA_USE_NETWORK="${SYFT_JAVA_USE_NETWORK:-true}"
-export SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES="${SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES:-true}"
-
-# Step 3: Fetch dependencies per language so license files are on disk
+# Step 2: Fetch dependencies per language so license files are on disk
 echo "Detecting project languages and fetching dependencies..." >&2
 fetch_rust_deps
 fetch_go_deps
 fetch_node_deps
 fetch_python_deps
 echo "License search directories: ${LICENSE_SEARCH_DIRS[*]:-"(repo root only)"}" >&2
+
+# Step 3: Generate SBOM internally (for dependency enumeration only — not published)
+SBOM_FILE="/tmp/license-origins-sbom.json"
+
+export SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES="${SYFT_GOLANG_SEARCH_LOCAL_MOD_CACHE_LICENSES:-true}"
+export SYFT_GOLANG_SEARCH_REMOTE_LICENSES="${SYFT_GOLANG_SEARCH_REMOTE_LICENSES:-true}"
+export SYFT_JAVA_USE_NETWORK="${SYFT_JAVA_USE_NETWORK:-true}"
+export SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES="${SYFT_JAVASCRIPT_SEARCH_REMOTE_LICENSES:-true}"
 
 echo "Generating SBOM with syft..." >&2
 if ! syft dir:. -o cyclonedx-json > "$SBOM_FILE" 2>/dev/null; then
@@ -311,8 +304,6 @@ if jq -e '(.components // []) | length == 0' "$SBOM_FILE" >/dev/null 2>&1; then
 fi
 
 echo "SBOM generated: $(jq '.components | length' "$SBOM_FILE") components" >&2
-
-cat "$SBOM_FILE" | lunar collect -j ".sbom.auto.cyclonedx" -
 
 # Step 4: Initialize cache
 if [ "$CACHE_ENABLED" = "true" ]; then

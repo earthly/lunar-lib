@@ -1,10 +1,10 @@
 # License Origins Collector
 
-Generate SBOMs and scan dependency license files for country-of-origin mentions.
+Scan dependency license files for country-of-origin mentions.
 
 ## Overview
 
-This collector generates a CycloneDX SBOM using syft, fetches dependencies per language ecosystem (Rust, Go, Node.js, Python), and scans each dependency's license files for country-of-origin mentions. Results are cached in Postgres keyed by PURL@version. Replaces the `syft` collector — use it *instead of* `syft` on the same component.
+This collector fetches dependencies per language ecosystem (Rust, Go, Node.js, Python), generates an internal SBOM to enumerate them, then scans each dependency's license files for country-of-origin mentions. Results are cached in Postgres keyed by PURL@version. Use alongside the `syft` collector for full SBOM + origin coverage.
 
 ## Collected Data
 
@@ -12,8 +12,6 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.sbom.auto.source` | object | Syft source metadata (tool, integration, version) |
-| `.sbom.auto.cyclonedx` | object | Full CycloneDX SBOM from syft |
 | `.sbom.license_origins.source` | object | License origins source metadata |
 | `.sbom.license_origins.packages[]` | array | Packages with country mentions (purl, countries, excerpts) |
 | `.sbom.license_origins.summary` | object | Scan statistics (files scanned, cache hits/misses, countries found) |
