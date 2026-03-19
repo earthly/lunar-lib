@@ -12,6 +12,7 @@ if ! command -v yq &>/dev/null; then
     echo "Error: yq is required (https://github.com/mikefarah/yq)" >&2
     exit 1
 fi
+
 if ! yq --version 2>&1 | grep -q "mikefarah"; then
     echo "Error: wrong yq installed. Need mikefarah/yq." >&2
     echo "Install: https://github.com/mikefarah/yq#install" >&2
@@ -55,8 +56,8 @@ git commit -m "Pin images for $VERSION"
 echo "Tagging $VERSION..."
 git tag "$VERSION"
 
-git push -u origin "$VERSION"
-git push origin "refs/tags/$VERSION"
+git push -u origin "refs/heads/$VERSION:refs/heads/$VERSION"
+git push origin "refs/tags/$VERSION:refs/tags/$VERSION"
 
 echo ""
 echo "Release $VERSION created and pushed (branch + tag)."
