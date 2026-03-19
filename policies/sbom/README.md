@@ -49,7 +49,10 @@ policies:
       min_license_coverage: "90"
       min_components: "1"
       # allowed_formats: "cyclonedx"
+      # disallowed_packages: '["alibabacloud", "aliyun-.*", ".*\\.ru$"]'
 ```
+
+> **Tip:** `disallowed_licenses` and `disallowed_packages` accept either a comma-separated string (`"GPL.*,AGPL.*"`) or a JSON array string (`'["GPL.*", "AGPL.*"]'`). JSON arrays are recommended when patterns contain commas or complex regex.
 
 ## Examples
 

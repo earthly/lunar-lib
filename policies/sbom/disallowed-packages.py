@@ -2,7 +2,7 @@ import re
 import sys
 
 sys.path.insert(0, ".")
-from helpers import get_sbom_components
+from helpers import get_sbom_components, parse_patterns
 from lunar_policy import Check, variable_or_default
 
 
@@ -14,7 +14,7 @@ def check_disallowed_packages(node=None):
     )
     with c:
         patterns_str = variable_or_default("disallowed_packages", "")
-        patterns = [p.strip() for p in patterns_str.split(",") if p.strip()]
+        patterns = parse_patterns(patterns_str)
 
         if not patterns:
             pass  # No patterns configured — auto-pass

@@ -77,7 +77,7 @@ policies:
 
 inputs:
   disallowed_licenses:
-    description: Comma-separated regex patterns of disallowed licenses (e.g. "GPL.*,AGPL.*")
+    description: Regex patterns of disallowed licenses. Accepts a comma-separated string (e.g. "GPL.*,AGPL.*") or a JSON array (e.g. '["GPL.*", "AGPL.*"]').
   min_license_coverage:
     description: Minimum percentage of components that must have license info (0-100)
     default: "50"
@@ -91,5 +91,5 @@ inputs:
     description: Comma-separated list of blocked countries for license origin checks (e.g. "Russia,China,Iran,North Korea")
     default: ""
   disallowed_packages:
-    description: Comma-separated regex patterns for disallowed packages (matched against PURL, name, and group; e.g. "ru\\.yandex\\..*,com\\.alibaba\\..*")
+    description: Regex patterns for disallowed packages, matched against PURL, name, and group. Accepts a comma-separated string or a JSON array (e.g. '["ru\\.yandex\\..*", "com\\.alibaba\\..*"]').
     default: ""

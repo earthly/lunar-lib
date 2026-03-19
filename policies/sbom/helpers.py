@@ -1,5 +1,24 @@
 """Shared helpers for SBOM policy checks."""
 
+import json
+
+
+def parse_patterns(raw):
+    """Parse a pattern list from a comma-separated string or JSON array string.
+
+    Accepts either ``"GPL.*,AGPL.*"`` or ``'["GPL.*", "AGPL.*"]'``.
+    Returns a list of stripped, non-empty strings.
+    """
+    raw = raw.strip()
+    if not raw:
+        return []
+    if raw.startswith("["):
+        try:
+            return [p.strip() for p in json.loads(raw) if isinstance(p, str) and p.strip()]
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON array in pattern input: {e}")
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
 
 def get_sbom_components(c):
     """Collect SBOM components from both auto and cicd paths.
