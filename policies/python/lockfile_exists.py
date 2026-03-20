@@ -8,6 +8,8 @@ def check_lockfile_exists(node=None):
         python = c.get_node(".lang.python")
         if not python.exists():
             c.skip("Not a Python project")
+        if not python.get_node(".project_exists").exists():
+            c.skip("No Python project detected in this component")
 
         # Check for poetry.lock
         poetry_lock = python.get_node(".poetry_lock_exists")

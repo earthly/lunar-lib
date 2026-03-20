@@ -18,6 +18,8 @@ def check_min_node_version_cicd(min_version=None, node=None):
         nodejs = c.get_node(".lang.nodejs")
         if not nodejs.exists():
             c.skip("Not a Node.js project")
+        if not nodejs.get_node(".project_exists").exists() and not nodejs.get_node(".cicd").exists():
+            c.skip("No Node.js project detected in this component")
 
         cmds_node = nodejs.get_node(".cicd.cmds")
         if not cmds_node.exists():

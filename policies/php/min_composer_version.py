@@ -11,6 +11,8 @@ def check_min_composer_version(min_version=None, node=None):
         php = c.get_node(".lang.php")
         if not php.exists():
             c.skip("Not a PHP project")
+        if not php.get_node(".project_exists").exists() and not php.get_node(".cicd").exists():
+            c.skip("No PHP project detected in this component")
 
         cmds_node = php.get_node(".composer.cicd.cmds")
         if not cmds_node.exists():

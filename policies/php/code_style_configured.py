@@ -8,6 +8,8 @@ def check_code_style_configured(node=None):
         php = c.get_node(".lang.php")
         if not php.exists():
             c.skip("Not a PHP project")
+        if not php.get_node(".project_exists").exists():
+            c.skip("No PHP project detected in this component")
 
         cs_node = php.get_node(".code_style_configured")
         if not cs_node.exists():

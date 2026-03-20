@@ -30,6 +30,8 @@ def check_min_gradle_version(min_version=None, node=None):
         java = c.get_node(".lang.java")
         if not java.exists():
             c.skip("Not a Java project")
+        if not java.get_node(".project_exists").exists():
+            c.skip("No Java project detected in this component")
 
         cmds_node = java.get_node(".cicd.cmds")
         if not cmds_node.exists():

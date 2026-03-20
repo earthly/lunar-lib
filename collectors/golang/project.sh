@@ -41,6 +41,7 @@ jq -n \
     --argjson vendor_exists "$vendor_exists" \
     --argjson goreleaser_exists "$goreleaser_exists" \
     '{
+        project_exists: $go_mod_exists,
         build_systems: ["go"],
         go_mod_exists: $go_mod_exists,
         go_sum_exists: $go_sum_exists,

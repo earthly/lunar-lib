@@ -8,6 +8,8 @@ def check_typescript_configured(node=None):
         nodejs = c.get_node(".lang.nodejs")
         if not nodejs.exists():
             c.skip("Not a Node.js project")
+        if not nodejs.get_node(".project_exists").exists():
+            c.skip("No Node.js project detected in this component")
 
         tsconfig = nodejs.get_node(".tsconfig_exists")
         if not tsconfig.exists():

@@ -26,6 +26,9 @@ python_version_file_exists=false
 [[ -f "Pipfile.lock" ]] && pipfile_lock_exists=true
 [[ -f ".python-version" ]] && python_version_file_exists=true
 
+project_exists=false
+[[ "$pyproject_exists" == true ]] || [[ "$requirements_txt_exists" == true ]] || [[ "$setup_py_exists" == true ]] || [[ "$pipfile_exists" == true ]] && project_exists=true
+
 # Detect build systems
 build_systems=()
 if [[ "$pyproject_exists" == true ]]; then
@@ -105,7 +108,9 @@ jq -n \
     --arg linter "$linter" \
     --argjson type_checker_configured "$type_checker_configured" \
     --arg type_checker "$type_checker" \
+    --argjson project_exists "$project_exists" \
     '{
+        project_exists: $project_exists,
         build_systems: $build_systems,
         pyproject_exists: $pyproject_exists,
         requirements_txt_exists: $requirements_txt_exists,

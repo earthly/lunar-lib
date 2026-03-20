@@ -8,6 +8,8 @@ def check_wrapper_exists(node=None):
         java = c.get_node(".lang.java")
         if not java.exists():
             c.skip("Not a Java project")
+        if not java.get_node(".project_exists").exists():
+            c.skip("No Java project detected in this component")
 
         build_systems_node = java.get_node(".build_systems")
         if not build_systems_node.exists():

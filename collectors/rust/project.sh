@@ -100,6 +100,7 @@ jq -n \
     --argjson workspace "$workspace_json" \
     --argjson unsafe_blocks "$unsafe_json" \
     '{
+        project_exists: $cargo_toml_exists,
         build_systems: ["cargo"],
         cargo_toml_exists: $cargo_toml_exists,
         cargo_lock_exists: $cargo_lock_exists,

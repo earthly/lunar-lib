@@ -8,6 +8,8 @@ def check_lockfile_exists(node=None):
         nodejs = c.get_node(".lang.nodejs")
         if not nodejs.exists():
             c.skip("Not a Node.js project")
+        if not nodejs.get_node(".project_exists").exists():
+            c.skip("No Node.js project detected in this component")
 
         package_lock = nodejs.get_value_or_default(".package_lock_exists", False)
         yarn_lock = nodejs.get_value_or_default(".yarn_lock_exists", False)
