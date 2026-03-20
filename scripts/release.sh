@@ -36,6 +36,8 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
+ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
 echo "Creating release branch $VERSION from current HEAD..."
 git checkout -b "$VERSION"
 
@@ -58,6 +60,8 @@ git tag "$VERSION"
 
 git push -u origin "refs/heads/$VERSION:refs/heads/$VERSION"
 git push origin "refs/tags/$VERSION:refs/tags/$VERSION"
+
+git checkout "$ORIGINAL_BRANCH"
 
 echo ""
 echo "Release $VERSION created and pushed (branch + tag)."
