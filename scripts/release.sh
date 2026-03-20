@@ -8,9 +8,10 @@ if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
 fi
 
-if ! command -v sed &>/dev/null; then
-    echo "Error: sed is required" >&2
-    exit 1
+if [[ "$OSTYPE" == darwin* ]]; then
+    sedi() { sed -i '' "$@"; }
+else
+    sedi() { sed -i "$@"; }
 fi
 
 if git show-ref --verify --quiet "refs/heads/$VERSION" 2>/dev/null || \
@@ -37,7 +38,7 @@ git checkout -b "$VERSION"
 
 echo "Rewriting manifests: -main → -$VERSION..."
 find . -name 'lunar-*.yml' -exec \
-    sed -i "s|earthly/lunar-lib:\(.*\)-main|earthly/lunar-lib:\1-${VERSION}|g" {} +
+    sedi "s|earthly/lunar-lib:\(.*\)-main|earthly/lunar-lib:\1-${VERSION}|g" {} +
 
 # Verify no earthly/lunar-lib images still reference -main
 if grep -r 'earthly/lunar-lib:.*-main' --include='lunar-*.yml' .; then
