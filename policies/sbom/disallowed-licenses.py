@@ -1,12 +1,12 @@
 import re
 import sys
 sys.path.insert(0, ".")
-from helpers import get_sbom_components
+from helpers import get_sbom_components, parse_patterns
 from lunar_policy import Check, variable_or_default
 
 with Check("disallowed-licenses", "Checks for disallowed licenses in SBOM components") as c:
     disallowed_str = variable_or_default("disallowed_licenses", "")
-    disallowed_patterns = [p.strip() for p in disallowed_str.split(",") if p.strip()]
+    disallowed_patterns = parse_patterns(disallowed_str)
 
     if not disallowed_patterns:
         # No patterns configured — auto-pass
