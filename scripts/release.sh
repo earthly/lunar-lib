@@ -8,14 +8,8 @@ if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
 fi
 
-if ! command -v yq &>/dev/null; then
-    echo "Error: yq is required (https://github.com/mikefarah/yq)" >&2
-    exit 1
-fi
-
-if ! yq --version 2>&1 | grep -q "mikefarah"; then
-    echo "Error: wrong yq installed. Need mikefarah/yq." >&2
-    echo "Install: https://github.com/mikefarah/yq#install" >&2
+if ! command -v sed &>/dev/null; then
+    echo "Error: sed is required" >&2
     exit 1
 fi
 
@@ -42,9 +36,8 @@ echo "Creating release branch $VERSION from current HEAD..."
 git checkout -b "$VERSION"
 
 echo "Rewriting manifests: -main → -$VERSION..."
-export IMAGE_TAG="$VERSION"
 find . -name 'lunar-*.yml' -exec \
-    yq -i '(.. | select(tag == "!!str" and test("earthly/lunar-lib:.*-main$"))) |= sub("-main$", "-" + strenv(IMAGE_TAG))' {} \;
+    sed -i "s|earthly/lunar-lib:\(.*\)-main|earthly/lunar-lib:\1-${VERSION}|g" {} +
 
 # Verify no earthly/lunar-lib images still reference -main
 if grep -r 'earthly/lunar-lib:.*-main' --include='lunar-*.yml' .; then
