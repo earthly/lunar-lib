@@ -207,11 +207,11 @@ CATALOG_ENTRIES=$(jq \
         key: (.url | gsub("https://"; "")),
         value: (
             {
-                tags: [(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"] + ["github-visibility-\(.visibility | ascii_downcase)"],
+                tags: ([(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"] + ["github-visibility-\(.visibility | ascii_downcase)"]),
                 meta: {
                     description: .description,
                     visibility: .visibility,
-                    archived: (if .isArchived then "true" else "false" end)
+                    archived: (if .isArchived then "true" else "false" end),
                 }
             } + (if $owner != "" then {owner: $owner} else {} end)
         )
@@ -257,7 +257,7 @@ while true; do
         '.[$start:$start + $count] | from_entries')
     
     # Write batch to catalog
-    if echo "$BATCH_COMPONENTS" | lunar catalog --json '.components' -; then
+    if echo "$BATCH_COMPONENTS" | lunar catalog raw --json '.components' -; then
         SUCCESS_COUNT=$((SUCCESS_COUNT + BATCH_COUNT))
         echo "Batch $BATCH_NUM: successfully cataloged $BATCH_COUNT components"
     else
