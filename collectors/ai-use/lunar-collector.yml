@@ -4,7 +4,7 @@ name: ai-use
 description: Collect AI coding assistant usage data from repositories and CI pipelines
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v0.1.0
 default_image_ci_collectors: native
 
 landing_page:

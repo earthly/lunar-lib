@@ -4,7 +4,7 @@ name: php
 description: Collect PHP project information, CI/CD commands, and dependencies
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v0.1.0
 default_image_ci_collectors: native
 
 landing_page:
