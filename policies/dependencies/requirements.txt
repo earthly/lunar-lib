@@ -1,2 +1,2 @@
-lunar-policy==0.2.2
+lunar-policy==0.2.3
 semver==3.0.2
