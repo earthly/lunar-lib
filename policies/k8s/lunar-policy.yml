@@ -4,7 +4,7 @@ name: k8s
 description: Kubernetes configuration and resource policies
 author: earthly
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 
 landing_page:
   display_name: "Kubernetes Guardrails"

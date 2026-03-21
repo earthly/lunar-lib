@@ -4,7 +4,7 @@ name: ticket
 description: Enforce issue tracker ticket hygiene in PRs
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 
 landing_page:
   display_name: "Ticket Guardrails"

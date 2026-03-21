@@ -4,7 +4,7 @@ name: readme
 description: README file best practices
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 landing_page:
   display_name: "README Guardrails"
   long_description: |

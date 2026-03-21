@@ -3,7 +3,7 @@ version: 0
 name: codeowners
 description: Enforce code ownership standards via CODEOWNERS file validation
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 
 landing_page:
   display_name: "CODEOWNERS Guardrails"

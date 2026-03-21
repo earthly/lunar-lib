@@ -4,7 +4,7 @@ name: jira
 description: Collect Jira ticket metadata from PR titles and validate against Jira API
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 
 landing_page:
   display_name: "Jira Collector"

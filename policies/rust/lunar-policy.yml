@@ -4,7 +4,7 @@ name: rust
 description: Enforces Rust project structure, safety, and toolchain standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.4
 
 landing_page:
   display_name: "Rust Project Guardrails"

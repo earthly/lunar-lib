@@ -4,7 +4,7 @@ name: golang
 description: Collect Go project information, CI/CD commands, test coverage, and linting
 author: earthly
 
-default_image: earthly/lunar-lib:golang-main
+default_image: earthly/lunar-lib:golang-v1.0.4
 default_image_ci_collectors: native
 
 landing_page:
