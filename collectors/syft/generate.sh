@@ -39,6 +39,25 @@ if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
   fi
 fi
 
+# For Rust projects: fetch crate sources so we can extract license metadata
+# Syft's Rust cataloger reads Cargo.lock for deps but doesn't resolve licenses,
+# so we build a license map from the downloaded crate Cargo.toml files and inject
+# it into the SBOM as a post-processing step.
+RUST_LICENSE_MAP="/tmp/rust-license-map.json"
+if command -v cargo >/dev/null 2>&1 && { [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; }; then
+  echo "Detected Rust project; fetching crate sources for license detection..." >&2
+  PLUGIN_DIR="${LUNAR_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)}"
+  (
+    set +e
+    cargo fetch --quiet 2>&1 || true
+    CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+    REGISTRY_SRC="$CARGO_HOME/registry/src"
+    if [[ -d "$REGISTRY_SRC" ]] && [[ -f "$PLUGIN_DIR/rust-license-map.py" ]]; then
+      python3 "$PLUGIN_DIR/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
+    fi
+  ) >&2 || echo "Warning: Rust license detection failed; continuing without licenses" >&2
+fi
+
 # Generate CycloneDX JSON SBOM
 SBOM_FILE="/tmp/sbom.json"
 if ! syft dir:. -o cyclonedx-json > "$SBOM_FILE"; then
@@ -50,6 +69,27 @@ fi
 if jq -e '(.components // []) | length == 0' "$SBOM_FILE" >/dev/null 2>&1; then
   echo "SBOM has no components; skipping collection" >&2
   exit 0
+fi
+
+# Inject Rust license data into SBOM components that are missing licenses
+if [[ -f "$RUST_LICENSE_MAP" ]] && jq -e 'length > 0' "$RUST_LICENSE_MAP" >/dev/null 2>&1; then
+  SBOM_INJECTED="/tmp/sbom-injected.json"
+  jq --slurpfile lm "$RUST_LICENSE_MAP" '
+    ($lm[0]) as $licenses |
+    .components |= [.[] | if (.licenses == null or .licenses == []) then
+      (.name + "@" + (.version // "")) as $key |
+      if $licenses[$key] then
+        ($licenses[$key]) as $lic |
+        if ($lic | test(" OR | AND ")) then
+          .licenses = [{ "expression": $lic }]
+        else
+          .licenses = [{ "license": { "id": $lic } }]
+        end
+      else . end
+    else . end]
+  ' "$SBOM_FILE" > "$SBOM_INJECTED" && mv "$SBOM_INJECTED" "$SBOM_FILE"
+  count=$(jq '[.components[] | select(.licenses != null and .licenses != [])] | length' "$SBOM_FILE")
+  echo "Injected licenses into SBOM ($count components with licenses)" >&2
 fi
 
 # Collect the full SBOM

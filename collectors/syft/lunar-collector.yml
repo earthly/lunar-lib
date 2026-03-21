@@ -13,7 +13,7 @@ landing_page:
   long_description: |
     Generate Software Bill of Materials automatically or detect existing
     Syft SBOM generation in CI pipelines. Supports CycloneDX and SPDX formats
-    with license detection for Go, Java, Node.js, and Python.
+    with license detection for Go, Java, Node.js, Python, and Rust.
   categories: ["security"]
   icon: "assets/syft.svg"
   status: "stable"
@@ -26,12 +26,12 @@ collectors:
   - name: generate
     description: |
       Auto-generates a CycloneDX SBOM using Syft. Enables remote license
-      lookups for Go, Java, Node.js, and Python. Writes full SBOM to
+      lookups for Go, Java, Node.js, Python, and Rust. Writes full SBOM to
       .sbom.auto.cyclonedx with source metadata.
     mainBash: generate.sh
     hook:
       type: code
-    keywords: ["sbom", "syft", "cyclonedx", "software bill of materials", "license detection"]
+    keywords: ["sbom", "syft", "cyclonedx", "software bill of materials", "license detection", "rust", "cargo"]
 
   - name: ci
     description: |
