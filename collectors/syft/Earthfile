@@ -12,6 +12,7 @@ image:
     # Install Cargo via rustup for Rust license detection (cargo fetch populates the registry cache)
     ENV RUSTUP_HOME=/usr/local/rustup
     ENV CARGO_HOME=/usr/local/cargo
+    ENV RUSTUP_TOOLCHAIN=stable
     ENV PATH="/usr/local/cargo/bin:$PATH"
     RUN apk add --no-cache gcc musl-dev && \
         curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable && \
