@@ -17,7 +17,7 @@ source "$(dirname "$0")/helpers.sh"
 #
 # HOW IT WORKS:
 # 1. Get DB connection via `lunar sql connection-string`
-# 2. Query components_latest2 for PRs with Snyk data for this component
+# 2. Query components_latest for PRs with Snyk data for this component
 # 3. If found, write proof to Component JSON that scanning is happening
 #
 # =============================================================================
@@ -42,12 +42,11 @@ fi
 SAFE_COMPONENT_ID=$(echo "$LUNAR_COMPONENT_ID" | sed "s/'/''/g")
 
 for CATEGORY in sca sast container_scan iac_scan; do
-    # Query components_latest2 for PR data with Snyk results.
-    # Note: using components_latest2 due to temporary schema limitation.
+    # Query components_latest for PR data with Snyk results.
     QUERY="
         SELECT EXISTS (
             SELECT 1
-            FROM components_latest2 pr
+            FROM components_latest pr
             WHERE pr.component_id = '$SAFE_COMPONENT_ID'
               AND pr.pr IS NOT NULL
               AND (pr.component_json->'$CATEGORY'->'native'->'snyk') IS NOT NULL
