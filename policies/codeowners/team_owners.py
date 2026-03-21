@@ -8,11 +8,16 @@ def main(node=None):
         node=node,
     )
     with c:
-        if not c.get_value(".ownership.codeowners.exists"):
+        codeowners = c.get_node(".ownership.codeowners")
+        if not codeowners.exists():
+            c.skip("No codeowners data collected")
+            return c
+
+        if not codeowners.get_value(".exists"):
             c.fail("No CODEOWNERS file found")
             return c
 
-        team_owners = c.get_value(".ownership.codeowners.team_owners")
+        team_owners = codeowners.get_value(".team_owners")
         c.assert_true(
             len(team_owners) > 0,
             "CODEOWNERS has no team-based owners (@org/team). "

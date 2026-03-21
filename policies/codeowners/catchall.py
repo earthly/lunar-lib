@@ -4,12 +4,17 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("catchall", "CODEOWNERS should have a default catch-all rule", node=node)
     with c:
-        if not c.get_value(".ownership.codeowners.exists"):
+        codeowners = c.get_node(".ownership.codeowners")
+        if not codeowners.exists():
+            c.skip("No codeowners data collected")
+            return c
+
+        if not codeowners.get_value(".exists"):
             c.fail("No CODEOWNERS file found")
             return c
 
         has_catchall = False
-        for rule in c.get_node(".ownership.codeowners.rules"):
+        for rule in codeowners.get_node(".rules"):
             if rule.get_value(".pattern") == "*":
                 has_catchall = True
                 break

@@ -8,13 +8,18 @@ def main(node=None):
         node=node,
     )
     with c:
-        if not c.get_value(".ownership.codeowners.exists"):
+        codeowners = c.get_node(".ownership.codeowners")
+        if not codeowners.exists():
+            c.skip("No codeowners data collected")
+            return c
+
+        if not codeowners.get_value(".exists"):
             c.fail("No CODEOWNERS file found")
             return c
 
-        team_owners = set(c.get_value(".ownership.codeowners.team_owners"))
+        team_owners = set(codeowners.get_value(".team_owners"))
 
-        for rule in c.get_node(".ownership.codeowners.rules"):
+        for rule in codeowners.get_node(".rules"):
             owners = rule.get_value_or_default(".owners", [])
             if not owners:
                 continue  # Empty rules handled by no-empty-rules check

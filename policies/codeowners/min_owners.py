@@ -8,7 +8,12 @@ def main(node=None, min_owners_override=None):
         node=node,
     )
     with c:
-        if not c.get_value(".ownership.codeowners.exists"):
+        codeowners = c.get_node(".ownership.codeowners")
+        if not codeowners.exists():
+            c.skip("No codeowners data collected")
+            return c
+
+        if not codeowners.get_value(".exists"):
             c.fail("No CODEOWNERS file found")
             return c
 
@@ -24,7 +29,7 @@ def main(node=None, min_owners_override=None):
                 f"Policy misconfiguration: min_owners_per_rule must be a number, got: {min_owners}"
             )
 
-        for rule in c.get_node(".ownership.codeowners.rules"):
+        for rule in codeowners.get_node(".rules"):
             pattern = rule.get_value(".pattern")
             owner_count = rule.get_value(".owner_count")
             # Skip rules that intentionally un-assign ownership (0 owners)
