@@ -39,6 +39,15 @@ if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
   fi
 fi
 
+# For Rust projects: fetch crate sources so Syft can read license files from the registry cache
+if command -v cargo >/dev/null 2>&1; then
+  if [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; then
+    echo "Detected Rust project; fetching crate sources for license detection..." >&2
+    cargo fetch --quiet 2>/dev/null || \
+      echo "Warning: cargo fetch failed; license detection may be incomplete" >&2
+  fi
+fi
+
 # Generate CycloneDX JSON SBOM
 SBOM_FILE="/tmp/sbom.json"
 if ! syft dir:. -o cyclonedx-json > "$SBOM_FILE"; then
