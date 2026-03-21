@@ -47,7 +47,7 @@ SAFE_PR=$(echo "$LUNAR_COMPONENT_PR" | sed "s/'/''/g")
 # Query for other PRs using the same ticket.
 QUERY="
   SELECT COUNT(DISTINCT (component_id, pr))
-  FROM components_latest2
+  FROM components_latest
   WHERE pr IS NOT NULL
     AND component_json->'vcs'->'pr'->'ticket'->>'id' = '${SAFE_TICKET_KEY}'
     AND NOT (component_id = '${SAFE_COMPONENT_ID}' AND pr::text = '${SAFE_PR}')
