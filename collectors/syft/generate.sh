@@ -44,16 +44,16 @@ fi
 # so we build a license map from the downloaded crate Cargo.toml files and inject
 # it into the SBOM as a post-processing step.
 RUST_LICENSE_MAP="/tmp/rust-license-map.json"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if command -v cargo >/dev/null 2>&1 && { [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; }; then
   echo "Detected Rust project; fetching crate sources for license detection..." >&2
+  PLUGIN_DIR="${LUNAR_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)}"
   (
     set +e
     cargo fetch --quiet 2>&1 || true
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
     REGISTRY_SRC="$CARGO_HOME/registry/src"
-    if [[ -d "$REGISTRY_SRC" ]]; then
-      python3 "${LUNAR_PLUGIN_ROOT:-$SCRIPT_DIR}/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
+    if [[ -d "$REGISTRY_SRC" ]] && [[ -f "$PLUGIN_DIR/rust-license-map.py" ]]; then
+      python3 "$PLUGIN_DIR/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
     fi
   ) >&2 || echo "Warning: Rust license detection failed; continuing without licenses" >&2
 fi
