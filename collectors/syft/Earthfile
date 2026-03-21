@@ -9,11 +9,16 @@ image:
     RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
         chmod +x /usr/local/bin/syft
 
-    # Install Cargo for Rust license detection (cargo fetch populates the registry cache)
-    RUN apk add --no-cache cargo
+    # Install Cargo via rustup for Rust license detection (cargo fetch populates the registry cache)
+    ENV RUSTUP_HOME=/usr/local/rustup
+    ENV CARGO_HOME=/usr/local/cargo
+    ENV PATH="/usr/local/cargo/bin:$PATH"
+    RUN apk add --no-cache gcc musl-dev && \
+        curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable && \
+        cargo --version
 
     # Verify installation
-    RUN syft version && cargo --version
+    RUN syft version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:syft-$VERSION
