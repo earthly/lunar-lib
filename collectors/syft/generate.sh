@@ -39,12 +39,40 @@ if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
   fi
 fi
 
-# For Rust projects: fetch crate sources so Syft can read license files from the registry cache
+# For Rust projects: fetch crate sources so we can extract license metadata
+# Syft's Rust cataloger reads Cargo.lock for deps but doesn't resolve licenses,
+# so we build a license map from the downloaded crate Cargo.toml files and inject
+# it into the SBOM as a post-processing step.
+RUST_LICENSE_MAP="/tmp/rust-license-map.json"
 if command -v cargo >/dev/null 2>&1; then
   if [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; then
     echo "Detected Rust project; fetching crate sources for license detection..." >&2
     cargo fetch --quiet 2>/dev/null || \
       echo "Warning: cargo fetch failed; license detection may be incomplete" >&2
+
+    CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+    REGISTRY_SRC="$CARGO_HOME/registry/src"
+    if [[ -d "$REGISTRY_SRC" ]]; then
+      echo "{}" > "$RUST_LICENSE_MAP"
+      for crate_dir in "$REGISTRY_SRC"/*/*; do
+        [[ -d "$crate_dir" ]] || continue
+        crate_toml="$crate_dir/Cargo.toml"
+        [[ -f "$crate_toml" ]] || continue
+        license=$(grep -m1 '^license ' "$crate_toml" 2>/dev/null \
+          | sed 's/^license *= *["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\}/\1/' \
+          | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+          | sed 's|/| OR |g')
+        [[ -z "$license" ]] && continue
+        dirname=$(basename "$crate_dir")
+        crate_name="${dirname%-[0-9]*}"
+        crate_version="${dirname#"$crate_name"-}"
+        key="${crate_name}@${crate_version}"
+        RUST_LICENSE_MAP_CONTENT=$(jq --arg k "$key" --arg l "$license" '. + {($k): $l}' "$RUST_LICENSE_MAP")
+        echo "$RUST_LICENSE_MAP_CONTENT" > "$RUST_LICENSE_MAP"
+      done
+      license_count=$(jq 'length' "$RUST_LICENSE_MAP")
+      echo "Built license map for $license_count Rust crates" >&2
+    fi
   fi
 fi
 
@@ -59,6 +87,27 @@ fi
 if jq -e '(.components // []) | length == 0' "$SBOM_FILE" >/dev/null 2>&1; then
   echo "SBOM has no components; skipping collection" >&2
   exit 0
+fi
+
+# Inject Rust license data into SBOM components that are missing licenses
+if [[ -f "$RUST_LICENSE_MAP" ]] && jq -e 'length > 0' "$RUST_LICENSE_MAP" >/dev/null 2>&1; then
+  injected=$(jq --slurpfile lm "$RUST_LICENSE_MAP" '
+    ($lm[0]) as $licenses |
+    .components |= [.[] | if (.licenses == null or .licenses == []) then
+      (.name + "@" + (.version // "")) as $key |
+      if $licenses[$key] then
+        ($licenses[$key]) as $lic |
+        if ($lic | test(" OR | AND ")) then
+          .licenses = [{ "expression": $lic }]
+        else
+          .licenses = [{ "license": { "id": $lic } }]
+        end
+      else . end
+    else . end]
+  ' "$SBOM_FILE")
+  echo "$injected" > "$SBOM_FILE"
+  count=$(echo "$injected" | jq '[.components[] | select(.licenses != null and .licenses != [])] | length')
+  echo "Injected licenses into SBOM ($count components with licenses)" >&2
 fi
 
 # Collect the full SBOM
