@@ -44,19 +44,18 @@ fi
 # so we build a license map from the downloaded crate Cargo.toml files and inject
 # it into the SBOM as a post-processing step.
 RUST_LICENSE_MAP="/tmp/rust-license-map.json"
-if command -v cargo >/dev/null 2>&1; then
-  if [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; then
-    echo "Detected Rust project; fetching crate sources for license detection..." >&2
-    cargo fetch --quiet 2>/dev/null || \
-      echo "Warning: cargo fetch failed; license detection may be incomplete" >&2
-
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if command -v cargo >/dev/null 2>&1 && { [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; }; then
+  echo "Detected Rust project; fetching crate sources for license detection..." >&2
+  (
+    set +e
+    cargo fetch --quiet 2>&1 || true
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
     REGISTRY_SRC="$CARGO_HOME/registry/src"
     if [[ -d "$REGISTRY_SRC" ]]; then
-      python3 "$LUNAR_PLUGIN_ROOT/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" || \
-        echo "Warning: license map extraction failed" >&2
+      python3 "${LUNAR_PLUGIN_ROOT:-$SCRIPT_DIR}/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
     fi
-  fi
+  ) >&2 || echo "Warning: Rust license detection failed; continuing without licenses" >&2
 fi
 
 # Generate CycloneDX JSON SBOM
