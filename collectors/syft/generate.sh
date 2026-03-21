@@ -53,26 +53,8 @@ if command -v cargo >/dev/null 2>&1; then
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
     REGISTRY_SRC="$CARGO_HOME/registry/src"
     if [[ -d "$REGISTRY_SRC" ]]; then
-      python3 -c "
-import os, json, re, glob
-registry = '$REGISTRY_SRC'
-license_map = {}
-for toml_path in glob.glob(os.path.join(registry, '*', '*', 'Cargo.toml')):
-    crate_dir = os.path.basename(os.path.dirname(toml_path))
-    m = re.match(r'^(.+)-(\d+\..*)$', crate_dir)
-    if not m:
-        continue
-    crate_name, crate_version = m.group(1), m.group(2)
-    with open(toml_path) as f:
-        for line in f:
-            lm = re.match(r'^license\s*=\s*[\"'"'"']([^\"'"'"']+)[\"'"'"']', line)
-            if lm:
-                lic = lm.group(1).strip().replace('/', ' OR ')
-                license_map[crate_name + '@' + crate_version] = lic
-                break
-json.dump(license_map, open('$RUST_LICENSE_MAP', 'w'))
-print(f'Built license map for {len(license_map)} Rust crates', flush=True)
-" >&2 || echo "Warning: license map extraction failed" >&2
+      python3 "$LUNAR_PLUGIN_ROOT/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" || \
+        echo "Warning: license map extraction failed" >&2
     fi
   fi
 fi
