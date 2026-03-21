@@ -53,25 +53,26 @@ if command -v cargo >/dev/null 2>&1; then
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
     REGISTRY_SRC="$CARGO_HOME/registry/src"
     if [[ -d "$REGISTRY_SRC" ]]; then
-      echo "{}" > "$RUST_LICENSE_MAP"
-      for crate_dir in "$REGISTRY_SRC"/*/*; do
-        [[ -d "$crate_dir" ]] || continue
-        crate_toml="$crate_dir/Cargo.toml"
-        [[ -f "$crate_toml" ]] || continue
-        license=$(grep -m1 '^license ' "$crate_toml" 2>/dev/null \
-          | sed 's/^license *= *["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\}/\1/' \
-          | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-          | sed 's|/| OR |g')
-        [[ -z "$license" ]] && continue
-        dirname=$(basename "$crate_dir")
-        crate_name="${dirname%-[0-9]*}"
-        crate_version="${dirname#"$crate_name"-}"
-        key="${crate_name}@${crate_version}"
-        RUST_LICENSE_MAP_CONTENT=$(jq --arg k "$key" --arg l "$license" '. + {($k): $l}' "$RUST_LICENSE_MAP")
-        echo "$RUST_LICENSE_MAP_CONTENT" > "$RUST_LICENSE_MAP"
-      done
-      license_count=$(jq 'length' "$RUST_LICENSE_MAP")
-      echo "Built license map for $license_count Rust crates" >&2
+      python3 -c "
+import os, json, re, glob
+registry = '$REGISTRY_SRC'
+license_map = {}
+for toml_path in glob.glob(os.path.join(registry, '*', '*', 'Cargo.toml')):
+    crate_dir = os.path.basename(os.path.dirname(toml_path))
+    m = re.match(r'^(.+)-(\d+\..*)$', crate_dir)
+    if not m:
+        continue
+    crate_name, crate_version = m.group(1), m.group(2)
+    with open(toml_path) as f:
+        for line in f:
+            lm = re.match(r'^license\s*=\s*[\"'"'"']([^\"'"'"']+)[\"'"'"']', line)
+            if lm:
+                lic = lm.group(1).strip().replace('/', ' OR ')
+                license_map[crate_name + '@' + crate_version] = lic
+                break
+json.dump(license_map, open('$RUST_LICENSE_MAP', 'w'))
+print(f'Built license map for {len(license_map)} Rust crates', flush=True)
+" >&2 || echo "Warning: license map extraction failed" >&2
     fi
   fi
 fi
@@ -91,7 +92,8 @@ fi
 
 # Inject Rust license data into SBOM components that are missing licenses
 if [[ -f "$RUST_LICENSE_MAP" ]] && jq -e 'length > 0' "$RUST_LICENSE_MAP" >/dev/null 2>&1; then
-  injected=$(jq --slurpfile lm "$RUST_LICENSE_MAP" '
+  SBOM_INJECTED="/tmp/sbom-injected.json"
+  jq --slurpfile lm "$RUST_LICENSE_MAP" '
     ($lm[0]) as $licenses |
     .components |= [.[] | if (.licenses == null or .licenses == []) then
       (.name + "@" + (.version // "")) as $key |
@@ -104,9 +106,8 @@ if [[ -f "$RUST_LICENSE_MAP" ]] && jq -e 'length > 0' "$RUST_LICENSE_MAP" >/dev/
         end
       else . end
     else . end]
-  ' "$SBOM_FILE")
-  echo "$injected" > "$SBOM_FILE"
-  count=$(echo "$injected" | jq '[.components[] | select(.licenses != null and .licenses != [])] | length')
+  ' "$SBOM_FILE" > "$SBOM_INJECTED" && mv "$SBOM_INJECTED" "$SBOM_FILE"
+  count=$(jq '[.components[] | select(.licenses != null and .licenses != [])] | length' "$SBOM_FILE")
   echo "Injected licenses into SBOM ($count components with licenses)" >&2
 fi
 
