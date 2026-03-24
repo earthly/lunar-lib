@@ -22,9 +22,9 @@ version=""
 # Core file detection
 [[ -f "Cargo.toml" ]] && cargo_toml_exists=true
 [[ -f "Cargo.lock" ]] && cargo_lock_exists=true
-[[ -f "rust-toolchain.toml" ]] || [[ -f "rust-toolchain" ]] && rust_toolchain_exists=true
-[[ -f "clippy.toml" ]] || [[ -f ".clippy.toml" ]] && clippy_configured=true
-[[ -f "rustfmt.toml" ]] || [[ -f ".rustfmt.toml" ]] && rustfmt_configured=true
+if [[ -f "rust-toolchain.toml" ]] || [[ -f "rust-toolchain" ]]; then rust_toolchain_exists=true; fi
+if [[ -f "clippy.toml" ]] || [[ -f ".clippy.toml" ]]; then clippy_configured=true; fi
+if [[ -f "rustfmt.toml" ]] || [[ -f ".rustfmt.toml" ]]; then rustfmt_configured=true; fi
 
 # Parse Cargo.toml for metadata (POSIX-compatible, no grep -P)
 if [[ "$cargo_toml_exists" == "true" ]]; then
