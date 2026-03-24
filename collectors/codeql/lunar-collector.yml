@@ -15,7 +15,7 @@ landing_page:
     paths, enabling tool-agnostic SAST policies.
   category: "security"
   icon: "assets/codeql.svg"
-  status: "stable"
+  status: "beta"
   related:
     - slug: "sast"
       type: "policy"
