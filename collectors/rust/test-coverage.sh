@@ -24,7 +24,7 @@ if [[ "$CMD_STR" == *"tarpaulin"* ]]; then
     fi
     # Fallback: parse from CI output if available via LUNAR_CI_OUTPUT
     if [[ -z "$coverage_pct" ]] && [[ -n "$LUNAR_CI_OUTPUT" ]]; then
-        coverage_pct=$(echo "$LUNAR_CI_OUTPUT" | grep -oP '[\d.]+(?=% coverage)' | tail -1 || true)
+        coverage_pct=$(echo "$LUNAR_CI_OUTPUT" | sed -n 's/.*\([0-9][0-9]*\.[0-9]*\)% coverage.*/\1/p' | tail -1 || true)
     fi
 fi
 
