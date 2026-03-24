@@ -46,25 +46,17 @@ collectors:
 
   - name: cli
     description: |
-      Detects CodeQL CLI executions in CI pipelines.
+      Detects CodeQL CLI or legacy codeql-runner executions in CI pipelines.
       Captures the command and version.
     mainBash: cli.sh
-    hook:
-      type: ci-after-command
-      binary:
-        name: codeql
-    keywords: ["codeql cli", "ci integration", "sast", "code scanning"]
-
-  - name: cli-legacy
-    description: |
-      Detects legacy codeql-runner executions in CI pipelines.
-      Captures the command and version.
-    mainBash: cli.sh
-    hook:
-      type: ci-after-command
-      binary:
-        name: codeql-runner
-    keywords: ["codeql-runner", "ci integration", "sast", "legacy"]
+    hooks:
+      - type: ci-after-command
+        binary:
+          name: codeql
+      - type: ci-after-command
+        binary:
+          name: codeql-runner
+    keywords: ["codeql cli", "codeql-runner", "ci integration", "sast", "code scanning"]
 
 secrets:
   GH_TOKEN:
