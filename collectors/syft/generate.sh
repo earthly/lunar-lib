@@ -46,14 +46,21 @@ fi
 RUST_LICENSE_MAP="/tmp/rust-license-map.json"
 if command -v cargo >/dev/null 2>&1 && { [[ -f "Cargo.lock" ]] || [[ -f "Cargo.toml" ]]; }; then
   echo "Detected Rust project; fetching crate sources for license detection..." >&2
-  PLUGIN_DIR="${LUNAR_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)}"
+  PLUGIN_DIR="${LUNAR_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)}"
   (
     set +e
     cargo fetch --quiet 2>&1 || true
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
     REGISTRY_SRC="$CARGO_HOME/registry/src"
-    if [[ -d "$REGISTRY_SRC" ]] && [[ -f "$PLUGIN_DIR/rust-license-map.py" ]]; then
-      python3 "$PLUGIN_DIR/rust-license-map.py" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
+    if [[ -d "$REGISTRY_SRC" ]]; then
+      SCRIPT="$PLUGIN_DIR/rust-license-map.py"
+      if [[ ! -f "$SCRIPT" ]]; then
+        echo "rust-license-map.py not found at $SCRIPT (LUNAR_PLUGIN_ROOT=$LUNAR_PLUGIN_ROOT)" >&2
+      else
+        python3 "$SCRIPT" "$REGISTRY_SRC" "$RUST_LICENSE_MAP" 2>&1
+      fi
+    else
+      echo "No registry src dir at $REGISTRY_SRC" >&2
     fi
   ) >&2 || echo "Warning: Rust license detection failed; continuing without licenses" >&2
 fi
