@@ -49,12 +49,27 @@ if ! echo "$CMD_STR" | grep -qE 'database\s+(interpret-results|analyze)'; then
 fi
 
 # Parse --output=<path> from the command args
-SARIF_FILE=""
+SARIF_PATH=""
 if echo "$CMD_STR" | grep -qoE '\-\-output[= ]\S+'; then
-    SARIF_FILE=$(echo "$CMD_STR" | grep -oE '\-\-output[= ]\S+' | head -1 | sed -E 's/--output[= ]//')
+    SARIF_PATH=$(echo "$CMD_STR" | grep -oE '\-\-output[= ]\S+' | head -1 | sed -E 's/--output[= ]//')
 fi
 
-if [ -z "$SARIF_FILE" ] || [ ! -f "$SARIF_FILE" ]; then
+if [ -z "$SARIF_PATH" ]; then
+    exit 0
+fi
+
+# Resolve the SARIF file — try as-is first, then relative to $GITHUB_WORKSPACE
+SARIF_FILE=""
+if [ -f "$SARIF_PATH" ]; then
+    SARIF_FILE="$SARIF_PATH"
+elif [ -n "$GITHUB_WORKSPACE" ] && [ -f "$GITHUB_WORKSPACE/$SARIF_PATH" ]; then
+    SARIF_FILE="$GITHUB_WORKSPACE/$SARIF_PATH"
+elif [ -n "$GITHUB_WORKSPACE" ] && [ -f "$GITHUB_WORKSPACE/../results/$(basename "$SARIF_PATH")" ]; then
+    SARIF_FILE="$GITHUB_WORKSPACE/../results/$(basename "$SARIF_PATH")"
+fi
+
+if [ -z "$SARIF_FILE" ]; then
+    echo "SARIF file not found at $SARIF_PATH" >&2
     exit 0
 fi
 
