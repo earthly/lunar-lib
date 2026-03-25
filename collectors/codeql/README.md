@@ -15,8 +15,12 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.sast.source` | object | Source metadata (`tool`, `integration`, optional `version`) |
+| `.sast.findings` | object | Severity counts: `critical`, `high`, `medium`, `low`, `total` |
+| `.sast.issues[]` | array | Individual findings with `severity`, `rule`, `file`, `line`, `message` |
+| `.sast.summary` | object | `has_critical`, `has_high` booleans |
 | `.sast.native.codeql.github_app` | object | Raw GitHub Code Scanning check-run data |
 | `.sast.native.codeql.cicd` | object | CodeQL CLI invocations detected in CI |
+| `.sast.native.codeql.sarif` | object | Raw SARIF output from CodeQL analysis (when available) |
 | `.sast.running_in_prs` | boolean | Compliance proof that PRs are being scanned |
 
 ## Collectors
@@ -41,6 +45,6 @@ collectors:
 
 The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. CodeQL posts check-runs via the `github-advanced-security` app. The collector queries the check-runs API, filters by this app slug, and waits for completion.
 
-The `cli` collector matches both `codeql` and `codeql-runner` (legacy) binary executions in CI, used by teams running analysis outside of GitHub Actions.
+The `cli` collector matches both `codeql` and `codeql-runner` (legacy) binary executions in CI. When the traced command is `codeql database analyze` or `codeql database interpret-results` with a `--output=` flag, the collector reads the SARIF file from disk and collects it as raw data plus normalized findings counts and issues.
 
 The `running-in-prs` collector queries the Lunar Hub database to verify PR scanning. It uses `lunar sql connection-string` to obtain database credentials. If unavailable, the collector skips silently.

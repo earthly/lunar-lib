@@ -47,7 +47,9 @@ collectors:
   - name: cli
     description: |
       Detects CodeQL CLI or legacy codeql-runner executions in CI pipelines.
-      Captures the command and version.
+      Captures command metadata and, when the SARIF output file is available
+      on disk (from codeql database analyze/interpret-results), collects the
+      raw SARIF and normalizes findings into .sast.findings and .sast.issues.
     mainBash: cli.sh
     hooks:
       - type: ci-after-command
@@ -68,7 +70,28 @@ example_component_json: |
       "running_in_prs": true,
       "source": {
         "tool": "codeql",
-        "integration": "github_app"
+        "version": "2.16.0",
+        "integration": "ci"
+      },
+      "findings": {
+        "critical": 0,
+        "high": 1,
+        "medium": 3,
+        "low": 0,
+        "total": 4
+      },
+      "issues": [
+        {
+          "severity": "high",
+          "rule": "go/sql-injection",
+          "file": "db/query.go",
+          "line": 42,
+          "message": "Unsanitized input used in SQL query"
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true
       },
       "native": {
         "codeql": {
@@ -76,14 +99,14 @@ example_component_json: |
             "id": 12345,
             "name": "CodeQL",
             "status": "completed",
-            "conclusion": "success",
-            "details_url": "https://github.com/org/repo/security/code-scanning"
+            "conclusion": "success"
           },
           "cicd": {
             "cmds": [
-              {"cmd": "codeql database analyze", "version": "2.16.0"}
+              {"cmd": "codeql database interpret-results --format=sarif-latest --output=../results/go.sarif", "version": "2.16.0"}
             ]
-          }
+          },
+          "sarif": {}
         }
       }
     }
