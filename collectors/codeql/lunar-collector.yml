@@ -44,7 +44,7 @@ collectors:
       runs_on: [default-branch]
     keywords: ["codeql", "pr scanning", "compliance proof", "default branch"]
 
-  - name: cli
+  - name: cicd
     description: |
       Detects CodeQL CLI or legacy codeql-runner executions in CI pipelines.
       Captures command metadata and, when the SARIF output file is available
