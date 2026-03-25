@@ -29,7 +29,7 @@ This collector writes to the following Component JSON paths:
 |-----------|-----------|-------------|
 | `github-app` | code (PRs only) | Detects CodeQL via GitHub Code Scanning check-runs |
 | `running-in-prs` | code (default branch) | Proves CodeQL is running on PRs (compliance proof for default branch) |
-| `cli` | ci-after-command | Detects `codeql` and legacy `codeql-runner` executions in CI |
+| `cicd` | ci-after-command | Detects `codeql` and legacy `codeql-runner` executions in CI, collects SARIF |
 
 ## Installation
 
@@ -45,6 +45,6 @@ collectors:
 
 The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. CodeQL posts check-runs via the `github-advanced-security` app. The collector queries the check-runs API, filters by this app slug, and waits for completion.
 
-The `cli` collector matches both `codeql` and `codeql-runner` (legacy) binary executions in CI. When the traced command is `codeql database analyze` or `codeql database interpret-results` with a `--output=` flag, the collector reads the SARIF file from disk and collects it as raw data plus normalized findings counts and issues.
+The `cicd` collector matches both `codeql` and `codeql-runner` (legacy) binary executions in CI. When the traced command is `codeql database analyze` or `codeql database interpret-results` with a `--output=` flag, the collector reads the SARIF file from disk and collects it as raw data plus normalized findings counts and issues.
 
 The `running-in-prs` collector queries the Lunar Hub database to verify PR scanning. It uses `lunar sql connection-string` to obtain database credentials. If unavailable, the collector skips silently.
