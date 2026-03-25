@@ -25,7 +25,7 @@ collectors:
   - name: github-app
     description: |
       Detects CodeQL scans on pull requests by querying GitHub check-runs API
-      for the github-code-scanning app. Waits for scan completion and captures
+      for the github-advanced-security app. Waits for scan completion and captures
       check status, conclusion, and URLs.
     mainBash: github-app.sh
     hook:

@@ -18,7 +18,7 @@ fetch_codeql_checks() {
         -H 'Accept: application/vnd.github+json' \
         -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" \
         "https://api.github.com/repos/$REPO/commits/$LUNAR_COMPONENT_GIT_SHA/check-runs" | \
-        jq -c '.check_runs | map(select(.app.slug == "github-code-scanning"))' 2>/dev/null || echo "[]"
+        jq -c '.check_runs | map(select(.app.slug == "github-advanced-security"))' 2>/dev/null || echo "[]"
 }
 
 FOUND_CHECK=false

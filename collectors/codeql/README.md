@@ -39,7 +39,7 @@ collectors:
       GH_TOKEN: ${GH_TOKEN}
 ```
 
-The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. CodeQL runs as part of GitHub Code Scanning, which posts check-runs via the `github-code-scanning` app. The collector queries the check-runs API, filters by this app slug, and waits for completion.
+The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access. CodeQL posts check-runs via the `github-advanced-security` app. The collector queries the check-runs API, filters by this app slug, and waits for completion.
 
 The `cli` collector matches both `codeql` and `codeql-runner` (legacy) binary executions in CI, used by teams running analysis outside of GitHub Actions.
 
