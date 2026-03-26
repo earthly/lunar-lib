@@ -4,7 +4,7 @@ name: license-origins
 description: Scan dependency license files for country-of-origin mentions
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:license-origins-main
+default_image: earthly/lunar-lib:license-origins-v1.0.5
 
 landing_page:
   display_name: "License Origins Collector"

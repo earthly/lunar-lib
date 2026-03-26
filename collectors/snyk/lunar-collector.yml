@@ -4,7 +4,7 @@ name: snyk
 description: Detects Snyk security scans via GitHub App or CLI integration
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.5
 default_image_ci_collectors: native
 
 landing_page:

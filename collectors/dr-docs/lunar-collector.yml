@@ -3,7 +3,7 @@ version: 0
 name: dr-docs
 description: Collect disaster recovery plan and exercise documentation
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.5
 
 landing_page:
   display_name: "DR Documentation Collector"

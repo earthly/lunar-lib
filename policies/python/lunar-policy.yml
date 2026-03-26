@@ -4,7 +4,7 @@ name: python
 description: Enforces Python project structure and standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.0.5
 
 landing_page:
   display_name: "Python Project Guardrails"
