@@ -1,0 +1,52 @@
+version: 0
+
+name: dotnet
+description: Enforces .NET project structure and standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: ".NET Project Guardrails"
+  long_description: |
+    Enforce .NET-specific project standards including project file presence,
+    target framework configuration, dependency locking, and test project requirements.
+  category: "devex-build-and-ci"
+  icon: "assets/dotnet.svg"
+  status: "stable"
+  requires:
+    - slug: "dotnet"
+      type: "collector"
+      reason: "Provides .NET project metadata"
+  related: []
+
+policies:
+  - name: project-file-exists
+    description: |
+      Ensures the project has at least one .NET project file (.csproj, .fsproj, .vbproj).
+      Required for all .NET projects to be buildable.
+    mainPython: ./project_file_exists.py
+    keywords: ["project file", ".csproj", ".fsproj", "project structure"]
+
+  - name: target-framework-set
+    description: |
+      Ensures all project files have a target framework specified.
+      Required for proper compilation and runtime behavior.
+    mainPython: ./target_framework_set.py
+    keywords: ["target framework", "TargetFramework", "compilation"]
+
+  - name: dependencies-locked
+    description: |
+      Ensures the project has packages.lock.json files for dependency locking.
+      Required for reproducible builds and supply chain security.
+    mainPython: ./dependencies_locked.py
+    keywords: ["packages.lock.json", "dependencies", "reproducible builds", "security"]
+
+  - name: test-project-exists
+    description: |
+      Ensures the project has at least one test project.
+      Encourages proper testing practices and quality assurance.
+    mainPython: ./test_project_exists.py
+    keywords: ["test project", "testing", "quality assurance", "xunit", "nunit"]
+
+inputs: {}

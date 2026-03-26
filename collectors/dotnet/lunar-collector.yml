@@ -1,0 +1,88 @@
+version: 0
+
+name: dotnet
+description: Collect .NET/C# project information, dependencies, and test project detection
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: ".NET Collector"
+  long_description: |
+    Analyze .NET projects to collect project structure, target frameworks, NuGet dependencies,
+    and test project identification. Supports C#, F#, and VB.NET with SDK-style and legacy projects.
+  categories: ["languages", "build"]
+  icon: "assets/dotnet.svg"
+  status: "beta"
+  related:
+    - slug: "dotnet"
+      type: "policy"
+      reason: "Provides .NET project guardrails using collected project metadata"
+
+collectors:
+  - name: project
+    description: |
+      Detects .NET project structure including project files (.csproj, .fsproj, .vbproj),
+      solution files (.sln), SDK configuration (global.json), MSBuild properties
+      (Directory.Build.props), target frameworks, project types, and SDK versions.
+      Writes project metadata to .lang.dotnet.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: [".net project", "csharp", "fsharp", "dotnet", "csproj", "sln"]
+
+  - name: dependencies
+    description: |
+      Extracts NuGet dependencies from project files, including direct dependencies,
+      project references, and dependency locking status (packages.lock.json).
+      Writes dependency data to .lang.dotnet.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["nuget dependencies", "packages", "project references", "supply chain"]
+
+example_component_json: |
+  {
+    "lang": {
+      "dotnet": {
+        "sdk_version": "8.0.100",
+        "target_frameworks": ["net8.0"],
+        "project_files": [
+          {
+            "path": "MyApp/MyApp.csproj",
+            "type": "csharp",
+            "output_type": "Exe",
+            "target_framework": "net8.0"
+          }
+        ],
+        "solution_files": ["MyApp.sln"],
+        "global_json_exists": true,
+        "directory_build_props_exists": false,
+        "packages_lock_exists": true,
+        "test_projects": [
+          {
+            "path": "MyApp.Tests/MyApp.Tests.csproj",
+            "type": "csharp",
+            "test_framework": "xunit"
+          }
+        ],
+        "source": { "tool": "dotnet", "integration": "code" },
+        "dependencies": {
+          "direct": [
+            {
+              "name": "Microsoft.Extensions.Hosting",
+              "version": "8.0.0",
+              "type": "package"
+            }
+          ],
+          "project_references": [
+            {
+              "path": "MyLibrary/MyLibrary.csproj"
+            }
+          ],
+          "source": { "tool": "dotnet", "integration": "code" }
+        }
+      }
+    }
+  }
