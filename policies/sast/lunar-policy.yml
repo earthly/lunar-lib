@@ -21,6 +21,9 @@ landing_page:
     - slug: "snyk"
       type: "collector"
       reason: "Provides SAST scan results via Snyk Code"
+    - slug: "codeql"
+      type: "collector"
+      reason: "Provides SAST scan results via GitHub CodeQL"
   related: []
 
 policies:

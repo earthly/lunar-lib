@@ -1,0 +1,113 @@
+version: 0
+
+name: codeql
+description: Detects CodeQL security scans via GitHub Code Scanning or CLI integration
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "CodeQL Collector"
+  long_description: |
+    Detects GitHub CodeQL security scanning via GitHub Code Scanning check-runs
+    or CLI integration in CI pipelines. Writes to normalized SAST Component JSON
+    paths, enabling tool-agnostic SAST policies.
+  category: "security"
+  icon: "assets/codeql.svg"
+  status: "beta"
+  related:
+    - slug: "sast"
+      type: "policy"
+      reason: "Enforces SAST standards using CodeQL scan data"
+
+collectors:
+  - name: github-app
+    description: |
+      Detects CodeQL scans on pull requests by querying GitHub check-runs API
+      for the github-advanced-security app. Waits for scan completion and captures
+      check status, conclusion, and URLs.
+    mainBash: github-app.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["codeql", "github code scanning", "sast", "code analysis", "security"]
+
+  - name: running-in-prs
+    description: |
+      Proves CodeQL is running on PRs by querying Lunar Hub for CodeQL data
+      from recent PRs. Used on the default branch to provide compliance proof
+      that PR scanning is happening.
+    mainBash: running-in-prs.sh
+    hook:
+      type: code
+      runs_on: [default-branch]
+    keywords: ["codeql", "pr scanning", "compliance proof", "default branch"]
+
+  - name: cicd
+    description: |
+      Detects CodeQL CLI or legacy codeql-runner executions in CI pipelines.
+      Captures command metadata and, when the SARIF output file is available
+      on disk (from codeql database analyze/interpret-results), collects the
+      raw SARIF and normalizes findings into .sast.findings and .sast.issues.
+    mainBash: cli.sh
+    hooks:
+      - type: ci-after-command
+        binary:
+          name: codeql
+      - type: ci-after-command
+        binary:
+          name: codeql-runner
+    keywords: ["codeql cli", "codeql-runner", "ci integration", "sast", "code scanning"]
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for github-app collector)
+
+example_component_json: |
+  {
+    "sast": {
+      "running_in_prs": true,
+      "source": {
+        "tool": "codeql",
+        "version": "2.16.0",
+        "integration": "ci"
+      },
+      "findings": {
+        "critical": 0,
+        "high": 1,
+        "medium": 3,
+        "low": 0,
+        "total": 4
+      },
+      "issues": [
+        {
+          "severity": "high",
+          "rule": "go/sql-injection",
+          "file": "db/query.go",
+          "line": 42,
+          "message": "Unsanitized input used in SQL query"
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true
+      },
+      "native": {
+        "codeql": {
+          "github_app": {
+            "id": 12345,
+            "name": "CodeQL",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "codeql database interpret-results --format=sarif-latest --output=../results/go.sarif", "version": "2.16.0"}
+            ]
+          },
+          "sarif": {}
+        }
+      }
+    }
+  }
