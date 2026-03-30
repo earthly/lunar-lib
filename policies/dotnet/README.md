@@ -16,8 +16,8 @@ This plugin provides the following policies (use `include` to select a subset):
 | `target-framework-set` | Ensures target framework is specified | Warning | Projects missing framework specification |
 | `dependencies-locked` | Validates packages.lock.json exists | Warning | Dependencies not locked for reproducible builds |
 | `test-project-exists` | Ensures at least one test project exists | Info | No automated tests detected |
-| `min-dotnet-sdk-version` | Ensures SDK version meets minimum requirements | Warning | Using outdated SDK version |
-| `min-dotnet-sdk-version-cicd` | Ensures CI/CD SDK version meets minimum requirements | Warning | CI/CD using outdated SDK version |
+| `min-sdk-version` | Ensures SDK version meets minimum requirements | Warning | Using outdated SDK version |
+| `min-sdk-version-cicd` | Ensures CI/CD SDK version meets minimum requirements | Warning | CI/CD using outdated SDK version |
 
 ## Required Data
 
@@ -43,8 +43,8 @@ policies:
     enforcement: report-pr
     # include: [project-file-exists, target-framework-set]  # Only run specific checks
     # inputs:
-    #   min_dotnet_sdk_version: "8.0"        # Minimum SDK version for development
-    #   min_dotnet_sdk_version_cicd: "8.0"   # Minimum SDK version for CI/CD
+    #   min_sdk_version: "8.0"        # Minimum SDK version for development
+    #   min_sdk_version_cicd: "8.0"   # Minimum SDK version for CI/CD
 ```
 
 ## Examples
@@ -123,7 +123,7 @@ policies:
 2. Add project reference: `dotnet add MyProject.Tests reference MyProject.csproj`
 3. Write unit tests and run with `dotnet test`
 
-### min-dotnet-sdk-version
+### min-sdk-version
 1. Update global.json to specify minimum SDK version:
    ```json
    {
@@ -136,7 +136,7 @@ policies:
 3. Verify installation: `dotnet --version`
 4. Consider using `rollForward: "latestMinor"` policy for flexibility
 
-### min-dotnet-sdk-version-cicd
+### min-sdk-version-cicd
 1. Update CI/CD pipeline files to use required SDK version:
    - **GitHub Actions**: Update `dotnet-version` in setup-dotnet action
    - **Azure DevOps**: Update `version` in DotNetCoreCLI task
