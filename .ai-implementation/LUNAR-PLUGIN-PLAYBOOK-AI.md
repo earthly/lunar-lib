@@ -163,15 +163,17 @@ Create a PR with the spec files only (non-draft mode). Assign **only Brandon** (
 
 **Do not write implementation code until Vlad approves the spec.**
 
+⚠️ **THIS IS A HARD GATE.** Addressing review comments on the spec (updating YAML, README, fixing names, etc.) is NOT approval to implement. Even if you've addressed every comment, even if CI is green, even if the spec looks perfect — do NOT create `.sh` or `.py` implementation files until Vlad's GitHub review status is "APPROVED". Review comments ≠ go-ahead. Only an explicit approval counts.
+
 The review flow is sequential:
 
-1. **Brandon reviews first.** Address his feedback. Iterate until he's satisfied.
-2. **Brandon assigns Vlad.** When Brandon is happy with the spec, he'll assign Vlad (`vladaionescu`) as a reviewer.
-3. **Vlad reviews.** Address his feedback. Iterate.
-4. **Vlad approves = go-ahead.** Once Vlad approves the PR, you can proceed to implementation.
+1. **Brandon reviews first.** Address his feedback. Iterate until he's satisfied. This means updating spec files only (YAML, README, SVG). No implementation code.
+2. **Brandon assigns Vlad.** When Brandon is happy with the spec, he'll assign Vlad (`vladaionescu`) as a reviewer. You do NOT assign Vlad yourself.
+3. **Vlad reviews.** Address his feedback. Iterate. Still spec files only.
+4. **Vlad approves = go-ahead.** Once Vlad's GitHub review status is "APPROVED", you can proceed to implementation.
 
 **While waiting:**
-- Address review comments. Push updates.
+- Address review comments. Push updates to spec files only.
 - If reviewers are discussing with each other (e.g. @-mentioning each other), **wait for them to reach a conclusion** before acting.
 - They may address you as "claude" or "devin" in PR comments — treat that as a direct instruction.
 
