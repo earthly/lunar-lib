@@ -1,10 +1,10 @@
 # .NET Project Guardrails
 
-Enforce .NET-specific project standards including project file presence, target framework configuration, dependency locking, and test project requirements.
+Enforce .NET-specific project standards including project file presence, target framework configuration, dependency locking, test project requirements, and minimum SDK version requirements for both development and CI/CD environments.
 
 ## Overview
 
-This policy validates .NET projects against best practices for project structure and build configuration. It ensures projects have proper project files, specify target frameworks, use dependency locking for reproducible builds, and include test projects for quality assurance.
+This policy validates .NET projects against best practices for project structure and build configuration. It ensures projects have proper project files, specify target frameworks, use dependency locking for reproducible builds, include test projects for quality assurance, and meet minimum SDK version requirements for both development and CI/CD environments.
 
 ## Policies
 
@@ -16,6 +16,8 @@ This plugin provides the following policies (use `include` to select a subset):
 | `target-framework-set` | Ensures target framework is specified | Warning | Projects missing framework specification |
 | `dependencies-locked` | Validates packages.lock.json exists | Warning | Dependencies not locked for reproducible builds |
 | `test-project-exists` | Ensures at least one test project exists | Info | No automated tests detected |
+| `min-dotnet-sdk-version` | Ensures SDK version meets minimum requirements | Warning | Using outdated SDK version |
+| `min-dotnet-sdk-version-cicd` | Ensures CI/CD SDK version meets minimum requirements | Warning | CI/CD using outdated SDK version |
 
 ## Required Data
 
@@ -27,6 +29,8 @@ This policy reads from the following Component JSON paths:
 | `.lang.dotnet.project_files` | array | [`dotnet`](https://github.com/earthly/lunar-lib/tree/main/collectors/dotnet) collector |
 | `.lang.dotnet.packages_lock_exists` | boolean | [`dotnet`](https://github.com/earthly/lunar-lib/tree/main/collectors/dotnet) collector |
 | `.lang.dotnet.test_projects` | array | [`dotnet`](https://github.com/earthly/lunar-lib/tree/main/collectors/dotnet) collector |
+| `.lang.dotnet.sdk_version` | string | [`dotnet`](https://github.com/earthly/lunar-lib/tree/main/collectors/dotnet) collector |
+| `.lang.dotnet.cicd.cmds` | array | [`dotnet`](https://github.com/earthly/lunar-lib/tree/main/collectors/dotnet) collector |
 
 ## Installation
 
@@ -38,6 +42,9 @@ policies:
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # include: [project-file-exists, target-framework-set]  # Only run specific checks
+    # inputs:
+    #   min_dotnet_sdk_version: "8.0"        # Minimum SDK version for development
+    #   min_dotnet_sdk_version_cicd: "8.0"   # Minimum SDK version for CI/CD
 ```
 
 ## Examples
@@ -115,3 +122,29 @@ policies:
    - `dotnet new mstest -n MyProject.Tests`
 2. Add project reference: `dotnet add MyProject.Tests reference MyProject.csproj`
 3. Write unit tests and run with `dotnet test`
+
+### min-dotnet-sdk-version
+1. Update global.json to specify minimum SDK version:
+   ```json
+   {
+     "sdk": {
+       "version": "8.0.100"
+     }
+   }
+   ```
+2. Install the required SDK version: `dotnet --install-sdk 8.0.100`
+3. Verify installation: `dotnet --version`
+4. Consider using `rollForward: "latestMinor"` policy for flexibility
+
+### min-dotnet-sdk-version-cicd
+1. Update CI/CD pipeline files to use required SDK version:
+   - **GitHub Actions**: Update `dotnet-version` in setup-dotnet action
+   - **Azure DevOps**: Update `version` in DotNetCoreCLI task
+   - **Jenkins**: Update SDK version in docker image or installation step
+2. Example GitHub Actions update:
+   ```yaml
+   - uses: actions/setup-dotnet@v3
+     with:
+       dotnet-version: '8.0.x'
+   ```
+3. Test pipeline with updated SDK version before merging
