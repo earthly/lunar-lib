@@ -9,16 +9,18 @@ Step-by-step playbook for cloud-based AI agents (Devin, etc.) to create lunar-li
 Every lunar-lib plugin PR follows this lifecycle on a **single PR**:
 
 ```text
-Spec → Review & iterate → "Go ahead" → Implement → Review & iterate → Approval → Merge
+Spec → Brandon reviews → Vlad reviews → Vlad approves (go-ahead) → Implement → Brandon reviews → Approval → Merge
 ```
 
 | Stage | What you do | What you wait for |
 |-------|------------|-------------------|
-| **Spec** | Create YAML manifest, README, SVG icon. Push as PR. Assign Brandon and Vlad as reviewers. | Reviewers comment. Address feedback. Iterate. |
-| **Go-ahead gate** | — | **Both Brandon and Vlad** comment "go ahead" (or equivalent). Either one may explicitly say to proceed without the other — follow what they say. |
-| **Implementation** | Add scripts to the same PR. Test. Post results. | Reviewers comment. Address feedback. Spec changes may be requested even at this stage — make them. |
-| **Approval gate** | — | **Both Brandon and Vlad** approve the PR via GitHub review (unless one explicitly says the other's approval isn't needed). |
-| **Merge** | Squash-merge. Clean up worktree. | — |
+| **Spec** | Create YAML manifest, README, SVG icon. Push as PR (non-draft). Assign **only Brandon** as reviewer. | Brandon comments. Address feedback. Iterate. |
+| **Brandon → Vlad handoff** | — | **Brandon** assigns **Vlad** as reviewer when he's satisfied with the spec. |
+| **Vlad spec review** | Address Vlad's feedback. Iterate. | Vlad comments. |
+| **Go-ahead gate** | — | **Vlad approves** the spec. This is the green light to implement. |
+| **Implementation** | Add scripts to the same PR. Test. Post results. | **Brandon** reviews implementation. Address feedback. Spec changes may still be requested — make them. |
+| **Approval gate** | — | **Brandon approves** the PR (or merges directly). |
+| **Merge** | Squash-merge (or Brandon merges directly). Clean up worktree. | — |
 
 **Never skip the spec stage.** The spec is cheap to iterate on. Code is expensive to throw away.
 
@@ -155,15 +157,18 @@ The PR description must include:
 
 ### Open the PR
 
-Create a PR with the spec files only. Assign **Brandon** (`brandonSc`) and **Vlad** (`vladaionescu`) as reviewers.
+Create a PR with the spec files only (non-draft mode). Assign **only Brandon** (`brandonSc`) as reviewer. Do NOT assign Vlad yet — Brandon will assign him when the spec is ready for Vlad's review.
 
 ### Then wait for go-ahead
 
-**Do not write implementation code until reviewers say "go ahead."**
+**Do not write implementation code until Vlad approves the spec.**
 
-The two reviewers are **Brandon** (`@brandonSc`) and **Vlad** (`@vladaionescu`). The default rule is: **both must say "go ahead"** (or "LGTM", "looks good", etc.) before you proceed.
+The review flow is sequential:
 
-**Exception:** Either reviewer may explicitly say something like "go ahead, don't wait for me" or "Vlad can review later" — in that case, one go-ahead is enough. Follow what they say.
+1. **Brandon reviews first.** Address his feedback. Iterate until he's satisfied.
+2. **Brandon assigns Vlad.** When Brandon is happy with the spec, he'll assign Vlad (`vladaionescu`) as a reviewer.
+3. **Vlad reviews.** Address his feedback. Iterate.
+4. **Vlad approves = go-ahead.** Once Vlad approves the PR, you can proceed to implementation.
 
 **While waiting:**
 - Address review comments. Push updates.
@@ -317,13 +322,12 @@ CodeRabbit will automatically review the PR. Address its feedback, but **use jud
 
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale.
 
-Wait for **both Brandon and Vlad** to approve the PR via GitHub review. The same exception applies as at the go-ahead gate: if one explicitly says the other's approval isn't needed, one approval is enough. Follow what they say.
+Wait for **Brandon** to approve the implementation (or merge directly). Brandon is the implementation reviewer.
 
 **While waiting:**
 - Fix CI failures automatically.
 - Address review comments. Push fixes. Reply to reviewers on the PR.
-- If reviewers are discussing with each other, wait for them to reach a conclusion before acting.
-- **Do not merge** until you have the required approvals.
+- **Do not merge** until Brandon approves or merges directly.
 
 ---
 
@@ -333,9 +337,9 @@ Wait for **both Brandon and Vlad** to approve the PR via GitHub review. The same
 
 - [ ] CI is green
 - [ ] CodeRabbit comments addressed
-- [ ] **Both Brandon and Vlad approved** (unless one explicitly waived the other's review)
+- [ ] **Brandon approved** (or is merging directly)
 - [ ] Test results posted on PR
-- [ ] No unresolved review threads
+- [ ] No unresolved review threads / suggestions
 
 ### Merge
 
@@ -406,9 +410,9 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 
 | Mistake | Why it's wrong | Fix |
 |---------|---------------|-----|
-| Starting implementation before "go ahead" | The spec may change significantly during review. Implementation effort is wasted. | Wait for both Brandon and Vlad (or explicit single go-ahead). |
+| Starting implementation before Vlad approves | The spec may change significantly during review. Implementation effort is wasted. | Wait for Vlad to approve the spec before implementing. |
 | Using `git add .` or `git add -A` | Stages unintended files (test configs, temp files, etc.). | Always `git add` specific directories: `git add collectors/<name>/` or `git add policies/<name>/`. |
-| Merging with only one approval | Both reviewers need to approve unless one explicitly waives. | Wait for both. |
+| Merging without Brandon's approval | Brandon reviews implementation and must approve (or merge directly) before merging. | Wait for Brandon's approval on the implementation. |
 | Not posting test results on the PR | Reviewers need evidence, not trust. | Always post a test results comment with the template from this playbook. |
 | Ignoring CodeRabbit feedback | CodeRabbit auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every CodeRabbit comment before requesting human review. |
 
