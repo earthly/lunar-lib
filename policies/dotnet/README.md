@@ -1,6 +1,6 @@
 # .NET Project Guardrails
 
-Enforce .NET-specific project standards including project file presence, target framework configuration, dependency locking, test project requirements, and minimum SDK version requirements for both development and CI/CD environments.
+Enforce .NET project standards including project file presence, target framework configuration, dependency locking, test projects, and SDK version requirements.
 
 ## Overview
 

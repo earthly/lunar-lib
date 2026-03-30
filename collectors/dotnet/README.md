@@ -14,6 +14,7 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.lang.dotnet` | object | .NET project metadata (SDK version, frameworks, project files, test projects) |
 | `.lang.dotnet.dependencies` | object | NuGet packages and project references from project files |
+| `.lang.dotnet.cicd` | object | CI/CD command tracking with SDK version |
 
 ## Collectors
 
@@ -23,6 +24,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 |-----------|-----------|-------------|
 | `project` | code | Detects .NET project structure, target frameworks, SDK versions, test projects |
 | `dependencies` | code | Extracts NuGet dependencies and project references from project files |
+| `cicd` | ci-before-command | Tracks dotnet commands in CI with SDK version |
 
 ## Installation
 

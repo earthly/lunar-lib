@@ -50,26 +50,26 @@ policies:
     mainPython: ./test_project_exists.py
     keywords: ["test project", "testing", "quality assurance", "xunit", "nunit"]
 
-  - name: min-dotnet-sdk-version
+  - name: min-sdk-version
     description: |
       Ensures the .NET SDK version meets minimum requirements.
       Prevents using outdated SDK versions that may have security vulnerabilities or missing features.
-    mainPython: ./min_dotnet_sdk_version.py
+    mainPython: ./min_sdk_version.py
     keywords: ["SDK version", ".NET SDK", "global.json", "version requirements"]
 
-  - name: min-dotnet-sdk-version-cicd
+  - name: min-sdk-version-cicd
     description: |
       Ensures the .NET SDK version used in CI/CD meets minimum requirements.
       Prevents CI/CD pipelines from using outdated SDK versions.
-    mainPython: ./min_dotnet_sdk_version_cicd.py
+    mainPython: ./min_sdk_version_cicd.py
     keywords: ["CI/CD", "SDK version", ".NET SDK", "build pipeline"]
 
 inputs:
-  min_dotnet_sdk_version:
+  min_sdk_version:
     type: str
     default: "8.0"
     description: "Minimum .NET SDK version required for the project"
-  min_dotnet_sdk_version_cicd:
+  min_sdk_version_cicd:
     type: str
     default: "8.0"
     description: "Minimum .NET SDK version required for CI/CD pipelines"

@@ -42,6 +42,18 @@ collectors:
       type: code
     keywords: ["nuget dependencies", "packages", "project references", "supply chain"]
 
+  - name: cicd
+    description: |
+      Records every dotnet command executed in CI pipelines along with the .NET
+      SDK version. Writes command strings and version info to .lang.dotnet.cicd
+      for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: dotnet
+    keywords: ["dotnet ci", "dotnet version", "ci commands", "build tracking", "deployment tracking"]
+
 example_component_json: |
   {
     "lang": {
@@ -82,6 +94,14 @@ example_component_json: |
             }
           ],
           "source": { "tool": "dotnet", "integration": "code" }
+        },
+        "cicd": {
+          "cmds": [
+            {"cmd": "dotnet restore", "version": "8.0.100"},
+            {"cmd": "dotnet build --configuration Release", "version": "8.0.100"},
+            {"cmd": "dotnet test --no-build", "version": "8.0.100"}
+          ],
+          "source": {"tool": "dotnet", "integration": "ci"}
         }
       }
     }
