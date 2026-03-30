@@ -6,8 +6,6 @@ Collects .NET/C# project information, dependencies, and test project detection.
 
 This collector gathers metadata about .NET projects including project structure detection, target frameworks, NuGet dependencies, project references, and test project identification. It supports C#, F#, and VB.NET projects with both SDK-style and legacy project formats. Code hooks analyze project files statically to extract build and dependency information.
 
-**Note:** This collector analyzes project files at rest—it doesn't build or run projects, just reads their configuration.
-
 ## Collected Data
 
 This collector writes to the following Component JSON paths:
