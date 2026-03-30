@@ -172,6 +172,8 @@ The review flow is sequential:
 3. **Vlad reviews.** Address his feedback. Iterate. Still spec files only.
 4. **Vlad approves = go-ahead.** Once Vlad's GitHub review status is "APPROVED", you can proceed to implementation.
 
+**Exception:** Brandon may explicitly tell you to go ahead with implementation even without Vlad's approval (e.g. if Vlad is away). If Brandon says to proceed, that's a valid go-ahead — follow his instruction.
+
 **While waiting:**
 - Address review comments. Push updates to spec files only.
 - If reviewers are discussing with each other (e.g. @-mentioning each other), **wait for them to reach a conclusion** before acting.
