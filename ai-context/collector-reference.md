@@ -248,9 +248,9 @@ hook:
 
 ### Dependency Hook: `after-json`
 
-The `after-json` hook lets a collector run **after** all collection is complete for this run. The hub handles scheduling: once every collector and CI workflow that could write to the declared path has finished, the dependent collector fires—regardless of whether data was actually written.
+The `after-json` hook lets a collector run **after** all other collection is complete — every collector and CI workflow in the run finishes first, then `after-json` collectors fire. The declared path does not need to exist; the dependent collector runs regardless of whether data was actually written.
 
-This decouples dependencies from knowing *which* specific collector produces the data. You declare "I need data at `.sbom`" and the hub fires your collector at the end of the run so it can check what's there.
+This lets you build collectors that depend on output from other collectors without coupling to a specific upstream. You declare "I need data at `.sbom`" and your collector runs at the end of the run to check what's there.
 
 ```yaml
 hook:
