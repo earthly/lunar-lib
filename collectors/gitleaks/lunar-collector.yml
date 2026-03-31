@@ -14,7 +14,7 @@ landing_page:
     Detects API keys, passwords, tokens, and other credentials in code.
     Zero configuration required — runs on every repo and writes normalized
     results to the .secrets Component JSON category.
-  category: "security"
+  categories: ["security"]
   icon: "assets/gitleaks.svg"
   status: "beta"
   related:
@@ -36,7 +36,7 @@ collectors:
   - name: cicd
     description: |
       Detects Gitleaks execution in CI pipelines. Captures the command
-      and version. Records source metadata to .secrets.
+      and version. Writes detected commands to .native.gitleaks.cicd.cmds.
     mainBash: cicd.sh
     hook:
       type: ci-after-command
@@ -71,6 +71,11 @@ example_component_json: |
                 "Commit": "abc1234",
                 "Description": "Generic API Key"
               }
+            ]
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "gitleaks detect --source . --report-format json", "version": "8.21.2"}
             ]
           }
         }
