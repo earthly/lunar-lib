@@ -20,11 +20,11 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.api.specs[]` | array | `api-docs` collector |
-| `.api.specs[].valid` | boolean | `api-docs` collector |
-| `.api.specs[].version` | string | `api-docs` collector |
+| `.api.specs[]` | array | `openapi` / `swagger` collectors |
+| `.api.specs[].valid` | boolean | `openapi` / `swagger` collectors |
+| `.api.specs[].version` | string | `openapi` / `swagger` collectors |
 
-**Note:** Ensure the `api-docs` collector is configured before enabling this policy.
+**Note:** Enable at least one of the `openapi` or `swagger` collectors before using this policy.
 
 ## Installation
 

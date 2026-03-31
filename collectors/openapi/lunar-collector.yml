@@ -1,0 +1,60 @@
+version: 0
+
+name: openapi
+description: Detect and analyze OpenAPI 3.x specification files
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "OpenAPI Collector"
+  long_description: |
+    Detect OpenAPI 3.x specification files in repositories. Parses spec
+    version, endpoint count, and schema count. Validates spec file syntax.
+    Supports YAML and JSON formats.
+  categories: ["documentation"]
+  icon: "assets/openapi.svg"
+  status: "beta"
+  related:
+    - slug: "api-docs"
+      type: "policy"
+      reason: "Enforces API documentation standards based on collected spec metadata"
+
+collectors:
+  - name: openapi
+    description: |
+      Searches the repository for OpenAPI 3.x specification files by common
+      filenames (openapi.yaml, openapi.yml, openapi.json). For each spec found,
+      extracts the spec version, validity, endpoint count, and schema count.
+      Writes results to `.api`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["openapi", "api", "rest", "documentation", "spec"]
+
+inputs:
+  find_command:
+    description: |
+      Custom find command to locate OpenAPI spec files. Default searches for
+      common OpenAPI filenames recursively, excluding node_modules and vendor dirs.
+    default: "find . -type f \\( -name 'openapi.yaml' -o -name 'openapi.yml' -o -name 'openapi.json' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'"
+
+example_component_json: |
+  {
+    "api": {
+      "specs": [
+        {
+          "type": "openapi",
+          "path": "api/openapi.yaml",
+          "valid": true,
+          "version": "3.0.3",
+          "paths_count": 42,
+          "schemas_count": 15
+        }
+      ],
+      "source": {
+        "tool": "openapi",
+        "version": "1.0.0",
+        "integration": "code"
+      }
+    }
+  }

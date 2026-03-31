@@ -15,9 +15,12 @@ landing_page:
   icon: "assets/api-docs.svg"
   status: "beta"
   requires:
-    - slug: "api-docs"
+    - slug: "openapi"
       type: "collector"
-      reason: "Provides API spec file metadata"
+      reason: "Provides OpenAPI 3.x spec file metadata"
+    - slug: "swagger"
+      type: "collector"
+      reason: "Provides Swagger 2.0 spec file metadata"
   related: []
 
 policies:
@@ -25,7 +28,7 @@ policies:
     description: |
       Verifies that at least one OpenAPI or Swagger specification file exists
       in the repository by checking if `.api.specs` is non-empty.
-      Skips if the api-docs collector has not run.
+      Skips if neither the openapi nor swagger collector has run.
     mainPython: ./spec-exists.py
     keywords: ["openapi", "swagger", "api", "documentation", "spec"]
 

@@ -1,0 +1,60 @@
+version: 0
+
+name: swagger
+description: Detect and analyze Swagger 2.0 specification files
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Swagger Collector"
+  long_description: |
+    Detect Swagger 2.0 specification files in repositories. Parses spec
+    version, endpoint count, and schema count. Validates spec file syntax.
+    Supports YAML and JSON formats.
+  categories: ["documentation"]
+  icon: "assets/swagger.svg"
+  status: "beta"
+  related:
+    - slug: "api-docs"
+      type: "policy"
+      reason: "Enforces API documentation standards based on collected spec metadata"
+
+collectors:
+  - name: swagger
+    description: |
+      Searches the repository for Swagger 2.0 specification files by common
+      filenames (swagger.yaml, swagger.yml, swagger.json). For each spec found,
+      extracts the spec version, validity, endpoint count, and schema count.
+      Writes results to `.api`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["swagger", "api", "rest", "documentation", "spec"]
+
+inputs:
+  find_command:
+    description: |
+      Custom find command to locate Swagger spec files. Default searches for
+      common Swagger filenames recursively, excluding node_modules and vendor dirs.
+    default: "find . -type f \\( -name 'swagger.yaml' -o -name 'swagger.yml' -o -name 'swagger.json' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'"
+
+example_component_json: |
+  {
+    "api": {
+      "specs": [
+        {
+          "type": "swagger",
+          "path": "swagger.json",
+          "valid": true,
+          "version": "2.0",
+          "paths_count": 18,
+          "schemas_count": 7
+        }
+      ],
+      "source": {
+        "tool": "swagger",
+        "version": "1.0.0",
+        "integration": "code"
+      }
+    }
+  }
