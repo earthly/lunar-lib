@@ -120,7 +120,6 @@ Key points:
 | `ci-after-step` | After CI step | CI Agent (in-pipeline) |
 | `ci-before-command` | Before specific command runs | CI Agent (process-level) |
 | `ci-after-command` | After specific command runs | CI Agent (process-level) |
-| `after-collector` | After specific collector(s) resolve | Lunar Runner (with accumulated Component JSON) |
 | `after-json` | After a Component JSON path is populated | Lunar Runner (with accumulated Component JSON) |
 
 Example collector definition:
@@ -148,7 +147,7 @@ Key points:
 - CI-based collectors run in the context of the CI pipeline (access to build artifacts, test results, etc.)
 - Code/cron collectors run on Lunar Runners with a clone of the repository
 - Collectors may run either containerized or non-containerized
-- Dependency hooks (`after-collector`, `after-json`) let collectors run after upstream data is available — see [Collector Reference](./collector-reference.md#dependency-hooks) for details
+- The `after-json` dependency hook lets collectors run after upstream data is available — see [Collector Reference](./collector-reference.md#dependency-hook-after-json) for details
 
 ### Policies
 

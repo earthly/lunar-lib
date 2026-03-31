@@ -246,68 +246,11 @@ hook:
 - Collecting CI timing information
 - Detecting specific tools being run
 
-### Dependency Hooks
+### Dependency Hook: `after-json`
 
-Dependency hooks let collectors run **after** other collectors have resolved—either waiting for specific collectors by name, or waiting for data to appear at a Component JSON path. The hub handles scheduling: when the upstream resolves (data produced or determined to be permanently absent for this run), the dependent collector fires.
+The `after-json` hook lets a collector run **after** a Component JSON path is populated—or determined to be permanently empty for this run. The hub handles scheduling: when all upstream collectors and CI workflows that could write to the path have resolved, the dependent collector fires.
 
-#### `after-collector` Hook
-
-Triggers after one or more specific collectors have resolved. The dependent collector can then read Component JSON via `lunar component get-json` to decide whether to act.
-
-**Single dependency:**
-
-```yaml
-hook:
-  type: after-collector
-  collector: syft.cicd
-```
-
-The collector fires after `syft.cicd` resolves—whether it produced data or not.
-
-**Multiple dependencies (array form):**
-
-```yaml
-hook:
-  type: after-collector
-  collectors: [snyk.github-app, snyk.cicd]    # wait for ALL to resolve
-```
-
-Use array form when you need to wait for multiple detection methods before deciding. For example, an auto-scanner fallback that should only run if *neither* the GitHub App nor the CI CLI detected the tool.
-
-**Context:** Lunar Runner. The collector receives the same environment as a `code` collector, plus access to accumulated Component JSON from upstream collectors.
-
-**Use cases:**
-- Auto-generate SBOM if CI didn't produce one (`after-collector: syft.cicd`)
-- Enrich SBOM with vulnerability data after SBOM collector finishes (`after-collector: syft.auto`)
-- Run fallback scanner only if both GitHub App and CI detection came up empty (`collectors: [snyk.github-app, snyk.cicd]`)
-- Chain collectors: `syft.cicd → syft.auto → manifest-cyber.api → compliance-classifier`
-
-**Resolution semantics:**
-- Data appears → dependent fires immediately
-- All upstream workflows and collectors finish without writing data → dependent fires with no upstream data (allowing fallback logic)
-- Chains compose naturally: each link is a single `after-collector` on the previous step
-
-**Common pattern — fallback collector:**
-
-```bash
-#!/bin/bash
-set -e
-
-# This collector runs after syft.cicd resolves.
-# Check if SBOM already exists — if so, skip.
-EXISTING=$(lunar component get-json ".sbom" 2>/dev/null || echo "")
-if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
-  echo "SBOM already collected by CI, skipping auto-generation"
-  exit 0
-fi
-
-# No SBOM from CI — generate one
-syft . -o spdx-json | lunar collect -j ".sbom" -
-```
-
-#### `after-json` Hook
-
-Triggers when a **Component JSON path** is populated—or determined to be permanently empty for this run. This decouples the dependency from knowing which specific collector produces the data.
+This decouples dependencies from knowing *which* specific collector produces the data. You declare "I need data at `.sbom`" and the hub figures out when that's ready.
 
 ```yaml
 hook:
@@ -315,7 +258,7 @@ hook:
   path: ".sca"                    # fire after .sca is populated (or determined absent)
 ```
 
-**Context:** Same as `after-collector`. The collector receives access to accumulated Component JSON.
+**Context:** Lunar Runner. The collector receives the same environment as a `code` collector, plus access to accumulated Component JSON from upstream collectors.
 
 **Use cases:**
 - SBOM enrichment that works regardless of SBOM source (Syft, Trivy, cdxgen, or custom)
@@ -323,46 +266,9 @@ hook:
 - Linter fallback — run auto-linter if no lint data exists, regardless of which tool could have produced it
 - Secret scanning fallback — works whether Gitleaks, TruffleHog, or GitHub's scanner provided data
 
-**Resolution semantics:** Same as `after-collector`—fire when data appears at the path, or when all collectors and CI workflows finish without writing to it.
-
-**When to use `after-json` vs `after-collector`:**
-
-| Scenario | Use | Why |
-|----------|-----|-----|
-| Known upstream (SBOM fallback for Syft) | `after-collector` | Explicit, inspectable dependency graph |
-| Multiple known upstreams (Snyk via App + CI) | `after-collector` (array) | Wait for all known sources |
-| Unknown upstream (enrich any SBOM) | `after-json` | Don't care which tool produced it |
-| Open-ended fallback (any SCA scanner) | `after-json` | Can't enumerate all possible upstreams |
-
-**Trade-off:** `after-json` dependencies aren't visible in the manifest's collector list—you can't look at a config and see which collectors a dependent is implicitly waiting on. With `after-collector`, the dependency graph is explicit. Use `after-collector` when you know your upstreams; use `after-json` for open-ended fallback scenarios.
-
-#### Overrideable dependencies in plugins
-
-Plugins shipped via lunar-lib can use `after-collector` with sensible defaults, and users override them in `lunar-config.yml` when their setup differs. This makes plugins portable without requiring `after-json` for every case.
-
-**In the plugin's `lunar-collector.yml`:**
-
-```yaml
-collectors:
-  - name: api
-    description: Enrich SBOM with vulnerability data
-    mainBash: api.sh
-    hook:
-      type: after-collector
-      collectors: [syft.cicd, syft.auto]    # Default: wait for Syft
-```
-
-**In the user's `lunar-config.yml` (override):**
-
-```yaml
-collectors:
-  - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
-    on: ["scope:SOC2"]
-    override_deps:
-      api: [trivy.cicd, trivy.auto]         # Override: wait for Trivy instead
-```
-
-This is a middle ground between hardcoded `after-collector` and fully dynamic `after-json`. The plugin author picks reasonable defaults; users who have a different tool chain override without touching the plugin code.
+**Resolution semantics:**
+- Data appears at the path → dependent fires immediately
+- All upstream collectors and CI workflows finish without writing to the path → dependent fires with no upstream data (allowing fallback logic)
 
 **Example — SBOM enrichment (source-agnostic):**
 
@@ -370,6 +276,7 @@ This is a middle ground between hardcoded `after-collector` and fully dynamic `a
 #!/bin/bash
 set -e
 
+# Hook: type: after-json, path: ".sbom"
 # This collector runs after .sbom is populated (by any tool).
 SBOM=$(lunar component get-json ".sbom" 2>/dev/null || echo "")
 if [ -z "$SBOM" ] || [ "$SBOM" = "null" ]; then
@@ -382,6 +289,24 @@ curl -fsS -H "Authorization: Bearer $LUNAR_SECRET_MANIFEST_CYBER_TOKEN" \
   -d "$SBOM" \
   "https://api.manifestcyber.com/v1/enrich" | \
   lunar collect -j ".sbom.enrichment" -
+```
+
+**Example — fallback collector:**
+
+```bash
+#!/bin/bash
+set -e
+
+# Hook: type: after-json, path: ".sbom"
+# If no SBOM was produced by CI or any other collector, generate one.
+EXISTING=$(lunar component get-json ".sbom" 2>/dev/null || echo "")
+if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+  echo "SBOM already collected, skipping auto-generation"
+  exit 0
+fi
+
+# No SBOM from any source — generate one
+syft . -o spdx-json | lunar collect -j ".sbom" -
 ```
 
 ### Multiple Hooks
@@ -830,7 +755,7 @@ collectors:
       - Feature B                     # implementation details.
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
-      type: code                      # Or: cron, ci-*, after-collector, after-json
+      type: code                      # Or: cron, ci-*, after-json
     keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
 # === Inputs (optional) ===
