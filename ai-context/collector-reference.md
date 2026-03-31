@@ -336,6 +336,34 @@ hook:
 
 **Trade-off:** `after-json` dependencies aren't visible in the manifest's collector list—you can't look at a config and see which collectors a dependent is implicitly waiting on. With `after-collector`, the dependency graph is explicit. Use `after-collector` when you know your upstreams; use `after-json` for open-ended fallback scenarios.
 
+#### Overrideable dependencies in plugins
+
+Plugins shipped via lunar-lib can use `after-collector` with sensible defaults, and users override them in `lunar-config.yml` when their setup differs. This makes plugins portable without requiring `after-json` for every case.
+
+**In the plugin's `lunar-collector.yml`:**
+
+```yaml
+collectors:
+  - name: api
+    description: Enrich SBOM with vulnerability data
+    mainBash: api.sh
+    hook:
+      type: after-collector
+      collectors: [syft.cicd, syft.auto]    # Default: wait for Syft
+```
+
+**In the user's `lunar-config.yml` (override):**
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
+    on: ["scope:SOC2"]
+    override_deps:
+      api: [trivy.cicd, trivy.auto]         # Override: wait for Trivy instead
+```
+
+This is a middle ground between hardcoded `after-collector` and fully dynamic `after-json`. The plugin author picks reasonable defaults; users who have a different tool chain override without touching the plugin code.
+
 **Example — SBOM enrichment (source-agnostic):**
 
 ```bash
@@ -802,7 +830,7 @@ collectors:
       - Feature B                     # implementation details.
     mainBash: main.sh                 # Or: runBash: "inline script"
     hook:
-      type: code                      # Or: cron, ci-before-command, etc.
+      type: code                      # Or: cron, ci-*, after-collector, after-json
     keywords: ["keyword1", "keyword2", "seo term"]  # Required: SEO keywords
 
 # === Inputs (optional) ===
