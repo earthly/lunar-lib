@@ -248,14 +248,14 @@ hook:
 
 ### Dependency Hook: `after-json`
 
-The `after-json` hook lets a collector run **after** a Component JSON path is populated—or determined to be permanently empty for this run. The hub handles scheduling: when all upstream collectors and CI workflows that could write to the path have resolved, the dependent collector fires.
+The `after-json` hook lets a collector run **after** all collection is complete for this run. The hub handles scheduling: once every collector and CI workflow that could write to the declared path has finished, the dependent collector fires—regardless of whether data was actually written.
 
-This decouples dependencies from knowing *which* specific collector produces the data. You declare "I need data at `.sbom`" and the hub figures out when that's ready.
+This decouples dependencies from knowing *which* specific collector produces the data. You declare "I need data at `.sbom`" and the hub fires your collector at the end of the run so it can check what's there.
 
 ```yaml
 hook:
   type: after-json
-  path: ".sca"                    # fire after .sca is populated (or determined absent)
+  path: ".sca"                    # runs at the end of collection; .sca may or may not exist
 ```
 
 **Context:** Lunar Runner. The collector receives the same environment as a `code` collector, plus access to accumulated Component JSON from upstream collectors.
@@ -267,8 +267,9 @@ hook:
 - Secret scanning fallback — works whether Gitleaks, TruffleHog, or GitHub's scanner provided data
 
 **Resolution semantics:**
-- Data appears at the path → dependent fires immediately
-- All upstream collectors and CI workflows finish without writing to the path → dependent fires with no upstream data (allowing fallback logic)
+- The dependent collector always fires at the end of the run, after all upstream collectors and CI workflows have finished
+- If data exists at the path, the collector can read and act on it (enrichment, post-processing)
+- If no data exists at the path, the collector can generate it (fallback logic)
 
 **Example — SBOM enrichment (source-agnostic):**
 
@@ -277,7 +278,7 @@ hook:
 set -e
 
 # Hook: type: after-json, path: ".sbom"
-# This collector runs after .sbom is populated (by any tool).
+# This collector runs at the end — .sbom may or may not exist.
 SBOM=$(lunar component get-json ".sbom" 2>/dev/null || echo "")
 if [ -z "$SBOM" ] || [ "$SBOM" = "null" ]; then
   echo "No SBOM data available, nothing to enrich"
