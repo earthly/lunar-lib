@@ -12,8 +12,7 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.api.spec_exists` | boolean | Whether any API spec file was found |
-| `.api.specs[]` | array | List of detected API specification files |
+| `.api.specs[]` | array | List of detected API specification files (empty when none found) |
 | `.api.specs[].type` | string | Spec type: `"openapi"` or `"swagger"` |
 | `.api.specs[].path` | string | File path relative to repo root |
 | `.api.specs[].valid` | boolean | Whether the file parses without errors |

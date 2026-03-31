@@ -42,7 +42,6 @@ inputs:
 example_component_json: |
   {
     "api": {
-      "spec_exists": true,
       "specs": [
         {
           "type": "openapi",

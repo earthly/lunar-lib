@@ -20,7 +20,6 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.api.spec_exists` | boolean | `api-docs` collector |
 | `.api.specs[]` | array | `api-docs` collector |
 | `.api.specs[].valid` | boolean | `api-docs` collector |
 | `.api.specs[].version` | string | `api-docs` collector |
@@ -48,7 +47,6 @@ Repository with a valid OpenAPI 3.x spec:
 ```json
 {
   "api": {
-    "spec_exists": true,
     "specs": [
       {
         "type": "openapi",
@@ -68,7 +66,7 @@ Repository with no API spec files:
 ```json
 {
   "api": {
-    "spec_exists": false
+    "specs": []
   }
 }
 ```
@@ -80,7 +78,6 @@ Repository with no API spec files:
 ```json
 {
   "api": {
-    "spec_exists": true,
     "specs": [
       {
         "type": "openapi",
@@ -100,7 +97,6 @@ Repository with no API spec files:
 ```json
 {
   "api": {
-    "spec_exists": true,
     "specs": [
       {
         "type": "swagger",
