@@ -1,0 +1,62 @@
+version: 0
+
+name: api-docs
+description: API documentation best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+landing_page:
+  display_name: "API Docs Guardrails"
+  long_description: |
+    Validate API documentation standards. Ensures repositories with APIs have
+    valid OpenAPI or Swagger specification files and encourages migration to
+    OpenAPI 3.x from deprecated Swagger 2.0.
+  category: "repository-and-ownership"
+  icon: "assets/api-docs.svg"
+  status: "beta"
+  requires:
+    - slug: "api-docs"
+      type: "collector"
+      reason: "Provides API spec file metadata"
+  related: []
+
+policies:
+  - name: spec-exists
+    description: |
+      Verifies that at least one OpenAPI or Swagger specification file exists
+      in the repository. Skips if the api-docs collector has not run.
+    mainPython: ./spec-exists.py
+    keywords: ["openapi", "swagger", "api", "documentation", "spec"]
+
+  - name: spec-valid
+    description: |
+      Checks that all detected API spec files parse without errors.
+      Skips if no spec files were detected.
+    mainPython: ./spec-valid.py
+    keywords: ["openapi", "swagger", "api", "validation", "syntax"]
+
+  - name: spec-version-3
+    description: |
+      Ensures all API specs use OpenAPI 3.x rather than deprecated Swagger 2.0.
+      Skips if no spec files were detected.
+    mainPython: ./spec-version-3.py
+    keywords: ["openapi", "swagger", "api", "version", "migration"]
+
+inputs: {}
+
+example_component_json: |
+  {
+    "api": {
+      "spec_exists": true,
+      "specs": [
+        {
+          "type": "openapi",
+          "path": "api/openapi.yaml",
+          "valid": true,
+          "version": "3.0.3",
+          "paths_count": 42,
+          "schemas_count": 15
+        }
+      ]
+    }
+  }

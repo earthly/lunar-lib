@@ -1,0 +1,62 @@
+version: 0
+
+name: api-docs
+description: Detect and analyze OpenAPI/Swagger specification files
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "API Docs Collector"
+  long_description: |
+    Detect OpenAPI and Swagger specification files in repositories. Parses spec
+    version, endpoint count, and schema count. Validates spec file syntax.
+    Supports YAML and JSON formats.
+  categories: ["documentation"]
+  icon: "assets/api-docs.svg"
+  status: "beta"
+  related:
+    - slug: "api-docs"
+      type: "policy"
+      reason: "Enforces API documentation standards based on collected spec metadata"
+
+collectors:
+  - name: api-docs
+    description: |
+      Searches the repository for OpenAPI and Swagger specification files by
+      common filenames (openapi.yaml, swagger.json, etc.) and by scanning YAML/JSON
+      files for OpenAPI/Swagger version markers. For each spec found, extracts
+      the spec type, version, validity, endpoint count, and schema count.
+      Writes results to `.api`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["openapi", "swagger", "api", "api-docs", "rest", "documentation", "spec"]
+
+inputs:
+  find_command:
+    description: |
+      Custom find command to locate API spec files. Default searches for common
+      OpenAPI/Swagger filenames recursively, excluding node_modules and vendor dirs.
+    default: "find . -type f \\( -name 'openapi.yaml' -o -name 'openapi.yml' -o -name 'openapi.json' -o -name 'swagger.yaml' -o -name 'swagger.yml' -o -name 'swagger.json' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'"
+
+example_component_json: |
+  {
+    "api": {
+      "spec_exists": true,
+      "specs": [
+        {
+          "type": "openapi",
+          "path": "api/openapi.yaml",
+          "valid": true,
+          "version": "3.0.3",
+          "paths_count": 42,
+          "schemas_count": 15
+        }
+      ],
+      "source": {
+        "tool": "api-docs",
+        "version": "1.0.0",
+        "integration": "code"
+      }
+    }
+  }
