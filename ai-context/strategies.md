@@ -377,3 +377,65 @@ Use [ast-grep](https://ast-grep.github.io/) to extract specific code patterns ba
 * No usage of deprecated APIs
 * No security anti-patterns (SQL injection risks, dangerous exec calls)
 * Feature flags are documented and follow conventions
+
+---
+
+## Strategy 17: Multi-Collector Category Aggregation
+
+Use multiple technology-specific collectors that all write to the same Component JSON category, with a single technology-agnostic policy that consumes the merged data.
+
+**How it works:**
+* Instead of one collector that handles multiple technologies (e.g., a single "api-docs" collector that detects both OpenAPI and Swagger), split into separate collectors — one per technology or format.
+* Each collector writes to the **same category** in the Component JSON (e.g., `.api`). Lunar auto-merges arrays at the same path, so both collectors' results end up in one unified array.
+* A single policy reads the merged data and makes assertions without caring which collector produced which entry. The policy is technology-agnostic.
+
+**Architecture:**
+
+```
+collectors/openapi/  ──writes──▶  .api.specs[]  ◀──writes──  collectors/swagger/
+                                       │
+                                       ▼
+                              policies/api-docs/
+                           (reads .api.specs[], doesn't
+                            care about the source)
+```
+
+**When to use this pattern:**
+* Multiple technologies or formats produce semantically equivalent data (OpenAPI 3.x + Swagger 2.0, npm + yarn + pnpm, Docker + Podman)
+* Each technology has distinct file patterns, parsing logic, or detection methods
+* Policies should apply uniformly regardless of the underlying technology
+* You want users to enable only the collectors relevant to their stack
+
+**Advantages over a single combined collector:**
+* **Focused responsibility:** Each collector does one thing well — find and parse one spec format
+* **Independent enablement:** Teams using only OpenAPI don't need a Swagger collector running (and vice versa)
+* **Independent evolution:** Adding support for a new format (e.g., AsyncAPI, gRPC protobuf) means adding a new collector without touching existing ones
+* **Cleaner icons and branding:** Each collector gets its own technology-specific icon on the landing page, while the policy gets a generic icon representing the domain (e.g., a "docs" book icon)
+
+**Key design rules:**
+1. **Collectors are technology-specific.** Name them after the technology: `openapi`, `swagger`, `grpc` — not `api-docs-openapi`.
+2. **Policies are domain-specific.** Name them after the domain: `api-docs` — not `openapi-policy`.
+3. **Use the same array path.** Both collectors write to the same `.category.array[]` path so Lunar merges them automatically.
+4. **Include a `type` field.** Each spec entry should include a `type` field (e.g., `"openapi"`, `"swagger"`) so policies can distinguish when needed (e.g., "migrate away from Swagger 2.0").
+5. **Policy declares all collectors as dependencies** via `requires` in `lunar-policy.yml`, so the platform knows which collectors feed it.
+
+**Canonical example: `.api` category**
+
+Two collectors (`openapi`, `swagger`) both write to `.api.specs[]`:
+```json
+{
+  "api": {
+    "specs": [
+      { "type": "openapi", "path": "api/openapi.yaml", "valid": true, "version": "3.0.3" },
+      { "type": "swagger", "path": "swagger.json", "valid": true, "version": "2.0" }
+    ]
+  }
+}
+```
+
+The `api-docs` policy then asserts:
+* **spec-exists:** `.api.specs` is non-empty (at least one spec file of any type)
+* **spec-valid:** all entries have `valid: true` (regardless of type)
+* **spec-version-3:** no entries have `type: "swagger"` (migration enforcement)
+
+**Future extensibility:** Adding an AsyncAPI or gRPC collector that also writes to `.api.specs[]` requires zero changes to the existing policy — it just gets more data to evaluate.
