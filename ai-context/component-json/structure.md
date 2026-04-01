@@ -100,6 +100,11 @@ This table lists important sub-objects within each category. For full details, s
 | `.api.rest.schemas[]` | Normalized REST schemas (`name`, `type`, `property_count`, `required_count`, `properties`) |
 | `.api.rest.native.openapi` | Full raw OpenAPI 3.x spec as JSON |
 | `.api.rest.native.swagger` | Full raw Swagger 2.0 spec as JSON |
+| `.api.grpc.services[]` | gRPC service definitions (`name`, `rpcs[]`) — future |
+| `.api.grpc.messages[]` | Protobuf message definitions (`name`, `field_count`, `fields`) — future |
+| `.api.graphql.queries[]` | GraphQL queries (`name`, `return_type`, `arguments`, `description`) — future |
+| `.api.graphql.mutations[]` | GraphQL mutations (`name`, `return_type`, `arguments`, `description`) — future |
+| `.api.graphql.types[]` | GraphQL type definitions (`name`, `kind`, `field_count`, `fields`) — future |
 | **[`.code_patterns`](cat-code-patterns.md)** | **AST-based code pattern analysis (Strategy 16)** |
 | `.code_patterns.source` | Tool source (`tool`, `version`) |
 | `.code_patterns.security` | Security anti-patterns (`sql_concat`, `eval_exec`, `weak_crypto`, etc.) |

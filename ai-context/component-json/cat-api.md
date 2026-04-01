@@ -20,6 +20,8 @@ The full, unmodified spec as JSON. Policies that need deep inspection of tool-sp
 
 ## Full Structure
 
+This example shows a repo with all three API protocols. In practice, most repos will have only one or two.
+
 ```json
 {
   "api": {
@@ -34,12 +36,21 @@ The full, unmodified spec as JSON. Policies that need deep inspection of tool-sp
         "schema_count": 5
       },
       {
-        "path": "swagger.json",
-        "format": "swagger",
-        "protocol": "rest",
+        "path": "proto/user.proto",
+        "format": "protobuf",
+        "protocol": "grpc",
         "valid": true,
-        "version": "2.0",
-        "operation_count": 8,
+        "version": "proto3",
+        "operation_count": 4,
+        "schema_count": 6
+      },
+      {
+        "path": "schema.graphql",
+        "format": "graphql",
+        "protocol": "graphql",
+        "valid": true,
+        "version": null,
+        "operation_count": 5,
         "schema_count": 3
       }
     ],
@@ -96,8 +107,106 @@ The full, unmodified spec as JSON. Policies that need deep inspection of tool-sp
         }
       ],
       "native": {
-        "openapi": { "openapi": "3.0.3", "info": { "...": "full raw OpenAPI spec as JSON" } },
-        "swagger": { "swagger": "2.0", "info": { "...": "full raw Swagger spec as JSON" } }
+        "openapi": { "openapi": "3.0.3", "info": { "...": "full raw OpenAPI spec as JSON" } }
+      }
+    },
+
+    "grpc": {
+      "services": [
+        {
+          "name": "UserService",
+          "rpcs": [
+            {
+              "name": "GetUser",
+              "request_type": "GetUserRequest",
+              "response_type": "User",
+              "client_streaming": false,
+              "server_streaming": false
+            },
+            {
+              "name": "ListUsers",
+              "request_type": "ListUsersRequest",
+              "response_type": "ListUsersResponse",
+              "client_streaming": false,
+              "server_streaming": true
+            }
+          ]
+        }
+      ],
+      "messages": [
+        {
+          "name": "User",
+          "field_count": 4,
+          "fields": ["id", "email", "name", "created_at"]
+        },
+        {
+          "name": "GetUserRequest",
+          "field_count": 1,
+          "fields": ["id"]
+        }
+      ],
+      "native": {
+        "protobuf": {
+          "files": [
+            { "path": "proto/user.proto", "content": "syntax = \"proto3\"; ..." }
+          ]
+        }
+      }
+    },
+
+    "graphql": {
+      "queries": [
+        {
+          "name": "users",
+          "return_type": "[User!]!",
+          "arguments": [
+            { "name": "limit", "type": "Int", "default_value": "10" }
+          ],
+          "description": "List all users"
+        },
+        {
+          "name": "user",
+          "return_type": "User",
+          "arguments": [
+            { "name": "id", "type": "ID!", "default_value": null }
+          ],
+          "description": "Get user by ID"
+        }
+      ],
+      "mutations": [
+        {
+          "name": "createUser",
+          "return_type": "User!",
+          "arguments": [
+            { "name": "input", "type": "CreateUserInput!", "default_value": null }
+          ],
+          "description": "Create a new user"
+        }
+      ],
+      "subscriptions": [
+        {
+          "name": "userCreated",
+          "return_type": "User!",
+          "arguments": [],
+          "description": "Subscribe to new user creation events"
+        }
+      ],
+      "types": [
+        {
+          "name": "User",
+          "kind": "OBJECT",
+          "field_count": 4,
+          "fields": ["id", "email", "name", "createdAt"]
+        },
+        {
+          "name": "CreateUserInput",
+          "kind": "INPUT_OBJECT",
+          "field_count": 2,
+          "fields": ["email", "name"]
+        }
+      ],
+      "native": {
+        "sdl": "type User {\n  id: ID!\n  email: String!\n  name: String!\n  createdAt: DateTime!\n}\n..."
       }
     }
   }
@@ -138,12 +247,52 @@ The full, unmodified spec as JSON. Policies that need deep inspection of tool-sp
 | `.api.rest.schemas[].required_count` | number | Number of required properties |
 | `.api.rest.schemas[].properties` | array | List of property names |
 
+### gRPC-Specific Normalized (Layer 2 — future)
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.api.grpc.services[]` | array | gRPC service definitions |
+| `.api.grpc.services[].name` | string | Service name (e.g., `"UserService"`) |
+| `.api.grpc.services[].rpcs[]` | array | RPC methods in the service |
+| `.api.grpc.services[].rpcs[].name` | string | RPC method name |
+| `.api.grpc.services[].rpcs[].request_type` | string | Request message type |
+| `.api.grpc.services[].rpcs[].response_type` | string | Response message type |
+| `.api.grpc.services[].rpcs[].client_streaming` | boolean | Client-side streaming |
+| `.api.grpc.services[].rpcs[].server_streaming` | boolean | Server-side streaming |
+| `.api.grpc.messages[]` | array | Protobuf message definitions |
+| `.api.grpc.messages[].name` | string | Message name |
+| `.api.grpc.messages[].field_count` | number | Number of fields |
+| `.api.grpc.messages[].fields` | array | List of field names |
+
+### GraphQL-Specific Normalized (Layer 2 — future)
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.api.graphql.queries[]` | array | GraphQL query operations |
+| `.api.graphql.queries[].name` | string | Query name |
+| `.api.graphql.queries[].return_type` | string | Return type (e.g., `"[User!]!"`) |
+| `.api.graphql.queries[].arguments[]` | array | Query arguments |
+| `.api.graphql.queries[].description` | string | Short description |
+| `.api.graphql.mutations[]` | array | GraphQL mutation operations |
+| `.api.graphql.mutations[].name` | string | Mutation name |
+| `.api.graphql.mutations[].return_type` | string | Return type |
+| `.api.graphql.mutations[].arguments[]` | array | Mutation arguments |
+| `.api.graphql.mutations[].description` | string | Short description |
+| `.api.graphql.subscriptions[]` | array | GraphQL subscription operations |
+| `.api.graphql.types[]` | array | GraphQL type definitions |
+| `.api.graphql.types[].name` | string | Type name |
+| `.api.graphql.types[].kind` | string | Type kind (`"OBJECT"`, `"INPUT_OBJECT"`, `"ENUM"`, `"INTERFACE"`, `"UNION"`) |
+| `.api.graphql.types[].field_count` | number | Number of fields |
+| `.api.graphql.types[].fields` | array | List of field names |
+
 ### Native/Raw (Layer 3)
 
 | Path | Type | Description |
 |------|------|-------------|
 | `.api.rest.native.openapi` | object | Full raw OpenAPI 3.x spec as JSON |
 | `.api.rest.native.swagger` | object | Full raw Swagger 2.0 spec as JSON |
+| `.api.grpc.native.protobuf` | object | Raw .proto file contents (future) |
+| `.api.graphql.native.sdl` | string | Raw GraphQL SDL schema (future) |
 
 ## Collectors
 
@@ -223,7 +372,99 @@ A `protobuf` collector would write to `.api.spec_files[]` (with `protocol: "grpc
 
 ## Future: GraphQL Support
 
-GraphQL would follow the same pattern with `.api.graphql.queries[]`, `.api.graphql.mutations[]`, `.api.graphql.types[]`, and `.api.graphql.native.sdl` for the raw schema definition.
+When a GraphQL collector is added, it will follow the same layered pattern. GraphQL has three operation types (queries, mutations, subscriptions) and a type system — all normalized under `.api.graphql`:
+
+```json
+{
+  "api": {
+    "spec_files": [
+      {
+        "path": "schema.graphql",
+        "format": "graphql",
+        "protocol": "graphql",
+        "valid": true,
+        "version": null,
+        "operation_count": 5,
+        "schema_count": 3
+      }
+    ],
+
+    "graphql": {
+      "queries": [
+        {
+          "name": "users",
+          "return_type": "[User!]!",
+          "arguments": [
+            { "name": "limit", "type": "Int", "default_value": "10" },
+            { "name": "offset", "type": "Int", "default_value": "0" }
+          ],
+          "description": "List all users"
+        },
+        {
+          "name": "user",
+          "return_type": "User",
+          "arguments": [
+            { "name": "id", "type": "ID!", "default_value": null }
+          ],
+          "description": "Get user by ID"
+        }
+      ],
+      "mutations": [
+        {
+          "name": "createUser",
+          "return_type": "User!",
+          "arguments": [
+            { "name": "input", "type": "CreateUserInput!", "default_value": null }
+          ],
+          "description": "Create a new user"
+        },
+        {
+          "name": "updateUser",
+          "return_type": "User!",
+          "arguments": [
+            { "name": "id", "type": "ID!", "default_value": null },
+            { "name": "input", "type": "UpdateUserInput!", "default_value": null }
+          ],
+          "description": "Update an existing user"
+        }
+      ],
+      "subscriptions": [
+        {
+          "name": "userCreated",
+          "return_type": "User!",
+          "arguments": [],
+          "description": "Subscribe to new user creation events"
+        }
+      ],
+      "types": [
+        {
+          "name": "User",
+          "kind": "OBJECT",
+          "field_count": 4,
+          "fields": ["id", "email", "name", "createdAt"]
+        },
+        {
+          "name": "CreateUserInput",
+          "kind": "INPUT_OBJECT",
+          "field_count": 2,
+          "fields": ["email", "name"]
+        },
+        {
+          "name": "Role",
+          "kind": "ENUM",
+          "field_count": 3,
+          "fields": ["ADMIN", "USER", "GUEST"]
+        }
+      ],
+      "native": {
+        "sdl": "type User {\n  id: ID!\n  email: String!\n  name: String!\n  createdAt: DateTime!\n}\n\ninput CreateUserInput {\n  email: String!\n  name: String!\n}\n\nenum Role {\n  ADMIN\n  USER\n  GUEST\n}\n\ntype Query {\n  users(limit: Int = 10, offset: Int = 0): [User!]!\n  user(id: ID!): User\n}\n\ntype Mutation {\n  createUser(input: CreateUserInput!): User!\n  updateUser(id: ID!, input: UpdateUserInput!): User!\n}\n\ntype Subscription {\n  userCreated: User!\n}"
+      }
+    }
+  }
+}
+```
+
+A `graphql` collector would detect `.graphql` / `.gql` schema files, introspection endpoints, or `schema.graphql` files. It writes to `.api.spec_files[]` (with `protocol: "graphql"`) and `.api.graphql.*`. The existing `api-docs` policy would pick up GraphQL specs for universal checks. GraphQL-specific policies could assert on things like "all queries must have descriptions" or "no unlimited list queries without pagination arguments".
 
 ## Design Notes
 
