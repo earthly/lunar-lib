@@ -1,17 +1,19 @@
 version: 0
 
 name: openapi
-description: Detect and analyze OpenAPI 3.x specification files
+description: Detect and analyze OpenAPI and Swagger specification files
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
   display_name: "OpenAPI Collector"
   long_description: |
-    Detect OpenAPI 3.x specification files in repositories. Parses each spec
-    to extract endpoints, schemas, and metadata. Stores normalized REST data
-    under `.api.rest` and the full raw spec under `.api.rest.native.openapi`.
-    Supports YAML and JSON formats.
+    Detect OpenAPI 3.x and Swagger 2.0 specification files in repositories.
+    Parses each spec to extract endpoints, schemas, and metadata. Stores
+    normalized REST data under `.api.rest` and the full raw spec under
+    `.api.rest.native.openapi` or `.api.rest.native.swagger`. Supports YAML
+    and JSON formats. Handles both naming conventions since OpenAPI is the
+    evolution of the Swagger specification.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
   status: "beta"
@@ -23,22 +25,24 @@ landing_page:
 collectors:
   - name: openapi
     description: |
-      Searches the repository for OpenAPI 3.x specification files by common
-      filenames (openapi.yaml, openapi.yml, openapi.json). For each spec found:
+      Searches the repository for OpenAPI 3.x and Swagger 2.0 specification
+      files by common filenames (openapi.yaml, openapi.yml, openapi.json,
+      swagger.yaml, swagger.yml, swagger.json). For each spec found:
       - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
       - Extracts and normalizes endpoints to `.api.rest.endpoints[]`
       - Extracts and normalizes schemas to `.api.rest.schemas[]`
       - Stores the full raw spec as JSON under `.api.rest.native.openapi`
+        (for OpenAPI 3.x) or `.api.rest.native.swagger` (for Swagger 2.0)
     hook:
       type: code
-    keywords: ["openapi", "api", "rest", "documentation", "spec"]
+    keywords: ["openapi", "swagger", "api", "rest", "documentation", "spec"]
 
 inputs:
   find_command:
     description: |
-      Custom find command to locate OpenAPI spec files. Default searches for
-      common OpenAPI filenames recursively, excluding node_modules and vendor dirs.
-    default: "find . -type f \\( -name 'openapi.yaml' -o -name 'openapi.yml' -o -name 'openapi.json' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'"
+      Custom find command to locate OpenAPI/Swagger spec files. Default searches
+      for common filenames recursively, excluding node_modules and vendor dirs.
+    default: "find . -type f \\( -name 'openapi.yaml' -o -name 'openapi.yml' -o -name 'openapi.json' -o -name 'swagger.yaml' -o -name 'swagger.yml' -o -name 'swagger.json' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'"
 
 example_component_json: |
   {
@@ -52,6 +56,15 @@ example_component_json: |
           "version": "3.0.3",
           "operation_count": 12,
           "schema_count": 5
+        },
+        {
+          "path": "legacy/swagger.json",
+          "format": "swagger",
+          "protocol": "rest",
+          "valid": true,
+          "version": "2.0",
+          "operation_count": 8,
+          "schema_count": 3
         }
       ],
       "rest": {
@@ -80,6 +93,13 @@ example_component_json: |
             "parameters": [
               { "name": "id", "in": "path", "type": "string", "required": true }
             ]
+          },
+          {
+            "path": "/pets",
+            "method": "GET",
+            "operation_id": "listPets",
+            "summary": "List all pets",
+            "tags": ["pets"]
           }
         ],
         "schemas": [
@@ -96,6 +116,13 @@ example_component_json: |
             "property_count": 2,
             "required_count": 2,
             "properties": ["email", "name"]
+          },
+          {
+            "name": "Pet",
+            "type": "object",
+            "property_count": 3,
+            "required_count": 2,
+            "properties": ["id", "name", "tag"]
           }
         ],
         "native": {
@@ -103,6 +130,11 @@ example_component_json: |
             "openapi": "3.0.3",
             "info": { "title": "User API", "version": "1.0.0" },
             "paths": { "/users": { "get": { "...": "full spec" } } }
+          },
+          "swagger": {
+            "swagger": "2.0",
+            "info": { "title": "Petstore", "version": "1.0.0" },
+            "paths": { "/pets": { "get": { "...": "full spec" } } }
           }
         }
       }

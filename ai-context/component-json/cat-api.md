@@ -298,10 +298,9 @@ This example shows a repo with all three API protocols. In practice, most repos 
 
 | Collector | Writes To | Detects |
 |-----------|-----------|---------|
-| `openapi` | `.api.spec_files[]`, `.api.rest.endpoints[]`, `.api.rest.schemas[]`, `.api.rest.native.openapi` | OpenAPI 3.x files |
-| `swagger` | `.api.spec_files[]`, `.api.rest.endpoints[]`, `.api.rest.schemas[]`, `.api.rest.native.swagger` | Swagger 2.0 files |
+| `openapi` | `.api.spec_files[]`, `.api.rest.endpoints[]`, `.api.rest.schemas[]`, `.api.rest.native.openapi`, `.api.rest.native.swagger` | OpenAPI 3.x and Swagger 2.0 files |
 
-Both collectors write to the same arrays (`.api.spec_files[]`, `.api.rest.endpoints[]`, `.api.rest.schemas[]`). Lunar auto-merges them. The `format` field on each entry distinguishes the source.
+The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 specs in a single pass — since Swagger is the predecessor to OpenAPI (Swagger 2.0 was renamed to OpenAPI 3.0), they share the same REST API description paradigm. The `format` field on each `.api.spec_files[]` entry distinguishes the source (`"openapi"` vs `"swagger"`).
 
 ## Future: gRPC Support
 
@@ -471,10 +470,11 @@ A `graphql` collector would detect `.graphql` / `.gql` schema files, introspecti
 This category follows the standard collector/policy pattern: each spec format gets its own technology-specific collector, but they all feed the same `.api` category (see [Raw/Native Data convention](conventions.md#rawnative-data) and [collector naming conventions](../collector-reference.md#8-naming-convention-cicd-vs-auto-sub-keys-for-ci-detected-and-auto-run-collectors)):
 
 ```
-collectors/openapi/  ──writes──┐
-                                ├──→  .api.spec_files[]  ←──reads── policies/api-docs/
-collectors/swagger/  ──writes──┘        .api.rest.*
+collectors/openapi/  ──writes──→  .api.spec_files[]  ←──reads── policies/api-docs/
+                                  .api.rest.*
 ```
+
+The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 file formats (since they're the same spec lineage). No separate swagger collector is needed.
 
 **Why three layers?**
 - **Layer 1** lets policies answer universal questions ("has API docs?", "all specs valid?") with zero knowledge of REST vs gRPC.
