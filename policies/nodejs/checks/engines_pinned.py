@@ -8,7 +8,8 @@ def check_engines_pinned(node=None):
         nodejs = c.get_node(".lang.nodejs")
         if not nodejs.exists():
             c.skip("Not a Node.js project")
-        if not nodejs.get_node(".project_exists").exists():
+        project_exists_node = nodejs.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
             c.skip("No Node.js project detected in this component")
 
         engines_node = nodejs.get_node(".engines_node")

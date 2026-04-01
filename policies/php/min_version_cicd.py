@@ -11,7 +11,8 @@ def check_min_version_cicd(min_version=None, node=None):
         php = c.get_node(".lang.php")
         if not php.exists():
             c.skip("Not a PHP project")
-        if not php.get_node(".project_exists").exists() and not php.get_node(".cicd").exists():
+        project_exists_node = php.get_node(".project_exists")
+        if (not project_exists_node.exists() or not project_exists_node.get_value()) and not php.get_node(".cicd").exists():
             c.skip("No PHP project detected in this component")
 
         cmds_node = php.get_node(".cicd.cmds")
