@@ -468,7 +468,7 @@ A `graphql` collector would detect `.graphql` / `.gql` schema files, introspecti
 
 ## Design Notes
 
-This category uses **[Strategy 17: Multi-Collector Category Aggregation](../strategies.md#strategy-17-multi-collector-category-aggregation)**. Each spec format gets its own technology-specific collector, but they all feed the same `.api` category:
+This category follows the standard collector/policy pattern: each spec format gets its own technology-specific collector, but they all feed the same `.api` category (see [Raw/Native Data convention](conventions.md#rawnative-data) and [collector naming conventions](../collector-reference.md#8-naming-convention-cicd-vs-auto-sub-keys-for-ci-detected-and-auto-run-collectors)):
 
 ```
 collectors/openapi/  ──writes──┐
