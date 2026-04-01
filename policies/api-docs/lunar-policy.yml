@@ -29,21 +29,18 @@ policies:
       Verifies that at least one OpenAPI or Swagger specification file exists
       in the repository by checking if `.api.specs` is non-empty.
       Skips if neither the openapi nor swagger collector has run.
-    mainPython: ./spec-exists.py
     keywords: ["openapi", "swagger", "api", "documentation", "spec"]
 
   - name: spec-valid
     description: |
       Checks that all detected API spec files parse without errors.
       Skips if no spec files were detected.
-    mainPython: ./spec-valid.py
     keywords: ["openapi", "swagger", "api", "validation", "syntax"]
 
   - name: spec-version-3
     description: |
       Ensures all API specs use OpenAPI 3.x rather than deprecated Swagger 2.0.
       Skips if no spec files were detected.
-    mainPython: ./spec-version-3.py
     keywords: ["openapi", "swagger", "api", "version", "migration"]
 
 inputs: {}

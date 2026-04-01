@@ -26,7 +26,6 @@ collectors:
       filenames (swagger.yaml, swagger.yml, swagger.json). For each spec found,
       extracts the spec version, validity, endpoint count, and schema count.
       Writes results to `.api`.
-    mainBash: main.sh
     hook:
       type: code
     keywords: ["swagger", "api", "rest", "documentation", "spec"]
