@@ -18,10 +18,7 @@ landing_page:
   requires:
     - slug: "openapi"
       type: "collector"
-      reason: "Provides OpenAPI 3.x spec metadata, normalized endpoints/schemas, and raw spec"
-    - slug: "swagger"
-      type: "collector"
-      reason: "Provides Swagger 2.0 spec metadata, normalized endpoints/schemas, and raw spec"
+      reason: "Collects OpenAPI and Swagger spec metadata, endpoints, and schemas"
   related: []
 
 policies:

@@ -8,12 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpenAPI Collector"
   long_description: |
-    Detect OpenAPI 3.x and Swagger 2.0 specification files in repositories.
-    Parses each spec to extract endpoints, schemas, and metadata. Stores
-    normalized REST data under `.api.rest` and the full raw spec under
-    `.api.rest.native.openapi` or `.api.rest.native.swagger`. Supports YAML
-    and JSON formats. Handles both naming conventions since OpenAPI is the
-    evolution of the Swagger specification.
+    Detect OpenAPI 3.x and Swagger 2.0 spec files in repositories. Parses
+    each spec to extract endpoints, schemas, and metadata into normalized
+    `.api.rest` structure. Stores full raw specs under `.api.rest.native`.
+    Handles both naming conventions in YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
   status: "beta"
