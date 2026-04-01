@@ -8,8 +8,9 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpenAPI Collector"
   long_description: |
-    Detect OpenAPI 3.x specification files in repositories. Parses spec
-    version, endpoint count, and schema count. Validates spec file syntax.
+    Detect OpenAPI 3.x specification files in repositories. Parses each spec
+    to extract endpoints, schemas, and metadata. Stores normalized REST data
+    under `.api.rest` and the full raw spec under `.api.rest.native.openapi`.
     Supports YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
@@ -23,9 +24,11 @@ collectors:
   - name: openapi
     description: |
       Searches the repository for OpenAPI 3.x specification files by common
-      filenames (openapi.yaml, openapi.yml, openapi.json). For each spec found,
-      extracts the spec version, validity, endpoint count, and schema count.
-      Writes results to `.api`.
+      filenames (openapi.yaml, openapi.yml, openapi.json). For each spec found:
+      - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
+      - Extracts and normalizes endpoints to `.api.rest.endpoints[]`
+      - Extracts and normalizes schemas to `.api.rest.schemas[]`
+      - Stores the full raw spec as JSON under `.api.rest.native.openapi`
     hook:
       type: code
     keywords: ["openapi", "api", "rest", "documentation", "spec"]
@@ -40,20 +43,68 @@ inputs:
 example_component_json: |
   {
     "api": {
-      "specs": [
+      "spec_files": [
         {
-          "type": "openapi",
           "path": "api/openapi.yaml",
+          "format": "openapi",
+          "protocol": "rest",
           "valid": true,
           "version": "3.0.3",
-          "paths_count": 42,
-          "schemas_count": 15
+          "operation_count": 12,
+          "schema_count": 5
         }
       ],
-      "source": {
-        "tool": "openapi",
-        "version": "1.0.0",
-        "integration": "code"
+      "rest": {
+        "endpoints": [
+          {
+            "path": "/users",
+            "method": "GET",
+            "operation_id": "listUsers",
+            "summary": "List all users",
+            "tags": ["users"]
+          },
+          {
+            "path": "/users",
+            "method": "POST",
+            "operation_id": "createUser",
+            "summary": "Create a new user",
+            "tags": ["users"],
+            "request_body": "CreateUserRequest"
+          },
+          {
+            "path": "/users/{id}",
+            "method": "GET",
+            "operation_id": "getUser",
+            "summary": "Get user by ID",
+            "tags": ["users"],
+            "parameters": [
+              { "name": "id", "in": "path", "type": "string", "required": true }
+            ]
+          }
+        ],
+        "schemas": [
+          {
+            "name": "User",
+            "type": "object",
+            "property_count": 4,
+            "required_count": 2,
+            "properties": ["id", "email", "name", "created_at"]
+          },
+          {
+            "name": "CreateUserRequest",
+            "type": "object",
+            "property_count": 2,
+            "required_count": 2,
+            "properties": ["email", "name"]
+          }
+        ],
+        "native": {
+          "openapi": {
+            "openapi": "3.0.3",
+            "info": { "title": "User API", "version": "1.0.0" },
+            "paths": { "/users": { "get": { "...": "full spec" } } }
+          }
+        }
       }
     }
   }

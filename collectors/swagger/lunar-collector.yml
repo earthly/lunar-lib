@@ -8,8 +8,9 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Swagger Collector"
   long_description: |
-    Detect Swagger 2.0 specification files in repositories. Parses spec
-    version, endpoint count, and schema count. Validates spec file syntax.
+    Detect Swagger 2.0 specification files in repositories. Parses each spec
+    to extract endpoints, schemas, and metadata. Stores normalized REST data
+    under `.api.rest` and the full raw spec under `.api.rest.native.swagger`.
     Supports YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/swagger.svg"
@@ -23,9 +24,11 @@ collectors:
   - name: swagger
     description: |
       Searches the repository for Swagger 2.0 specification files by common
-      filenames (swagger.yaml, swagger.yml, swagger.json). For each spec found,
-      extracts the spec version, validity, endpoint count, and schema count.
-      Writes results to `.api`.
+      filenames (swagger.yaml, swagger.yml, swagger.json). For each spec found:
+      - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
+      - Extracts and normalizes endpoints to `.api.rest.endpoints[]`
+      - Extracts and normalizes schemas to `.api.rest.schemas[]`
+      - Stores the full raw spec as JSON under `.api.rest.native.swagger`
     hook:
       type: code
     keywords: ["swagger", "api", "rest", "documentation", "spec"]
@@ -40,20 +43,68 @@ inputs:
 example_component_json: |
   {
     "api": {
-      "specs": [
+      "spec_files": [
         {
-          "type": "swagger",
           "path": "swagger.json",
+          "format": "swagger",
+          "protocol": "rest",
           "valid": true,
           "version": "2.0",
-          "paths_count": 18,
-          "schemas_count": 7
+          "operation_count": 8,
+          "schema_count": 3
         }
       ],
-      "source": {
-        "tool": "swagger",
-        "version": "1.0.0",
-        "integration": "code"
+      "rest": {
+        "endpoints": [
+          {
+            "path": "/pets",
+            "method": "GET",
+            "operation_id": "listPets",
+            "summary": "List all pets",
+            "tags": ["pets"]
+          },
+          {
+            "path": "/pets",
+            "method": "POST",
+            "operation_id": "createPet",
+            "summary": "Create a pet",
+            "tags": ["pets"],
+            "request_body": "Pet"
+          },
+          {
+            "path": "/pets/{petId}",
+            "method": "GET",
+            "operation_id": "showPetById",
+            "summary": "Info for a specific pet",
+            "tags": ["pets"],
+            "parameters": [
+              { "name": "petId", "in": "path", "type": "string", "required": true }
+            ]
+          }
+        ],
+        "schemas": [
+          {
+            "name": "Pet",
+            "type": "object",
+            "property_count": 3,
+            "required_count": 2,
+            "properties": ["id", "name", "tag"]
+          },
+          {
+            "name": "Error",
+            "type": "object",
+            "property_count": 2,
+            "required_count": 2,
+            "properties": ["code", "message"]
+          }
+        ],
+        "native": {
+          "swagger": {
+            "swagger": "2.0",
+            "info": { "title": "Petstore", "version": "1.0.0" },
+            "paths": { "/pets": { "get": { "...": "full spec" } } }
+          }
+        }
       }
     }
   }

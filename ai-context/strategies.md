@@ -392,12 +392,11 @@ Use multiple technology-specific collectors that all write to the same Component
 **Architecture:**
 
 ```
-collectors/openapi/  ──writes──▶  .api.specs[]  ◀──writes──  collectors/swagger/
-                                       │
-                                       ▼
-                              policies/api-docs/
-                           (reads .api.specs[], doesn't
-                            care about the source)
+collectors/openapi/  ──writes──┐
+                                ├──→  .api.spec_files[]    ←──reads── policies/api-docs/
+collectors/swagger/  ──writes──┘      .api.rest.endpoints[]
+                                      .api.rest.schemas[]
+                                      .api.rest.native.*
 ```
 
 **When to use this pattern:**
@@ -416,26 +415,46 @@ collectors/openapi/  ──writes──▶  .api.specs[]  ◀──writes── 
 1. **Collectors are technology-specific.** Name them after the technology: `openapi`, `swagger`, `grpc` — not `api-docs-openapi`.
 2. **Policies are domain-specific.** Name them after the domain: `api-docs` — not `openapi-policy`.
 3. **Use the same array path.** Both collectors write to the same `.category.array[]` path so Lunar merges them automatically.
-4. **Include a `type` field.** Each spec entry should include a `type` field (e.g., `"openapi"`, `"swagger"`) so policies can distinguish when needed (e.g., "migrate away from Swagger 2.0").
+4. **Include a `format` field.** Each entry should include a `format` field (e.g., `"openapi"`, `"swagger"`) so policies can distinguish when needed (e.g., "migrate away from Swagger 2.0").
 5. **Policy declares all collectors as dependencies** via `requires` in `lunar-policy.yml`, so the platform knows which collectors feed it.
 
 **Canonical example: `.api` category**
 
-Two collectors (`openapi`, `swagger`) both write to `.api.specs[]`:
+The `.api` category uses a **layered normalization** approach (see [cat-api.md](component-json/cat-api.md) for full details):
+
+- **Layer 1 — Protocol-agnostic:** `.api.spec_files[]` holds metadata for every spec file regardless of protocol (REST, gRPC, GraphQL). Policies that just need "does an API exist?" or "are all specs valid?" operate here.
+- **Layer 2 — Protocol-specific normalized:** `.api.rest.endpoints[]` and `.api.rest.schemas[]` contain actual REST API surface data, normalized from any source format (OpenAPI or Swagger). Future `.api.grpc.*` would hold gRPC-specific data.
+- **Layer 3 — Native/raw:** `.api.rest.native.openapi` and `.api.rest.native.swagger` store the full unmodified spec as JSON for deep inspection.
+
+Two collectors (`openapi`, `swagger`) both write to all three layers:
 ```json
 {
   "api": {
-    "specs": [
-      { "type": "openapi", "path": "api/openapi.yaml", "valid": true, "version": "3.0.3" },
-      { "type": "swagger", "path": "swagger.json", "valid": true, "version": "2.0" }
-    ]
+    "spec_files": [
+      { "path": "api/openapi.yaml", "format": "openapi", "protocol": "rest", "valid": true, "version": "3.0.3", "operation_count": 12, "schema_count": 5 },
+      { "path": "swagger.json", "format": "swagger", "protocol": "rest", "valid": true, "version": "2.0", "operation_count": 8, "schema_count": 3 }
+    ],
+    "rest": {
+      "endpoints": [
+        { "path": "/users", "method": "GET", "operation_id": "listUsers", "summary": "List all users" },
+        { "path": "/pets", "method": "GET", "operation_id": "listPets", "summary": "List all pets" }
+      ],
+      "schemas": [
+        { "name": "User", "type": "object", "property_count": 4, "required_count": 2 },
+        { "name": "Pet", "type": "object", "property_count": 3, "required_count": 2 }
+      ],
+      "native": {
+        "openapi": { "openapi": "3.0.3", "...": "full raw spec" },
+        "swagger": { "swagger": "2.0", "...": "full raw spec" }
+      }
+    }
   }
 }
 ```
 
 The `api-docs` policy then asserts:
-* **spec-exists:** `.api.specs` is non-empty (at least one spec file of any type)
-* **spec-valid:** all entries have `valid: true` (regardless of type)
-* **spec-version-3:** no entries have `type: "swagger"` (migration enforcement)
+* **spec-exists:** `.api.spec_files` is non-empty (at least one spec file of any type)
+* **spec-valid:** all entries have `valid: true` (regardless of format)
+* **spec-version-3:** no entries have `format: "swagger"` (migration enforcement)
 
-**Future extensibility:** Adding an AsyncAPI or gRPC collector that also writes to `.api.specs[]` requires zero changes to the existing policy — it just gets more data to evaluate.
+**Future extensibility:** Adding a gRPC/protobuf collector writes to `.api.spec_files[]` (with `protocol: "grpc"`) and `.api.grpc.*`. The existing `api-docs` policy automatically picks up gRPC specs for protocol-agnostic checks (spec exists, spec valid) with zero changes. gRPC-specific policies read `.api.grpc.services[]` and `.api.grpc.messages[]`.

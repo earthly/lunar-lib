@@ -9,37 +9,41 @@ landing_page:
   display_name: "API Docs Guardrails"
   long_description: |
     Validate API documentation standards. Ensures repositories with APIs have
-    valid OpenAPI or Swagger specification files and encourages migration to
-    OpenAPI 3.x from deprecated Swagger 2.0.
+    valid specification files and encourages migration from deprecated Swagger
+    2.0 to OpenAPI 3.x. Operates on protocol-agnostic `.api.spec_files[]` for
+    universal checks and `.api.rest.*` for REST-specific validation.
   category: "repository-and-ownership"
   icon: "assets/api-docs.svg"
   status: "beta"
   requires:
     - slug: "openapi"
       type: "collector"
-      reason: "Provides OpenAPI 3.x spec file metadata"
+      reason: "Provides OpenAPI 3.x spec metadata, normalized endpoints/schemas, and raw spec"
     - slug: "swagger"
       type: "collector"
-      reason: "Provides Swagger 2.0 spec file metadata"
+      reason: "Provides Swagger 2.0 spec metadata, normalized endpoints/schemas, and raw spec"
   related: []
 
 policies:
   - name: spec-exists
     description: |
-      Verifies that at least one OpenAPI or Swagger specification file exists
-      in the repository by checking if `.api.specs` is non-empty.
+      Verifies that at least one API specification file exists in the repository
+      by checking if `.api.spec_files[]` is non-empty. Protocol-agnostic — works
+      for REST (OpenAPI/Swagger), gRPC (protobuf), or any future API format.
       Skips if neither the openapi nor swagger collector has run.
     keywords: ["openapi", "swagger", "api", "documentation", "spec"]
 
   - name: spec-valid
     description: |
-      Checks that all detected API spec files parse without errors.
+      Checks that all detected API spec files parse without errors by verifying
+      `.api.spec_files[].valid` is true for every entry.
       Skips if no spec files were detected.
     keywords: ["openapi", "swagger", "api", "validation", "syntax"]
 
   - name: spec-version-3
     description: |
-      Ensures all API specs use OpenAPI 3.x rather than deprecated Swagger 2.0.
+      Ensures all API specs use OpenAPI 3.x rather than deprecated Swagger 2.0
+      by checking `.api.spec_files[].format` for any `"swagger"` entries.
       Skips if no spec files were detected.
     keywords: ["openapi", "swagger", "api", "version", "migration"]
 
@@ -48,15 +52,43 @@ inputs: {}
 example_component_json: |
   {
     "api": {
-      "specs": [
+      "spec_files": [
         {
-          "type": "openapi",
           "path": "api/openapi.yaml",
+          "format": "openapi",
+          "protocol": "rest",
           "valid": true,
           "version": "3.0.3",
-          "paths_count": 42,
-          "schemas_count": 15
+          "operation_count": 12,
+          "schema_count": 5
         }
-      ]
+      ],
+      "rest": {
+        "endpoints": [
+          {
+            "path": "/users",
+            "method": "GET",
+            "operation_id": "listUsers",
+            "summary": "List all users",
+            "tags": ["users"]
+          }
+        ],
+        "schemas": [
+          {
+            "name": "User",
+            "type": "object",
+            "property_count": 4,
+            "required_count": 2,
+            "properties": ["id", "email", "name", "created_at"]
+          }
+        ],
+        "native": {
+          "openapi": {
+            "openapi": "3.0.3",
+            "info": { "title": "User API", "version": "1.0.0" },
+            "paths": { "...": "full raw spec" }
+          }
+        }
+      }
     }
   }
