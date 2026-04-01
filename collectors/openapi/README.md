@@ -4,9 +4,7 @@ Detect and analyze OpenAPI 3.x and Swagger 2.0 specification files in repositori
 
 ## Overview
 
-Searches repositories for OpenAPI and Swagger specification files by common filenames and parses their contents. Extracts normalized endpoint and schema data for REST API analysis, and stores the full raw spec for deep inspection. Supports both YAML and JSON formats. Skips gracefully when no spec files are found.
-
-OpenAPI is the evolution of the Swagger specification — Swagger 2.0 was renamed to OpenAPI 3.0 when the spec was donated to the OpenAPI Initiative. This collector handles both naming conventions (`openapi.yaml`/`openapi.json` and `swagger.yaml`/`swagger.json`) in a single pass, normalizing both formats into the same `.api.rest` structure.
+Searches repositories for OpenAPI and Swagger specification files by common filenames and parses their contents. Extracts normalized endpoint and schema data for REST API analysis, and stores the full raw spec for deep inspection. Supports both YAML and JSON formats. OpenAPI is the evolution of the Swagger specification — Swagger 2.0 was renamed to OpenAPI 3.0 when donated to the OpenAPI Initiative. This collector handles both naming conventions (`openapi.yaml`/`openapi.json` and `swagger.yaml`/`swagger.json`) in a single pass, normalizing both formats into the same `.api.rest` structure.
 
 ## Collected Data
 
@@ -51,14 +49,7 @@ This collector writes to the following Component JSON paths:
 | `.api.rest.native.openapi` | object | The entire raw OpenAPI 3.x spec converted to JSON |
 | `.api.rest.native.swagger` | object | The entire raw Swagger 2.0 spec converted to JSON |
 
-## Supported Formats
-
-| Format | File Patterns | Spec Version | Native Path |
-|--------|--------------|--------------|-------------|
-| OpenAPI 3.x | `openapi.yaml`, `openapi.yml`, `openapi.json` | 3.0.x, 3.1.x | `.api.rest.native.openapi` |
-| Swagger 2.0 | `swagger.yaml`, `swagger.yml`, `swagger.json` | 2.0 | `.api.rest.native.swagger` |
-
-Both formats produce the same normalized output under `.api.rest.endpoints[]` and `.api.rest.schemas[]`. The `format` field in `.api.spec_files[]` distinguishes the source.
+**File patterns:** OpenAPI 3.x (`openapi.yaml`, `openapi.yml`, `openapi.json`) and Swagger 2.0 (`swagger.yaml`, `swagger.yml`, `swagger.json`). Both formats produce the same normalized output under `.api.rest.endpoints[]` and `.api.rest.schemas[]`.
 
 ## Collectors
 
