@@ -51,7 +51,8 @@ example_component_json: |
           "valid": true,
           "version": "3.0.3",
           "operation_count": 12,
-          "schema_count": 5
+          "schema_count": 5,
+          "has_docs": true
         },
         {
           "path": "legacy/swagger.json",
@@ -60,7 +61,8 @@ example_component_json: |
           "valid": true,
           "version": "2.0",
           "operation_count": 8,
-          "schema_count": 3
+          "schema_count": 3,
+          "has_docs": true
         }
       ],
       "native": {

@@ -37,6 +37,14 @@ policies:
       Skips if no spec files were detected.
     keywords: ["openapi", "swagger", "api", "validation", "syntax"]
 
+  - name: has-docs
+    description: |
+      Checks that all API spec files include human-readable documentation
+      (descriptions, examples) by verifying `.api.spec_files[].has_docs` is
+      true for every entry. A bare definition without descriptions doesn't
+      count. Skips if no spec files were detected.
+    keywords: ["openapi", "swagger", "grpc", "graphql", "api", "documentation"]
+
   - name: spec-version-3
     description: |
       Ensures all API specs use OpenAPI 3.x rather than deprecated Swagger 2.0
@@ -57,7 +65,8 @@ example_component_json: |
           "valid": true,
           "version": "3.0.3",
           "operation_count": 12,
-          "schema_count": 5
+          "schema_count": 5,
+          "has_docs": true
         }
       ],
       "native": {
