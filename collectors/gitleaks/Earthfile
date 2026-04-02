@@ -1,0 +1,16 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Gitleaks
+    ARG GITLEAKS_VERSION=8.21.2
+    ARG TARGETARCH
+    RUN curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin gitleaks && \
+        chmod +x /usr/local/bin/gitleaks
+
+    # Verify installation
+    RUN gitleaks version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:gitleaks-$VERSION
