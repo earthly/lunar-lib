@@ -34,6 +34,7 @@ collectors:
         human-readable documentation (descriptions, summaries, examples)
       - Stores the full raw spec as JSON under `.api.native.openapi`
         (all versions share one key — same spec lineage)
+    mainBash: main.sh
     hook:
       type: code
     keywords: ["openapi", "swagger", "api", "rest", "documentation", "spec"]

@@ -23,6 +23,7 @@ landing_page:
 
 policies:
   - name: spec-exists
+    mainPython: ./spec-exists.py
     description: |
       Verifies that at least one API specification file exists in the repository
       by checking if `.api.spec_files[]` is non-empty. Protocol-agnostic — works
@@ -31,6 +32,7 @@ policies:
     keywords: ["openapi", "swagger", "api", "documentation", "spec"]
 
   - name: spec-valid
+    mainPython: ./spec-valid.py
     description: |
       Checks that all detected API spec files parse without errors by verifying
       `.api.spec_files[].valid` is true for every entry.
@@ -38,6 +40,7 @@ policies:
     keywords: ["openapi", "swagger", "api", "validation", "syntax"]
 
   - name: has-docs
+    mainPython: ./has-docs.py
     description: |
       Checks that all API spec files include human-readable documentation
       (descriptions, examples) by verifying `.api.spec_files[].has_docs` is

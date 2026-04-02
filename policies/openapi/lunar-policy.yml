@@ -23,6 +23,7 @@ landing_page:
 
 policies:
   - name: spec-version
+    mainPython: ./spec-version.py
     description: |
       Ensures all REST API specs meet a minimum OpenAPI version. Compares the
       major version from `.api.spec_files[].version` against `min_version`
