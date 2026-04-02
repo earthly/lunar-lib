@@ -23,6 +23,6 @@ if [[ -n "$version" ]]; then
 
   # Write cicd command entry (no jq required)
   # Multiple go commands in same CI run will each append to the cmds array
-  echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$version\"}],\"source\":{\"tool\":\"go\",\"integration\":\"ci\"}}" | \
-    lunar collect -j ".lang.go.cicd" -
+  lunar collect -j ".lang.go.cicd.cmds" \
+    "[{\"cmd\": \"$CMD_ESCAPED\", \"version\": \"$version\"}]"
 fi

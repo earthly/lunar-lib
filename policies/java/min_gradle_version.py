@@ -31,14 +31,11 @@ def check_min_gradle_version(min_version=None, node=None):
         if not java.exists():
             c.skip("Not a Java project")
 
-        cmds_node = java.get_node(".cicd.cmds")
+        cmds_node = java.get_node(".gradle.cicd.cmds")
         if not cmds_node.exists():
-            c.skip("No CI/CD commands recorded")
-
-        cmds = cmds_node.get_value()
-        gradle_cmds = [cmd for cmd in cmds if cmd.get("tool") == "gradle"]
-        if not gradle_cmds:
             c.skip("No Gradle CI/CD commands recorded")
+
+        gradle_cmds = cmds_node.get_value()
 
         violations = []
         for cmd_info in gradle_cmds:

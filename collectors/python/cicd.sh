@@ -9,14 +9,12 @@ set -e
 # Complex arguments with embedded quotes are uncommon in practice.
 CMD_STR=$(echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
 
-# Get Python version — always use "python3" (not pip/poetry/uv which have their own versions)
-# The python3 binary is in the same BIN_DIR as the traced tool
-PYTHON_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}python3"
+# Get Python version using the exact traced binary
+PYTHON_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-python3}"
 version=$("$PYTHON_BIN" --version 2>/dev/null | awk '{print $2}' || echo "")
 
 if [[ -n "$version" ]]; then
     # Escape special characters for safe JSON embedding
     CMD_ESCAPED=$(printf '%s' "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
     lunar collect -j ".lang.python.cicd.cmds" "[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$version\"}]"
-    lunar collect -j ".lang.python.cicd.source" '{"tool":"python","integration":"ci"}'
 fi
