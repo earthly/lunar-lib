@@ -13,7 +13,7 @@ landing_page:
     every workflow (triggers, jobs, action references), runs actionlint for syntax
     and type checking, and classifies version pinning status for all third-party
     action references.
-  category: "build"
+  category: "ci-cd"
   icon: "assets/gha-lint.svg"
   status: "beta"
   keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
