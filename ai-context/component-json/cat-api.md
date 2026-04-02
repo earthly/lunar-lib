@@ -18,6 +18,22 @@ Each protocol gets its own sub-object with **normalized, tool-agnostic** data. F
 
 The full, unmodified spec as JSON. Policies that need deep inspection of tool-specific fields (e.g., OpenAPI `x-` extensions, security schemes) can reach into the raw data. Each format gets its own key under `.native`.
 
+## Design Tradeoffs: Two Layers vs Three Layers
+
+An alternative design is to flatten to **two layers** — just `.api.*` (protocol-agnostic) + `.api.native.*` (raw specs) — skipping the protocol-specific normalization layer entirely.
+
+| | Three layers (chosen) | Two layers (alternative) |
+|---|---|---|
+| **Structure** | `.api.spec_files[]` → `.api.rest.endpoints[]` → `.api.rest.native.openapi` | `.api.spec_files[]` → `.api.native.openapi` |
+| **Policy authoring** | Policies query structured, normalized data (e.g., `.api.rest.endpoints[].summary`) without parsing raw specs | Policies must parse raw native specs for anything beyond `spec_files` metadata |
+| **Cross-tool consistency** | OpenAPI and Swagger endpoints normalize to the same `endpoints[]` shape | Each native format has its own shape; policies handle the differences |
+| **Design risk** | Must design the normalized shape upfront per protocol — risky for protocols we haven't built yet (gRPC, GraphQL) | No premature normalization; native data speaks for itself |
+| **Complexity** | Deeper hierarchy, more collector logic to extract and normalize | Flatter, simpler, fewer moving parts |
+
+**Why three layers was chosen:** The protocol-specific normalization (Layer 2) is where most policy value lives. Checking "all REST endpoints have descriptions" or "no endpoint accepts unbounded input" requires structured endpoint data, not raw JSON parsing. `spec_files` (Layer 1) handles the universal "does documentation exist?" question, and `native` (Layer 3) handles edge cases needing raw access. Layer 2 bridges the gap.
+
+**When to reconsider:** If a future protocol's normalized shape is unclear (i.e., we can't confidently design `.api.grpc.services[]`), start with just `spec_files` + `native` for that protocol and add Layer 2 once the policy needs are clear.
+
 ## Full Structure
 
 This example shows a repo with all three API protocols. In practice, most repos will have only one or two.
