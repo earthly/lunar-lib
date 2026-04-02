@@ -344,8 +344,6 @@ GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh <command> --repo pantalasa-crono
 git remote set-url origin "https://x-access-token:$(bender-gh-token pantalasa-cronos)@github.com/pantalasa-cronos/<repo>.git"
 ```
 
-**Grafana credentials** are stored at `~/.bender/grafana-credentials` (separate creds per environment).
-
 ### Post test results on the PR
 
 After testing, comment on the PR documenting what you tested and the results:
