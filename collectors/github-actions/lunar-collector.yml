@@ -1,20 +1,20 @@
 version: 0
 
-name: gha-lint
+name: github-actions
 description: Parses GitHub Actions workflows, runs actionlint, and detects version pinning status
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:gha-lint-main
+default_image: earthly/lunar-lib:github-actions-main
 
 landing_page:
-  display_name: "GHA Workflow Lint Collector"
+  display_name: "GitHub Actions Collector"
   long_description: |
     Parses and lints GitHub Actions workflow files. Extracts structured data from
     every workflow (triggers, jobs, action references), runs actionlint for syntax
     and type checking, and classifies version pinning status for all third-party
     action references.
   category: "ci-cd"
-  icon: "assets/gha-lint.svg"
+  icon: "assets/github-actions.svg"
   status: "beta"
   keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
 
@@ -34,7 +34,7 @@ example_component_json: |
     "ci": {
       "gha": {
         "source": {
-          "tool": "gha-lint",
+          "tool": "github-actions",
           "version": "0.1.0",
           "integration": "code"
         },

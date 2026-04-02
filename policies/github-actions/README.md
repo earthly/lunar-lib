@@ -1,4 +1,4 @@
-# GHA Workflow Lint Guardrails
+# GitHub Actions Guardrails
 
 Enforces GitHub Actions workflow lint quality and supply-chain pinning hygiene.
 
@@ -23,11 +23,11 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.ci.gha.workflows[]` | array | `gha-lint` collector |
-| `.ci.gha.actionlint` | object | `gha-lint` collector |
-| `.ci.gha.pinning_summary` | object | `gha-lint` collector |
+| `.ci.gha.workflows[]` | array | `github-actions` collector |
+| `.ci.gha.actionlint` | object | `github-actions` collector |
+| `.ci.gha.pinning_summary` | object | `github-actions` collector |
 
-**Note:** Ensure the `gha-lint` collector is configured before enabling this policy.
+**Note:** Ensure the `github-actions` collector is configured before enabling this policy.
 
 ## Installation
 
@@ -35,7 +35,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github://earthly/lunar-lib/policies/gha-lint@main
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [actionlint-clean, actions-pinned]  # Only run specific checks

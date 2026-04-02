@@ -1,22 +1,22 @@
 version: 0
 
-name: gha-lint
+name: github-actions
 description: Evaluates GitHub Actions workflow lint quality and supply-chain pinning hygiene
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "GHA Workflow Lint Guardrails"
+  display_name: "GitHub Actions Guardrails"
   long_description: |
     Enforces lint quality and supply-chain hygiene for GitHub Actions workflows.
     Checks that workflows pass actionlint validation, that third-party actions
     use pinned versions (SHA or tag), and that no mutable refs are used.
   category: "devex-build-and-ci"
-  icon: "assets/gha-lint.svg"
+  icon: "assets/github-actions.svg"
   status: "beta"
   requires:
-    - slug: "gha-lint"
+    - slug: "github-actions"
       type: "collector"
       reason: "Provides parsed workflow data, actionlint results, and pinning analysis"
   related: []

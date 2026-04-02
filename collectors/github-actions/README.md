@@ -1,4 +1,4 @@
-# GHA Workflow Lint Collector
+# GitHub Actions Collector
 
 Parses GitHub Actions workflows, runs actionlint, and detects version pinning status for supply-chain hygiene.
 
@@ -33,6 +33,6 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/gha-lint@main
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
     on: ["domain:your-domain"]  # Or use tags like [backend, frontend]
 ```
