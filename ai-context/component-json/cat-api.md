@@ -45,7 +45,8 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
         "valid": true,
         "version": "3.0.3",
         "operation_count": 12,
-        "schema_count": 5
+        "schema_count": 5,
+        "has_docs": true
       },
       {
         "path": "proto/user.proto",
@@ -54,7 +55,8 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
         "valid": true,
         "version": "proto3",
         "operation_count": 4,
-        "schema_count": 6
+        "schema_count": 6,
+        "has_docs": false
       },
       {
         "path": "schema.graphql",
@@ -63,7 +65,8 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
         "valid": true,
         "version": null,
         "operation_count": 5,
-        "schema_count": 3
+        "schema_count": 3,
+        "has_docs": true
       }
     ],
 
@@ -108,6 +111,7 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 | `.api.spec_files[].version` | string | Spec version (e.g., `"3.0.3"`, `"2.0"`, `"proto3"`) |
 | `.api.spec_files[].operation_count` | number | Number of operations defined in this spec |
 | `.api.spec_files[].schema_count` | number | Number of schema/type definitions in this spec |
+| `.api.spec_files[].has_docs` | boolean | Whether the spec includes human-readable documentation (descriptions, examples) beyond just the API definition |
 
 ### Native/Raw (Layer 2)
 
@@ -140,7 +144,8 @@ When a gRPC/protobuf collector is added, it writes to `.api.spec_files[]` (with 
         "valid": true,
         "version": "proto3",
         "operation_count": 4,
-        "schema_count": 6
+        "schema_count": 6,
+        "has_docs": false
       }
     ],
     "native": {
@@ -169,7 +174,8 @@ When a GraphQL collector is added, it writes to `.api.spec_files[]` (with `proto
         "valid": true,
         "version": null,
         "operation_count": 5,
-        "schema_count": 3
+        "schema_count": 3,
+        "has_docs": true
       }
     ],
     "native": {
