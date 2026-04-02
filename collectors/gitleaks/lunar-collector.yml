@@ -35,8 +35,11 @@ collectors:
 
   - name: cicd
     description: |
-      Detects Gitleaks execution in CI pipelines. Captures the command
-      and version. Writes detected commands to .native.gitleaks.cicd.cmds.
+      Detects Gitleaks execution in CI pipelines. Records command metadata
+      to .native.gitleaks.cicd.cmds and collects the JSON report file if
+      --report-path / -r can be parsed from the command. Collected reports
+      are written to .secrets.cicd (normalized) and
+      .native.gitleaks.cicd.report (raw).
     mainBash: cicd.sh
     hook:
       type: ci-after-command
@@ -60,6 +63,14 @@ example_component_json: |
           "secret_type": "Generic API Key"
         }
       ],
+      "cicd": [
+        {
+          "rule": "aws-access-key-id",
+          "file": "deploy.sh",
+          "line": 10,
+          "secret_type": "AWS Access Key ID"
+        }
+      ],
       "native": {
         "gitleaks": {
           "auto": {
@@ -75,7 +86,16 @@ example_component_json: |
           },
           "cicd": {
             "cmds": [
-              {"cmd": "gitleaks detect --source . --report-format json", "version": "8.21.2"}
+              {"cmd": "gitleaks detect --report-path results.json --source .", "version": "8.21.2"}
+            ],
+            "report": [
+              {
+                "RuleID": "aws-access-key-id",
+                "File": "deploy.sh",
+                "StartLine": 10,
+                "Commit": "def5678",
+                "Description": "AWS Access Key ID"
+              }
             ]
           }
         }
