@@ -4,13 +4,7 @@ Detects hardcoded secrets using Gitleaks — either by auto-running scans or by 
 
 ## Overview
 
-This collector has two modes of operation:
-
-1. **Auto-scan** (`scan` sub-collector): Runs Gitleaks against the repository source code on every collection cycle. Detects API keys, passwords, tokens, and other credentials. Results are written to the normalized `.secrets` Component JSON category.
-
-2. **CI detection** (`cicd` sub-collector): Detects existing Gitleaks executions in CI pipelines. Captures command and version metadata. When `--report-path` / `-r` is found in the traced command, collects the report file and normalizes findings into `.secrets.cicd`.
-
-Both modes feed into the `secrets` policy for enforcement.
+This collector detects hardcoded secrets using Gitleaks in two modes: the `scan` sub-collector auto-runs Gitleaks on every repo, while the `cicd` sub-collector detects existing Gitleaks executions in CI and collects their report files. Results are normalized into the `.secrets` Component JSON category for the `secrets` policy.
 
 ## Collected Data
 
