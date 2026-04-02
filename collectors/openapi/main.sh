@@ -2,7 +2,7 @@
 set -e
 
 # OpenAPI/Swagger collector — finds spec files, extracts metadata,
-# writes to .api.spec_files[] and .api.native.openapi
+# writes to .api.spec_files and .api.native.openapi
 
 FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name 'openapi.yaml' -o -name 'openapi.yml' -o -name 'openapi.json' -o -name 'swagger.yaml' -o -name 'swagger.yml' -o -name 'swagger.json' \) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*'}"
 
@@ -12,6 +12,11 @@ if [ -z "$SPEC_FILES" ]; then
     echo "No OpenAPI/Swagger spec files found"
     exit 0
 fi
+
+# Temp files for accumulating results
+NATIVE_MAP=$(mktemp)
+echo '{}' > "$NATIVE_MAP"
+trap 'rm -f "$NATIVE_MAP"' EXIT
 
 while IFS= read -r file; do
     [ -z "$file" ] && continue
@@ -35,18 +40,16 @@ while IFS= read -r file; do
         # File exists but failed to parse — still record it
         jq -n \
             --arg path "$filepath" \
-            --arg format "unknown" \
-            --arg protocol "rest" \
-            '{
+            '[{
                 path: $path,
-                format: $format,
-                protocol: $protocol,
+                format: "unknown",
+                protocol: "rest",
                 valid: false,
                 version: null,
                 operation_count: 0,
                 schema_count: 0,
                 has_docs: false
-            }' | lunar collect -j ".api.spec_files[]" -
+            }]' | lunar collect -j ".api.spec_files" -
         continue
     fi
 
@@ -77,7 +80,7 @@ while IFS= read -r file; do
         ((.components.schemas // {}) | length) +
         ((.definitions // {}) | length)' 2>/dev/null || echo "0")
 
-    # Build spec_files entry
+    # Collect spec_files entry as a single-element array (auto-merges across calls)
     jq -n \
         --arg path "$filepath" \
         --arg format "$format" \
@@ -85,7 +88,7 @@ while IFS= read -r file; do
         --argjson valid "$valid" \
         --argjson op_count "$operation_count" \
         --argjson schema_count "$schema_count" \
-        '{
+        '[{
             path: $path,
             format: $format,
             protocol: "rest",
@@ -94,12 +97,17 @@ while IFS= read -r file; do
             operation_count: $op_count,
             schema_count: $schema_count,
             has_docs: true
-        }' | lunar collect -j ".api.spec_files[]" -
+        }]' | lunar collect -j ".api.spec_files" -
 
-    # Store raw spec under native.openapi keyed by file path
-    echo "$raw_json" | lunar collect -j ".api.native.openapi.\"$filepath\"" -
+    # Accumulate native specs into a single map (to avoid dot-in-filename path issues)
+    NATIVE_MAP_NEW=$(jq --arg key "$filepath" --argjson val "$raw_json" \
+        '. + {($key): $val}' "$NATIVE_MAP")
+    echo "$NATIVE_MAP_NEW" > "$NATIVE_MAP"
 
 done <<< "$SPEC_FILES"
+
+# Collect the full native.openapi map in one shot
+lunar collect -j ".api.native.openapi" - < "$NATIVE_MAP"
 
 # Source metadata
 lunar collect ".api.source.tool" "openapi-collector"
