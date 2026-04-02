@@ -91,6 +91,12 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
             }
           }
         }
+      },
+      "protobuf": {
+        "proto/user.proto": "syntax = \"proto3\";\npackage user;\n\nservice UserService {\n  rpc GetUser (GetUserRequest) returns (User);\n  rpc ListUsers (ListUsersRequest) returns (ListUsersResponse);\n  rpc CreateUser (CreateUserRequest) returns (User);\n  rpc DeleteUser (DeleteUserRequest) returns (Empty);\n}\n\nmessage User {\n  string id = 1;\n  string email = 2;\n  string name = 3;\n}\n\nmessage GetUserRequest { string id = 1; }\nmessage ListUsersRequest { int32 limit = 1; }\nmessage ListUsersResponse { repeated User users = 1; }\nmessage CreateUserRequest { string email = 1; string name = 2; }\nmessage DeleteUserRequest { string id = 1; }"
+      },
+      "graphql": {
+        "schema.graphql": "type User {\n  id: ID!\n  \"\"\"The user's email address\"\"\"\n  email: String!\n  name: String!\n  createdAt: DateTime!\n}\n\ntype Query {\n  \"\"\"List users with optional pagination\"\"\"\n  users(limit: Int = 10, offset: Int = 0): [User!]!\n  user(id: ID!): User\n  searchUsers(query: String!): [User!]!\n}\n\ntype Mutation {\n  createUser(input: CreateUserInput!): User!\n  deleteUser(id: ID!): Boolean!\n}"
       }
     }
   }
