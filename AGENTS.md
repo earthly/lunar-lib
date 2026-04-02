@@ -19,6 +19,17 @@ This directory contains reference documentation for AI agents working with the L
 1. **Check CI status**: Run `gh pr checks <PR>` and verify all checks pass.
 2. **Fix failures immediately**: If CI fails, read the logs (`gh run view <run-id> --log-failed`), fix the issue, and push again. Do not leave a PR with failing CI.
 
+### SVG Icon Guidelines
+
+When creating or editing SVG icons for collectors, policies, or catalogers:
+
+1. **Use `fill="black"`** — the website converts black to white at render time. Black is visible in GitHub PR diffs; white is invisible on GitHub's white background.
+2. **Source from [simple-icons](https://github.com/simple-icons/simple-icons)** when a standard icon exists. Strip `<title>` tags and `role="img"` attributes.
+3. **No solid background rectangles** — use transparent backgrounds only.
+4. **No colored fills** — only `black`, `white` (with `fill-opacity`), `none`, or `currentColor`. RGB colors get flattened.
+5. **Validate before committing**: `earthly +lint` runs `validate_svg_grayscale.py` which enforces these rules.
+6. **Full guidelines**: See `LUNAR-PLUGIN-PLAYBOOK-AI.md` (SVG section) for the complete reference.
+
 ### Phase Awareness
 
 - **Spec-only phase**: Only create/edit YAML manifests, READMEs, SVGs, and documentation. No `.sh` or `.py` implementation files.
