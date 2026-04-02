@@ -8,10 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpenAPI Collector"
   long_description: |
-    Detect OpenAPI 3.x and Swagger 2.0 spec files in repositories. Writes
-    spec metadata to `.api.spec_files[]` and full raw specs to
-    `.api.native.openapi`. Handles both naming
-    conventions in YAML and JSON formats.
+    Detect OpenAPI and Swagger spec files in repositories (any version —
+    Swagger 1.x/2.0, OpenAPI 3.0/3.1+). Writes spec metadata to
+    `.api.spec_files[]` and full raw specs to `.api.native.openapi`.
+    Handles both naming conventions in YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
   status: "beta"
@@ -23,14 +23,17 @@ landing_page:
 collectors:
   - name: openapi
     description: |
-      Searches the repository for OpenAPI 3.x and Swagger 2.0 specification
-      files by common filenames (openapi.yaml, openapi.yml, openapi.json,
-      swagger.yaml, swagger.yml, swagger.json). For each spec found:
+      Searches the repository for OpenAPI and Swagger specification files
+      (any version) by common filenames (openapi.yaml, openapi.yml,
+      openapi.json, swagger.yaml, swagger.yml, swagger.json). For each
+      spec found:
       - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
+      - Records the declared version (e.g., "2.0", "3.0.3", "3.1.0") so
+        policies can enforce version requirements
       - Sets `has_docs: true` — OpenAPI/Swagger specs inherently contain
         human-readable documentation (descriptions, summaries, examples)
       - Stores the full raw spec as JSON under `.api.native.openapi`
-        (both OpenAPI 3.x and Swagger 2.0 — same spec lineage)
+        (all versions share one key — same spec lineage)
     hook:
       type: code
     keywords: ["openapi", "swagger", "api", "rest", "documentation", "spec"]

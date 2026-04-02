@@ -1,6 +1,6 @@
 # OpenAPI Collector
 
-Detect and analyze OpenAPI 3.x and Swagger 2.0 specification files in repositories.
+Detect and analyze OpenAPI and Swagger specification files in repositories (any version).
 
 ## Overview
 
@@ -16,7 +16,7 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.api.spec_files[]` | array | Spec file metadata (one entry per spec file found) |
 | `.api.spec_files[].path` | string | File path relative to repo root |
-| `.api.spec_files[].format` | string | `"openapi"` for OpenAPI 3.x, `"swagger"` for Swagger 2.0 |
+| `.api.spec_files[].format` | string | `"openapi"` for OpenAPI 3.x+, `"swagger"` for Swagger 1.x/2.0 |
 | `.api.spec_files[].protocol` | string | Always `"rest"` |
 | `.api.spec_files[].valid` | boolean | Whether the file parses without errors |
 | `.api.spec_files[].version` | string | Spec version (e.g. `"3.0.3"`, `"3.1.0"`, `"2.0"`) |
@@ -28,7 +28,7 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.api.native.openapi` | object | Map of file path → raw spec as JSON. Both OpenAPI 3.x and Swagger 2.0 live here (same spec lineage) |
+| `.api.native.openapi` | object | Map of file path → raw spec as JSON. All versions live here (same spec lineage) |
 
 **File patterns:** OpenAPI 3.x (`openapi.yaml`, `openapi.yml`, `openapi.json`) and Swagger 2.0 (`swagger.yaml`, `swagger.yml`, `swagger.json`).
 
@@ -36,7 +36,7 @@ This collector writes to the following Component JSON paths:
 
 | Collector | Description |
 |-----------|-------------|
-| `openapi` | Detects OpenAPI 3.x and Swagger 2.0 spec files, extracts metadata and raw specs |
+| `openapi` | Detects OpenAPI and Swagger spec files (any version), extracts metadata and raw specs |
 
 ## Installation
 
