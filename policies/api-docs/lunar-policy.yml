@@ -1,0 +1,78 @@
+version: 0
+
+name: api-docs
+description: API documentation best practices
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+landing_page:
+  display_name: "API Docs Guardrails"
+  long_description: |
+    Validate API documentation standards. Ensures repositories with APIs have
+    valid specification files with human-readable documentation. Operates on
+    protocol-agnostic `.api.spec_files[]` for universal checks across all
+    API protocols (REST, gRPC, GraphQL).
+  category: "repository-and-ownership"
+  icon: "assets/api-docs.svg"
+  status: "beta"
+  requires:
+    - slug: "openapi"
+      type: "collector"
+      reason: "Collects OpenAPI and Swagger spec metadata and raw specs"
+  related: []
+
+policies:
+  - name: spec-exists
+    mainPython: ./spec-exists.py
+    description: |
+      Verifies that at least one API specification file exists in the repository
+      by checking if `.api.spec_files[]` is non-empty. Protocol-agnostic — works
+      for REST (OpenAPI/Swagger), gRPC (protobuf), or any future API format.
+      Skips if neither the openapi nor swagger collector has run.
+    keywords: ["openapi", "swagger", "api", "documentation", "spec"]
+
+  - name: spec-valid
+    mainPython: ./spec-valid.py
+    description: |
+      Checks that all detected API spec files parse without errors by verifying
+      `.api.spec_files[].valid` is true for every entry.
+      Skips if no spec files were detected.
+    keywords: ["openapi", "swagger", "api", "validation", "syntax"]
+
+  - name: has-docs
+    mainPython: ./has-docs.py
+    description: |
+      Checks that all API spec files include human-readable documentation
+      (descriptions, examples) by verifying `.api.spec_files[].has_docs` is
+      true for every entry. A bare definition without descriptions doesn't
+      count. Skips if no spec files were detected.
+    keywords: ["openapi", "swagger", "grpc", "graphql", "api", "documentation"]
+
+inputs: {}
+
+example_component_json: |
+  {
+    "api": {
+      "spec_files": [
+        {
+          "path": "api/openapi.yaml",
+          "format": "openapi",
+          "protocol": "rest",
+          "valid": true,
+          "version": "3.0.3",
+          "operation_count": 12,
+          "schema_count": 5,
+          "has_docs": true
+        }
+      ],
+      "native": {
+        "openapi": {
+          "api/openapi.yaml": {
+            "openapi": "3.0.3",
+            "info": { "title": "User API", "version": "1.0.0" },
+            "paths": { "...": "full raw spec" }
+          }
+        }
+      }
+    }
+  }

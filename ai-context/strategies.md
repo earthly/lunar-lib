@@ -377,3 +377,4 @@ Use [ast-grep](https://ast-grep.github.io/) to extract specific code patterns ba
 * No usage of deprecated APIs
 * No security anti-patterns (SQL injection risks, dangerous exec calls)
 * Feature flags are documented and follow conventions
+

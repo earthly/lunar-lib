@@ -95,7 +95,10 @@ This table lists important sub-objects within each category. For full details, s
 | `.compliance.data_classification` | Data classification (`level`, `contains_pii`, `contains_pci`) |
 | `.compliance.controls` | Control status (`access_reviews`, `audit_logging`, `encryption_at_rest`) |
 | **[`.api`](cat-api.md)** | **API specifications and documentation** |
-| `.api.specs[]` | API spec files (`type`, `path`, `valid`, `version`) |
+| `.api.spec_files[]` | Spec file metadata — protocol-agnostic (`path`, `format`, `protocol`, `valid`, `version`, `operation_count`, `schema_count`, `has_docs`) |
+| `.api.native.openapi` | Map of file path → raw OpenAPI/Swagger spec as JSON (all versions, same spec lineage) |
+| `.api.native.protobuf` | Map of file path → raw .proto content as string — future |
+| `.api.native.graphql` | Map of file path → raw GraphQL SDL schema as string — future |
 | **[`.code_patterns`](cat-code-patterns.md)** | **AST-based code pattern analysis (Strategy 16)** |
 | `.code_patterns.source` | Tool source (`tool`, `version`) |
 | `.code_patterns.security` | Security anti-patterns (`sql_concat`, `eval_exec`, `weak_crypto`, etc.) |
