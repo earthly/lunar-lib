@@ -8,10 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpenAPI Collector"
   long_description: |
-    Detect OpenAPI 3.x and Swagger 2.0 spec files in repositories. Parses
-    each spec to extract endpoints, schemas, and metadata into normalized
-    `.api.rest` structure. Stores full raw specs under `.api.rest.native`.
-    Handles both naming conventions in YAML and JSON formats.
+    Detect OpenAPI 3.x and Swagger 2.0 spec files in repositories. Writes
+    spec metadata to `.api.spec_files[]` and full raw specs to
+    `.api.native.openapi` or `.api.native.swagger`. Handles both naming
+    conventions in YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
   status: "beta"
@@ -27,10 +27,8 @@ collectors:
       files by common filenames (openapi.yaml, openapi.yml, openapi.json,
       swagger.yaml, swagger.yml, swagger.json). For each spec found:
       - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
-      - Extracts and normalizes endpoints to `.api.rest.endpoints[]`
-      - Extracts and normalizes schemas to `.api.rest.schemas[]`
-      - Stores the full raw spec as JSON under `.api.rest.native.openapi`
-        (for OpenAPI 3.x) or `.api.rest.native.swagger` (for Swagger 2.0)
+      - Stores the full raw spec as JSON under `.api.native.openapi`
+        (for OpenAPI 3.x) or `.api.native.swagger` (for Swagger 2.0)
     hook:
       type: code
     keywords: ["openapi", "swagger", "api", "rest", "documentation", "spec"]
@@ -65,75 +63,16 @@ example_component_json: |
           "schema_count": 3
         }
       ],
-      "rest": {
-        "endpoints": [
-          {
-            "path": "/users",
-            "method": "GET",
-            "operation_id": "listUsers",
-            "summary": "List all users",
-            "tags": ["users"]
-          },
-          {
-            "path": "/users",
-            "method": "POST",
-            "operation_id": "createUser",
-            "summary": "Create a new user",
-            "tags": ["users"],
-            "request_body": "CreateUserRequest"
-          },
-          {
-            "path": "/users/{id}",
-            "method": "GET",
-            "operation_id": "getUser",
-            "summary": "Get user by ID",
-            "tags": ["users"],
-            "parameters": [
-              { "name": "id", "in": "path", "type": "string", "required": true }
-            ]
-          },
-          {
-            "path": "/pets",
-            "method": "GET",
-            "operation_id": "listPets",
-            "summary": "List all pets",
-            "tags": ["pets"]
-          }
-        ],
-        "schemas": [
-          {
-            "name": "User",
-            "type": "object",
-            "property_count": 4,
-            "required_count": 2,
-            "properties": ["id", "email", "name", "created_at"]
-          },
-          {
-            "name": "CreateUserRequest",
-            "type": "object",
-            "property_count": 2,
-            "required_count": 2,
-            "properties": ["email", "name"]
-          },
-          {
-            "name": "Pet",
-            "type": "object",
-            "property_count": 3,
-            "required_count": 2,
-            "properties": ["id", "name", "tag"]
-          }
-        ],
-        "native": {
-          "openapi": {
-            "openapi": "3.0.3",
-            "info": { "title": "User API", "version": "1.0.0" },
-            "paths": { "/users": { "get": { "...": "full spec" } } }
-          },
-          "swagger": {
-            "swagger": "2.0",
-            "info": { "title": "Petstore", "version": "1.0.0" },
-            "paths": { "/pets": { "get": { "...": "full spec" } } }
-          }
+      "native": {
+        "openapi": {
+          "openapi": "3.0.3",
+          "info": { "title": "User API", "version": "1.0.0" },
+          "paths": { "/users": { "get": { "...": "full spec" } } }
+        },
+        "swagger": {
+          "swagger": "2.0",
+          "info": { "title": "Petstore", "version": "1.0.0" },
+          "paths": { "/pets": { "get": { "...": "full spec" } } }
         }
       }
     }

@@ -10,15 +10,15 @@ landing_page:
   long_description: |
     Validate API documentation standards. Ensures repositories with APIs have
     valid specification files and encourages migration from deprecated Swagger
-    2.0 to OpenAPI 3.x. Operates on protocol-agnostic `.api.spec_files[]` for
-    universal checks and `.api.rest.*` for REST-specific validation.
+    2.0 to OpenAPI 3.x. Operates on protocol-agnostic `.api.spec_files[]`
+    for universal checks across all API protocols.
   category: "repository-and-ownership"
   icon: "assets/api-docs.svg"
   status: "beta"
   requires:
     - slug: "openapi"
       type: "collector"
-      reason: "Collects OpenAPI and Swagger spec metadata, endpoints, and schemas"
+      reason: "Collects OpenAPI and Swagger spec metadata and raw specs"
   related: []
 
 policies:
@@ -60,31 +60,11 @@ example_component_json: |
           "schema_count": 5
         }
       ],
-      "rest": {
-        "endpoints": [
-          {
-            "path": "/users",
-            "method": "GET",
-            "operation_id": "listUsers",
-            "summary": "List all users",
-            "tags": ["users"]
-          }
-        ],
-        "schemas": [
-          {
-            "name": "User",
-            "type": "object",
-            "property_count": 4,
-            "required_count": 2,
-            "properties": ["id", "email", "name", "created_at"]
-          }
-        ],
-        "native": {
-          "openapi": {
-            "openapi": "3.0.3",
-            "info": { "title": "User API", "version": "1.0.0" },
-            "paths": { "...": "full raw spec" }
-          }
+      "native": {
+        "openapi": {
+          "openapi": "3.0.3",
+          "info": { "title": "User API", "version": "1.0.0" },
+          "paths": { "...": "full raw spec" }
         }
       }
     }
