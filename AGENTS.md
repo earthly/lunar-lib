@@ -2,31 +2,6 @@
 
 This directory contains reference documentation for AI agents working with the Lunar platform.
 
----
-
-## Mandatory Checks (All Workers)
-
-**These rules are non-negotiable. Follow them every time you work in this repo.**
-
-### Before Committing
-
-1. **Run the linter if you changed spec files**: If you modified any files in `collectors/` or `policies/` (YAML manifests, READMEs, SVGs, requirements.txt), run `earthly +lint` and fix ALL errors before committing. You can skip it for changes that don't touch those directories.
-2. **Validate YAML manifests**: Ensure all `requires` references point to collectors/policies that actually exist. The linter checks this.
-3. **Stage only relevant files**: Use `git add collectors/<name>/` or `git add policies/<name>/` — never `git add .` or `git add -A`.
-
-### After Pushing
-
-1. **Check CI status**: Run `gh pr checks <PR>` and verify all checks pass.
-2. **Fix failures immediately**: If CI fails, read the logs (`gh run view <run-id> --log-failed`), fix the issue, and push again. Do not leave a PR with failing CI.
-
-### Phase Awareness
-
-- **Spec-only phase**: Only create/edit YAML manifests, READMEs, SVGs, and documentation. No `.sh` or `.py` implementation files.
-- **Implementation phase**: Write the code. Test locally with `lunar collector dev` / `lunar policy dev` before pushing.
-- Check the PR title and conversation context for which phase you're in. `[Spec Only]` in the title = spec phase.
-
----
-
 ## Reference Documentation
 
 * [about-lunar.md](ai-context/about-lunar.md): **Start here.** High-level overview of the Lunar platform, the problem it solves, and key concepts from a user perspective.
