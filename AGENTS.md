@@ -10,7 +10,7 @@ This directory contains reference documentation for AI agents working with the L
 
 ### Before Committing
 
-1. **Run the linter**: `earthly +lint` — fix ALL errors before committing. Do not commit with lint failures.
+1. **Run the linter if you changed spec files**: If you modified any files in `collectors/` or `policies/` (YAML manifests, READMEs, SVGs, requirements.txt), run `earthly +lint` and fix ALL errors before committing. You can skip it for changes that don't touch those directories.
 2. **Validate YAML manifests**: Ensure all `requires` references point to collectors/policies that actually exist. The linter checks this.
 3. **Stage only relevant files**: Use `git add collectors/<name>/` or `git add policies/<name>/` — never `git add .` or `git add -A`.
 
