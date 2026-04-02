@@ -1,0 +1,74 @@
+version: 0
+
+name: openapi
+description: OpenAPI and Swagger specification standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+landing_page:
+  display_name: "OpenAPI Guardrails"
+  long_description: |
+    Enforce OpenAPI-specific standards. Encourages migration from deprecated
+    Swagger 2.0 to OpenAPI 3.x. Operates on `.api.spec_files[]` entries with
+    `protocol: "rest"` and on `.api.native.openapi` for deep spec inspection.
+  category: "devex-build-and-ci"
+  icon: "assets/openapi.svg"
+  status: "beta"
+  requires:
+    - slug: "openapi"
+      type: "collector"
+      reason: "Collects OpenAPI and Swagger spec metadata and raw specs"
+  related: []
+
+policies:
+  - name: spec-version-3
+    description: |
+      Ensures all REST API specs use OpenAPI 3.x rather than deprecated
+      Swagger 2.0 by checking `.api.spec_files[].format` for any `"swagger"`
+      entries. Only checks entries with `protocol: "rest"`.
+      Skips if no REST spec files were detected.
+    keywords: ["openapi", "swagger", "api", "version", "migration"]
+
+inputs: {}
+
+example_component_json: |
+  {
+    "api": {
+      "spec_files": [
+        {
+          "path": "api/openapi.yaml",
+          "format": "openapi",
+          "protocol": "rest",
+          "valid": true,
+          "version": "3.0.3",
+          "operation_count": 12,
+          "schema_count": 5,
+          "has_docs": true
+        },
+        {
+          "path": "legacy/swagger.json",
+          "format": "swagger",
+          "protocol": "rest",
+          "valid": true,
+          "version": "2.0",
+          "operation_count": 8,
+          "schema_count": 3,
+          "has_docs": true
+        }
+      ],
+      "native": {
+        "openapi": {
+          "api/openapi.yaml": {
+            "openapi": "3.0.3",
+            "info": { "title": "User API", "version": "1.0.0" },
+            "paths": { "...": "full raw spec" }
+          },
+          "legacy/swagger.json": {
+            "swagger": "2.0",
+            "info": { "title": "Petstore", "version": "1.0.0" },
+            "paths": { "...": "full raw spec" }
+          }
+        }
+      }
+    }
+  }
