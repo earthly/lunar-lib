@@ -1,12 +1,16 @@
 # Gitleaks Collector
 
-Automatically scans repositories for hardcoded secrets using Gitleaks.
+Detects hardcoded secrets using Gitleaks — either by auto-running scans or by collecting results from existing Gitleaks CI executions.
 
 ## Overview
 
-This collector auto-runs Gitleaks secret scanning on every repository. It detects API keys, passwords, tokens, and other credentials in code. Results are written to the normalized `.secrets` Component JSON category, enabling the `secrets` policy to enforce secret-free codebases.
+This collector has two modes of operation:
 
-The collector also detects Gitleaks executions in CI pipelines, capturing command and version metadata. When `--report-path` / `-r` is found in the CI command, the report file is collected and normalized into `.secrets.cicd`.
+1. **Auto-scan** (`scan` sub-collector): Runs Gitleaks against the repository source code on every collection cycle. Detects API keys, passwords, tokens, and other credentials. Results are written to the normalized `.secrets` Component JSON category.
+
+2. **CI detection** (`cicd` sub-collector): Detects existing Gitleaks executions in CI pipelines. Captures command and version metadata. When `--report-path` / `-r` is found in the traced command, collects the report file and normalizes findings into `.secrets.cicd`.
+
+Both modes feed into the `secrets` policy for enforcement.
 
 ## Collected Data
 
@@ -40,7 +44,7 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags
 ```
 
-No configuration or secrets required. The `scan` collector runs Gitleaks automatically using the `gitleaks-main` container image. The `ci` collector detects Gitleaks invocations in CI pipelines.
+No configuration or secrets required. The `scan` sub-collector runs Gitleaks automatically using the `gitleaks-main` container image. The `cicd` sub-collector detects existing Gitleaks invocations in CI pipelines and collects their report files.
 
 The `scan` collector uses `--no-git` mode to scan the working directory without requiring git history. Findings are limited to 50 per scan to avoid oversized Component JSON payloads.
 

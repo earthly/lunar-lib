@@ -1,7 +1,7 @@
 version: 0
 
 name: gitleaks
-description: Auto-runs Gitleaks secret scanning on every repository
+description: Detects hardcoded secrets via auto-scanning or by collecting existing Gitleaks CI results
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:gitleaks-main
@@ -10,10 +10,10 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Gitleaks Collector"
   long_description: |
-    Automatically scans repositories for hardcoded secrets using Gitleaks.
-    Detects API keys, passwords, tokens, and other credentials in code.
-    Zero configuration required — runs on every repo and writes normalized
-    results to the .secrets Component JSON category.
+    Detects hardcoded secrets using Gitleaks in two modes: auto-runs scans
+    on every repo, and detects existing Gitleaks executions in CI pipelines
+    to collect their report files. Results are written to the normalized
+    .secrets Component JSON category.
   categories: ["security"]
   icon: "assets/gitleaks.svg"
   status: "beta"
