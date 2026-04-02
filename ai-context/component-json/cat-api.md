@@ -111,7 +111,7 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 | `.api.spec_files[].version` | string | Spec version (e.g., `"3.0.3"`, `"2.0"`, `"proto3"`) |
 | `.api.spec_files[].operation_count` | number | Number of operations defined in this spec |
 | `.api.spec_files[].schema_count` | number | Number of schema/type definitions in this spec |
-| `.api.spec_files[].has_docs` | boolean | Whether the spec includes human-readable documentation (descriptions, examples) beyond just the API definition |
+| `.api.spec_files[].has_docs` | boolean | Whether the spec includes human-readable documentation. Always `true` for OpenAPI/Swagger (inherently documentation). Future gRPC/GraphQL collectors must detect doc generation tooling |
 
 ### Native/Raw (Layer 2)
 

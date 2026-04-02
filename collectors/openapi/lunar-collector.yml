@@ -27,6 +27,8 @@ collectors:
       files by common filenames (openapi.yaml, openapi.yml, openapi.json,
       swagger.yaml, swagger.yml, swagger.json). For each spec found:
       - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
+      - Sets `has_docs: true` — OpenAPI/Swagger specs inherently contain
+        human-readable documentation (descriptions, summaries, examples)
       - Stores the full raw spec as JSON under `.api.native.openapi`
         (both OpenAPI 3.x and Swagger 2.0 — same spec lineage)
     hook:

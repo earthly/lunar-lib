@@ -4,7 +4,7 @@ Detect and analyze OpenAPI 3.x and Swagger 2.0 specification files in repositori
 
 ## Overview
 
-Searches repositories for OpenAPI and Swagger specification files by common filenames and parses their contents. Extracts normalized endpoint and schema data for REST API analysis, and stores the full raw spec for deep inspection. Supports both YAML and JSON formats. OpenAPI is the evolution of the Swagger specification — Swagger 2.0 was renamed to OpenAPI 3.0 when donated to the OpenAPI Initiative. This collector handles both naming conventions (`openapi.yaml`/`openapi.json` and `swagger.yaml`/`swagger.json`) in a single pass, normalizing both formats into the same `.api.rest` structure.
+Searches repositories for OpenAPI and Swagger specification files by common filenames and parses their contents. Stores the full raw spec under `.api.native.openapi` for deep inspection, and writes protocol-agnostic metadata to `.api.spec_files[]`. Supports both YAML and JSON formats. OpenAPI is the evolution of the Swagger specification — Swagger 2.0 was renamed to OpenAPI 3.0 when donated to the OpenAPI Initiative. This collector handles both naming conventions (`openapi.yaml`/`openapi.json` and `swagger.yaml`/`swagger.json`) in a single pass.
 
 ## Collected Data
 
@@ -22,40 +22,21 @@ This collector writes to the following Component JSON paths:
 | `.api.spec_files[].version` | string | Spec version (e.g. `"3.0.3"`, `"3.1.0"`, `"2.0"`) |
 | `.api.spec_files[].operation_count` | number | Number of operations (path + method combinations) |
 | `.api.spec_files[].schema_count` | number | Number of schema/definition entries |
+| `.api.spec_files[].has_docs` | boolean | Always `true` for OpenAPI/Swagger — these specs inherently contain human-readable documentation |
 
-### REST-Specific Normalized (`.api.rest.*`)
-
-| Path | Type | Description |
-|------|------|-------------|
-| `.api.rest.endpoints[]` | array | Normalized REST endpoints extracted from the spec |
-| `.api.rest.endpoints[].path` | string | URL path (e.g. `"/users/{id}"`) |
-| `.api.rest.endpoints[].method` | string | HTTP method (`"GET"`, `"POST"`, etc.) |
-| `.api.rest.endpoints[].operation_id` | string | Operation identifier |
-| `.api.rest.endpoints[].summary` | string | Short description |
-| `.api.rest.endpoints[].tags` | array | Grouping tags |
-| `.api.rest.endpoints[].parameters[]` | array | Path/query/header parameters |
-| `.api.rest.endpoints[].request_body` | string | Request body schema name |
-| `.api.rest.schemas[]` | array | Normalized schema definitions |
-| `.api.rest.schemas[].name` | string | Schema name |
-| `.api.rest.schemas[].type` | string | Schema type (`"object"`, `"array"`, etc.) |
-| `.api.rest.schemas[].property_count` | number | Number of properties |
-| `.api.rest.schemas[].required_count` | number | Number of required properties |
-| `.api.rest.schemas[].properties` | array | List of property names |
-
-### Native/Raw (`.api.rest.native.*`)
+### Native/Raw (`.api.native.openapi`)
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.api.rest.native.openapi` | object | The entire raw OpenAPI 3.x spec converted to JSON |
-| `.api.rest.native.swagger` | object | The entire raw Swagger 2.0 spec converted to JSON |
+| `.api.native.openapi` | object | Map of file path → raw spec as JSON. Both OpenAPI 3.x and Swagger 2.0 live here (same spec lineage) |
 
-**File patterns:** OpenAPI 3.x (`openapi.yaml`, `openapi.yml`, `openapi.json`) and Swagger 2.0 (`swagger.yaml`, `swagger.yml`, `swagger.json`). Both formats produce the same normalized output under `.api.rest.endpoints[]` and `.api.rest.schemas[]`.
+**File patterns:** OpenAPI 3.x (`openapi.yaml`, `openapi.yml`, `openapi.json`) and Swagger 2.0 (`swagger.yaml`, `swagger.yml`, `swagger.json`).
 
 ## Collectors
 
 | Collector | Description |
 |-----------|-------------|
-| `openapi` | Detects OpenAPI 3.x and Swagger 2.0 spec files, extracts metadata, endpoints, schemas, and raw specs |
+| `openapi` | Detects OpenAPI 3.x and Swagger 2.0 spec files, extracts metadata and raw specs |
 
 ## Installation
 
