@@ -114,8 +114,8 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 | Path | Type | Description |
 |------|------|-------------|
 | `.api.native.openapi` | object | Map of file path → raw spec as JSON. Holds both OpenAPI 3.x and Swagger 2.0 (each self-identifies via top-level key) |
-| `.api.native.protobuf` | object | Raw .proto file contents (future, gRPC collector) |
-| `.api.native.graphql` | string | Raw GraphQL SDL schema (future, GraphQL collector) |
+| `.api.native.protobuf` | object | Map of file path → raw .proto content as string (future, gRPC collector) |
+| `.api.native.graphql` | object | Map of file path → raw GraphQL SDL schema as string (future, GraphQL collector) |
 
 ## Collectors
 
@@ -173,7 +173,9 @@ When a GraphQL collector is added, it writes to `.api.spec_files[]` (with `proto
       }
     ],
     "native": {
-      "graphql": "type User {\n  id: ID!\n  email: String!\n  name: String!\n}\n\ntype Query {\n  users(limit: Int = 10): [User!]!\n  user(id: ID!): User\n}\n\ntype Mutation {\n  createUser(input: CreateUserInput!): User!\n}"
+      "graphql": {
+        "schema.graphql": "type User {\n  id: ID!\n  email: String!\n  name: String!\n}\n\ntype Query {\n  users(limit: Int = 10): [User!]!\n  user(id: ID!): User\n}\n\ntype Mutation {\n  createUser(input: CreateUserInput!): User!\n}"
+      }
     }
   }
 }
