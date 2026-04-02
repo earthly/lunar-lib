@@ -10,7 +10,7 @@ landing_page:
   long_description: |
     Detect OpenAPI 3.x and Swagger 2.0 spec files in repositories. Writes
     spec metadata to `.api.spec_files[]` and full raw specs to
-    `.api.native.openapi` or `.api.native.swagger`. Handles both naming
+    `.api.native.openapi`. Handles both naming
     conventions in YAML and JSON formats.
   categories: ["documentation"]
   icon: "assets/openapi.svg"
@@ -28,7 +28,7 @@ collectors:
       swagger.yaml, swagger.yml, swagger.json). For each spec found:
       - Writes spec file metadata to `.api.spec_files[]` (protocol-agnostic)
       - Stores the full raw spec as JSON under `.api.native.openapi`
-        (for OpenAPI 3.x) or `.api.native.swagger` (for Swagger 2.0)
+        (both OpenAPI 3.x and Swagger 2.0 — same spec lineage)
     hook:
       type: code
     keywords: ["openapi", "swagger", "api", "rest", "documentation", "spec"]
@@ -68,11 +68,6 @@ example_component_json: |
           "openapi": "3.0.3",
           "info": { "title": "User API", "version": "1.0.0" },
           "paths": { "/users": { "get": { "...": "full spec" } } }
-        },
-        "swagger": {
-          "swagger": "2.0",
-          "info": { "title": "Petstore", "version": "1.0.0" },
-          "paths": { "/pets": { "get": { "...": "full spec" } } }
         }
       }
     }

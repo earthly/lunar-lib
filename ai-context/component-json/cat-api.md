@@ -12,7 +12,7 @@ The top level holds data that applies regardless of API protocol. Every API — 
 
 ### Layer 2: Native/Raw (`.api.native.openapi`, `.api.native.protobuf`, etc.)
 
-The full, unmodified spec as JSON. Policies that need deep inspection of tool-specific fields (e.g., OpenAPI endpoints, security schemes, gRPC service definitions) parse the raw data directly. Each format gets its own key under `.api.native`.
+The full, unmodified spec as JSON. Policies that need deep inspection of tool-specific fields (e.g., OpenAPI endpoints, security schemes, gRPC service definitions) parse the raw data directly. Each spec lineage gets its own key under `.api.native` — Swagger 2.0 and OpenAPI 3.x share `.api.native.openapi` since Swagger 2.0 is just the earlier version of the same spec (the raw JSON already self-identifies via `"swagger": "2.0"` vs `"openapi": "3.x"`).
 
 ## Design Tradeoffs: Two Layers vs Three Layers
 
@@ -20,7 +20,7 @@ An alternative design adds a **third layer** of protocol-specific normalization 
 
 | | Two layers (chosen) | Three layers (alternative) |
 |---|---|---|
-| **Structure** | `.api.spec_files[]` + `.api.native.openapi` | `.api.spec_files[]` + `.api.rest.endpoints[]` + `.api.rest.native.openapi` |
+| **Structure** | `.api.spec_files[]` + `.api.native.*` | `.api.spec_files[]` + `.api.rest.endpoints[]` + `.api.rest.native.*` |
 | **Policy authoring** | Policies parse raw native specs for anything beyond `spec_files` metadata | Policies query structured, normalized data without parsing raw specs |
 | **Cross-tool consistency** | Each native format has its own shape; policies handle the differences | OpenAPI and Swagger endpoints normalize to the same `endpoints[]` shape |
 | **Design risk** | No premature normalization; native data speaks for itself | Must design the normalized shape upfront per protocol — risky for protocols we haven't built yet |
@@ -111,8 +111,7 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.api.native.openapi` | object | Full raw OpenAPI 3.x spec as JSON |
-| `.api.native.swagger` | object | Full raw Swagger 2.0 spec as JSON |
+| `.api.native.openapi` | object | Full raw OpenAPI/Swagger spec as JSON (both 3.x and 2.0 — self-identifies via top-level key) |
 | `.api.native.protobuf` | object | Raw .proto file contents (future, gRPC collector) |
 | `.api.native.graphql` | string | Raw GraphQL SDL schema (future, GraphQL collector) |
 
@@ -120,9 +119,9 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 
 | Collector | Writes To | Detects |
 |-----------|-----------|---------|
-| `openapi` | `.api.spec_files[]`, `.api.native.openapi`, `.api.native.swagger` | OpenAPI 3.x and Swagger 2.0 files |
+| `openapi` | `.api.spec_files[]`, `.api.native.openapi` | OpenAPI 3.x and Swagger 2.0 files |
 
-The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 specs in a single pass — since Swagger is the predecessor to OpenAPI (Swagger 2.0 was renamed to OpenAPI 3.0), they share the same REST API description paradigm. The `format` field on each `.api.spec_files[]` entry distinguishes the source (`"openapi"` vs `"swagger"`).
+The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 specs in a single pass — Swagger IS OpenAPI (2.0 was renamed to 3.0 when the project moved to the OpenAPI Initiative). Both versions store their raw spec under `.api.native.openapi`; the raw JSON self-identifies via the top-level key (`"openapi": "3.0.3"` vs `"swagger": "2.0"`). The `format` field on each `.api.spec_files[]` entry distinguishes the source version (`"openapi"` vs `"swagger"`) for policies that need to check.
 
 ## Future: gRPC Support
 
@@ -191,7 +190,7 @@ collectors/openapi/  ──writes──→  .api.spec_files[]  ←──reads─
                                   .api.native.*
 ```
 
-The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 file formats (since they're the same spec lineage). No separate swagger collector is needed.
+The `openapi` collector handles both OpenAPI 3.x and Swagger 2.0 file formats (Swagger IS OpenAPI). Both versions share `.api.native.openapi` — no separate swagger key or collector is needed.
 
 **Why two layers?**
 - **Layer 1** lets policies answer universal questions ("has API docs?", "all specs valid?") with zero knowledge of REST vs gRPC.
