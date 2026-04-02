@@ -65,9 +65,16 @@ example_component_json: |
       ],
       "native": {
         "openapi": {
-          "openapi": "3.0.3",
-          "info": { "title": "User API", "version": "1.0.0" },
-          "paths": { "/users": { "get": { "...": "full spec" } } }
+          "api/openapi.yaml": {
+            "openapi": "3.0.3",
+            "info": { "title": "User API", "version": "1.0.0" },
+            "paths": { "/users": { "get": { "...": "full spec" } } }
+          },
+          "legacy/swagger.json": {
+            "swagger": "2.0",
+            "info": { "title": "Petstore", "version": "1.0.0" },
+            "paths": { "/pets": { "get": { "...": "full spec" } } }
+          }
         }
       }
     }

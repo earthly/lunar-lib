@@ -12,7 +12,7 @@ The top level holds data that applies regardless of API protocol. Every API — 
 
 ### Layer 2: Native/Raw (`.api.native.openapi`, `.api.native.protobuf`, etc.)
 
-The full, unmodified spec as JSON. Policies that need deep inspection of tool-specific fields (e.g., OpenAPI endpoints, security schemes, gRPC service definitions) parse the raw data directly. Each spec lineage gets its own key under `.api.native` — Swagger 2.0 and OpenAPI 3.x share `.api.native.openapi` since Swagger 2.0 is just the earlier version of the same spec (the raw JSON already self-identifies via `"swagger": "2.0"` vs `"openapi": "3.x"`).
+The full, unmodified specs as JSON, organized as a map of file path to raw spec content under each spec lineage key. Policies that need deep inspection of tool-specific fields (e.g., OpenAPI endpoints, security schemes, gRPC service definitions) look up the spec by path and parse the raw data directly. Each spec lineage gets its own key under `.api.native` (e.g., `.api.native.openapi["api/openapi.yaml"]`). Swagger 2.0 and OpenAPI 3.x share `.api.native.openapi` since they're the same spec lineage.
 
 ## Design Tradeoffs: Two Layers vs Three Layers
 
@@ -69,21 +69,23 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 
     "native": {
       "openapi": {
-        "openapi": "3.0.3",
-        "info": { "title": "User API", "version": "1.0.0" },
-        "paths": {
-          "/users": {
-            "get": { "operationId": "listUsers", "summary": "List all users", "tags": ["users"] },
-            "post": { "operationId": "createUser", "summary": "Create a new user", "tags": ["users"] }
+        "api/openapi.yaml": {
+          "openapi": "3.0.3",
+          "info": { "title": "User API", "version": "1.0.0" },
+          "paths": {
+            "/users": {
+              "get": { "operationId": "listUsers", "summary": "List all users", "tags": ["users"] },
+              "post": { "operationId": "createUser", "summary": "Create a new user", "tags": ["users"] }
+            },
+            "/users/{id}": {
+              "get": { "operationId": "getUser", "summary": "Get user by ID", "tags": ["users"] }
+            }
           },
-          "/users/{id}": {
-            "get": { "operationId": "getUser", "summary": "Get user by ID", "tags": ["users"] }
-          }
-        },
-        "components": {
-          "schemas": {
-            "User": { "type": "object", "properties": { "...": "full schema" } },
-            "CreateUserRequest": { "type": "object", "properties": { "...": "full schema" } }
+          "components": {
+            "schemas": {
+              "User": { "type": "object", "properties": { "...": "full schema" } },
+              "CreateUserRequest": { "type": "object", "properties": { "...": "full schema" } }
+            }
           }
         }
       }
@@ -111,7 +113,7 @@ This example shows a repo with REST (OpenAPI) and gRPC APIs. In practice, most r
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.api.native.openapi` | object | Full raw OpenAPI/Swagger spec as JSON (both 3.x and 2.0 — self-identifies via top-level key) |
+| `.api.native.openapi` | object | Map of file path → raw spec as JSON. Holds both OpenAPI 3.x and Swagger 2.0 (each self-identifies via top-level key) |
 | `.api.native.protobuf` | object | Raw .proto file contents (future, gRPC collector) |
 | `.api.native.graphql` | string | Raw GraphQL SDL schema (future, GraphQL collector) |
 
@@ -143,9 +145,7 @@ When a gRPC/protobuf collector is added, it writes to `.api.spec_files[]` (with 
     ],
     "native": {
       "protobuf": {
-        "files": [
-          { "path": "proto/user.proto", "content": "syntax = \"proto3\"; ..." }
-        ]
+        "proto/user.proto": "syntax = \"proto3\";\npackage user;\n\nservice UserService {\n  rpc GetUser (GetUserRequest) returns (User);\n  rpc ListUsers (ListUsersRequest) returns (ListUsersResponse);\n}\n\nmessage User { ... }"
       }
     }
   }
