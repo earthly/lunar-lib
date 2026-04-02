@@ -1,0 +1,78 @@
+version: 0
+
+name: gha-lint
+description: Parses GitHub Actions workflows, runs actionlint, and detects version pinning status
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:gha-lint-main
+
+landing_page:
+  display_name: "GHA Workflow Lint Collector"
+  long_description: |
+    Parses and lints GitHub Actions workflow files. Extracts structured data from
+    every workflow (triggers, jobs, action references), runs actionlint for syntax
+    and type checking, and classifies version pinning status for all third-party
+    action references.
+  category: "build"
+  icon: "assets/gha-lint.svg"
+  status: "beta"
+  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
+
+collectors:
+  - name: workflows
+    description: |
+      Parses all GitHub Actions workflow files in .github/workflows/,
+      runs actionlint for lint errors, and classifies action version
+      pinning (SHA, tag, branch, unpinned) for supply-chain hygiene.
+    mainBash: workflows.sh
+    hook:
+      type: code
+    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint"]
+
+example_component_json: |
+  {
+    "ci": {
+      "gha": {
+        "source": {
+          "tool": "gha-lint",
+          "version": "0.1.0",
+          "integration": "code"
+        },
+        "workflows": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "name": "CI",
+            "triggers": ["push", "pull_request"],
+            "jobs": ["build", "test", "lint"],
+            "permissions": { "contents": "read" },
+            "actions": [
+              { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
+              { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" },
+              { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
+            ]
+          }
+        ],
+        "actionlint": {
+          "errors": [
+            {
+              "file": ".github/workflows/ci.yml",
+              "line": 42,
+              "column": 9,
+              "message": "property \"unknown_field\" is not defined",
+              "rule": "syntax-check"
+            }
+          ],
+          "error_count": 1,
+          "warning_count": 0
+        },
+        "pinning_summary": {
+          "total_actions": 3,
+          "sha_pinned": 1,
+          "tag_pinned": 1,
+          "branch_ref": 1,
+          "unpinned": 0,
+          "third_party_unpinned": ["docker/login-action@main"]
+        }
+      }
+    }
+  }
