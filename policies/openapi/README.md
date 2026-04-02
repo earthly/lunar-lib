@@ -10,7 +10,7 @@ OpenAPI-specific policy checks that operate on `.api.spec_files[]` entries with 
 
 | Policy | Description |
 |--------|-------------|
-| `spec-version-3` | Ensures all REST specs use OpenAPI 3.x, flags deprecated Swagger 2.0 |
+| `spec-version` | Ensures all REST specs meet a minimum OpenAPI version (default: 3), flags older specs |
 
 ## Required Data
 
@@ -19,7 +19,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.api.spec_files[]` | array | `openapi` collector |
-| `.api.spec_files[].format` | string | `openapi` collector |
+| `.api.spec_files[].version` | string | `openapi` collector |
 | `.api.spec_files[].protocol` | string | `openapi` collector |
 
 ## Installation
@@ -31,6 +31,8 @@ policies:
   - uses: github://earthly/lunar-lib/policies/openapi@main
     on: ["domain:your-domain"]
     enforcement: report-pr
+    # with:
+    #   min_version: "3"  # default — require OpenAPI 3.x+
 ```
 
 Requires the `openapi` collector to be enabled.
@@ -81,11 +83,11 @@ Repository with OpenAPI 3.x spec:
 }
 ```
 
-**Failure message:** `"API spec swagger.json uses Swagger 2.0 — migrate to OpenAPI 3.x"`
+**Failure message:** `"swagger.json uses version 2.0 — minimum required is 3"`
 
 ## Remediation
 
-### spec-version-3
+### spec-version
 1. Migrate from Swagger 2.0 to OpenAPI 3.x using a tool like [swagger2openapi](https://github.com/Mermade/oas-kit/tree/main/packages/swagger2openapi)
 2. Key changes: `host`/`basePath` → `servers[]`, `definitions` → `components/schemas`, `produces`/`consumes` → per-operation `content` types
 3. Validate the migrated spec with [Spectral](https://github.com/stoplightio/spectral)

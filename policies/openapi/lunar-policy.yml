@@ -8,9 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpenAPI Guardrails"
   long_description: |
-    Enforce OpenAPI-specific standards. Encourages migration from deprecated
-    Swagger 2.0 to OpenAPI 3.x. Operates on `.api.spec_files[]` entries with
-    `protocol: "rest"` and on `.api.native.openapi` for deep spec inspection.
+    Enforce OpenAPI-specific standards. Validates spec version meets a
+    configurable minimum (default: 3). Operates on `.api.spec_files[]`
+    entries with `protocol: "rest"` and `.api.native.openapi` for deep
+    spec inspection.
   category: "devex-build-and-ci"
   icon: "assets/openapi.svg"
   status: "beta"
@@ -21,15 +22,20 @@ landing_page:
   related: []
 
 policies:
-  - name: spec-version-3
+  - name: spec-version
     description: |
-      Ensures all REST API specs use OpenAPI 3.x rather than deprecated
-      Swagger 2.0 by checking `.api.spec_files[].format` for any `"swagger"`
-      entries. Only checks entries with `protocol: "rest"`.
-      Skips if no REST spec files were detected.
+      Ensures all REST API specs meet a minimum OpenAPI version. Compares the
+      major version from `.api.spec_files[].version` against `min_version`
+      (default: 3). Flags any spec below the threshold. Only checks entries
+      with `protocol: "rest"`. Skips if no REST spec files were detected.
     keywords: ["openapi", "swagger", "api", "version", "migration"]
 
-inputs: {}
+inputs:
+  min_version:
+    description: |
+      Minimum required major OpenAPI version. Specs with a major version below
+      this value will fail. Default is 3 (i.e., require OpenAPI 3.x+).
+    default: "3"
 
 example_component_json: |
   {
