@@ -4,9 +4,7 @@ Collects C/C++ project information, build system details, dependencies, and CI c
 
 ## Overview
 
-This collector gathers metadata about C/C++ projects including build system detection (CMake, Make, Meson, Autotools, Bazel), source file inventory, C++ standard version, package manager dependencies (Conan, vcpkg), optional cppcheck static analysis, and CI/CD compiler command tracking.
-
-**Note:** The cppcheck sub-collector only runs if cppcheck is available in the image. The CI-hook collectors (`cicd`, `cmake-cicd`) don't compile code—they observe and collect data from compiler/build commands that your CI pipeline already runs.
+This collector gathers metadata about C/C++ projects including build system detection (CMake, Make, Meson, Autotools, Bazel), source file inventory, C++ standard version, package manager dependencies (Conan, vcpkg), cppcheck static analysis, and CI/CD compiler command tracking. Runs in a custom `cpp-main` image with cppcheck pre-installed.
 
 ## Collected Data
 
@@ -31,7 +29,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 |-----------|-----------|-------------|
 | `project` | code | Detects build systems, source files, C++ standard version |
 | `dependencies` | code | Extracts dependencies from Conan, vcpkg, and CMake |
-| `cppcheck` | code | Runs cppcheck static analysis (if available) |
+| `cppcheck` | code | Runs cppcheck static analysis on C/C++ source files |
 | `cicd` | ci-before-command | Tracks C/C++ compiler commands in CI |
 | `cmake-cicd` | ci-before-command | Tracks CMake commands in CI |
 
