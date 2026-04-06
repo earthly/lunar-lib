@@ -198,6 +198,7 @@ The actual scripts referenced in the YAML manifest:
 - **CI collectors should minimize dependencies** — CI collectors run `native` on the user's CI runner (GitHub Actions, GitLab CI, BuildKite, etc.). You should try to use only native tools like `bash`, `curl`, `git`, `grep`, `sed`, and `awk`. Avoid `jq`, `yq`, `python` unless necessary. Use `lunar collect` with key-value pairs instead of building JSON. Code collectors in `base-main` have `jq` and other tools — this restriction is CI-only.
 - **Graceful degradation** — Missing secrets or configs should `exit 0` with a stderr message, not `exit 1`.
 - **Copy helpers from similar plugins** — If the closest plugin has a `helpers.sh` with reusable logic, copy it rather than inventing new patterns.
+- **Custom Docker images must be wired into CI** — If your plugin needs an Earthfile (installs external tools, uses a non-base image), you must add it to the root Earthfile's `+all` target: `BUILD --pass-args ./<type>/<name>+image`. Without this, CI won't build or push the image and it won't exist on Docker Hub.
 - See [Common Mistakes](#common-mistakes) before writing any code.
 
 ### Testing
@@ -493,6 +494,7 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 | Using `earthly/lunar-scripts:1.0.0` | Legacy image. | Use `earthly/lunar-lib:base-main` or `earthly/lunar-lib:<name>-main`. |
 | Using `native` for code collectors | Code collectors must run in a container. | Use `earthly/lunar-lib:base-main` or a custom image. |
 | Committing a temporary image tag | The tag won't exist after your test branch is cleaned up. | Always use `-main` tag in committed code. |
+| Adding an Earthfile but not wiring it into the root `+all` target | CI builds and pushes images via `earthly --push +all`. If your Earthfile's `+image` target isn't listed in the root Earthfile's `+all` target, CI will never build or push your image. | Add `BUILD --pass-args ./<type>/<name>+image` to the `+all` target in the root Earthfile. |
 
 ---
 

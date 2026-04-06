@@ -97,6 +97,7 @@ all:
     BUILD --pass-args ./collectors/license-origins+image
     BUILD --pass-args ./collectors/terraform+image
     BUILD --pass-args ./collectors/trivy+image
+    BUILD --pass-args ./collectors/gitleaks+image
     BUILD --pass-args ./catalogers/github-org+image
     BUILD --pass-args ./policies/dependencies+image
 
