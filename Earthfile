@@ -74,12 +74,15 @@ lint:
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
     COPY --dir catalogers collectors policies scripts .
+    COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py
     # Landing page metadata validation for all plugin types
     RUN python scripts/validate_landing_page_metadata.py
     # SVG icon grayscale validation (rgb colors get flattened on the website)
     RUN python scripts/validate_svg_grayscale.py
+    # Validate all plugin Earthfiles with image targets are wired into +all
+    RUN python scripts/validate_earthfile_wiring.py
 
 ai-context:
     COPY --dir ai-context .
@@ -98,6 +101,8 @@ all:
     BUILD --pass-args ./collectors/terraform+image
     BUILD --pass-args ./collectors/trivy+image
     BUILD --pass-args ./collectors/gitleaks+image
+    BUILD --pass-args ./collectors/php+image
+    BUILD --pass-args ./collectors/rust+image
     BUILD --pass-args ./catalogers/github-org+image
     BUILD --pass-args ./policies/dependencies+image
 
