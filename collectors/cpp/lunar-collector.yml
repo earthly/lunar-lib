@@ -16,6 +16,10 @@ landing_page:
   categories: ["languages", "build"]
   icon: "assets/cpp.svg"
   status: "beta"
+  related:
+    - slug: "cpp"
+      type: "policy"
+      reason: "C/C++ project guardrails using collected metadata"
 
 collectors:
   - name: project

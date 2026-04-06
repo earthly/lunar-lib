@@ -1,0 +1,77 @@
+version: 0
+
+name: cpp
+description: Enforces C/C++ project structure, build standards, and code quality
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "C/C++ Project Guardrails"
+  long_description: |
+    Enforce C/C++ project standards including build system presence,
+    minimum C++ standard version, cppcheck compliance, and compiler/CMake
+    version requirements in CI/CD environments.
+  category: "devex-build-and-ci"
+  icon: "assets/cpp.svg"
+  status: "beta"
+  requires:
+    - slug: "cpp"
+      type: "collector"
+      reason: "Provides C/C++ project metadata"
+  related: []
+
+policies:
+  - name: build-system-exists
+    description: |
+      Ensures at least one build system (CMake, Make, Meson, Autotools, Bazel)
+      is detected. Unlike Go or Rust where the toolchain is the build system,
+      C/C++ projects require an explicit build system to be compilable.
+    mainPython: build_system_exists.py
+    keywords: ["build system", "cmake", "make", "meson", "project structure"]
+
+  - name: min-cpp-standard
+    description: |
+      Ensures the project uses at least the minimum required C++ standard.
+      Modern standards (C++17+) provide safer constructs, better type safety,
+      and deprecate dangerous legacy features.
+    mainPython: min_cpp_standard.py
+    keywords: ["c++ standard", "c++17", "c++20", "language version"]
+
+  - name: cppcheck-clean
+    description: |
+      Ensures cppcheck reports no errors and fewer warnings than the
+      configured threshold. cppcheck catches undefined behavior, memory
+      leaks, and other common C/C++ mistakes.
+    mainPython: cppcheck_clean.py
+    keywords: ["cppcheck", "static analysis", "code quality", "warnings"]
+
+  - name: min-compiler-version-cicd
+    description: |
+      Ensures the C/C++ compiler version (gcc or clang) used in CI/CD
+      meets the minimum required version. Newer compilers provide better
+      diagnostics, optimization, and standard compliance.
+    mainPython: min_compiler_version_cicd.py
+    keywords: ["compiler version", "gcc", "clang", "ci/cd", "toolchain"]
+
+  - name: min-cmake-version-cicd
+    description: |
+      Ensures the CMake version used in CI/CD meets the minimum required
+      version. Modern CMake features (targets, presets, dependency management)
+      require recent versions.
+    mainPython: min_cmake_version_cicd.py
+    keywords: ["cmake version", "ci/cd", "build system", "cmake presets"]
+
+inputs:
+  min_cpp_standard:
+    description: Minimum required C++ standard (e.g., "17", "20", "23")
+    default: "17"
+  max_cppcheck_warnings:
+    description: Maximum allowed cppcheck warnings (0 = must be clean)
+    default: "0"
+  min_compiler_version:
+    description: Minimum required compiler version for CI/CD (e.g., "12.0.0" for gcc, "15.0.0" for clang)
+    default: "12.0.0"
+  min_cmake_version:
+    description: Minimum required CMake version for CI/CD (e.g., "3.20.0")
+    default: "3.20.0"
