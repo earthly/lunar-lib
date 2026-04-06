@@ -32,46 +32,49 @@ collectors:
 example_component_json: |
   {
     "ci": {
-      "gha": {
-        "source": {
-          "tool": "github-actions",
-          "version": "0.1.0",
-          "integration": "code"
-        },
-        "workflows": [
+      "lint": {
+        "source": { "tool": "actionlint", "version": "1.7.7", "integration": "code" },
+        "errors": [
           {
             "file": ".github/workflows/ci.yml",
-            "name": "CI",
-            "triggers": ["push", "pull_request"],
-            "jobs": ["build", "test", "lint"],
-            "permissions": { "contents": "read" },
-            "actions": [
-              { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
-              { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" },
-              { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
-            ]
+            "line": 42,
+            "column": 9,
+            "message": "property \"unknown_field\" is not defined",
+            "rule": "syntax-check"
           }
         ],
-        "actionlint": {
-          "errors": [
+        "error_count": 1,
+        "warning_count": 0
+      },
+      "dependencies": {
+        "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
+        "total": 3,
+        "pinned": 2,
+        "unpinned": 1,
+        "items": [
+          { "name": "actions/checkout", "ref": "abc123def456", "pinning": "sha", "party": "1st" },
+          { "name": "docker/build-push-action", "ref": "v5.1.0", "pinning": "tag", "party": "3rd" },
+          { "name": "docker/login-action", "ref": "main", "pinning": "branch", "party": "3rd" }
+        ],
+        "third_party_unpinned": ["docker/login-action@main"]
+      },
+      "native": {
+        "github_actions": {
+          "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
+          "workflows": [
             {
               "file": ".github/workflows/ci.yml",
-              "line": 42,
-              "column": 9,
-              "message": "property \"unknown_field\" is not defined",
-              "rule": "syntax-check"
+              "name": "CI",
+              "triggers": ["push", "pull_request"],
+              "jobs": ["build", "test", "lint"],
+              "permissions": { "contents": "read" },
+              "actions": [
+                { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
+                { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" },
+                { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
+              ]
             }
-          ],
-          "error_count": 1,
-          "warning_count": 0
-        },
-        "pinning_summary": {
-          "total_actions": 3,
-          "sha_pinned": 1,
-          "tag_pinned": 1,
-          "branch_ref": 1,
-          "unpinned": 0,
-          "third_party_unpinned": ["docker/login-action@main"]
+          ]
         }
       }
     }

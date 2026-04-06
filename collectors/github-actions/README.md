@@ -10,14 +10,20 @@ Skips gracefully if no `.github/workflows/` directory exists.
 
 ## Collected Data
 
-This collector writes to the following Component JSON paths:
+This collector writes to both **normalized** (vendor-agnostic) and **native** (GHA-specific) Component JSON paths:
+
+### Normalized paths
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.gha.source` | object | Source metadata (tool, version, integration) |
-| `.ci.gha.workflows[]` | array | Parsed workflow data (file, name, triggers, jobs, permissions, actions) |
-| `.ci.gha.actionlint` | object | Lint results (errors with file/line/rule, error and warning counts) |
-| `.ci.gha.pinning_summary` | object | Aggregate pinning stats (SHA, tag, branch, unpinned counts) |
+| `.ci.lint` | object | CI config lint results (errors with file/line/rule, counts) |
+| `.ci.dependencies` | object | CI dependency pinning status (total, pinned, unpinned, item details) |
+
+### Native paths
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.ci.native.github_actions` | object | Raw GHA workflow data (full parsed workflows with triggers, jobs, permissions, action refs) |
 
 ## Collectors
 

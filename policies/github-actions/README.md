@@ -19,13 +19,13 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ## Required Data
 
-This policy reads from the following Component JSON paths:
+This policy reads from normalized and native Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.ci.gha.workflows[]` | array | `github-actions` collector |
-| `.ci.gha.actionlint` | object | `github-actions` collector |
-| `.ci.gha.pinning_summary` | object | `github-actions` collector |
+| `.ci.lint` | object | `github-actions` collector (normalized) |
+| `.ci.dependencies` | object | `github-actions` collector (normalized) |
+| `.ci.native.github_actions.workflows[]` | array | `github-actions` collector (native) |
 
 **Note:** Ensure the `github-actions` collector is configured before enabling this policy.
 
@@ -48,25 +48,33 @@ policies:
 ```json
 {
   "ci": {
-    "gha": {
-      "workflows": [
-        {
-          "file": ".github/workflows/ci.yml",
-          "name": "CI",
-          "actions": [
-            { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
-            { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" }
-          ]
-        }
+    "lint": {
+      "errors": [],
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "dependencies": {
+      "total": 2,
+      "pinned": 2,
+      "unpinned": 0,
+      "items": [
+        { "name": "actions/checkout", "ref": "abc123def456", "pinning": "sha", "party": "1st" },
+        { "name": "docker/build-push-action", "ref": "v5.1.0", "pinning": "tag", "party": "3rd" }
       ],
-      "actionlint": { "errors": [], "error_count": 0, "warning_count": 0 },
-      "pinning_summary": {
-        "total_actions": 2,
-        "sha_pinned": 1,
-        "tag_pinned": 1,
-        "branch_ref": 0,
-        "unpinned": 0,
-        "third_party_unpinned": []
+      "third_party_unpinned": []
+    },
+    "native": {
+      "github_actions": {
+        "workflows": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "name": "CI",
+            "actions": [
+              { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
+              { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" }
+            ]
+          }
+        ]
       }
     }
   }
@@ -78,28 +86,31 @@ policies:
 ```json
 {
   "ci": {
-    "gha": {
-      "workflows": [
-        {
-          "file": ".github/workflows/ci.yml",
-          "name": "CI",
-          "actions": [
-            { "uses": "docker/build-push-action@main", "pinning": "branch", "party": "3rd" }
-          ]
-        }
+    "lint": {
+      "errors": [{ "file": ".github/workflows/ci.yml", "line": 42, "message": "unknown field", "rule": "syntax-check" }],
+      "error_count": 1,
+      "warning_count": 0
+    },
+    "dependencies": {
+      "total": 1,
+      "pinned": 0,
+      "unpinned": 1,
+      "items": [
+        { "name": "docker/build-push-action", "ref": "main", "pinning": "branch", "party": "3rd" }
       ],
-      "actionlint": {
-        "errors": [{ "file": ".github/workflows/ci.yml", "line": 42, "message": "unknown field", "rule": "syntax-check" }],
-        "error_count": 1,
-        "warning_count": 0
-      },
-      "pinning_summary": {
-        "total_actions": 1,
-        "sha_pinned": 0,
-        "tag_pinned": 0,
-        "branch_ref": 1,
-        "unpinned": 0,
-        "third_party_unpinned": ["docker/build-push-action@main"]
+      "third_party_unpinned": ["docker/build-push-action@main"]
+    },
+    "native": {
+      "github_actions": {
+        "workflows": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "name": "CI",
+            "actions": [
+              { "uses": "docker/build-push-action@main", "pinning": "branch", "party": "3rd" }
+            ]
+          }
+        ]
       }
     }
   }
