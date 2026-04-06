@@ -72,30 +72,32 @@ ALL_DEPS="[]"
 while IFS= read -r file; do
     [ -z "$file" ] && continue
 
-    # Extract workflow metadata with yq
-    wf_name=$(yq -r '.name // ""' "$file" 2>/dev/null || echo "")
+    # Convert YAML to JSON once with yq, then use jq for all querying
+    wf_json=$(yq -o json "$file" 2>/dev/null || echo '{}')
+
+    wf_name=$(echo "$wf_json" | jq -r '.name // ""' 2>/dev/null || echo "")
 
     # Handle 'on' field (can be string, array, or object)
-    triggers=$(yq -c '
+    triggers=$(echo "$wf_json" | jq -c '
         .on | if type == "string" then [.]
         elif type == "array" then .
         elif type == "object" then [keys[]]
         else [] end
-    ' "$file" 2>/dev/null || echo '[]')
+    ' 2>/dev/null || echo '[]')
 
     # Extract job names
-    jobs=$(yq -c '[.jobs | keys[]]' "$file" 2>/dev/null || echo '[]')
+    jobs=$(echo "$wf_json" | jq -c '[.jobs | keys[]]' 2>/dev/null || echo '[]')
 
     # Extract workflow-level permissions
-    permissions=$(yq -c '.permissions // null' "$file" 2>/dev/null)
+    permissions=$(echo "$wf_json" | jq -c '.permissions // null' 2>/dev/null || echo 'null')
 
     # Extract all uses: references from job steps and reusable workflow calls
-    uses_refs=$(yq -c '
+    uses_refs=$(echo "$wf_json" | jq -c '
         [
             (.jobs[]?.steps[]? | select(.uses) | .uses),
             (.jobs[]? | select(.uses) | .uses)
         ]
-    ' "$file" 2>/dev/null || echo '[]')
+    ' 2>/dev/null || echo '[]')
 
     # Classify each action
     ACTIONS="[]"
