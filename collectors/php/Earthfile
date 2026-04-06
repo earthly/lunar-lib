@@ -1,10 +1,11 @@
 VERSION 0.8
 
 image:
-    FROM --pass-args ../../+base-image
+    # Use Debian variant — PHP packages need apt-get
+    ARG SCRIPTS_VERSION=main-debian
+    FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
-    # Install PHP CLI and Composer
-    RUN apt-get update && \
+    RUN apt-get update -qq && \
         apt-get install -y --no-install-recommends php-cli php-json php-xml && \
         rm -rf /var/lib/apt/lists/*
 
