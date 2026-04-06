@@ -1,0 +1,104 @@
+version: 0
+
+name: gitleaks
+description: Detects hardcoded secrets via auto-scanning or by collecting existing Gitleaks CI results
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:gitleaks-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Gitleaks Collector"
+  long_description: |
+    Detects hardcoded secrets using Gitleaks in two modes: auto-runs scans
+    on every repo, and detects existing Gitleaks executions in CI pipelines
+    to collect their report files. Results are written to the normalized
+    .secrets Component JSON category.
+  categories: ["security"]
+  icon: "assets/gitleaks.svg"
+  status: "beta"
+  related:
+    - slug: "secrets"
+      type: "policy"
+      reason: "Enforces secret scanning standards using Gitleaks data"
+
+collectors:
+  - name: scan
+    description: |
+      Auto-runs Gitleaks against the repository source code. Parses the
+      JSON report and writes normalized findings to .secrets with source
+      metadata.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords: ["gitleaks", "secrets", "credentials", "api keys", "secret scanning"]
+
+  - name: cicd
+    description: |
+      Detects Gitleaks execution in CI pipelines. Records command metadata
+      to .native.gitleaks.cicd.cmds and collects the JSON report file if
+      --report-path / -r can be parsed from the command. Collected reports
+      are written to .secrets.cicd (normalized) and
+      .native.gitleaks.cicd.report (raw).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: gitleaks
+    keywords: ["gitleaks", "ci detection", "secret scanning", "ci"]
+
+example_component_json: |
+  {
+    "secrets": {
+      "source": {
+        "tool": "gitleaks",
+        "version": "8.21.2",
+        "integration": "code"
+      },
+      "issues": [
+        {
+          "rule": "generic-api-key",
+          "file": "config/settings.py",
+          "line": 42,
+          "secret_type": "Generic API Key"
+        }
+      ],
+      "cicd": [
+        {
+          "rule": "aws-access-key-id",
+          "file": "deploy.sh",
+          "line": 10,
+          "secret_type": "AWS Access Key ID"
+        }
+      ],
+      "native": {
+        "gitleaks": {
+          "auto": {
+            "report": [
+              {
+                "RuleID": "generic-api-key",
+                "File": "config/settings.py",
+                "StartLine": 42,
+                "Commit": "abc1234",
+                "Description": "Generic API Key"
+              }
+            ]
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "gitleaks detect --report-path results.json --source .", "version": "8.21.2"}
+            ],
+            "report": [
+              {
+                "RuleID": "aws-access-key-id",
+                "File": "deploy.sh",
+                "StartLine": 10,
+                "Commit": "def5678",
+                "Description": "AWS Access Key ID"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

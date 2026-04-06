@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+  <!-- Page outline -->
+  <rect x="10" y="5" width="80" height="100" rx="4" fill="none" stroke="black" stroke-width="6"/>
+  <!-- Top circle (top-left area) -->
+  <circle cx="38" cy="20" r="7" fill="none" stroke="black" stroke-width="4"/>
+  <!-- Line from top circle down to bottom-left circle -->
+  <line x1="38" y1="27" x2="38" y2="55" stroke="black" stroke-width="4" stroke-linecap="round"/>
+  <!-- Line from top circle down-right to bottom-right circle -->
+  <line x1="42" y1="27" x2="62" y2="55" stroke="black" stroke-width="4" stroke-linecap="round"/>
+  <!-- Bottom-left circle (directly below top) -->
+  <circle cx="38" cy="62" r="7" fill="none" stroke="black" stroke-width="4"/>
+  <!-- Bottom-right circle (below and to the right) -->
+  <circle cx="62" cy="62" r="7" fill="none" stroke="black" stroke-width="4"/>
+  <!-- Dots under bottom-left circle -->
+  <circle cx="34" cy="78" r="2.5" fill="black"/>
+  <circle cx="42" cy="78" r="2.5" fill="black"/>
+  <circle cx="34" cy="86" r="2" fill="black"/>
+  <circle cx="42" cy="86" r="2" fill="black"/>
+  <circle cx="38" cy="94" r="1.5" fill="black"/>
+  <!-- Dots under bottom-right circle -->
+  <circle cx="58" cy="78" r="2.5" fill="black"/>
+  <circle cx="66" cy="78" r="2.5" fill="black"/>
+  <circle cx="58" cy="86" r="2" fill="black"/>
+  <circle cx="66" cy="86" r="2" fill="black"/>
+  <circle cx="62" cy="94" r="1.5" fill="black"/>
+</svg>

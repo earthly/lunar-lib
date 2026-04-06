@@ -280,7 +280,71 @@ Don't worry about breaking things — cronos exists specifically for this. Clean
 
 #### 6. CI collectors must be tested on cronos
 
-If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-after-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment. Local `lunar collector dev` is not sufficient — CI hooks only fire during actual CI runs. Push the collector config to `pantalasa-cronos/lunar`, trigger a build on a component repo, and verify the collected data on the hub.
+If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-after-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment. Local `lunar collector dev` is not sufficient — CI hooks only fire during actual CI runs.
+
+**Step-by-step cronos testing process:**
+
+1. **Add collector + policy to cronos config** — Edit `pantalasa-cronos/lunar`'s `lunar-config.yml` to reference your branch:
+   ```yaml
+   collectors:
+     - uses: github://earthly/lunar-lib/collectors/YOUR_COLLECTOR@YOUR_BRANCH
+       on: ["domain:engineering"]
+   policies:
+     - uses: github://earthly/lunar-lib/policies/YOUR_POLICY@YOUR_BRANCH
+       enforcement: report-pr
+   ```
+   Push to `pantalasa-cronos/lunar` — the CI sync action deploys it to the cronos hub.
+
+2. **Modify a component to use your tool in CI** — Clone a component repo (e.g. `pantalasa-cronos/backend`), add a CI step that runs your tool with report output:
+   ```yaml
+   # Example: adding gitleaks to .github/workflows/ci.yml
+   gitleaks:
+     runs-on: cronos
+     steps:
+       - uses: actions/checkout@v4
+       - name: Install & Run
+         run: |
+           curl -sSfL <tool-download-url> | tar xz -C /usr/local/bin
+           <tool> scan --report-path report.json
+   ```
+   Push to trigger the CI workflow. The lunar agent on the `cronos` runner traces commands and feeds data to collectors.
+
+3. **Wait for CI + collection** — Watch the workflow complete:
+   ```bash
+   GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run watch <run-id> --repo pantalasa-cronos/<component>
+   ```
+   Collection happens automatically after CI completes. Data appears in the cronos hub DB within ~1 minute.
+
+4. **Verify collected data** — Query the cronos DB via Grafana API:
+   ```bash
+   # Login
+   curl -s -c /tmp/cookies.txt "https://cronos.demo.earthly.dev/login" \
+     -X POST -H "Content-Type: application/json" \
+     -d '{"user":"admin","password":"<password>"}'
+
+   # Query component JSON for your category
+   curl -s -b /tmp/cookies.txt "https://cronos.demo.earthly.dev/api/ds/query" \
+     -X POST -H "Content-Type: application/json" \
+     -d '{"queries":[{"refId":"A","datasource":{"uid":"PCC52D03280B7034C","type":"grafana-postgresql-datasource"},
+       "rawSql":"SELECT component_json->'"'"'<category>'"'"' FROM components WHERE component_id = '"'"'github.com/pantalasa-cronos/<component>'"'"' AND git_sha = '"'"'<sha>'"'"'",
+       "format":"table"}],"from":"now-1h","to":"now"}'
+   ```
+   The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results.
+
+5. **Check the dashboard** — Use Playwright or a browser to verify:
+   - **Collectors listing** (`/d/zzznoc11btoga/collectors-listing`) — your collector shows runs > 0
+   - **Component JSON** (`/d/lujsqdc/component-json?var-component=<name>`) — your category data appears
+   - **Security initiative** (`/d/aeiw523n2m4u8b/initiative-detail?var-initiative=security`) — your policies are listed
+   Note: Dashboard UIDs differ between environments. Query `/api/search?type=dash-db` to find UIDs.
+
+6. **Clean up** — Remove test files from the component repo after verifying results.
+
+**Cross-org auth for pantalasa-cronos:**
+```bash
+GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh <command> --repo pantalasa-cronos/<repo>
+# Or for git operations:
+git remote set-url origin "https://x-access-token:$(bender-gh-token pantalasa-cronos)@github.com/pantalasa-cronos/<repo>.git"
+```
 
 ### Post test results on the PR
 
