@@ -8,6 +8,9 @@ def check_linter_configured(node=None):
         python = c.get_node(".lang.python")
         if not python.exists():
             c.skip("Not a Python project")
+        project_exists_node = python.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Python project detected in this component")
 
         linter_node = python.get_node(".linter_configured")
         if not linter_node.exists():

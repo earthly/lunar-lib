@@ -29,6 +29,9 @@ def check_min_java_version(min_version=None, node=None):
         java = c.get_node(".lang.java")
         if not java.exists():
             c.skip("Not a Java project")
+        project_exists_node = java.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Java project detected in this component")
 
         version_node = java.get_node(".version")
         if not version_node.exists():

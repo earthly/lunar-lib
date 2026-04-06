@@ -11,6 +11,9 @@ def check_min_python_version(min_version=None, node=None):
         python = c.get_node(".lang.python")
         if not python.exists():
             c.skip("Not a Python project")
+        project_exists_node = python.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Python project detected in this component")
 
         version_node = python.get_node(".version")
         if not version_node.exists():

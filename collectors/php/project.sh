@@ -86,6 +86,7 @@ jq -n \
     --argjson composer_lock_exists "$composer_lock_exists" \
     --argjson vendor_exists "$vendor_exists" \
     '{
+        project_exists: $composer_json_exists,
         build_systems: ["composer"],
         phpunit_configured: $phpunit_configured,
         static_analysis_configured: $static_analysis_configured,

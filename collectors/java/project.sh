@@ -34,6 +34,9 @@ if [[ -f "gradle.lockfile" ]]; then
     gradle_lock_exists=true
 fi
 
+project_exists=false
+[[ "$pom_exists" == true ]] || [[ "$gradle_exists" == true ]] && project_exists=true
+
 # Detect static analysis tools
 if [[ -f "checkstyle.xml" ]] || [[ -f "config/checkstyle/checkstyle.xml" ]]; then
     checkstyle_configured=true
@@ -100,7 +103,9 @@ jq -n \
     --argjson gradle_lock_exists "$gradle_lock_exists" \
     --argjson checkstyle_configured "$checkstyle_configured" \
     --argjson spotbugs_configured "$spotbugs_configured" \
+    --argjson project_exists "$project_exists" \
     '{
+        project_exists: $project_exists,
         build_systems: $build_systems,
         pom_xml_exists: $pom_exists,
         build_gradle_exists: $gradle_exists,

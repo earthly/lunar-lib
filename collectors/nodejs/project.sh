@@ -98,6 +98,7 @@ jq -n \
     --arg engines_node "$engines_node" \
     --arg monorepo_type "$monorepo_type" \
     '{
+        project_exists: $package_json_exists,
         build_systems: $build_systems,
         package_json_exists: $package_json_exists,
         package_lock_exists: $package_lock_exists,
