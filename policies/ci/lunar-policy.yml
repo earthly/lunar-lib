@@ -1,0 +1,47 @@
+version: 0
+
+name: ci
+description: Evaluates CI configuration lint quality and supply-chain dependency pinning
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "CI Guardrails"
+  long_description: |
+    Enforces lint quality and supply-chain hygiene for CI configurations.
+    Checks that CI config files pass lint validation and that third-party
+    CI dependencies (actions, orbs, templates) use pinned versions.
+  category: "devex-build-and-ci"
+  icon: "assets/ci.svg"
+  status: "beta"
+  requires:
+    - slug: "github-actions"
+      type: "collector"
+      reason: "Provides CI lint results and dependency pinning data via normalized paths"
+  related: []
+  keywords: ["ci", "lint", "pinning", "supply-chain", "dependencies", "github-actions"]
+
+policies:
+  - name: lint-clean
+    description: |
+      Ensures no lint errors across CI configuration files. Reads from the
+      normalized .ci.lint path — works with any CI vendor's lint tool
+      (actionlint for GHA, gitlab-ci-lint for GitLab, etc.).
+    mainPython: lint_clean.py
+    keywords: ["lint", "ci", "syntax", "config"]
+
+  - name: dependencies-pinned
+    description: |
+      Verifies all third-party CI dependencies use SHA or tag pins, not
+      branch refs. Reads from the normalized .ci.dependencies path — works
+      with GHA actions, GitLab templates, CircleCI orbs, etc.
+    mainPython: dependencies_pinned.py
+    keywords: ["pinning", "supply-chain", "dependencies", "sha", "tag"]
+
+  - name: no-mutable-refs
+    description: |
+      Ensures no third-party CI dependencies reference mutable refs like
+      @main, @master, or @latest. Reads from normalized .ci.dependencies.
+    mainPython: no_mutable_refs.py
+    keywords: ["mutable", "branch", "main", "master", "supply-chain"]
