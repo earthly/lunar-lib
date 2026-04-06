@@ -2,11 +2,10 @@
 
 # Shared helper functions for the nodejs collector
 
-# Check if the current directory is a Node.js project.
-# Returns 0 (success) if it's a Node.js project, 1 (failure) otherwise.
+# Check if the repo contains a Node.js project (root or subdirs).
+# Requires package.json — the collector reports on npm/yarn metadata,
+# dependencies, and tooling that only exist when a manifest is present.
 is_nodejs_project() {
-    if [[ -f "package.json" ]]; then
-        return 0
-    fi
-    return 1
+    [[ -f "package.json" ]] && return 0
+    git ls-files --error-unmatch '**/package.json' >/dev/null 2>&1
 }

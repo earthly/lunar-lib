@@ -2,14 +2,10 @@
 
 # Shared helper functions for the rust collector
 
-# Check if the current directory is a Rust project.
-# Returns 0 (success) if it's a Rust project, 1 (failure) otherwise.
+# Check if the repo contains a Rust project (root or subdirs).
+# Requires Cargo.toml — stray .rs files alone are not sufficient, since
+# downstream scripts (clippy, cargo commands) need a Cargo manifest.
 is_rust_project() {
-    if [[ -f "Cargo.toml" ]]; then
-        return 0
-    fi
-    if find . -maxdepth 3 -name "*.rs" -type f -not -path './.git/*' 2>/dev/null | head -1 | grep -q .; then
-        return 0
-    fi
-    return 1
+    [[ -f "Cargo.toml" ]] && return 0
+    git ls-files --error-unmatch '**/Cargo.toml' >/dev/null 2>&1
 }

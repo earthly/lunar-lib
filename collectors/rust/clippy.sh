@@ -8,11 +8,6 @@ if ! is_rust_project; then
     exit 0
 fi
 
-if [[ ! -f "Cargo.toml" ]]; then
-    echo "No Cargo.toml found, exiting"
-    exit 0
-fi
-
 clippy_passed=false
 
 # Get optional extra args
