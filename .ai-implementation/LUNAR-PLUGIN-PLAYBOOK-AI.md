@@ -385,7 +385,7 @@ This validates README structure, YAML manifest fields (`display_name`, `long_des
 
 ### Push implementation
 
-Commit and push the implementation to the same PR branch. CI will run automatically. Fix any CI failures.
+Commit and push the implementation to the same PR branch. CI will run automatically. Fix any CI failures. Check for merge conflicts with main — if any exist, resolve them immediately (`git fetch origin main && git merge origin/main`). Do NOT leave a PR with merge conflicts.
 
 ### Then wait for approval
 
