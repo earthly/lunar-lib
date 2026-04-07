@@ -8,7 +8,7 @@ image: +image
 default_image_ci_collectors: native
 
 landing_page:
-  display_name: "Run Code Review"
+  display_name: "Run Code Review Collector"
   long_description: |
     Runs an AI-powered code review on pull requests using the Claude CLI in
     review mode. Captures review findings and writes them to Component JSON

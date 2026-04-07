@@ -7,7 +7,7 @@ author: support@earthly.dev
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Code Reviewer Detector"
+  display_name: "Code Reviewer Collector"
   long_description: |
     Detects AI code review tools active on pull requests by querying the GitHub
     check-runs API. Currently detects Claude Code Review; extensible to other
