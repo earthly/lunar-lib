@@ -12,6 +12,7 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
+| `.ai.instructions.all[]` | array append | GEMINI.md entry appended to the normalized instruction files array |
 | `.ai.native.gemini.instruction_file` | object | GEMINI.md file: existence, path, line count, byte size, symlink status |
 | `.ai.native.gemini.cicd.cmds[]` | array | Gemini CLI invocations in CI: command string, version, and flags |
 

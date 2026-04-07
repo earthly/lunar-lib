@@ -52,7 +52,8 @@ collectors:
     description: |
       Discovers CLAUDE.md instruction files across the repository. Records file path,
       line count, byte size, and whether it is a symlink to AGENTS.md. Writes to
-      ai.native.claude.instruction_file.
+      ai.native.claude.instruction_file and appends to ai.instructions.all[] for
+      normalized cross-tool access.
     mainBash: instruction-file.sh
     hook:
       type: code
@@ -94,6 +95,19 @@ example_component_json: |
           "last_seen": "2024-01-14T08:00:00Z"
         }
       ],
+      "instructions": {
+        "all": [
+          {
+            "path": "CLAUDE.md",
+            "dir": ".",
+            "filename": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          }
+        ]
+      },
       "native": {
         "claude": {
           "instruction_file": {

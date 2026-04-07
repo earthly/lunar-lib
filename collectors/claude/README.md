@@ -15,6 +15,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.ai.code_reviewers[]` | array entry | Normalized code reviewer entry: tool name, check name, detection status, last seen timestamp |
+| `.ai.instructions.all[]` | array append | CLAUDE.md entry appended to the normalized instruction files array |
 | `.ai.native.claude.instruction_file` | object | CLAUDE.md file: existence, path, line count, byte size, symlink status |
 | `.ai.native.claude.cicd.cmds[]` | array | Claude CLI invocations in CI: command string, version, allowed/disallowed tools, MCP config |
 | `{path}` (configurable) | any | Claude prompt response from run-prompt, optionally conforming to a JSON schema |

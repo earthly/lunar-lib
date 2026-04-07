@@ -12,6 +12,7 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
+| `.ai.instructions.all[]` | array append | CODEX.md entry appended to the normalized instruction files array |
 | `.ai.native.codex.instruction_file` | object | CODEX.md file: existence, path, line count, byte size, symlink status |
 | `.ai.native.codex.cicd.cmds[]` | array | Codex CLI invocations in CI: command string, version, and flags |
 

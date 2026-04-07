@@ -39,8 +39,9 @@ policies:
   - name: instruction-file-exists
     description: |
       Verifies that an agent instruction file exists at the repository root. Checks
-      AGENTS.md from the ai collector and tool-specific files (CLAUDE.md, CODEX.md,
-      GEMINI.md) from their respective tool collectors. Passes if any exists.
+      ai.instructions.all[] which is populated by the ai collector (AGENTS.md) and
+      tool-specific collectors via array append (CLAUDE.md, CODEX.md, GEMINI.md).
+      Passes if any entry exists.
     mainPython: instruction_file_exists.py
     keywords: ["agents.md", "claude.md", "ai instructions", "agent context"]
 

@@ -23,8 +23,7 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | Path | Provided By | Description |
 |------|-------------|-------------|
 | `.ai.code_reviewers[]` | `coderabbit`, `claude` collectors | Normalized array of detected code review tools |
-| `.ai.instructions` | `ai` collector | AGENTS.md instruction file metadata (root file, sections) |
-| `.ai.native.<tool>.instruction_file` | `claude`, `codex`, `gemini` collectors | Tool-specific instruction file (CLAUDE.md, CODEX.md, GEMINI.md) |
+| `.ai.instructions` | `ai`, `claude`, `codex`, `gemini` collectors | Instruction file metadata — `ai` writes root/AGENTS.md, tool collectors append to `all[]` via array append |
 | `.ai.plans_dir` | `ai` collector | Plans directory existence and file count |
 | `.ai.authorship` | `ai` collector | AI authorship annotation coverage |
 

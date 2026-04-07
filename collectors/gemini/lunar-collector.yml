@@ -26,7 +26,8 @@ collectors:
     description: |
       Discovers GEMINI.md instruction files across the repository. Records file path,
       line count, byte size, and whether it is a symlink to AGENTS.md. Writes to
-      ai.native.gemini.instruction_file.
+      ai.native.gemini.instruction_file and appends to ai.instructions.all[] for
+      normalized cross-tool access.
     mainBash: instruction-file.sh
     hook:
       type: code
@@ -47,6 +48,19 @@ collectors:
 example_component_json: |
   {
     "ai": {
+      "instructions": {
+        "all": [
+          {
+            "path": "GEMINI.md",
+            "dir": ".",
+            "filename": "GEMINI.md",
+            "lines": 60,
+            "bytes": 2400,
+            "is_symlink": false,
+            "symlink_target": null
+          }
+        ]
+      },
       "native": {
         "gemini": {
           "instruction_file": {
