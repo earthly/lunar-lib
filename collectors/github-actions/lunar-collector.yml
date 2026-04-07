@@ -1,0 +1,81 @@
+version: 0
+
+name: github-actions
+description: Parses GitHub Actions workflows, runs actionlint, and detects version pinning status
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:github-actions-main
+
+landing_page:
+  display_name: "GitHub Actions Collector"
+  long_description: |
+    Parses and lints GitHub Actions workflow files. Extracts structured data from
+    every workflow (triggers, jobs, action references), runs actionlint for syntax
+    and type checking, and classifies version pinning status for all third-party
+    action references.
+  category: "ci-cd"
+  icon: "assets/github-actions.svg"
+  status: "beta"
+  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
+
+collectors:
+  - name: workflows
+    description: |
+      Parses all GitHub Actions workflow files in .github/workflows/,
+      runs actionlint for lint errors, and classifies action version
+      pinning (SHA, tag, branch, unpinned) for supply-chain hygiene.
+    mainBash: workflows.sh
+    hook:
+      type: code
+    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint"]
+
+example_component_json: |
+  {
+    "ci": {
+      "lint": {
+        "source": { "tool": "actionlint", "version": "1.7.7", "integration": "code" },
+        "errors": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "line": 42,
+            "column": 9,
+            "message": "property \"unknown_field\" is not defined",
+            "rule": "syntax-check"
+          }
+        ],
+        "error_count": 1,
+        "warning_count": 0
+      },
+      "dependencies": {
+        "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
+        "total": 3,
+        "pinned": 2,
+        "unpinned": 1,
+        "items": [
+          { "name": "actions/checkout", "ref": "abc123def456", "pinning": "sha", "party": "1st" },
+          { "name": "docker/build-push-action", "ref": "v5.1.0", "pinning": "tag", "party": "3rd" },
+          { "name": "docker/login-action", "ref": "main", "pinning": "branch", "party": "3rd" }
+        ],
+        "third_party_unpinned": ["docker/login-action@main"]
+      },
+      "native": {
+        "github_actions": {
+          "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
+          "workflows": [
+            {
+              "file": ".github/workflows/ci.yml",
+              "name": "CI",
+              "triggers": ["push", "pull_request"],
+              "jobs": ["build", "test", "lint"],
+              "permissions": { "contents": "read" },
+              "actions": [
+                { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
+                { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" },
+                { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
