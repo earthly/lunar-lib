@@ -38,8 +38,9 @@ policies:
 
   - name: instruction-file-exists
     description: |
-      Verifies that an agent instruction file exists at the repository root.
-      Passes if any recognized file is found (AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md).
+      Verifies that an agent instruction file exists at the repository root. Checks
+      AGENTS.md from the ai collector and tool-specific files (CLAUDE.md, CODEX.md,
+      GEMINI.md) from their respective tool collectors. Passes if any exists.
     mainPython: instruction_file_exists.py
     keywords: ["agents.md", "claude.md", "ai instructions", "agent context"]
 
@@ -67,9 +68,9 @@ policies:
 
   - name: symlinked-aliases
     description: |
-      Verifies that CLAUDE.md symlinks exist alongside AGENTS.md files. Claude Code does not
-      support the AGENTS.md filename natively, so a symlink is required for compatibility.
-      Other tools (Gemini, Codex) support AGENTS.md directly.
+      Verifies that CLAUDE.md symlinks exist alongside AGENTS.md. Reads AGENTS.md from the
+      ai collector and CLAUDE.md symlink status from the claude collector. Claude Code does
+      not support AGENTS.md natively, so a symlink is required for compatibility.
     mainPython: symlinked_aliases.py
     keywords: ["claude.md symlink", "agents.md", "compatibility"]
 

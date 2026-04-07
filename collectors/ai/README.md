@@ -4,7 +4,7 @@ Collect tool-agnostic AI coding assistant usage data from repositories.
 
 ## Overview
 
-This collector tracks how AI coding assistants are used across your repositories. It discovers agent instruction files (AGENTS.md, CLAUDE.md, etc.), checks for dedicated planning directories, and collects AI authorship annotations from commits.
+This collector tracks tool-agnostic AI coding assistant usage across your repositories. It discovers the vendor-neutral AGENTS.md instruction file, checks for dedicated planning directories, and collects AI authorship annotations from commits. Tool-specific instruction files (CLAUDE.md, CODEX.md, GEMINI.md) are discovered by their respective tool collectors.
 
 This is the tool-agnostic portion of the `ai.*` namespace. Tool-specific collectors (`claude`, `coderabbit`, `codex`, `gemini`) handle detection of individual tools.
 
@@ -24,7 +24,7 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Hook | Description |
 |-----------|------|-------------|
-| `instruction-files` | `code` | Discovers AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md files with metadata and symlink status |
+| `instruction-files` | `code` | Discovers AGENTS.md files with metadata and symlink status |
 | `plans-dir` | `code` | Checks for a dedicated AI plans directory |
 | `ai-authorship` | `code` | Collects AI authorship annotations from commits via Git AI standard or git trailers |
 
@@ -37,7 +37,7 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/ai@main
     on: ["domain:your-domain"]
     # with:
-    #   md_find_command: "find . -type f \\( -name AGENTS.md -o -name CLAUDE.md \\)"
+    #   md_find_command: "find . -type f -name AGENTS.md"
     #   plans_dir_paths: ".agents/plans,.ai/plans"
     #   annotation_prefix: "AI-"
     #   default_branch_window: "50"

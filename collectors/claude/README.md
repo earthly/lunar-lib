@@ -15,6 +15,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.ai.code_reviewers[]` | array entry | Normalized code reviewer entry: tool name, check name, detection status, last seen timestamp |
+| `.ai.native.claude.instruction_file` | object | CLAUDE.md file: existence, path, line count, byte size, symlink status |
 | `.ai.native.claude.cicd.cmds[]` | array | Claude CLI invocations in CI: command string, version, allowed/disallowed tools, MCP config |
 | `{path}` (configurable) | any | Claude prompt response from run-prompt, optionally conforming to a JSON schema |
 
@@ -25,6 +26,7 @@ This integration provides the following collectors:
 | Collector | Hook | Description |
 |-----------|------|-------------|
 | `code-reviewer` | `code` (PRs only) | Detects Claude Code Review check-runs on PRs via GitHub API |
+| `instruction-file` | `code` | Discovers CLAUDE.md instruction files with metadata and symlink status |
 | `cicd` | `ci-after-command` (binary: claude) | Captures Claude CLI invocations in CI with flag extraction |
 | `run-prompt` | `code` | Runs a Claude AI prompt against the repo and collects structured results |
 

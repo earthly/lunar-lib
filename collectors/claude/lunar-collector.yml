@@ -48,6 +48,16 @@ collectors:
         name: claude
     keywords: ["claude", "claude code", "ai ci", "ci safety"]
 
+  - name: instruction-file
+    description: |
+      Discovers CLAUDE.md instruction files across the repository. Records file path,
+      line count, byte size, and whether it is a symlink to AGENTS.md. Writes to
+      ai.native.claude.instruction_file.
+    mainBash: instruction-file.sh
+    hook:
+      type: code
+    keywords: ["claude.md", "instruction file", "agent context"]
+
   - name: run-prompt
     description: |
       Runs a Claude AI prompt against the repository and collects the results.
@@ -86,6 +96,14 @@ example_component_json: |
       ],
       "native": {
         "claude": {
+          "instruction_file": {
+            "exists": true,
+            "path": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          },
           "cicd": {
             "cmds": [
               {

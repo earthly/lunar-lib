@@ -35,14 +35,14 @@ landing_page:
 collectors:
   - name: instruction-files
     description: |
-      Discovers all agent instruction files (AGENTS.md, CLAUDE.md, GEMINI.md, CODEX.md) across
-      the repository using a configurable find command. Records each file's path, line count,
-      byte size, markdown section headings, and symlink status. Groups files by directory for
-      per-directory policy checks.
+      Discovers the vendor-neutral AGENTS.md instruction file across the repository. Records
+      each file's path, line count, byte size, markdown section headings, and symlink status.
+      Tool-specific instruction files (CLAUDE.md, CODEX.md, GEMINI.md) are discovered by
+      their respective tool collectors.
     mainBash: instruction-files.sh
     hook:
       type: code
-    keywords: ["agents.md", "claude.md", "ai instructions", "agent context", "coding assistant"]
+    keywords: ["agents.md", "ai instructions", "agent context", "coding assistant"]
 
   - name: plans-dir
     description: |
@@ -66,8 +66,8 @@ collectors:
 
 inputs:
   md_find_command:
-    description: Command to find agent instruction files (must output one file path per line)
-    default: "find . \\( -type f -o -type l \\) \\( -name AGENTS.md -o -name CLAUDE.md -o -name GEMINI.md -o -name CODEX.md \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
+    description: Command to find AGENTS.md instruction files (must output one file path per line)
+    default: "find . \\( -type f -o -type l \\) -name AGENTS.md -not -path '*/node_modules/*' -not -path '*/.git/*'"
   plans_dir_paths:
     description: Comma-separated list of candidate paths for the plans directory (first match wins)
     default: ".agents/plans,.ai/plans"
@@ -99,29 +99,10 @@ example_component_json: |
             "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"],
             "is_symlink": false,
             "symlink_target": null
-          },
-          {
-            "path": "CLAUDE.md",
-            "dir": ".",
-            "filename": "CLAUDE.md",
-            "lines": 85,
-            "bytes": 3200,
-            "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"],
-            "is_symlink": true,
-            "symlink_target": "AGENTS.md"
           }
         ],
-        "count": 2,
+        "count": 1,
         "total_bytes": 3200,
-        "directories": [
-          {
-            "dir": ".",
-            "files": [
-              { "filename": "AGENTS.md", "is_symlink": false },
-              { "filename": "CLAUDE.md", "is_symlink": true, "symlink_target": "AGENTS.md" }
-            ]
-          }
-        ],
         "source": { "tool": "find", "integration": "code" }
       },
       "plans_dir": {
