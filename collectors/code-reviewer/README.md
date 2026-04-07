@@ -1,4 +1,4 @@
-# Code Reviewer Detector
+# Code Reviewer Collector
 
 Detect AI code review tools active on pull requests.
 

@@ -1,4 +1,4 @@
-# Run Code Review
+# Run Code Review Collector
 
 Run AI-powered code review on pull requests.
 
