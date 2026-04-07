@@ -1,0 +1,54 @@
+version: 0
+
+name: gemini
+description: Detect Google Gemini CLI usage in CI pipelines
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Gemini Collector"
+  long_description: |
+    Detects Google Gemini CLI invocations in CI pipelines. Records command
+    strings, versions, and flags for policy-level analysis. Writes to
+    ai.native.gemini under the unified ai.* namespace.
+  category: "code-analysis"
+  icon: "assets/gemini.svg"
+  status: "experimental"
+  related:
+    - slug: "ai"
+      type: "policy"
+      reason: "Enforces AI usage standards based on collected data"
+
+collectors:
+  - name: cicd
+    description: |
+      Detects Google Gemini CLI invocations in CI pipelines. Records the command
+      string and version for policy-level flag analysis (dangerous flags like
+      --yolo and -y).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: gemini
+    keywords: ["gemini", "google", "ai ci", "ci safety"]
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "gemini": {
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "gemini run --json 'review this PR'",
+                "tool": "gemini",
+                "version": "0.1.0"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

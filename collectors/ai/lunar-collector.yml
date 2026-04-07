@@ -5,15 +5,14 @@ description: Collect tool-agnostic AI coding assistant usage data from repositor
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
-default_image_ci_collectors: native
 
 landing_page:
   display_name: "AI Collector"
   long_description: |
     Track tool-agnostic AI coding assistant usage across your organization.
-    Collects agent instruction files, plans directories, CI tool invocations,
-    and AI authorship annotations. Part of the unified ai.* namespace.
-  categories: ["code-analysis", "ci-cd"]
+    Collects agent instruction files, plans directories, and AI authorship
+    annotations. Part of the unified ai.* namespace.
+  categories: ["code-analysis"]
   icon: "assets/ai.svg"
   status: "experimental"
   related:
@@ -26,6 +25,12 @@ landing_page:
     - slug: "coderabbit"
       type: "collector"
       reason: "CodeRabbit-specific detection (code review, config)"
+    - slug: "codex"
+      type: "collector"
+      reason: "Codex-specific CI detection"
+    - slug: "gemini"
+      type: "collector"
+      reason: "Gemini-specific CI detection"
 
 collectors:
   - name: instruction-files
@@ -48,30 +53,6 @@ collectors:
     hook:
       type: code
     keywords: ["ai plans", "agent planning", "task management"]
-
-  - name: ai-cli-ci-codex
-    description: |
-      Detects OpenAI Codex CLI invocations in CI pipelines. Records the command
-      string and version for policy-level flag analysis. Will move to a dedicated
-      codex collector in the future.
-    mainBash: ai-cli-ci.sh
-    hook:
-      type: ci-after-command
-      binary:
-        name: codex
-    keywords: ["codex", "openai", "ai ci", "ci safety"]
-
-  - name: ai-cli-ci-gemini
-    description: |
-      Detects Google Gemini CLI invocations in CI pipelines. Records the command
-      string and version for policy-level flag analysis. Will move to a dedicated
-      gemini collector in the future.
-    mainBash: ai-cli-ci.sh
-    hook:
-      type: ci-after-command
-      binary:
-        name: gemini
-    keywords: ["gemini", "google", "ai ci", "ci safety"]
 
   - name: ai-authorship
     description: |
@@ -147,15 +128,6 @@ example_component_json: |
         "exists": true,
         "path": ".agents/plans",
         "file_count": 3
-      },
-      "cicd": {
-        "cmds": [
-          {
-            "cmd": "codex exec --json 'review this PR'",
-            "tool": "codex",
-            "version": "0.1.0"
-          }
-        ]
       },
       "authorship": {
         "provider": "git-ai",
