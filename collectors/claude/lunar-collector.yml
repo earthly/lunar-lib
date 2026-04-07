@@ -1,7 +1,7 @@
 version: 0
 
 name: claude
-description: Detect Claude CLI usage in CI, discover instruction files, and run AI prompts against code
+description: Detect Claude code review activity, CI usage, instruction files, and run AI prompts against code
 author: support@earthly.dev
 
 image: +image
@@ -10,21 +10,44 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Claude Collector"
   long_description: |
-    Captures Claude CLI invocations in CI pipelines, discovers CLAUDE.md
-    instruction files, and runs custom Claude prompts against code. Writes to
-    ai.native.claude and appends to normalized ai.instructions.all[].
+    Detects Claude Code Review on pull requests, captures Claude CLI invocations
+    in CI, discovers CLAUDE.md instruction files, and runs custom Claude prompts
+    against code. Writes to normalized ai.code_reviewers[] plus Claude-specific
+    data in ai.native.claude.
   category: "code-analysis"
   icon: "assets/claude.svg"
   status: "experimental"
   related:
     - slug: "ai"
       type: "policy"
-      reason: "Enforces instruction file and naming standards"
+      reason: "Enforces code reviewer presence and instruction file standards"
     - slug: "ast-grep"
       type: "collector"
       reason: "Use ast-grep for syntax-aware pattern matching without AI"
 
 collectors:
+  - name: code-reviewer
+    description: |
+      Detects Claude Code Review check-runs on pull requests by querying the
+      GitHub check-runs API. Waits for scan completion and writes a normalized
+      entry to ai.code_reviewers[].
+    mainBash: code-reviewer.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request"]
+
+  - name: run-code-review
+    description: |
+      Runs the Claude CLI in review mode against pull request diffs. Captures
+      review findings, severity levels, and affected files. Writes results to
+      ai.native.claude.code_review for Claude-specific policy evaluation.
+    mainBash: run-code-review.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request", "claude cli"]
+
   - name: cicd
     description: |
       Detects Claude Code CLI invocations in CI pipelines. Records the command
@@ -68,12 +91,22 @@ inputs:
     description: Optional JSON schema for structured output in run-prompt
 
 secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for code-reviewer check-runs query)
   ANTHROPIC_API_KEY:
-    description: Anthropic API key for Claude authentication (required for run-prompt collector)
+    description: Anthropic API key for Claude authentication (required for run-prompt and run-code-review)
 
 example_component_json: |
   {
     "ai": {
+      "code_reviewers": [
+        {
+          "tool": "claude",
+          "check_name": "Claude Code Review",
+          "detected": true,
+          "last_seen": "2024-01-14T08:00:00Z"
+        }
+      ],
       "instructions": {
         "all": [
           {
@@ -104,6 +137,18 @@ example_component_json: |
                 "tool": "claude",
                 "version": "1.0.20",
                 "allowed_tools": "Bash(git*) Read"
+              }
+            ]
+          },
+          "code_review": {
+            "ran": true,
+            "findings_count": 3,
+            "findings": [
+              {
+                "severity": "warning",
+                "file": "src/auth.ts",
+                "line": 42,
+                "message": "Token expiry not checked before use"
               }
             ]
           }
