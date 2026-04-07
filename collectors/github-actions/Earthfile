@@ -1,0 +1,22 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    ARG TARGETARCH
+
+    # Install actionlint
+    ARG ACTIONLINT_VERSION=1.7.7
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+        curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ARCH}.tar.gz" | tar xz && \
+        mv actionlint /usr/local/bin/ && \
+        chmod +x /usr/local/bin/actionlint
+
+    # Install yq for YAML parsing
+    ARG YQ_VERSION=4.44.6
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+        curl -sSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${ARCH}" -o /usr/local/bin/yq && \
+        chmod +x /usr/local/bin/yq
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:github-actions-$VERSION
