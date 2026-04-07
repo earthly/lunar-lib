@@ -279,9 +279,34 @@ The `pantalasa-cronos` environment is a sandbox — you have full freedom to:
 
 Don't worry about breaking things — cronos exists specifically for this. Clean up test branches when done.
 
-#### 6. CI collectors must be tested on cronos
+#### 6. CI collectors must be tested — both locally and on cronos
 
-If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-after-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment. Local `lunar collector dev` is not sufficient — CI hooks only fire during actual CI runs.
+If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-command`, etc.), it **must** be tested in two ways:
+
+**A. Local simulation testing** — Before pushing, test CI collectors locally by simulating the CI environment variables that Lunar injects:
+```bash
+# Mock the lunar binary to capture collect calls
+mkdir -p /tmp/mock-bin
+cat > /tmp/mock-bin/lunar << 'EOF'
+#!/bin/bash
+if [[ "$1" == "collect" ]]; then
+    echo "LUNAR_COLLECT: $@" >&2
+    [[ "$*" == *" -"* ]] && [[ "$*" == *"-j"* ]] && { input=$(cat); echo "STDIN: $input" >&2; }
+fi
+EOF
+chmod +x /tmp/mock-bin/lunar
+export PATH="/tmp/mock-bin:$PATH"
+
+# Set CI environment variables and run the script
+export LUNAR_CI_COMMAND='["gcc", "-o", "main", "main.c"]'
+export LUNAR_CI_COMMAND_BIN="gcc"
+export LUNAR_CI_COMMAND_BIN_DIR="/usr/bin"
+bash collectors/<plugin>/cicd.sh
+```
+
+Test with both **compact** (`["gcc","main.c"]`) and **pretty-printed** (`["gcc", "main.c"]`) JSON array formats for `LUNAR_CI_COMMAND`. Verify the JSON output is valid and the version extraction works.
+
+**B. Cronos integration testing** — Local simulation is not sufficient alone. CI hooks must also be tested on the `pantalasa-cronos` demo environment during actual CI runs.
 
 **Step-by-step cronos testing process:**
 
@@ -332,11 +357,25 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-after-comm
    ```
    The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results.
 
-5. **Check the dashboard** — Use Playwright or a browser to verify:
+5. **Screenshot the dashboard using Playwright MCP** — Use the Playwright MCP server to capture proof that everything works end-to-end in the real system. These screenshots are **required** evidence for the PR.
+
+   Screenshots to capture:
+   - **Component JSON page** (`/d/lujsqdc/component-json?var-component=<name>`) — expand the tree to show your collector's category data (e.g. `lang.cpp`)
+   - **Component details page** (`/d/aecnnrn714em8d/component-details?var-component=<name>&var-pr=0`) — scroll to show any new policy checks added by your plugin
    - **Collectors listing** (`/d/zzznoc11btoga/collectors-listing`) — your collector shows runs > 0
-   - **Component JSON** (`/d/lujsqdc/component-json?var-component=<name>`) — your category data appears
-   - **Security initiative** (`/d/aeiw523n2m4u8b/initiative-detail?var-initiative=security`) — your policies are listed
+
+   Playwright MCP flow:
+   1. Read Grafana credentials from `~/.bender/grafana-credentials`
+   2. Use `browser_navigate` to go to `https://cronos.demo.earthly.dev/login` (or `lunar.demo.earthly.dev`)
+   3. Use `browser_type` / `browser_click` to log in with the credentials
+   4. Navigate to each dashboard URL above
+   5. Use `browser_snapshot` and `browser_screenshot` to capture the page
+   6. For JSON page: click tree nodes to expand your data section, then screenshot
+   7. For component details: scroll to the policy checks section, then screenshot
+
    Note: Dashboard UIDs differ between environments. Query `/api/search?type=dash-db` to find UIDs.
+
+   Upload screenshots to the PR comment as image attachments — they serve as proof that the collector and policies are working in the real system.
 
 6. **Clean up** — Remove test files from the component repo after verifying results.
 
@@ -349,7 +388,7 @@ git remote set-url origin "https://x-access-token:$(bender-gh-token pantalasa-cr
 
 ### Post test results on the PR
 
-After testing, comment on the PR documenting what you tested and the results:
+After testing, comment on the PR documenting what you tested and the results. **Include Playwright screenshots** from the cronos dashboard as proof.
 
 ```markdown
 ## Test Results
@@ -367,7 +406,12 @@ After testing, comment on the PR documenting what you tested and the results:
 - ✅ Empty input data → no Component JSON written
 - ✅ Malformed data → handled without crash
 
+### Dashboard screenshots (from cronos)
+- Component JSON showing `.lang.<language>` data: [screenshot]
+- Component details page showing policy checks: [screenshot]
 ```
+
+Upload the Playwright screenshots as GitHub comment image attachments. These are required proof that the plugin works end-to-end in the real system — not just in local `lunar collector dev` / `lunar policy dev` tests.
 
 ### A note on unit tests
 
