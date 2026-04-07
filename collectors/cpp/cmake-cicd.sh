@@ -5,7 +5,7 @@ set -e
 
 CMD_RAW="$LUNAR_CI_COMMAND"
 if [[ "$CMD_RAW" == "["* ]]; then
-    CMD_STR=$(echo "$CMD_RAW" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g')
+    CMD_STR=$(echo "$CMD_RAW" | sed 's/^\[//; s/\]$//; s/", *"/ /g; s/"//g')
 else
     CMD_STR="$CMD_RAW"
 fi
