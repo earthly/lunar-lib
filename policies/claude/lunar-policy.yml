@@ -1,7 +1,7 @@
 version: 0
 
 name: claude
-description: Claude-specific CI safety and conventions guardrails
+description: Claude-specific CI safety, instruction file, and conventions guardrails
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -9,15 +9,15 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Claude Guardrails"
   long_description: |
-    Enforces Claude-specific CI safety standards. Validates that Claude CLI
-    invocations do not use dangerous flags and use structured JSON output.
+    Enforces Claude-specific standards: CI safety flags, structured output,
+    and CLAUDE.md symlink compatibility alongside AGENTS.md.
   category: "devex-build-and-ci"
   icon: "assets/claude.svg"
   status: "experimental"
   requires:
     - slug: "claude"
       type: "collector"
-      reason: "Provides Claude CI command data from ai.native.claude.cicd"
+      reason: "Provides Claude CI command data and CLAUDE.md instruction file detection"
   related: []
 
 policies:
@@ -37,6 +37,14 @@ policies:
     mainPython: cli_structured_output.py
     keywords: ["claude", "json output", "structured output", "ci automation"]
 
+  - name: symlinked-aliases
+    description: |
+      Verifies that CLAUDE.md exists as a symlink to AGENTS.md. Claude Code does not
+      support the AGENTS.md filename natively, so a symlink is required for compatibility.
+      Reads from ai.native.claude.instruction_file to check symlink status.
+    mainPython: symlinked_aliases.py
+    keywords: ["claude.md", "symlink", "agents.md", "compatibility"]
+
 inputs:
   dangerous_flags:
     description: Comma-separated dangerous flags for Claude CLI
@@ -47,6 +55,14 @@ example_component_json: |
     "ai": {
       "native": {
         "claude": {
+          "instruction_file": {
+            "exists": true,
+            "path": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          },
           "cicd": {
             "cmds": [
               {

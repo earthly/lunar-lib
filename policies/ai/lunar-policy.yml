@@ -66,14 +66,6 @@ policies:
     mainPython: instruction_file_sections.py
     keywords: ["agents.md sections", "documentation structure", "agent context"]
 
-  - name: symlinked-aliases
-    description: |
-      Verifies that CLAUDE.md symlinks exist alongside AGENTS.md. Reads AGENTS.md from the
-      ai collector and CLAUDE.md symlink status from the claude collector. Claude Code does
-      not support AGENTS.md natively, so a symlink is required for compatibility.
-    mainPython: symlinked_aliases.py
-    keywords: ["claude.md symlink", "agents.md", "compatibility"]
-
   - name: plans-dir-exists
     description: |
       Verifies that a dedicated plans directory exists for AI agent task planning.
@@ -93,9 +85,6 @@ inputs:
   canonical_filename:
     description: The canonical (vendor-neutral) instruction filename
     default: "AGENTS.md"
-  required_symlinks:
-    description: Comma-separated list of symlinks required alongside the canonical file
-    default: "CLAUDE.md"
   min_lines:
     description: Minimum number of lines for the root instruction file (0 to disable)
     default: "10"

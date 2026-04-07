@@ -15,7 +15,6 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | `canonical-naming` | warning | Root instruction file should use the vendor-neutral name (AGENTS.md) |
 | `instruction-file-length` | warning | Root instruction file must be within configured length bounds |
 | `instruction-file-sections` | warning | Root instruction file must contain required section headings |
-| `symlinked-aliases` | warning | CLAUDE.md symlinks must exist alongside AGENTS.md for compatibility |
 | `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
 | `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
 
@@ -88,6 +87,5 @@ No code reviewer detected, no instruction file:
 - **code-reviewer**: Enable a code review bot (CodeRabbit, Claude) and configure its collector
 - **instruction-file-exists**: Create an AGENTS.md file at the repo root
 - **canonical-naming**: Rename to AGENTS.md (vendor-neutral) or symlink it
-- **symlinked-aliases**: Create `ln -s AGENTS.md CLAUDE.md` for Claude compatibility
 - **plans-dir-exists**: Create a `.agents/plans` directory for AI agent task planning
 - **ai-authorship-annotated**: Enable git-ai or add AI-model trailers to commits
