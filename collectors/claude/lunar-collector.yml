@@ -52,7 +52,8 @@ collectors:
     description: |
       Detects Claude Code CLI invocations in CI pipelines. Records the command
       string, version, and extracted flags (--allowedTools, --disallowedTools,
-      --mcp-config) for policy-level analysis. Moved from ai-use collector.
+      --mcp-config) for policy-level analysis. Also appends to ai.code_reviewers[]
+      when it detects review-mode invocations (e.g. claude --review).
     mainBash: cicd.sh
     hook:
       type: ci-after-command
