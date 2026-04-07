@@ -1,51 +1,53 @@
 # AI Guardrails
 
-Cross-tool AI guardrails for code review and tooling standards.
+Enforce AI coding assistant standards across your organization.
 
 ## Overview
 
-This policy enforces AI tool standards across your organization using normalized data from tool-specific collectors. It checks that AI code review bots are active on pull requests, regardless of which specific tool is in use.
-
-The policy reads from the `ai.code_reviewers[]` array, which is populated by tool-specific collectors (`coderabbit`, `claude`). Future subpolicies can be added here for other cross-tool AI checks (e.g., authorship validation, instruction file requirements).
+This policy enforces AI tool standards using data from the `ai.*` namespace. It covers code review bot presence, instruction file quality, CI safety flags, structured output, and AI authorship annotations.
 
 ## Policies
 
 | Policy | Severity | Description |
 |--------|----------|-------------|
-| `code-reviewer` | error | At least one AI code reviewer must be active (any entry in `ai.code_reviewers[]` with `detected: true`) |
-
-### code-reviewer
-
-**What it checks:** The `ai.code_reviewers[]` array must contain at least one entry with `detected: true`.
-
-**When it fails:** No AI code reviewer is detected on the component. This means no tool-specific collector (coderabbit, claude, etc.) has found an active code review bot.
-
-**When it skips:** No `ai.code_reviewers` data exists at all — this means no tool-specific collectors are configured, so the check is not applicable.
+| `code-reviewer` | error | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
+| `instruction-file-exists` | error | An agent instruction file must exist at the repo root |
+| `canonical-naming` | warning | Root instruction file should use the vendor-neutral name (AGENTS.md) |
+| `instruction-file-length` | warning | Root instruction file must be within configured length bounds |
+| `instruction-file-sections` | warning | Root instruction file must contain required section headings |
+| `symlinked-aliases` | warning | CLAUDE.md symlinks must exist alongside AGENTS.md for compatibility |
+| `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
+| `ai-cli-safe-flags` | error | AI CLI tools in CI must not use dangerous permission-bypassing flags |
+| `ai-cli-structured-output` | warning | AI CLI tools in CI should use structured JSON output |
+| `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
 
 ## Required Data
 
 | Path | Provided By | Description |
 |------|-------------|-------------|
-| `.ai.code_reviewers[]` | `coderabbit` collector, `claude` collector | Normalized array of detected code review tools |
+| `.ai.code_reviewers[]` | `coderabbit`, `claude` collectors | Normalized array of detected code review tools |
+| `.ai.instructions` | `ai` collector | Instruction file metadata (root, all files, sections, symlinks) |
+| `.ai.plans_dir` | `ai` collector | Plans directory existence and file count |
+| `.ai.authorship` | `ai` collector | AI authorship annotation coverage |
+| `.ai.native.<tool>.cicd.cmds[]` | `claude`, `codex`, `gemini` collectors | CI command data for flag analysis |
 
 ## Installation
 
-Add to your `lunar-config.yml`:
-
 ```yaml
-# First, enable at least one tool-specific collector:
+# Enable tool-specific collectors for code review detection:
 collectors:
+  - uses: github://earthly/lunar-lib/collectors/ai@main
+    on: ["domain:your-domain"]
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
     on: ["domain:your-domain"]
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
-
   - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 
-# Then enable the policy:
+# Enable the policy:
 policies:
   - uses: github://earthly/lunar-lib/policies/ai@main
     enforcement: report-pr
@@ -55,56 +57,39 @@ policies:
 
 ### Passing
 
-Component has an active code reviewer:
+Component has an active code reviewer and proper instruction files:
 
 ```json
 {
   "ai": {
     "code_reviewers": [
-      {
-        "tool": "coderabbit",
-        "check_name": "coderabbitai",
-        "detected": true,
-        "last_seen": "2024-01-15T10:30:00Z"
-      }
-    ]
+      { "tool": "coderabbit", "check_name": "coderabbitai", "detected": true }
+    ],
+    "instructions": {
+      "root": { "exists": true, "filename": "AGENTS.md", "lines": 85 }
+    }
   }
 }
 ```
 
 ### Failing
 
-Component has code reviewer data but none are active:
+No code reviewer detected, no instruction file:
 
 ```json
 {
   "ai": {
-    "code_reviewers": [
-      {
-        "tool": "coderabbit",
-        "check_name": "coderabbitai",
-        "detected": false,
-        "last_seen": "2023-06-01T12:00:00Z"
-      }
-    ]
+    "code_reviewers": [],
+    "instructions": { "root": { "exists": false } }
   }
-}
-```
-
-### Skipped
-
-No code reviewer data exists (no tool-specific collectors configured):
-
-```json
-{
-  "ai": {}
 }
 ```
 
 ## Remediation
 
-If the `code-reviewer` check fails:
-
-1. **Enable a code review bot** on your repository (CodeRabbit, Claude Code Review, etc.)
-2. **Configure the matching collector** in your `lunar-config.yml` to detect the tool
-3. **Verify the bot is active** — open a PR and confirm the review bot posts checks
+- **code-reviewer**: Enable a code review bot (CodeRabbit, Claude) and configure its collector
+- **instruction-file-exists**: Create an AGENTS.md file at the repo root
+- **canonical-naming**: Rename to AGENTS.md (vendor-neutral) or symlink it
+- **symlinked-aliases**: Create `ln -s AGENTS.md CLAUDE.md` for Claude compatibility
+- **ai-cli-safe-flags**: Remove dangerous flags (--dangerously-skip-permissions, --yolo) from CI
+- **ai-authorship-annotated**: Enable git-ai or add AI-model trailers to commits
