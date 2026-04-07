@@ -279,34 +279,9 @@ The `pantalasa-cronos` environment is a sandbox — you have full freedom to:
 
 Don't worry about breaking things — cronos exists specifically for this. Clean up test branches when done.
 
-#### 6. CI collectors must be tested — both locally and on cronos
+#### 6. CI collectors must be tested on cronos
 
-If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-command`, etc.), it **must** be tested in two ways:
-
-**A. Local simulation testing** — Before pushing, test CI collectors locally by simulating the CI environment variables that Lunar injects:
-```bash
-# Mock the lunar binary to capture collect calls
-mkdir -p /tmp/mock-bin
-cat > /tmp/mock-bin/lunar << 'EOF'
-#!/bin/bash
-if [[ "$1" == "collect" ]]; then
-    echo "LUNAR_COLLECT: $@" >&2
-    [[ "$*" == *" -"* ]] && [[ "$*" == *"-j"* ]] && { input=$(cat); echo "STDIN: $input" >&2; }
-fi
-EOF
-chmod +x /tmp/mock-bin/lunar
-export PATH="/tmp/mock-bin:$PATH"
-
-# Set CI environment variables and run the script
-export LUNAR_CI_COMMAND='["gcc", "-o", "main", "main.c"]'
-export LUNAR_CI_COMMAND_BIN="gcc"
-export LUNAR_CI_COMMAND_BIN_DIR="/usr/bin"
-bash collectors/<plugin>/cicd.sh
-```
-
-Test with both **compact** (`["gcc","main.c"]`) and **pretty-printed** (`["gcc", "main.c"]`) JSON array formats for `LUNAR_CI_COMMAND`. Verify the JSON output is valid and the version extraction works.
-
-**B. Cronos integration testing** — Local simulation is not sufficient alone. CI hooks must also be tested on the `pantalasa-cronos` demo environment during actual CI runs.
+If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment with real CI runs. Local simulation is not sufficient — CI hooks only fire during actual CI runs with Lunar instrumentation active.
 
 **Step-by-step cronos testing process:**
 
