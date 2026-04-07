@@ -1,0 +1,50 @@
+version: 0
+
+name: ai
+description: Cross-tool AI guardrails for code review and tooling standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "AI Guardrails"
+  long_description: |
+    Enforces AI tool standards across your organization. Checks that AI code
+    review bots are active on pull requests using normalized data from
+    tool-specific collectors (claude, coderabbit). Tool-agnostic — works with
+    any supported reviewer.
+  category: "devex-build-and-ci"
+  icon: "assets/ai.svg"
+  status: "experimental"
+  requires:
+    - slug: "coderabbit"
+      type: "collector"
+      reason: "Provides CodeRabbit code review detection data"
+    - slug: "claude"
+      type: "collector"
+      reason: "Provides Claude code review detection data"
+  related: []
+
+policies:
+  - name: code-reviewer
+    description: |
+      Verifies that at least one AI code reviewer is active on the component.
+      Checks ai.code_reviewers[] for any entry with detected: true. Tool-agnostic —
+      doesn't care which reviewer is active, just that something is reviewing code.
+      Skips if no code reviewer data exists (no tool-specific collectors configured).
+    mainPython: code_reviewer.py
+    keywords: ["code review", "ai review", "coderabbit", "claude", "pull request"]
+
+example_component_json: |
+  {
+    "ai": {
+      "code_reviewers": [
+        {
+          "tool": "coderabbit",
+          "check_name": "coderabbitai",
+          "detected": true,
+          "last_seen": "2024-01-15T10:30:00Z"
+        }
+      ]
+    }
+  }
