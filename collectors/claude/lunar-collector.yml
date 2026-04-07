@@ -1,7 +1,7 @@
 version: 0
 
 name: claude
-description: Detect Claude code review activity, CI usage, and run AI prompts against code
+description: Detect Claude CLI usage in CI, discover instruction files, and run AI prompts against code
 author: support@earthly.dev
 
 image: +image
@@ -10,32 +10,21 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Claude Collector"
   long_description: |
-    Detects Claude Code Review on pull requests, captures Claude CLI invocations
-    in CI, and runs custom Claude prompts against code. Writes to normalized
-    ai.code_reviewers[] plus Claude-specific data in ai.native.claude.
+    Captures Claude CLI invocations in CI pipelines, discovers CLAUDE.md
+    instruction files, and runs custom Claude prompts against code. Writes to
+    ai.native.claude and appends to normalized ai.instructions.all[].
   category: "code-analysis"
   icon: "assets/claude.svg"
   status: "experimental"
   related:
     - slug: "ai"
       type: "policy"
-      reason: "Enforces code reviewer presence using collected data"
+      reason: "Enforces instruction file and naming standards"
     - slug: "ast-grep"
       type: "collector"
       reason: "Use ast-grep for syntax-aware pattern matching without AI"
 
 collectors:
-  - name: code-reviewer
-    description: |
-      Detects Claude Code Review check-runs on pull requests by querying the
-      GitHub check-runs API. Waits for scan completion and writes a normalized
-      entry to ai.code_reviewers[].
-    mainBash: code-reviewer.sh
-    hook:
-      type: code
-      runs_on: [prs]
-    keywords: ["claude", "code review", "ai review", "pull request"]
-
   - name: cicd
     description: |
       Detects Claude Code CLI invocations in CI pipelines. Records the command
@@ -79,22 +68,12 @@ inputs:
     description: Optional JSON schema for structured output in run-prompt
 
 secrets:
-  GH_TOKEN:
-    description: GitHub token for API access (required for code-reviewer collector)
   ANTHROPIC_API_KEY:
     description: Anthropic API key for Claude authentication (required for run-prompt collector)
 
 example_component_json: |
   {
     "ai": {
-      "code_reviewers": [
-        {
-          "tool": "claude",
-          "check_name": "Claude Code Review",
-          "detected": true,
-          "last_seen": "2024-01-14T08:00:00Z"
-        }
-      ],
       "instructions": {
         "all": [
           {

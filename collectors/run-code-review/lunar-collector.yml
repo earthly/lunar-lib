@@ -1,0 +1,67 @@
+version: 0
+
+name: run-code-review
+description: Run AI-powered code review on pull requests
+author: support@earthly.dev
+
+image: +image
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Run Code Review"
+  long_description: |
+    Runs an AI-powered code review on pull requests using the Claude CLI in
+    review mode. Captures review findings and writes them to Component JSON
+    for policy evaluation. Distinct from the code-reviewer collector, which
+    only detects existing review tools — this collector actively performs the
+    review.
+  category: "code-analysis"
+  icon: "assets/run-code-review.svg"
+  status: "experimental"
+  related:
+    - slug: "code-reviewer"
+      type: "collector"
+      reason: "Passively detects code review tools instead of running one"
+    - slug: "claude"
+      type: "collector"
+      reason: "Claude CLI detection and instruction file discovery"
+
+collectors:
+  - name: claude
+    description: |
+      Runs the Claude CLI in review mode against pull request diffs. Captures
+      review findings, severity levels, and affected files. Writes results to
+      ai.native.claude.code_review for Claude-specific policy evaluation.
+    mainBash: claude.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request", "claude cli"]
+
+secrets:
+  ANTHROPIC_API_KEY:
+    description: Anthropic API key for Claude CLI authentication
+  GH_TOKEN:
+    description: GitHub token for PR diff access
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "claude": {
+          "code_review": {
+            "ran": true,
+            "findings_count": 3,
+            "findings": [
+              {
+                "severity": "warning",
+                "file": "src/auth.ts",
+                "line": 42,
+                "message": "Token expiry not checked before use"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

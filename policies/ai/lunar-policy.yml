@@ -18,12 +18,12 @@ landing_page:
     - slug: "ai"
       type: "collector"
       reason: "Provides instruction files, plans dirs, and authorship data"
+    - slug: "code-reviewer"
+      type: "collector"
+      reason: "Provides AI code review detection data for code-reviewer policy check"
     - slug: "coderabbit"
       type: "collector"
       reason: "Provides CodeRabbit code review detection data"
-    - slug: "claude"
-      type: "collector"
-      reason: "Provides Claude code review and CI detection data"
   related: []
 
 policies:

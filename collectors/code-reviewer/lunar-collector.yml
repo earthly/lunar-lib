@@ -1,0 +1,55 @@
+version: 0
+
+name: code-reviewer
+description: Detect AI code review tools active on pull requests
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Code Reviewer Detector"
+  long_description: |
+    Detects AI code review tools active on pull requests by querying the GitHub
+    check-runs API. Currently detects Claude Code Review; extensible to other
+    tools. Writes to normalized ai.code_reviewers[] for tool-agnostic policy
+    evaluation.
+  category: "code-analysis"
+  icon: "assets/code-reviewer.svg"
+  status: "experimental"
+  related:
+    - slug: "ai"
+      type: "policy"
+      reason: "Enforces code reviewer presence using collected data"
+    - slug: "run-code-review"
+      type: "collector"
+      reason: "Actively runs AI code review instead of just detecting it"
+
+collectors:
+  - name: claude
+    description: |
+      Detects Claude Code Review check-runs on pull requests by querying the
+      GitHub check-runs API. Waits for scan completion and writes a normalized
+      entry to ai.code_reviewers[].
+    mainBash: claude.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request"]
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for check-runs query)
+
+example_component_json: |
+  {
+    "ai": {
+      "code_reviewers": [
+        {
+          "tool": "claude",
+          "check_name": "Claude Code Review",
+          "detected": true,
+          "last_seen": "2024-01-14T08:00:00Z"
+        }
+      ]
+    }
+  }
