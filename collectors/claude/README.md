@@ -6,7 +6,7 @@ Detect Claude code review activity, CI usage, instruction files, and run AI prom
 
 This collector detects Claude Code Review on pull requests, captures Claude CLI invocations in CI pipelines, discovers CLAUDE.md instruction files, and can run custom Claude AI prompts or code review against PRs.
 
-Code reviewer data writes to normalized `ai.code_reviewers[]`. Instruction file data writes to both `ai.native.claude.instruction_file` and normalized `ai.instructions.all[]` via array append. CI data writes to `ai.native.claude.cicd`. The run-code-review subcollector writes to `ai.native.claude.code_review`. The prompt runner writes to a user-configurable Component JSON path.
+Code reviewer data writes to normalized `ai.code_reviewers[]`; instruction files write to both `ai.native.claude.instruction_file` and `ai.instructions.all[]` via array append. CI data writes to `ai.native.claude.cicd`, run-code-review to `ai.native.claude.code_review`, and run-prompt to a user-configurable path.
 
 ## Collected Data
 
