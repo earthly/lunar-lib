@@ -1,0 +1,61 @@
+version: 0
+
+name: gemini
+description: Gemini-specific CI safety and conventions guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Gemini Guardrails"
+  long_description: |
+    Enforces Gemini-specific CI safety standards. Validates that Gemini CLI
+    invocations do not use dangerous flags and use structured JSON output.
+  category: "devex-build-and-ci"
+  icon: "assets/gemini.svg"
+  status: "experimental"
+  requires:
+    - slug: "gemini"
+      type: "collector"
+      reason: "Provides Gemini CI command data from ai.native.gemini.cicd"
+  related: []
+
+policies:
+  - name: cli-safe-flags
+    description: |
+      Ensures Gemini CLI invocations in CI do not use dangerous permission-bypassing
+      flags. Flags like --yolo and -y remove safety guardrails that prevent the AI
+      from executing arbitrary code without human approval.
+    mainPython: cli_safe_flags.py
+    keywords: ["gemini", "ci safety", "dangerous flags", "permissions"]
+
+  - name: cli-structured-output
+    description: |
+      Ensures Gemini CLI invocations in CI use structured JSON output instead of
+      plain text. JSON output makes AI automation deterministic and parseable.
+    mainPython: cli_structured_output.py
+    keywords: ["gemini", "json output", "structured output", "ci automation"]
+
+inputs:
+  dangerous_flags:
+    description: Comma-separated dangerous flags for Gemini CLI
+    default: "--yolo,-y"
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "gemini": {
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "gemini run --json 'review this PR'",
+                "tool": "gemini",
+                "version": "0.1.0"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

@@ -9,8 +9,8 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "AI Guardrails"
   long_description: |
-    Enforce AI tool standards: code review bots, instruction files, naming
-    conventions, plans directories, CI safety, and authorship annotations.
+    Enforce cross-tool AI standards: code review bots, instruction files,
+    naming conventions, plans directories, and authorship annotations.
   category: "devex-build-and-ci"
   icon: "assets/ai.svg"
   status: "experimental"
@@ -80,23 +80,6 @@ policies:
     mainPython: plans_dir_exists.py
     keywords: ["ai plans", "agent planning", "task management"]
 
-  - name: ai-cli-safe-flags
-    description: |
-      Ensures AI CLI tools running in CI do not use dangerous permission-bypassing flags.
-      Flags like --dangerously-skip-permissions (Claude), --yolo (Codex/Gemini), and
-      --sandbox danger-full-access (Codex) remove safety guardrails. Reads from
-      ai.native.<tool>.cicd.cmds[] across all tool-specific collectors.
-    mainPython: ai_cli_safe_flags.py
-    keywords: ["ci safety", "dangerous flags", "permissions", "sandbox"]
-
-  - name: ai-cli-structured-output
-    description: |
-      Ensures AI CLI tools in CI headless mode use structured JSON output instead of
-      plain text. JSON output makes AI automation deterministic and parseable. Reads from
-      ai.native.<tool>.cicd.cmds[] across all tool-specific collectors.
-    mainPython: ai_cli_structured_output.py
-    keywords: ["json output", "structured output", "ci automation"]
-
   - name: ai-authorship-annotated
     description: |
       Verifies that commits include AI authorship annotations. Supports the Git AI standard
@@ -124,15 +107,6 @@ inputs:
   required_sections:
     description: Comma-separated required section heading substrings (case-insensitive)
     default: "Project Overview,Build Commands"
-  dangerous_flags_claude:
-    description: Comma-separated dangerous flags for Claude CLI
-    default: "--dangerously-skip-permissions,--allow-dangerously-skip-permissions"
-  dangerous_flags_codex:
-    description: Comma-separated dangerous flags for Codex CLI
-    default: "--dangerously-bypass-approvals-and-sandbox,--yolo,--full-auto"
-  dangerous_flags_gemini:
-    description: Comma-separated dangerous flags for Gemini CLI
-    default: "--yolo,-y"
   min_annotation_percentage:
     description: Minimum percentage of commits that should have AI annotations (0 = awareness mode)
     default: "0"
@@ -164,20 +138,6 @@ example_component_json: |
         "exists": true,
         "path": ".agents/plans",
         "file_count": 3
-      },
-      "native": {
-        "claude": {
-          "cicd": {
-            "cmds": [
-              {
-                "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
-                "tool": "claude",
-                "version": "1.0.20",
-                "allowed_tools": "Bash(git*) Read"
-              }
-            ]
-          }
-        }
       },
       "authorship": {
         "provider": "git-ai",

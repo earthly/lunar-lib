@@ -1,0 +1,63 @@
+version: 0
+
+name: claude
+description: Claude-specific CI safety and conventions guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Claude Guardrails"
+  long_description: |
+    Enforces Claude-specific CI safety standards. Validates that Claude CLI
+    invocations do not use dangerous flags and use structured JSON output.
+  category: "devex-build-and-ci"
+  icon: "assets/claude.svg"
+  status: "experimental"
+  requires:
+    - slug: "claude"
+      type: "collector"
+      reason: "Provides Claude CI command data from ai.native.claude.cicd"
+  related: []
+
+policies:
+  - name: cli-safe-flags
+    description: |
+      Ensures Claude CLI invocations in CI do not use dangerous permission-bypassing
+      flags. Flags like --dangerously-skip-permissions remove safety guardrails that
+      prevent the AI from executing arbitrary code without human approval.
+    mainPython: cli_safe_flags.py
+    keywords: ["claude", "ci safety", "dangerous flags", "permissions"]
+
+  - name: cli-structured-output
+    description: |
+      Ensures Claude CLI invocations in CI headless mode use structured JSON output
+      (--output-format json) instead of plain text. JSON output makes AI automation
+      deterministic and parseable.
+    mainPython: cli_structured_output.py
+    keywords: ["claude", "json output", "structured output", "ci automation"]
+
+inputs:
+  dangerous_flags:
+    description: Comma-separated dangerous flags for Claude CLI
+    default: "--dangerously-skip-permissions,--allow-dangerously-skip-permissions"
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "claude": {
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
+                "tool": "claude",
+                "version": "1.0.20",
+                "allowed_tools": "Bash(git*) Read"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

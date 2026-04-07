@@ -4,7 +4,7 @@ Enforce AI coding assistant standards across your organization.
 
 ## Overview
 
-This policy enforces AI tool standards using data from the `ai.*` namespace. It covers code review bot presence, instruction file quality, CI safety flags, structured output, and AI authorship annotations.
+This policy enforces cross-tool AI standards using data from the `ai.*` namespace. It covers code review bot presence, instruction file quality, plans directories, and AI authorship annotations.
 
 ## Policies
 
@@ -17,8 +17,6 @@ This policy enforces AI tool standards using data from the `ai.*` namespace. It 
 | `instruction-file-sections` | warning | Root instruction file must contain required section headings |
 | `symlinked-aliases` | warning | CLAUDE.md symlinks must exist alongside AGENTS.md for compatibility |
 | `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
-| `ai-cli-safe-flags` | error | AI CLI tools in CI must not use dangerous permission-bypassing flags |
-| `ai-cli-structured-output` | warning | AI CLI tools in CI should use structured JSON output |
 | `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
 
 ## Required Data
@@ -29,7 +27,6 @@ This policy enforces AI tool standards using data from the `ai.*` namespace. It 
 | `.ai.instructions` | `ai` collector | Instruction file metadata (root, all files, sections, symlinks) |
 | `.ai.plans_dir` | `ai` collector | Plans directory existence and file count |
 | `.ai.authorship` | `ai` collector | AI authorship annotation coverage |
-| `.ai.native.<tool>.cicd.cmds[]` | `claude`, `codex`, `gemini` collectors | CI command data for flag analysis |
 
 ## Installation
 
@@ -91,5 +88,5 @@ No code reviewer detected, no instruction file:
 - **instruction-file-exists**: Create an AGENTS.md file at the repo root
 - **canonical-naming**: Rename to AGENTS.md (vendor-neutral) or symlink it
 - **symlinked-aliases**: Create `ln -s AGENTS.md CLAUDE.md` for Claude compatibility
-- **ai-cli-safe-flags**: Remove dangerous flags (--dangerously-skip-permissions, --yolo) from CI
+- **plans-dir-exists**: Create a `.agents/plans` directory for AI agent task planning
 - **ai-authorship-annotated**: Enable git-ai or add AI-model trailers to commits
