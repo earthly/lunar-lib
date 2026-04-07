@@ -1,0 +1,13 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install cppcheck
+    RUN apk add --no-cache cppcheck
+
+    # Verify installation
+    RUN cppcheck --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:cpp-$VERSION

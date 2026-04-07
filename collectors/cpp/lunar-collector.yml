@@ -1,0 +1,134 @@
+version: 0
+
+name: cpp
+description: Collect C/C++ project information, build system details, dependencies, and CI commands
+author: earthly
+
+default_image: earthly/lunar-lib:cpp-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "C/C++ Collector"
+  long_description: |
+    Analyze C/C++ projects to collect build system info (CMake, Make, Meson, Autotools),
+    dependency graphs, cppcheck linting, and CI compiler commands.
+    Enforce C/C++ engineering standards.
+  categories: ["languages", "build"]
+  icon: "assets/cpp.svg"
+  status: "beta"
+  related:
+    - slug: "cpp"
+      type: "policy"
+      reason: "C/C++ project guardrails using collected metadata"
+
+collectors:
+  - name: project
+    description: |
+      Detects C/C++ project structure including build systems (CMake, Make, Meson,
+      Autotools, Bazel), source file counts, C++ standard version, and package manager
+      configuration (Conan, vcpkg). Writes project metadata to .lang.cpp.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["c++", "c", "cmake", "makefile", "meson", "project structure"]
+
+  - name: dependencies
+    description: |
+      Extracts C/C++ dependencies from package managers (Conan, vcpkg) and
+      CMakeLists.txt find_package() calls. Writes dependency data to
+      .lang.cpp.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["c++ dependencies", "conan", "vcpkg", "cmake packages", "supply chain"]
+
+  - name: cppcheck
+    description: |
+      Runs cppcheck static analysis on C/C++ source files. Collects lint
+      warnings with file, line, severity, and message. Writes normalized warnings
+      to .lang.cpp.lint and raw output to .lang.cpp.native.cppcheck.
+    mainBash: cppcheck.sh
+    hook:
+      type: code
+    keywords: ["cppcheck", "c++ linting", "static analysis", "code quality"]
+
+  - name: cicd
+    description: |
+      Records C/C++ compiler commands (gcc, g++, clang, clang++) executed in
+      CI pipelines along with compiler version. Writes command strings and
+      version info to .lang.cpp.cicd for audit trails and build reproducibility.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(gcc|g\+\+|clang|clang\+\+|cc|c\+\+)$
+    keywords: ["c++ ci", "compiler version", "gcc", "clang", "ci commands"]
+
+  - name: cmake-cicd
+    description: |
+      Records CMake commands executed in CI pipelines along with the CMake
+      version. Writes command strings and version info to .lang.cpp.cicd
+      for build system tracking.
+    mainBash: cmake-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: cmake
+    keywords: ["cmake ci", "cmake version", "build system tracking"]
+
+example_component_json: |
+  {
+    "lang": {
+      "cpp": {
+        "build_systems": ["cmake", "make"],
+        "cmake_exists": true,
+        "makefile_exists": true,
+        "conanfile_exists": false,
+        "vcpkg_json_exists": false,
+        "meson_build_exists": false,
+        "cpp_standard": "17",
+        "source_files": {
+          "c": 5,
+          "cpp": 23,
+          "headers": 18
+        },
+        "source": { "tool": "cpp", "integration": "code" },
+        "dependencies": {
+          "direct": [
+            { "name": "boost/1.82.0", "version": "1.82.0", "manager": "conan" }
+          ],
+          "cmake_packages": ["Boost", "OpenSSL", "Threads"],
+          "source": { "tool": "cpp", "integration": "code" }
+        },
+        "lint": {
+          "warnings": [
+            {
+              "file": "src/main.cpp",
+              "line": 42,
+              "severity": "warning",
+              "message": "Variable 'x' is not initialized",
+              "id": "uninitvar"
+            }
+          ],
+          "tool": "cppcheck",
+          "source": { "tool": "cppcheck", "integration": "code" }
+        },
+        "native": {
+          "cppcheck": {
+            "passed": true,
+            "exit_code": 0,
+            "error_count": 0,
+            "warning_count": 1,
+            "source": { "tool": "cppcheck", "integration": "code" }
+          }
+        },
+        "cicd": {
+          "cmds": [
+            { "cmd": "g++ -std=c++17 -O2 -o main main.cpp", "version": "12.2.0" },
+            { "cmd": "cmake --build . --config Release", "version": "3.27.0" }
+          ],
+          "source": { "tool": "cpp", "integration": "ci" }
+        }
+      }
+    }
+  }
