@@ -8,24 +8,88 @@ if ! is_html_project; then
     exit 0
 fi
 
-# Check for CSS-family files
-css_files=$(find . -maxdepth 10 -type f \( -name "*.css" -o -name "*.scss" -o -name "*.less" \) -not -path './.git/*' -not -path '*/node_modules/*' 2>/dev/null)
-if [[ -z "$css_files" ]]; then
+# Find CSS files (plain CSS only for reliable linting — SCSS/LESS need custom syntaxes)
+css_files=$(find . -maxdepth 10 -type f -name "*.css" -not -path './.git/*' -not -path '*/node_modules/*' 2>/dev/null)
+scss_files=$(find . -maxdepth 10 -type f -name "*.scss" -not -path './.git/*' -not -path '*/node_modules/*' 2>/dev/null)
+less_files=$(find . -maxdepth 10 -type f -name "*.less" -not -path './.git/*' -not -path '*/node_modules/*' 2>/dev/null)
+
+all_files="${css_files}${scss_files:+$'\n'$scss_files}${less_files:+$'\n'$less_files}"
+all_files=$(echo "$all_files" | sed '/^$/d')
+
+if [[ -z "$all_files" ]]; then
     echo "No CSS/SCSS/LESS files found for Stylelint" >&2
     exit 0
 fi
 
-# Run Stylelint with JSON output and default config
-# Use --config to provide a minimal config if no project config exists
-STYLELINT_ARGS=()
-if [[ ! -f ".stylelintrc" ]] && [[ ! -f ".stylelintrc.json" ]] && [[ ! -f ".stylelintrc.yml" ]] && [[ ! -f "stylelint.config.js" ]] && [[ ! -f "stylelint.config.mjs" ]]; then
-    STYLELINT_ARGS=(--config '{"extends":"stylelint-config-standard"}')
-fi
+# Determine if a project config exists
+HAS_PROJECT_CONFIG=false
+for cfg in .stylelintrc .stylelintrc.json .stylelintrc.yml stylelint.config.js stylelint.config.mjs; do
+    if [[ -f "$cfg" ]]; then
+        HAS_PROJECT_CONFIG=true
+        break
+    fi
+done
 
-set +e
-echo "$css_files" | xargs stylelint --formatter json "${STYLELINT_ARGS[@]}" > /tmp/stylelint-output.json 2>/dev/null
-exit_code=$?
-set -e
+# Run Stylelint per file type to handle syntax differences
+> /tmp/stylelint-output.json.parts
+
+run_stylelint() {
+    local files="$1"
+    local syntax_arg="$2"
+    local config_arg="$3"
+
+    [[ -z "$files" ]] && return
+
+    local args=(--formatter json)
+    [[ -n "$syntax_arg" ]] && args+=(--custom-syntax "$syntax_arg")
+    if [[ "$HAS_PROJECT_CONFIG" == "false" && -n "$config_arg" ]]; then
+        args+=(--config "$config_arg")
+    fi
+
+    set +e
+    echo "$files" | xargs stylelint "${args[@]}" >> /tmp/stylelint-output.json.parts 2>/dev/null
+    set -e
+}
+
+# CSS: uses default parser with stylelint-config-standard
+run_stylelint "$css_files" "" '{"extends":"stylelint-config-standard"}'
+
+# SCSS: uses postcss-scss syntax
+run_stylelint "$scss_files" "postcss-scss" '{"extends":"stylelint-config-standard"}'
+
+# LESS: uses postcss-less syntax
+run_stylelint "$less_files" "postcss-less" '{"extends":"stylelint-config-standard"}'
+
+# Merge all JSON arrays from the parts file into one array
+# Each stylelint run outputs a JSON array; merge them
+python3 - <<'PY' > /tmp/stylelint-output.json
+import json, sys
+
+results = []
+raw = open("/tmp/stylelint-output.json.parts").read().strip()
+if not raw:
+    print("[]")
+    sys.exit(0)
+
+# Each stylelint run appends a JSON array; try to parse them
+decoder = json.JSONDecoder()
+pos = 0
+while pos < len(raw):
+    # Skip whitespace
+    while pos < len(raw) and raw[pos] in ' \t\n\r':
+        pos += 1
+    if pos >= len(raw):
+        break
+    try:
+        obj, end = decoder.raw_decode(raw, pos)
+        if isinstance(obj, list):
+            results.extend(obj)
+        pos = end
+    except json.JSONDecodeError:
+        pos += 1
+
+print(json.dumps(results))
+PY
 
 if [[ ! -f /tmp/stylelint-output.json ]] || [[ ! -s /tmp/stylelint-output.json ]]; then
     echo "Stylelint did not produce output" >&2
