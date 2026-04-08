@@ -105,6 +105,7 @@ all:
     BUILD --pass-args ./collectors/rust+image
     BUILD --pass-args ./collectors/cpp+image
     BUILD --pass-args ./collectors/github-actions+image
+    BUILD --pass-args ./collectors/html+image
     BUILD --pass-args ./catalogers/github-org+image
     BUILD --pass-args ./policies/dependencies+image
 
