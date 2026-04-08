@@ -66,7 +66,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/repo@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # exclude: [editorconfig-exists]  # Exclude checks you don't want
+    exclude: [editorconfig-exists]
     # include: [readme-exists, codeowners-exists, gitignore-exists, license-exists]
     # with:
     #   min_lines: "25"
