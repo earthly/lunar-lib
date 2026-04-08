@@ -121,21 +121,21 @@ policies:
     keywords: ["license", "open source", "repository hygiene"]
 
   # --- Security policy checks ---
-  - name: security-md-exists
+  - name: security-exists
     description: |
       Verifies that a SECURITY.md file exists in the repository root or .github/
       directory. Provides a channel for responsible vulnerability disclosure.
-      Reads from `.repo.security_md`.
-    mainPython: ./security-md-exists.py
+      Reads from `.repo.security`.
+    mainPython: ./security-exists.py
     keywords: ["security", "vulnerability disclosure", "repository hygiene"]
 
   # --- Contributing checks ---
-  - name: contributing-md-exists
+  - name: contributing-exists
     description: |
       Verifies that a CONTRIBUTING.md file exists in the repository root or .github/
       directory. Helps external and internal contributors understand the process.
       Reads from `.repo.contributing`.
-    mainPython: ./contributing-md-exists.py
+    mainPython: ./contributing-exists.py
     keywords: ["contributing", "contribution guide", "repository hygiene"]
 
   # --- Editorconfig checks ---

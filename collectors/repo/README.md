@@ -15,7 +15,7 @@ This collector writes to the following Component JSON paths:
 | `.repo.readme` | object | README metadata (exists, path, lines, sections) |
 | `.repo.gitignore` | object | .gitignore metadata (exists, path, lines, patterns) |
 | `.repo.license` | object | LICENSE metadata (exists, path, spdx_id) |
-| `.repo.security_md` | object | SECURITY.md metadata (exists, path, lines, sections) |
+| `.repo.security` | object | SECURITY.md metadata (exists, path, lines, sections) |
 | `.repo.contributing` | object | CONTRIBUTING.md metadata (exists, path, lines, sections) |
 | `.repo.editorconfig` | object | .editorconfig metadata (exists, path, sections) |
 | `.ownership.codeowners` | object | Parsed CODEOWNERS data (exists, valid, owners, rules) |
@@ -30,7 +30,7 @@ This integration provides the following collectors (use `include` to select a su
 | `codeowners` | Parses CODEOWNERS file, extracts ownership rules, validates syntax |
 | `gitignore` | Detects .gitignore, counts lines and active patterns |
 | `license` | Detects LICENSE file, identifies SPDX license type |
-| `security-md` | Detects SECURITY.md, extracts line count and sections |
+| `security` | Detects SECURITY.md, extracts line count and sections |
 | `contributing` | Detects CONTRIBUTING.md, extracts line count and sections |
 | `editorconfig` | Detects .editorconfig, counts section blocks |
 

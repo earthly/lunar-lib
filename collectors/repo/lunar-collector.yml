@@ -64,11 +64,11 @@ collectors:
       type: code
     keywords: ["license", "open source", "spdx", "repository hygiene"]
 
-  - name: security-md
+  - name: security
     description: |
       Detects SECURITY.md in the repository root or .github/ directory.
-      Extracts line count and section headings. Writes to `.repo.security_md`.
-    mainBash: security-md.sh
+      Extracts line count and section headings. Writes to `.repo.security`.
+    mainBash: security.sh
     hook:
       type: code
     keywords: ["security", "vulnerability disclosure", "security policy"]
@@ -125,7 +125,7 @@ example_component_json: |
         "path": "LICENSE",
         "spdx_id": "MIT"
       },
-      "security_md": {
+      "security": {
         "exists": true,
         "path": "SECURITY.md",
         "lines": 28,

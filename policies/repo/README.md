@@ -37,8 +37,8 @@ This plugin provides the following policies (use `include` to select a subset):
 |--------|-------------|
 | `gitignore-exists` | Verifies .gitignore file exists |
 | `license-exists` | Verifies LICENSE file exists |
-| `security-md-exists` | Verifies SECURITY.md file exists |
-| `contributing-md-exists` | Verifies CONTRIBUTING.md file exists |
+| `security-exists` | Verifies SECURITY.md file exists |
+| `contributing-exists` | Verifies CONTRIBUTING.md file exists |
 | `editorconfig-exists` | Verifies .editorconfig file exists (**disabled by default**) |
 
 ## Required Data
@@ -50,7 +50,7 @@ This policy reads from the following Component JSON paths:
 | `.repo.readme` | object | `repo` collector (readme subcollector) |
 | `.repo.gitignore` | object | `repo` collector (gitignore subcollector) |
 | `.repo.license` | object | `repo` collector (license subcollector) |
-| `.repo.security_md` | object | `repo` collector (security-md subcollector) |
+| `.repo.security` | object | `repo` collector (security subcollector) |
 | `.repo.contributing` | object | `repo` collector (contributing subcollector) |
 | `.repo.editorconfig` | object | `repo` collector (editorconfig subcollector) |
 | `.ownership.codeowners` | object | `repo` collector (codeowners subcollector) |
@@ -90,7 +90,7 @@ policies:
     },
     "gitignore": { "exists": true, "path": ".gitignore", "lines": 42, "patterns": 35 },
     "license": { "exists": true, "path": "LICENSE", "spdx_id": "MIT" },
-    "security_md": { "exists": true, "path": "SECURITY.md", "lines": 28, "sections": ["Reporting a Vulnerability"] },
+    "security": { "exists": true, "path": "SECURITY.md", "lines": 28, "sections": ["Reporting a Vulnerability"] },
     "contributing": { "exists": true, "path": "CONTRIBUTING.md", "lines": 55, "sections": ["Getting Started", "Pull Requests"] },
     "editorconfig": { "exists": true, "path": ".editorconfig", "sections": 4 }
   },
@@ -116,7 +116,7 @@ policies:
     "readme": { "exists": false },
     "gitignore": { "exists": false },
     "license": { "exists": false },
-    "security_md": { "exists": false },
+    "security": { "exists": false },
     "contributing": { "exists": false },
     "editorconfig": { "exists": false }
   },
