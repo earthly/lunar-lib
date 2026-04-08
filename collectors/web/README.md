@@ -12,13 +12,14 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.lang.html` | object | HTML file detection data (present only if `.html` files found) |
+| `.lang.html` | object | Present only if `.html` files found |
 | `.lang.html.file_count` | number | Number of `.html` files in the repository |
-| `.lang.css` | object | CSS/preprocessor detection data (present only if `.css`/`.scss`/`.less` files found) |
+| `.lang.css` | object | Present only if `.css` files found |
 | `.lang.css.file_count` | number | Number of `.css` files |
-| `.lang.css.scss_file_count` | number | Number of `.scss` files |
-| `.lang.css.less_file_count` | number | Number of `.less` files |
-| `.lang.css.preprocessors` | array | Detected preprocessors (e.g., `["scss", "less"]`) |
+| `.lang.scss` | object | Present only if `.scss` files found |
+| `.lang.scss.file_count` | number | Number of `.scss` files |
+| `.lang.less` | object | Present only if `.less` files found |
+| `.lang.less.file_count` | number | Number of `.less` files |
 
 ## Collectors
 
@@ -26,7 +27,7 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
-| `project` | code | Detects HTML and CSS-family files, writes counts to `.lang.html` and `.lang.css` |
+| `project` | code | Detects HTML/CSS/SCSS/LESS files, writes counts to `.lang.html`, `.lang.css`, `.lang.scss`, `.lang.less` |
 
 ## Installation
 

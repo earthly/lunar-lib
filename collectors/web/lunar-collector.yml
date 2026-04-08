@@ -20,8 +20,8 @@ collectors:
   - name: project
     description: |
       Scans the repository for HTML and CSS-family files (.html, .css, .scss,
-      .less). Counts files of each type and writes detection data to .lang.html
-      and .lang.css. Skips gracefully if no web files are found.
+      .less). Counts files of each type and writes a separate .lang.<type> entry
+      per detected type. Skips gracefully if no web files are found.
     mainBash: project.sh
     hook:
       type: code
@@ -36,9 +36,14 @@ example_component_json: |
       },
       "css": {
         "file_count": 8,
-        "scss_file_count": 3,
-        "less_file_count": 0,
-        "preprocessors": ["scss"],
+        "source": { "tool": "web", "integration": "code" }
+      },
+      "scss": {
+        "file_count": 3,
+        "source": { "tool": "web", "integration": "code" }
+      },
+      "less": {
+        "file_count": 2,
         "source": { "tool": "web", "integration": "code" }
       }
     }
