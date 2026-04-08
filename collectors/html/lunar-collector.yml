@@ -1,0 +1,116 @@
+version: 0
+
+name: html
+description: Detect and lint HTML, CSS, SCSS, and LESS files
+author: earthly
+
+default_image: earthly/lunar-lib:html-main
+
+landing_page:
+  display_name: "HTML Collector"
+  long_description: |
+    Detect HTML, CSS, SCSS, and LESS files, run HTMLHint and Stylelint for
+    code quality analysis. Categorize frontend markup projects and surface
+    lint issues for policy enforcement.
+  categories: ["languages"]
+  icon: "assets/html.svg"
+  status: "beta"
+  related:
+    - slug: "html"
+      type: "policy"
+      reason: "HTML/CSS lint guardrails using collected metadata"
+
+collectors:
+  - name: project
+    description: |
+      Scans the repository for HTML and CSS-family files (.html, .css, .scss,
+      .less). Counts files of each type and writes a separate .lang.<type> entry
+      per detected type. Skips gracefully if no matching files are found.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["html", "css", "scss", "less", "frontend", "web", "markup", "stylesheet"]
+
+  - name: htmlhint
+    description: |
+      Runs HTMLHint on all .html files to catch common issues: unclosed tags,
+      missing attributes, accessibility problems. Writes normalized warnings
+      to .lang.html.lint and raw output to .lang.html.native.htmlhint.
+    mainBash: htmlhint.sh
+    hook:
+      type: code
+    keywords: ["htmlhint", "html linting", "accessibility", "markup quality"]
+
+  - name: stylelint
+    description: |
+      Runs Stylelint on CSS, SCSS, and LESS files to catch invalid properties,
+      formatting issues, and common mistakes. Writes normalized warnings to
+      .lang.css.lint and raw output to .lang.css.native.stylelint.
+    mainBash: stylelint.sh
+    hook:
+      type: code
+    keywords: ["stylelint", "css linting", "scss", "less", "stylesheet quality"]
+
+example_component_json: |
+  {
+    "lang": {
+      "html": {
+        "file_count": 12,
+        "source": { "tool": "html", "integration": "code" },
+        "lint": {
+          "warnings": [
+            {
+              "file": "index.html",
+              "line": 15,
+              "severity": "warning",
+              "message": "Tag must be paired, missing: </div>",
+              "rule": "tag-pair"
+            }
+          ],
+          "tool": "htmlhint",
+          "source": { "tool": "htmlhint", "integration": "code" }
+        },
+        "native": {
+          "htmlhint": {
+            "passed": false,
+            "error_count": 0,
+            "warning_count": 1,
+            "source": { "tool": "htmlhint", "integration": "code" }
+          }
+        }
+      },
+      "css": {
+        "file_count": 8,
+        "source": { "tool": "html", "integration": "code" },
+        "lint": {
+          "warnings": [
+            {
+              "file": "styles/main.css",
+              "line": 42,
+              "severity": "error",
+              "message": "Unexpected unknown property \"colr\"",
+              "rule": "property-no-unknown"
+            }
+          ],
+          "tool": "stylelint",
+          "source": { "tool": "stylelint", "integration": "code" }
+        },
+        "native": {
+          "stylelint": {
+            "passed": false,
+            "error_count": 1,
+            "warning_count": 0,
+            "source": { "tool": "stylelint", "integration": "code" }
+          }
+        }
+      },
+      "scss": {
+        "file_count": 3,
+        "source": { "tool": "html", "integration": "code" }
+      },
+      "less": {
+        "file_count": 2,
+        "source": { "tool": "html", "integration": "code" }
+      }
+    }
+  }

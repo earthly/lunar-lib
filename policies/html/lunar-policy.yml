@@ -1,0 +1,47 @@
+version: 0
+
+name: html
+description: Enforces HTML and CSS code quality via HTMLHint and Stylelint
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "HTML/CSS Guardrails"
+  long_description: |
+    Enforce markup and stylesheet quality standards. Validates that
+    HTMLHint and Stylelint report no errors or warnings above
+    configured thresholds.
+  category: "devex-build-and-ci"
+  icon: "assets/html.svg"
+  status: "beta"
+  requires:
+    - slug: "html"
+      type: "collector"
+      reason: "Provides HTML/CSS lint data"
+  related: []
+
+policies:
+  - name: htmlhint-clean
+    description: |
+      Ensures HTMLHint reports no errors and fewer warnings than the
+      configured threshold. HTMLHint catches unclosed tags, missing
+      attributes, and accessibility issues in HTML files.
+    mainPython: htmlhint_clean.py
+    keywords: ["htmlhint", "html linting", "markup quality", "accessibility"]
+
+  - name: stylelint-clean
+    description: |
+      Ensures Stylelint reports no errors and fewer warnings than the
+      configured threshold. Stylelint catches invalid properties,
+      formatting issues, and common CSS/SCSS/LESS mistakes.
+    mainPython: stylelint_clean.py
+    keywords: ["stylelint", "css linting", "stylesheet quality", "scss", "less"]
+
+inputs:
+  max_htmlhint_warnings:
+    description: Maximum allowed HTMLHint warnings (0 = must be clean)
+    default: "0"
+  max_stylelint_warnings:
+    description: Maximum allowed Stylelint warnings (0 = must be clean)
+    default: "0"

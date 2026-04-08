@@ -1,0 +1,16 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Node.js and npm
+    RUN apk add --no-cache nodejs npm
+
+    # Install HTMLHint, Stylelint, and PostCSS syntaxes for SCSS/LESS
+    RUN npm install -g htmlhint stylelint stylelint-config-standard postcss-scss postcss-less
+
+    # Verify installations
+    RUN htmlhint --version && stylelint --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:html-$VERSION
