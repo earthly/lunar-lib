@@ -17,13 +17,13 @@ fi
 
 # Run Stylelint with JSON output and default config
 # Use --config to provide a minimal config if no project config exists
-STYLELINT_CONFIG=""
+STYLELINT_ARGS=()
 if [[ ! -f ".stylelintrc" ]] && [[ ! -f ".stylelintrc.json" ]] && [[ ! -f ".stylelintrc.yml" ]] && [[ ! -f "stylelint.config.js" ]] && [[ ! -f "stylelint.config.mjs" ]]; then
-    STYLELINT_CONFIG='--config {"extends":"stylelint-config-standard"}'
+    STYLELINT_ARGS=(--config '{"extends":"stylelint-config-standard"}')
 fi
 
 set +e
-echo "$css_files" | xargs stylelint --formatter json $STYLELINT_CONFIG > /tmp/stylelint-output.json 2>/dev/null
+echo "$css_files" | xargs stylelint --formatter json "${STYLELINT_ARGS[@]}" > /tmp/stylelint-output.json 2>/dev/null
 exit_code=$?
 set -e
 
