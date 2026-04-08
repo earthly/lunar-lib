@@ -102,40 +102,48 @@ policies:
     mainPython: ./codeowners-max-owners.py
     keywords: ["codeowners", "maximum owners", "diffused ownership"]
 
-  # --- Standard file checks ---
+  # --- Gitignore checks ---
   - name: gitignore-exists
     description: |
       Verifies that a .gitignore file exists in the repository root. Prevents
       accidental commits of build artifacts, dependencies, and IDE files.
+      Reads from `.repo.gitignore`.
     mainPython: ./gitignore-exists.py
     keywords: ["gitignore", "repository hygiene"]
 
+  # --- License checks ---
   - name: license-exists
     description: |
       Verifies that a LICENSE file exists in the repository root. Checks
       common variants: LICENSE, LICENSE.md, LICENSE.txt, LICENCE.
+      Reads from `.repo.license`.
     mainPython: ./license-exists.py
     keywords: ["license", "open source", "repository hygiene"]
 
+  # --- Security policy checks ---
   - name: security-md-exists
     description: |
       Verifies that a SECURITY.md file exists in the repository root or .github/
       directory. Provides a channel for responsible vulnerability disclosure.
+      Reads from `.repo.security_md`.
     mainPython: ./security-md-exists.py
     keywords: ["security", "vulnerability disclosure", "repository hygiene"]
 
+  # --- Contributing checks ---
   - name: contributing-md-exists
     description: |
       Verifies that a CONTRIBUTING.md file exists in the repository root or .github/
       directory. Helps external and internal contributors understand the process.
+      Reads from `.repo.contributing`.
     mainPython: ./contributing-md-exists.py
     keywords: ["contributing", "contribution guide", "repository hygiene"]
 
+  # --- Editorconfig checks ---
   - name: editorconfig-exists
     description: |
       Verifies that an .editorconfig file exists in the repository root. Ensures
       consistent coding style across editors. Disabled by default; enable with
-      the check_editorconfig input.
+      the check_editorconfig input. Reads from `.repo.editorconfig`.
     mainPython: ./editorconfig-exists.py
     keywords: ["editorconfig", "code style", "repository hygiene"]
 

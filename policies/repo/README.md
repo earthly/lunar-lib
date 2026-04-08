@@ -48,7 +48,11 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.repo.readme` | object | `repo` collector (readme subcollector) |
-| `.repo.files` | object | `repo` collector (repo-files subcollector) |
+| `.repo.gitignore` | object | `repo` collector (gitignore subcollector) |
+| `.repo.license` | object | `repo` collector (license subcollector) |
+| `.repo.security_md` | object | `repo` collector (security-md subcollector) |
+| `.repo.contributing` | object | `repo` collector (contributing subcollector) |
+| `.repo.editorconfig` | object | `repo` collector (editorconfig subcollector) |
 | `.ownership.codeowners` | object | `repo` collector (codeowners subcollector) |
 
 **Note:** Ensure the `repo` collector is configured before enabling this policy.
@@ -84,13 +88,11 @@ policies:
       "lines": 150,
       "sections": ["Installation", "Usage", "Contributing"]
     },
-    "files": {
-      "gitignore": true,
-      "license": true,
-      "security_md": true,
-      "contributing": true,
-      "editorconfig": true
-    }
+    "gitignore": { "exists": true, "path": ".gitignore", "lines": 42, "patterns": 35 },
+    "license": { "exists": true, "path": "LICENSE", "spdx_id": "MIT" },
+    "security_md": { "exists": true, "path": "SECURITY.md", "lines": 28, "sections": ["Reporting a Vulnerability"] },
+    "contributing": { "exists": true, "path": "CONTRIBUTING.md", "lines": 55, "sections": ["Getting Started", "Pull Requests"] },
+    "editorconfig": { "exists": true, "path": ".editorconfig", "sections": 4 }
   },
   "ownership": {
     "codeowners": {
@@ -112,13 +114,11 @@ policies:
 {
   "repo": {
     "readme": { "exists": false },
-    "files": {
-      "gitignore": false,
-      "license": false,
-      "security_md": false,
-      "contributing": false,
-      "editorconfig": false
-    }
+    "gitignore": { "exists": false },
+    "license": { "exists": false },
+    "security_md": { "exists": false },
+    "contributing": { "exists": false },
+    "editorconfig": { "exists": false }
   },
   "ownership": {
     "codeowners": { "exists": false }

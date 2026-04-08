@@ -44,15 +44,52 @@ collectors:
       type: code
     keywords: ["codeowners", "code ownership", "repository ownership", "team ownership"]
 
-  - name: repo-files
+  - name: gitignore
     description: |
-      Scans the repository for standard configuration and documentation files:
-      .gitignore, LICENSE (multiple variants), SECURITY.md, CONTRIBUTING.md,
-      and .editorconfig. Writes boolean presence flags to `.repo.files`.
-    mainBash: repo-files.sh
+      Detects .gitignore in the repository root. Extracts line count and
+      number of active patterns (non-comment, non-empty lines).
+      Writes to `.repo.gitignore`.
+    mainBash: gitignore.sh
     hook:
       type: code
-    keywords: ["gitignore", "license", "security", "contributing", "editorconfig", "repository files"]
+    keywords: ["gitignore", "ignore patterns", "repository hygiene"]
+
+  - name: license
+    description: |
+      Detects LICENSE files (LICENSE, LICENSE.md, LICENSE.txt, LICENCE and
+      variants). Attempts to identify the SPDX license type from file content.
+      Writes to `.repo.license`.
+    mainBash: license.sh
+    hook:
+      type: code
+    keywords: ["license", "open source", "spdx", "repository hygiene"]
+
+  - name: security-md
+    description: |
+      Detects SECURITY.md in the repository root or .github/ directory.
+      Extracts line count and section headings. Writes to `.repo.security_md`.
+    mainBash: security-md.sh
+    hook:
+      type: code
+    keywords: ["security", "vulnerability disclosure", "security policy"]
+
+  - name: contributing
+    description: |
+      Detects CONTRIBUTING.md in the repository root or .github/ directory.
+      Extracts line count and section headings. Writes to `.repo.contributing`.
+    mainBash: contributing.sh
+    hook:
+      type: code
+    keywords: ["contributing", "contribution guide", "developer onboarding"]
+
+  - name: editorconfig
+    description: |
+      Detects .editorconfig in the repository root. Extracts the number of
+      section blocks defined. Writes to `.repo.editorconfig`.
+    mainBash: editorconfig.sh
+    hook:
+      type: code
+    keywords: ["editorconfig", "code style", "editor settings"]
 
 inputs:
   readme_paths:
@@ -77,12 +114,42 @@ example_component_json: |
           "License"
         ]
       },
-      "files": {
-        "gitignore": true,
-        "license": true,
-        "security_md": true,
-        "contributing": true,
-        "editorconfig": false
+      "gitignore": {
+        "exists": true,
+        "path": ".gitignore",
+        "lines": 42,
+        "patterns": 35
+      },
+      "license": {
+        "exists": true,
+        "path": "LICENSE",
+        "spdx_id": "MIT"
+      },
+      "security_md": {
+        "exists": true,
+        "path": "SECURITY.md",
+        "lines": 28,
+        "sections": [
+          "Reporting a Vulnerability",
+          "Response Timeline",
+          "Scope"
+        ]
+      },
+      "contributing": {
+        "exists": true,
+        "path": "CONTRIBUTING.md",
+        "lines": 55,
+        "sections": [
+          "Getting Started",
+          "Development Setup",
+          "Pull Requests",
+          "Code of Conduct"
+        ]
+      },
+      "editorconfig": {
+        "exists": true,
+        "path": ".editorconfig",
+        "sections": 4
       }
     },
     "ownership": {

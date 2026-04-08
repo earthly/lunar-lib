@@ -4,7 +4,7 @@ Collect standard repository metadata including README, CODEOWNERS, and common co
 
 ## Overview
 
-Aggregates repository hygiene data by scanning for README files, CODEOWNERS ownership rules, and standard configuration files (.gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, .editorconfig). This collector consolidates the existing `readme` and `codeowners` collectors into a single top-level plugin, adding a `repo-files` subcollector for common file detection.
+Aggregates repository hygiene data by scanning for README files, CODEOWNERS ownership rules, and standard configuration files. Each file type has its own subcollector that extracts rich metadata (line counts, sections, patterns) for in-depth policy checks. Consolidates the existing `readme` and `codeowners` collectors into a single top-level plugin.
 
 ## Collected Data
 
@@ -12,8 +12,12 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.repo.readme` | object | README file metadata (exists, path, lines, sections) |
-| `.repo.files` | object | Boolean presence flags for standard repository files |
+| `.repo.readme` | object | README metadata (exists, path, lines, sections) |
+| `.repo.gitignore` | object | .gitignore metadata (exists, path, lines, patterns) |
+| `.repo.license` | object | LICENSE metadata (exists, path, spdx_id) |
+| `.repo.security_md` | object | SECURITY.md metadata (exists, path, lines, sections) |
+| `.repo.contributing` | object | CONTRIBUTING.md metadata (exists, path, lines, sections) |
+| `.repo.editorconfig` | object | .editorconfig metadata (exists, path, sections) |
 | `.ownership.codeowners` | object | Parsed CODEOWNERS data (exists, valid, owners, rules) |
 
 ## Collectors
@@ -22,9 +26,13 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Description |
 |-----------|-------------|
-| `readme` | Detects README files and extracts metadata (line count, section headings) |
+| `readme` | Detects README files, extracts line count and section headings |
 | `codeowners` | Parses CODEOWNERS file, extracts ownership rules, validates syntax |
-| `repo-files` | Scans for .gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, .editorconfig |
+| `gitignore` | Detects .gitignore, counts lines and active patterns |
+| `license` | Detects LICENSE file, identifies SPDX license type |
+| `security-md` | Detects SECURITY.md, extracts line count and sections |
+| `contributing` | Detects CONTRIBUTING.md, extracts line count and sections |
+| `editorconfig` | Detects .editorconfig, counts section blocks |
 
 ## Installation
 
