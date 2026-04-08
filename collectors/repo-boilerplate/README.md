@@ -1,10 +1,10 @@
-# Repository Collector
+# Repo Boilerplate Collector
 
-Collect standard repository metadata including README, CODEOWNERS, and common configuration files.
+Collect standard repository boilerplate metadata including README, CODEOWNERS, and common configuration files.
 
 ## Overview
 
-Aggregates repository hygiene data by scanning for README files, CODEOWNERS ownership rules, and standard configuration files. Each file type has its own subcollector that extracts rich metadata (line counts, sections, patterns) for in-depth policy checks. Consolidates the existing `readme` and `codeowners` collectors into a single top-level plugin.
+Aggregates repository boilerplate data by scanning for README files, CODEOWNERS ownership rules, and standard configuration files. Each file type has its own subcollector that extracts rich metadata (line counts, sections, patterns) for in-depth policy checks. Consolidates the existing `readme` and `codeowners` collectors into a single top-level plugin.
 
 ## Collected Data
 
@@ -40,7 +40,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/repo@main
+  - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
     on: ["domain:your-domain"]
     # with:
     #   readme_paths: "README.md,README,README.txt,README.rst"

@@ -1,22 +1,22 @@
 version: 0
 
-name: repo
-description: Repository hygiene guardrails for README, CODEOWNERS, and standard files
+name: repo-boilerplate
+description: Repository boilerplate guardrails for README, CODEOWNERS, and standard files
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Repository Guardrails"
+  display_name: "Repo Boilerplate Guardrails"
   long_description: |
-    Enforce repository hygiene including README quality, CODEOWNERS validation,
-    and presence of standard files (.gitignore, LICENSE, SECURITY.md,
+    Enforce repository boilerplate standards including README quality, CODEOWNERS
+    validation, and presence of standard files (.gitignore, LICENSE, SECURITY.md,
     CONTRIBUTING.md). Consolidates readme and codeowners policies into a single
     plugin with additional file-existence checks.
   category: "repository-and-ownership"
-  icon: "assets/repo.svg"
+  icon: "assets/repo-boilerplate.svg"
   status: "beta"
   requires:
-    - slug: "repo"
+    - slug: "repo-boilerplate"
       type: "collector"
       reason: "Provides README, CODEOWNERS, and standard file metadata"
   related: []

@@ -1,10 +1,10 @@
-# Repository Guardrails
+# Repo Boilerplate Guardrails
 
-Enforce repository hygiene standards for README, CODEOWNERS, and standard configuration files.
+Enforce repository boilerplate standards for README, CODEOWNERS, and standard configuration files.
 
 ## Overview
 
-Validates that repositories maintain documentation standards, code ownership rules, and include standard configuration files. Consolidates the existing `readme` and `codeowners` policies into a single plugin, adding checks for .gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, and .editorconfig.
+Validates that repositories maintain documentation standards, code ownership rules, and include standard boilerplate files. Consolidates the existing `readme` and `codeowners` policies into a single plugin, adding checks for .gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, and .editorconfig.
 
 ## Policies
 
@@ -47,15 +47,15 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.repo.readme` | object | `repo` collector (readme subcollector) |
-| `.repo.gitignore` | object | `repo` collector (gitignore subcollector) |
-| `.repo.license` | object | `repo` collector (license subcollector) |
-| `.repo.security` | object | `repo` collector (security subcollector) |
-| `.repo.contributing` | object | `repo` collector (contributing subcollector) |
-| `.repo.editorconfig` | object | `repo` collector (editorconfig subcollector) |
-| `.ownership.codeowners` | object | `repo` collector (codeowners subcollector) |
+| `.repo.readme` | object | `repo-boilerplate` collector (readme subcollector) |
+| `.repo.gitignore` | object | `repo-boilerplate` collector (gitignore subcollector) |
+| `.repo.license` | object | `repo-boilerplate` collector (license subcollector) |
+| `.repo.security` | object | `repo-boilerplate` collector (security subcollector) |
+| `.repo.contributing` | object | `repo-boilerplate` collector (contributing subcollector) |
+| `.repo.editorconfig` | object | `repo-boilerplate` collector (editorconfig subcollector) |
+| `.ownership.codeowners` | object | `repo-boilerplate` collector (codeowners subcollector) |
 
-**Note:** Ensure the `repo` collector is configured before enabling this policy.
+**Note:** Ensure the `repo-boilerplate` collector is configured before enabling this policy.
 
 ## Installation
 
@@ -63,7 +63,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  - uses: github://earthly/lunar-lib/policies/repo@main
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
     on: ["domain:your-domain"]
     enforcement: report-pr
     exclude: [editorconfig-exists]
