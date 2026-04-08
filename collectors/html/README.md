@@ -1,6 +1,6 @@
-# Web Collector
+# HTML Collector
 
-Detects HTML and CSS/preprocessor files for frontend project categorization.
+Detects HTML and CSS/preprocessor files for frontend markup categorization.
 
 ## Overview
 
@@ -35,6 +35,6 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/web@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/html@v1.0.0
     on: ["domain:your-domain"]
 ```

@@ -1,19 +1,19 @@
 version: 0
 
-name: web
-description: Detect HTML and CSS/preprocessor files for frontend project categorization
+name: html
+description: Detect HTML and CSS/preprocessor files for frontend markup categorization
 author: earthly
 
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Web Collector"
+  display_name: "HTML Collector"
   long_description: |
-    Detect HTML, CSS, SCSS, and LESS files to categorize frontend projects.
+    Detect HTML, CSS, SCSS, and LESS files to categorize frontend markup projects.
     Distinguishes primarily-frontend repos from repos with incidental HTML.
     Lightweight detection collector — no external tools required.
   categories: ["languages"]
-  icon: "assets/web.svg"
+  icon: "assets/html.svg"
   status: "beta"
 
 collectors:
@@ -21,7 +21,7 @@ collectors:
     description: |
       Scans the repository for HTML and CSS-family files (.html, .css, .scss,
       .less). Counts files of each type and writes a separate .lang.<type> entry
-      per detected type. Skips gracefully if no web files are found.
+      per detected type. Skips gracefully if no matching files are found.
     mainBash: project.sh
     hook:
       type: code
@@ -32,19 +32,19 @@ example_component_json: |
     "lang": {
       "html": {
         "file_count": 12,
-        "source": { "tool": "web", "integration": "code" }
+        "source": { "tool": "html", "integration": "code" }
       },
       "css": {
         "file_count": 8,
-        "source": { "tool": "web", "integration": "code" }
+        "source": { "tool": "html", "integration": "code" }
       },
       "scss": {
         "file_count": 3,
-        "source": { "tool": "web", "integration": "code" }
+        "source": { "tool": "html", "integration": "code" }
       },
       "less": {
         "file_count": 2,
-        "source": { "tool": "web", "integration": "code" }
+        "source": { "tool": "html", "integration": "code" }
       }
     }
   }
