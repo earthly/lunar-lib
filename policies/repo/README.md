@@ -39,7 +39,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `license-exists` | Verifies LICENSE file exists |
 | `security-exists` | Verifies SECURITY.md file exists |
 | `contributing-exists` | Verifies CONTRIBUTING.md file exists |
-| `editorconfig-exists` | Verifies .editorconfig file exists (**disabled by default**) |
+| `editorconfig-exists` | Verifies .editorconfig file exists (use `exclude` if not wanted) |
 
 ## Required Data
 
@@ -66,13 +66,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/repo@main
     on: ["domain:your-domain"]
     enforcement: report-pr
+    # exclude: [editorconfig-exists]  # Exclude checks you don't want
     # include: [readme-exists, codeowners-exists, gitignore-exists, license-exists]
     # with:
     #   min_lines: "25"
     #   required_sections: "Installation,Usage"
     #   min_owners_per_rule: "2"
     #   max_owners_per_rule: "10"
-    #   check_editorconfig: "true"
 ```
 
 ## Examples

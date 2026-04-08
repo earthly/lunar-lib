@@ -142,8 +142,8 @@ policies:
   - name: editorconfig-exists
     description: |
       Verifies that an .editorconfig file exists in the repository root. Ensures
-      consistent coding style across editors. Disabled by default; enable with
-      the check_editorconfig input. Reads from `.repo.editorconfig`.
+      consistent coding style across editors. Use exclude/include in lunar-config
+      to control whether this check runs. Reads from `.repo.editorconfig`.
     mainPython: ./editorconfig-exists.py
     keywords: ["editorconfig", "code style", "repository hygiene"]
 
@@ -160,6 +160,3 @@ inputs:
   max_owners_per_rule:
     description: Maximum number of owners allowed per CODEOWNERS rule
     default: "10"
-  check_editorconfig:
-    description: Enable the editorconfig-exists check (disabled by default)
-    default: "false"
