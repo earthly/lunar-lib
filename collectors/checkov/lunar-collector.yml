@@ -1,0 +1,98 @@
+version: 0
+
+name: checkov
+description: Auto-runs Checkov IaC security scanning and detects Checkov CI executions
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:checkov-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Checkov Collector"
+  long_description: |
+    Auto-runs Checkov on infrastructure code (Terraform, CloudFormation,
+    Kubernetes, Dockerfiles) and detects Checkov CI executions. Results
+    are normalized into .iac_scan for the iac-scan policy.
+  categories: ["security"]
+  icon: "assets/checkov.svg"
+  status: "beta"
+  keywords: ["checkov", "iac", "terraform", "infrastructure", "security", "scanning", "cloudformation", "kubernetes", "dockerfile"]
+  related:
+    - slug: "iac-scan"
+      type: "policy"
+      reason: "Enforces IaC security thresholds using Checkov scan data"
+
+collectors:
+  - name: scan
+    description: |
+      Auto-runs Checkov against infrastructure code in the repository. Detects
+      IaC files (Terraform, CloudFormation, Kubernetes, Dockerfiles, ARM, etc.),
+      runs Checkov with JSON output, and normalizes findings by severity into
+      .iac_scan. Also writes .iac.files to signal IaC presence for policy
+      skip logic. Skips gracefully if no IaC files are detected.
+    mainBash: scan.sh
+    hook:
+      type: code
+    keywords: ["checkov", "iac", "terraform", "cloudformation", "kubernetes", "dockerfile", "security scanning", "auto-run"]
+
+  - name: cicd
+    description: |
+      Detects Checkov execution in CI pipelines. Records command metadata
+      to .iac_scan.native.checkov.cicd.cmds and attempts to collect the JSON
+      report file if --output-file-path can be parsed from the command.
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: checkov
+    keywords: ["checkov", "ci", "ci detection", "iac scanning"]
+
+example_component_json: |
+  {
+    "iac": {
+      "files": [
+        {"path": "infra/main.tf"},
+        {"path": "Dockerfile"},
+        {"path": "k8s/deployment.yaml"}
+      ]
+    },
+    "iac_scan": {
+      "source": {
+        "tool": "checkov",
+        "version": "3.2.1",
+        "integration": "code"
+      },
+      "findings": {
+        "critical": 0,
+        "high": 2,
+        "medium": 5,
+        "low": 8,
+        "total": 15
+      },
+      "summary": {
+        "has_critical": false,
+        "has_high": true,
+        "has_medium": true,
+        "has_low": true
+      },
+      "native": {
+        "checkov": {
+          "auto": {
+            "passed": 42,
+            "failed": 15,
+            "skipped": 3,
+            "findings": [
+              {
+                "check_id": "CKV_AWS_18",
+                "check_name": "Ensure the S3 bucket has access logging enabled",
+                "severity": "high",
+                "resource": "aws_s3_bucket.data",
+                "file": "infra/main.tf",
+                "file_line_range": [10, 15]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
