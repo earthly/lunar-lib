@@ -59,7 +59,7 @@ fi
 # Run Checkov with JSON output
 REPORT_FILE="/tmp/checkov-report.json"
 EXIT_CODE=0
-checkov -d . --output json --quiet --compact > "$REPORT_FILE" 2>/dev/null || EXIT_CODE=$?
+checkov -d . --output json --quiet --skip-download > "$REPORT_FILE" 2>/dev/null || EXIT_CODE=$?
 
 # Exit codes: 0 = all pass, 1 = failures found, anything else = error
 if [ "$EXIT_CODE" -gt 1 ]; then
