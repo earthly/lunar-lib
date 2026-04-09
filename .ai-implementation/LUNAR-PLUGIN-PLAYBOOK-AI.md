@@ -287,6 +287,14 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
 
 **Step-by-step cronos testing process:**
 
+0. **⚠️ PREREQUISITE: Ensure your plugin's Docker image exists on Docker Hub** — If your plugin has its own `Earthfile` (i.e. it builds a custom Docker image like `earthly/lunar-lib:<plugin>-<version>`), the image **must** be pushed to Docker Hub before cronos can use it. lunar-lib CI does this automatically on every push — but for new plugins, your first CI run on the branch must complete successfully before testing on cronos. Verify with:
+   ```bash
+   # Branch slashes are normalized to dashes in image tags
+   docker manifest inspect earthly/lunar-lib:<plugin>-<normalized-branch>
+   # Example: bender/eng-487-ruby → earthly/lunar-lib:ruby-bender-eng-487-ruby
+   ```
+   If the image doesn't exist, push a commit to your lunar-lib branch and wait for CI to build and push it. **Do NOT proceed to step 1 until the image exists** — the cronos sync will succeed but the collector will silently fail to run because the runner can't pull the image. Plugins without an Earthfile run on the base image and can skip this step.
+
 1. **Add collector + policy to cronos config** — Edit `pantalasa-cronos/lunar`'s `lunar-config.yml` to reference your branch:
    ```yaml
    collectors:
