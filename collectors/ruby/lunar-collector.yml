@@ -4,7 +4,7 @@ name: ruby
 description: Collect Ruby project information, CI/CD commands, and dependencies
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:ruby-main
 default_image_ci_collectors: native
 
 landing_page:
@@ -79,6 +79,17 @@ collectors:
       binary:
         name: rake
     keywords: ["rake ci", "rake version", "ci commands", "build automation"]
+
+  - name: bundler-audit
+    description: |
+      Runs bundler-audit against Gemfile.lock to check for known vulnerabilities
+      in gem dependencies. Requires Gemfile.lock to be present. Writes advisory
+      details including gem name, version, CVE, and severity to
+      .lang.ruby.bundler_audit.
+    mainBash: bundler-audit.sh
+    hook:
+      type: code
+    keywords: ["bundler-audit", "vulnerabilities", "security", "gem audit", "CVE"]
 
   - name: bundler-audit-cicd
     description: |

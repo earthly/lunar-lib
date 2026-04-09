@@ -37,6 +37,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `cicd` | ci-before-command | Tracks ruby commands run in CI with version info |
 | `bundler-cicd` | ci-before-command | Tracks bundle commands run in CI with version info |
 | `rake-cicd` | ci-before-command | Tracks rake commands run in CI with version info |
+| `bundler-audit` | code | Auto-runs bundler-audit against Gemfile.lock for vulnerability detection |
 | `bundler-audit-cicd` | ci-after-command | Parses bundler-audit vulnerability results from CI |
 
 ## Installation
