@@ -1,0 +1,14 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Ruby, Bundler, and bundler-audit
+    RUN apk add --no-cache ruby ruby-bundler ruby-json
+    RUN gem install bundler-audit --no-document
+
+    # Verify installations
+    RUN ruby --version && bundle --version && bundle audit --help >/dev/null 2>&1
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:ruby-$VERSION
