@@ -40,14 +40,23 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `bundler-audit` | code | Auto-runs bundler-audit against Gemfile.lock for vulnerability detection |
 | `bundler-audit-cicd` | ci-after-command | Parses bundler-audit vulnerability results from CI |
 
-## CI Integration
+## Installation
+
+Add to your `lunar-config.yml`:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+    on: ["domain:your-domain"]  # replace with your own domain or tags
+    # include: [project, dependencies]  # Only include specific subcollectors
+```
 
 The CI-hook collectors (`cicd`, `bundler-cicd`, `rake-cicd`, `bundler-audit-cicd`) require a GitHub Actions workflow that runs on a Lunar-enabled runner. Example steps:
 
 ```yaml
 jobs:
   build:
-    runs-on: cronos  # or your Lunar-enabled runner
+    runs-on: your-lunar-runner
     steps:
       - uses: actions/checkout@v4
       - run: bundle install
@@ -60,14 +69,3 @@ jobs:
 ```
 
 Each step triggers the corresponding CI hook collector, which captures command versions and output for the Component JSON.
-
-## Installation
-
-Add to your `lunar-config.yml`:
-
-```yaml
-collectors:
-  - uses: github://earthly/lunar-lib/collectors/ruby@main
-    on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
-```
