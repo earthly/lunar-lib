@@ -35,9 +35,9 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `project` | code | Collects project structure, Ruby version, build systems, gemspec files |
 | `dependencies` | code | Collects dependency graph from Gemfile and Gemfile.lock |
 | `cicd` | ci-before-command | Tracks ruby commands run in CI with version info |
-| `bundle-cicd` | ci-before-command | Tracks bundle commands run in CI with version info |
+| `bundler-cicd` | ci-before-command | Tracks bundle commands run in CI with version info |
 | `rake-cicd` | ci-before-command | Tracks rake commands run in CI with version info |
-| `bundle-audit-cicd` | ci-after-command | Parses bundler-audit vulnerability results from CI |
+| `bundler-audit-cicd` | ci-after-command | Parses bundler-audit vulnerability results from CI |
 
 ## Installation
 

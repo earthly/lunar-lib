@@ -28,7 +28,7 @@ This policy reads from the following Component JSON paths:
 | `.lang.ruby.gemfile_lock_exists` | boolean | `ruby` collector (project) |
 | `.lang.ruby.ruby_version_file_exists` | boolean | `ruby` collector (project) |
 | `.lang.ruby.version` | string | `ruby` collector (project) |
-| `.lang.ruby.bundler_audit.vulnerabilities` | array | `ruby` collector (bundle-audit-cicd) |
+| `.lang.ruby.bundler_audit.vulnerabilities` | array | `ruby` collector (bundler-audit-cicd) |
 
 **Note:** Ensure the `ruby` collector is configured before enabling this policy.
 

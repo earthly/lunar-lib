@@ -57,12 +57,12 @@ collectors:
         name: ruby
     keywords: ["ruby ci", "ruby version", "ci commands", "build tracking"]
 
-  - name: bundle-cicd
+  - name: bundler-cicd
     description: |
       Records every bundle command executed in CI pipelines along with the
       Bundler version. Writes command strings and version info to
       .lang.ruby.bundler.cicd.
-    mainBash: bundle-cicd.sh
+    mainBash: bundler-cicd.sh
     hook:
       type: ci-before-command
       binary:
@@ -80,12 +80,12 @@ collectors:
         name: rake
     keywords: ["rake ci", "rake version", "ci commands", "build automation"]
 
-  - name: bundle-audit-cicd
+  - name: bundler-audit-cicd
     description: |
       Parses bundle audit results after the command completes in CI. Extracts
       vulnerability advisories including gem name, installed version, advisory ID,
       and severity. Writes results to .lang.ruby.bundler_audit.
-    mainBash: bundle-audit-cicd.sh
+    mainBash: bundler-audit-cicd.sh
     hook:
       type: ci-after-command
       binary:
