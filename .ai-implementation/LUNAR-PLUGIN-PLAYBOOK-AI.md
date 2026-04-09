@@ -174,6 +174,8 @@ The review flow is sequential:
 3. **Second reviewer reviews.** Address their feedback. Iterate. Still spec files only.
 4. **Second reviewer approves = go-ahead.** Once the second reviewer's GitHub review status is "APPROVED", you can proceed to implementation.
 
+**Automatic testing on approval:** When the second reviewer approves the spec, the full integration testing plan (cronos testing, screenshots, component JSON verification) should be executed automatically as part of the implementation phase — don't wait for a separate instruction. Spec approval IS the green light to implement AND test.
+
 **Exception:** The requester may explicitly tell you to go ahead with implementation even without the second reviewer's approval (e.g. if that person is away). If the requester says to proceed, that's a valid go-ahead — follow their instruction.
 
 **While waiting:**
@@ -296,6 +298,12 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
    ```
    Push to `pantalasa-cronos/lunar` — the CI sync action deploys it to the cronos hub.
 
+   ⚠️ **WAIT FOR THE BUILD TO PASS before making any commits to component repos.** The lunar config sync workflow must succeed first — if it fails, the hub won't know about your collector/policy and testing is pointless. Monitor with:
+   ```bash
+   GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run list --repo pantalasa-cronos/lunar --limit 1 --json status,conclusion
+   ```
+   Only proceed to step 2 once the build is green.
+
 2. **Modify a component to use your tool in CI** — Clone a component repo (e.g. `pantalasa-cronos/backend`), add a CI step that runs your tool with report output:
    ```yaml
    # Example: adding gitleaks to .github/workflows/ci.yml
@@ -310,11 +318,13 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
    ```
    Push to trigger the CI workflow. The lunar agent on the `cronos` runner traces commands and feeds data to collectors.
 
-3. **Wait for CI + collection** — Watch the workflow complete:
+3. **Wait for CI + collection + UI settling** — Watch the workflow complete:
    ```bash
    GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run watch <run-id> --repo pantalasa-cronos/<component>
    ```
    Collection happens automatically after CI completes. Data appears in the cronos hub DB within ~1 minute.
+
+   ⚠️ **After the workflow finishes, wait at least 1 minute before checking the UI.** The system needs time to settle pending states — if you check immediately, you may see stale/pending data that hasn't been fully processed yet. `sleep 60` is your friend here.
 
 4. **Verify collected data** — Query the cronos DB via Grafana API:
    ```bash
@@ -336,7 +346,7 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
 
    Screenshots to capture:
    - **Component JSON page** (`/d/lujsqdc/component-json?var-component=<name>`) — expand the tree to show your collector's category data (e.g. `lang.cpp`)
-   - **Component details page** (`/d/aecnnrn714em8d/component-details?var-component=<name>&var-pr=0`) — scroll to show any new policy checks added by your plugin
+   - **Component details page** (`/d/aecnnrn714em8d/component-details?var-component=<name>&var-pr=0`) — scroll the checks table to the rows showing the specific policy checks from your plugin (e.g. `html.htmlhint-clean`, `html.stylelint-clean`). The screenshot must show the checks we care about, not just the top of an empty or unrelated table.
    - **Collectors listing** (`/d/zzznoc11btoga/collectors-listing`) — your collector shows runs > 0
 
    Playwright MCP flow:
@@ -376,6 +386,21 @@ After testing, comment on the PR documenting what you tested and the results. **
 | Negative (no data) | check-name | ⏭️ SKIP | Skips gracefully |
 | Edge case (missing field) | check-name | ⏭️ SKIP | No error |
 
+### Component JSON Output
+
+Include the actual component JSON output showing the collected data. This proves the collector
+is writing the correct paths and values.
+
+```json
+{
+  "lang": {
+    "<language>": {
+      "...collected data..."
+    }
+  }
+}
+```
+
 ### Edge cases verified:
 - ✅ Missing API key → graceful exit 0
 - ✅ Empty input data → no Component JSON written
@@ -383,7 +408,7 @@ After testing, comment on the PR documenting what you tested and the results. **
 
 ### Dashboard screenshots (from cronos)
 - Component JSON showing `.lang.<language>` data: [screenshot]
-- Component details page showing policy checks: [screenshot]
+- Component details page with checks table scrolled to show YOUR plugin's checks: [screenshot]
 ```
 
 Upload the Playwright screenshots as GitHub comment image attachments. These are required proof that the plugin works end-to-end in the real system — not just in local `lunar collector dev` / `lunar policy dev` tests.
