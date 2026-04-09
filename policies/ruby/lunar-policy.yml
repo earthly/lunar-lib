@@ -48,7 +48,7 @@ policies:
     description: |
       Ensures bundler-audit reports no known vulnerabilities in the project's
       gem dependencies. Skips gracefully if bundler-audit has not been run.
-      Requires the bundle-audit-cicd collector to capture audit results from CI.
+      Requires the bundler-audit-cicd collector to capture audit results from CI.
     mainPython: bundler_audit_clean.py
     keywords: ["bundler-audit", "vulnerabilities", "security", "CVE", "advisory"]
 
