@@ -312,9 +312,41 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
    ```
    Only proceed to step 2 once the build is green.
 
-2. **Modify a component to use your tool in CI** — Clone a component repo (e.g. `pantalasa-cronos/backend`), add a CI step that runs your tool with report output:
+2. **Ensure the component repo has a GitHub Actions workflow running on `cronos`** — CI collectors only receive data from jobs that run on the `cronos` self-hosted runner. If you created a new component repo, it won't have a workflow yet — you must add one. If using an existing repo, verify its workflow uses `runs-on: cronos`.
+
+   For language collectors, the workflow should exercise the language's toolchain so CI hooks fire:
    ```yaml
-   # Example: adding gitleaks to .github/workflows/ci.yml
+   # Example: .github/workflows/ci.yml for a Ruby component
+   name: CI
+   on:
+     push:
+       branches: ["**"]
+     pull_request:
+       branches: ["**"]
+   jobs:
+     build:
+       runs-on: cronos
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install dependencies
+           run: bundle install
+         - name: Run tests
+           run: rake spec
+     audit:
+       runs-on: cronos
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install dependencies
+           run: bundle install
+         - name: Run bundle audit
+           run: |
+             gem install bundler-audit
+             bundle audit check --update
+   ```
+
+   For tool collectors (SBOM, SAST, etc.), add a job that runs your tool:
+   ```yaml
+   # Example: adding gitleaks to an existing workflow
    gitleaks:
      runs-on: cronos
      steps:
@@ -324,7 +356,8 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
            curl -sSfL <tool-download-url> | tar xz -C /usr/local/bin
            <tool> scan --report-path report.json
    ```
-   Push to trigger the CI workflow. The lunar agent on the `cronos` runner traces commands and feeds data to collectors.
+
+   Push to trigger the CI workflow. The lunar agent on the `cronos` runner traces commands and feeds data to collectors. **Without this workflow, code collectors will still run (they clone the repo directly), but CI collectors will never fire.**
 
 3. **Wait for CI + collection + UI settling** — Watch the workflow complete:
    ```bash
