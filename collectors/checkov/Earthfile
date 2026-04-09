@@ -1,0 +1,17 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Checkov via pip
+    # Build deps needed for some native extensions (pycep-parser, etc.)
+    ARG CHECKOV_VERSION=3.2.360
+    RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev libffi-dev && \
+        pip install --no-cache-dir --break-system-packages "checkov==${CHECKOV_VERSION}" && \
+        apk del .build-deps
+
+    # Verify installation
+    RUN checkov --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:checkov-$VERSION
