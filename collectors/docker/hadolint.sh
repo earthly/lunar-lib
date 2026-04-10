@@ -55,8 +55,6 @@ LINT_RESULTS=$(echo "$RAW_OUTPUT" | jq '
     })
 ')
 
-# Only collect lint_results if there are actual issues
-ISSUE_COUNT=$(echo "$RAW_OUTPUT" | jq 'length')
-if [ "$ISSUE_COUNT" -gt 0 ]; then
-    echo "$LINT_RESULTS" | lunar collect -j ".containers.lint_results" -
-fi
+# Always collect lint_results — even when empty — so the policy can
+# distinguish "ran clean" (pass) from "never ran" (pending).
+echo "$LINT_RESULTS" | lunar collect -j ".containers.lint_results" -
