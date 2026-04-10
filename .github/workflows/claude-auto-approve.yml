@@ -116,7 +116,7 @@ jobs:
 
       - name: Auto-approve PR
         if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
-        uses: hmarr/auto-approve-action@a94899fbcd5680f994689ca31a8a60cde1b24342 # v4
+        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ steps.pr.outputs.pr_number }}
