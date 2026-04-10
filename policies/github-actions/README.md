@@ -1,4 +1,4 @@
-# GitHub Actions Security
+# GitHub Actions Security Guardrails
 
 Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene.
 

@@ -7,7 +7,7 @@ author: support@earthly.dev
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "GitHub Actions Security"
+  display_name: "GitHub Actions Security Guardrails"
   long_description: |
     Enforces security best practices for GitHub Actions workflows. Detects
     template injection, dangerous pull_request_target checkouts, missing
