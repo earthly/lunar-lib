@@ -10,9 +10,9 @@ landing_page:
   display_name: "GitHub Actions Collector"
   long_description: |
     Parses and lints GitHub Actions workflow files. Extracts structured data from
-    every workflow (triggers, jobs, steps, action references), runs actionlint for
-    syntax and type checking, and classifies version pinning status for all
-    third-party action references.
+    every workflow (triggers, jobs, action references), runs actionlint for syntax
+    and type checking, and classifies version pinning status for all third-party
+    action references.
   category: "ci-cd"
   icon: "assets/github-actions.svg"
   status: "beta"
@@ -66,28 +66,8 @@ example_component_json: |
               "file": ".github/workflows/ci.yml",
               "name": "CI",
               "triggers": ["push", "pull_request"],
+              "jobs": ["build", "test", "lint"],
               "permissions": { "contents": "read" },
-              "jobs": {
-                "build": {
-                  "permissions": null,
-                  "steps": [
-                    {
-                      "name": "Checkout",
-                      "uses": "actions/checkout@abc123def456",
-                      "with": { "persist-credentials": false }
-                    },
-                    {
-                      "name": "Run tests",
-                      "run": "echo \"PR: $PR_TITLE\"",
-                      "env": { "PR_TITLE": "${{ github.event.pull_request.title }}" }
-                    }
-                  ]
-                },
-                "deploy": {
-                  "uses": "./.github/workflows/reusable.yml",
-                  "secrets": "inherit"
-                }
-              },
               "actions": [
                 { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
                 { "uses": "docker/build-push-action@v5.1.0", "pinning": "tag", "party": "3rd" },
