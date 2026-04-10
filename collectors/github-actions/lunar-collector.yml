@@ -1,7 +1,7 @@
 version: 0
 
 name: github-actions
-description: Parses GitHub Actions workflows, runs actionlint, and detects version pinning status
+description: Parses GitHub Actions workflows, runs actionlint, detects version pinning, and analyzes security misconfigurations
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:github-actions-main
@@ -9,14 +9,13 @@ default_image: earthly/lunar-lib:github-actions-main
 landing_page:
   display_name: "GitHub Actions Collector"
   long_description: |
-    Parses and lints GitHub Actions workflow files. Extracts structured data from
-    every workflow (triggers, jobs, action references), runs actionlint for syntax
-    and type checking, and classifies version pinning status for all third-party
-    action references.
+    Parses GitHub Actions workflows for lint errors (actionlint), version pinning
+    status, and security misconfigurations. Detects template injection, dangerous
+    checkouts, missing permissions, credential persistence, and secrets inheritance.
   category: "ci-cd"
   icon: "assets/github-actions.svg"
   status: "beta"
-  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
+  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain", "security", "injection", "permissions"]
 
 collectors:
   - name: workflows
@@ -28,6 +27,18 @@ collectors:
     hook:
       type: code
     keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint"]
+
+  - name: security
+    description: |
+      Statically analyzes all GitHub Actions workflow files in .github/workflows/
+      for security misconfigurations: injectable expressions in run: blocks and
+      actions/github-script script: fields, dangerous pull_request_target checkouts,
+      missing or write-all permissions, checkout credential persistence, and
+      secrets inheritance in reusable workflow calls.
+    mainBash: security.sh
+    hook:
+      type: code
+    keywords: ["github-actions", "security", "injection", "permissions", "checkout", "secrets"]
 
 example_component_json: |
   {
@@ -57,6 +68,60 @@ example_component_json: |
           { "name": "docker/login-action", "ref": "main", "pinning": "branch", "party": "3rd" }
         ],
         "third_party_unpinned": ["docker/login-action@main"]
+      },
+      "security": {
+        "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
+        "injectable_expressions": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "build",
+            "step": "Run tests",
+            "expression": "github.event.pull_request.title",
+            "context": "run"
+          },
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "build",
+            "step": "Post comment",
+            "expression": "github.event.issue.body",
+            "context": "script"
+          }
+        ],
+        "dangerous_checkouts": [
+          {
+            "file": ".github/workflows/pr-target.yml",
+            "trigger": "pull_request_target",
+            "job": "build",
+            "step": "Checkout",
+            "checkout_ref": "github.event.pull_request.head.sha"
+          }
+        ],
+        "permissions_missing": [
+          {
+            "file": ".github/workflows/ci.yml"
+          }
+        ],
+        "write_all_permissions": [
+          {
+            "file": ".github/workflows/deploy.yml",
+            "level": "workflow",
+            "value": "write-all"
+          }
+        ],
+        "persist_credentials": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "build",
+            "step": "Checkout"
+          }
+        ],
+        "secrets_inherit": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "deploy",
+            "called_workflow": "./.github/workflows/reusable.yml"
+          }
+        ]
       },
       "native": {
         "github_actions": {

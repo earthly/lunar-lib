@@ -12,7 +12,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description |
 |--------|-------------|
-| `no-script-injection` | Flags attacker-controlled `${{ }}` expressions in `run:` blocks |
+| `no-script-injection` | Flags attacker-controlled `${{ }}` expressions in `run:` blocks and `actions/github-script` `script:` fields |
 | `no-dangerous-trigger-checkout` | Flags `pull_request_target` workflows that check out PR head code |
 | `permissions-declared` | Flags workflows with no explicit `permissions:` key |
 | `no-write-all-permissions` | Flags `permissions: write-all` at workflow or job level |
@@ -25,20 +25,20 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.ci.security.injectable_expressions` | array | `gha-security` collector |
-| `.ci.security.dangerous_checkouts` | array | `gha-security` collector |
-| `.ci.security.permissions_missing` | array | `gha-security` collector |
-| `.ci.security.write_all_permissions` | array | `gha-security` collector |
-| `.ci.security.persist_credentials` | array | `gha-security` collector |
-| `.ci.security.secrets_inherit` | array | `gha-security` collector |
+| `.ci.security.injectable_expressions` | array | `github-actions` collector (security sub-collector) |
+| `.ci.security.dangerous_checkouts` | array | `github-actions` collector (security sub-collector) |
+| `.ci.security.permissions_missing` | array | `github-actions` collector (security sub-collector) |
+| `.ci.security.write_all_permissions` | array | `github-actions` collector (security sub-collector) |
+| `.ci.security.persist_credentials` | array | `github-actions` collector (security sub-collector) |
+| `.ci.security.secrets_inherit` | array | `github-actions` collector (security sub-collector) |
 
-**Note:** Ensure the `gha-security` collector is configured before enabling this policy.
+**Note:** Ensure the `github-actions` collector is configured before enabling this policy.
 
 ## Installation
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/gha-security@main
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
     on: ["domain:your-domain"]
 
 policies:
@@ -58,7 +58,7 @@ All workflows have explicit permissions, no injectable expressions, and secure c
 {
   "ci": {
     "security": {
-      "source": { "tool": "gha-security", "version": "0.1.0", "integration": "code" },
+      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
       "injectable_expressions": [],
       "dangerous_checkouts": [],
       "permissions_missing": [],
@@ -78,7 +78,7 @@ A workflow uses `github.event.pull_request.title` directly in a `run:` block:
 {
   "ci": {
     "security": {
-      "source": { "tool": "gha-security", "version": "0.1.0", "integration": "code" },
+      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
       "injectable_expressions": [
         {
           "file": ".github/workflows/ci.yml",
@@ -93,7 +93,7 @@ A workflow uses `github.event.pull_request.title` directly in a `run:` block:
 }
 ```
 
-**Failure message:** `"1 injectable expression(s) found in run blocks — .github/workflows/ci.yml: job 'greet', step 'Echo PR title' uses github.event.pull_request.title"`
+**Failure message:** `"1 injectable expression(s) found — .github/workflows/ci.yml: job 'greet', step 'Echo PR title' uses github.event.pull_request.title in run block"`
 
 ### Failing Example — Dangerous Checkout
 
@@ -103,7 +103,7 @@ A `pull_request_target` workflow checks out PR head code:
 {
   "ci": {
     "security": {
-      "source": { "tool": "gha-security", "version": "0.1.0", "integration": "code" },
+      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
       "dangerous_checkouts": [
         {
           "file": ".github/workflows/pr-target.yml",
@@ -134,6 +134,22 @@ Use intermediate environment variables instead of inline expressions:
 - run: echo "PR: $PR_TITLE"
   env:
     PR_TITLE: ${{ github.event.pull_request.title }}
+```
+
+For `actions/github-script`, use `context` properties instead of template expressions:
+
+```yaml
+# Bad — injectable
+- uses: actions/github-script@v7
+  with:
+    script: |
+      const title = "${{ github.event.pull_request.title }}";
+
+# Good — safe
+- uses: actions/github-script@v7
+  with:
+    script: |
+      const title = context.payload.pull_request.title;
 ```
 
 ### Dangerous Checkout (`no-dangerous-trigger-checkout`)
@@ -192,4 +208,3 @@ uses: ./.github/workflows/deploy.yml
 secrets:
   DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
 ```
-

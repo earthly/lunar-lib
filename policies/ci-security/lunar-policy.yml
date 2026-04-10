@@ -16,9 +16,9 @@ landing_page:
   icon: "assets/ci-security.svg"
   status: "beta"
   requires:
-    - slug: "gha-security"
+    - slug: "github-actions"
       type: "collector"
-      reason: "Provides security analysis data for GitHub Actions workflows via .ci.security"
+      reason: "Security sub-collector provides workflow analysis data via .ci.security"
   keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
 
 policies:
