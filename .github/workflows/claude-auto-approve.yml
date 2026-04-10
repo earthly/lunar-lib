@@ -9,7 +9,8 @@ jobs:
     name: auto-approve
     if: |
       github.event.check_run.name == 'Claude Code Review' &&
-      github.event.check_run.conclusion == 'neutral'
+      github.event.check_run.conclusion == 'neutral' &&
+      github.event.check_run.app.slug == 'claude'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -57,7 +58,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CHECK_DATA=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
-            --jq '{number: .pull_requests[0].number, base: .pull_requests[0].base.ref}')
+            --jq '{number: .pull_requests[0].number, base: .pull_requests[0].base.ref}') || true
+
+          if [ -z "$CHECK_DATA" ]; then
+            echo "Failed to fetch check-run data, skipping auto-approve"
+            exit 0
+          fi
 
           PR_NUMBER=$(echo "$CHECK_DATA" | jq -r '.number // empty')
           BASE_REF=$(echo "$CHECK_DATA" | jq -r '.base // empty')
@@ -87,7 +93,7 @@ jobs:
 
       - name: Auto-approve PR
         if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != ''
-        uses: hmarr/auto-approve-action@v4
+        uses: hmarr/auto-approve-action@a94899fbcd5680f994689ca31a8a60cde1b24342 # v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ steps.pr.outputs.pr_number }}
