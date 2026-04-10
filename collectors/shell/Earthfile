@@ -1,0 +1,13 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install shellcheck
+    RUN apk add --no-cache shellcheck
+
+    # Verify installation
+    RUN shellcheck --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:shell-$VERSION
