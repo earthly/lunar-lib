@@ -5,6 +5,7 @@ description: Detect shell scripts and run ShellCheck linting for bash/sh files
 author: earthly
 
 default_image: earthly/lunar-lib:shell-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Shell Collector"
@@ -45,6 +46,18 @@ collectors:
       type: code
     keywords: ["shellcheck", "linting", "shell", "bash", "static analysis", "code quality"]
 
+  - name: shellcheck-cicd
+    description: |
+      Detects ShellCheck executions in CI pipelines and records the command
+      and version. Writes CI integration metadata to .lang.shell.native.shellcheck.cicd
+      confirming ShellCheck is part of the CI workflow.
+    mainBash: shellcheck-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: shellcheck
+    keywords: ["shellcheck", "ci", "cicd", "shell", "linting", "pipeline"]
+
 inputs:
   shellcheck_severity:
     description: Minimum ShellCheck severity level to report (error, warning, info, style)
@@ -68,7 +81,11 @@ example_component_json: |
             "error_count": 0,
             "warning_count": 1,
             "info_count": 0,
-            "style_count": 0
+            "style_count": 0,
+            "cicd": {
+              "commands": ["shellcheck scripts/*.sh"],
+              "version": "0.10.0"
+            }
           }
         },
         "lint": {

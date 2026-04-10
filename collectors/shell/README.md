@@ -22,6 +22,8 @@ This collector writes to the following Component JSON paths:
 | `.lang.shell.native.shellcheck.warning_count` | integer | Number of warnings found |
 | `.lang.shell.native.shellcheck.info_count` | integer | Number of informational issues |
 | `.lang.shell.native.shellcheck.style_count` | integer | Number of style suggestions |
+| `.lang.shell.native.shellcheck.cicd.commands` | array | ShellCheck commands detected in CI |
+| `.lang.shell.native.shellcheck.cicd.version` | string | ShellCheck version detected in CI |
 | `.lang.shell.lint.warnings` | array | Normalized lint warnings |
 | `.lang.shell.lint.linters` | array | Linters used (`["shellcheck"]`) |
 | `.lang.shell.lint.source` | object | Source metadata |
@@ -34,6 +36,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 |-----------|-----------|-------------|
 | `project` | code | Detects shell scripts and identifies shell types from shebangs |
 | `shellcheck` | code | Runs ShellCheck and writes lint results |
+| `shellcheck-cicd` | ci-before-command | Detects ShellCheck usage in CI pipelines |
 
 ## Installation
 
@@ -43,7 +46,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/shell@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, shellcheck]  # Only include specific subcollectors
+    # include: [project, shellcheck, shellcheck-cicd]  # Only include specific subcollectors
     # with:
     #   shellcheck_severity: "warning"  # Minimum severity: error, warning, info, style (default: style)
 ```
