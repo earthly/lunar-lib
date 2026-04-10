@@ -433,7 +433,9 @@ Commit and push the implementation to the same PR branch. CI will run automatica
 
 ### Then wait for approval
 
-Claude will automatically review the PR when it's opened (or converted from draft). Address its inline comments, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging. You can request a re-review by commenting `@claude review once` on the PR.
+Claude will automatically review the PR when it's opened (or converted from draft). Address its inline comments, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
+
+You can request a re-review by commenting `@claude review once` on the PR, but **be mindful of costs** (~$15-25 per review). Only request a re-review when there have been significant code changes — e.g., after initially implementing code for a spec-only PR, or after a major refactor. For minor fixes (typos, small bug fixes, addressing review feedback), skip the re-review.
 
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale.
 
