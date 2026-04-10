@@ -49,6 +49,7 @@ collectors:
     on: ["domain:your-domain"]  # replace with your own domain or tags
     # include: [project, shellcheck, shellcheck-cicd]  # Only include specific subcollectors
     # with:
+    #   find_command: "find . -type f -name '*.sh' -not -path '*/node_modules/*'"  # Override file discovery
     #   shellcheck_severity: "warning"  # Minimum severity: error, warning, info, style (default: style)
 ```
 

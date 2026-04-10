@@ -59,6 +59,9 @@ collectors:
     keywords: ["shellcheck", "ci", "cicd", "shell", "linting", "pipeline"]
 
 inputs:
+  find_command:
+    description: Command to find shell scripts (must output one file path per line)
+    default: "find . -type f \\( -name '*.sh' -o -name '*.bash' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/.terraform/*'"
   shellcheck_severity:
     description: Minimum ShellCheck severity level to report (error, warning, info, style)
     default: "style"
