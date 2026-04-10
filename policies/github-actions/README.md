@@ -4,7 +4,7 @@ Enforces GitHub Actions security best practices — injection prevention, least-
 
 ## Overview
 
-Checks GitHub Actions workflows for six categories of security misconfiguration that have led to real-world supply chain compromises. All checks are based on static YAML analysis — no runtime data needed. Skips gracefully when no GitHub Actions security data is available (i.e., component has no `.github/workflows/` directory). Complements the general `ci` policy (which covers vendor-agnostic lint and dependency pinning) with GHA-specific security checks. Different from the `sast` policy (which covers application code analysis, not CI configuration).
+Checks GitHub Actions workflows for six categories of security misconfiguration that have led to real-world supply chain compromises. All checks analyze the parsed workflow data collected by the `github-actions` collector — no separate security collector needed. Skips gracefully when no GitHub Actions workflow data is available (i.e., component has no `.github/workflows/` directory). Complements the general `ci` policy (which covers vendor-agnostic lint and dependency pinning) with GHA-specific security checks. Different from the `sast` policy (which covers application code analysis, not CI configuration).
 
 ## Policies
 
@@ -25,12 +25,9 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.ci.native.github_actions.security.injectable_expressions` | array | `github-actions` collector (security sub-collector) |
-| `.ci.native.github_actions.security.dangerous_checkouts` | array | `github-actions` collector (security sub-collector) |
-| `.ci.native.github_actions.security.permissions_missing` | array | `github-actions` collector (security sub-collector) |
-| `.ci.native.github_actions.security.write_all_permissions` | array | `github-actions` collector (security sub-collector) |
-| `.ci.native.github_actions.security.persist_credentials` | array | `github-actions` collector (security sub-collector) |
-| `.ci.native.github_actions.security.secrets_inherit` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.workflows[]` | array | `github-actions` collector (workflows sub-collector) |
+
+The policy walks the parsed workflow data (triggers, permissions, jobs, steps, run blocks, with parameters) and applies security rules directly. No pre-processed security data needed — the collector just gathers the raw workflow structure.
 
 **Note:** Ensure the `github-actions` collector is configured before enabling this policy.
 
@@ -52,21 +49,37 @@ policies:
 
 ### Passing Example
 
-All workflows have explicit permissions, no injectable expressions, and secure checkout configuration:
+Workflow has explicit permissions, safe env-var indirection for user input, and secure checkout:
 
 ```json
 {
   "ci": {
     "native": {
       "github_actions": {
-        "security": {
-          "injectable_expressions": [],
-          "dangerous_checkouts": [],
-          "permissions_missing": [],
-          "write_all_permissions": [],
-          "persist_credentials": [],
-          "secrets_inherit": []
-        }
+        "workflows": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "name": "CI",
+            "triggers": ["push", "pull_request"],
+            "permissions": { "contents": "read" },
+            "jobs": {
+              "build": {
+                "steps": [
+                  {
+                    "name": "Checkout",
+                    "uses": "actions/checkout@abc123",
+                    "with": { "persist-credentials": false }
+                  },
+                  {
+                    "name": "Run tests",
+                    "run": "echo \"PR: $PR_TITLE\"",
+                    "env": { "PR_TITLE": "${{ github.event.pull_request.title }}" }
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     }
   }
@@ -75,24 +88,29 @@ All workflows have explicit permissions, no injectable expressions, and secure c
 
 ### Failing Example — Script Injection
 
-A workflow uses `github.event.pull_request.title` directly in a `run:` block:
+A workflow uses `github.event.pull_request.title` directly in a `run:` block (not via env var):
 
 ```json
 {
   "ci": {
     "native": {
       "github_actions": {
-        "security": {
-          "injectable_expressions": [
-            {
-              "file": ".github/workflows/ci.yml",
-              "job": "greet",
-              "step": "Echo PR title",
-              "expression": "github.event.pull_request.title",
-              "context": "run"
+        "workflows": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "triggers": ["pull_request"],
+            "jobs": {
+              "greet": {
+                "steps": [
+                  {
+                    "name": "Echo PR title",
+                    "run": "echo \"PR: ${{ github.event.pull_request.title }}\""
+                  }
+                ]
+              }
             }
-          ]
-        }
+          }
+        ]
       }
     }
   }
@@ -110,17 +128,23 @@ A `pull_request_target` workflow checks out PR head code:
   "ci": {
     "native": {
       "github_actions": {
-        "security": {
-          "dangerous_checkouts": [
-            {
-              "file": ".github/workflows/pr-target.yml",
-              "trigger": "pull_request_target",
-              "job": "build",
-              "step": "Checkout",
-              "checkout_ref": "github.event.pull_request.head.sha"
+        "workflows": [
+          {
+            "file": ".github/workflows/pr-target.yml",
+            "triggers": ["pull_request_target"],
+            "jobs": {
+              "build": {
+                "steps": [
+                  {
+                    "name": "Checkout",
+                    "uses": "actions/checkout@v4",
+                    "with": { "ref": "${{ github.event.pull_request.head.sha }}" }
+                  }
+                ]
+              }
             }
-          ]
-        }
+          }
+        ]
       }
     }
   }

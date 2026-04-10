@@ -1,10 +1,10 @@
 # GitHub Actions Collector
 
-Parses GitHub Actions workflows, runs actionlint, detects version pinning, and analyzes security misconfigurations.
+Parses GitHub Actions workflows, runs actionlint, and detects version pinning status for supply-chain hygiene.
 
 ## Overview
 
-This collector analyzes all GitHub Actions workflow files (`.github/workflows/*.yml`) in a repository. It extracts structured data from each workflow (name, triggers, jobs, action references), runs [actionlint](https://github.com/rhysd/actionlint) for syntax and type checking, classifies version pinning status for every action reference, and performs security analysis for injection risks, permissions issues, and credential hygiene. Skips gracefully if no `.github/workflows/` directory exists.
+This collector analyzes all GitHub Actions workflow files (`.github/workflows/*.yml`) in a repository. It extracts structured data from each workflow (name, triggers, jobs, steps, action references), runs [actionlint](https://github.com/rhysd/actionlint) for syntax and type checking, and classifies version pinning status for every action reference. The native data includes full step-level details (run blocks, with parameters, env vars) for downstream policy analysis. Skips gracefully if no `.github/workflows/` directory exists.
 
 ## Collected Data
 
@@ -21,13 +21,7 @@ This collector writes to **normalized** (vendor-agnostic) and **native** (GHA-sp
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.native.github_actions` | object | Raw GHA workflow data (full parsed workflows with triggers, jobs, permissions, action refs) |
-| `.ci.native.github_actions.security.injectable_expressions[]` | array | `${{ }}` expressions in `run:` blocks and `actions/github-script` `script:` fields using attacker-controllable contexts |
-| `.ci.native.github_actions.security.dangerous_checkouts[]` | array | `pull_request_target` workflows that check out PR head code |
-| `.ci.native.github_actions.security.permissions_missing[]` | array | Workflows with no explicit `permissions:` key |
-| `.ci.native.github_actions.security.write_all_permissions[]` | array | Workflows or jobs with `permissions: write-all` |
-| `.ci.native.github_actions.security.persist_credentials[]` | array | `actions/checkout` steps without `persist-credentials: false` |
-| `.ci.native.github_actions.security.secrets_inherit[]` | array | Reusable workflow calls using `secrets: inherit` |
+| `.ci.native.github_actions.workflows[]` | array | Full parsed workflows with triggers, jobs, steps, permissions, action refs, run blocks, with parameters |
 
 ## Collectors
 
@@ -36,7 +30,6 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |-----------|-------------|
 | `workflows` | Parses workflows, runs actionlint, and detects version pinning |
-| `security` | Analyzes workflows for injection risks, permission issues, and insecure patterns |
 
 ## Installation
 
