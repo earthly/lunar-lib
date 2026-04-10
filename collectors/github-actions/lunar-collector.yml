@@ -66,7 +66,20 @@ example_component_json: |
               "file": ".github/workflows/ci.yml",
               "name": "CI",
               "triggers": ["push", "pull_request"],
-              "jobs": ["build", "test", "lint"],
+              "jobs": {
+                "build": {
+                  "steps": [
+                    { "uses": "actions/checkout@abc123def456", "with": { "persist-credentials": false } },
+                    { "run": "make build" }
+                  ]
+                },
+                "test": {
+                  "steps": [
+                    { "uses": "actions/checkout@abc123def456" },
+                    { "run": "make test" }
+                  ]
+                }
+              },
               "permissions": { "contents": "read" },
               "actions": [
                 { "uses": "actions/checkout@abc123def456", "pinning": "sha", "party": "1st" },
