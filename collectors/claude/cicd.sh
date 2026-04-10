@@ -22,20 +22,21 @@ MCP_CONFIG=$(extract_flag_value "$CMD_STR" "--mcp-config")
 
 # Build JSON — native bash (no jq in CI collectors)
 JSON="{"
-JSON="$JSON\"cmd\": \"$(echo "$CMD_STR" | sed 's/"/\\"/g')\","
+JSON="$JSON\"cmd\": "$(json_escape "$CMD_STR")","
+JSON="$JSON\"cmd_args\": $LUNAR_CI_COMMAND,"
 JSON="$JSON\"tool\": \"$TOOL\","
 JSON="$JSON\"version\": \"$VERSION\""
 
-[ -n "$ALLOWED_TOOLS" ] && JSON="$JSON,\"allowed_tools\": \"$(echo "$ALLOWED_TOOLS" | sed 's/"/\\"/g')\""
-[ -n "$DISALLOWED_TOOLS" ] && JSON="$JSON,\"disallowed_tools\": \"$(echo "$DISALLOWED_TOOLS" | sed 's/"/\\"/g')\""
-[ -n "$TOOLS_RESTRICTION" ] && JSON="$JSON,\"tools_restriction\": \"$(echo "$TOOLS_RESTRICTION" | sed 's/"/\\"/g')\""
-[ -n "$MCP_CONFIG" ] && JSON="$JSON,\"mcp_config\": \"$(echo "$MCP_CONFIG" | sed 's/"/\\"/g')\""
+[ -n "$ALLOWED_TOOLS" ] && JSON="$JSON,\"allowed_tools\": "$(json_escape "$ALLOWED_TOOLS")""
+[ -n "$DISALLOWED_TOOLS" ] && JSON="$JSON,\"disallowed_tools\": "$(json_escape "$DISALLOWED_TOOLS")""
+[ -n "$TOOLS_RESTRICTION" ] && JSON="$JSON,\"tools_restriction\": "$(json_escape "$TOOLS_RESTRICTION")""
+[ -n "$MCP_CONFIG" ] && JSON="$JSON,\"mcp_config\": "$(json_escape "$MCP_CONFIG")""
 
 JSON="$JSON}"
 
 echo "[$JSON]" | lunar collect -j ".ai.native.claude.cicd.cmds" -
 
 # If review mode detected, also write to normalized code_reviewers
-if echo "$CMD_STR" | grep -qE '\-\-review|review-mode|code.review'; then
+if echo "$CMD_STR" | grep -qE '\-\-review|review-mode|code[._-]review'; then
   echo "{\"tool\":\"claude\",\"check_name\":\"claude-cli-review\",\"detected\":true,\"last_seen\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" | lunar collect -j ".ai.code_reviewers[]" -
 fi

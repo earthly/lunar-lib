@@ -14,6 +14,11 @@ parse_cmd_str() {
   echo "$LUNAR_CI_COMMAND" | sed 's/^\[//; s/\]$//; s/","/ /g; s/"//g'
 }
 
+# Escape a string for safe embedding in a JSON string value.
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' '
+}
+
 # Extract a single flag value from a command string.
 extract_flag_value() {
   local cmd="$1"
