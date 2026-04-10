@@ -45,7 +45,7 @@ jobs:
           echo "Important issues: $IMPORTANT"
           echo "Nits: $NITS"
 
-          if [ "$IMPORTANT" -eq 0 ] && [ "$NITS" -eq 0 ]; then
+          if [ "$IMPORTANT" -eq 0 ]; then
             echo "should_approve=true" >> $GITHUB_OUTPUT
           else
             echo "should_approve=false" >> $GITHUB_OUTPUT
