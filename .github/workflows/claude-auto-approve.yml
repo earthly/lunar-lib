@@ -114,17 +114,6 @@ jobs:
             echo "head_matches=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Post approval comment
-        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment ${{ steps.pr.outputs.pr_number }} \
-            --repo ${{ github.repository }} \
-            --body "## Claude Auto-Approve
-
-          Claude Code Review found no issues. ✅ **Auto-approved.**"
-
       - name: Auto-approve PR
         if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
         uses: hmarr/auto-approve-action@a94899fbcd5680f994689ca31a8a60cde1b24342 # v4
