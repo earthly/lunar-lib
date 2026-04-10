@@ -78,6 +78,14 @@ jobs:
             exit 0
           fi
 
+          IS_DRAFT=$(gh pr view "$PR_NUMBER" \
+            --repo ${{ github.repository }} \
+            --json isDraft --jq .isDraft) || true
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "PR #$PR_NUMBER is a draft, skipping auto-approve"
+            exit 0
+          fi
+
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
       - name: Verify PR head matches reviewed commit
