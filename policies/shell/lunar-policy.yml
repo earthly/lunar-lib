@@ -19,10 +19,7 @@ landing_page:
     - slug: "shell"
       type: "collector"
       reason: "Provides ShellCheck lint data for shell scripts"
-  related:
-    - slug: "linter"
-      type: "policy"
-      reason: "Generic linter guardrails also compatible with shell lint data"
+  related: []
 
 policies:
   - name: shellcheck-clean
