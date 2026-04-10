@@ -10,8 +10,9 @@ landing_page:
   display_name: "Shell Guardrails"
   long_description: |
     Enforce shell script quality standards by validating ShellCheck results.
-    Ensures shell scripts are free of errors and warnings for consistent,
-    safe scripting practices.
+    Ensures ShellCheck finds no issues at or above the configured severity
+    level (default: style — all issues). Configurable via the collector's
+    shellcheck_severity input.
   category: "testing-and-quality"
   icon: "assets/shell.svg"
   status: "beta"
@@ -24,8 +25,8 @@ landing_page:
 policies:
   - name: shellcheck-clean
     description: |
-      Ensures ShellCheck reports no errors or warnings on shell scripts.
-      Skips if no shell scripts are detected in the component.
+      Ensures ShellCheck finds no issues at or above the configured severity
+      level. Skips if no shell scripts are detected in the component.
       Configurable warning threshold via max_shellcheck_warnings input.
     mainPython: shellcheck_clean.py
     keywords: ["shellcheck", "shell", "bash", "linting", "clean", "code quality"]

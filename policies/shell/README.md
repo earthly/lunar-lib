@@ -4,7 +4,7 @@ Enforces shell script quality standards using ShellCheck lint data.
 
 ## Overview
 
-This policy validates that ShellCheck runs cleanly against shell scripts in a component. It checks for errors and warnings, ensuring scripts follow best practices for portability, quoting, and correctness. Skips gracefully if no shell scripts are detected.
+This policy validates that ShellCheck runs cleanly against shell scripts in a component. It checks for issues at or above the configured severity level (default: style — all issues), ensuring scripts follow best practices for portability, quoting, and correctness. Skips gracefully if no shell scripts are detected.
 
 ## Policies
 
@@ -12,7 +12,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `shellcheck-clean` | Ensures no ShellCheck errors or warnings | ShellCheck found issues in shell scripts |
+| `shellcheck-clean` | Ensures no ShellCheck issues at or above configured severity | ShellCheck found issues in shell scripts |
 
 ## Required Data
 

@@ -15,13 +15,13 @@ This collector writes to the following Component JSON paths:
 | `.lang.shell.script_count` | integer | Number of shell scripts detected |
 | `.lang.shell.shells` | array | Shell types found (e.g., `["bash", "sh"]`) |
 | `.lang.shell.source` | object | Source metadata |
-| `.lang.shell.shellcheck.passed` | boolean | Whether ShellCheck found no issues |
-| `.lang.shell.shellcheck.version` | string | ShellCheck version used |
-| `.lang.shell.shellcheck.files_checked` | integer | Number of files checked |
-| `.lang.shell.shellcheck.error_count` | integer | Number of errors found |
-| `.lang.shell.shellcheck.warning_count` | integer | Number of warnings found |
-| `.lang.shell.shellcheck.info_count` | integer | Number of informational issues |
-| `.lang.shell.shellcheck.style_count` | integer | Number of style suggestions |
+| `.lang.shell.native.shellcheck.passed` | boolean | Whether ShellCheck found no issues |
+| `.lang.shell.native.shellcheck.version` | string | ShellCheck version used |
+| `.lang.shell.native.shellcheck.files_checked` | integer | Number of files checked |
+| `.lang.shell.native.shellcheck.error_count` | integer | Number of errors found |
+| `.lang.shell.native.shellcheck.warning_count` | integer | Number of warnings found |
+| `.lang.shell.native.shellcheck.info_count` | integer | Number of informational issues |
+| `.lang.shell.native.shellcheck.style_count` | integer | Number of style suggestions |
 | `.lang.shell.lint.warnings` | array | Normalized lint warnings |
 | `.lang.shell.lint.linters` | array | Linters used (`["shellcheck"]`) |
 | `.lang.shell.lint.source` | object | Source metadata |

@@ -5,7 +5,6 @@ description: Detect shell scripts and run ShellCheck linting for bash/sh files
 author: earthly
 
 default_image: earthly/lunar-lib:shell-main
-default_image_ci_collectors: native
 
 landing_page:
   display_name: "Shell Collector"
@@ -39,7 +38,7 @@ collectors:
     description: |
       Runs ShellCheck against all detected shell scripts with JSON output.
       Parses results into normalized lint warnings at .lang.shell.lint and
-      tool-specific summary data at .lang.shell.shellcheck including
+      tool-specific summary data at .lang.shell.native.shellcheck including
       pass/fail status and per-severity issue counts.
     mainBash: shellcheck.sh
     hook:
@@ -61,14 +60,16 @@ example_component_json: |
           "tool": "shell-collector",
           "integration": "code"
         },
-        "shellcheck": {
-          "passed": true,
-          "version": "0.10.0",
-          "files_checked": 3,
-          "error_count": 0,
-          "warning_count": 0,
-          "info_count": 0,
-          "style_count": 0
+        "native": {
+          "shellcheck": {
+            "passed": false,
+            "version": "0.10.0",
+            "files_checked": 3,
+            "error_count": 0,
+            "warning_count": 1,
+            "info_count": 0,
+            "style_count": 0
+          }
         },
         "lint": {
           "warnings": [
