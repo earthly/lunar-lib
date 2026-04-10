@@ -8,7 +8,7 @@ This collector analyzes all GitHub Actions workflow files (`.github/workflows/*.
 
 ## Collected Data
 
-This collector writes to **normalized** (vendor-agnostic), **security**, and **native** (GHA-specific) Component JSON paths:
+This collector writes to **normalized** (vendor-agnostic) and **native** (GHA-specific) Component JSON paths:
 
 ### Normalized paths
 
@@ -17,23 +17,17 @@ This collector writes to **normalized** (vendor-agnostic), **security**, and **n
 | `.ci.lint` | object | CI config lint results (errors with file/line/rule, counts) |
 | `.ci.dependencies` | object | CI dependency pinning status (total, pinned, unpinned, item details) |
 
-### Security paths
-
-| Path | Type | Description |
-|------|------|-------------|
-| `.ci.security.source` | object | Tool metadata (`tool`, `version`, `integration`) |
-| `.ci.security.injectable_expressions[]` | array | `${{ }}` expressions in `run:` blocks and `actions/github-script` `script:` fields using attacker-controllable contexts |
-| `.ci.security.dangerous_checkouts[]` | array | `pull_request_target` workflows that check out PR head code |
-| `.ci.security.permissions_missing[]` | array | Workflows with no explicit `permissions:` key |
-| `.ci.security.write_all_permissions[]` | array | Workflows or jobs with `permissions: write-all` |
-| `.ci.security.persist_credentials[]` | array | `actions/checkout` steps without `persist-credentials: false` |
-| `.ci.security.secrets_inherit[]` | array | Reusable workflow calls using `secrets: inherit` |
-
 ### Native paths
 
 | Path | Type | Description |
 |------|------|-------------|
 | `.ci.native.github_actions` | object | Raw GHA workflow data (full parsed workflows with triggers, jobs, permissions, action refs) |
+| `.ci.native.github_actions.security.injectable_expressions[]` | array | `${{ }}` expressions in `run:` blocks and `actions/github-script` `script:` fields using attacker-controllable contexts |
+| `.ci.native.github_actions.security.dangerous_checkouts[]` | array | `pull_request_target` workflows that check out PR head code |
+| `.ci.native.github_actions.security.permissions_missing[]` | array | Workflows with no explicit `permissions:` key |
+| `.ci.native.github_actions.security.write_all_permissions[]` | array | Workflows or jobs with `permissions: write-all` |
+| `.ci.native.github_actions.security.persist_credentials[]` | array | `actions/checkout` steps without `persist-credentials: false` |
+| `.ci.native.github_actions.security.secrets_inherit[]` | array | Reusable workflow calls using `secrets: inherit` |
 
 ## Collectors
 

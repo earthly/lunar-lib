@@ -69,60 +69,6 @@ example_component_json: |
         ],
         "third_party_unpinned": ["docker/login-action@main"]
       },
-      "security": {
-        "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
-        "injectable_expressions": [
-          {
-            "file": ".github/workflows/ci.yml",
-            "job": "build",
-            "step": "Run tests",
-            "expression": "github.event.pull_request.title",
-            "context": "run"
-          },
-          {
-            "file": ".github/workflows/ci.yml",
-            "job": "build",
-            "step": "Post comment",
-            "expression": "github.event.issue.body",
-            "context": "script"
-          }
-        ],
-        "dangerous_checkouts": [
-          {
-            "file": ".github/workflows/pr-target.yml",
-            "trigger": "pull_request_target",
-            "job": "build",
-            "step": "Checkout",
-            "checkout_ref": "github.event.pull_request.head.sha"
-          }
-        ],
-        "permissions_missing": [
-          {
-            "file": ".github/workflows/ci.yml"
-          }
-        ],
-        "write_all_permissions": [
-          {
-            "file": ".github/workflows/deploy.yml",
-            "level": "workflow",
-            "value": "write-all"
-          }
-        ],
-        "persist_credentials": [
-          {
-            "file": ".github/workflows/ci.yml",
-            "job": "build",
-            "step": "Checkout"
-          }
-        ],
-        "secrets_inherit": [
-          {
-            "file": ".github/workflows/ci.yml",
-            "job": "deploy",
-            "called_workflow": "./.github/workflows/reusable.yml"
-          }
-        ]
-      },
       "native": {
         "github_actions": {
           "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
@@ -139,7 +85,60 @@ example_component_json: |
                 { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
               ]
             }
-          ]
+          ],
+          "security": {
+            "injectable_expressions": [
+              {
+                "file": ".github/workflows/ci.yml",
+                "job": "build",
+                "step": "Run tests",
+                "expression": "github.event.pull_request.title",
+                "context": "run"
+              },
+              {
+                "file": ".github/workflows/ci.yml",
+                "job": "build",
+                "step": "Post comment",
+                "expression": "github.event.issue.body",
+                "context": "script"
+              }
+            ],
+            "dangerous_checkouts": [
+              {
+                "file": ".github/workflows/pr-target.yml",
+                "trigger": "pull_request_target",
+                "job": "build",
+                "step": "Checkout",
+                "checkout_ref": "github.event.pull_request.head.sha"
+              }
+            ],
+            "permissions_missing": [
+              {
+                "file": ".github/workflows/ci.yml"
+              }
+            ],
+            "write_all_permissions": [
+              {
+                "file": ".github/workflows/deploy.yml",
+                "level": "workflow",
+                "value": "write-all"
+              }
+            ],
+            "persist_credentials": [
+              {
+                "file": ".github/workflows/ci.yml",
+                "job": "build",
+                "step": "Checkout"
+              }
+            ],
+            "secrets_inherit": [
+              {
+                "file": ".github/workflows/ci.yml",
+                "job": "deploy",
+                "called_workflow": "./.github/workflows/reusable.yml"
+              }
+            ]
+          }
         }
       }
     }

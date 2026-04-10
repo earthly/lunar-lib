@@ -25,12 +25,12 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.ci.security.injectable_expressions` | array | `github-actions` collector (security sub-collector) |
-| `.ci.security.dangerous_checkouts` | array | `github-actions` collector (security sub-collector) |
-| `.ci.security.permissions_missing` | array | `github-actions` collector (security sub-collector) |
-| `.ci.security.write_all_permissions` | array | `github-actions` collector (security sub-collector) |
-| `.ci.security.persist_credentials` | array | `github-actions` collector (security sub-collector) |
-| `.ci.security.secrets_inherit` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.injectable_expressions` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.dangerous_checkouts` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.permissions_missing` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.write_all_permissions` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.persist_credentials` | array | `github-actions` collector (security sub-collector) |
+| `.ci.native.github_actions.security.secrets_inherit` | array | `github-actions` collector (security sub-collector) |
 
 **Note:** Ensure the `github-actions` collector is configured before enabling this policy.
 
@@ -57,14 +57,17 @@ All workflows have explicit permissions, no injectable expressions, and secure c
 ```json
 {
   "ci": {
-    "security": {
-      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
-      "injectable_expressions": [],
-      "dangerous_checkouts": [],
-      "permissions_missing": [],
-      "write_all_permissions": [],
-      "persist_credentials": [],
-      "secrets_inherit": []
+    "native": {
+      "github_actions": {
+        "security": {
+          "injectable_expressions": [],
+          "dangerous_checkouts": [],
+          "permissions_missing": [],
+          "write_all_permissions": [],
+          "persist_credentials": [],
+          "secrets_inherit": []
+        }
+      }
     }
   }
 }
@@ -77,17 +80,20 @@ A workflow uses `github.event.pull_request.title` directly in a `run:` block:
 ```json
 {
   "ci": {
-    "security": {
-      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
-      "injectable_expressions": [
-        {
-          "file": ".github/workflows/ci.yml",
-          "job": "greet",
-          "step": "Echo PR title",
-          "expression": "github.event.pull_request.title",
-          "context": "run"
+    "native": {
+      "github_actions": {
+        "security": {
+          "injectable_expressions": [
+            {
+              "file": ".github/workflows/ci.yml",
+              "job": "greet",
+              "step": "Echo PR title",
+              "expression": "github.event.pull_request.title",
+              "context": "run"
+            }
+          ]
         }
-      ]
+      }
     }
   }
 }
@@ -102,17 +108,20 @@ A `pull_request_target` workflow checks out PR head code:
 ```json
 {
   "ci": {
-    "security": {
-      "source": { "tool": "github-actions", "version": "0.1.0", "integration": "code" },
-      "dangerous_checkouts": [
-        {
-          "file": ".github/workflows/pr-target.yml",
-          "trigger": "pull_request_target",
-          "job": "build",
-          "step": "Checkout",
-          "checkout_ref": "github.event.pull_request.head.sha"
+    "native": {
+      "github_actions": {
+        "security": {
+          "dangerous_checkouts": [
+            {
+              "file": ".github/workflows/pr-target.yml",
+              "trigger": "pull_request_target",
+              "job": "build",
+              "step": "Checkout",
+              "checkout_ref": "github.event.pull_request.head.sha"
+            }
+          ]
         }
-      ]
+      }
     }
   }
 }
