@@ -18,7 +18,7 @@ landing_page:
   requires:
     - slug: "github-actions"
       type: "collector"
-      reason: "Security sub-collector provides workflow analysis data via .ci.security"
+      reason: "Provides workflow security analysis data at .ci.security (injectable expressions, permissions, checkouts, secrets)"
   keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
 
 policies:
