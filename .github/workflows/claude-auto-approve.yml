@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SEVERITY=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
-            --jq '.output.text | split("bughunter-severity: ")[1] | split(" -->")[0]')
+            --jq '(.output.text // "") | split("bughunter-severity: ")[1] // "" | split(" -->")[0] // ""') || true
 
           echo "Raw severity: $SEVERITY"
 
@@ -50,11 +50,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
-            --jq '.pull_requests[0].number // empty')
+          CHECK_DATA=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
+            --jq '{number: .pull_requests[0].number, base: .pull_requests[0].base.ref}')
+
+          PR_NUMBER=$(echo "$CHECK_DATA" | jq -r '.number // empty')
+          BASE_REF=$(echo "$CHECK_DATA" | jq -r '.base // empty')
 
           if [ -z "$PR_NUMBER" ]; then
             echo "No PR associated with this check run"
+            exit 0
+          fi
+
+          if [ "$BASE_REF" != "main" ]; then
+            echo "PR #$PR_NUMBER targets $BASE_REF, not main — skipping auto-approve"
             exit 0
           fi
 
