@@ -4,7 +4,7 @@ name: claude
 description: Detect Claude code review activity, CI usage, instruction files, and run AI prompts against code
 author: support@earthly.dev
 
-image: +image
+default_image: earthly/lunar-lib:claude-main
 default_image_ci_collectors: native
 
 landing_page:

@@ -6,10 +6,7 @@ def main(node=None):
     with c:
         plans_dir = c.get_node(".ai.plans_dir")
         if not plans_dir.exists():
-            c.fail(
-                "No plans directory found (e.g. .agents/plans/). "
-                "Create one to keep AI-generated plans organized and reviewable."
-            )
+            c.skip("No plans directory data collected — enable the ai collector")
             return c
 
         exists = plans_dir.get_value(".exists")

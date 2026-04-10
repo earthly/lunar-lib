@@ -6,15 +6,15 @@ def main(node=None):
     with c:
         authorship = c.get_node(".ai.authorship")
         if not authorship.exists():
-            c.fail("No AI authorship annotation data found for this component")
+            c.skip("No authorship data collected — enable the ai collector")
             return c
 
-        total = authorship.get_value(".total_commits")
+        total = authorship.get_value_or_default(".total_commits", 0)
 
         if total == 0:
             return c
 
-        annotated = authorship.get_value(".annotated_commits")
+        annotated = authorship.get_value_or_default(".annotated_commits", 0)
         min_pct = int(variable_or_default("min_annotation_percentage", "0"))
 
         actual_pct = (annotated / total) * 100

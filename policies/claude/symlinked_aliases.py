@@ -6,7 +6,7 @@ def main(node=None):
     with c:
         instr = c.get_node(".ai.native.claude.instruction_file")
         if not instr.exists():
-            c.fail("No CLAUDE.md found — Claude Code requires CLAUDE.md (symlinked to AGENTS.md)")
+            c.skip("No Claude instruction file data collected — enable the claude collector")
             return c
 
         exists = instr.get_value(".exists")

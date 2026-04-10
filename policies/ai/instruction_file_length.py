@@ -6,16 +6,19 @@ def main(node=None):
     with c:
         instructions = c.get_node(".ai.instructions")
         if not instructions.exists():
-            c.fail("No agent instruction file found at repository root")
+            c.skip("No instruction file data collected — enable the ai collector")
             return c
 
         exists = instructions.get_value(".root.exists")
+        if not exists:
+            c.fail("No agent instruction file found at repository root")
+            return c
 
         min_lines = int(variable_or_default("min_lines", "10"))
         max_lines = int(variable_or_default("max_lines", "300"))
         max_total_bytes = int(variable_or_default("max_total_bytes", "32768"))
 
-        lines = instructions.get_value_or_default(".root.lines", 0) if exists else 0
+        lines = instructions.get_value_or_default(".root.lines", 0)
 
         if min_lines > 0:
             c.assert_greater_or_equal(

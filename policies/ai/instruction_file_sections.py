@@ -21,9 +21,7 @@ def main(node=None):
             )
 
         if not instructions.exists():
-            c.fail(
-                f"No instruction file at root — missing required sections: {', '.join(required)}"
-            )
+            c.skip("No instruction file data collected — enable the ai collector")
             return c
 
         exists = instructions.get_value(".root.exists")

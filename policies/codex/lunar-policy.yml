@@ -39,7 +39,7 @@ policies:
 inputs:
   dangerous_flags:
     description: Comma-separated dangerous flags for Codex CLI
-    default: "--full-auto"
+    default: "--dangerously-bypass-approvals-and-sandbox,--yolo,--full-auto"
 
 example_component_json: |
   {

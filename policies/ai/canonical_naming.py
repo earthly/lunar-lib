@@ -6,7 +6,7 @@ def main(node=None):
     with c:
         instructions = c.get_node(".ai.instructions")
         if not instructions.exists():
-            c.fail("No agent instruction file found at repository root")
+            c.skip("No instruction file data collected — enable the ai collector")
             return c
 
         exists = instructions.get_value(".root.exists")
