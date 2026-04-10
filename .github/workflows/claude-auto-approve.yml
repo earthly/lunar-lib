@@ -39,8 +39,8 @@ jobs:
             exit 0
           fi
 
-          IMPORTANT=$(echo "$SEVERITY" | jq -r '.normal // 0')
-          NITS=$(echo "$SEVERITY" | jq -r '.nit // 0')
+          IMPORTANT=$(echo "$SEVERITY" | jq -r '.normal // 0 | floor')
+          NITS=$(echo "$SEVERITY" | jq -r '.nit // 0 | floor')
 
           echo "Important issues: $IMPORTANT"
           echo "Nits: $NITS"
@@ -80,8 +80,34 @@ jobs:
 
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
-      - name: Post approval comment
+      - name: Verify PR head matches reviewed commit
         if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != ''
+        id: verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_HEAD=$(gh pr view ${{ steps.pr.outputs.pr_number }} \
+            --repo ${{ github.repository }} \
+            --json headRefOid --jq .headRefOid) || true
+
+          REVIEWED_SHA="${{ github.event.check_run.head_sha }}"
+
+          if [ -z "$CURRENT_HEAD" ]; then
+            echo "Failed to fetch PR head, skipping auto-approve"
+            echo "head_matches=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$CURRENT_HEAD" != "$REVIEWED_SHA" ]; then
+            echo "PR HEAD ($CURRENT_HEAD) differs from reviewed commit ($REVIEWED_SHA) — skipping auto-approve"
+            echo "head_matches=false" >> $GITHUB_OUTPUT
+          else
+            echo "PR HEAD matches reviewed commit"
+            echo "head_matches=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post approval comment
+        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -92,7 +118,7 @@ jobs:
           Claude Code Review found no issues. ✅ **Auto-approved.**"
 
       - name: Auto-approve PR
-        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != ''
+        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
         uses: hmarr/auto-approve-action@a94899fbcd5680f994689ca31a8a60cde1b24342 # v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
