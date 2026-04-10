@@ -433,7 +433,7 @@ Commit and push the implementation to the same PR branch. CI will run automatica
 
 ### Then wait for approval
 
-CodeRabbit will automatically review the PR. Address its feedback, but **use judgment** — CodeRabbit sometimes flags things that aren't real issues or suggests unnecessary changes. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging. CodeRabbit learns from your replies, so always respond — even to dismiss a false positive.
+Claude will automatically review the PR when it's opened (or converted from draft). Address its inline comments, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging. You can request a re-review by commenting `@claude review once` on the PR.
 
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale.
 
@@ -451,7 +451,7 @@ Wait for the **requester** to approve the implementation (or merge directly). Th
 ### Pre-merge checklist
 
 - [ ] CI is green
-- [ ] CodeRabbit comments addressed
+- [ ] Claude review comments addressed
 - [ ] **Requester approved** (or is merging directly)
 - [ ] Test results posted on PR
 - [ ] No unresolved review threads / suggestions
@@ -529,7 +529,7 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 | Using `git add .` or `git add -A` | Stages unintended files (test configs, temp files, etc.). | Always `git add` specific directories: `git add collectors/<name>/` or `git add policies/<name>/`. |
 | Merging without requester's approval | The requester reviews implementation and must approve (or merge directly) before merging. | Wait for the requester's approval on the implementation. |
 | Not posting test results on the PR | Reviewers need evidence, not trust. | Always post a test results comment with the template from this playbook. |
-| Ignoring CodeRabbit feedback | CodeRabbit auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every CodeRabbit comment before requesting human review. |
+| Ignoring Claude review feedback | Claude auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every Claude review comment before requesting human review. |
 
 ### Docker images
 
