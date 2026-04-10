@@ -50,7 +50,6 @@ collectors:
     # include: [project, shellcheck, shellcheck-cicd]  # Only include specific subcollectors
     # with:
     #   find_command: "find . -type f -name '*.sh' -not -path '*/node_modules/*'"  # Override file discovery
-    #   shellcheck_severity: "warning"  # Minimum severity: error, warning, info, style (default: style)
 ```
 
 No configuration required. Skips gracefully if no shell scripts are found.

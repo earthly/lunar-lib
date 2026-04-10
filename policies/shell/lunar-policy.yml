@@ -11,8 +11,8 @@ landing_page:
   long_description: |
     Enforce shell script quality standards by validating ShellCheck results.
     Ensures ShellCheck finds no issues at or above the configured severity
-    level (default: style — all issues). Configurable via the collector's
-    shellcheck_severity input.
+    level (default: warning). Severity filtering happens at the policy level
+    so all data is preserved in Component JSON for dashboards and other consumers.
   category: "testing-and-quality"
   icon: "assets/shell.svg"
   status: "beta"
@@ -26,12 +26,15 @@ policies:
   - name: shellcheck-clean
     description: |
       Ensures ShellCheck finds no issues at or above the configured severity
-      level. Skips if no shell scripts are detected in the component.
-      Configurable warning threshold via max_shellcheck_warnings input.
+      level (default: warning). Skips if no shell scripts are detected.
+      Severity filtering and warning threshold are both configurable.
     mainPython: shellcheck_clean.py
     keywords: ["shellcheck", "shell", "bash", "linting", "clean", "code quality"]
 
 inputs:
+  min_severity:
+    description: Minimum severity level to enforce (error, warning, info, style). Issues below this level are ignored.
+    default: "warning"
   max_shellcheck_warnings:
-    description: Maximum number of ShellCheck warnings allowed (0 = must be completely clean)
+    description: Maximum number of ShellCheck warnings allowed at or above min_severity (0 = must be completely clean)
     default: "0"
