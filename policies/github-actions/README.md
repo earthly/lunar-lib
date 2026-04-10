@@ -1,10 +1,10 @@
-# CI Security Guardrails
+# GitHub Actions Security
 
 Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene.
 
 ## Overview
 
-Checks GitHub Actions workflows for six categories of security misconfiguration that have led to real-world supply chain compromises. All checks are based on static YAML analysis — no runtime data needed. Skips gracefully when no GitHub Actions security data is available (i.e., component has no `.github/workflows/` directory). Different from the existing `ci` policy (which covers action pinning and mutable refs — no overlap) and the `sast` policy (which covers application code analysis, not CI configuration).
+Checks GitHub Actions workflows for six categories of security misconfiguration that have led to real-world supply chain compromises. All checks are based on static YAML analysis — no runtime data needed. Skips gracefully when no GitHub Actions security data is available (i.e., component has no `.github/workflows/` directory). Complements the general `ci` policy (which covers vendor-agnostic lint and dependency pinning) with GHA-specific security checks. Different from the `sast` policy (which covers application code analysis, not CI configuration).
 
 ## Policies
 
@@ -42,7 +42,7 @@ collectors:
     on: ["domain:your-domain"]
 
 policies:
-  - uses: github://earthly/lunar-lib/policies/ci-security@main
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [no-script-injection, permissions-declared]  # Run specific checks only

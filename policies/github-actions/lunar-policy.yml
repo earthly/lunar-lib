@@ -1,19 +1,19 @@
 version: 0
 
-name: ci-security
+name: github-actions
 description: Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "CI Security Guardrails"
+  display_name: "GitHub Actions Security"
   long_description: |
     Enforces security best practices for GitHub Actions workflows. Detects
     template injection, dangerous pull_request_target checkouts, missing
     permissions, credential persistence, and secrets inheritance.
   category: "security-and-compliance"
-  icon: "assets/ci-security.svg"
+  icon: "assets/github-actions.svg"
   status: "beta"
   requires:
     - slug: "github-actions"
