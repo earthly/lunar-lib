@@ -383,25 +383,50 @@ If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-com
    ```
    The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results.
 
-5. **Screenshot the dashboard using Playwright MCP** — Use the Playwright MCP server to capture proof that everything works end-to-end in the real system. These screenshots are **required** evidence for the PR.
+5. **Validate in the UI and capture evidence** — Check the cronos Grafana dashboards to confirm the collector and policy are working. This is a smoke test — you need to prove things are actually showing up in the UI, not just take random screenshots.
 
-   Screenshots to capture:
-   - **Component JSON page** (`/d/lujsqdc/component-json?var-component=<name>`) — expand the tree to show your collector's category data (e.g. `lang.cpp`)
-   - **Component details page** (`/d/aecnnrn714em8d/component-details?var-component=<name>&var-pr=0`) — scroll the checks table to the rows showing the specific policy checks from your plugin (e.g. `html.htmlhint-clean`, `html.stylelint-clean`). The screenshot must show the checks we care about, not just the top of an empty or unrelated table.
-   - **Collectors listing** (`/d/zzznoc11btoga/collectors-listing`) — your collector shows runs > 0
+   **What to check and what counts as valid:**
 
-   Playwright MCP flow:
+   **A. Checks table (Component Details page)**
+   - Navigate to the component details page and scroll to the checks table
+   - Find the rows for your plugin's policy checks (e.g. `ruby.gemfile-exists`, `ruby.lockfile-exists`)
+   - **Valid**: Checks show a green (pass) or red (fail) result — this means the policy ran and produced a verdict
+   - **Invalid — pending (yellow)**: If the checks are still in a pending/yellow state, they haven't completed yet. This is NOT valid evidence. Wait and re-check.
+   - **Invalid — stale (asterisk)**: If any check has an asterisk `*` next to it, the data is stale (from a previous run, not the current one). This is NOT valid evidence. Wait and re-check.
+   - If checks remain pending or stale after ~10 minutes of waiting, there may be a problem with your policy or the cronos environment itself. Double-check your policy logic first. If the policy looks correct, escalate — the staging environment breaks sometimes and that's not your fault, but don't assume it's working when it isn't.
+
+   **B. Component JSON page**
+   - Navigate to the Component JSON page for your component
+   - Expand the tree to show your collector's data section (e.g. `.lang.ruby`)
+   - **Valid**: The JSON tree shows the fields your collector writes, especially anything populated by CI hooks (e.g. `.lang.ruby.cicd`, `.lang.ruby.bundler.cicd`)
+   - **Invalid — missing section**: If the JSON section for your collector is completely missing, not all collectors have run yet. Check if CI completed, check if the code hook image exists on Docker Hub, and wait for the next collection cycle.
+   - For CI-only data: if the component doesn't have a GitHub Actions workflow running on the cronos runner, CI hook collectors will never fire. Make sure the workflow exists and has completed at least once.
+
+   **C. Errors**
+   - Check the top of the component page for a "Some errors occurred" banner
+   - If present, click through and check if any errors are from YOUR collector or policy
+   - If they are — that's a bug. Fix it, push, and re-test. Do NOT post evidence with errors from your own plugin.
+
+   **D. What to do if the UI is broken**
+   - Empty tables, missing data, broken dashboards, or timeouts do NOT count as valid evidence
+   - Don't assume "done" if something looks wrong — investigate first
+   - If you've verified your collector/policy code is correct and the environment appears broken, speak up and let the reviewer know. The cronos staging environment has issues sometimes. That's fine, but you need to flag it rather than pretending everything is working.
+
+   **Screenshots to capture (once validation passes):**
+   - **Component details page** — checks table scrolled to show YOUR plugin's checks with green/red results (no yellow pending, no stale asterisks)
+   - **Component JSON page** — tree expanded to show your collector's data section with CI-populated fields visible
+   - **Collectors listing** (optional) — your collector shows runs > 0
+
+   **How to capture screenshots:**
+
+   Use Playwright to capture Grafana dashboards:
    1. Read Grafana credentials from `~/.bender/grafana-credentials`
-   2. Use `browser_navigate` to go to `https://cronos.demo.earthly.dev/login` (or `lunar.demo.earthly.dev`)
-   3. Use `browser_type` / `browser_click` to log in with the credentials
-   4. Navigate to each dashboard URL above
-   5. Use `browser_snapshot` and `browser_screenshot` to capture the page
-   6. For JSON page: click tree nodes to expand your data section, then screenshot
-   7. For component details: scroll to the policy checks section, then screenshot
+   2. Navigate to `https://cronos.demo.earthly.dev/login` and log in
+   3. Navigate to each dashboard URL (query `/api/search?type=dash-db` for dashboard UIDs — they differ between environments)
+   4. For JSON page: click tree nodes to expand your data section, then screenshot
+   5. For component details: scroll to the policy checks section showing your checks, then screenshot
 
-   Note: Dashboard UIDs differ between environments. Query `/api/search?type=dash-db` to find UIDs.
-
-   Upload screenshots to the PR comment as image attachments — they serve as proof that the collector and policies are working in the real system.
+   Upload screenshots to the PR comment as image attachments — they serve as proof that the plugin works end-to-end.
 
 6. **Clean up** — Remove test files from the component repo after verifying results.
 
@@ -414,45 +439,30 @@ git remote set-url origin "https://x-access-token:$(bender-gh-token pantalasa-cr
 
 ### Post test results on the PR
 
-After testing, comment on the PR documenting what you tested and the results. **Include Playwright screenshots** from the cronos dashboard as proof.
+After testing and validating in the UI (see step 5 above), post a PR comment with evidence. The comment should be a quick smoke test summary showing things are working — not a novel.
 
 ```markdown
-## Test Results
+## Integration Test Evidence
 
-### Results
+### Checks table (Component Details)
+- [screenshot of checks table showing your plugin's checks with pass/fail results]
+- All checks resolved (no pending/yellow, no stale asterisks)
 
-| Test case | Check | Result | Notes |
-|-----------|-------|--------|-------|
-| Positive (data present) | check-name | ✅ PASS | Correct output |
-| Negative (no data) | check-name | ⏭️ SKIP | Skips gracefully |
-| Edge case (missing field) | check-name | ⏭️ SKIP | No error |
+### Component JSON
+- [screenshot of Component JSON tree showing your collector's data]
+- CI-populated fields visible (e.g. `.lang.<language>.cicd`, `.lang.<language>.<tool>.cicd`)
 
-### Component JSON Output
+### Errors
+- No collector/policy errors on the component page (or: errors found and fixed — see commit <sha>)
 
-Include the actual component JSON output showing the collected data. This proves the collector
-is writing the correct paths and values.
-
-```json
-{
-  "lang": {
-    "<language>": {
-      "...collected data..."
-    }
-  }
-}
+### Notes
+- <any caveats, e.g. "code hook collectors pending until Docker image is on main">
 ```
 
-### Edge cases verified:
-- ✅ Missing API key → graceful exit 0
-- ✅ Empty input data → no Component JSON written
-- ✅ Malformed data → handled without crash
-
-### Dashboard screenshots (from cronos)
-- Component JSON showing `.lang.<language>` data: [screenshot]
-- Component details page with checks table scrolled to show YOUR plugin's checks: [screenshot]
-```
-
-Upload the Playwright screenshots as GitHub comment image attachments. These are required proof that the plugin works end-to-end in the real system — not just in local `lunar collector dev` / `lunar policy dev` tests.
+**What makes evidence valid vs. invalid:**
+- Valid: checks show green/red results, JSON tree has your data, no errors from your plugin
+- Invalid: pending checks (yellow), stale checks (asterisk), missing JSON sections, empty tables, error banners from your collector/policy, broken UI
+- If the environment is broken and you can't get valid evidence, say so explicitly — don't post screenshots of broken state and call it done
 
 ### A note on unit tests
 
