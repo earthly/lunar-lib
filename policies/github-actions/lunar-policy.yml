@@ -18,7 +18,7 @@ landing_page:
   requires:
     - slug: "github-actions"
       type: "collector"
-      reason: "Provides parsed workflow data at .ci.native.github_actions.workflows (triggers, jobs, steps, permissions)"
+      reason: "Parsed workflow data at .ci.native.github_actions.workflows"
   keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
 
 policies:
