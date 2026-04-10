@@ -211,7 +211,7 @@ CMD ["python", "app.py"]
 To suppress specific rules, add a `.hadolint.yaml` to your repo root:
 
 ```yaml
-ignored:
+ignore:
   - DL3008
   - DL3013
 ```
