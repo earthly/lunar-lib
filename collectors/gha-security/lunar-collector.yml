@@ -1,0 +1,83 @@
+version: 0
+
+name: gha-security
+description: Statically analyzes GitHub Actions workflows for security misconfigurations and injection risks
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:gha-security-main
+
+landing_page:
+  display_name: "GitHub Actions Security Collector"
+  long_description: |
+    Parses GitHub Actions workflow files for security findings: template injection
+    in run blocks, dangerous pull_request_target checkouts, missing or overly broad
+    permissions, credential persistence, and secrets inheritance in reusable calls.
+  categories: ["security", "ci-cd"]
+  icon: "assets/gha-security.svg"
+  status: "beta"
+  keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
+
+collectors:
+  - name: security
+    description: |
+      Statically analyzes all GitHub Actions workflow files in .github/workflows/
+      for security misconfigurations: injectable expressions in run blocks,
+      dangerous pull_request_target checkouts, missing or write-all permissions,
+      checkout credential persistence, and secrets inheritance.
+    mainBash: security.sh
+    hook:
+      type: code
+    keywords: ["github-actions", "security", "injection", "permissions", "checkout", "secrets"]
+
+example_component_json: |
+  {
+    "ci": {
+      "security": {
+        "source": { "tool": "gha-security", "version": "0.1.0", "integration": "code" },
+        "injectable_expressions": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "build",
+            "step": "Run tests",
+            "expression": "github.event.pull_request.title",
+            "context": "run"
+          }
+        ],
+        "dangerous_checkouts": [
+          {
+            "file": ".github/workflows/pr-target.yml",
+            "trigger": "pull_request_target",
+            "job": "build",
+            "step": "Checkout",
+            "checkout_ref": "github.event.pull_request.head.sha"
+          }
+        ],
+        "permissions_missing": [
+          {
+            "file": ".github/workflows/ci.yml"
+          }
+        ],
+        "write_all_permissions": [
+          {
+            "file": ".github/workflows/deploy.yml",
+            "level": "workflow",
+            "value": "write-all"
+          }
+        ],
+        "persist_credentials": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "build",
+            "step": "Checkout"
+          }
+        ],
+        "secrets_inherit": [
+          {
+            "file": ".github/workflows/ci.yml",
+            "job": "deploy",
+            "called_workflow": "./.github/workflows/reusable.yml"
+          }
+        ]
+      }
+    }
+  }
