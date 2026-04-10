@@ -19,6 +19,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
 | `user` | USER instruction must be present | Final stage missing USER instruction |
 | `build-tagged` | Container builds must use explicit `-t`/`--tag` | Build command missing image tag |
+| `dockerfile-lint-clean` | Dockerfiles must pass hadolint linting | Dockerfile has lint issues at or above configured severity |
 
 ## Required Data
 
@@ -27,7 +28,8 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.containers.definitions[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (dockerfile sub-collector) |
-| `.containers.builds[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (build-cicd sub-collector) |
+| `.containers.builds[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (cicd sub-collector) |
+| `.containers.lint_results[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (hadolint sub-collector) |
 
 ## Installation
 
@@ -42,6 +44,7 @@ policies:
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
     #   required_labels: "org.opencontainers.image.source,git_sha"
+    #   hadolint_severity: "warning"  # error (default), warning, info, style
 ```
 
 ## Examples
@@ -188,4 +191,27 @@ LABEL org.opencontainers.image.source="https://github.com/org/repo"
 ```bash
 # In build command (dynamic labels)
 docker build -t app:v1 --label git_sha=$GITHUB_SHA .
+```
+
+### dockerfile-lint-clean
+
+Fix the hadolint violations reported in the check output. Common fixes:
+
+```dockerfile
+# DL3008: Pin versions in apt-get install
+RUN apt-get install -y --no-install-recommends curl=7.88.1-10+deb12u5
+
+# DL3009: Delete apt lists after install
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# DL3025: Use JSON form for CMD
+CMD ["python", "app.py"]
+```
+
+To suppress specific rules, add a `.hadolint.yaml` to your repo root:
+
+```yaml
+ignored:
+  - DL3008
+  - DL3013
 ```

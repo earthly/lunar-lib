@@ -41,6 +41,19 @@ Container images and Dockerfiles. Tool-agnostic (works with Docker, Podman, Buil
         "signed": true
       }
     ],
+    "lint_results": [
+      {
+        "path": "Dockerfile",
+        "issues": [
+          {
+            "line": 5,
+            "rule": "DL3008",
+            "severity": "warning",
+            "message": "Pin versions in apt get install."
+          }
+        ]
+      }
+    ],
     "registries_used": ["docker.io", "gcr.io"]
   }
 }
@@ -51,5 +64,6 @@ Container images and Dockerfiles. Tool-agnostic (works with Docker, Podman, Buil
 - `.containers.definitions[].valid` — Dockerfile valid
 - `.containers.definitions[].final_stage.user` — User instruction value
 - `.containers.definitions[].base_images[].tag` — Tag value (check for `null` or `"latest"`)
+- `.containers.lint_results[]` — Per-Dockerfile lint results (rule, severity, message, line)
 - `.containers.builds[].signed` — Image signed
 - `.containers.registries_used` — Registries for allowlist checking

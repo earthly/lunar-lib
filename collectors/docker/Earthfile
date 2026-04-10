@@ -11,5 +11,12 @@ image:
         mv dockerfile-json /usr/local/bin/ && \
         echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
 
+    # Install hadolint
+    ARG HADOLINT_VERSION=2.12.0
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
+        curl -sSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${ARCH}" -o /usr/local/bin/hadolint && \
+        chmod +x /usr/local/bin/hadolint && \
+        echo "${HADOLINT_VERSION}" > /usr/local/bin/hadolint.version
+
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:docker-$VERSION

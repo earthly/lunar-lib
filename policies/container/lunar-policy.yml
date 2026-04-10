@@ -71,6 +71,14 @@ policies:
     mainPython: build_tagged.py
     keywords: ["docker build", "image tags", "container registry", "build tagging"]
 
+  - name: dockerfile-lint-clean
+    description: |
+      Requires Dockerfiles to pass hadolint linting with no issues at or above the
+      configured severity threshold. Enforces Dockerfile best practices including
+      pinned versions, proper instruction usage, and security hygiene.
+    mainPython: dockerfile_lint_clean.py
+    keywords: ["hadolint", "dockerfile lint", "dockerfile best practices", "docker lint", "container lint"]
+
 inputs:
   allowed_registries:
     description: Comma-separated list of allowed registries
@@ -78,3 +86,6 @@ inputs:
   required_labels:
     description: Comma-separated list of required labels checked across Dockerfile and build commands (empty = no requirement)
     default: ""
+  hadolint_severity:
+    description: Minimum hadolint severity to enforce (error, warning, info, style)
+    default: "error"

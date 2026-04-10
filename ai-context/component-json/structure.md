@@ -35,6 +35,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`, `labels`) |
 | `.containers.definitions[].base_images[]` | Base image info (`reference`, `image`, `tag`) |
 | `.containers.definitions[].final_stage` | Final stage info (`base_name`, `base_image`, `user`, `has_healthcheck`) |
+| `.containers.lint_results[]` | Per-Dockerfile lint results (`path`, `issues[]` with `rule`, `severity`, `message`, `line`) |
 | `.containers.builds[]` | Built images (`image`, `tag`, `signed`, `has_git_sha_label`) |
 | **[`.k8s`](cat-k8s.md)** | **Kubernetes manifests and configuration** |
 | `.k8s.manifests[]` | Manifest files (`path`, `valid`, `resources`) |
