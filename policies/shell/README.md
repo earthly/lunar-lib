@@ -4,7 +4,7 @@ Enforces shell script quality standards using ShellCheck lint data.
 
 ## Overview
 
-This policy validates that ShellCheck runs cleanly against shell scripts in a component. It enforces issues at or above the configured severity level (default: warning), ensuring scripts follow best practices for portability, quoting, and correctness. The collector gathers all findings; severity filtering happens here at the policy level. Skips gracefully if no shell scripts are detected.
+This policy validates that ShellCheck runs cleanly against shell scripts in a component. It enforces issues at or above the configured severity level (default: error), ensuring scripts follow best practices for portability, quoting, and correctness. The collector gathers all findings; severity filtering happens here at the policy level. Skips gracefully if no shell scripts are detected.
 
 ## Policies
 
@@ -33,7 +33,7 @@ policies:
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
     # with:
-    #   min_severity: "warning"  # Minimum severity to enforce: error, warning, info, style (default: warning)
+    #   min_severity: "error"  # Minimum severity to enforce: error, warning, info, style (default: error)
     #   max_shellcheck_warnings: "0"  # Maximum warnings allowed at or above min_severity (default: "0")
 ```
 
