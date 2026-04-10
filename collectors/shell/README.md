@@ -13,6 +13,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.lang.shell.script_count` | integer | Number of shell scripts detected |
+| `.lang.shell.scripts` | array | File paths of detected shell scripts |
 | `.lang.shell.shells` | array | Shell types found (e.g., `["bash", "sh"]`) |
 | `.lang.shell.source` | object | Source metadata |
 | `.lang.shell.native.shellcheck.passed` | boolean | Whether ShellCheck found no issues |

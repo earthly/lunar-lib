@@ -45,6 +45,7 @@ policies:
   "lang": {
     "shell": {
       "script_count": 3,
+      "scripts": ["deploy.sh", "build/compile.sh", "scripts/test.sh"],
       "shells": ["bash", "sh"],
       "lint": {
         "warnings": [],
@@ -62,6 +63,7 @@ policies:
   "lang": {
     "shell": {
       "script_count": 3,
+      "scripts": ["deploy.sh", "build/compile.sh", "scripts/test.sh"],
       "shells": ["bash"],
       "lint": {
         "warnings": [
