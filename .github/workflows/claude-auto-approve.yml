@@ -32,6 +32,12 @@ jobs:
             exit 0
           fi
 
+          if ! echo "$SEVERITY" | jq -e . > /dev/null 2>&1; then
+            echo "Severity data is not valid JSON, skipping auto-approve"
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           IMPORTANT=$(echo "$SEVERITY" | jq -r '.normal // 0')
           NITS=$(echo "$SEVERITY" | jq -r '.nit // 0')
 
