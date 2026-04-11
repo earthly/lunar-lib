@@ -472,13 +472,26 @@ If this is a **new** collector or policy, it needs to be added to `pantalasa-cro
 - uses: github://earthly/lunar-lib/collectors/<name>@<branch>/<feature>
 ```
 
-**After merge:** Update the reference to `@main`:
+**After testing — cleanup depends on whether the plugin is new or existing:**
 
-```yaml
-- uses: github://earthly/lunar-lib/collectors/<name>@main
-```
+**New collectors/policies** (not yet on `@main` — no Docker image exists for `@main` until the PR merges):
+1. **Remove** the collector/policy entry from `lunar-config.yml` entirely
+2. Commit and push the removal
+3. Verify the sync build passes
+4. After the PR merges to `lunar-lib`, **re-add** the entry referencing `@main`:
+   ```yaml
+   - uses: github://earthly/lunar-lib/collectors/<name>@main
+   ```
 
-Don't leave branch references in the cronos config after merging.
+**Existing collectors/policies** (already on `@main` — Docker images exist):
+1. **Revert** the `uses:` reference back to `@main`:
+   ```yaml
+   - uses: github://earthly/lunar-lib/collectors/<name>@main
+   ```
+2. Commit and push the revert
+3. Verify the sync build passes
+
+⚠️ **Why this matters:** `@main` references resolve to Docker images tagged from `main`. For new plugins, that image doesn't exist until the PR is merged and CI runs on `main`. Setting a new plugin to `@main` before merge means the hub tries to pull a nonexistent image — the collector silently fails or never executes. Don't leave branch references in the cronos config after merging either — those break when the branch is deleted.
 
 ---
 
