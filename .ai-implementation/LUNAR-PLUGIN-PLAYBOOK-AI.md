@@ -478,10 +478,13 @@ If this is a **new** collector or policy, it needs to be added to `pantalasa-cro
 1. **Remove** the collector/policy entry from `lunar-config.yml` entirely
 2. Commit and push the removal
 3. Verify the sync build passes
-4. After the PR merges to `lunar-lib`, **re-add** the entry referencing `@main`:
+4. After the PR merges to `lunar-lib`, **wait for CI on `main` to complete** and push the Docker image (check with `gh run list --repo earthly/lunar-lib --branch main --limit 1 --json status`)
+5. **Re-add** the entry referencing `@main`:
    ```yaml
    - uses: github://earthly/lunar-lib/collectors/<name>@main
    ```
+6. Commit and push the re-add
+7. Verify the sync build passes
 
 **Existing collectors/policies** (already on `@main` — Docker images exist):
 1. **Revert** the `uses:` reference back to `@main`:
