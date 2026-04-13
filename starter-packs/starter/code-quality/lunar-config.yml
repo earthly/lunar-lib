@@ -90,6 +90,9 @@ policies:
       - require-pull-request
 
   # --- Language-specific guardrails (all at score) ---
+  # Version checks use sensible defaults. Override with `with:` to match your stack:
+  #   min_go_version: "1.21"  |  min_java_version: "17"
+  #   min_node_version: "18"  |  min_python_version: "3.9"
 
   # Go
   - uses: ./policies/golang
@@ -99,6 +102,8 @@ policies:
       - go-sum-exists
       - min-go-version
       - tests-recursive
+    # with:
+    #   min_go_version: "1.22"
 
   # Java
   - uses: ./policies/java
@@ -107,6 +112,8 @@ policies:
       - build-tool-wrapper-exists
       - min-java-version
       - tests-all-modules
+    # with:
+    #   min_java_version: "21"
 
   # Node.js
   - uses: ./policies/nodejs
@@ -116,6 +123,8 @@ policies:
       - typescript-configured
       - engines-pinned
       - min-node-version
+    # with:
+    #   min_node_version: "20"
 
   # Python
   - uses: ./policies/python

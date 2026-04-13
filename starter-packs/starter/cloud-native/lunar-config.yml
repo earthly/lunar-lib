@@ -56,6 +56,8 @@ policies:
     include:
       - module-versions-pinned
       - min-provider-versions
+    with:
+      min_provider_versions: '{"aws": "5.0"}'  # Customize per your stack
 
   # --- General IaC ---
   - uses: ./policies/iac
