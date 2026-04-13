@@ -6,14 +6,14 @@ Curated collections of collectors and policies organized by complexity tier. Eac
 
 ### [Starter](./starter/) — Zero Config, Zero Secrets
 
-Import and it works. No configuration, no secrets, no vendor accounts. Collectors skip gracefully when a technology isn't present. Four theme-based packs:
+Import and it works. No configuration, no secrets, no vendor accounts. Collectors only trigger when the relevant technology is detected. Four theme-based packs:
 
 - **[Security Essentials](./starter/security-essentials/)** — Vulnerability scanning, secret detection, supply-chain security
 - **[Code Quality](./starter/code-quality/)** — Testing, linting, ownership, repo hygiene, language guardrails
 - **[Cloud Native](./starter/cloud-native/)** — Kubernetes, Terraform, Docker, IaC security
 - **[Quick Start](./starter/quick-start/)** — Highest-impact items from all categories, minimal noise
 
-All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS) — they skip automatically when the language isn't detected, so there's zero cost to including them.
+All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS) — they only trigger when the language is detected, so there's zero cost to including them.
 
 ### [Starter+](./starter+/) — Light Configuration or Secrets
 

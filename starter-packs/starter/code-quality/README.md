@@ -7,7 +7,7 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 ### Collectors
 | Collector | Purpose |
 |-----------|---------|
-| All language collectors | Auto-detect languages, skip if absent |
+| All language collectors | Only trigger when the language is detected |
 | `readme` | README analysis |
 | `codeowners` | CODEOWNERS file parsing |
 | `repo-boilerplate` | Standard repo files detection |

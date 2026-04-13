@@ -1,13 +1,13 @@
 # Cloud Native / Infrastructure Starter Pack
 
-For teams running Kubernetes, Terraform, and Docker. Covers resource management, health probes, provider pinning, IaC scanning, and container best practices. All checks skip gracefully when infrastructure files aren't present.
+For teams running Kubernetes, Terraform, and Docker. Covers resource management, health probes, provider pinning, IaC scanning, and container best practices. Checks only trigger when the relevant infrastructure files are present.
 
 ## What's Included
 
 ### Collectors
 | Collector | Purpose |
 |-----------|---------|
-| All language collectors | Auto-detect languages, skip if absent |
+| All language collectors | Only trigger when the language is detected |
 | `k8s` | Kubernetes manifest analysis (skips if none) |
 | `terraform` | Terraform file analysis (skips if none) |
 | `docker` | Dockerfile analysis |

@@ -6,7 +6,7 @@ version: 0
 # ============================================================================
 
 collectors:
-  # --- Language collectors (all skip-safe) ---
+  # --- Language collectors (only trigger when language is detected) ---
   - uses: ./collectors/golang
   - uses: ./collectors/java
   - uses: ./collectors/nodejs

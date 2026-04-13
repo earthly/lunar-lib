@@ -7,7 +7,7 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 ### Collectors
 | Collector | Purpose |
 |-----------|---------|
-| All language collectors | Auto-detect languages, skip if absent |
+| All language collectors | Only trigger when the language is detected |
 | `gitleaks` | Secret scanning (zero-config) |
 | `trivy` | SCA + container vulnerability scanning (zero-config) |
 | `syft` | SBOM generation (zero-config) |
