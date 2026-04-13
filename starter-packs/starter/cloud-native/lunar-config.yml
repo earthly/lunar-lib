@@ -29,6 +29,7 @@ collectors:
 
   # --- CI context ---
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
 
 policies:
   # --- Container ---
@@ -44,7 +45,6 @@ policies:
       - user
       - stable-tags
       - build-tagged
-      - dockerfile-lint-clean
 
   # --- Kubernetes ---
   - uses: github://earthly/lunar-lib/policies/k8s@v1.0.5

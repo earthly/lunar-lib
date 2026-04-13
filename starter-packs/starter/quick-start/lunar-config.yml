@@ -67,12 +67,6 @@ policies:
     include:
       - ran
 
-  # --- Dependencies ---
-  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
-    enforcement: score
-    include:
-      - min-versions
-
   # --- SCA ---
   - uses: github://earthly/lunar-lib/policies/sca@v1.0.5
     enforcement: score
@@ -95,4 +89,3 @@ policies:
       - no-latest
       - user
       - healthcheck
-      - dockerfile-lint-clean

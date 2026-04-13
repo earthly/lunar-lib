@@ -89,7 +89,6 @@ policies:
       - user
       - healthcheck
       - stable-tags
-      - dockerfile-lint-clean
 
   # --- SBOM ---
   - uses: github://earthly/lunar-lib/policies/sbom@v1.0.5

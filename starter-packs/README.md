@@ -14,7 +14,7 @@ Import and it works. No configuration, no secrets, no vendor accounts. Collector
 - **[AI Native](./starter/ai-native/)** — AI instruction files, CLI safety, authorship tracking, code quality gates
 - **[Quick Start](./starter/quick-start/)** — Highest-impact items from all categories, minimal noise
 
-All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS) — they only trigger when the language is detected, so there's zero cost to including them.
+All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS, Shell, Ruby) — they only trigger when the language is detected, so there's zero cost to including them.
 
 ### [Starter+](./starter+/) — Light Configuration or Secrets
 
