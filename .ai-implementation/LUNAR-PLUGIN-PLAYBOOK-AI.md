@@ -250,7 +250,7 @@ You need component repos on `pantalasa-cronos` to test against. Either:
 - **Modify an existing component** to exercise your scenarios (e.g. add a `go.mod`, Dockerfile, GitHub Actions workflow)
 - **Create a new component repo** if none of the existing ones fit (e.g. a new programming language collector needs a repo in that language). If creating new: set up a GitHub Actions workflow with `runs_on: cronos`, add the component to `lunar-config.yml`, and verify the workflow runs successfully before testing collectors against it.
 
-Available existing components on `pantalasa-cronos`:
+Examples of existing components on `pantalasa-cronos`:
 
 | Component | Language/Type |
 |-----------|--------------|
@@ -260,6 +260,8 @@ Available existing components on `pantalasa-cronos`:
 | `kafka-go` | Go |
 | `hadoop` | Java |
 | `spark` | Java |
+
+Check `pantalasa-cronos/lunar/lunar-config.yml` for the full list of registered components.
 
 ### Step 5: Trigger collection
 
