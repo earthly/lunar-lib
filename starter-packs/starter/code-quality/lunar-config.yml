@@ -180,6 +180,8 @@ policies:
       - lockfile-exists
       - ruby-version-set
       - bundler-audit-clean
+    with:
+      min_ruby_version: "3.1"
 
   # HTML/CSS
   - uses: github://earthly/lunar-lib/policies/html@main
