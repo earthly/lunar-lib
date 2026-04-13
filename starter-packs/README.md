@@ -12,7 +12,7 @@ Import and it works. No configuration, no secrets, no vendor accounts. Collector
 - **[Code Quality](./starter/code-quality/)** — Testing, linting, ownership, repo hygiene, language guardrails
 - **[Cloud Native](./starter/cloud-native/)** — Kubernetes, Terraform, Docker, IaC security
 - **[AI Native](./starter/ai-native/)** — AI instruction files, CLI safety, authorship tracking, code quality gates
-- **[Quick Start](./starter/quick-start/)** — Highest-impact items from all categories, minimal noise
+- **[Baseline](./starter/baseline/)** — Highest-impact items from all categories, minimal noise
 
 All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS, Shell, Ruby) — they only trigger when the language is detected, so there's zero cost to including them.
 

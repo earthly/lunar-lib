@@ -1,4 +1,4 @@
-# Quick Start Pack
+# Baseline Pack
 
 The "just works" pack — highest-impact items from security, quality, and infrastructure with zero noise. Almost everything runs at `score` level (health dashboard only), with one exception: secret detection reports on PRs because leaked secrets are an emergency, not a gradual improvement.
 
@@ -38,7 +38,7 @@ This pack is designed for day-one adoption. Import it, look at your dashboard, a
 
 ## Growing From Here
 
-Once you're comfortable with the Quick Start baseline:
+Once you're comfortable with the Baseline pack:
 
 1. **Want more security?** Switch to the [Security Essentials](../security-essentials/) pack or promote `sca.max-severity` and `vcs.branch-protection-enabled` to `report-pr`
 2. **Want language guardrails?** Switch to the [Code Quality](../code-quality/) pack or add language-specific policies
