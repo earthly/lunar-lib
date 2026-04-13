@@ -45,4 +45,4 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 
 ## Combining Packs
 
-Packs can be combined by merging their `lunar-config.yml` files. When the same policy appears in multiple packs, keep the entry with the higher enforcement level or merge their `include` lists.
+These packs are starting points. Browse the other packs for ideas and pull in any collectors or policies that fit your needs.
