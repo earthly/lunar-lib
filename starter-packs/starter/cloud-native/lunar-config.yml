@@ -23,7 +23,7 @@ collectors:
   - uses: ./collectors/docker         # Dockerfile analysis
 
   # --- Security scanners ---
-  - uses: ./collectors/trivy          # Container + IaC vuln scanning (zero-config)
+  - uses: ./collectors/trivy          # Dependency vulnerability scanning (zero-config)
 
   # --- CI context ---
   - uses: ./collectors/github         # Repo settings

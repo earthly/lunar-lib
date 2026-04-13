@@ -13,7 +13,7 @@ The "just works" pack — highest-impact items from security, quality, and infra
 | `repo-boilerplate` | Standard repo files |
 | `github` | Repo settings |
 | `gitleaks` | Secret scanning (zero-config) |
-| `trivy` | SCA + container scanning (zero-config) |
+| `trivy` | Dependency vulnerability scanning (zero-config) |
 | `syft` | SBOM generation (zero-config) |
 | `docker` | Dockerfile analysis (skips if none) |
 

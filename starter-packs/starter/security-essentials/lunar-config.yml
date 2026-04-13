@@ -19,7 +19,7 @@ collectors:
 
   # --- Security scanners ---
   - uses: ./collectors/gitleaks       # Secret scanning (zero-config)
-  - uses: ./collectors/trivy          # SCA + container vuln scanning (zero-config)
+  - uses: ./collectors/trivy          # Dependency vulnerability scanning (zero-config)
   - uses: ./collectors/syft           # SBOM generation (zero-config)
   - uses: ./collectors/semgrep        # SAST scanning (skips if not configured)
 

@@ -11,7 +11,7 @@ For teams running Kubernetes, Terraform, and Docker. Covers resource management,
 | `k8s` | Kubernetes manifest analysis (skips if none) |
 | `terraform` | Terraform file analysis (skips if none) |
 | `docker` | Dockerfile analysis |
-| `trivy` | Container + IaC vulnerability scanning (zero-config) |
+| `trivy` | Dependency vulnerability scanning (zero-config) |
 | `github` | Repo settings |
 
 ### Policies

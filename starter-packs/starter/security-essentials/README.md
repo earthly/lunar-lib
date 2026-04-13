@@ -9,7 +9,7 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
 | `gitleaks` | Secret scanning (zero-config) |
-| `trivy` | SCA + container vulnerability scanning (zero-config) |
+| `trivy` | Dependency vulnerability scanning (zero-config) |
 | `syft` | SBOM generation (zero-config) |
 | `semgrep` | SAST scanning (skips if not configured) |
 | `docker` | Dockerfile analysis |
