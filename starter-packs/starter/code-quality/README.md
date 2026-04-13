@@ -8,8 +8,7 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 | Collector | Purpose |
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
-| `codeowners` | CODEOWNERS file parsing |
-| `repo-boilerplate` | Standard repo files detection |
+| `repo-boilerplate` | Standard repo files, README, CODEOWNERS |
 | `github` | Repo settings |
 | `codecov` | Coverage data (skips if not configured) |
 
@@ -18,8 +17,7 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 **Repo Standards (all at score)**
 | Policy | Checks |
 |--------|--------|
-| `repo-boilerplate` | `readme-exists`, `codeowners-exists`, `gitignore-exists`, `license-exists`, `readme-min-line-count`, `editorconfig-exists`, `security-exists`, `contributing-exists` |
-| `codeowners` | `exists`, `valid`, `catchall`, `min-owners` |
+| `repo-boilerplate` | `readme-exists`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `codeowners-min-owners`, `gitignore-exists`, `license-exists`, `readme-min-line-count`, `editorconfig-exists`, `security-exists`, `contributing-exists` |
 | `vcs` | `branch-protection-enabled`, `require-pull-request` |
 
 **Testing & Linting (all at score)**

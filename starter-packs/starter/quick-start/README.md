@@ -8,8 +8,7 @@ The "just works" pack — highest-impact items from security, quality, and infra
 | Collector | Purpose |
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
-| `codeowners` | CODEOWNERS parsing |
-| `repo-boilerplate` | Standard repo files |
+| `repo-boilerplate` | Standard repo files, README, CODEOWNERS |
 | `github` | Repo settings |
 | `gitleaks` | Secret scanning (zero-config) |
 | `trivy` | Dependency vulnerability scanning (zero-config) |
@@ -21,8 +20,7 @@ The "just works" pack — highest-impact items from security, quality, and infra
 | Policy | Check | Enforcement | Category |
 |--------|-------|-------------|----------|
 | `secrets` | `no-hardcoded-secrets` | **report-pr** | Security |
-| `repo-boilerplate` | `readme-exists`, `codeowners-exists`, `gitignore-exists`, `license-exists` | score | Quality |
-| `codeowners` | `exists`, `valid` | score | Quality |
+| `repo-boilerplate` | `readme-exists`, `codeowners-exists`, `codeowners-valid`, `gitignore-exists`, `license-exists` | score | Quality |
 | `vcs` | `branch-protection-enabled`, `require-pull-request` | score | Security |
 | `testing` | `executed`, `passing` | score | Quality |
 | `linter` | `ran` | score | Quality |

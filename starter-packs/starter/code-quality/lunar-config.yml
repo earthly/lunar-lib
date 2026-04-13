@@ -19,7 +19,6 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- Repo health ---
-  - uses: github://earthly/lunar-lib/collectors/codeowners@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
 
@@ -33,21 +32,15 @@ policies:
     include:
       - readme-exists
       - codeowners-exists
+      - codeowners-valid
+      - codeowners-catchall
+      - codeowners-min-owners
       - gitignore-exists
       - license-exists
       - readme-min-line-count
       - editorconfig-exists
       - security-exists
       - contributing-exists
-
-  # --- Code ownership ---
-  - uses: github://earthly/lunar-lib/policies/codeowners@v1.0.5
-    enforcement: score
-    include:
-      - exists
-      - valid
-      - catchall
-      - min-owners
 
   # --- Testing ---
   - uses: github://earthly/lunar-lib/policies/testing@v1.0.5
