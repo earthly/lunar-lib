@@ -12,11 +12,11 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/cpp@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/dotnet@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/html@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/shell@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/ruby@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- Infrastructure ---
   - uses: github://earthly/lunar-lib/collectors/k8s@v1.0.5
@@ -25,7 +25,7 @@ collectors:
 
   # --- Security scanners ---
   - uses: github://earthly/lunar-lib/collectors/trivy@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/checkov@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/checkov@main
 
   # --- CI context ---
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
@@ -94,7 +94,7 @@ policies:
       min_severity: "critical"
 
   # --- CI hygiene ---
-  - uses: github://earthly/lunar-lib/policies/ci@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/ci@main
     enforcement: score
     include:
       - lint-clean

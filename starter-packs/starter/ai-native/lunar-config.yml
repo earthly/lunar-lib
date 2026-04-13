@@ -12,11 +12,11 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/cpp@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/dotnet@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/html@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/shell@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/ruby@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- AI ---
   - uses: github://earthly/lunar-lib/collectors/ai@main
@@ -26,8 +26,8 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
 
   # --- Security ---
-  - uses: github://earthly/lunar-lib/collectors/gitleaks@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/github-actions@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/gitleaks@main
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
 
   # --- Repo context ---
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
@@ -64,13 +64,13 @@ policies:
       - cli-structured-output
 
   # --- Secret detection ---
-  - uses: github://earthly/lunar-lib/policies/secrets@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/secrets@main
     enforcement: report-pr
     include:
       - no-hardcoded-secrets
 
   # --- CI security ---
-  - uses: github://earthly/lunar-lib/policies/github-actions@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
     enforcement: score
     include:
       - no-script-injection
