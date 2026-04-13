@@ -46,4 +46,5 @@ Once you're comfortable with the Quick Start baseline:
 1. **Want more security?** Switch to the [Security Essentials](../security-essentials/) pack or promote `sca.max-severity` and `vcs.branch-protection-enabled` to `report-pr`
 2. **Want language guardrails?** Switch to the [Code Quality](../code-quality/) pack or add language-specific policies
 3. **Running K8s/Terraform?** Switch to the [Cloud Native](../cloud-native/) pack or add `k8s` and `terraform` policies
-4. **Want it all?** Combine packs by merging their configs
+4. **Using AI coding agents?** Switch to the [AI Native](../ai-native/) pack for instruction file checks, CLI safety, and authorship tracking
+5. **Want it all?** Combine packs by merging their configs

@@ -1,0 +1,74 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: AI Native
+# ============================================================================
+
+collectors:
+  # --- Language collectors (only trigger when language is detected) ---
+  - uses: github://earthly/lunar-lib/collectors/golang@main
+  - uses: github://earthly/lunar-lib/collectors/java@main
+  - uses: github://earthly/lunar-lib/collectors/nodejs@main
+  - uses: github://earthly/lunar-lib/collectors/python@main
+  - uses: github://earthly/lunar-lib/collectors/rust@main
+  - uses: github://earthly/lunar-lib/collectors/php@main
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+
+  # --- AI ---
+  - uses: github://earthly/lunar-lib/collectors/ai-use@main
+
+  # --- Security ---
+  - uses: github://earthly/lunar-lib/collectors/gitleaks@main
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
+
+  # --- Repo context ---
+  - uses: github://earthly/lunar-lib/collectors/github@main
+
+policies:
+  # --- AI guardrails ---
+  - uses: github://earthly/lunar-lib/policies/ai-use@main
+    enforcement: score
+    include:
+      - instruction-file-exists
+      - canonical-naming
+      - instruction-file-length
+      - ai-cli-safe-flags
+      - ai-cli-structured-output
+      - ai-authorship-annotated
+
+  # --- Secret detection ---
+  - uses: github://earthly/lunar-lib/policies/secrets@main
+    enforcement: report-pr
+    include:
+      - no-hardcoded-secrets
+
+  # --- CI security ---
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
+    enforcement: score
+    include:
+      - no-script-injection
+      - permissions-declared
+
+  # --- VCS ---
+  - uses: github://earthly/lunar-lib/policies/vcs@main
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Testing ---
+  - uses: github://earthly/lunar-lib/policies/testing@main
+    enforcement: score
+    include:
+      - executed
+      - passing
+
+  # --- Linting ---
+  - uses: github://earthly/lunar-lib/policies/linter@main
+    enforcement: score
+    include:
+      - ran
