@@ -16,6 +16,10 @@ This plugin provides the following policies (use `include` to select a subset):
 | `lockfile-exists` | Ensures Gemfile.lock exists for reproducible dependency resolution |
 | `ruby-version-set` | Ensures Ruby version is pinned via .ruby-version or Gemfile ruby directive |
 | `bundler-audit-clean` | Ensures no known vulnerabilities in gem dependencies (skips if no audit data) |
+| `min-ruby-version` | Ensures project Ruby version meets the configured minimum |
+| `min-ruby-version-cicd` | Ensures Ruby version used in CI/CD meets the configured minimum |
+| `min-bundler-version-cicd` | Ensures Bundler version used in CI/CD meets the configured minimum |
+| `min-rake-version-cicd` | Ensures Rake version used in CI/CD meets the configured minimum |
 
 ## Required Data
 
@@ -29,6 +33,9 @@ This policy reads from the following Component JSON paths:
 | `.lang.ruby.ruby_version_file_exists` | boolean | `ruby` collector (project) |
 | `.lang.ruby.version` | string | `ruby` collector (project) |
 | `.lang.ruby.bundler_audit.vulnerabilities` | array | `ruby` collector (bundler-audit or bundler-audit-cicd) |
+| `.lang.ruby.cicd.cmds` | array | `ruby` collector (cicd) |
+| `.lang.ruby.bundler.cicd.cmds` | array | `ruby` collector (bundler-cicd) |
+| `.lang.ruby.rake.cicd.cmds` | array | `ruby` collector (rake-cicd) |
 
 **Note:** Ensure the `ruby` collector is configured before enabling this policy.
 
@@ -44,6 +51,10 @@ policies:
     # include: [gemfile-exists, lockfile-exists]  # Only run specific checks
     # with:
     #   max_audit_vulnerabilities: "0"
+    #   min_ruby_version: "3.0"
+    #   min_ruby_version_cicd: "3.0"
+    #   min_bundler_version_cicd: "2.4"
+    #   min_rake_version_cicd: "13.0"
 ```
 
 ## Examples
@@ -110,3 +121,7 @@ When this policy fails, you can resolve it by:
 2. **lockfile-exists** — Run `bundle install` to generate Gemfile.lock and commit it
 3. **ruby-version-set** — Create a `.ruby-version` file (e.g., `echo "3.2.2" > .ruby-version`) or add `ruby "3.2.2"` to your Gemfile
 4. **bundler-audit-clean** — Run `bundle audit` to see vulnerabilities, then `bundle update <gem>` to update affected gems
+5. **min-ruby-version** — Update the Ruby version in `.ruby-version` or your Gemfile `ruby` directive to meet the minimum
+6. **min-ruby-version-cicd** — Update the Ruby installation in your CI environment to the required minimum version
+7. **min-bundler-version-cicd** — Run `gem install bundler` in CI to update to a supported Bundler version
+8. **min-rake-version-cicd** — Update the `rake` gem in your Gemfile to meet the minimum version

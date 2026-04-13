@@ -53,7 +53,48 @@ policies:
     mainPython: bundler_audit_clean.py
     keywords: ["bundler-audit", "vulnerabilities", "security", "CVE", "advisory"]
 
+  - name: min-ruby-version
+    description: |
+      Ensures the project uses at least the minimum required Ruby version.
+      Helps maintain security and compatibility standards.
+    mainPython: min_ruby_version.py
+    keywords: ["ruby version", "compatibility", "security"]
+
+  - name: min-ruby-version-cicd
+    description: |
+      Ensures the Ruby version used in CI/CD commands meets the minimum
+      required version for build environments.
+    mainPython: min_ruby_version_cicd.py
+    keywords: ["ruby version", "ci/cd", "compatibility", "security"]
+
+  - name: min-bundler-version-cicd
+    description: |
+      Ensures the Bundler version used in CI/CD commands meets the minimum
+      required version. Outdated Bundler versions may have security issues
+      or lack features needed for reliable dependency resolution.
+    mainPython: min_bundler_version_cicd.py
+    keywords: ["bundler version", "ci/cd", "compatibility", "security"]
+
+  - name: min-rake-version-cicd
+    description: |
+      Ensures the Rake version used in CI/CD commands meets the minimum
+      required version for build automation.
+    mainPython: min_rake_version_cicd.py
+    keywords: ["rake version", "ci/cd", "compatibility", "security"]
+
 inputs:
   max_audit_vulnerabilities:
     description: Maximum allowed known vulnerabilities from bundler-audit (0 = must be clean)
     default: "0"
+  min_ruby_version:
+    description: Minimum required Ruby version (e.g., "3.0", "3.2")
+    default: "3.0"
+  min_ruby_version_cicd:
+    description: Minimum required Ruby version for CI/CD commands
+    default: "3.0"
+  min_bundler_version_cicd:
+    description: Minimum required Bundler version for CI/CD commands
+    default: "2.4"
+  min_rake_version_cicd:
+    description: Minimum required Rake version for CI/CD commands
+    default: "13.0"
