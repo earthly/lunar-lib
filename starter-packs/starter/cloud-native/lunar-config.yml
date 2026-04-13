@@ -29,31 +29,37 @@ collectors:
   - uses: ./collectors/github         # Repo settings
 
 policies:
-  # --- Kubernetes: report critical configs, track maturity ---
-  - uses: ./policies/k8s
+  # --- Container: no-latest is the one report-pr check ---
+  - uses: ./policies/container
     enforcement: report-pr
     include:
-      - requests-and-limits    # All containers must have resource limits
-      - probes                 # Liveness/readiness probes required
+      - no-latest              # Don't use :latest tags — the clearest anti-pattern
 
+  - uses: ./policies/container
+    enforcement: score
+    include:
+      - healthcheck
+      - user
+      - stable-tags
+      - build-tagged
+
+  # --- Kubernetes ---
   - uses: ./policies/k8s
     enforcement: score
     include:
+      - requests-and-limits
+      - probes
       - valid
       - pdb
       - non-root
       - min-replicas
 
-  # --- Terraform: report unpinned providers, track state backend ---
-  - uses: ./policies/terraform
-    enforcement: report-pr
-    include:
-      - provider-versions-pinned
-      - remote-backend
-
+  # --- Terraform ---
   - uses: ./policies/terraform
     enforcement: score
     include:
+      - provider-versions-pinned
+      - remote-backend
       - module-versions-pinned
       - min-provider-versions
     with:
@@ -66,45 +72,23 @@ policies:
       - valid
       - datastore-destroy-protection
 
-  # --- IaC scanning: report critical misconfigs ---
-  - uses: ./policies/iac-scan
-    enforcement: report-pr
-    include:
-      - max-severity
-    with:
-      min_severity: "critical"
-
+  # --- IaC scanning ---
   - uses: ./policies/iac-scan
     enforcement: score
     include:
       - executed
-
-  # --- Container best practices: report key issues ---
-  - uses: ./policies/container
-    enforcement: report-pr
-    include:
-      - no-latest            # Don't use :latest tags
-      - healthcheck          # HEALTHCHECK instruction present
-      - user                 # Run as non-root
-
-  - uses: ./policies/container
-    enforcement: score
-    include:
-      - stable-tags
-      - build-tagged
-
-  # --- Container scanning: report critical image vulns ---
-  - uses: ./policies/container-scan
-    enforcement: report-pr
-    include:
       - max-severity
     with:
       min_severity: "critical"
 
+  # --- Container scanning ---
   - uses: ./policies/container-scan
     enforcement: score
     include:
       - executed
+      - max-severity
+    with:
+      min_severity: "critical"
 
   # --- CI hygiene ---
   - uses: ./policies/ci

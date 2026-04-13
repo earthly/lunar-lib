@@ -21,27 +21,22 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 |--------|-------|-------------|-----|
 | `secrets` | `no-hardcoded-secrets` | **block-pr** | Leaked secrets must never merge |
 | `secrets` | `executed` | score | Track that scanner ran |
-| `sca` | `max-severity` (critical) | report-pr | Surface critical vulns on PRs |
-| `sca` | `executed` | score | Track SCA coverage |
-| `sast` | `max-severity` (high) | report-pr | Surface high-severity findings |
-| `sast` | `executed` | score | Track SAST coverage |
-| `container-scan` | `max-severity` (critical) | report-pr | Surface critical image vulns |
-| `container-scan` | `executed` | score | Track scan coverage |
-| `container` | `no-latest`, `user` | report-pr | No `:latest` tags, non-root containers |
-| `container` | `healthcheck`, `stable-tags` | score | Track Dockerfile best practices |
+| `sca` | `executed`, `max-severity` (critical) | score | Track SCA coverage |
+| `sast` | `executed`, `max-severity` (high) | score | Track SAST coverage |
+| `container-scan` | `executed`, `max-severity` (critical) | score | Track container security |
+| `container` | `no-latest`, `user`, `healthcheck`, `stable-tags` | score | Track Dockerfile maturity |
 | `sbom` | `sbom-exists`, `has-licenses` | score | Track SBOM generation |
-| `vcs` | `branch-protection-enabled`, `require-pull-request` | report-pr | Surface missing branch protection |
-| `vcs` | `minimum-approvals`, `require-codeowner-review`, `disallow-force-push` | score | Track VCS maturity |
+| `vcs` | `branch-protection-enabled`, `require-pull-request`, `minimum-approvals`, `require-codeowner-review`, `disallow-force-push` | score | Track VCS maturity |
 
 ## Enforcement Philosophy
 
 - **block-pr**: Only secret detection — leaked secrets are an immediate security incident
-- **report-pr**: Vulnerability findings and critical Dockerfile issues — visible on every PR but won't block while your team ramps up
-- **score**: Everything else — tracked in your health dashboard for gradual improvement
+- **score**: Everything else — gives your team a security health dashboard without PR friction on day 1
 
 ## Tightening Over Time
 
-As your team matures, consider promoting:
-1. `sca.max-severity` → `block-pr` (once your dependency hygiene is clean)
-2. `container.no-latest` → `block-pr` (once all images use explicit tags)
-3. `vcs.branch-protection-enabled` → `block-pr` (once all repos have protection)
+As your security posture matures, consider promoting:
+1. `sca.max-severity` → `report-pr` (once your dependency hygiene is clean)
+2. `container.no-latest` → `report-pr` (once all images use explicit tags)
+3. `vcs.branch-protection-enabled` → `report-pr` (once all repos have protection)
+4. `sast.max-severity` → `report-pr` (once existing findings are triaged)

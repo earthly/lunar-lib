@@ -28,7 +28,7 @@ collectors:
   - uses: ./collectors/github         # Repo settings, branch protection
 
 policies:
-  # --- Secret detection: block PRs with leaked secrets ---
+  # --- Secret detection: the ONE block-pr check ---
   - uses: ./policies/secrets
     enforcement: block-pr
     include:
@@ -39,75 +39,55 @@ policies:
     include:
       - executed
 
-  # --- SCA: report critical vulns on PRs, track scanner execution ---
-  - uses: ./policies/sca
-    enforcement: report-pr
-    include:
-      - max-severity
-    with:
-      min_severity: "critical"
-
+  # --- SCA ---
   - uses: ./policies/sca
     enforcement: score
     include:
       - executed
+      - max-severity
+    with:
+      min_severity: "critical"
 
-  # --- SAST: report findings on PRs, track execution ---
+  # --- SAST ---
   - uses: ./policies/sast
-    enforcement: report-pr
+    enforcement: score
     include:
+      - executed
       - max-severity
     with:
       min_severity: "high"
 
-  - uses: ./policies/sast
+  # --- Container scanning ---
+  - uses: ./policies/container-scan
     enforcement: score
     include:
       - executed
-
-  # --- Container scanning: report critical image vulns ---
-  - uses: ./policies/container-scan
-    enforcement: report-pr
-    include:
       - max-severity
     with:
       min_severity: "critical"
 
-  - uses: ./policies/container-scan
-    enforcement: score
-    include:
-      - executed
-
-  # --- Dockerfile best practices: security-relevant checks ---
-  - uses: ./policies/container
-    enforcement: report-pr
-    include:
-      - no-latest          # Don't use :latest tags
-      - user               # Run as non-root
-
+  # --- Dockerfile best practices ---
   - uses: ./policies/container
     enforcement: score
     include:
+      - no-latest
+      - user
       - healthcheck
       - stable-tags
 
-  # --- SBOM: track generation ---
+  # --- SBOM ---
   - uses: ./policies/sbom
     enforcement: score
     include:
       - sbom-exists
       - has-licenses
 
-  # --- Branch protection: report missing protections ---
-  - uses: ./policies/vcs
-    enforcement: report-pr
-    include:
-      - branch-protection-enabled
-      - require-pull-request
-
+  # --- Branch protection ---
   - uses: ./policies/vcs
     enforcement: score
     include:
+      - branch-protection-enabled
+      - require-pull-request
       - minimum-approvals
       - require-codeowner-review
       - disallow-force-push
