@@ -2,7 +2,6 @@ version: 0
 
 # ============================================================================
 # Starter Pack: Code Quality & Standards
-# Focus: Testing, linting, ownership, repo hygiene, language guardrails
 # ============================================================================
 
 collectors:
@@ -26,7 +25,7 @@ collectors:
   - uses: ./collectors/github
 
   # --- Quality tools ---
-  - uses: ./collectors/codecov        # Coverage data (skips if not configured)
+  - uses: ./collectors/codecov
 
 policies:
   # --- Repo standards ---
@@ -79,7 +78,7 @@ policies:
       - branch-protection-enabled
       - require-pull-request
 
-  # --- Language-specific guardrails (all at score) ---
+  # --- Language-specific guardrails ---
   # Version checks use sensible defaults. Override with `with:` to match your stack:
   #   min_go_version: "1.21"  |  min_java_version: "17"
   #   min_node_version: "18"  |  min_python_version: "3.9"

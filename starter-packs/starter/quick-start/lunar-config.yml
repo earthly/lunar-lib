@@ -2,8 +2,6 @@ version: 0
 
 # ============================================================================
 # Starter Pack: Quick Start
-# Focus: Highest-impact items from all categories, minimal noise
-# Everything at score except secret detection (report-pr)
 # ============================================================================
 
 collectors:
@@ -26,16 +24,16 @@ collectors:
   - uses: ./collectors/repo-boilerplate
   - uses: ./collectors/github
 
-  # --- Security (zero-config) ---
-  - uses: ./collectors/gitleaks       # Secret scanning
-  - uses: ./collectors/trivy          # Dependency vulnerability scanning
-  - uses: ./collectors/syft           # SBOM generation
+  # --- Security ---
+  - uses: ./collectors/gitleaks
+  - uses: ./collectors/trivy
+  - uses: ./collectors/syft
 
   # --- Infrastructure ---
-  - uses: ./collectors/docker         # Dockerfile analysis (skips if none)
+  - uses: ./collectors/docker
 
 policies:
-  # --- Secret detection: the ONE thing that reports on PRs ---
+  # --- Secret detection ---
   - uses: ./policies/secrets
     enforcement: report-pr
     include:
@@ -83,7 +81,7 @@ policies:
     include:
       - min-versions
 
-  # --- SCA: track vulnerability scanning ---
+  # --- SCA ---
   - uses: ./policies/sca
     enforcement: score
     include:
@@ -98,7 +96,7 @@ policies:
     include:
       - sbom-exists
 
-  # --- Container basics ---
+  # --- Container ---
   - uses: ./policies/container
     enforcement: score
     include:

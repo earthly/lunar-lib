@@ -2,7 +2,6 @@ version: 0
 
 # ============================================================================
 # Starter Pack: Cloud Native / Infrastructure
-# Focus: Kubernetes, Terraform, Docker, IaC security
 # ============================================================================
 
 collectors:
@@ -20,23 +19,23 @@ collectors:
   - uses: ./collectors/ruby
 
   # --- Infrastructure ---
-  - uses: ./collectors/k8s            # Kubernetes manifests (skips if none)
-  - uses: ./collectors/terraform      # Terraform files (skips if none)
-  - uses: ./collectors/docker         # Dockerfile analysis
+  - uses: ./collectors/k8s
+  - uses: ./collectors/terraform
+  - uses: ./collectors/docker
 
   # --- Security scanners ---
-  - uses: ./collectors/trivy          # Dependency vulnerability scanning (zero-config)
-  - uses: ./collectors/checkov        # IaC scanning (zero-config)
+  - uses: ./collectors/trivy
+  - uses: ./collectors/checkov
 
   # --- CI context ---
-  - uses: ./collectors/github         # Repo settings
+  - uses: ./collectors/github
 
 policies:
-  # --- Container: no-latest is the one report-pr check ---
+  # --- Container ---
   - uses: ./policies/container
     enforcement: report-pr
     include:
-      - no-latest              # Don't use :latest tags — the clearest anti-pattern
+      - no-latest
 
   - uses: ./policies/container
     enforcement: score
@@ -67,7 +66,7 @@ policies:
       - module-versions-pinned
       - min-provider-versions
     with:
-      min_provider_versions: '{"aws": "5.0"}'  # Customize per your stack
+      min_provider_versions: '{"aws": "5.0"}'
 
   # --- General IaC ---
   - uses: ./policies/iac
