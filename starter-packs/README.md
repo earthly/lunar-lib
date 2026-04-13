@@ -1,32 +1,38 @@
 # Starter Packs
 
-Curated collections of collectors and policies for common use cases. Each pack is a ready-to-use `lunar-config.yml` that you can drop into your project or merge with an existing config.
+Curated collections of collectors and policies organized by complexity tier. Each pack is a ready-to-use `lunar-config.yml` that you can drop into your project or merge with an existing config.
 
-All packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS) — they skip automatically when the language isn't detected, so there's zero cost to including them.
+## Tiers
 
-## Available Packs
+### [Starter](./starter/) — Zero Config, Zero Secrets
 
-### [Security Essentials](./security-essentials/)
-For teams whose top priority is vulnerability scanning, secret detection, and supply-chain security. Includes scanners (Gitleaks, Trivy, Syft, Semgrep), container security, and VCS branch protection. Critical checks like secret detection block PRs; scanning tools report for awareness.
+Import and it works. No configuration, no secrets, no vendor accounts. Collectors skip gracefully when a technology isn't present. Four theme-based packs:
 
-### [Code Quality](./code-quality/)
-For teams focused on testing, linting, code ownership, and repo hygiene. Includes repo standards (README, CODEOWNERS, license), testing and linter enforcement, dependency management, and language-specific guardrails for every detected language.
+- **[Security Essentials](./starter/security-essentials/)** — Vulnerability scanning, secret detection, supply-chain security
+- **[Code Quality](./starter/code-quality/)** — Testing, linting, ownership, repo hygiene, language guardrails
+- **[Cloud Native](./starter/cloud-native/)** — Kubernetes, Terraform, Docker, IaC security
+- **[Quick Start](./starter/quick-start/)** — Highest-impact items from all categories, minimal noise
 
-### [Cloud Native](./cloud-native/)
-For teams running Kubernetes, Terraform, and Docker. Covers resource limits, health probes, provider pinning, IaC scanning, Dockerfile best practices, and container vulnerability scanning. All checks skip gracefully when infrastructure files aren't present.
+All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS) — they skip automatically when the language isn't detected, so there's zero cost to including them.
 
-### [Quick Start](./quick-start/)
-The "just works" pack — highest-impact items from all categories with minimal noise. Everything runs at `score` level (no PR blocking) except secret detection, which reports on PRs. Perfect for teams that want immediate visibility without disruption.
+### [Starter+](./starter+/) — Light Configuration or Secrets
+
+Easy to set up but requires a secret (API key, token) or a URL to connect to an external service. Examples: Snyk, Jira, SonarQube, PagerDuty.
+
+### [Advanced](./advanced/) — Specific Use Cases or Significant Configuration
+
+For specific use cases or requires meaningful configuration to be useful. Examples: custom AST rules, OpenTelemetry, AI governance, GitOps.
 
 ## How to Use
 
-1. Copy the `lunar-config.yml` from the pack directory into your project root
-2. Customize enforcement levels as your team matures:
+1. Pick a pack from the [Starter](./starter/) tier to get started immediately
+2. Copy the `lunar-config.yml` from the pack directory into your project root
+3. Customize enforcement levels as your team matures:
    - `score` → track in health dashboard only
    - `report-pr` → comment on PRs without blocking
    - `block-pr` → require passing before merge
-3. Use `include`/`exclude` to enable or disable specific checks within a policy
-4. Import the same policy multiple times at different enforcement levels for different checks
+4. Use `include`/`exclude` to enable or disable specific checks within a policy
+5. Import the same policy multiple times at different enforcement levels for different checks
 
 ## Enforcement Level Guide
 
