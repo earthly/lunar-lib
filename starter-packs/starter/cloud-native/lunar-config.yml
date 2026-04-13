@@ -16,6 +16,8 @@ collectors:
   - uses: ./collectors/cpp
   - uses: ./collectors/dotnet
   - uses: ./collectors/html
+  - uses: ./collectors/shell
+  - uses: ./collectors/ruby
 
   # --- Infrastructure ---
   - uses: ./collectors/k8s            # Kubernetes manifests (skips if none)
@@ -24,6 +26,7 @@ collectors:
 
   # --- Security scanners ---
   - uses: ./collectors/trivy          # Dependency vulnerability scanning (zero-config)
+  - uses: ./collectors/checkov        # IaC scanning (zero-config)
 
   # --- CI context ---
   - uses: ./collectors/github         # Repo settings
@@ -42,6 +45,7 @@ policies:
       - user
       - stable-tags
       - build-tagged
+      - dockerfile-lint-clean
 
   # --- Kubernetes ---
   - uses: ./policies/k8s

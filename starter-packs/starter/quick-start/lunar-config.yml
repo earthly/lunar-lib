@@ -17,6 +17,8 @@ collectors:
   - uses: ./collectors/cpp
   - uses: ./collectors/dotnet
   - uses: ./collectors/html
+  - uses: ./collectors/shell
+  - uses: ./collectors/ruby
 
   # --- Repo health ---
   - uses: ./collectors/readme
@@ -103,3 +105,4 @@ policies:
       - no-latest
       - user
       - healthcheck
+      - dockerfile-lint-clean

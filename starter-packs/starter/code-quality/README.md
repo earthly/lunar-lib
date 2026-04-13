@@ -41,6 +41,8 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 | `php` | `composer-json-exists`, `composer-lock-exists`, `phpunit-configured`, `min-version` |
 | `cpp` | `build-system-exists`, `min-cpp-standard`, `cppcheck-clean` |
 | `dotnet` | `project-file-exists`, `target-framework-set`, `dependencies-locked`, `test-project-exists` |
+| `shell` | `shellcheck-clean` |
+| `ruby` | `gemfile-exists`, `lockfile-exists`, `ruby-version-set`, `bundler-audit-clean` |
 | `html` | `htmlhint-clean`, `stylelint-clean` |
 
 ## Enforcement Philosophy

@@ -16,6 +16,8 @@ collectors:
   - uses: ./collectors/cpp
   - uses: ./collectors/dotnet
   - uses: ./collectors/html
+  - uses: ./collectors/shell
+  - uses: ./collectors/ruby
 
   # --- Security scanners ---
   - uses: ./collectors/gitleaks       # Secret scanning (zero-config)
@@ -26,6 +28,7 @@ collectors:
   # --- Infrastructure context ---
   - uses: ./collectors/docker         # Dockerfile analysis
   - uses: ./collectors/github         # Repo settings, branch protection
+  - uses: ./collectors/github-actions  # GitHub Actions workflow analysis
 
 policies:
   # --- Secret detection: the ONE block-pr check ---
@@ -66,6 +69,17 @@ policies:
     with:
       min_severity: "critical"
 
+  # --- GitHub Actions security ---
+  - uses: ./policies/github-actions
+    enforcement: score
+    include:
+      - no-script-injection
+      - no-dangerous-trigger-checkout
+      - permissions-declared
+      - no-write-all-permissions
+      - checkout-no-persist-credentials
+      - no-secrets-inherit
+
   # --- Dockerfile best practices ---
   - uses: ./policies/container
     enforcement: score
@@ -74,6 +88,7 @@ policies:
       - user
       - healthcheck
       - stable-tags
+      - dockerfile-lint-clean
 
   # --- SBOM ---
   - uses: ./policies/sbom

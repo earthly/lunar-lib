@@ -12,6 +12,7 @@ For teams running Kubernetes, Terraform, and Docker. Covers resource management,
 | `terraform` | Terraform file analysis (skips if none) |
 | `docker` | Dockerfile analysis |
 | `trivy` | Dependency vulnerability scanning (zero-config) |
+| `checkov` | IaC scanning (zero-config) |
 | `github` | Repo settings |
 
 ### Policies
@@ -19,7 +20,7 @@ For teams running Kubernetes, Terraform, and Docker. Covers resource management,
 | Policy | Check | Enforcement | Why |
 |--------|-------|-------------|-----|
 | `container` | `no-latest` | **report-pr** | Using `:latest` tags is the clearest anti-pattern |
-| `container` | `healthcheck`, `user`, `stable-tags`, `build-tagged` | score | Track Dockerfile maturity |
+| `container` | `healthcheck`, `user`, `stable-tags`, `build-tagged`, `dockerfile-lint-clean` | score | Track Dockerfile maturity |
 | `k8s` | `requests-and-limits`, `probes`, `valid`, `pdb`, `non-root`, `min-replicas` | score | Track K8s maturity |
 | `terraform` | `provider-versions-pinned`, `remote-backend`, `module-versions-pinned`, `min-provider-versions` | score | Track Terraform hygiene |
 | `iac` | `valid`, `datastore-destroy-protection` | score | Track IaC standards |

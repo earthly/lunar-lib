@@ -14,6 +14,7 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 | `semgrep` | SAST scanning (skips if not configured) |
 | `docker` | Dockerfile analysis |
 | `github` | Repo settings, branch protection |
+| `github-actions` | GitHub Actions workflow analysis |
 
 ### Policies
 
@@ -24,7 +25,8 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 | `sca` | `executed`, `max-severity` (critical) | score | Track SCA coverage |
 | `sast` | `executed`, `max-severity` (high) | score | Track SAST coverage |
 | `container-scan` | `executed`, `max-severity` (critical) | score | Track container security |
-| `container` | `no-latest`, `user`, `healthcheck`, `stable-tags` | score | Track Dockerfile maturity |
+| `github-actions` | `no-script-injection`, `no-dangerous-trigger-checkout`, `permissions-declared`, `no-write-all-permissions`, `checkout-no-persist-credentials`, `no-secrets-inherit` | score | Track CI/CD security |
+| `container` | `no-latest`, `user`, `healthcheck`, `stable-tags`, `dockerfile-lint-clean` | score | Track Dockerfile maturity |
 | `sbom` | `sbom-exists`, `has-licenses` | score | Track SBOM generation |
 | `vcs` | `branch-protection-enabled`, `require-pull-request`, `minimum-approvals`, `require-codeowner-review`, `disallow-force-push` | score | Track VCS maturity |
 

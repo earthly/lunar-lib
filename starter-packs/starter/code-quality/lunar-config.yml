@@ -16,6 +16,8 @@ collectors:
   - uses: ./collectors/cpp
   - uses: ./collectors/dotnet
   - uses: ./collectors/html
+  - uses: ./collectors/shell
+  - uses: ./collectors/ruby
 
   # --- Repo health ---
   - uses: ./collectors/readme
@@ -157,6 +159,21 @@ policies:
       - target-framework-set
       - dependencies-locked
       - test-project-exists
+
+  # Shell
+  - uses: ./policies/shell
+    enforcement: score
+    include:
+      - shellcheck-clean
+
+  # Ruby
+  - uses: ./policies/ruby
+    enforcement: score
+    include:
+      - gemfile-exists
+      - lockfile-exists
+      - ruby-version-set
+      - bundler-audit-clean
 
   # HTML/CSS
   - uses: ./policies/html

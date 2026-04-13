@@ -30,7 +30,7 @@ The "just works" pack — highest-impact items from security, quality, and infra
 | `dependencies` | `min-versions` | score | Quality |
 | `sca` | `executed`, `max-severity` (critical) | score | Security |
 | `sbom` | `sbom-exists` | score | Security |
-| `container` | `no-latest`, `user`, `healthcheck` | score | Infrastructure |
+| `container` | `no-latest`, `user`, `healthcheck`, `dockerfile-lint-clean` | score | Infrastructure |
 
 ## Enforcement Philosophy
 
