@@ -31,6 +31,11 @@ checks:
     run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
     message: "Linter failed. Fix the errors above before committing."
 
+  - name: earthfile-wired-into-all
+    on: "collectors/*/Earthfile"
+    run: "PLUGIN_DIR=$(dirname {file} | sed \"s|$(git rev-parse --show-toplevel)/||\"); ROOT_EF=$(git rev-parse --show-toplevel)/Earthfile; grep -q \"$PLUGIN_DIR\" \"$ROOT_EF\""
+    message: "This plugin has an Earthfile but is not referenced in the root Earthfile's +all target. Add: BUILD --pass-args ./<plugin-path>+image"
+
   - name: collector-gnu-grep
     on: "collectors/**/*.sh"
     run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
