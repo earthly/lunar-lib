@@ -6,30 +6,30 @@ version: 0
 
 collectors:
   # --- Language collectors (only trigger when language is detected) ---
-  - uses: ./collectors/golang
-  - uses: ./collectors/java
-  - uses: ./collectors/nodejs
-  - uses: ./collectors/python
-  - uses: ./collectors/rust
-  - uses: ./collectors/php
-  - uses: ./collectors/cpp
-  - uses: ./collectors/dotnet
-  - uses: ./collectors/html
-  - uses: ./collectors/shell
-  - uses: ./collectors/ruby
+  - uses: github://earthly/lunar-lib/collectors/golang@main
+  - uses: github://earthly/lunar-lib/collectors/java@main
+  - uses: github://earthly/lunar-lib/collectors/nodejs@main
+  - uses: github://earthly/lunar-lib/collectors/python@main
+  - uses: github://earthly/lunar-lib/collectors/rust@main
+  - uses: github://earthly/lunar-lib/collectors/php@main
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- Repo health ---
-  - uses: ./collectors/readme
-  - uses: ./collectors/codeowners
-  - uses: ./collectors/repo-boilerplate
-  - uses: ./collectors/github
+  - uses: github://earthly/lunar-lib/collectors/readme@main
+  - uses: github://earthly/lunar-lib/collectors/codeowners@main
+  - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
+  - uses: github://earthly/lunar-lib/collectors/github@main
 
   # --- Quality tools ---
-  - uses: ./collectors/codecov
+  - uses: github://earthly/lunar-lib/collectors/codecov@main
 
 policies:
   # --- Repo standards ---
-  - uses: ./policies/repo-boilerplate
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
     enforcement: score
     include:
       - readme-exists
@@ -42,7 +42,7 @@ policies:
       - contributing-exists
 
   # --- Code ownership ---
-  - uses: ./policies/codeowners
+  - uses: github://earthly/lunar-lib/policies/codeowners@main
     enforcement: score
     include:
       - exists
@@ -51,7 +51,7 @@ policies:
       - min-owners
 
   # --- Testing ---
-  - uses: ./policies/testing
+  - uses: github://earthly/lunar-lib/policies/testing@main
     enforcement: score
     include:
       - executed
@@ -60,19 +60,19 @@ policies:
       - coverage-reported
 
   # --- Linting ---
-  - uses: ./policies/linter
+  - uses: github://earthly/lunar-lib/policies/linter@main
     enforcement: score
     include:
       - ran
 
   # --- Dependencies ---
-  - uses: ./policies/dependencies
+  - uses: github://earthly/lunar-lib/policies/dependencies@main
     enforcement: score
     include:
       - min-versions
 
   # --- VCS ---
-  - uses: ./policies/vcs
+  - uses: github://earthly/lunar-lib/policies/vcs@main
     enforcement: score
     include:
       - branch-protection-enabled
@@ -84,7 +84,7 @@ policies:
   #   min_node_version: "18"  |  min_python_version: "3.9"
 
   # Go
-  - uses: ./policies/golang
+  - uses: github://earthly/lunar-lib/policies/golang@main
     enforcement: score
     include:
       - go-mod-exists
@@ -95,7 +95,7 @@ policies:
     #   min_go_version: "1.22"
 
   # Java
-  - uses: ./policies/java
+  - uses: github://earthly/lunar-lib/policies/java@main
     enforcement: score
     include:
       - build-tool-wrapper-exists
@@ -105,7 +105,7 @@ policies:
     #   min_java_version: "21"
 
   # Node.js
-  - uses: ./policies/nodejs
+  - uses: github://earthly/lunar-lib/policies/nodejs@main
     enforcement: score
     include:
       - lockfile-exists
@@ -116,7 +116,7 @@ policies:
     #   min_node_version: "20"
 
   # Python
-  - uses: ./policies/python
+  - uses: github://earthly/lunar-lib/policies/python@main
     enforcement: score
     include:
       - lockfile-exists
@@ -124,7 +124,7 @@ policies:
       - min-python-version
 
   # Rust
-  - uses: ./policies/rust
+  - uses: github://earthly/lunar-lib/policies/rust@main
     enforcement: score
     include:
       - cargo-toml-exists
@@ -133,7 +133,7 @@ policies:
       - clippy-clean
 
   # PHP
-  - uses: ./policies/php
+  - uses: github://earthly/lunar-lib/policies/php@main
     enforcement: score
     include:
       - composer-json-exists
@@ -143,7 +143,7 @@ policies:
       - min-version
 
   # C/C++
-  - uses: ./policies/cpp
+  - uses: github://earthly/lunar-lib/policies/cpp@main
     enforcement: score
     include:
       - build-system-exists
@@ -151,7 +151,7 @@ policies:
       - cppcheck-clean
 
   # .NET
-  - uses: ./policies/dotnet
+  - uses: github://earthly/lunar-lib/policies/dotnet@main
     enforcement: score
     include:
       - project-file-exists
@@ -160,13 +160,13 @@ policies:
       - test-project-exists
 
   # Shell
-  - uses: ./policies/shell
+  - uses: github://earthly/lunar-lib/policies/shell@main
     enforcement: score
     include:
       - shellcheck-clean
 
   # Ruby
-  - uses: ./policies/ruby
+  - uses: github://earthly/lunar-lib/policies/ruby@main
     enforcement: score
     include:
       - gemfile-exists
@@ -175,7 +175,7 @@ policies:
       - bundler-audit-clean
 
   # HTML/CSS
-  - uses: ./policies/html
+  - uses: github://earthly/lunar-lib/policies/html@main
     enforcement: score
     include:
       - htmlhint-clean

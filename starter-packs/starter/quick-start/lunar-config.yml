@@ -6,41 +6,41 @@ version: 0
 
 collectors:
   # --- Language collectors (only trigger when language is detected) ---
-  - uses: ./collectors/golang
-  - uses: ./collectors/java
-  - uses: ./collectors/nodejs
-  - uses: ./collectors/python
-  - uses: ./collectors/rust
-  - uses: ./collectors/php
-  - uses: ./collectors/cpp
-  - uses: ./collectors/dotnet
-  - uses: ./collectors/html
-  - uses: ./collectors/shell
-  - uses: ./collectors/ruby
+  - uses: github://earthly/lunar-lib/collectors/golang@main
+  - uses: github://earthly/lunar-lib/collectors/java@main
+  - uses: github://earthly/lunar-lib/collectors/nodejs@main
+  - uses: github://earthly/lunar-lib/collectors/python@main
+  - uses: github://earthly/lunar-lib/collectors/rust@main
+  - uses: github://earthly/lunar-lib/collectors/php@main
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- Repo health ---
-  - uses: ./collectors/readme
-  - uses: ./collectors/codeowners
-  - uses: ./collectors/repo-boilerplate
-  - uses: ./collectors/github
+  - uses: github://earthly/lunar-lib/collectors/readme@main
+  - uses: github://earthly/lunar-lib/collectors/codeowners@main
+  - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
+  - uses: github://earthly/lunar-lib/collectors/github@main
 
   # --- Security ---
-  - uses: ./collectors/gitleaks
-  - uses: ./collectors/trivy
-  - uses: ./collectors/syft
+  - uses: github://earthly/lunar-lib/collectors/gitleaks@main
+  - uses: github://earthly/lunar-lib/collectors/trivy@main
+  - uses: github://earthly/lunar-lib/collectors/syft@main
 
   # --- Infrastructure ---
-  - uses: ./collectors/docker
+  - uses: github://earthly/lunar-lib/collectors/docker@main
 
 policies:
   # --- Secret detection ---
-  - uses: ./policies/secrets
+  - uses: github://earthly/lunar-lib/policies/secrets@main
     enforcement: report-pr
     include:
       - no-hardcoded-secrets
 
   # --- Repo basics ---
-  - uses: ./policies/repo-boilerplate
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
     enforcement: score
     include:
       - readme-exists
@@ -49,40 +49,40 @@ policies:
       - license-exists
 
   # --- Code ownership ---
-  - uses: ./policies/codeowners
+  - uses: github://earthly/lunar-lib/policies/codeowners@main
     enforcement: score
     include:
       - exists
       - valid
 
   # --- VCS ---
-  - uses: ./policies/vcs
+  - uses: github://earthly/lunar-lib/policies/vcs@main
     enforcement: score
     include:
       - branch-protection-enabled
       - require-pull-request
 
   # --- Testing ---
-  - uses: ./policies/testing
+  - uses: github://earthly/lunar-lib/policies/testing@main
     enforcement: score
     include:
       - executed
       - passing
 
   # --- Linting ---
-  - uses: ./policies/linter
+  - uses: github://earthly/lunar-lib/policies/linter@main
     enforcement: score
     include:
       - ran
 
   # --- Dependencies ---
-  - uses: ./policies/dependencies
+  - uses: github://earthly/lunar-lib/policies/dependencies@main
     enforcement: score
     include:
       - min-versions
 
   # --- SCA ---
-  - uses: ./policies/sca
+  - uses: github://earthly/lunar-lib/policies/sca@main
     enforcement: score
     include:
       - executed
@@ -91,13 +91,13 @@ policies:
       min_severity: "critical"
 
   # --- SBOM ---
-  - uses: ./policies/sbom
+  - uses: github://earthly/lunar-lib/policies/sbom@main
     enforcement: score
     include:
       - sbom-exists
 
   # --- Container ---
-  - uses: ./policies/container
+  - uses: github://earthly/lunar-lib/policies/container@main
     enforcement: score
     include:
       - no-latest

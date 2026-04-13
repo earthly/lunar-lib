@@ -6,38 +6,38 @@ version: 0
 
 collectors:
   # --- Language collectors (only trigger when language is detected) ---
-  - uses: ./collectors/golang
-  - uses: ./collectors/java
-  - uses: ./collectors/nodejs
-  - uses: ./collectors/python
-  - uses: ./collectors/rust
-  - uses: ./collectors/php
-  - uses: ./collectors/cpp
-  - uses: ./collectors/dotnet
-  - uses: ./collectors/html
-  - uses: ./collectors/shell
-  - uses: ./collectors/ruby
+  - uses: github://earthly/lunar-lib/collectors/golang@main
+  - uses: github://earthly/lunar-lib/collectors/java@main
+  - uses: github://earthly/lunar-lib/collectors/nodejs@main
+  - uses: github://earthly/lunar-lib/collectors/python@main
+  - uses: github://earthly/lunar-lib/collectors/rust@main
+  - uses: github://earthly/lunar-lib/collectors/php@main
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
 
   # --- Infrastructure ---
-  - uses: ./collectors/k8s
-  - uses: ./collectors/terraform
-  - uses: ./collectors/docker
+  - uses: github://earthly/lunar-lib/collectors/k8s@main
+  - uses: github://earthly/lunar-lib/collectors/terraform@main
+  - uses: github://earthly/lunar-lib/collectors/docker@main
 
   # --- Security scanners ---
-  - uses: ./collectors/trivy
-  - uses: ./collectors/checkov
+  - uses: github://earthly/lunar-lib/collectors/trivy@main
+  - uses: github://earthly/lunar-lib/collectors/checkov@main
 
   # --- CI context ---
-  - uses: ./collectors/github
+  - uses: github://earthly/lunar-lib/collectors/github@main
 
 policies:
   # --- Container ---
-  - uses: ./policies/container
+  - uses: github://earthly/lunar-lib/policies/container@main
     enforcement: report-pr
     include:
       - no-latest
 
-  - uses: ./policies/container
+  - uses: github://earthly/lunar-lib/policies/container@main
     enforcement: score
     include:
       - healthcheck
@@ -47,7 +47,7 @@ policies:
       - dockerfile-lint-clean
 
   # --- Kubernetes ---
-  - uses: ./policies/k8s
+  - uses: github://earthly/lunar-lib/policies/k8s@main
     enforcement: score
     include:
       - requests-and-limits
@@ -58,7 +58,7 @@ policies:
       - min-replicas
 
   # --- Terraform ---
-  - uses: ./policies/terraform
+  - uses: github://earthly/lunar-lib/policies/terraform@main
     enforcement: score
     include:
       - provider-versions-pinned
@@ -69,14 +69,14 @@ policies:
       min_provider_versions: '{"aws": "5.0"}'
 
   # --- General IaC ---
-  - uses: ./policies/iac
+  - uses: github://earthly/lunar-lib/policies/iac@main
     enforcement: score
     include:
       - valid
       - datastore-destroy-protection
 
   # --- IaC scanning ---
-  - uses: ./policies/iac-scan
+  - uses: github://earthly/lunar-lib/policies/iac-scan@main
     enforcement: score
     include:
       - executed
@@ -85,7 +85,7 @@ policies:
       min_severity: "critical"
 
   # --- Container scanning ---
-  - uses: ./policies/container-scan
+  - uses: github://earthly/lunar-lib/policies/container-scan@main
     enforcement: score
     include:
       - executed
@@ -94,7 +94,7 @@ policies:
       min_severity: "critical"
 
   # --- CI hygiene ---
-  - uses: ./policies/ci
+  - uses: github://earthly/lunar-lib/policies/ci@main
     enforcement: score
     include:
       - lint-clean
