@@ -1,6 +1,6 @@
 # Lunar Plugin PR Playbook
 
-Step-by-step playbook for cloud-based AI agents (Devin, etc.) to create lunar-lib collector and policy PRs end-to-end. This is a **bot-mode** workflow — the agent works autonomously through each phase, pausing only at explicit review gates.
+Step-by-step playbook for AI agents creating lunar-lib collector and policy PRs end-to-end. This is a **bot-mode** workflow — the agent works autonomously through each phase, pausing only at explicit review gates.
 
 ---
 
@@ -9,22 +9,26 @@ Step-by-step playbook for cloud-based AI agents (Devin, etc.) to create lunar-li
 Every lunar-lib plugin PR follows this lifecycle on a **single PR**:
 
 ```text
-Spec → Requester reviews → Second reviewer reviews → Second reviewer approves (go-ahead) → Implement → Requester reviews → Approval → Merge
+Spec → Primary review & iterate → Secondary review → Implement & test → Review & iterate → Approval → Merge
 ```
-
-**Requester** = the human who asked for this work (Linear ticket assignee, Slack requester, or whoever prompted the AI agent directly).
 
 | Stage | What you do | What you wait for |
 |-------|------------|-------------------|
-| **Spec** | Create YAML manifest, README, SVG icon. Push as PR (non-draft). Assign **only the requester** as reviewer. | Requester comments. Address feedback. Iterate. |
-| **Requester → second reviewer handoff** | — | **Requester** assigns a second reviewer when they're satisfied with the spec. |
-| **Second reviewer spec review** | Address the second reviewer's feedback. Iterate. | Second reviewer comments. |
-| **Go-ahead gate** | — | **Second reviewer approves** the spec. This is the green light to implement. |
-| **Implementation** | Add scripts to the same PR. Test. Post results. | **Requester** reviews implementation. Address feedback. Spec changes may still be requested — make them. |
-| **Approval gate** | — | **Requester approves** the PR (or merges directly). |
-| **Merge** | Squash-merge (or requester merges directly). Clean up worktree. | — |
+| **Spec** | Create YAML manifest, README, SVG icon. Push as draft PR. Assign the primary reviewer. | Primary reviewer comments. Address feedback. Iterate. |
+| **Secondary review** | — | Primary reviewer assigns a secondary reviewer when satisfied. Wait for the secondary reviewer to approve. |
+| **Go-ahead gate** | — | **The secondary reviewer approves the spec.** This is your signal — start implementing immediately. |
+| **Implementation & testing** | Write code, deploy to cronos, test, gather evidence, post results, undeploy from cronos. Push to PR. | Reviewers comment. Address feedback. Spec changes may be requested even at this stage — make them and re-test. |
+| **Approval gate** | — | **Both reviewers** approve the implementation via GitHub review. |
+| **Merge** | Squash-merge. Re-add to cronos with `@main`. Clean up. | — |
 
 **Never skip the spec stage.** The spec is cheap to iterate on. Code is expensive to throw away.
+
+### How the review flow works
+
+1. **Primary reviewer iterates on the spec.** This is the person who requested the work or was assigned first. They go back and forth with you — comments, change requests, discussion — until they're satisfied with the design.
+2. **Primary reviewer assigns a secondary reviewer.** This signals the primary review is done. They wouldn't assign someone else unless they're happy.
+3. **Secondary reviewer approves.** They may also request changes first — address them, then they approve.
+4. **You start implementing immediately.** The secondary reviewer's approval is the trigger. **Do not ask permission. Do not re-propose a plan. Do not wait for further instructions.** Begin writing code and testing right away.
 
 ---
 
@@ -159,29 +163,22 @@ The PR description must include:
 
 ### Open the PR
 
-Create a PR with the spec files only (non-draft mode). Assign **only the requester** (the human who asked for this work) as reviewer. Do NOT assign a second reviewer yourself — the requester will assign one when the spec is ready.
+Create a draft PR with the spec files only. Assign the **primary reviewer** (the person who requested the work, or who will iterate on the design with you).
 
 ### Then wait for go-ahead
 
-**Do not write implementation code until the second reviewer approves the spec.**
+**Do not write implementation code until the secondary reviewer approves.**
 
-⚠️ **THIS IS A HARD GATE.** Addressing review comments on the spec (updating YAML, README, fixing names, etc.) is NOT approval to implement. Even if you've addressed every comment, even if CI is green, even if the spec looks perfect — do NOT create `.sh` or `.py` implementation files until the second reviewer's GitHub review status is "APPROVED". Review comments ≠ go-ahead. Only an explicit approval counts.
+The primary reviewer will iterate with you — comments, change requests, back and forth. Address their feedback and push updates.
 
-The review flow is sequential:
-
-1. **Requester reviews first.** Address their feedback. Iterate until they're satisfied. This means updating spec files only (YAML, README, SVG). No implementation code.
-2. **Requester assigns a second reviewer.** When the requester is happy with the spec, they'll assign someone else to review. You do NOT assign the second reviewer yourself.
-3. **Second reviewer reviews.** Address their feedback. Iterate. Still spec files only.
-4. **Second reviewer approves = go-ahead.** Once the second reviewer's GitHub review status is "APPROVED", you can proceed to implementation.
-
-**Automatic testing on approval:** When the second reviewer approves the spec, the full integration testing plan (cronos testing, screenshots, component JSON verification) should be executed automatically as part of the implementation phase — don't wait for a separate instruction. Spec approval IS the green light to implement AND test.
-
-**Exception:** The requester may explicitly tell you to go ahead with implementation even without the second reviewer's approval (e.g. if that person is away). If the requester says to proceed, that's a valid go-ahead — follow their instruction.
+When the primary reviewer is satisfied, they will assign a **secondary reviewer**. Wait for the secondary reviewer to approve the spec.
 
 **While waiting:**
-- Address review comments. Push updates to spec files only.
+- Address review comments. Push updates.
 - If reviewers are discussing with each other (e.g. @-mentioning each other), **wait for them to reach a conclusion** before acting.
-- They may address you as "claude" or "devin" in PR comments — treat that as a direct instruction.
+- They may address you as "claude" or "devin" or "bender" in PR comments — treat that as a direct instruction.
+
+**When the secondary reviewer approves: start implementing immediately.** Their approval is the "go ahead" signal. Do not ask for permission or confirmation — begin Step 1 of the implementation checklist below.
 
 ---
 
@@ -200,92 +197,141 @@ The actual scripts referenced in the YAML manifest:
 - **CI collectors should minimize dependencies** — CI collectors run `native` on the user's CI runner (GitHub Actions, GitLab CI, BuildKite, etc.). You should try to use only native tools like `bash`, `curl`, `git`, `grep`, `sed`, and `awk`. Avoid `jq`, `yq`, `python` unless necessary. Use `lunar collect` with key-value pairs instead of building JSON. Code collectors in `base-main` have `jq` and other tools — this restriction is CI-only.
 - **Graceful degradation** — Missing secrets or configs should `exit 0` with a stderr message, not `exit 1`.
 - **Copy helpers from similar plugins** — If the closest plugin has a `helpers.sh` with reusable logic, copy it rather than inventing new patterns.
-- **Custom Docker images must be wired into CI** — If your plugin needs an Earthfile (installs external tools, uses a non-base image), you must add it to the root Earthfile's `+all` target: `BUILD --pass-args ./<type>/<name>+image`. Without this, CI won't build or push the image and it won't exist on Docker Hub.
 - See [Common Mistakes](#common-mistakes) before writing any code.
 
-### Testing
+---
 
-Test before pushing. All `lunar` commands must be run from the `pantalasa-cronos/lunar` repo — clone it first if you haven't:
+## Testing
+
+Follow this checklist **in order**. Every step must be completed before moving to the next.
+
+### Step 1: Write implementation code
+
+Write the scripts referenced in the YAML manifest. Commit locally but do not push yet.
+
+### Step 2: Docker image prerequisite (if custom Earthfile)
+
+**Skip this step if the plugin uses the default `base-main` image (no Earthfile in the plugin directory).**
+
+If the plugin has its own `Earthfile` (custom Docker image):
+
+1. Ensure the plugin's Earthfile is wired into the root `Earthfile`'s `+all` target:
+   ```
+   BUILD --pass-args ./collectors/<name>+image
+   ```
+2. Push your branch to `earthly/lunar-lib` — CI builds and pushes images automatically.
+3. Wait for lunar-lib CI to pass.
+4. Verify the image exists on Docker Hub:
+   ```bash
+   docker manifest inspect earthly/lunar-lib:<plugin>-<normalized-branch>
+   ```
+   Branch `bender/eng-487-ruby` produces image tag `ruby-bender-eng-487-ruby` (slashes become dashes).
+5. **Temporarily change `default_image`** in `lunar-collector.yml` to your branch image tag. The hub uses this field literally — it must point to an image that exists.
+
+### Step 3: Deploy to cronos for testing
+
+Add your plugin to the cronos test environment config.
+
+1. Edit `pantalasa-cronos/lunar/lunar-config.yml` — add a branch reference:
+   ```yaml
+   - uses: github://earthly/lunar-lib/collectors/<name>@<branch>
+   ```
+2. Commit and push to `pantalasa-cronos/lunar`.
+3. **Wait for the sync-manifest CI workflow to pass.** The hub only gets config updates when this workflow succeeds. Check with:
+   ```bash
+   gh run list --repo pantalasa-cronos/lunar --limit 3
+   ```
+   **Do NOT proceed until the sync build is green.**
+
+### Step 4: Prepare a test component
+
+You need component repos on `pantalasa-cronos` to test against. Either:
+
+- **Modify an existing component** to exercise your scenarios (e.g. add a `go.mod`, Dockerfile, GitHub Actions workflow)
+- **Create a new component repo** if none of the existing ones fit (e.g. a new programming language collector needs a repo in that language). If creating new: set up a GitHub Actions workflow with `runs_on: cronos`, add the component to `lunar-config.yml`, and verify the workflow runs successfully before testing collectors against it.
+
+Examples of existing components on `pantalasa-cronos`:
+
+| Component | Language/Type |
+|-----------|--------------|
+| `backend` | Go |
+| `frontend` | Node.js |
+| `auth` | Python |
+| `kafka-go` | Go |
+| `hadoop` | Java |
+| `spark` | Java |
+
+Check `pantalasa-cronos/lunar/lunar-config.yml` for the full list of registered components.
+
+### Step 5: Trigger collection
+
+Push a commit to the component repo you're testing against. This triggers CI, which triggers the hub to run collectors.
+
+1. Push a commit to the component repo (e.g. `pantalasa-cronos/backend`).
+2. Wait for the component repo CI to finish (~30 seconds).
+3. Wait ~1 more minute for the hub to process collection results.
+
+**For CI collectors** (hooks like `ci-after-job`, `ci-after-command`): local `lunar collector dev` is **not sufficient**. CI hooks only fire during actual CI runs. You must go through this full deploy+trigger cycle.
+
+### Step 6: Run local dev tests
+
+All `lunar` commands must be run from the `pantalasa-cronos/lunar` directory with `LUNAR_HUB_TOKEN` set:
 
 ```bash
-git clone https://github.com/pantalasa-cronos/lunar.git
+cd ~/repos/pantalasa-cronos-lunar  # or wherever the cronos lunar repo is cloned
+export LUNAR_HUB_TOKEN=<token>     # should already be in your environment
 ```
 
-Run all `lunar collector dev` and `lunar policy dev` commands from inside this repo. The `--config-dir` flag defaults to `.` so make sure you `cd` into the cronos lunar repo before running commands.
-
-**`LUNAR_HUB_TOKEN` must be set.** The Lunar CLI requires this environment variable to communicate with the hub. It should already be provided in your environment as a secret — if it's not set, `lunar` commands will fail. Do not hardcode it anywhere.
-
-#### 1. Test collectors
-
+**Test collectors:**
 ```bash
 lunar collector dev <plugin>.<sub-collector> \
   --component <component> \
-  --verbose \
-  --secrets "SECRET_NAME=value"
+  --verbose
 ```
 
-Verify:
-- Correct Component JSON paths are written
-- Output structure matches `example_component_json`
-- Missing secrets/configs cause `exit 0` with a stderr message, not `exit 1`
-
-#### 2. Test policies
-
+**Get component JSON (ground truth for correctness):**
 ```bash
-# Get live component JSON from hub
 lunar component get-json <component> > /tmp/component.json
+```
 
-# Run policy against it
+**Test policies against real data:**
+```bash
 lunar policy dev <plugin>.<check> --component-json /tmp/component.json
 ```
 
-Test each check against:
-- A component where data exists → expect PASS
-- A component where data is missing → expect SKIP (not ERROR)
-- Edge cases (missing fields, unexpected values) → expect graceful handling
-
-#### 3. Test the collector → policy pipeline
-
-Chain them: run the collector, capture its output, feed to the policy:
-
+**Test the full pipeline (collector output → policy):**
 ```bash
-# Capture collector output and merge JSON lines
 lunar collector dev <plugin>.<sub> --component <component> 2>&1 | \
   grep '^{' | jq -s 'reduce .[] as $item ({}; . * $item)' > /tmp/collected.json
-
-# Feed to policy
 lunar policy dev <plugin>.<check> --component-json /tmp/collected.json
 ```
 
-#### 4. Minimum coverage
+**Minimum coverage:**
 
-**Collectors:**
-- **Data present** — Component that HAS the relevant data. Verify correct, non-empty Component JSON is written with the expected paths and values.
-- **No data** — Component that does NOT have the relevant data. Collector should write **nothing** — no empty arrays, no source metadata, no placeholder objects. The key should simply not exist.
-- **Missing config** — Missing secrets or optional inputs. Collector should `exit 0` with a stderr message.
+Collectors:
+- [ ] **Data present** — Component that HAS the data. Verify correct, non-empty Component JSON with expected paths and values.
+- [ ] **No data** — Component that does NOT have the data. Collector writes nothing (no empty arrays, no placeholders).
+- [ ] **Missing config** — Missing secrets or optional inputs. Collector exits 0 with stderr message.
 
-**Policies:**
-- **Pass** — Component where all conditions are met. Check should PASS.
-- **Fail** — Component where conditions are NOT met. Check should FAIL (not error, not skip).
-- **Skip** — Component where the guardrail category doesn't apply (e.g. a Go policy on a Python repo). Check should SKIP gracefully.
-- **Edge cases** — Missing fields, unexpected values, empty data. Should not crash.
+Policies:
+- [ ] **Pass** — Component where all conditions are met. Check PASSes.
+- [ ] **Fail** — Component where conditions are NOT met. Check FAILs (not error, not skip).
+- [ ] **Skip** — Category doesn't apply (e.g. Go policy on Python repo). Check SKIPs gracefully.
+- [ ] **Edge cases** — Missing fields, unexpected values, empty data. No crash.
 
-#### 5. What you can do in cronos
+### Step 7: Gather evidence
 
-The `pantalasa-cronos` environment is a sandbox — you have full freedom to:
-- **Add files or dependencies to existing components** (e.g. add a `go.mod`, Terraform files, Dockerfiles, GitHub Actions workflows)
-- **Create entirely new components** if none of the existing ones fit your testing needs
-- **Install any open-source software** needed to test the plugin thoroughly
-- **Create PRs on component repos** to test PR-context collectors/policies
-- **Modify GitHub Actions workflows** to add CI steps (e.g. SBOM generation, security scans)
+All of these are **required** and must be attached to the PR:
 
-Don't worry about breaking things — cronos exists specifically for this. Clean up test branches when done.
+1. **Component JSON output** from `lunar component get-json` — paste the relevant section (the paths your collector writes to). This is the ground truth for correctness.
 
-#### 6. CI collectors must be tested on cronos
+2. **Two screenshots from the cronos dashboard** (`cronos.demo.earthly.dev`):
+   - **Component checks view** — scrolled to show the checks from any new or related policies. Proves policies evaluated correctly in the live environment.
+   - **Component JSON view** — scrolled to show data your collector produced. Proves the UI displays it correctly.
 
-If the plugin includes a CI collector (hooks like `ci-after-job`, `ci-before-command`, etc.), it **must** be tested on the `pantalasa-cronos` demo environment with real CI runs. Local simulation is not sufficient — CI hooks only fire during actual CI runs with Lunar instrumentation active.
+   The screenshots don't need to be exhaustive. The point is evidence that the UI is working and looks mostly right. The actual JSON from the CLI is the ground truth.
 
-**Step-by-step cronos testing process:**
+### Step 8: Post test results on the PR
 
 0. **⚠️ PREREQUISITE: Ensure your plugin's Docker image exists on Docker Hub** — If your plugin has its own `Earthfile` (i.e. it builds a custom Docker image like `earthly/lunar-lib:<plugin>-<version>`), the image **must** be pushed to Docker Hub before cronos can use it. lunar-lib CI does this automatically on every push — but for new plugins, your first CI run on the branch must complete successfully before testing on cronos. Verify with:
    ```bash
@@ -466,34 +512,23 @@ After testing and validating in the UI (see step 5 above), post a PR comment wit
 
 ### A note on unit tests
 
-Unit tests are not required and should **not** be committed. The primary way to validate collectors and policies is `lunar collector dev` / `lunar policy dev` locally and testing on cronos. If you find unit tests helpful for debugging complex logic during development, that's fine — just don't include them in the PR. Delete them before committing.
+Unit tests are not required and should **not** be committed. The primary way to validate collectors and policies is `lunar collector dev` / `lunar policy dev` locally and testing on cronos. If you find unit tests helpful for debugging complex logic during development, that's fine — just don't include them in the PR.
 
-### Lint before pushing
+---
 
-Run the linter locally before committing to avoid back-and-forth CI failures:
+## Implementation review
 
-```bash
-earthly +lint
-```
-
-This validates README structure, YAML manifest fields (`display_name`, `long_description`, `category`, `status`, `keywords`), and other conventions. Fix any errors before pushing.
-
-### Push implementation
-
-Commit and push the implementation to the same PR branch. CI will run automatically. Fix any CI failures. Check for merge conflicts with main — if any exist, resolve them immediately (`git fetch origin main && git merge origin/main`). Do NOT leave a PR with merge conflicts.
-
-### Then wait for approval
-
-CodeRabbit will automatically review the PR. Address its feedback, but **use judgment** — CodeRabbit sometimes flags things that aren't real issues or suggests unnecessary changes. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging. CodeRabbit learns from your replies, so always respond — even to dismiss a false positive.
+Claude will automatically review the PR via the `claude-code-action` GitHub Action. Address its feedback, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
 
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale.
 
-Wait for the **requester** to approve the implementation (or merge directly). The requester is the implementation reviewer.
+Wait for **both reviewers** to approve the PR via GitHub review.
 
 **While waiting:**
 - Fix CI failures automatically.
 - Address review comments. Push fixes. Reply to reviewers on the PR.
-- **Do not merge** until the requester approves or merges directly.
+- If reviewers are discussing with each other, wait for them to reach a conclusion before acting.
+- **Do not merge** until you have both approvals.
 
 ---
 
@@ -502,32 +537,57 @@ Wait for the **requester** to approve the implementation (or merge directly). Th
 ### Pre-merge checklist
 
 - [ ] CI is green
-- [ ] CodeRabbit comments addressed
-- [ ] **Requester approved** (or is merging directly)
-- [ ] Test results posted on PR
-- [ ] No unresolved review threads / suggestions
+- [ ] Claude review comments addressed
+- [ ] **Both reviewers approved** the implementation
+- [ ] Test results with JSON output + screenshots posted on PR
+- [ ] No unresolved review threads
+- [ ] Cronos config cleaned up (no branch refs remaining)
+- [ ] `default_image` reverted to `-main` tag (if custom Earthfile)
 
-### Merge
+### Squash-merge
 
 Squash-merge the PR and delete the branch.
 
-### Add to cronos
+### Post-merge: contribute back to cronos
 
-If this is a **new** collector or policy, it needs to be added to `pantalasa-cronos/lunar/lunar-config.yml`. Existing plugins that are already referenced will pick up changes from `@main` automatically.
-
-**Testing a branch (before merge):** Reference your branch temporarily:
-
-```yaml
-- uses: github://earthly/lunar-lib/collectors/<name>@<branch>/<feature>
-```
-
-**After merge:** Update the reference to `@main`:
+**For NEW plugins:** re-add the collector/policy to `pantalasa-cronos/lunar/lunar-config.yml`, now referencing `@main`:
 
 ```yaml
 - uses: github://earthly/lunar-lib/collectors/<name>@main
 ```
 
-Don't leave branch references in the cronos config after merging.
+Commit, push, and **verify the sync-manifest CI build passes**.
+
+**For EXISTING plugins:** the config already points to `@main`, so nothing to do.
+
+### Clean up
+
+1. Delete the worktree/branch locally.
+2. Write down what you learned — append to your learning journal.
+3. Close the Linear ticket if still open.
+
+---
+
+## Cronos testing checklist (quick reference)
+
+Use this as a sequential checklist during the testing phase:
+
+```
+1. [ ] Earthfile wired into +all (if custom image)
+2. [ ] lunar-lib CI green, Docker image verified on Docker Hub
+3. [ ] default_image temporarily changed to branch tag (if custom image)
+4. [ ] Branch ref added to pantalasa-cronos/lunar/lunar-config.yml
+5. [ ] Sync-manifest CI green
+6. [ ] Test component prepared (existing modified or new created)
+7. [ ] Commit pushed to component repo to trigger collection
+8. [ ] Wait for component CI + 1 minute for hub processing
+9. [ ] lunar component get-json output captured
+10. [ ] 2 screenshots taken (checks view, JSON view)
+11. [ ] Test results posted on PR (JSON + screenshots + test matrix)
+12. [ ] Branch ref removed/reverted from cronos config
+13. [ ] Sync-manifest CI green (post-cleanup)
+14. [ ] default_image reverted to -main (if custom image)
+```
 
 ---
 
@@ -552,7 +612,6 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 | Using `c.exists()` for skip logic | `c.exists()` raises `NoDataError` if missing — your `c.skip()` after it is unreachable. | Use `c.get_node(path).exists()` which returns `True`/`False`. |
 | Calling `get_value()` without checking `exists()` | Crashes with `ValueError` if the path doesn't exist. | Always call `node.exists()` before `node.get_value()`. |
 | Skipping when a sibling check already fails | Inflates the compliance score. If the guardrail IS relevant but upstream data is missing because a sibling requirement isn't met, the component should be penalized. | Let it fail (don't skip). See `ai-context/policy-reference.md` for skip vs fail guidance. |
-| Using `c.succeed()` | There is no `c.succeed()` method. | Checks auto-pass if no assertions fail. Just don't call anything. |
 
 ### Collector code
 
@@ -576,11 +635,12 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 
 | Mistake | Why it's wrong | Fix |
 |---------|---------------|-----|
-| Starting implementation before second reviewer approves | The spec may change significantly during review. Implementation effort is wasted. | Wait for the second reviewer to approve the spec before implementing. |
+| Starting implementation before secondary reviewer approves | The spec may change significantly during review. Implementation effort is wasted. | Wait for the secondary reviewer's approval. |
 | Using `git add .` or `git add -A` | Stages unintended files (test configs, temp files, etc.). | Always `git add` specific directories: `git add collectors/<name>/` or `git add policies/<name>/`. |
-| Merging without requester's approval | The requester reviews implementation and must approve (or merge directly) before merging. | Wait for the requester's approval on the implementation. |
-| Not posting test results on the PR | Reviewers need evidence, not trust. | Always post a test results comment with the template from this playbook. |
-| Ignoring CodeRabbit feedback | CodeRabbit auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every CodeRabbit comment before requesting human review. |
+| Merging with only one approval | Both reviewers need to approve unless one explicitly waives. | Wait for both. |
+| Not posting test results on the PR | Reviewers need evidence, not trust. | Always post test results with JSON output, screenshots, and the test matrix template. |
+| Ignoring Claude review feedback | Claude auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every Claude review comment before requesting human review. |
+| Leaving branch refs in cronos config | The branch gets deleted on merge, breaking all manifest syncs. | Undeploy from cronos before pushing for review (Step 9). |
 
 ### Docker images
 
@@ -589,7 +649,6 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 | Using `earthly/lunar-scripts:1.0.0` | Legacy image. | Use `earthly/lunar-lib:base-main` or `earthly/lunar-lib:<name>-main`. |
 | Using `native` for code collectors | Code collectors must run in a container. | Use `earthly/lunar-lib:base-main` or a custom image. |
 | Committing a temporary image tag | The tag won't exist after your test branch is cleaned up. | Always use `-main` tag in committed code. |
-| Adding an Earthfile but not wiring it into the root `+all` target | CI builds and pushes images via `earthly --push +all`. If your Earthfile's `+image` target isn't listed in the root Earthfile's `+all` target, CI will never build or push your image. | Add `BUILD --pass-args ./<type>/<name>+image` to the `+all` target in the root Earthfile. |
 
 ---
 
@@ -616,4 +675,3 @@ These are the most frequent mistakes AI agents make on lunar-lib PRs. Read this 
 If you encounter something unclear, make a mistake that wasn't covered here, or discover a workaround that a future agent would benefit from — **open a separate PR to update this document**. Don't just fix it in your head and move on. If you think a future agent would make the same mistake, add it to the [Common Mistakes](#common-mistakes) section or clarify the relevant instructions.
 
 This is how the playbook stays useful over time.
-
