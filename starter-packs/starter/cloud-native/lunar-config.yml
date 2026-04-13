@@ -24,7 +24,6 @@ collectors:
 
   # --- Security scanners ---
   - uses: ./collectors/trivy          # Container + IaC vuln scanning (zero-config)
-  - uses: ./collectors/syft           # SBOM generation (zero-config)
 
   # --- CI context ---
   - uses: ./collectors/github         # Repo settings
@@ -104,13 +103,6 @@ policies:
     enforcement: score
     include:
       - executed
-
-  # --- SBOM tracking ---
-  - uses: ./policies/sbom
-    enforcement: score
-    include:
-      - sbom-exists
-      - has-licenses
 
   # --- CI hygiene ---
   - uses: ./policies/ci

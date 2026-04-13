@@ -12,7 +12,6 @@ For teams running Kubernetes, Terraform, and Docker. Covers resource management,
 | `terraform` | Terraform file analysis (skips if none) |
 | `docker` | Dockerfile analysis |
 | `trivy` | Container + IaC vulnerability scanning (zero-config) |
-| `syft` | SBOM generation (zero-config) |
 | `github` | Repo settings |
 
 ### Policies
@@ -44,16 +43,15 @@ For teams running Kubernetes, Terraform, and Docker. Covers resource management,
 | `container-scan` | `max-severity` (critical) | report-pr | Surface critical image vulnerabilities |
 | `container-scan` | `executed` | score | Track scan coverage |
 
-**Supply Chain & CI**
+**CI**
 | Policy | Check | Enforcement | Why |
 |--------|-------|-------------|-----|
-| `sbom` | `sbom-exists`, `has-licenses` | score | Track SBOM generation |
 | `ci` | `lint-clean`, `dependencies-pinned`, `no-mutable-refs` | score | Track CI hygiene |
 
 ## Enforcement Philosophy
 
 - **report-pr**: Critical infrastructure checks — missing resource limits, unpinned providers, critical IaC vulnerabilities, Dockerfile security issues
-- **score**: Maturity tracking — PodDisruptionBudgets, non-root containers, SBOM, CI hygiene
+- **score**: Maturity tracking — PodDisruptionBudgets, non-root containers, CI hygiene
 
 ## Tightening Over Time
 
