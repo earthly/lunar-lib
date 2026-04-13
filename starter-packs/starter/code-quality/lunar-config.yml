@@ -65,10 +65,19 @@ policies:
       - ran
 
   # --- Dependencies ---
-  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
-    enforcement: score
-    include:
-      - min-versions
+  # Configure per your stack — a couple examples:
+  # - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+  #   enforcement: score
+  #   include:
+  #     - min-versions
+  #   with:
+  #     min_versions: '{"react": "18.0", "express": "4.18"}'
+  # - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+  #   enforcement: score
+  #   include:
+  #     - min-versions
+  #   with:
+  #     min_versions: '{"django": "4.2", "flask": "3.0"}'
 
   # --- VCS ---
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
@@ -78,9 +87,6 @@ policies:
       - require-pull-request
 
   # --- Language-specific guardrails ---
-  # Version checks use sensible defaults. Override with `with:` to match your stack:
-  #   min_go_version: "1.21"  |  min_java_version: "17"
-  #   min_node_version: "18"  |  min_python_version: "3.9"
 
   # Go
   - uses: github://earthly/lunar-lib/policies/golang@v1.0.5
@@ -90,8 +96,8 @@ policies:
       - go-sum-exists
       - min-go-version
       - tests-recursive
-    # with:
-    #   min_go_version: "1.22"
+    with:
+      min_go_version: "1.21"
 
   # Java
   - uses: github://earthly/lunar-lib/policies/java@v1.0.5
@@ -100,8 +106,8 @@ policies:
       - build-tool-wrapper-exists
       - min-java-version
       - tests-all-modules
-    # with:
-    #   min_java_version: "21"
+    with:
+      min_java_version: "17"
 
   # Node.js
   - uses: github://earthly/lunar-lib/policies/nodejs@v1.0.5
@@ -111,8 +117,8 @@ policies:
       - typescript-configured
       - engines-pinned
       - min-node-version
-    # with:
-    #   min_node_version: "20"
+    with:
+      min_node_version: "18"
 
   # Python
   - uses: github://earthly/lunar-lib/policies/python@v1.0.5
@@ -121,6 +127,8 @@ policies:
       - lockfile-exists
       - linter-configured
       - min-python-version
+    with:
+      min_python_version: "3.9"
 
   # Rust
   - uses: github://earthly/lunar-lib/policies/rust@v1.0.5
