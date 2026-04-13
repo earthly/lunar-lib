@@ -16,7 +16,7 @@ Import and it works. No configuration, no secrets, no vendor accounts. Collector
 
 All starter packs include every language collector (Go, Java, Node.js, Python, Rust, PHP, C/C++, .NET, HTML/CSS, Shell, Ruby) — they only trigger when the language is detected, so there's zero cost to including them.
 
-### [Starter+](./starter+/) — Light Configuration or Secrets
+### [Starter Plus](./starter-plus/) — Light Configuration or Secrets
 
 Easy to set up but requires a secret (API key, token) or a URL to connect to an external service. Examples: Snyk, Jira, SonarQube, PagerDuty.
 
