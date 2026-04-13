@@ -1,0 +1,169 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Code Quality & Standards
+# Focus: Testing, linting, ownership, repo hygiene, language guardrails
+# ============================================================================
+
+collectors:
+  # --- Language collectors (all skip-safe) ---
+  - uses: ./collectors/golang
+  - uses: ./collectors/java
+  - uses: ./collectors/nodejs
+  - uses: ./collectors/python
+  - uses: ./collectors/rust
+  - uses: ./collectors/php
+  - uses: ./collectors/cpp
+  - uses: ./collectors/dotnet
+  - uses: ./collectors/html
+
+  # --- Repo health ---
+  - uses: ./collectors/readme
+  - uses: ./collectors/codeowners
+  - uses: ./collectors/repo-boilerplate
+  - uses: ./collectors/github
+
+  # --- Quality tools ---
+  - uses: ./collectors/codecov        # Coverage data (skips if not configured)
+
+policies:
+  # --- Repo standards: report missing essentials, track nice-to-haves ---
+  - uses: ./policies/repo-boilerplate
+    enforcement: report-pr
+    include:
+      - readme-exists
+      - codeowners-exists
+      - gitignore-exists
+      - license-exists
+
+  - uses: ./policies/repo-boilerplate
+    enforcement: score
+    include:
+      - readme-min-line-count
+      - editorconfig-exists
+      - security-exists
+      - contributing-exists
+
+  # --- Code ownership ---
+  - uses: ./policies/codeowners
+    enforcement: report-pr
+    include:
+      - exists
+      - valid
+
+  - uses: ./policies/codeowners
+    enforcement: score
+    include:
+      - catchall
+      - min-owners
+
+  # --- Testing: report if tests exist and pass, track coverage ---
+  - uses: ./policies/testing
+    enforcement: report-pr
+    include:
+      - executed
+      - passing
+
+  - uses: ./policies/testing
+    enforcement: score
+    include:
+      - coverage-collected
+      - coverage-reported
+
+  # --- Linting ---
+  - uses: ./policies/linter
+    enforcement: score
+    include:
+      - ran
+
+  # --- Dependencies ---
+  - uses: ./policies/dependencies
+    enforcement: report-pr
+    include:
+      - min-versions
+
+  # --- VCS: track branch protection ---
+  - uses: ./policies/vcs
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Language-specific guardrails (all at score) ---
+
+  # Go
+  - uses: ./policies/golang
+    enforcement: score
+    include:
+      - go-mod-exists
+      - go-sum-exists
+      - min-go-version
+      - tests-recursive
+
+  # Java
+  - uses: ./policies/java
+    enforcement: score
+    include:
+      - build-tool-wrapper-exists
+      - min-java-version
+      - tests-all-modules
+
+  # Node.js
+  - uses: ./policies/nodejs
+    enforcement: score
+    include:
+      - lockfile-exists
+      - typescript-configured
+      - engines-pinned
+      - min-node-version
+
+  # Python
+  - uses: ./policies/python
+    enforcement: score
+    include:
+      - lockfile-exists
+      - linter-configured
+      - min-python-version
+
+  # Rust
+  - uses: ./policies/rust
+    enforcement: score
+    include:
+      - cargo-toml-exists
+      - cargo-lock-exists
+      - min-rust-edition
+      - clippy-clean
+
+  # PHP
+  - uses: ./policies/php
+    enforcement: score
+    include:
+      - composer-json-exists
+      - composer-lock-exists
+      - phpunit-configured
+      - static-analysis-configured
+      - min-version
+
+  # C/C++
+  - uses: ./policies/cpp
+    enforcement: score
+    include:
+      - build-system-exists
+      - min-cpp-standard
+      - cppcheck-clean
+
+  # .NET
+  - uses: ./policies/dotnet
+    enforcement: score
+    include:
+      - project-file-exists
+      - target-framework-set
+      - dependencies-locked
+      - test-project-exists
+
+  # HTML/CSS
+  - uses: ./policies/html
+    enforcement: score
+    include:
+      - htmlhint-clean
+      - stylelint-clean

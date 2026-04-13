@@ -1,0 +1,105 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Quick Start
+# Focus: Highest-impact items from all categories, minimal noise
+# Everything at score except secret detection (report-pr)
+# ============================================================================
+
+collectors:
+  # --- Language collectors (all skip-safe) ---
+  - uses: ./collectors/golang
+  - uses: ./collectors/java
+  - uses: ./collectors/nodejs
+  - uses: ./collectors/python
+  - uses: ./collectors/rust
+  - uses: ./collectors/php
+  - uses: ./collectors/cpp
+  - uses: ./collectors/dotnet
+  - uses: ./collectors/html
+
+  # --- Repo health ---
+  - uses: ./collectors/readme
+  - uses: ./collectors/codeowners
+  - uses: ./collectors/repo-boilerplate
+  - uses: ./collectors/github
+
+  # --- Security (zero-config) ---
+  - uses: ./collectors/gitleaks       # Secret scanning
+  - uses: ./collectors/trivy          # SCA + container scanning
+  - uses: ./collectors/syft           # SBOM generation
+
+  # --- Infrastructure ---
+  - uses: ./collectors/docker         # Dockerfile analysis (skips if none)
+
+policies:
+  # --- Secret detection: the ONE thing that reports on PRs ---
+  - uses: ./policies/secrets
+    enforcement: report-pr
+    include:
+      - no-hardcoded-secrets
+
+  # --- Repo basics ---
+  - uses: ./policies/repo-boilerplate
+    enforcement: score
+    include:
+      - readme-exists
+      - codeowners-exists
+      - gitignore-exists
+      - license-exists
+
+  # --- Code ownership ---
+  - uses: ./policies/codeowners
+    enforcement: score
+    include:
+      - exists
+      - valid
+
+  # --- VCS ---
+  - uses: ./policies/vcs
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Testing ---
+  - uses: ./policies/testing
+    enforcement: score
+    include:
+      - executed
+      - passing
+
+  # --- Linting ---
+  - uses: ./policies/linter
+    enforcement: score
+    include:
+      - ran
+
+  # --- Dependencies ---
+  - uses: ./policies/dependencies
+    enforcement: score
+    include:
+      - min-versions
+
+  # --- SCA: track vulnerability scanning ---
+  - uses: ./policies/sca
+    enforcement: score
+    include:
+      - executed
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  # --- SBOM ---
+  - uses: ./policies/sbom
+    enforcement: score
+    include:
+      - sbom-exists
+
+  # --- Container basics ---
+  - uses: ./policies/container
+    enforcement: score
+    include:
+      - no-latest
+      - user
+      - healthcheck

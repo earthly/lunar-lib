@@ -1,0 +1,113 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Security Essentials
+# Focus: Vulnerability scanning, secret detection, supply-chain security
+# ============================================================================
+
+collectors:
+  # --- Language collectors (all skip-safe) ---
+  - uses: ./collectors/golang
+  - uses: ./collectors/java
+  - uses: ./collectors/nodejs
+  - uses: ./collectors/python
+  - uses: ./collectors/rust
+  - uses: ./collectors/php
+  - uses: ./collectors/cpp
+  - uses: ./collectors/dotnet
+  - uses: ./collectors/html
+
+  # --- Security scanners ---
+  - uses: ./collectors/gitleaks       # Secret scanning (zero-config)
+  - uses: ./collectors/trivy          # SCA + container vuln scanning (zero-config)
+  - uses: ./collectors/syft           # SBOM generation (zero-config)
+  - uses: ./collectors/semgrep        # SAST scanning (skips if not configured)
+
+  # --- Infrastructure context ---
+  - uses: ./collectors/docker         # Dockerfile analysis
+  - uses: ./collectors/github         # Repo settings, branch protection
+
+policies:
+  # --- Secret detection: block PRs with leaked secrets ---
+  - uses: ./policies/secrets
+    enforcement: block-pr
+    include:
+      - no-hardcoded-secrets
+
+  - uses: ./policies/secrets
+    enforcement: score
+    include:
+      - executed
+
+  # --- SCA: report critical vulns on PRs, track scanner execution ---
+  - uses: ./policies/sca
+    enforcement: report-pr
+    include:
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  - uses: ./policies/sca
+    enforcement: score
+    include:
+      - executed
+
+  # --- SAST: report findings on PRs, track execution ---
+  - uses: ./policies/sast
+    enforcement: report-pr
+    include:
+      - max-severity
+    with:
+      min_severity: "high"
+
+  - uses: ./policies/sast
+    enforcement: score
+    include:
+      - executed
+
+  # --- Container scanning: report critical image vulns ---
+  - uses: ./policies/container-scan
+    enforcement: report-pr
+    include:
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  - uses: ./policies/container-scan
+    enforcement: score
+    include:
+      - executed
+
+  # --- Dockerfile best practices: security-relevant checks ---
+  - uses: ./policies/container
+    enforcement: report-pr
+    include:
+      - no-latest          # Don't use :latest tags
+      - user               # Run as non-root
+
+  - uses: ./policies/container
+    enforcement: score
+    include:
+      - healthcheck
+      - stable-tags
+
+  # --- SBOM: track generation ---
+  - uses: ./policies/sbom
+    enforcement: score
+    include:
+      - sbom-exists
+      - has-licenses
+
+  # --- Branch protection: report missing protections ---
+  - uses: ./policies/vcs
+    enforcement: report-pr
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  - uses: ./policies/vcs
+    enforcement: score
+    include:
+      - minimum-approvals
+      - require-codeowner-review
+      - disallow-force-push
