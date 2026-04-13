@@ -27,6 +27,7 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 |--------|--------|
 | `testing` | `executed`, `passing`, `coverage-collected`, `coverage-reported` |
 | `linter` | `ran` |
+| `dependencies` | `min-versions` (configured per stack) |
 
 **Language Guardrails (all at score)**
 | Policy | Key Checks |

@@ -65,19 +65,18 @@ policies:
       - ran
 
   # --- Dependencies ---
-  # Configure per your stack — a couple examples:
-  # - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
-  #   enforcement: score
-  #   include:
-  #     - min-versions
-  #   with:
-  #     min_versions: '{"react": "18.0", "express": "4.18"}'
-  # - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
-  #   enforcement: score
-  #   include:
-  #     - min-versions
-  #   with:
-  #     min_versions: '{"django": "4.2", "flask": "3.0"}'
+  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+    enforcement: score
+    include:
+      - min-versions
+    with:
+      min_versions: '{"react": "18.0", "express": "4.18"}'
+  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+    enforcement: score
+    include:
+      - min-versions
+    with:
+      min_versions: '{"django": "4.2", "flask": "3.0"}'
 
   # --- VCS ---
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
@@ -138,6 +137,8 @@ policies:
       - cargo-lock-exists
       - min-rust-edition
       - clippy-clean
+    with:
+      min_rust_edition: "2021"
 
   # PHP
   - uses: github://earthly/lunar-lib/policies/php@v1.0.5
@@ -148,6 +149,8 @@ policies:
       - phpunit-configured
       - static-analysis-configured
       - min-version
+    with:
+      min_version: "8.1"
 
   # C/C++
   - uses: github://earthly/lunar-lib/policies/cpp@main
@@ -156,6 +159,8 @@ policies:
       - build-system-exists
       - min-cpp-standard
       - cppcheck-clean
+    with:
+      min_cpp_standard: "17"
 
   # .NET
   - uses: github://earthly/lunar-lib/policies/dotnet@main
@@ -165,6 +170,8 @@ policies:
       - target-framework-set
       - dependencies-locked
       - test-project-exists
+    with:
+      min_sdk_version: "8.0"
 
   # Shell
   - uses: github://earthly/lunar-lib/policies/shell@main

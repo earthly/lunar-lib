@@ -23,6 +23,8 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/syft@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/semgrep@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/snyk@main
+  - uses: github://earthly/lunar-lib/collectors/codeql@v1.0.5
 
   # --- Infrastructure context ---
   - uses: github://earthly/lunar-lib/collectors/docker@v1.0.5

@@ -12,6 +12,8 @@ For teams whose top priority is vulnerability scanning, secret detection, and su
 | `trivy` | Dependency vulnerability scanning (zero-config) |
 | `syft` | SBOM generation (zero-config) |
 | `semgrep` | SAST scanning (skips if not configured) |
+| `snyk` | Snyk security scanning (skips if not configured) |
+| `codeql` | CodeQL static analysis (skips if not configured) |
 | `docker` | Dockerfile analysis |
 | `github` | Repo settings, branch protection |
 | `github-actions` | GitHub Actions workflow analysis |
