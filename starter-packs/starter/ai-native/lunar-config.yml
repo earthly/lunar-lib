@@ -19,7 +19,11 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/ruby@v1.0.5
 
   # --- AI ---
-  - uses: github://earthly/lunar-lib/collectors/ai-use@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/ai@main
+  - uses: github://earthly/lunar-lib/collectors/claude@main
+  - uses: github://earthly/lunar-lib/collectors/codex@main
+  - uses: github://earthly/lunar-lib/collectors/gemini@main
+  - uses: github://earthly/lunar-lib/collectors/coderabbit@main
 
   # --- Security ---
   - uses: github://earthly/lunar-lib/collectors/gitleaks@v1.0.5
@@ -29,16 +33,35 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
 
 policies:
-  # --- AI guardrails ---
-  - uses: github://earthly/lunar-lib/policies/ai-use@v1.0.5
+  # --- AI guardrails (shared) ---
+  - uses: github://earthly/lunar-lib/policies/ai@main
     enforcement: score
     include:
       - instruction-file-exists
       - canonical-naming
       - instruction-file-length
-      - ai-cli-safe-flags
-      - ai-cli-structured-output
       - ai-authorship-annotated
+
+  # --- Claude ---
+  - uses: github://earthly/lunar-lib/policies/claude@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
+
+  # --- Codex ---
+  - uses: github://earthly/lunar-lib/policies/codex@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
+
+  # --- Gemini ---
+  - uses: github://earthly/lunar-lib/policies/gemini@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
 
   # --- Secret detection ---
   - uses: github://earthly/lunar-lib/policies/secrets@v1.0.5

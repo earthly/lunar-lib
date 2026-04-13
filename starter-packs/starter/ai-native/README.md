@@ -8,7 +8,11 @@ For teams using AI coding agents (Claude Code, Codex, Gemini CLI) in development
 | Collector | Purpose |
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
-| `ai-use` | AI instruction files, CLI usage in CI, authorship annotations |
+| `ai` | AI instruction files, plans directories, authorship annotations |
+| `claude` | Claude Code CLI usage in CI |
+| `codex` | Codex CLI usage in CI |
+| `gemini` | Gemini CLI usage in CI |
+| `coderabbit` | CodeRabbit configuration detection |
 | `gitleaks` | Secret scanning |
 | `github-actions` | GitHub Actions workflow analysis |
 | `github` | Repo settings |
@@ -18,12 +22,16 @@ For teams using AI coding agents (Claude Code, Codex, Gemini CLI) in development
 **AI Guardrails (all at score)**
 | Policy | Check | What it does |
 |--------|-------|-------------|
-| `ai-use` | `instruction-file-exists` | Repo has an AGENTS.md, CLAUDE.md, or similar |
-| `ai-use` | `canonical-naming` | Root instruction file is named AGENTS.md |
-| `ai-use` | `instruction-file-length` | Instruction file is between 10–300 lines |
-| `ai-use` | `ai-cli-safe-flags` | No dangerous flags (--dangerously-skip-permissions, --yolo, --full-auto) in CI |
-| `ai-use` | `ai-cli-structured-output` | AI CLI in headless CI uses JSON output |
-| `ai-use` | `ai-authorship-annotated` | Tracks AI authorship annotations (passive by default) |
+| `ai` | `instruction-file-exists` | Repo has an AGENTS.md, CLAUDE.md, or similar |
+| `ai` | `canonical-naming` | Root instruction file is named AGENTS.md |
+| `ai` | `instruction-file-length` | Instruction file is between 10–300 lines |
+| `ai` | `ai-authorship-annotated` | Tracks AI authorship annotations (passive by default) |
+| `claude` | `cli-safe-flags` | No --dangerously-skip-permissions in CI |
+| `claude` | `cli-structured-output` | Claude CLI in headless CI uses JSON output |
+| `codex` | `cli-safe-flags` | No --yolo or --full-auto in CI |
+| `codex` | `cli-structured-output` | Codex CLI in headless CI uses JSON output |
+| `gemini` | `cli-safe-flags` | No --yolo in CI |
+| `gemini` | `cli-structured-output` | Gemini CLI in headless CI uses JSON output |
 
 **Supporting Checks**
 | Policy | Check | Enforcement | Why |
@@ -42,8 +50,9 @@ For teams using AI coding agents (Claude Code, Codex, Gemini CLI) in development
 ## Tightening Over Time
 
 As your AI development practices mature, consider promoting:
-1. `ai-use.instruction-file-exists` → `report-pr` (once all repos have instruction files)
-2. `ai-use.ai-cli-safe-flags` → `report-pr` (once CI pipelines are standardized)
-3. Add `ai-use.instruction-file-sections` to enforce required sections in instruction files
-4. Add `ai-use.symlinked-aliases` to ensure CLAUDE.md symlinks alongside AGENTS.md
-5. Raise `ai-use.ai-authorship-annotated` threshold with `min_annotation_percentage` to enforce annotation coverage
+1. `ai.instruction-file-exists` → `report-pr` (once all repos have instruction files)
+2. `claude.cli-safe-flags` → `report-pr` (once CI pipelines are standardized)
+3. Add `ai.instruction-file-sections` to enforce required sections in instruction files
+4. Add `claude.symlinked-aliases` to ensure CLAUDE.md symlinks alongside AGENTS.md
+5. Raise `ai.ai-authorship-annotated` threshold with `min_annotation_percentage` to enforce annotation coverage
+6. Add `coderabbit.config-exists` to require CodeRabbit configuration
