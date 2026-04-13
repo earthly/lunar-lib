@@ -19,7 +19,6 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/ruby@v1.0.5
 
   # --- Repo health ---
-  - uses: github://earthly/lunar-lib/collectors/readme@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/codeowners@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@v1.0.5
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5

@@ -1,6 +1,6 @@
 # AI Native Starter Pack
 
-For teams using AI coding agents (Claude Code, Codex, Gemini CLI) in development and CI. Ensures AI instruction files exist and follow conventions, dangerous CLI flags are caught, and AI-generated code goes through proper quality gates.
+For teams that rely heavily on AI coding agents (Claude Code, Codex, Gemini CLI) in development and CI. Ensures AI instruction files exist and follow conventions, dangerous CLI flags are caught, and AI-generated code goes through proper quality gates.
 
 ## What's Included
 

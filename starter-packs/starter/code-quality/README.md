@@ -8,7 +8,6 @@ For teams focused on testing, linting, code ownership, and repo hygiene. This is
 | Collector | Purpose |
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
-| `readme` | README analysis |
 | `codeowners` | CODEOWNERS file parsing |
 | `repo-boilerplate` | Standard repo files detection |
 | `github` | Repo settings |

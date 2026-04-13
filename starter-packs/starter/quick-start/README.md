@@ -8,7 +8,6 @@ The "just works" pack — highest-impact items from security, quality, and infra
 | Collector | Purpose |
 |-----------|---------|
 | All language collectors | Only trigger when the language is detected |
-| `readme` | README analysis |
 | `codeowners` | CODEOWNERS parsing |
 | `repo-boilerplate` | Standard repo files |
 | `github` | Repo settings |
