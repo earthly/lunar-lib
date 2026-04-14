@@ -8,9 +8,8 @@ image:
     RUN apk add --no-cache ruby ruby-bundler git
     RUN gem install bundler-audit --no-document
 
-    # Pre-download the advisory DB so bundler-audit works in network-isolated
-    # containers (code hook collectors run without network access).
-    # The DB refreshes on each image rebuild via CI.
+    # Pre-download the advisory DB to avoid a full git clone on every collector
+    # run. The runtime `bundle audit update` will pull incremental changes.
     RUN bundle audit download
 
     # Verify installations
