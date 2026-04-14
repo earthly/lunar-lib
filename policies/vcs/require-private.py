@@ -6,6 +6,7 @@ def main(node=None):
     with c:
         if not c.get_node(".vcs").exists():
             c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            return c
 
         visibility = c.get_value(".vcs.visibility")
         c.assert_equals(visibility, "private", f"Repository visibility is '{visibility}', but policy requires 'private'")

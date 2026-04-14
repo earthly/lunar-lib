@@ -14,11 +14,6 @@ if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
   exit 1
 fi
 
-if [ -z "$LUNAR_COMPONENT_ID" ]; then
-  echo "Error: LUNAR_COMPONENT_ID is not set" >&2
-  exit 1
-fi
-
 # LUNAR_COMPONENT_ID should be in format "github.com/owner/repo"
 # Extract owner and repo from LUNAR_COMPONENT_ID
 OWNER=$(echo "$LUNAR_COMPONENT_ID" | cut -d'/' -f2)

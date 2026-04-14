@@ -6,10 +6,12 @@ def main(node=None):
     with c:
         if not c.get_node(".vcs.branch_protection").exists():
             c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            return c
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
             c.fail("Branch protection is not enabled")
+            return c
         else:
             dismiss_stale_reviews = c.get_value(".vcs.branch_protection.dismiss_stale_reviews")
             c.assert_true(dismiss_stale_reviews, "Branch protection does not dismiss stale reviews when new commits are pushed")

@@ -6,6 +6,7 @@ def main(node=None, allowed_strategies_override=None):
     with c:
         if not c.get_node(".vcs.merge_strategies").exists():
             c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            return c
 
         allowed_merge_strategies = allowed_strategies_override if allowed_strategies_override is not None else variable_or_default("allowed_merge_strategies", "")
         allowed_list = [s.strip().lower() for s in allowed_merge_strategies.split(",") if s.strip()]

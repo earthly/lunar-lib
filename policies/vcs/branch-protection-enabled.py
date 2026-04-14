@@ -6,6 +6,7 @@ def main(node=None):
     with c:
         if not c.get_node(".vcs.branch_protection").exists():
             c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            return c
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         branch = c.get_value_or_default(".vcs.branch_protection.branch", "default branch")
