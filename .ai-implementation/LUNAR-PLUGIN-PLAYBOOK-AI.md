@@ -326,10 +326,10 @@ All of these are **required** and must be attached to the PR:
 1. **Component JSON output** from `lunar component get-json` — paste the relevant section (the paths your collector writes to). This is the ground truth for correctness.
 
 2. **Two screenshots from the cronos dashboard** (`cronos.demo.earthly.dev`):
-   - **Component checks view** — scrolled to show the checks from any new or related policies. Proves policies evaluated correctly in the live environment.
-   - **Component JSON view** — scrolled to show data your collector produced. Proves the UI displays it correctly.
+   - **Component checks view** — scrolled to show the specific rows for your plugin's policy checks (e.g. `iac-scan.*`, `ruby.*`). Do NOT capture the top of the table — scroll to YOUR checks.
+   - **Component JSON view** — tree expanded and scrolled to show the JSON section your collector writes (e.g. `.iac_scan`, `.lang.ruby`). Do NOT capture the top of the JSON tree — expand and scroll to YOUR data.
 
-   The screenshots don't need to be exhaustive. The point is evidence that the UI is working and looks mostly right. The actual JSON from the CLI is the ground truth.
+   Screenshots captured at the default scroll position (top of the page) are not valid evidence. Every screenshot must be scrolled to the relevant data. See Step 8.5 for detailed Playwright guidance on using `scrollIntoView()`. The actual JSON from the CLI is the ground truth — the screenshots prove the UI renders it correctly.
 
 ### Step 8: Post test results on the PR
 
@@ -465,8 +465,8 @@ All of these are **required** and must be attached to the PR:
    - If you've verified your collector/policy code is correct and the environment appears broken, speak up and let the reviewer know. The cronos staging environment has issues sometimes. That's fine, but you need to flag it rather than pretending everything is working.
 
    **Screenshots to capture (once validation passes):**
-   - **Component details page** — checks table scrolled to show YOUR plugin's checks with green/red results (no yellow pending, no stale asterisks)
-   - **Component JSON page** — tree expanded to show your collector's data section with CI-populated fields visible
+   - **Component details page** — checks table **scrolled so YOUR plugin's checks are visible in the viewport** with green/red results (no yellow pending, no stale asterisks). The default page load shows the top of the table — you MUST scroll down to the rows for your specific policy checks before capturing.
+   - **Component JSON page** — tree expanded and **scrolled so your collector's data section is visible in the viewport** (e.g. `.iac_scan`, `.lang.ruby`). The default page load shows the top of the JSON tree — you MUST expand the relevant nodes and scroll to them before capturing.
    - **Collectors listing** (optional) — your collector shows runs > 0
 
    **How to capture screenshots:**
@@ -476,8 +476,9 @@ All of these are **required** and must be attached to the PR:
    2. Navigate to `https://cronos.demo.earthly.dev/login` and log in
    3. Navigate to each dashboard URL (query `/api/search?type=dash-db` for dashboard UIDs — they differ between environments)
    4. **Wait for tables and panels to fully load before taking any screenshot.** Grafana dashboards load data asynchronously — tables may appear empty or show a loading spinner for several seconds after the page itself has loaded. After `waitForLoadState('networkidle')`, add an additional wait (5-8 seconds) and verify that the table/panel you need is actually populated before capturing. A screenshot of an empty or loading table is not valid evidence.
-   5. For JSON page: click tree nodes to expand your data section, then screenshot
-   6. For component details: scroll to the policy checks section showing your checks, then screenshot
+   5. **For JSON page**: expand the tree nodes for your collector's data section, then use `element.scrollIntoView()` to bring that section into the viewport before capturing. The screenshot must show the JSON paths your collector writes (e.g. `.iac_scan.findings`, `.lang.ruby.gems`), NOT the top of the tree.
+   6. **For component details**: locate the rows in the checks table that correspond to your policy checks (e.g. search or scroll for `iac-scan.*`, `ruby.*`), then use `element.scrollIntoView()` to bring those rows into the viewport before capturing. The screenshot must show your specific check results, NOT the top of the table.
+   7. **General rule**: A screenshot captured at the default scroll position (top of the page) is NOT valid evidence. Every screenshot must be scrolled to show the specific data your plugin produced. If the reviewer has to guess where your data is, the screenshot is useless.
 
    Upload screenshots to the PR comment as image attachments — they serve as proof that the plugin works end-to-end.
 
