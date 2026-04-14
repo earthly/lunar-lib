@@ -22,7 +22,7 @@ with other packs.
 
 | Pack | Domain | Example contents |
 |------|--------|-----------------|
-| `baseline` | Repo hygiene, languages, testing | repo-boilerplate, testing, linter, all language policies |
+| `baseline` | Repo hygiene, languages, testing | repo-boilerplate, testing, linter, all language policies. Day-1 zero-config pack that almost everyone should have. As new language plugins are added, they automatically get included here. |
 | `security` | Vulnerability scanning, secrets, supply chain | secrets, sca, sast, container-scan, sbom |
 | `iac` | Infrastructure as code | k8s, terraform, docker, container, github-actions, ci |
 | `ai` | AI development practices | ai, claude, codex, gemini, coderabbit |
@@ -49,9 +49,9 @@ name: security
 version: 1.0.0
 description: Vulnerability scanning, secret detection, supply-chain security
 
-requires:
-  secrets:
-    - SNYK_TOKEN  # optional — sca works without it but Snyk won't run
+secrets:
+  SNYK_TOKEN:
+    description: Snyk API token for enhanced SCA scanning (optional — sca works without it)
 
 collectors:
   - uses: github://earthly/lunar-lib/collectors/gitleaks@v1.0.5
@@ -102,14 +102,17 @@ policies:
       - has-licenses
 ```
 
-The manifest format is identical to `lunar-config.yml` with added metadata
-(`name`, `version`, `description`, `requires`). Existing starter pack configs
-would migrate to this format with minimal changes.
+The manifest format is closer to the existing collector/policy plugin config
+(`lunar-collector.yml` / `lunar-policy.yml`) than to `lunar-config.yml` — it
+has the same top-level keys (`name`, `version`, `description`, `secrets`) but
+extends the plugin format to support importing both collectors AND policies in
+a single package. This is the key platform addition: a plugin type that can
+declare a mix of collectors and policies rather than being limited to one or
+the other.
 
 ## Customization: Include / Exclude
 
-Users customize packs without ejecting by using `exclude` and `with` on the
-pack import:
+Users customize packs using `exclude` and `with` on the pack import:
 
 ### Excluding whole policies
 
@@ -198,9 +201,8 @@ dependency on another pack**:
 name: soc2
 version: 1.0.0
 description: SOC2 compliance — access controls, audit trail, data protection
-requires:
-  packs:
-    - security@v1     # soc2 builds on top of security
+depends:
+  - security@v1     # soc2 builds on top of security
 
 collectors:
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
@@ -250,11 +252,10 @@ Options for handling this:
    (soc2) inherits security's collectors and policy defaults as-is. If soc2
    needs stricter enforcement, it declares an `enforce` override:
    ```yaml
-   requires:
-     packs:
-       - security@v1
-         enforce:
-           secrets.no-hardcoded-secrets: block-pr
+   depends:
+     - security@v1
+       enforce:
+         secrets.no-hardcoded-secrets: block-pr
    ```
 
 2. **The user resolves at import time.** If both soc2 and pii import security
@@ -404,7 +405,7 @@ packs:
   - uses: github://earthly/lunar-lib/packs/iac@v1
 ```
 
-SOC2 pack declares `requires: [security@v1]`, so importing soc2 automatically
+SOC2 pack declares `depends: [security@v1]`, so importing soc2 automatically
 includes security's collectors and policies. User doesn't need to import
 security separately — soc2 builds on it. No duplication, no manual excludes.
 
@@ -433,7 +434,7 @@ packs:
   - uses: github://earthly/lunar-lib/packs/pii@v1
 ```
 
-### Example 6: Power user, partially ejected
+### Example 6: Power user, individual policy imports
 
 ```yaml
 packs:
@@ -575,11 +576,10 @@ The current copy-paste starter configs (PR #121) work today as templates.
 The migration to importable packs would be:
 
 1. **Now:** Ship copy-paste configs as-is (they work, no platform changes needed)
-2. **Platform work:** Add `packs:` section support to luna-config.yml
-3. **Repackage:** Convert starter configs into pack manifests (add name/version/requires metadata)
+2. **Platform work:** Add `packs:` section support to lunar-config.yml
+3. **Repackage:** Convert starter configs into pack manifests (add name/version/secrets metadata)
 4. **Validation:** Add duplicate detection to hub-on-pull
 5. **CLI:** Ship `lunar config validate` for local pre-push checking
-6. **Eject (future):** `lunar config eject <pack>` expands a pack import to raw policies
 
 The copy-paste configs in PR #121 are the content of the packs regardless of
 delivery format. The curation work isn't wasted — it just gets a manifest
@@ -596,12 +596,12 @@ wrapper.
 4. Composable — baseline + security + ai without manual merge
 5. Marketplace potential — third-party packs (HIPAA, PCI-DSS)
 6. Clean topic separation minimizes conflicts
-7. Include/exclude handles customization without ejecting
-8. Eject available as escape hatch for power users
+7. Include/exclude handles most customization needs
+8. Users can always drop to individual policy imports for full control
 
 **Cons:**
 1. Requires platform work (packs: section, validation, resolution)
-2. Customization beyond exclude/with requires ejecting
+2. Customization beyond exclude/with requires switching to individual policy imports
 3. Debugging is harder — need to resolve pack to see what's actually running
 4. Specialized packs may still overlap, requiring user intervention
 5. Version conflicts across packs need a resolution strategy
@@ -632,8 +632,8 @@ wrapper.
    available"? Current approach includes them explicitly.
 
 3. **Required vs. optional secrets:** How does a pack declare "SNYK_TOKEN makes
-   SCA better but isn't required"? The `requires.secrets` block needs
-   required vs. optional distinction.
+   SCA better but isn't required"? The `secrets` block (top-level, matching
+   collector/policy schema) could use a `required: false` field per secret.
 
 4. **Pack discovery:** Where do users browse available packs? A hub page?
    `lunar packs list`?
@@ -644,3 +644,34 @@ wrapper.
 6. **Validation UX:** Should `lunar config validate` produce a diff of what
    the resolved config looks like? That would help users understand what
    their pack imports actually expand to.
+
+## Appendix: The "Eject" Pattern
+
+One pattern worth considering (not as a core feature, but as a future
+convenience): the ability to expand a pack import into its raw policies, similar
+to `create-react-app eject` in the Node.js ecosystem.
+
+**How it would work:**
+
+```bash
+lunar config eject security
+```
+
+This would replace the `uses: packs/security@v1` line in the user's config with
+the full list of collectors and policies that the pack contains. The user gets
+a working raw config they can customize freely — no longer tied to the pack's
+version or opinions.
+
+**When this might be useful:**
+- A team has outgrown a pack and needs fine-grained control over every policy
+- A pack is being deprecated and users need to migrate off it
+- Debugging — seeing exactly what a pack resolves to
+
+**Why this is NOT a primary pattern:**
+- Most customization needs should be handled by `exclude`, `with`, and `enforce`
+  on the pack import itself
+- Ejecting loses the benefit of automatic version updates
+- The include/exclude + pack dependency model should cover the vast majority of
+  use cases without ever needing to eject
+
+This is a nice-to-have escape hatch, not a core workflow.
