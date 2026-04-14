@@ -147,12 +147,12 @@ inputs are overridable this way.
 ```yaml
 packs:
   - uses: packs/security@v1
-    enforce:
+    enforcement:
       secrets.no-hardcoded-secrets: report-pr   # soften from block-pr
       sca: block-pr                              # tighten from score
 ```
 
-The `enforce` block uses `<policy-name>` or `<policy-name>.<subpolicy>` as keys.
+The `enforcement` block uses `<policy-name>` or `<policy-name>.<subpolicy>` as keys.
 Policy-level overrides apply to all subpolicies of that policy. Subpolicy-level
 overrides take precedence over policy-level.
 
@@ -250,17 +250,17 @@ Options for handling this:
 
 1. **Pack dependencies are additive, not opinionated.** The dependent pack
    (soc2) inherits security's collectors and policy defaults as-is. If soc2
-   needs stricter enforcement, it declares an `enforce` override:
+   needs stricter enforcement, it declares an `enforcement` override:
    ```yaml
    depends:
      - security@v1
-       enforce:
+       enforcement:
          secrets.no-hardcoded-secrets: block-pr
    ```
 
 2. **The user resolves at import time.** If both soc2 and pii import security
    with conflicting enforcement overrides, validation flags it and the user
-   picks which opinion wins via their own `enforce` block.
+   picks which opinion wins via their own `enforcement` block.
 
 3. **Pack dependencies only pull in collectors.** The dependent pack gets
    security's scanners (gitleaks, trivy, etc.) but declares its own policy
@@ -668,7 +668,7 @@ version or opinions.
 - Debugging — seeing exactly what a pack resolves to
 
 **Why this is NOT a primary pattern:**
-- Most customization needs should be handled by `exclude`, `with`, and `enforce`
+- Most customization needs should be handled by `exclude`, `with`, and `enforcement`
   on the pack import itself
 - Ejecting loses the benefit of automatic version updates
 - The include/exclude + pack dependency model should cover the vast majority of
