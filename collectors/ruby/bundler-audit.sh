@@ -14,8 +14,9 @@ if ! command -v bundle >/dev/null 2>&1; then
     exit 0
 fi
 
-# Update the advisory database
-bundle audit update 2>/dev/null || true
+# Try to update the advisory database (may fail in network-isolated containers).
+# The Docker image ships with a pre-baked copy of ruby-advisory-db as fallback.
+bundle audit update 2>/dev/null || echo "Using pre-baked advisory DB" >&2
 
 # Run audit — non-zero exit means vulnerabilities found
 set +e
