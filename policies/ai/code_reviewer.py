@@ -4,13 +4,14 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("code-reviewer", "At least one AI code reviewer should be active", node=node)
     with c:
-        reviewers = c.get_node(".ai.code_reviewers")
-        if not reviewers.exists():
+        reviewers_node = c.get_node(".ai.code_reviewers")
+        reviewers_list = reviewers_node.get_value_or_default(".", None)
+        if reviewers_list is None:
             c.skip("No AI code reviewer data found — enable a tool-specific collector (claude, coderabbit)")
             return c
 
         found = False
-        for entry in reviewers:
+        for entry in reviewers_node:
             detected = entry.get_value_or_default(".detected", False)
             if detected:
                 found = True

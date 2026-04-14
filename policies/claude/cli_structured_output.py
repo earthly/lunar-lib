@@ -8,12 +8,13 @@ STRUCTURED_FLAGS = ["--output-format", "--json-schema"]
 def main(node=None):
     c = Check("cli-structured-output", "Claude CLI in CI headless mode should use structured JSON output", node=node)
     with c:
-        cmds = c.get_node(".ai.native.claude.cicd.cmds")
-        if not cmds.exists():
+        cmds_node = c.get_node(".ai.native.claude.cicd.cmds")
+        cmds_list = cmds_node.get_value_or_default(".", None)
+        if cmds_list is None:
             c.skip("No Claude CLI usage detected in CI")
             return c
 
-        for entry in cmds:
+        for entry in cmds_node:
             cmd = entry.get_value_or_default(".cmd", "")
             padded = f" {cmd} "
 

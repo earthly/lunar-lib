@@ -8,12 +8,13 @@ STRUCTURED_FLAGS = ["--output-format"]
 def main(node=None):
     c = Check("cli-structured-output", "Gemini CLI in CI should use structured JSON output", node=node)
     with c:
-        cmds = c.get_node(".ai.native.gemini.cicd.cmds")
-        if not cmds.exists():
+        cmds_node = c.get_node(".ai.native.gemini.cicd.cmds")
+        cmds_list = cmds_node.get_value_or_default(".", None)
+        if cmds_list is None:
             c.skip("No Gemini CLI usage detected in CI")
             return c
 
-        for entry in cmds:
+        for entry in cmds_node:
             cmd = entry.get_value_or_default(".cmd", "")
             padded = f" {cmd} "
 
