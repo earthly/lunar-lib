@@ -153,39 +153,22 @@ The `enforce` block uses `<policy-name>` or `<policy-name>.<subpolicy>` as keys.
 Policy-level overrides apply to all subpolicies of that policy. Subpolicy-level
 overrides take precedence over policy-level.
 
-## Handling Duplicates: User-Driven Resolution
+## Handling Duplicates
 
-### Design principle
+### Strategy 1: Avoid duplication by design
 
-The platform does NOT automatically resolve conflicts between packs. When two
-packs import the same policy, the platform flags it as a validation error and
-the user decides how to handle it.
+The primary strategy is to avoid policy duplication across packs entirely. This
+is the core reason packs are organized by topic rather than by complexity tier
+— each pack owns a cohesive domain and deliberately excludes policies that
+belong to another pack.
 
-### Why not auto-resolve?
+For example, `baseline` does NOT include `secrets` because that's security's
+domain. `security` does NOT include `testing` or `linter` because that's
+baseline's domain. Each pack is targeted precisely so that users can combine
+them freely without hitting conflicts:
 
-Auto-resolution (e.g., "highest enforcement wins") sounds clean but introduces
-surprising behavior:
-
-- User imports `security` (secrets at `block-pr`) + `baseline` (secrets at
-  `score`). Auto-resolve silently promotes to `block-pr`. User didn't realize
-  baseline's score-level check is now blocking PRs.
-- Two packs import the same policy with different `with:` inputs. Which input
-  wins? There's no obviously correct answer.
-- Auto-resolution hides what's actually running. Users should know exactly which
-  policies are active and at what enforcement level.
-
-> **Future idea:** Auto-resolution with enforcement promotion could work as an
-> opt-in behavior (`resolve: highest-enforcement`) for users who explicitly want
-> it. Not recommended as a default. Noted here for future consideration.
-
-### How it works
-
-**Step 1: Clean topic separation minimizes duplicates.**
-
-Packs are designed to own their domain without stepping on each other:
-
-| Policy | Owner pack | NOT in |
-|--------|-----------|--------|
+| Policy | Owner pack | Deliberately excluded from |
+|--------|-----------|---------------------------|
 | secrets | security | baseline, ai, iac |
 | sca, sast, sbom | security | baseline |
 | container, container-scan | iac | security |
@@ -196,16 +179,124 @@ Packs are designed to own their domain without stepping on each other:
 | language policies (go, java, ...) | baseline | security, iac |
 | ai, claude, codex, gemini | ai | (unique to ai) |
 
-With clean ownership, `baseline + security + iac + ai` has zero policy overlap.
+With clean ownership, the basic packs (`baseline + security + iac + ai`) have
+**zero policy overlap**. A user can import all four and never encounter a
+conflict. This should cover day-1 through month-6 for most teams.
 
-**Step 2: Specialized packs may introduce duplicates.**
+### Strategy 2: Pack dependencies for specialized packs
 
-When a user adds a specialized pack like `soc2` alongside `security`, some
-overlap is expected. For example, both might want `secrets` policies.
+Once users move beyond the basic packs into more specialized ones (soc2,
+PCI-DSS, HIPAA, PII), duplication becomes harder to avoid. A soc2 pack
+naturally wants some of the same policies as the security pack — secret
+detection, vulnerability scanning, access controls.
 
-**Step 3: Validation catches duplicates.**
+Rather than duplicating those policies, a specialized pack can **declare a
+dependency on another pack**:
 
-Hub-on-pull validates the resolved config and reports conflicts:
+```yaml
+# packs/soc2/pack.yml
+name: soc2
+version: 1.0.0
+description: SOC2 compliance — access controls, audit trail, data protection
+requires:
+  packs:
+    - security@v1     # soc2 builds on top of security
+
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+
+policies:
+  # SOC2-specific: stricter branch protection and audit controls
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
+    enforcement: block-pr
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+      - minimum-approvals
+      - require-codeowner-review
+      - disallow-force-push
+
+  # SOC2-specific: additional compliance checks
+  # (future policies as they're built)
+```
+
+When a user imports `soc2`, the platform also pulls in `security` automatically.
+The soc2 pack only declares the policies it adds beyond what security provides
+— no duplication.
+
+**User's config stays clean:**
+
+```yaml
+packs:
+  - uses: packs/baseline@v1
+  - uses: packs/soc2@v1          # automatically imports security
+  - uses: packs/iac@v1
+```
+
+Three lines. The user gets baseline + security + soc2 + iac without knowing
+that soc2 depends on security.
+
+**Where this gets interesting:** What happens when `soc2` and a future `pii`
+pack both depend on `security` but want different enforcement opinions?
+
+```yaml
+# soc2 wants secrets at block-pr (strict compliance)
+# pii wants secrets at score (monitoring only, different compliance regime)
+```
+
+Options for handling this:
+
+1. **Pack dependencies are additive, not opinionated.** The dependent pack
+   (soc2) inherits security's collectors and policy defaults as-is. If soc2
+   needs stricter enforcement, it declares an `enforce` override:
+   ```yaml
+   requires:
+     packs:
+       - security@v1
+         enforce:
+           secrets.no-hardcoded-secrets: block-pr
+   ```
+
+2. **The user resolves at import time.** If both soc2 and pii import security
+   with conflicting enforcement overrides, validation flags it and the user
+   picks which opinion wins via their own `enforce` block.
+
+3. **Pack dependencies only pull in collectors.** The dependent pack gets
+   security's scanners (gitleaks, trivy, etc.) but declares its own policy
+   imports with its own enforcement levels. This avoids enforcement conflicts
+   entirely — each pack fully owns its policy opinions.
+
+Option 3 is probably the safest starting point. It solves the collector
+duplication problem (which is the bulk of the overlap) while keeping policy
+enforcement decisions explicit per pack.
+
+### Strategy 3: User-driven resolution as fallback
+
+For cases that clean ownership and pack dependencies don't cover, the user
+resolves conflicts explicitly. The platform does NOT automatically pick a winner
+when two packs import the same policy — it flags the conflict and tells the user
+how to fix it.
+
+**Why not auto-resolve?**
+
+Auto-resolution (e.g., "highest enforcement wins") sounds clean but introduces
+surprising behavior:
+
+- Two packs import the same policy with different `with:` inputs. Which input
+  wins? There's no obviously correct answer.
+- Auto-resolution hides what's actually running. Users should know exactly which
+  policies are active and at what enforcement level.
+- Silent promotion from `score` to `block-pr` can break developer workflows
+  without the user understanding why PRs are suddenly blocked.
+
+> **Future idea:** Auto-resolution with enforcement promotion could work as an
+> opt-in behavior (`resolve: highest-enforcement`) for users who explicitly want
+> it. Not recommended as a default.
+
+**Validation catches duplicates:**
+
+Hub-on-pull validates the resolved config and reports conflicts with actionable
+fix suggestions:
 
 ```
 ⚠ Policy conflict: secrets@main appears in both 'security' and 'soc2'
@@ -230,9 +321,7 @@ Hub-on-pull validates the resolved config and reports conflicts:
          include: [no-hardcoded-secrets, executed]
 ```
 
-The validation message tells the user exactly what conflicts and how to fix it.
-
-**Step 4: Local validation.**
+**Local validation:**
 
 Users can validate before pushing:
 
@@ -242,6 +331,16 @@ lunar config validate
 
 Same validation logic as hub-on-pull, but runs locally. Catches conflicts
 early so the PR check doesn't surprise them.
+
+### Summary: Three layers of defense
+
+1. **Avoid duplication by design** — basic packs have zero overlap through clean
+   topic ownership. Covers day-1 through month-6 for most teams.
+2. **Pack dependencies** — specialized packs inherit from basic packs instead of
+   duplicating. Covers the soc2/pii/hipaa tier.
+3. **User-driven resolution** — when all else fails, validation flags conflicts
+   and the user resolves via exclude or direct import. Covers power users with
+   sophisticated multi-pack setups.
 
 ## Collector Deduplication
 
@@ -301,16 +400,40 @@ image tagging.
 ```yaml
 packs:
   - uses: github://earthly/lunar-lib/packs/baseline@v1
-  - uses: github://earthly/lunar-lib/packs/security@v1
-    exclude: [secrets]               # soc2 pack handles secrets
-  - uses: github://earthly/lunar-lib/packs/soc2@v1
+  - uses: github://earthly/lunar-lib/packs/soc2@v1     # depends on security, pulls it in
   - uses: github://earthly/lunar-lib/packs/iac@v1
 ```
 
-SOC2 pack overlaps with security on `secrets`. User excludes secrets from
-security pack and lets soc2 own it. Validation passes cleanly.
+SOC2 pack declares `requires: [security@v1]`, so importing soc2 automatically
+includes security's collectors and policies. User doesn't need to import
+security separately — soc2 builds on it. No duplication, no manual excludes.
 
-### Example 5: Power user, partially ejected
+### Example 5: Two compliance packs with conflicting opinions
+
+```yaml
+packs:
+  - uses: github://earthly/lunar-lib/packs/baseline@v1
+  - uses: github://earthly/lunar-lib/packs/soc2@v1     # depends on security
+  - uses: github://earthly/lunar-lib/packs/pii@v1      # also depends on security
+```
+
+Both soc2 and pii depend on security. If they both only inherit security's
+collectors (option 3 from pack dependencies), there's no conflict — each pack
+owns its own policy enforcement opinions. Security's collectors run once
+(deduped), soc2 declares its policies, pii declares its policies.
+
+If soc2 and pii DO have overlapping policies (e.g., both want `vcs` at different
+enforcement levels), validation flags it and the user resolves:
+
+```yaml
+packs:
+  - uses: github://earthly/lunar-lib/packs/baseline@v1
+  - uses: github://earthly/lunar-lib/packs/soc2@v1
+    exclude: [vcs]                    # let pii's vcs opinion win
+  - uses: github://earthly/lunar-lib/packs/pii@v1
+```
+
+### Example 6: Power user, partially ejected
 
 ```yaml
 packs:
@@ -404,33 +527,33 @@ AI development practices. Zero secrets required.
 
 ### soc2
 
-SOC2 and compliance. Overlaps with security on secret detection — user resolves
-via exclude.
+SOC2 and compliance. Depends on `security` pack — inherits its scanners
+rather than duplicating them. Adds compliance-specific policies on top.
 
-**Collectors:**
-- gitleaks, github
-- (may grow to include audit-specific collectors)
+**Depends on:** `security@v1` (inherits collectors: gitleaks, trivy, etc.)
+
+**Additional collectors:**
+- github (for access control and audit data)
 
 **Policies:**
 - `vcs` — branch-protection-enabled, require-pull-request, minimum-approvals, require-codeowner-review, disallow-force-push
-- `secrets` — no-hardcoded-secrets, executed (at stricter enforcement than security)
-- Additional compliance-specific policies as they're built
+- Additional compliance-specific policies as they're built (audit trail, access reviews, etc.)
 
 ## Overlap Map
 
 Where packs share collectors or policies, and who should own what:
 
-| Resource | baseline | security | iac | ai | soc2 |
-|----------|----------|----------|-----|-----|------|
+| Resource | baseline | security | iac | ai | soc2 (depends on security) |
+|----------|----------|----------|-----|-----|---------------------------|
 | Language collectors | ✅ owns | — | — | — | — |
-| gitleaks collector | — | ✅ owns | — | — | ⚠ needs |
-| trivy/syft/semgrep | — | ✅ owns | — | — | — |
-| github collector | ✅ owns | — | ⚠ needs | — | ⚠ needs |
+| gitleaks collector | — | ✅ owns | — | — | 🔗 inherited |
+| trivy/syft/semgrep | — | ✅ owns | — | — | 🔗 inherited |
+| github collector | ✅ owns | — | deduped | — | deduped |
 | docker collector | — | — | ✅ owns | — | — |
 | github-actions collector | — | — | ✅ owns | — | — |
 | ai/claude/codex/gemini | — | — | — | ✅ owns | — |
-| secrets policy | — | ✅ owns | — | — | ⚠ overlap |
-| sca/sast/sbom | — | ✅ owns | — | — | — |
+| secrets policy | — | ✅ owns | — | — | 🔗 inherited |
+| sca/sast/sbom | — | ✅ owns | — | — | 🔗 inherited |
 | container/container-scan | — | — | ✅ owns | — | — |
 | vcs policy | — | — | — | — | ✅ owns |
 | testing/linter | ✅ owns | — | — | — | — |
@@ -438,12 +561,13 @@ Where packs share collectors or policies, and who should own what:
 | language policies | ✅ owns | — | — | — | — |
 
 **Key overlap points:**
-- `gitleaks` collector: security owns, soc2 needs → collector dedup handles this (auto, safe)
-- `github` collector: baseline owns, iac/soc2 need → collector dedup handles this (auto, safe)
-- `secrets` policy: security owns, soc2 may want → user resolves via exclude
+- `gitleaks` collector: security owns, soc2 inherits via dependency → collector dedup (auto, safe)
+- `github` collector: baseline owns, iac/soc2 also declare → collector dedup (auto, safe)
+- `secrets` policy: security owns it. soc2 depends on security and inherits
+  the collectors but declares its own policies — no policy duplication.
 
-Most overlaps are collectors (auto-deduped, no conflict). The only policy
-overlap that's likely in practice is `secrets` between security and soc2.
+With pack dependencies, most potential overlaps are resolved structurally.
+Collector dedup handles the remaining shared data sources automatically.
 
 ## Migration Path
 
