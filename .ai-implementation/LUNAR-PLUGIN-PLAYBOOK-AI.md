@@ -326,63 +326,197 @@ All of these are **required** and must be attached to the PR:
 1. **Component JSON output** from `lunar component get-json` — paste the relevant section (the paths your collector writes to). This is the ground truth for correctness.
 
 2. **Two screenshots from the cronos dashboard** (`cronos.demo.earthly.dev`):
-   - **Component checks view** — scrolled to show the checks from any new or related policies. Proves policies evaluated correctly in the live environment.
-   - **Component JSON view** — scrolled to show data your collector produced. Proves the UI displays it correctly.
+   - **Component checks view** — scrolled to show the specific rows for your plugin's policy checks (e.g. `iac-scan.*`, `ruby.*`). Do NOT capture the top of the table — scroll to YOUR checks.
+   - **Component JSON view** — tree expanded and scrolled to show the JSON section your collector writes (e.g. `.iac_scan`, `.lang.ruby`). Do NOT capture the top of the JSON tree — expand and scroll to YOUR data.
 
-   The screenshots don't need to be exhaustive. The point is evidence that the UI is working and looks mostly right. The actual JSON from the CLI is the ground truth.
+   Screenshots captured at the default scroll position (top of the page) are not valid evidence. Every screenshot must be scrolled to the relevant data. See Step 8.5 for detailed Playwright guidance on using `scrollIntoView()`. The actual JSON from the CLI is the ground truth — the screenshots prove the UI renders it correctly.
 
 ### Step 8: Post test results on the PR
 
-Comment on the PR with the evidence:
+0. **⚠️ PREREQUISITE: Ensure your plugin's Docker image exists on Docker Hub** — If your plugin has its own `Earthfile` (i.e. it builds a custom Docker image like `earthly/lunar-lib:<plugin>-<version>`), the image **must** be pushed to Docker Hub before cronos can use it. lunar-lib CI does this automatically on every push — but for new plugins, your first CI run on the branch must complete successfully before testing on cronos. Verify with:
+   ```bash
+   # Branch slashes are normalized to dashes in image tags
+   docker manifest inspect earthly/lunar-lib:<plugin>-<normalized-branch>
+   # Example: bender/eng-487-ruby → earthly/lunar-lib:ruby-bender-eng-487-ruby
+   ```
+   If the image doesn't exist, push a commit to your lunar-lib branch and wait for CI to build and push it. **Do NOT proceed to step 1 until the image exists** — the cronos sync will succeed but the collector will silently fail to run because the runner can't pull the image. Plugins without an Earthfile run on the base image and can skip this step.
 
-```markdown
-## Test Results
+1. **Add collector + policy to cronos config** — Edit `pantalasa-cronos/lunar`'s `lunar-config.yml` to reference your branch:
+   ```yaml
+   collectors:
+     - uses: github://earthly/lunar-lib/collectors/YOUR_COLLECTOR@YOUR_BRANCH
+       on: ["domain:engineering"]
+   policies:
+     - uses: github://earthly/lunar-lib/policies/YOUR_POLICY@YOUR_BRANCH
+       enforcement: report-pr
+   ```
+   Push to `pantalasa-cronos/lunar` — the CI sync action deploys it to the cronos hub.
 
-### Component JSON (from `lunar component get-json <component>`)
+   ⚠️ **WAIT FOR THE BUILD TO PASS before making any commits to component repos.** The lunar config sync workflow must succeed first — if it fails, the hub won't know about your collector/policy and testing is pointless. Monitor with:
+   ```bash
+   GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run list --repo pantalasa-cronos/lunar --limit 1 --json status,conclusion
+   ```
+   Only proceed to step 2 once the build is green.
 
-<relevant JSON snippet>
+2. **Ensure the component repo has a GitHub Actions workflow running on `cronos`** — CI collectors only receive data from jobs that run on the `cronos` self-hosted runner. If you created a new component repo, it won't have a workflow yet — you must add one. If using an existing repo, verify its workflow uses `runs-on: cronos`.
 
-### Screenshots
+   For language collectors, the workflow should exercise the language's toolchain so CI hooks fire:
+   ```yaml
+   # Example: .github/workflows/ci.yml for a Ruby component
+   name: CI
+   on:
+     push:
+       branches: ["**"]
+     pull_request:
+       branches: ["**"]
+   jobs:
+     build:
+       runs-on: cronos
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install dependencies
+           run: bundle install
+         - name: Run tests
+           run: rake spec
+     audit:
+       runs-on: cronos
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install dependencies
+           run: bundle install
+         - name: Run bundle audit
+           run: |
+             gem install bundler-audit
+             bundle audit check --update
+   ```
 
-<component checks screenshot>
-<component JSON view screenshot>
+   For tool collectors (SBOM, SAST, etc.), add a job that runs your tool:
+   ```yaml
+   # Example: adding gitleaks to an existing workflow
+   gitleaks:
+     runs-on: cronos
+     steps:
+       - uses: actions/checkout@v4
+       - name: Install & Run
+         run: |
+           curl -sSfL <tool-download-url> | tar xz -C /usr/local/bin
+           <tool> scan --report-path report.json
+   ```
 
-### Test Matrix
+   Push to trigger the CI workflow. The lunar agent on the `cronos` runner traces commands and feeds data to collectors. **Without this workflow, code collectors will still run (they clone the repo directly), but CI collectors will never fire.**
 
-| Test case | Check | Result | Notes |
-|-----------|-------|--------|-------|
-| Positive (data present) | check-name | PASS | Correct output |
-| Negative (no data) | check-name | SKIP | Skips gracefully |
-| Edge case (missing field) | check-name | SKIP | No error |
+3. **Wait for CI + collection + UI settling** — Watch the workflow complete:
+   ```bash
+   GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run watch <run-id> --repo pantalasa-cronos/<component>
+   ```
+   Collection happens automatically after CI completes. Data appears in the cronos hub DB within ~1 minute.
 
-### Edge cases verified
-- Missing API key → graceful exit 0
-- Empty input data → no Component JSON written
-- Malformed data → handled without crash
+   ⚠️ **After the workflow finishes, wait at least 1 minute before checking the UI.** The system needs time to settle pending states — if you check immediately, you may see stale/pending data that hasn't been fully processed yet. `sleep 60` is your friend here.
+
+4. **Verify collected data** — Query the cronos DB via Grafana API:
+   ```bash
+   # Login
+   curl -s -c /tmp/cookies.txt "https://cronos.demo.earthly.dev/login" \
+     -X POST -H "Content-Type: application/json" \
+     -d '{"user":"admin","password":"<password>"}'
+
+   # Query component JSON for your category
+   curl -s -b /tmp/cookies.txt "https://cronos.demo.earthly.dev/api/ds/query" \
+     -X POST -H "Content-Type: application/json" \
+     -d '{"queries":[{"refId":"A","datasource":{"uid":"PCC52D03280B7034C","type":"grafana-postgresql-datasource"},
+       "rawSql":"SELECT component_json->'"'"'<category>'"'"' FROM components WHERE component_id = '"'"'github.com/pantalasa-cronos/<component>'"'"' AND git_sha = '"'"'<sha>'"'"'",
+       "format":"table"}],"from":"now-1h","to":"now"}'
+   ```
+   The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results.
+
+5. **Validate in the UI and capture evidence** — Check the cronos Grafana dashboards to confirm the collector and policy are working. This is a smoke test — you need to prove things are actually showing up in the UI, not just take random screenshots.
+
+   **What to check and what counts as valid:**
+
+   **A. Checks table (Component Details page)**
+   - Navigate to the component details page and scroll to the checks table
+   - Find the rows for your plugin's policy checks (e.g. `ruby.gemfile-exists`, `ruby.lockfile-exists`)
+   - **Valid**: Checks show a green (pass) or red (fail) result — this means the policy ran and produced a verdict
+   - **Invalid — pending (yellow)**: If the checks are still in a pending/yellow state, they haven't completed yet. This is NOT valid evidence. Wait and re-check.
+   - **Invalid — stale (asterisk)**: If any check has an asterisk `*` next to it, the data is stale (from a previous run, not the current one). This is NOT valid evidence. Wait and re-check.
+   - If checks remain pending or stale after ~10 minutes of waiting, there may be a problem with your policy or the cronos environment itself. Double-check your policy logic first. If the policy looks correct, escalate — the staging environment breaks sometimes and that's not your fault, but don't assume it's working when it isn't.
+
+   **B. Component JSON page**
+   - Navigate to the Component JSON page for your component
+   - Expand the tree to show your collector's data section (e.g. `.lang.ruby`)
+   - **Valid**: The JSON tree shows the fields your collector writes, especially anything populated by CI hooks (e.g. `.lang.ruby.cicd`, `.lang.ruby.bundler.cicd`)
+   - **Invalid — missing section**: If the JSON section for your collector is completely missing, not all collectors have run yet. Check if CI completed, check if the code hook image exists on Docker Hub, and wait for the next collection cycle.
+   - For CI-only data: if the component doesn't have a GitHub Actions workflow running on the cronos runner, CI hook collectors will never fire. Make sure the workflow exists and has completed at least once.
+
+   **C. Errors**
+   - Check the top of the component page for a "Some errors occurred" banner
+   - If present, click through and check if any errors are from YOUR collector or policy
+   - If they are — that's a bug. Fix it, push, and re-test. Do NOT post evidence with errors from your own plugin.
+
+   **D. Cross-check external signals**
+   - If checks are still pending or stale, look for corroborating evidence of environment problems beyond the Grafana UI:
+     - **Hanging GitHub Actions runs**: Check whether the component repo's CI runs on `cronos` have completed. A GitHub check that's still "in progress" or "queued" long after the workflow should have finished (e.g. >5 minutes for a simple build) indicates the cronos runner is stuck or the hub isn't processing. Check the run directly: `gh run view <run-id> --repo <owner>/<repo>`.
+     - **Policy sync failures**: Check if the cronos config repo's "Policy sync" workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
+   - These external signals help you distinguish "my code is broken" from "the environment is broken" — pending checks + a hanging CI run = environment issue, not a policy bug.
+
+   **E. What to do if the UI is broken**
+   - Empty tables, missing data, broken dashboards, or timeouts do NOT count as valid evidence
+   - Don't assume "done" if something looks wrong — investigate first
+   - If you've verified your collector/policy code is correct and the environment appears broken, speak up and let the reviewer know. The cronos staging environment has issues sometimes. That's fine, but you need to flag it rather than pretending everything is working.
+
+   **Screenshots to capture (once validation passes):**
+   - **Component details page** — checks table **scrolled so YOUR plugin's checks are visible in the viewport** with green/red results (no yellow pending, no stale asterisks). The default page load shows the top of the table — you MUST scroll down to the rows for your specific policy checks before capturing.
+   - **Component JSON page** — tree expanded and **scrolled so your collector's data section is visible in the viewport** (e.g. `.iac_scan`, `.lang.ruby`). The default page load shows the top of the JSON tree — you MUST expand the relevant nodes and scroll to them before capturing.
+   - **Collectors listing** (optional) — your collector shows runs > 0
+
+   **How to capture screenshots:**
+
+   Use Playwright to capture Grafana dashboards:
+   1. Read Grafana credentials from `~/.bender/grafana-credentials`
+   2. Navigate to `https://cronos.demo.earthly.dev/login` and log in
+   3. Navigate to each dashboard URL (query `/api/search?type=dash-db` for dashboard UIDs — they differ between environments)
+   4. **Wait for tables and panels to fully load before taking any screenshot.** Grafana dashboards load data asynchronously — tables may appear empty or show a loading spinner for several seconds after the page itself has loaded. After `waitForLoadState('networkidle')`, add an additional wait (5-8 seconds) and verify that the table/panel you need is actually populated before capturing. A screenshot of an empty or loading table is not valid evidence.
+   5. **For JSON page**: expand the tree nodes for your collector's data section, then use `element.scrollIntoView()` to bring that section into the viewport before capturing. The screenshot must show the JSON paths your collector writes (e.g. `.iac_scan.findings`, `.lang.ruby.gems`), NOT the top of the tree.
+   6. **For component details**: locate the rows in the checks table that correspond to your policy checks (e.g. search or scroll for `iac-scan.*`, `ruby.*`), then use `element.scrollIntoView()` to bring those rows into the viewport before capturing. The screenshot must show your specific check results, NOT the top of the table.
+   7. **General rule**: A screenshot captured at the default scroll position (top of the page) is NOT valid evidence. Every screenshot must be scrolled to show the specific data your plugin produced. If the reviewer has to guess where your data is, the screenshot is useless.
+
+   Upload screenshots to the PR comment as image attachments — they serve as proof that the plugin works end-to-end.
+
+6. **Clean up** — Remove test files from the component repo after verifying results.
+
+**Cross-org auth for pantalasa-cronos:**
+```bash
+GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh <command> --repo pantalasa-cronos/<repo>
+# Or for git operations:
+git remote set-url origin "https://x-access-token:$(bender-gh-token pantalasa-cronos)@github.com/pantalasa-cronos/<repo>.git"
 ```
 
-### Step 9: Undeploy from cronos
+### Post test results on the PR
 
-**This is mandatory before pushing for review.** Leaving branch refs in the cronos config will break manifest syncs when the branch is deleted after merge.
+After testing and validating in the UI (see step 5 above), post a PR comment with evidence. The comment should be a quick smoke test summary showing things are working — not a novel.
 
-**For NEW plugins (not yet on `@main`):**
-1. **Remove** the collector/policy entry from `pantalasa-cronos/lunar/lunar-config.yml` entirely.
-2. Commit and push.
-3. Verify the sync-manifest CI build passes.
+```markdown
+## Integration Test Evidence
 
-**For EXISTING plugins (already on `@main`):**
-1. **Revert** the `uses:` reference back to `@main` or the previous version tag.
-2. Commit and push.
-3. Verify the sync-manifest CI build passes.
+### Checks table (Component Details)
+- [screenshot of checks table showing your plugin's checks with pass/fail results]
+- All checks resolved (no pending/yellow, no stale asterisks)
 
-**If the plugin has a custom Earthfile:**
-- **Revert `default_image`** in `lunar-collector.yml` back to the `-main` tag before pushing for review.
+### Component JSON
+- [screenshot of Component JSON tree showing your collector's data]
+- CI-populated fields visible (e.g. `.lang.<language>.cicd`, `.lang.<language>.<tool>.cicd`)
 
-### Step 10: Push and lint
+### Errors
+- No collector/policy errors on the component page (or: errors found and fixed — see commit <sha>)
 
-1. Run the linter: `earthly +lint`. Fix any errors.
-2. Commit implementation code with specific paths: `git add collectors/<name>/` or `git add policies/<name>/`. **Never use `git add .` or `git add -A`.**
-3. Push to the PR branch. CI runs automatically — fix any failures.
+### Notes
+- <any caveats, e.g. "code hook collectors pending until Docker image is on main">
+```
+
+**What makes evidence valid vs. invalid:**
+- Valid: checks show green/red results, JSON tree has your data, no errors from your plugin
+- Invalid: pending checks (yellow), stale checks (asterisk), missing JSON sections, empty tables, tables still loading/rendering, error banners from your collector/policy, broken UI. If a table appears empty, confirm it has finished loading — Grafana panels render asynchronously and may still be fetching data.
+- If the environment is broken and you can't get valid evidence, say so explicitly — don't post screenshots of broken state and call it done
 
 ### A note on unit tests
 
