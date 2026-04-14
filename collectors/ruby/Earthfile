@@ -4,7 +4,8 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install Ruby, Bundler, and bundler-audit
-    RUN apk add --no-cache ruby ruby-bundler
+    # git is required for bundler-audit to clone the ruby-advisory-db
+    RUN apk add --no-cache ruby ruby-bundler git
     RUN gem install bundler-audit --no-document
 
     # Verify installations
