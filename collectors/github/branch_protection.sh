@@ -4,17 +4,13 @@ set -e
 
 # Only process GitHub repositories
 if [[ ! "$LUNAR_COMPONENT_ID" =~ ^github\.com/ ]]; then
+  echo "Skipping: LUNAR_COMPONENT_ID='${LUNAR_COMPONENT_ID:-<unset>}' is not a GitHub repository" >&2
   exit 0
 fi
 
 # Check for required environment variables
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
-  echo "Error: LUNAR_SECRET_GH_TOKEN is not set" >&2
-  exit 1
-fi
-
-if [ -z "$LUNAR_COMPONENT_ID" ]; then
-  echo "Error: LUNAR_COMPONENT_ID is not set" >&2
+  echo "Error: LUNAR_SECRET_GH_TOKEN is not set. Configure the GH_TOKEN secret for this collector." >&2
   exit 1
 fi
 

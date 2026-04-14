@@ -1,0 +1,67 @@
+checks:
+  # ── Hard validations ──
+
+  - name: svg-black-fill
+    on: "**/assets/*.svg"
+    run: "grep -qE 'fill=\"black\"' {file} && ! grep -iqE 'fill=\"(white|#fff|#ffffff)\"' {file}"
+    message: "SVG must use fill=\"black\". Website converts to white automatically."
+
+  - name: svg-no-title-tag
+    on: "**/assets/*.svg"
+    run: "! grep -qE '<title>' {file}"
+    message: "Strip <title> tags from SVG icons. They add unnecessary metadata."
+
+  - name: lint
+    on: "**/lunar-collector.yml"
+    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
+    message: "Linter failed. Fix the errors above before committing."
+
+  - name: lint-policy
+    on: "**/lunar-policy.yml"
+    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
+    message: "Linter failed. Fix the errors above before committing."
+
+  - name: lint-readme
+    on: "collectors/*/README.md"
+    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
+    message: "Linter failed. Fix the errors above before committing."
+
+  - name: lint-policy-readme
+    on: "policies/*/README.md"
+    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
+    message: "Linter failed. Fix the errors above before committing."
+
+  - name: earthfile-wired-into-all
+    on: "collectors/*/Earthfile"
+    run: "PLUGIN_DIR=$(dirname {file} | sed \"s|$(git rev-parse --show-toplevel)/||\"); ROOT_EF=$(git rev-parse --show-toplevel)/Earthfile; grep -q \"$PLUGIN_DIR\" \"$ROOT_EF\""
+    message: "This plugin has an Earthfile but is not referenced in the root Earthfile's +all target. Add: BUILD --pass-args ./<plugin-path>+image"
+
+  - name: collector-gnu-grep
+    on: "collectors/**/*.sh"
+    run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
+    message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
+
+  # ── Nudges (exit 1 to surface the message via additionalContext) ──
+  # The hook runner (lunar-verify.sh) collects findings from non-zero exits
+  # and returns them as additionalContext JSON. The hook itself always exits 0,
+  # so nudges never block the agent — they just surface reminders.
+
+  - name: svg-logo-sourcing
+    on: "**/assets/*.svg"
+    run: "exit 1"
+    message: "Reminder: Is this a tech-specific collector or policy? Check simple-icons (https://github.com/simple-icons/simple-icons) for an official logo before creating a custom one."
+
+  - name: ci-collector-testing-reminder
+    on: "collectors/*/lunar-collector.yml"
+    run: "if grep -q 'type: ci-' {file}; then exit 1; else exit 0; fi"
+    message: "Reminder: This collector has CI hooks. Local 'lunar collector dev' is NOT sufficient -- you must test on cronos with a real CI run (push config, trigger component build, verify data on hub)."
+
+  - name: manifest-example-json-freshness
+    on: "collectors/*/lunar-collector.yml"
+    run: "exit 1"
+    message: "Reminder: Does example_component_json still match what the collector actually produces? Run 'lunar collector dev' and compare the output to the example in this manifest."
+
+  - name: policy-skip-vs-fail
+    on: "policies/**/*.py"
+    run: "exit 1"
+    message: "Reminder: Skip vs fail matters: skip = category does not apply to this component (e.g. Go policy on a Python repo). fail = category applies but condition not met. Skipping when you should fail inflates compliance scores."
