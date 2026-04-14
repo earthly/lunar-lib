@@ -5,7 +5,8 @@ def main(node=None):
     c = Check("config-exists", "CodeRabbit configuration file should exist", node=node)
     with c:
         coderabbit = c.get_node(".ai.native.coderabbit")
-        if not coderabbit.exists():
+        coderabbit_data = coderabbit.get_value_or_default(".", None)
+        if coderabbit_data is None:
             c.skip("No CodeRabbit data found — enable the coderabbit collector")
             return c
 

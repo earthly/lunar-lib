@@ -8,7 +8,6 @@ set -e
 FILES=$(find . \( -type f -o -type l \) -name CLAUDE.md -not -path '*/node_modules/*' -not -path '*/.git/*' 2>/dev/null || true)
 
 if [ -z "$FILES" ]; then
-  jq -n '{ exists: false }' | lunar collect -j ".ai.native.claude.instruction_file" -
   exit 0
 fi
 

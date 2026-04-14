@@ -5,7 +5,8 @@ def main(node=None):
     c = Check("instruction-file-exists", "Agent instruction file should exist at repo root", node=node)
     with c:
         instructions = c.get_node(".ai.instructions")
-        if not instructions.exists():
+        instr_data = instructions.get_value_or_default(".", None)
+        if instr_data is None:
             c.skip("No instruction file data collected — enable the ai collector")
             return c
 

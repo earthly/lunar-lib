@@ -20,7 +20,8 @@ def main(node=None):
                 "Configure required sections or exclude this check."
             )
 
-        if not instructions.exists():
+        instr_data = instructions.get_value_or_default(".", None)
+        if instr_data is None:
             c.skip("No instruction file data collected — enable the ai collector")
             return c
 

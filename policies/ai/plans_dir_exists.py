@@ -5,7 +5,8 @@ def main(node=None):
     c = Check("plans-dir-exists", "Dedicated plans directory should exist for AI agent task planning", node=node)
     with c:
         plans_dir = c.get_node(".ai.plans_dir")
-        if not plans_dir.exists():
+        plans_data = plans_dir.get_value_or_default(".", None)
+        if plans_data is None:
             c.skip("No plans directory data collected — enable the ai collector")
             return c
 

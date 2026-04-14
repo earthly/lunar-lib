@@ -11,9 +11,6 @@ elif [ -f ".coderabbit.yml" ]; then
 fi
 
 if [ -z "$CONFIG_FILE" ]; then
-  jq -n '{
-    config_exists: false
-  }' | lunar collect -j ".ai.native.coderabbit" -
   exit 0
 fi
 
