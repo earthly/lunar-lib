@@ -49,6 +49,12 @@ If someone asks you to do something code-related and you're not sure what they m
 2. Run `gh api repos/<owner>/<repo>/pulls/<PR>/comments` to see all inline review comments
 3. Address EVERY unresolved comment — don't just respond to the latest one
 4. If a reviewer asked for code changes, make ALL the changes, commit, push, then reply to each thread
+5. **Resolve each thread after addressing it.** After replying to a review comment and pushing the fix, resolve the thread:
+   ```
+   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+   ```
+   To get thread IDs: `gh api graphql -f query='{ repository(owner: "OWNER", name: "REPO") { pullRequest(number: PR) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 1) { nodes { body } } } } } } }'`
+   Do NOT leave threads unresolved — resolved threads signal to reviewers that feedback has been addressed.
 
 ## Communication Rules
 
