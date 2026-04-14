@@ -2,18 +2,27 @@
 
 set -e
 
+echo "[DEBUG] branch_protection.sh starting" >&2
+echo "[DEBUG] LUNAR_COMPONENT_ID=${LUNAR_COMPONENT_ID:-<unset>}" >&2
+echo "[DEBUG] LUNAR_SECRET_GH_TOKEN set: $([ -n "$LUNAR_SECRET_GH_TOKEN" ] && echo 'yes' || echo 'no')" >&2
+echo "[DEBUG] LUNAR_SECRET_GH_TOKEN length: ${#LUNAR_SECRET_GH_TOKEN}" >&2
+
 # Only process GitHub repositories
 if [[ ! "$LUNAR_COMPONENT_ID" =~ ^github\.com/ ]]; then
+  echo "[DEBUG] LUNAR_COMPONENT_ID does not match ^github.com/ — exiting 0" >&2
   exit 0
 fi
+echo "[DEBUG] Component ID matches github.com pattern" >&2
 
 # Check for required environment variables
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
+  echo "[DEBUG] LUNAR_SECRET_GH_TOKEN is empty — exiting 1" >&2
   echo "Error: LUNAR_SECRET_GH_TOKEN is not set" >&2
   exit 1
 fi
 
 if [ -z "$LUNAR_COMPONENT_ID" ]; then
+  echo "[DEBUG] LUNAR_COMPONENT_ID is empty — exiting 1" >&2
   echo "Error: LUNAR_COMPONENT_ID is not set" >&2
   exit 1
 fi
@@ -22,6 +31,7 @@ fi
 # Extract owner and repo from LUNAR_COMPONENT_ID
 OWNER=$(echo "$LUNAR_COMPONENT_ID" | cut -d'/' -f2)
 REPO=$(echo "$LUNAR_COMPONENT_ID" | cut -d'/' -f3)
+echo "[DEBUG] Parsed OWNER=$OWNER REPO=$REPO" >&2
 
 if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
   echo "Error: Could not parse LUNAR_COMPONENT_ID='$LUNAR_COMPONENT_ID' (expected format: github.com/owner/repo)" >&2
@@ -37,29 +47,48 @@ API_BASE="https://api.github.com"
 gh_api() {
   local endpoint="$1"
   local url="${API_BASE}${endpoint}"
+  echo "[DEBUG] gh_api: GET $url" >&2
 
-  curl -sSL -H "Authorization: token ${LUNAR_SECRET_GH_TOKEN}" \
+  local http_code
+  local response
+  response=$(curl -sSL -w "\n%{http_code}" -H "Authorization: token ${LUNAR_SECRET_GH_TOKEN}" \
        -H "Accept: application/vnd.github+json" \
        -H "X-GitHub-Api-Version: 2022-11-28" \
-       "$url"
+       "$url")
+  http_code=$(echo "$response" | tail -1)
+  response=$(echo "$response" | sed '$d')
+  echo "[DEBUG] gh_api: HTTP $http_code (response length: ${#response})" >&2
+
+  if [ "$http_code" -ge 400 ] 2>/dev/null; then
+    echo "[DEBUG] gh_api: ERROR response: $(echo "$response" | head -c 500)" >&2
+  fi
+
+  echo "$response"
 }
 
 # Get the default branch from the repository
+echo "[DEBUG] Fetching repo data for ${OWNER}/${REPO}" >&2
 REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
 DEFAULT_BRANCH=$(echo "$REPO_DATA" | jq -r '.default_branch')
+echo "[DEBUG] Default branch: $DEFAULT_BRANCH" >&2
 
 # Fetch branch protection settings
-# Note: This endpoint returns 404 if branch protection is not enabled
+echo "[DEBUG] Fetching branch protection for branch '$DEFAULT_BRANCH'" >&2
 PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${DEFAULT_BRANCH}/protection" 2>/dev/null || echo '{}')
+echo "[DEBUG] Protection response length: ${#PROTECTION_DATA}" >&2
+echo "[DEBUG] Protection message: $(echo "$PROTECTION_DATA" | jq -r '.message // "none"')" >&2
 
 # Check if branch protection is enabled
 if echo "$PROTECTION_DATA" | jq -e '.message == "Branch not protected"' > /dev/null 2>&1 || \
    echo "$PROTECTION_DATA" | jq -e 'has("message") and .message != null' > /dev/null 2>&1; then
-  # Collect minimal branch protection data
+  echo "[DEBUG] Branch protection not enabled, collecting minimal data" >&2
   lunar collect -j ".vcs.branch_protection.enabled" false
   lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
+  echo "[DEBUG] branch_protection.sh completed (not protected)" >&2
   exit 0
 fi
+
+echo "[DEBUG] Branch protection IS enabled, extracting details..." >&2
 
 # Extract branch protection details
 REQUIRE_PR=$(echo "$PROTECTION_DATA" | jq 'has("required_pull_request_reviews")')
@@ -73,6 +102,7 @@ else
   REQUIRE_CODEOWNER_REVIEW=false
   DISMISS_STALE_REVIEWS=false
 fi
+echo "[DEBUG] PR: require=$REQUIRE_PR approvals=$REQUIRED_APPROVALS codeowner=$REQUIRE_CODEOWNER_REVIEW stale=$DISMISS_STALE_REVIEWS" >&2
 
 # Status checks
 REQUIRE_STATUS_CHECKS=$(echo "$PROTECTION_DATA" | jq 'has("required_status_checks") and .required_status_checks != null')
@@ -83,6 +113,7 @@ else
   REQUIRED_CHECKS='[]'
   REQUIRE_BRANCHES_UP_TO_DATE=false
 fi
+echo "[DEBUG] Status checks: require=$REQUIRE_STATUS_CHECKS checks=$REQUIRED_CHECKS up_to_date=$REQUIRE_BRANCHES_UP_TO_DATE" >&2
 
 # Force push and deletion restrictions
 ALLOW_FORCE_PUSH=$(echo "$PROTECTION_DATA" | jq '.allow_force_pushes.enabled // false')
@@ -104,6 +135,7 @@ else
   RESTRICTIONS_APPS='[]'
 fi
 
+echo "[DEBUG] Collecting branch protection data..." >&2
 # Collect branch protection data using dot notation
 lunar collect -j ".vcs.branch_protection.enabled" true \
       ".vcs.branch_protection.require_pr" "$REQUIRE_PR" \
@@ -123,3 +155,5 @@ echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictio
 echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
 echo "$RESTRICTIONS_APPS" | lunar collect -j ".vcs.branch_protection.restrictions.apps" -
 echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -
+
+echo "[DEBUG] branch_protection.sh completed successfully" >&2
