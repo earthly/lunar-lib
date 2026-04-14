@@ -9,7 +9,7 @@ def main(node=None):
             c.skip("No Claude instruction file data collected — enable the claude collector")
             return c
 
-        exists = instr.get_value(".exists")
+        exists = instr.get_value_or_default(".exists", False)
         if not exists:
             c.fail("No CLAUDE.md found — Claude Code requires CLAUDE.md (symlinked to AGENTS.md)")
             return c

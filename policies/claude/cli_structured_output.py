@@ -14,7 +14,7 @@ def main(node=None):
             return c
 
         for entry in cmds:
-            cmd = entry.get_value(".cmd")
+            cmd = entry.get_value_or_default(".cmd", "")
             padded = f" {cmd} "
 
             is_headless = any(ind in padded for ind in HEADLESS_INDICATORS)

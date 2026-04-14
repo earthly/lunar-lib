@@ -9,7 +9,7 @@ def main(node=None):
             c.skip("No plans directory data collected — enable the ai collector")
             return c
 
-        exists = plans_dir.get_value(".exists")
+        exists = plans_dir.get_value_or_default(".exists", False)
         c.assert_true(
             exists,
             "No plans directory found (e.g. .agents/plans/). "

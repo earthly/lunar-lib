@@ -9,7 +9,7 @@ def main(node=None):
             c.skip("No instruction file data collected — enable the ai collector")
             return c
 
-        exists = instructions.get_value(".root.exists")
+        exists = instructions.get_value_or_default(".root.exists", False)
         if not exists:
             c.fail("No agent instruction file found at repository root")
             return c

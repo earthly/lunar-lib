@@ -33,7 +33,7 @@ def main(node=None):
                 if found:
                     c.fail(f"Codex CI invocation uses dangerous flag: {found}")
             else:
-                cmd = entry.get_value(".cmd")
+                cmd = entry.get_value_or_default(".cmd", "")
                 padded = f" {cmd} "
                 for flag in dangerous_flags:
                     if f" {flag} " in padded or f" {flag}=" in padded:

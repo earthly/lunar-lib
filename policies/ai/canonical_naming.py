@@ -13,7 +13,7 @@ def main(node=None):
 
         root_exists = instructions.get_value_or_default(".root.exists", False)
         if root_exists:
-            actual = instructions.get_value(".root.filename")
+            actual = instructions.get_value_or_default(".root.filename", "")
             if actual != canonical:
                 if actual == "CLAUDE.md":
                     c.fail(
