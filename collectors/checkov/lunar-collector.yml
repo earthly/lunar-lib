@@ -4,7 +4,7 @@ name: checkov
 description: Auto-runs Checkov IaC security scanning and detects Checkov CI executions
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:checkov-main
+default_image: earthly/lunar-lib:checkov-bender-eng-484-checkov
 default_image_ci_collectors: native
 
 landing_page:
