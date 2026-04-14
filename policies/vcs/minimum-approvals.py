@@ -4,9 +4,9 @@ from lunar_policy import Check, variable_or_default
 def main(node=None, min_approvals_override=None):
     c = Check("minimum-approvals", "Pull requests should require minimum number of approvals", node=node)
     with c:
-        c.assert_exists(".vcs.branch_protection", 
-            "VCS data not found. Ensure the github collector is configured and has run.")
-        
+        if not c.get_node(".vcs.branch_protection").exists():
+            c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
             c.fail("Branch protection is not enabled")
