@@ -453,7 +453,13 @@ All of these are **required** and must be attached to the PR:
    - If present, click through and check if any errors are from YOUR collector or policy
    - If they are — that's a bug. Fix it, push, and re-test. Do NOT post evidence with errors from your own plugin.
 
-   **D. What to do if the UI is broken**
+   **D. Cross-check external signals**
+   - If checks are still pending or stale, look for corroborating evidence of environment problems beyond the Grafana UI:
+     - **Hanging GitHub Actions runs**: Check whether the component repo's CI runs on `cronos` have completed. A GitHub check that's still "in progress" or "queued" long after the workflow should have finished (e.g. >5 minutes for a simple build) indicates the cronos runner is stuck or the hub isn't processing. Check the run directly: `gh run view <run-id> --repo <owner>/<repo>`.
+     - **Policy sync failures**: Check if the cronos config repo's "Policy sync" workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
+   - These external signals help you distinguish "my code is broken" from "the environment is broken" — pending checks + a hanging CI run = environment issue, not a policy bug.
+
+   **E. What to do if the UI is broken**
    - Empty tables, missing data, broken dashboards, or timeouts do NOT count as valid evidence
    - Don't assume "done" if something looks wrong — investigate first
    - If you've verified your collector/policy code is correct and the environment appears broken, speak up and let the reviewer know. The cronos staging environment has issues sometimes. That's fine, but you need to flag it rather than pretending everything is working.
