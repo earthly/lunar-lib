@@ -1,0 +1,102 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Cloud Native / Infrastructure
+# ============================================================================
+
+collectors:
+  # --- Language collectors (only trigger when language is detected) ---
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/java@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+
+  # --- Infrastructure ---
+  - uses: github://earthly/lunar-lib/collectors/k8s@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/terraform@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/docker@v1.0.5
+
+  # --- Security scanners ---
+  - uses: github://earthly/lunar-lib/collectors/trivy@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/checkov@main
+
+  # --- CI context ---
+  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
+
+policies:
+  # --- Container ---
+  - uses: github://earthly/lunar-lib/policies/container@v1.0.5
+    enforcement: report-pr
+    include:
+      - no-latest
+
+  - uses: github://earthly/lunar-lib/policies/container@v1.0.5
+    enforcement: score
+    include:
+      - healthcheck
+      - user
+      - stable-tags
+      - build-tagged
+
+  # --- Kubernetes ---
+  - uses: github://earthly/lunar-lib/policies/k8s@v1.0.5
+    enforcement: score
+    include:
+      - requests-and-limits
+      - probes
+      - valid
+      - pdb
+      - non-root
+      - min-replicas
+
+  # --- Terraform ---
+  - uses: github://earthly/lunar-lib/policies/terraform@v1.0.5
+    enforcement: score
+    include:
+      - provider-versions-pinned
+      - remote-backend
+      - module-versions-pinned
+      - min-provider-versions
+    with:
+      min_provider_versions: '{"aws": "5.0"}'
+
+  # --- General IaC ---
+  - uses: github://earthly/lunar-lib/policies/iac@v1.0.5
+    enforcement: score
+    include:
+      - valid
+      - datastore-destroy-protection
+
+  # --- IaC scanning ---
+  - uses: github://earthly/lunar-lib/policies/iac-scan@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  # --- Container scanning ---
+  - uses: github://earthly/lunar-lib/policies/container-scan@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  # --- CI hygiene ---
+  - uses: github://earthly/lunar-lib/policies/ci@main
+    enforcement: score
+    include:
+      - lint-clean
+      - dependencies-pinned
+      - no-mutable-refs

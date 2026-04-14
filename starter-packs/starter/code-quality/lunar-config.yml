@@ -1,0 +1,191 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Code Quality & Standards
+# ============================================================================
+
+collectors:
+  # --- Language collectors (only trigger when language is detected) ---
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/java@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+
+  # --- Repo health ---
+  - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
+  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+
+  # --- Quality tools ---
+  - uses: github://earthly/lunar-lib/collectors/codecov@v1.0.5
+
+policies:
+  # --- Repo standards ---
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
+    enforcement: score
+    include:
+      - readme-exists
+      - codeowners-exists
+      - codeowners-valid
+      - codeowners-catchall
+      - codeowners-min-owners
+      - gitignore-exists
+      - license-exists
+      - readme-min-line-count
+      - editorconfig-exists
+      - security-exists
+      - contributing-exists
+
+  # --- Testing ---
+  - uses: github://earthly/lunar-lib/policies/testing@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - passing
+      - coverage-collected
+      - coverage-reported
+
+  # --- Linting ---
+  - uses: github://earthly/lunar-lib/policies/linter@v1.0.5
+    enforcement: score
+    include:
+      - ran
+
+  # --- Dependencies ---
+  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+    enforcement: score
+    include:
+      - min-versions
+    with:
+      min_versions: '{"react": "18.0", "express": "4.18"}'
+  - uses: github://earthly/lunar-lib/policies/dependencies@v1.0.5
+    enforcement: score
+    include:
+      - min-versions
+    with:
+      min_versions: '{"django": "4.2", "flask": "3.0"}'
+
+  # --- VCS ---
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Language-specific guardrails ---
+
+  # Go
+  - uses: github://earthly/lunar-lib/policies/golang@v1.0.5
+    enforcement: score
+    include:
+      - go-mod-exists
+      - go-sum-exists
+      - min-go-version
+      - tests-recursive
+    with:
+      min_go_version: "1.21"
+
+  # Java
+  - uses: github://earthly/lunar-lib/policies/java@v1.0.5
+    enforcement: score
+    include:
+      - build-tool-wrapper-exists
+      - min-java-version
+      - tests-all-modules
+    with:
+      min_java_version: "17"
+
+  # Node.js
+  - uses: github://earthly/lunar-lib/policies/nodejs@v1.0.5
+    enforcement: score
+    include:
+      - lockfile-exists
+      - typescript-configured
+      - engines-pinned
+      - min-node-version
+    with:
+      min_node_version: "18"
+
+  # Python
+  - uses: github://earthly/lunar-lib/policies/python@v1.0.5
+    enforcement: score
+    include:
+      - lockfile-exists
+      - linter-configured
+      - min-python-version
+    with:
+      min_python_version: "3.9"
+
+  # Rust
+  - uses: github://earthly/lunar-lib/policies/rust@v1.0.5
+    enforcement: score
+    include:
+      - cargo-toml-exists
+      - cargo-lock-exists
+      - min-rust-edition
+      - clippy-clean
+    with:
+      min_rust_edition: "2021"
+
+  # PHP
+  - uses: github://earthly/lunar-lib/policies/php@v1.0.5
+    enforcement: score
+    include:
+      - composer-json-exists
+      - composer-lock-exists
+      - phpunit-configured
+      - static-analysis-configured
+      - min-version
+    with:
+      min_version: "8.1"
+
+  # C/C++
+  - uses: github://earthly/lunar-lib/policies/cpp@main
+    enforcement: score
+    include:
+      - build-system-exists
+      - min-cpp-standard
+      - cppcheck-clean
+    with:
+      min_cpp_standard: "17"
+
+  # .NET
+  - uses: github://earthly/lunar-lib/policies/dotnet@main
+    enforcement: score
+    include:
+      - project-file-exists
+      - target-framework-set
+      - dependencies-locked
+      - test-project-exists
+    with:
+      min_sdk_version: "8.0"
+
+  # Shell
+  - uses: github://earthly/lunar-lib/policies/shell@main
+    enforcement: score
+    include:
+      - shellcheck-clean
+
+  # Ruby
+  - uses: github://earthly/lunar-lib/policies/ruby@main
+    enforcement: score
+    include:
+      - gemfile-exists
+      - lockfile-exists
+      - ruby-version-set
+      - bundler-audit-clean
+    with:
+      min_ruby_version: "3.1"
+
+  # HTML/CSS
+  - uses: github://earthly/lunar-lib/policies/html@main
+    enforcement: score
+    include:
+      - htmlhint-clean
+      - stylelint-clean
