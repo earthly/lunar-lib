@@ -491,6 +491,83 @@ with Check("lenient-check") as c:
     c.assert_greater_or_equal(replicas, 3, f"Need 3 replicas, found {replicas}")
 ```
 
+## Technology Detection: Skip vs Fail
+
+When a technology collector writes nothing (because the technology isn't present — see [Collector Reference: Write Nothing](collector-reference.md#9-write-nothing-when-technology-not-detected)), the corresponding policies must resolve to a **terminal state** — skip or fail — never be left pending.
+
+### The Problem: Pending Leak
+
+Policies that use `get_value()` or `exists()` on absent collector data raise `NoDataError`, which the `Check` context manager converts to **pending**. But if the collector already finished and simply wrote nothing (technology not detected), pending is the wrong end state — the check should resolve to skip or fail.
+
+### The Fix: `get_value_or_default`
+
+Use `get_value_or_default(".", None)` to detect absent collector data and resolve explicitly:
+
+```python
+def main(node=None):
+    c = Check("my-check", "Description", node=node)
+    with c:
+        data = c.get_node(".lang.go").get_value_or_default(".", None)
+        if data is None:
+            c.skip("Not a Go project")
+            return c
+        # ... proceed with assertions on the data ...
+    return c
+```
+
+`get_value_or_default` catches both `ValueError` and `NoDataError`, returning the default when data is absent — regardless of whether collectors are still running.
+
+### Decision Rules
+
+| Situation | Action | Example |
+|-----------|--------|---------|
+| Wrong tech stack — collector never ran for this technology | `c.skip(reason)` | Go policy on a Python repo |
+| Right tech stack, optional feature/tool not in use | `c.skip(reason)` | AI CLI policy when no CLI usage detected in CI |
+| Technology confirmed present, required sub-data missing | `c.fail(reason)` | Go project with no test coverage data |
+| Required artifact should exist for all components | `c.assert_exists(path, msg)` | SAST scanner should run in every CI pipeline |
+| Nothing to check, absence is acceptable | `return c` (pass) | No containers found — pass, not skip |
+
+**Rule of thumb:** Skip = "this check doesn't apply to this component" (applicability). Fail = "this check applies and the component doesn't meet it" (violation).
+
+### Examples from Existing Policies
+
+**Skip — wrong tech stack:**
+```python
+# From: policies/ai/instruction_file_exists.py
+instructions = c.get_node(".ai.instructions")
+instr_data = instructions.get_value_or_default(".", None)
+if instr_data is None:
+    c.skip("No instruction file data collected — enable the ai collector")
+    return c
+```
+
+**Skip — optional feature not detected:**
+```python
+# From: policies/claude/cli_structured_output.py
+cmds_node = c.get_node(".ai.native.claude.cicd.cmds")
+cmds_list = cmds_node.get_value_or_default(".", None)
+if cmds_list is None:
+    c.skip("No Claude CLI usage detected in CI")
+    return c
+```
+
+**Fail — data absence IS the violation:**
+```python
+# From: policies/sast/executed.py
+# First skip if no programming language at all, then fail if SAST missing
+if not c.get_node(".lang").exists():
+    c.skip("No programming language detected in this component")
+c.assert_exists(".sast", "No SAST scanning data found. Ensure a scanner is configured.")
+```
+
+**Pass — absence is acceptable:**
+```python
+# From: policies/container/no_latest.py
+definitions = c.get_node(".containers.definitions")
+if not definitions.exists():
+    return  # No containers — nothing to check, passes silently
+```
+
 ## Environment Variables
 
 Policies have access to these environment variables:

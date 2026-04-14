@@ -620,25 +620,24 @@ find . -name '*.tf' -type f | \
 
 ### Pattern 6: Graceful Degradation
 
-Handle missing data or errors gracefully.
+Handle missing data or errors gracefully. When the technology isn't detected, write nothing and exit cleanly (see [Best Practice 9](#9-write-nothing-when-technology-not-detected)).
 
 ```bash
 #!/bin/bash
 set -e
 
-# Check for required tools/files
+# Technology not detected → write nothing, exit cleanly
 if ! command -v yq &> /dev/null; then
   echo "yq not installed, skipping collection"
   exit 0
 fi
 
 if [ ! -f config.yaml ]; then
-  lunar collect -j ".config.exists" false
-  exit 0
+  exit 0  # No config found — write nothing
 fi
 
-# Proceed with collection
-lunar collect -j ".config.exists" true
+# Technology detected — proceed with collection
+lunar collect -j ".config" '{"exists": true, "valid": true}'
 # ... more collection ...
 ```
 
@@ -987,3 +986,38 @@ Many collectors either **detect a tool running in CI** or **auto-run a tool** th
 3. **Normalized paths** (e.g., `.sca.vulnerabilities`, `.testing.coverage`) remain tool-agnostic—any source can populate them.
 
 See `collectors/golang/cicd.sh` for a reference implementation of the `.cicd` pattern.
+
+### 9. Write Nothing When Technology Not Detected
+
+When a technology collector determines its technology is **not present** in the component, it should **write nothing** and `exit 0` — not write placeholder data like `{ "detected": false }` or `{ "config_exists": false }`.
+
+**Object presence in the Component JSON IS the signal.** If a Go collector writes nothing, policies know Go isn't present because `.lang.go` doesn't exist. Writing placeholder data creates ambiguity — policies then need to distinguish between "collector ran but found nothing" and "collector found something" rather than simply checking for data presence.
+
+```bash
+# CORRECT: Technology not detected → write nothing, exit cleanly
+if [[ ! -f "go.mod" ]]; then
+    echo "No go.mod found, exiting"
+    exit 0
+fi
+# Technology confirmed — proceed with collection
+lunar collect -j ".lang.go.version" "$GO_VERSION"
+```
+
+```bash
+# CORRECT: CI hook with no matching command → write nothing
+if [ -z "$LUNAR_CI_COMMAND" ]; then
+  exit 0
+fi
+# Command detected — collect it
+echo "[$JSON]" | lunar collect -j ".ai_use.cicd.cmds" -
+```
+
+```bash
+# WRONG: Don't write placeholder data for undetected technologies
+if [[ ! -f "go.mod" ]]; then
+    lunar collect -j ".lang.go.detected" false  # ❌ Don't do this
+    exit 0
+fi
+```
+
+This convention pairs with policy-side handling: policies use `get_value_or_default(".", None)` to detect absent collector data and resolve to **skip** or **fail** — never left **pending**. See the [Policy Reference — Technology Detection: Skip vs Fail](policy-reference.md#technology-detection-skip-vs-fail) for the full decision rules.
