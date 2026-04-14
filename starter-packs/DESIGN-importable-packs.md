@@ -24,7 +24,7 @@ with other packs.
 |------|--------|-----------------|
 | `baseline` | Repo hygiene, languages, testing | repo-boilerplate, testing, linter, all language policies. Day-1 zero-config pack that almost everyone should have. As new language plugins are added, they automatically get included here. |
 | `security` | Vulnerability scanning, secrets, supply chain | secrets, sca, sast, container-scan, sbom |
-| `iac` | Infrastructure as code | k8s, terraform, docker, container, github-actions, ci |
+| `infra` | Infrastructure as code | k8s, terraform, docker, container, github-actions, ci |
 | `ai` | AI development practices | ai, claude, codex, gemini, coderabbit |
 | `soc2` | SOC2 / compliance | vcs (branch protection, approvals), audit trail, access controls |
 
@@ -172,17 +172,17 @@ them freely without hitting conflicts:
 
 | Policy | Owner pack | Deliberately excluded from |
 |--------|-----------|---------------------------|
-| secrets | security | baseline, ai, iac |
+| secrets | security | baseline, ai, infra |
 | sca, sast, sbom | security | baseline |
-| container, container-scan | iac | security |
-| k8s, terraform, ci | iac | (unique to iac) |
+| container, container-scan | infra | security |
+| k8s, terraform, ci | infra | (unique to infra) |
 | vcs (branch protection) | soc2 | security, baseline |
-| repo-boilerplate | baseline | security, iac |
-| testing, linter | baseline | security, iac |
-| language policies (go, java, ...) | baseline | security, iac |
+| repo-boilerplate | baseline | security, infra |
+| testing, linter | baseline | security, infra |
+| language policies (go, java, ...) | baseline | security, infra |
 | ai, claude, codex, gemini | ai | (unique to ai) |
 
-With clean ownership, the basic packs (`baseline + security + iac + ai`) have
+With clean ownership, the basic packs (`baseline + security + infra + ai`) have
 **zero policy overlap**. A user can import all four and never encounter a
 conflict. This should cover day-1 through month-6 for most teams.
 
@@ -232,10 +232,10 @@ The soc2 pack only declares the policies it adds beyond what security provides
 packs:
   - uses: packs/baseline@v1
   - uses: packs/soc2@v1          # automatically imports security
-  - uses: packs/iac@v1
+  - uses: packs/infra@v1
 ```
 
-Three lines. The user gets baseline + security + soc2 + iac without knowing
+Three lines. The user gets baseline + security + soc2 + infra without knowing
 that soc2 depends on security.
 
 **Where this gets interesting:** What happens when `soc2` and a future `pii`
@@ -388,12 +388,12 @@ Three lines. Still zero overlap — AI pack only contains AI-specific policies.
 packs:
   - uses: github://earthly/lunar-lib/packs/baseline@v1
   - uses: github://earthly/lunar-lib/packs/security@v1
-  - uses: github://earthly/lunar-lib/packs/iac@v1
+  - uses: github://earthly/lunar-lib/packs/infra@v1
     with:
       container.no-latest: report-pr  # stricter for container images
 ```
 
-IAC adds k8s, terraform, docker checks. One override to tighten container
+Infra adds k8s, terraform, docker checks. One override to tighten container
 image tagging.
 
 ### Example 4: Compliance team, month 6
@@ -402,7 +402,7 @@ image tagging.
 packs:
   - uses: github://earthly/lunar-lib/packs/baseline@v1
   - uses: github://earthly/lunar-lib/packs/soc2@v1     # depends on security, pulls it in
-  - uses: github://earthly/lunar-lib/packs/iac@v1
+  - uses: github://earthly/lunar-lib/packs/infra@v1
 ```
 
 SOC2 pack declares `depends: [security@v1]`, so importing soc2 automatically
@@ -497,7 +497,7 @@ use SNYK_TOKEN for enhanced SCA.
 - `container-scan` — executed, max-severity (min: critical)
 - `sbom` — sbom-exists, has-licenses
 
-### iac
+### infra
 
 Infrastructure as code, container best practices, CI/CD security.
 
@@ -509,7 +509,7 @@ Infrastructure as code, container best practices, CI/CD security.
 - `container` — no-latest, user, healthcheck, stable-tags
 - `k8s` — k8s-specific checks
 - `terraform` — terraform-specific checks
-- `iac` / `iac-scan` — infrastructure scanning
+- `iac` / `iac-scan` (IaC policies) — infrastructure scanning
 - `github-actions` — no-script-injection, permissions, checkout safety
 - `ci` — CI pipeline checks
 
@@ -544,7 +544,7 @@ rather than duplicating them. Adds compliance-specific policies on top.
 
 Where packs share collectors or policies, and who should own what:
 
-| Resource | baseline | security | iac | ai | soc2 (depends on security) |
+| Resource | baseline | security | infra | ai | soc2 (depends on security) |
 |----------|----------|----------|-----|-----|---------------------------|
 | Language collectors | ✅ owns | — | — | — | — |
 | gitleaks collector | — | ✅ owns | — | — | 🔗 inherited |
@@ -563,7 +563,7 @@ Where packs share collectors or policies, and who should own what:
 
 **Key overlap points:**
 - `gitleaks` collector: security owns, soc2 inherits via dependency → collector dedup (auto, safe)
-- `github` collector: baseline owns, iac/soc2 also declare → collector dedup (auto, safe)
+- `github` collector: baseline owns, infra/soc2 also declare → collector dedup (auto, safe)
 - `secrets` policy: security owns it. soc2 depends on security and inherits
   the collectors but declares its own policies — no policy duplication.
 
