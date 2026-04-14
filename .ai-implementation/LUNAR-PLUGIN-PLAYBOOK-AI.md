@@ -469,8 +469,9 @@ All of these are **required** and must be attached to the PR:
    1. Read Grafana credentials from `~/.bender/grafana-credentials`
    2. Navigate to `https://cronos.demo.earthly.dev/login` and log in
    3. Navigate to each dashboard URL (query `/api/search?type=dash-db` for dashboard UIDs — they differ between environments)
-   4. For JSON page: click tree nodes to expand your data section, then screenshot
-   5. For component details: scroll to the policy checks section showing your checks, then screenshot
+   4. **Wait for tables and panels to fully load before taking any screenshot.** Grafana dashboards load data asynchronously — tables may appear empty or show a loading spinner for several seconds after the page itself has loaded. After `waitForLoadState('networkidle')`, add an additional wait (5-8 seconds) and verify that the table/panel you need is actually populated before capturing. A screenshot of an empty or loading table is not valid evidence.
+   5. For JSON page: click tree nodes to expand your data section, then screenshot
+   6. For component details: scroll to the policy checks section showing your checks, then screenshot
 
    Upload screenshots to the PR comment as image attachments — they serve as proof that the plugin works end-to-end.
 
@@ -507,7 +508,7 @@ After testing and validating in the UI (see step 5 above), post a PR comment wit
 
 **What makes evidence valid vs. invalid:**
 - Valid: checks show green/red results, JSON tree has your data, no errors from your plugin
-- Invalid: pending checks (yellow), stale checks (asterisk), missing JSON sections, empty tables, error banners from your collector/policy, broken UI
+- Invalid: pending checks (yellow), stale checks (asterisk), missing JSON sections, empty tables, tables still loading/rendering, error banners from your collector/policy, broken UI. If a table appears empty, confirm it has finished loading — Grafana panels render asynchronously and may still be fetching data.
 - If the environment is broken and you can't get valid evidence, say so explicitly — don't post screenshots of broken state and call it done
 
 ### A note on unit tests
