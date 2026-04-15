@@ -40,7 +40,7 @@ Before running a release, verify:
 | `main` is up to date | `git pull origin main` |
 | Working tree is clean | `git status --porcelain` → empty |
 | HEAD is what you want to release | `git log --oneline -5` — confirm the latest commits are what the human expects |
-| No existing branch/tag for this version | `git tag -l vX.Y.Z` and `git branch -l vX.Y.Z` → empty |
+| No existing branch/tag for this version | `git tag -l vX.Y.Z`, `git branch -a \| grep vX.Y.Z`, and `git ls-remote --refs origin \| grep vX.Y.Z` → all empty |
 | CI is green on main | `gh pr checks` or check the latest workflow run on main |
 
 ### Version numbering
@@ -80,7 +80,7 @@ cd /path/to/lunar-lib    # must be repo root
 
 The script handles everything:
 
-1. **Validates** the version format (must match `v[0-9]+.[0-9]+.[0-9]+`)
+1. **Validates** the version format (must match `^v[0-9]+\.[0-9]+\.[0-9]+$`)
 2. **Checks** working tree is clean, no duplicate branch/tag
 3. **Creates** local branch `vX.Y.Z`
 4. **Rewrites manifests** — all `lunar-*.yml` files: changes `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
@@ -165,6 +165,8 @@ After CI passes and images are verified, create a GitHub Release to document wha
    )"
    ```
 
+   **Note:** The `EOF` delimiter must be at column 0 (no leading spaces) or bash won't recognize it.
+
    Omit empty sections. Link PR numbers where applicable.
 
 ### Step 6: Notify
@@ -245,8 +247,9 @@ On `main` branch only, CI also pushes images tagged with the short git SHA (firs
 | `EARTHLY_TOKEN` | Earthly Cloud auth for builds |
 | `DOCKERHUB_USERNAME` | Docker Hub login |
 | `DOCKERHUB_TOKEN` | Docker Hub auth |
+| `SLACK_BOT_TOKEN` | Slack bot token for posting to #team-eng (agent runtime env, not a GitHub secret) |
 
-These are already configured — you don't need to set them up.
+The CI secrets (`EARTHLY_TOKEN`, Docker Hub) are configured in GitHub repo settings. `SLACK_BOT_TOKEN` is an agent runtime credential available in the agent's shell environment.
 
 ---
 
