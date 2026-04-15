@@ -81,6 +81,7 @@ If someone asks you to do something code-related and you're not sure what they m
      - If triggered from Slack, add the person who asked
   2. That reviewer will then add additional reviewers when they think the PR looks good. Do NOT add extra reviewers yourself.
   - People: Nacho=`idelvall`, Brandon=`brandonSc`, Vlad=`vladaionescu`, Corey=`dchw`, Mike=`mikejholly`
+- **Merge after approvals:** Once all assigned reviewers have approved, merge the PR immediately (squash merge for lunar-lib). Don't wait for an explicit "merge it" instruction — approval IS the merge signal.
 
 ## After a PR is Merged
 

@@ -44,6 +44,16 @@ collectors:
         name: docker
     keywords: ["docker build", "docker push", "container build", "image tags", "build labels", "ci builds"]
 
+  - name: hadolint
+    description: |
+      Lints all Dockerfiles using hadolint and collects the results. Writes raw
+      hadolint output to .containers.native.hadolint and normalized lint results
+      to .containers.lint_results for policy evaluation.
+    mainBash: hadolint.sh
+    hook:
+      type: code
+    keywords: ["hadolint", "dockerfile lint", "dockerfile best practices", "docker lint", "container lint"]
+
 inputs:
   find_command:
     description: Command to find Dockerfiles (must output one file path per line)
@@ -78,6 +88,19 @@ example_component_json: |
           }
         }
       ],
+      "lint_results": [
+        {
+          "path": "Dockerfile",
+          "issues": [
+            {
+              "line": 5,
+              "rule": "DL3008",
+              "severity": "warning",
+              "message": "Pin versions in apt get install."
+            }
+          ]
+        }
+      ],
       "builds": [
         {
           "cmd": "docker build -t myregistry.io/app:v1.2.3 --label git_sha=abc123 -f Dockerfile.prod .",
@@ -99,6 +122,23 @@ example_component_json: |
             ],
             "source": {"tool": "docker", "integration": "ci"}
           }
+        },
+        "hadolint": {
+          "source": {
+            "tool": "hadolint",
+            "version": "2.12.0",
+            "integration": "auto"
+          },
+          "report": [
+            {
+              "line": 5,
+              "code": "DL3008",
+              "level": "warning",
+              "message": "Pin versions in apt get install.",
+              "file": "Dockerfile",
+              "column": 1
+            }
+          ]
         }
       }
     }
