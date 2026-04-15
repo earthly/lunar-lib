@@ -13,7 +13,12 @@ def main():
             return
 
         threshold_name = variable_or_default("hadolint_severity", "error").lower()
-        threshold = SEVERITY_ORDER.get(threshold_name, 0)
+        if threshold_name not in SEVERITY_ORDER:
+            valid = ", ".join(SEVERITY_ORDER.keys())
+            raise ValueError(
+                f"Invalid hadolint_severity '{threshold_name}'. Valid values: {valid}"
+            )
+        threshold = SEVERITY_ORDER[threshold_name]
 
         for result in lint_results:
             path = result.get_value(".path")

@@ -10,6 +10,7 @@ DOCKERFILES=$(eval "$FIND_CMD" 2>/dev/null | sed 's|^\./||' || true)
 
 if [ -z "$DOCKERFILES" ]; then
     echo "No Dockerfiles found — nothing to lint" >&2
+    echo "[]" | lunar collect -j ".containers.lint_results" -
     exit 0
 fi
 
@@ -19,10 +20,13 @@ HADOLINT_VERSION=$(cat /usr/local/bin/hadolint.version 2>/dev/null || echo "unkn
 # Run hadolint on all Dockerfiles with JSON output
 # Exit code 0 = clean, 1 = issues found, >1 = error
 EXIT_CODE=0
-RAW_OUTPUT=$(echo "$DOCKERFILES" | xargs hadolint --format json 2>/dev/null) || EXIT_CODE=$?
+RAW_OUTPUT=$(echo "$DOCKERFILES" | tr '\n' '\0' | xargs -0 hadolint --format json 2>/dev/null) || EXIT_CODE=$?
 
 if [ "$EXIT_CODE" -gt 1 ]; then
     echo "hadolint exited with unexpected code $EXIT_CODE" >&2
+    jq -n --arg code "$EXIT_CODE" \
+        '{source: {tool: "hadolint", integration: "auto"}, error: "hadolint exited unexpectedly", exit_code: ($code | tonumber)}' \
+        | lunar collect -j ".containers.native.hadolint" -
     exit 0
 fi
 
