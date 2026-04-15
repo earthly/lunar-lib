@@ -1,0 +1,80 @@
+version: 0
+
+name: pagerduty
+description: Collect on-call schedule and escalation data from PagerDuty
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "PagerDuty Collector"
+  long_description: |
+    Query the PagerDuty API to collect on-call schedule, escalation policy,
+    and current responder data. Normalizes results into the .oncall category
+    for tool-agnostic policy evaluation.
+  categories: ["operational-readiness"]
+  icon: "assets/pagerduty.svg"
+  status: "beta"
+  related:
+    - slug: "oncall"
+      type: "policy"
+      reason: "Enforces on-call schedule, escalation, and staffing standards"
+
+collectors:
+  - name: oncall
+    description: |
+      Queries the PagerDuty REST API for the configured service. Fetches
+      service details, on-call schedule participants, and escalation policy.
+      Writes normalized data to .oncall.service, .oncall.schedule,
+      .oncall.escalation, and .oncall.summary. Stores the raw API response
+      under .oncall.native.pagerduty.
+    mainBash: oncall.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"
+      clone-code: false
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
+
+inputs:
+  service_id:
+    description: PagerDuty service ID to query (e.g. PXXXXXX)
+  pagerduty_base_url:
+    description: PagerDuty API base URL
+    default: "https://api.pagerduty.com"
+
+secrets:
+  PAGERDUTY_API_KEY:
+    description: PagerDuty REST API key (read-only token with service and oncall scopes)
+
+example_component_json: |
+  {
+    "oncall": {
+      "source": {
+        "tool": "pagerduty",
+        "integration": "api"
+      },
+      "service": {
+        "id": "PXXXXXX",
+        "name": "Payment API",
+        "status": "active"
+      },
+      "schedule": {
+        "exists": true,
+        "participants": 4,
+        "rotation": "weekly"
+      },
+      "escalation": {
+        "exists": true,
+        "levels": 3,
+        "policy_name": "Payment API Escalation"
+      },
+      "summary": {
+        "has_oncall": true,
+        "has_escalation": true,
+        "min_participants": 4
+      },
+      "native": {
+        "pagerduty": { "...full PagerDuty API response..." }
+      }
+    }
+  }
