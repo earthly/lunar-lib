@@ -4,7 +4,7 @@ Parse Helm charts and collect chart metadata, lint results, and dependency infor
 
 ## Overview
 
-This collector finds all Helm charts in a repository (directories containing `Chart.yaml`) and extracts structured metadata. It runs `helm lint` on each chart, parses version information, checks for a `values.schema.json` file, and enumerates chart dependencies with their version constraints. The collector outputs normalized data under `.helm` for policy evaluation.
+This collector finds all Helm charts in a repository (directories containing `Chart.yaml`) and extracts structured metadata. It runs `helm lint` on each chart, parses version information, checks for a `values.schema.json` file, and enumerates chart dependencies with their version constraints. The collector outputs normalized data under `.k8s.helm` for policy evaluation.
 
 ## Collected Data
 
@@ -12,22 +12,22 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.helm.source` | object | Tool metadata (tool name and version) |
-| `.helm.charts[]` | array | Discovered Helm charts with metadata |
-| `.helm.charts[].path` | string | Chart directory path |
-| `.helm.charts[].name` | string | Chart name from Chart.yaml |
-| `.helm.charts[].version` | string | Chart version |
-| `.helm.charts[].version_is_semver` | boolean | Whether version follows semver |
-| `.helm.charts[].lint_passed` | boolean | Whether helm lint passed |
-| `.helm.charts[].lint_errors` | array | Lint error messages (empty if passed) |
-| `.helm.charts[].has_values_schema` | boolean | Whether values.schema.json exists |
-| `.helm.charts[].schema_path` | string | Path to values schema file |
-| `.helm.charts[].dependencies[]` | array | Chart dependencies from Chart.yaml |
-| `.helm.charts[].dependencies[].name` | string | Dependency name |
-| `.helm.charts[].dependencies[].version` | string | Version constraint |
-| `.helm.charts[].dependencies[].is_pinned` | boolean | Whether version is constrained (not `*` or empty) |
-| `.helm.native.helm.cicd.cmds[]` | array | Helm commands executed in CI |
-| `.helm.native.helm.cicd.source` | object | CI integration metadata |
+| `.k8s.helm.source` | object | Tool metadata (tool name and version) |
+| `.k8s.helm.charts[]` | array | Discovered Helm charts with metadata |
+| `.k8s.helm.charts[].path` | string | Chart directory path |
+| `.k8s.helm.charts[].name` | string | Chart name from Chart.yaml |
+| `.k8s.helm.charts[].version` | string | Chart version |
+| `.k8s.helm.charts[].version_is_semver` | boolean | Whether version follows semver |
+| `.k8s.helm.charts[].lint_passed` | boolean | Whether helm lint passed |
+| `.k8s.helm.charts[].lint_errors` | array | Lint error messages (empty if passed) |
+| `.k8s.helm.charts[].has_values_schema` | boolean | Whether values.schema.json exists |
+| `.k8s.helm.charts[].schema_path` | string | Path to values schema file |
+| `.k8s.helm.charts[].dependencies[]` | array | Chart dependencies from Chart.yaml |
+| `.k8s.helm.charts[].dependencies[].name` | string | Dependency name |
+| `.k8s.helm.charts[].dependencies[].version` | string | Version constraint |
+| `.k8s.helm.charts[].dependencies[].is_pinned` | boolean | Whether version is constrained (not `*` or empty) |
+| `.k8s.helm.native.helm.cicd.cmds[]` | array | Helm commands executed in CI |
+| `.k8s.helm.native.helm.cicd.source` | object | CI integration metadata |
 
 ## Collectors
 

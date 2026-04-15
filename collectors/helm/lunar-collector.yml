@@ -58,46 +58,48 @@ inputs:
 
 example_component_json: |
   {
-    "helm": {
-      "source": {
-        "tool": "helm",
-        "version": "3.14.0"
-      },
-      "charts": [
-        {
-          "path": "charts/api",
-          "name": "api",
-          "version": "1.2.3",
-          "app_version": "2.0.0",
-          "version_is_semver": true,
-          "lint_passed": true,
-          "lint_errors": [],
-          "has_values_schema": true,
-          "schema_path": "charts/api/values.schema.json",
-          "dependencies": [
-            {
-              "name": "postgresql",
-              "version": "~11.9.0",
-              "repository": "https://charts.bitnami.com/bitnami",
-              "is_pinned": true
-            },
-            {
-              "name": "redis",
-              "version": "*",
-              "repository": "https://charts.bitnami.com/bitnami",
-              "is_pinned": false
+    "k8s": {
+      "helm": {
+        "source": {
+          "tool": "helm",
+          "version": "3.14.0"
+        },
+        "charts": [
+          {
+            "path": "charts/api",
+            "name": "api",
+            "version": "1.2.3",
+            "app_version": "2.0.0",
+            "version_is_semver": true,
+            "lint_passed": true,
+            "lint_errors": [],
+            "has_values_schema": true,
+            "schema_path": "charts/api/values.schema.json",
+            "dependencies": [
+              {
+                "name": "postgresql",
+                "version": "~11.9.0",
+                "repository": "https://charts.bitnami.com/bitnami",
+                "is_pinned": true
+              },
+              {
+                "name": "redis",
+                "version": "*",
+                "repository": "https://charts.bitnami.com/bitnami",
+                "is_pinned": false
+              }
+            ]
+          }
+        ],
+        "native": {
+          "helm": {
+            "cicd": {
+              "cmds": [
+                {"cmd": "helm upgrade --install api ./charts/api -f values-prod.yaml", "version": "3.14.0"},
+                {"cmd": "helm template api ./charts/api", "version": "3.14.0"}
+              ],
+              "source": {"tool": "helm", "integration": "ci"}
             }
-          ]
-        }
-      ],
-      "native": {
-        "helm": {
-          "cicd": {
-            "cmds": [
-              {"cmd": "helm upgrade --install api ./charts/api -f values-prod.yaml", "version": "3.14.0"},
-              {"cmd": "helm template api ./charts/api", "version": "3.14.0"}
-            ],
-            "source": {"tool": "helm", "integration": "ci"}
           }
         }
       }

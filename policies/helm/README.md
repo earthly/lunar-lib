@@ -23,13 +23,13 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.helm.charts[]` | array | `helm` collector |
-| `.helm.charts[].lint_passed` | boolean | `helm` collector |
-| `.helm.charts[].lint_errors` | array | `helm` collector |
-| `.helm.charts[].version` | string | `helm` collector |
-| `.helm.charts[].version_is_semver` | boolean | `helm` collector |
-| `.helm.charts[].has_values_schema` | boolean | `helm` collector |
-| `.helm.charts[].dependencies[]` | array | `helm` collector |
+| `.k8s.helm.charts[]` | array | `helm` collector |
+| `.k8s.helm.charts[].lint_passed` | boolean | `helm` collector |
+| `.k8s.helm.charts[].lint_errors` | array | `helm` collector |
+| `.k8s.helm.charts[].version` | string | `helm` collector |
+| `.k8s.helm.charts[].version_is_semver` | boolean | `helm` collector |
+| `.k8s.helm.charts[].has_values_schema` | boolean | `helm` collector |
+| `.k8s.helm.charts[].dependencies[]` | array | `helm` collector |
 
 **Note:** Ensure the `helm` collector is configured before enabling this policy.
 
@@ -57,26 +57,28 @@ A compliant chart with proper versioning, lint results, schema, and pinned depen
 
 ```json
 {
-  "helm": {
-    "charts": [
-      {
-        "path": "charts/api",
-        "name": "api",
-        "version": "1.2.3",
-        "version_is_semver": true,
-        "lint_passed": true,
-        "lint_errors": [],
-        "has_values_schema": true,
-        "schema_path": "charts/api/values.schema.json",
-        "dependencies": [
-          {
-            "name": "postgresql",
-            "version": "~11.9.0",
-            "is_pinned": true
-          }
-        ]
-      }
-    ]
+  "k8s": {
+    "helm": {
+      "charts": [
+        {
+          "path": "charts/api",
+          "name": "api",
+          "version": "1.2.3",
+          "version_is_semver": true,
+          "lint_passed": true,
+          "lint_errors": [],
+          "has_values_schema": true,
+          "schema_path": "charts/api/values.schema.json",
+          "dependencies": [
+            {
+              "name": "postgresql",
+              "version": "~11.9.0",
+              "is_pinned": true
+            }
+          ]
+        }
+      ]
+    }
   }
 }
 ```
@@ -87,25 +89,27 @@ A chart with lint errors, non-semver version, no schema, and unpinned dependenci
 
 ```json
 {
-  "helm": {
-    "charts": [
-      {
-        "path": "charts/app",
-        "name": "app",
-        "version": "latest",
-        "version_is_semver": false,
-        "lint_passed": false,
-        "lint_errors": ["templates/deployment.yaml: error converting YAML to JSON"],
-        "has_values_schema": false,
-        "dependencies": [
-          {
-            "name": "redis",
-            "version": "*",
-            "is_pinned": false
-          }
-        ]
-      }
-    ]
+  "k8s": {
+    "helm": {
+      "charts": [
+        {
+          "path": "charts/app",
+          "name": "app",
+          "version": "latest",
+          "version_is_semver": false,
+          "lint_passed": false,
+          "lint_errors": ["templates/deployment.yaml: error converting YAML to JSON"],
+          "has_values_schema": false,
+          "dependencies": [
+            {
+              "name": "redis",
+              "version": "*",
+              "is_pinned": false
+            }
+          ]
+        }
+      ]
+    }
   }
 }
 ```
