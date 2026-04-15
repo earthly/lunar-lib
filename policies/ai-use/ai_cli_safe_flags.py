@@ -27,13 +27,15 @@ def get_dangerous_flags():
 def main(node=None):
     c = Check("ai-cli-safe-flags", "AI CLI tools in CI should not use dangerous permission-bypassing flags", node=node)
     with c:
-        cmds = c.get_node(".ai_use.cicd.cmds")
-        if not cmds.exists():
+        cmds_node = c.get_node(".ai_use.cicd.cmds")
+        cmds_data = cmds_node.get_value_or_default(".", None)
+        if cmds_data is None:
             c.skip("No AI CLI usage detected in CI")
+            return c
 
         dangerous_flags = get_dangerous_flags()
 
-        for entry in cmds:
+        for entry in cmds_node:
             tool = entry.get_value(".tool")
             cmd = entry.get_value(".cmd")
             flags_to_check = dangerous_flags.get(tool, [])

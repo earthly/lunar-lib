@@ -1,0 +1,67 @@
+version: 0
+
+name: coderabbit
+description: Detect CodeRabbit code review activity and configuration
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "CodeRabbit Collector"
+  long_description: |
+    Detects CodeRabbit AI code review activity on pull requests by querying
+    GitHub check-runs API, and collects CodeRabbit configuration files.
+    Writes to normalized ai.code_reviewers[] for tool-agnostic policy checks,
+    plus tool-specific data in ai.native.coderabbit.
+  category: "code-analysis"
+  icon: "assets/coderabbit.svg"
+  status: "experimental"
+  related:
+    - slug: "ai"
+      type: "policy"
+      reason: "Enforces code reviewer presence using collected data"
+
+collectors:
+  - name: code-reviewer
+    description: |
+      Detects CodeRabbit check-runs on pull requests by querying the GitHub
+      check-runs API for the coderabbitai app. Waits for scan completion and
+      writes a normalized entry to ai.code_reviewers[].
+    mainBash: code-reviewer.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["coderabbit", "code review", "ai review", "pull request"]
+
+  - name: config
+    description: |
+      Detects CodeRabbit configuration files (.coderabbit.yaml or .coderabbit.yml)
+      in the repository root. Records config file presence and path.
+    mainBash: config.sh
+    hook:
+      type: code
+    keywords: ["coderabbit", "config", "yaml", "configuration"]
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for code-reviewer collector)
+
+example_component_json: |
+  {
+    "ai": {
+      "code_reviewers": [
+        {
+          "tool": "coderabbit",
+          "check_name": "coderabbitai",
+          "detected": true,
+          "last_seen": "2024-01-15T10:30:00Z"
+        }
+      ],
+      "native": {
+        "coderabbit": {
+          "config_file": ".coderabbit.yaml",
+          "config_exists": true
+        }
+      }
+    }
+  }

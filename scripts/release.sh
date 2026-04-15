@@ -47,6 +47,17 @@ if grep -r 'earthly/lunar-lib:.*-main' --include='lunar-*.yml' .; then
     exit 1
 fi
 
+echo "Rewriting starter-pack refs → @$VERSION..."
+while IFS= read -r -d '' file; do
+    "${SED_INPLACE[@]}" "s|github://earthly/lunar-lib/\([^@]*\)@[^[:space:]]*|github://earthly/lunar-lib/\1@${VERSION}|g" "$file"
+done < <(find . -path '*/starter-packs/*' -name '*.yml' -print0)
+
+# Verify all starter-pack refs now point at the target version
+if grep -E 'github://earthly/lunar-lib/[^@]+@' ./starter-packs/ -r --include='*.yml' | grep -v "@${VERSION}"; then
+    echo "ERROR: found starter-pack references not pinned to $VERSION" >&2
+    exit 1
+fi
+
 git add -A
 git commit -m "Pin images for $VERSION"
 

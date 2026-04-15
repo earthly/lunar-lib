@@ -1,212 +1,122 @@
-name: Claude Auto-Approve
+name: Auto-Approve
 
 on:
-  pull_request:
-    types: [opened, ready_for_review]
-    branches: [main]
+  check_run:
+    types: [completed]
 
 jobs:
-  claude-review:
-    name: claude-review
-    if: github.event.pull_request.draft == false
+  auto-approve:
+    name: auto-approve
+    if: |
+      github.event.check_run.name == 'Claude Code Review' &&
+      github.event.check_run.conclusion == 'neutral' &&
+      github.event.check_run.app.slug == 'claude'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
       contents: read
+      checks: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for git diff/log commands
-
-      - name: Setup git branches
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          # Fetch and checkout PR branch (using env vars to avoid shell injection)
-          git fetch origin "$PR_HEAD_REF"
-          git checkout "$PR_HEAD_REF"
-          
-          # Fetch base branch for comparison
-          git fetch origin "$PR_BASE_REF"
-
-      - name: Get PR context
-        id: pr-context
+      - name: Get review severity
+        id: severity
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get changed files
-          gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' > /tmp/files.txt
-          FILE_COUNT=$(wc -l < /tmp/files.txt | tr -d ' ')
-          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
-          
-          # Get diff stats
-          gh pr view ${{ github.event.pull_request.number }} --json additions,deletions,changedFiles \
-            --jq '"additions: \(.additions), deletions: \(.deletions), files: \(.changedFiles)"' > /tmp/stats.txt
+          SEVERITY=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
+            --jq '(.output.text // "") | split("bughunter-severity: ")[1] // "" | split(" -->")[0] // ""') || true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+          echo "Raw severity: $SEVERITY"
 
-      - name: Install Claude CLI
-        run: npm install -g @anthropic-ai/claude-code
+          if [ -z "$SEVERITY" ] || [ "$SEVERITY" = "null" ]; then
+            echo "No severity data found, skipping auto-approve"
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-      - name: Analyze with Claude
-        id: analyze
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          # Load file contents into env vars for template substitution
-          export PR_STATS="$(cat /tmp/stats.txt)"
-          export CHANGED_FILES="$(cat /tmp/files.txt)"
-          
-          # Hydrate prompt template with envsubst
-          envsubst < .github/prompts/auto-approve-review-prompt.md > /tmp/prompt.txt
-          
-          # Define JSON schema for structured output
-          JSON_SCHEMA='{
-            "type": "object",
-            "properties": {
-              "scope": { "type": "string", "enum": ["ISOLATED", "ISOLATED_SENSITIVE", "EXTENSIVE"] },
-              "scope_reasoning": { "type": "string" },
-              "major_issues": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "file": { "type": "string" },
-                    "line": { "type": "integer" },
-                    "issue": { "type": "string" }
-                  },
-                  "required": ["file", "issue"]
-                }
-              },
-              "medium_issues": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "file": { "type": "string" },
-                    "line": { "type": "integer" },
-                    "issue": { "type": "string" }
-                  },
-                  "required": ["file", "issue"]
-                }
-              },
-              "summary": { "type": "string" },
-              "recommendation": { "type": "string", "enum": ["APPROVE", "REVIEW_NEEDED"] }
-            },
-            "required": ["scope", "scope_reasoning", "major_issues", "medium_issues", "summary", "recommendation"]
-          }'
-          
-          # Run Claude CLI with JSON schema enforcement (using Opus for highest quality review)
-          # Allow only safe read-only git commands and file reading
-          # Read prompt from stdin using -p -
-          RESPONSE=$(claude -p - \
-            --model opus \
-            --output-format json \
-            --json-schema "$JSON_SCHEMA" \
-            --allowedTools "Bash(git diff*)" "Bash(git log*)" "Bash(git show*)" "Bash(git status*)" "Read" "Grep" "Glob" \
-            < /tmp/prompt.txt 2>&1) || true
-          
-          echo "Raw Claude Response:"
-          echo "$RESPONSE"
-          
-          # Check for errors in the response
-          IS_ERROR=$(echo "$RESPONSE" | jq -r '.is_error // false' 2>/dev/null || echo "false")
-          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.result // empty' 2>/dev/null || echo "")
-          
-          if [ "$IS_ERROR" = "true" ] || [ -z "$RESPONSE" ] || ! echo "$RESPONSE" | jq -e '.' > /dev/null 2>&1; then
-            echo "::error::Claude CLI error detected"
-            if [ -n "$ERROR_MSG" ]; then
-              echo "$ERROR_MSG"
-            fi
-            if [ -n "$RESPONSE" ]; then
-              echo "Raw response:"
-              echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
-            fi
-            exit 1
+          if ! echo "$SEVERITY" | jq -e . > /dev/null 2>&1; then
+            echo "Severity data is not valid JSON, skipping auto-approve"
+            echo "should_approve=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
-          
-          # Parse successful response (--json-schema puts output in .structured_output)
-          if echo "$RESPONSE" | jq -e '.structured_output' > /dev/null 2>&1; then
-            # With --json-schema, the structured output is directly in .structured_output
-            ANALYSIS=$(echo "$RESPONSE" | jq -c '.structured_output')
-          elif echo "$RESPONSE" | jq -e '.result' > /dev/null 2>&1; then
-            # Fallback to .result if structured_output not present
-            RESULT_RAW=$(echo "$RESPONSE" | jq -r '.result')
-            if echo "$RESULT_RAW" | jq -e '.' > /dev/null 2>&1; then
-              ANALYSIS="$RESULT_RAW"
-            else
-              ANALYSIS="{}"
-            fi
-          else
-            ANALYSIS="{}"
-          fi
-          
-          echo "Parsed Analysis:"
-          echo "$ANALYSIS" | jq '.' 2>/dev/null || echo "$ANALYSIS"
-          
-          # Validate we have the expected fields
-          if ! echo "$ANALYSIS" | jq -e '.recommendation' > /dev/null 2>&1; then
-            echo "::error::Invalid analysis format - missing required fields"
-            echo "Raw response:"
-            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
-            exit 1
-          fi
-          
-          # Extract fields
-          RECOMMENDATION=$(echo "$ANALYSIS" | jq -r '.recommendation // "REVIEW_NEEDED"')
-          SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "Unable to summarize"')
-          SCOPE=$(echo "$ANALYSIS" | jq -r '.scope // "EXTENSIVE"')
-          SCOPE_REASONING=$(echo "$ANALYSIS" | jq -r '.scope_reasoning // ""')
-          MAJOR_ISSUES=$(echo "$ANALYSIS" | jq -c '.major_issues // []')
-          MAJOR_ISSUES_COUNT=$(echo "$MAJOR_ISSUES" | jq 'length')
-          MEDIUM_ISSUES=$(echo "$ANALYSIS" | jq -c '.medium_issues // []')
-          MEDIUM_ISSUES_COUNT=$(echo "$MEDIUM_ISSUES" | jq 'length')
-          
-          # Set outputs
-          if [ "$RECOMMENDATION" = "APPROVE" ]; then
+
+          IMPORTANT=$(echo "$SEVERITY" | jq -r '.normal // 0 | floor')
+          NITS=$(echo "$SEVERITY" | jq -r '.nit // 0 | floor')
+
+          echo "Important issues: $IMPORTANT"
+          echo "Nits: $NITS"
+
+          if [ "$IMPORTANT" -eq 0 ]; then
             echo "should_approve=true" >> $GITHUB_OUTPUT
           else
             echo "should_approve=false" >> $GITHUB_OUTPUT
-            echo "Review needed: $SUMMARY"
-          fi
-          
-          # Build comment only for approvals
-          if [ "$RECOMMENDATION" = "APPROVE" ]; then
-            {
-              echo "## Claude Auto-Approve Review"
-              echo ""
-              echo "**Summary:** $SUMMARY"
-              echo ""
-              echo "**Scope:** $SCOPE"
-              echo "> $SCOPE_REASONING"
-              echo ""
-              echo "---"
-              echo "Conclusion: ✅ **Auto-approved** (isolated changes, no issues)"
-            } > /tmp/comment.txt
-            
-            cat /tmp/comment.txt
           fi
 
-      - name: Post approval comment
-        if: steps.analyze.outputs.should_approve == 'true'
+      - name: Find PR number
+        if: steps.severity.outputs.should_approve == 'true'
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat /tmp/comment.txt)"
+          CHECK_DATA=$(gh api repos/${{ github.repository }}/check-runs/${{ github.event.check_run.id }} \
+            --jq '{number: .pull_requests[0].number, base: .pull_requests[0].base.ref}') || true
+
+          if [ -z "$CHECK_DATA" ]; then
+            echo "Failed to fetch check-run data, skipping auto-approve"
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$CHECK_DATA" | jq -r '.number // empty')
+          BASE_REF=$(echo "$CHECK_DATA" | jq -r '.base // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR associated with this check run"
+            exit 0
+          fi
+
+          if [ "$BASE_REF" != "main" ]; then
+            echo "PR #$PR_NUMBER targets $BASE_REF, not main — skipping auto-approve"
+            exit 0
+          fi
+
+          IS_DRAFT=$(gh pr view "$PR_NUMBER" \
+            --repo ${{ github.repository }} \
+            --json isDraft --jq .isDraft) || true
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "PR #$PR_NUMBER is a draft, skipping auto-approve"
+            exit 0
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Verify PR head matches reviewed commit
+        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != ''
+        id: verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_HEAD=$(gh pr view ${{ steps.pr.outputs.pr_number }} \
+            --repo ${{ github.repository }} \
+            --json headRefOid --jq .headRefOid) || true
+
+          REVIEWED_SHA="${{ github.event.check_run.head_sha }}"
+
+          if [ -z "$CURRENT_HEAD" ]; then
+            echo "Failed to fetch PR head, skipping auto-approve"
+            echo "head_matches=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$CURRENT_HEAD" != "$REVIEWED_SHA" ]; then
+            echo "PR HEAD ($CURRENT_HEAD) differs from reviewed commit ($REVIEWED_SHA) — skipping auto-approve"
+            echo "head_matches=false" >> $GITHUB_OUTPUT
+          else
+            echo "PR HEAD matches reviewed commit"
+            echo "head_matches=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Auto-approve PR
-        if: steps.analyze.outputs.should_approve == 'true'
-        uses: hmarr/auto-approve-action@v4
+        if: steps.severity.outputs.should_approve == 'true' && steps.pr.outputs.pr_number != '' && steps.verify.outputs.head_matches == 'true'
+        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.pr.outputs.pr_number }}

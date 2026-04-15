@@ -1,0 +1,19 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Ruby, Bundler, and bundler-audit
+    # git is required for bundler-audit to clone the ruby-advisory-db
+    RUN apk add --no-cache ruby ruby-bundler git
+    RUN gem install bundler-audit --no-document
+
+    # Pre-download the advisory DB to avoid a full git clone on every collector
+    # run. The runtime `bundle audit update` will pull incremental changes.
+    RUN bundle audit download
+
+    # Verify installations
+    RUN ruby --version && bundle --version && bundle audit --help >/dev/null 2>&1
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:ruby-$VERSION

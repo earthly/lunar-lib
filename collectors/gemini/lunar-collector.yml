@@ -1,0 +1,86 @@
+version: 0
+
+name: gemini
+description: Detect Google Gemini CLI usage and instruction files
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Gemini Collector"
+  long_description: |
+    Detects Google Gemini CLI invocations in CI pipelines. Records command
+    strings, versions, and flags for policy-level analysis. Writes to
+    ai.native.gemini under the unified ai.* namespace.
+  category: "code-analysis"
+  icon: "assets/gemini.svg"
+  status: "experimental"
+  related:
+    - slug: "ai"
+      type: "policy"
+      reason: "Enforces AI usage standards based on collected data"
+
+collectors:
+  - name: instruction-file
+    description: |
+      Discovers GEMINI.md instruction files across the repository. Records file path,
+      line count, byte size, and whether it is a symlink to AGENTS.md. Writes to
+      ai.native.gemini.instruction_file and appends to ai.instructions.all[] for
+      normalized cross-tool access.
+    mainBash: instruction-file.sh
+    hook:
+      type: code
+    keywords: ["gemini.md", "instruction file", "agent context"]
+
+  - name: cicd
+    description: |
+      Detects Google Gemini CLI invocations in CI pipelines. Records the command
+      string and version for policy-level flag analysis (dangerous flags like
+      --yolo and -y).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: gemini
+    keywords: ["gemini", "google", "ai ci", "ci safety"]
+
+example_component_json: |
+  {
+    "ai": {
+      "instructions": {
+        "all": [
+          {
+            "path": "GEMINI.md",
+            "dir": ".",
+            "filename": "GEMINI.md",
+            "lines": 60,
+            "bytes": 2400,
+            "is_symlink": false,
+            "symlink_target": null
+          }
+        ]
+      },
+      "native": {
+        "gemini": {
+          "instruction_file": {
+            "exists": true,
+            "path": "GEMINI.md",
+            "lines": 60,
+            "bytes": 2400,
+            "is_symlink": false,
+            "symlink_target": null
+          },
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "gemini run --json 'review this PR'",
+                "tool": "gemini",
+                "version": "0.1.0"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
