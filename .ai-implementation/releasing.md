@@ -45,20 +45,27 @@ Before running a release, verify:
 
 - Format: `vX.Y.Z` (v-prefixed semver, e.g. `v1.0.6`)
 - Check the latest tag: `git tag --sort=-creatordate | head -5`
-- Bump rules: the human decides the version. If they don't specify, ask them — don't guess.
+- You propose the version — see Step 1 below.
 
 ---
 
 ## Release Steps
 
-### Step 1: Confirm with the human
+### Step 1: Propose a version and get sign-off
 
-Before running anything:
+Analyze what changed since the last release and propose the next version:
 
-1. Show the current HEAD: `git log --oneline -5`
-2. Show the last release tag: `git tag --sort=-creatordate | head -3`
-3. Show what's new since the last release: `git log --oneline <last-tag>..HEAD`
-4. Ask: "Release `vX.Y.Z` from this HEAD? Confirm and I'll run it."
+1. Find the last release tag: `git tag --sort=-creatordate | grep '^v' | head -1`
+2. List changes since that tag: `git log --oneline <last-tag>..HEAD`
+3. Determine the bump:
+   - **Patch** (`v1.0.5` → `v1.0.6`): bug fixes, doc updates, minor improvements
+   - **Minor** (`v1.0.5` → `v1.1.0`): new collectors/policies, new features, non-breaking changes
+   - **Major** (`v1.0.5` → `v2.0.0`): breaking changes to manifest format, SDK, or plugin interface
+4. DM the person who requested the release (via Slack) with your proposal:
+   - The proposed version number
+   - A summary of what's included (e.g., "3 new collectors, 2 bug fixes")
+   - Current HEAD (`git log --oneline -1`)
+5. Wait for their sign-off before proceeding.
 
 **Do not proceed without explicit confirmation of the version number.**
 
@@ -124,14 +131,63 @@ Or check via Docker Hub API (no auth needed for public images):
 curl -s "https://hub.docker.com/v2/repositories/earthly/lunar-lib/tags/?name=vX.Y.Z&page_size=100" | jq '.results[].name'
 ```
 
-### Step 5: Notify the human
+### Step 5: Create a GitHub Release with release notes
 
-Report:
+After CI passes and images are verified, create a GitHub Release to document what shipped:
+
+1. **Generate categorized release notes** by analyzing commits since the previous tag:
+
+   ```bash
+   git log --oneline <previous-tag>..vX.Y.Z
+   ```
+
+2. **Categorize changes** into these sections:
+   - **New Collectors** — newly added collectors (include status: beta, experimental, stable)
+   - **New Policies** — newly added policies (include status)
+   - **Fixes** — bug fixes to existing collectors/policies
+   - **Improvements** — enhancements, performance, refactors
+   - **Other** — docs, CI, tooling changes
+
+   To determine plugin status, check the plugin's manifest (`lunar-collector.yml` or `lunar-policy.yml`) for any `status` or `maturity` field. If absent, default to "stable" for plugins with tests and "beta" for new plugins in their first release.
+
+3. **Create the release:**
+
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z" --notes "$(cat <<'EOF'
+   ## New Collectors
+   - **plugin-name** (beta) — brief description
+
+   ## New Policies
+   - **plugin-name** (stable) — brief description
+
+   ## Fixes
+   - Fix description (#PR)
+
+   ## Improvements
+   - Improvement description (#PR)
+   EOF
+   )"
+   ```
+
+   Omit empty sections. Link PR numbers where applicable.
+
+### Step 6: Notify
+
+**On success:** Post to `#team-eng` on Slack for visibility:
 - Release tag: `vX.Y.Z`
-- CI status: passed/failed
-- Number of images published
+- Summary of what's new (new collectors/policies, key fixes)
+- Link to the GitHub Release
 - How consumers pin it: `@vX.Y.Z` in their `lunar-config.yml`
-- Reminder: wait for CI to fully complete before pinning downstream
+
+```bash
+# Post to #team-eng
+curl -s -X POST https://slack.com/api/chat.postMessage \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"#team-eng","text":"lunar-lib vX.Y.Z released: <github-release-url>\n\n<summary>"}'
+```
+
+**On failure or questions:** DM the person who requested the release directly — don't spam the team channel with problems.
 
 ---
 
