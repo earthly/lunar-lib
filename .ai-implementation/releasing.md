@@ -165,7 +165,7 @@ After CI passes and images are verified, create a GitHub Release to document wha
    )"
    ```
 
-   **Note:** The `EOF` delimiter must be at column 0 (no leading spaces) or bash won't recognize it.
+   **Important:** When running this, the `EOF` delimiter must be at column 0 (no leading spaces). The indentation above is for markdown readability only — in your actual shell command, left-align `EOF`.
 
    Omit empty sections. Link PR numbers where applicable.
 
