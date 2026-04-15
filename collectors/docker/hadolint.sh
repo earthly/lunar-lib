@@ -19,10 +19,11 @@ HADOLINT_VERSION=$(cat /usr/local/bin/hadolint.version 2>/dev/null || echo "unkn
 
 # Run hadolint on all Dockerfiles with JSON output
 # Exit code 0 = clean, 1 = issues found, >1 = error
+# xargs returns 123 when the child exits 1-125, so 123 is also normal.
 EXIT_CODE=0
 RAW_OUTPUT=$(echo "$DOCKERFILES" | tr '\n' '\0' | xargs -0 hadolint --format json 2>/dev/null) || EXIT_CODE=$?
 
-if [ "$EXIT_CODE" -gt 1 ]; then
+if [ "$EXIT_CODE" -gt 1 ] && [ "$EXIT_CODE" -ne 123 ]; then
     echo "hadolint exited with unexpected code $EXIT_CODE" >&2
     jq -n --arg code "$EXIT_CODE" \
         '{source: {tool: "hadolint", integration: "auto"}, error: "hadolint exited unexpectedly", exit_code: ($code | tonumber)}' \
