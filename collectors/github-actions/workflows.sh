@@ -85,8 +85,25 @@ while IFS= read -r file; do
         else [] end
     ' 2>/dev/null || echo '[]')
 
-    # Extract job names
-    jobs=$(echo "$wf_json" | jq -c '[.jobs | keys[]]' 2>/dev/null || echo '[]')
+    # Extract full job details for native data
+    jobs_detail=$(echo "$wf_json" | jq -c '
+        if .jobs then
+            .jobs | to_entries | map({
+                key: .key,
+                value: (
+                    (if .value.permissions then {permissions: .value.permissions} else {} end)
+                    + (if .value.uses then {uses: .value.uses} else {} end)
+                    + (if .value.secrets then {secrets: .value.secrets} else {} end)
+                    + {steps: [(.value.steps // [])[] |
+                        {name, uses, run, "with": .["with"], env}
+                        | with_entries(select(.value != null))
+                    ]}
+                )
+            }) | from_entries
+        else
+            {}
+        end
+    ' 2>/dev/null || echo '{}')
 
     # Extract workflow-level permissions
     permissions=$(echo "$wf_json" | jq -c '.permissions // null' 2>/dev/null || echo 'null')
@@ -114,7 +131,7 @@ while IFS= read -r file; do
         --arg file "$file" \
         --arg name "$wf_name" \
         --argjson triggers "$triggers" \
-        --argjson jobs "$jobs" \
+        --argjson jobs "$jobs_detail" \
         --argjson permissions "$permissions" \
         --argjson actions "$ACTIONS" \
         '{

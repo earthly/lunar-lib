@@ -1,0 +1,72 @@
+version: 0
+
+name: github-actions
+description: Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "GitHub Actions Security Guardrails"
+  long_description: |
+    Enforces security best practices for GitHub Actions workflows. Detects
+    template injection, dangerous pull_request_target checkouts, missing
+    permissions, credential persistence, and secrets inheritance.
+  category: "security-and-compliance"
+  icon: "assets/github-actions.svg"
+  status: "beta"
+  requires:
+    - slug: "github-actions"
+      type: "collector"
+      reason: "Parsed workflow data at .ci.native.github_actions.workflows"
+  keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
+
+policies:
+  - name: no-script-injection
+    description: |
+      Flags attacker-controlled ${{ }} expressions used directly in run: blocks
+      and actions/github-script script: fields. These get substituted before the
+      shell executes, enabling arbitrary code injection via PR titles, branch
+      names, commit messages, and other user-controlled inputs.
+    mainPython: no_script_injection.py
+    keywords: ["injection", "run", "expression", "template", "security"]
+
+  - name: no-dangerous-trigger-checkout
+    description: |
+      Flags pull_request_target workflows that check out PR head code. This runs
+      attacker-supplied code with base-branch secrets and write permissions —
+      the pattern behind the tj-actions/changed-files breach (CVE-2025-30066).
+    mainPython: no_dangerous_trigger_checkout.py
+    keywords: ["pull-request-target", "checkout", "fork", "security"]
+
+  - name: permissions-declared
+    description: |
+      Flags workflows with no permissions: key at workflow or job level. Without
+      explicit permissions, workflows inherit org/repo defaults which may be
+      write-all on repos created before GitHub's Feb 2023 default change.
+    mainPython: permissions_declared.py
+    keywords: ["permissions", "least-privilege", "security"]
+
+  - name: no-write-all-permissions
+    description: |
+      Flags explicit permissions: write-all at workflow or job level. Workflows
+      should declare only the specific scopes they need to follow the principle
+      of least privilege.
+    mainPython: no_write_all_permissions.py
+    keywords: ["permissions", "write-all", "least-privilege", "security"]
+
+  - name: checkout-no-persist-credentials
+    description: |
+      Flags actions/checkout steps that don't set persist-credentials: false.
+      The default (true) stores GITHUB_TOKEN in .git/config, which leaks if the
+      checkout directory is uploaded as an artifact (ArtiPACKED attacks, 2024).
+    mainPython: checkout_no_persist_credentials.py
+    keywords: ["checkout", "credentials", "token", "security"]
+
+  - name: no-secrets-inherit
+    description: |
+      Flags secrets: inherit in reusable workflow calls. This passes ALL
+      repository and org secrets to the called workflow, violating
+      least-privilege. Workflows should explicitly pass only needed secrets.
+    mainPython: no_secrets_inherit.py
+    keywords: ["secrets", "inherit", "reusable", "least-privilege", "security"]
