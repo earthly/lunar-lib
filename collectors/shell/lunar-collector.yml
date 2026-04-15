@@ -4,7 +4,7 @@ name: shell
 description: Detect shell scripts and run ShellCheck linting for bash/sh files
 author: earthly
 
-default_image: earthly/lunar-lib:shell-main
+default_image: earthly/lunar-lib:shell-v1.1.0
 default_image_ci_collectors: native
 
 landing_page:

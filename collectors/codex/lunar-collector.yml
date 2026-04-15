@@ -4,7 +4,7 @@ name: codex
 description: Detect OpenAI Codex CLI usage and instruction files
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.1.0
 default_image_ci_collectors: native
 
 landing_page:

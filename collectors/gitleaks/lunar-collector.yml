@@ -4,7 +4,7 @@ name: gitleaks
 description: Detects hardcoded secrets via auto-scanning or by collecting existing Gitleaks CI results
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:gitleaks-main
+default_image: earthly/lunar-lib:gitleaks-v1.1.0
 default_image_ci_collectors: native
 
 landing_page:

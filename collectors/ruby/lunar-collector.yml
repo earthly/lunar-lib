@@ -4,7 +4,7 @@ name: ruby
 description: Collect Ruby project information, CI/CD commands, and dependencies
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:ruby-main
+default_image: earthly/lunar-lib:ruby-v1.1.0
 default_image_ci_collectors: native
 
 landing_page:

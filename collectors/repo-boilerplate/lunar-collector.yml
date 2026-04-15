@@ -3,7 +3,7 @@ version: 0
 name: repo-boilerplate
 description: Collect standard repository boilerplate metadata including README, CODEOWNERS, and common configuration files
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.1.0
 
 landing_page:
   display_name: "Repo Boilerplate Collector"
@@ -20,7 +20,7 @@ landing_page:
       type: "policy"
       reason: "Enforces repository boilerplate standards based on collected metadata"
 
-default_image_non_ci_collectors: earthly/lunar-lib:base-main
+default_image_non_ci_collectors: earthly/lunar-lib:base-v1.1.0
 
 collectors:
   - name: readme

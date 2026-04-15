@@ -6,39 +6,39 @@ version: 0
 
 collectors:
   # --- Language collectors (only trigger when language is detected) ---
-  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/java@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/cpp@main
-  - uses: github://earthly/lunar-lib/collectors/dotnet@main
-  - uses: github://earthly/lunar-lib/collectors/html@main
-  - uses: github://earthly/lunar-lib/collectors/shell@main
-  - uses: github://earthly/lunar-lib/collectors/ruby@main
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/java@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/python@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/rust@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/php@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/cpp@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/dotnet@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/html@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/shell@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/ruby@v1.1.0
 
   # --- Infrastructure ---
-  - uses: github://earthly/lunar-lib/collectors/k8s@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/terraform@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/docker@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/k8s@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/terraform@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/docker@v1.1.0
 
   # --- Security scanners ---
-  - uses: github://earthly/lunar-lib/collectors/trivy@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/checkov@main
+  - uses: github://earthly/lunar-lib/collectors/trivy@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/checkov@v1.1.0
 
   # --- CI context ---
-  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
-  - uses: github://earthly/lunar-lib/collectors/github-actions@main
+  - uses: github://earthly/lunar-lib/collectors/github@v1.1.0
+  - uses: github://earthly/lunar-lib/collectors/github-actions@v1.1.0
 
 policies:
   # --- Container ---
-  - uses: github://earthly/lunar-lib/policies/container@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/container@v1.1.0
     enforcement: report-pr
     include:
       - no-latest
 
-  - uses: github://earthly/lunar-lib/policies/container@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/container@v1.1.0
     enforcement: score
     include:
       - healthcheck
@@ -47,7 +47,7 @@ policies:
       - build-tagged
 
   # --- Kubernetes ---
-  - uses: github://earthly/lunar-lib/policies/k8s@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/k8s@v1.1.0
     enforcement: score
     include:
       - requests-and-limits
@@ -58,7 +58,7 @@ policies:
       - min-replicas
 
   # --- Terraform ---
-  - uses: github://earthly/lunar-lib/policies/terraform@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/terraform@v1.1.0
     enforcement: score
     include:
       - provider-versions-pinned
@@ -69,14 +69,14 @@ policies:
       min_provider_versions: '{"aws": "5.0"}'
 
   # --- General IaC ---
-  - uses: github://earthly/lunar-lib/policies/iac@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/iac@v1.1.0
     enforcement: score
     include:
       - valid
       - datastore-destroy-protection
 
   # --- IaC scanning ---
-  - uses: github://earthly/lunar-lib/policies/iac-scan@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/iac-scan@v1.1.0
     enforcement: score
     include:
       - executed
@@ -85,7 +85,7 @@ policies:
       min_severity: "critical"
 
   # --- Container scanning ---
-  - uses: github://earthly/lunar-lib/policies/container-scan@v1.0.5
+  - uses: github://earthly/lunar-lib/policies/container-scan@v1.1.0
     enforcement: score
     include:
       - executed
@@ -94,7 +94,7 @@ policies:
       min_severity: "critical"
 
   # --- CI hygiene ---
-  - uses: github://earthly/lunar-lib/policies/ci@main
+  - uses: github://earthly/lunar-lib/policies/ci@v1.1.0
     enforcement: score
     include:
       - lint-clean

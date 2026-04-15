@@ -3,7 +3,7 @@ version: 0
 name: github-org
 description: Catalogs GitHub organization repositories as Lunar components
 author: earthly
-default_image: earthly/lunar-lib:github-org-main
+default_image: earthly/lunar-lib:github-org-v1.1.0
 
 landing_page:
   display_name: "GitHub Org Cataloger"

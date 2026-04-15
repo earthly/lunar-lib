@@ -4,7 +4,7 @@ name: sast
 description: Static Application Security Testing (SAST) security policies
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.1.0
 
 landing_page:
   display_name: "SAST Guardrails"

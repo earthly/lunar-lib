@@ -4,7 +4,7 @@ name: cpp
 description: Collect C/C++ project information, build system details, dependencies, and CI commands
 author: earthly
 
-default_image: earthly/lunar-lib:cpp-main
+default_image: earthly/lunar-lib:cpp-v1.1.0
 default_image_ci_collectors: native
 
 landing_page:

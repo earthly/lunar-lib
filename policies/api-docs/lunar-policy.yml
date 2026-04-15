@@ -4,7 +4,7 @@ name: api-docs
 description: API documentation best practices
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.1.0
 landing_page:
   display_name: "API Docs Guardrails"
   long_description: |

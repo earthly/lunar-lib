@@ -4,7 +4,7 @@ name: terraform
 description: Parses Terraform HCL files and collects IaC configuration data
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:terraform-main
+default_image: earthly/lunar-lib:terraform-v1.1.0
 
 landing_page:
   display_name: "Terraform Collector"

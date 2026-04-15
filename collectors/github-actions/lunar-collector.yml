@@ -4,7 +4,7 @@ name: github-actions
 description: Parses GitHub Actions workflows, runs actionlint, and detects version pinning status
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:github-actions-main
+default_image: earthly/lunar-lib:github-actions-v1.1.0
 
 landing_page:
   display_name: "GitHub Actions Collector"
