@@ -51,7 +51,7 @@ collectors:
 inputs:
   find_command:
     description: Command to find Chart.yaml files (must output one file path per line)
-    default: "find . -type f -name 'Chart.yaml'"
+    default: "find . -type f \\( -name 'Chart.yaml' -o -name 'Chart.yml' \\)"
   lint_strict:
     description: Enable strict mode for helm lint (true/false)
     default: "false"
