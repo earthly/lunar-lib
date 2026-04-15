@@ -1,0 +1,115 @@
+version: 0
+
+name: shell
+description: Detect shell scripts and run ShellCheck linting for bash/sh files
+author: earthly
+
+default_image: earthly/lunar-lib:shell-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Shell Collector"
+  long_description: |
+    Detect shell scripts (.sh, .bash) in a repository and run ShellCheck for
+    automated static analysis. Writes language detection data and lint results
+    to Component JSON. Skips gracefully if no shell scripts are found.
+  categories: ["languages", "build"]
+  icon: "assets/shell.svg"
+  status: "beta"
+  related:
+    - slug: "shell"
+      type: "policy"
+      reason: "ShellCheck linting guardrails using collected lint data"
+    - slug: "linter"
+      type: "policy"
+      reason: "Generic linter guardrails compatible with shell lint data"
+
+collectors:
+  - name: project
+    description: |
+      Detects shell scripts in the repository by scanning for .sh and .bash files.
+      Identifies shell types from shebang lines (bash, sh, zsh, dash, etc.).
+      Writes script count, file locations, and shell type metadata to .lang.shell.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["shell", "bash", "sh", "scripts", "shebang", "scripting"]
+
+  - name: shellcheck
+    description: |
+      Runs ShellCheck against all detected shell scripts with JSON output.
+      Parses results into normalized lint warnings at .lang.shell.lint and
+      tool-specific summary data at .lang.shell.native.shellcheck including
+      pass/fail status and per-severity issue counts.
+    mainBash: shellcheck.sh
+    hook:
+      type: code
+    keywords: ["shellcheck", "linting", "shell", "bash", "static analysis", "code quality"]
+
+  - name: shellcheck-cicd
+    description: |
+      Detects ShellCheck executions in CI pipelines and records the command
+      and version. Writes CI integration metadata to .lang.shell.native.shellcheck.cicd
+      confirming ShellCheck is part of the CI workflow.
+    mainBash: shellcheck-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: shellcheck
+    keywords: ["shellcheck", "ci", "cicd", "shell", "linting", "pipeline"]
+
+inputs:
+  find_command:
+    description: Command to find shell scripts (must output one file path per line)
+    default: "find . -type f \\( -name '*.sh' -o -name '*.bash' \\) -not -path '*/node_modules/*' -not -path '*/vendor/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/.terraform/*'"
+  shellcheck_severity:
+    description: Minimum ShellCheck severity level to collect (error, warning, info, style). Default collects everything.
+    default: "style"
+
+example_component_json: |
+  {
+    "lang": {
+      "shell": {
+        "script_count": 3,
+        "scripts": ["deploy.sh", "build/compile.sh", "scripts/test.sh"],
+        "shells": ["bash", "sh"],
+        "source": {
+          "tool": "shell-collector",
+          "integration": "code"
+        },
+        "native": {
+          "shellcheck": {
+            "passed": false,
+            "version": "0.10.0",
+            "files_checked": 3,
+            "error_count": 0,
+            "warning_count": 1,
+            "info_count": 0,
+            "style_count": 0,
+            "cicd": {
+              "commands": ["shellcheck scripts/*.sh"],
+              "version": "0.10.0"
+            }
+          }
+        },
+        "lint": {
+          "warnings": [
+            {
+              "file": "deploy.sh",
+              "line": 15,
+              "column": 3,
+              "message": "Double quote to prevent globbing and word splitting.",
+              "linter": "shellcheck",
+              "severity": "warning",
+              "code": "SC2086"
+            }
+          ],
+          "linters": ["shellcheck"],
+          "source": {
+            "tool": "shellcheck",
+            "integration": "code"
+          }
+        }
+      }
+    }
+  }

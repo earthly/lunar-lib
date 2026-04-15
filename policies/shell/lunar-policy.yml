@@ -1,0 +1,40 @@
+version: 0
+
+name: shell
+description: Shell script quality and linting guardrails
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Shell Guardrails"
+  long_description: |
+    Enforce shell script quality standards by validating ShellCheck results.
+    Ensures ShellCheck finds no issues at or above the configured severity
+    level (default: error). Severity filtering happens at the policy level
+    so all data is preserved in Component JSON for dashboards and other consumers.
+  category: "testing-and-quality"
+  icon: "assets/shell.svg"
+  status: "beta"
+  requires:
+    - slug: "shell"
+      type: "collector"
+      reason: "Provides ShellCheck lint data for shell scripts"
+  related: []
+
+policies:
+  - name: shellcheck-clean
+    description: |
+      Ensures ShellCheck finds no issues at or above the configured severity
+      level (default: error). Skips if no shell scripts are detected.
+      Severity filtering and warning threshold are both configurable.
+    mainPython: shellcheck_clean.py
+    keywords: ["shellcheck", "shell", "bash", "linting", "clean", "code quality"]
+
+inputs:
+  min_severity:
+    description: Minimum severity level to enforce (error, warning, info, style). Issues below this level are ignored.
+    default: "error"
+  max_shellcheck_warnings:
+    description: Maximum number of ShellCheck warnings allowed at or above min_severity (0 = must be completely clean)
+    default: "0"
