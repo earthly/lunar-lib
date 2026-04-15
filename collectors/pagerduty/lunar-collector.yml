@@ -23,11 +23,13 @@ landing_page:
 collectors:
   - name: oncall
     description: |
-      Queries the PagerDuty REST API for the configured service. Fetches
-      service details, on-call schedule participants, and escalation policy.
-      Writes normalized data to .oncall.service, .oncall.schedule,
-      .oncall.escalation, and .oncall.summary. Stores the raw API response
-      under .oncall.native.pagerduty.
+      Queries the PagerDuty REST API for the component's service. Discovers
+      the service ID from component metadata annotations
+      (pagerduty.com/service-id) or falls back to the explicit service_id
+      input. Fetches service details, on-call schedule participants, and
+      escalation policy. Writes normalized data to .oncall.service,
+      .oncall.schedule, .oncall.escalation, and .oncall.summary. Stores the
+      raw API response under .oncall.native.pagerduty.
     mainBash: oncall.sh
     hook:
       type: cron
@@ -37,7 +39,10 @@ collectors:
 
 inputs:
   service_id:
-    description: PagerDuty service ID to query (e.g. PXXXXXX)
+    description: >
+      PagerDuty service ID to query (e.g. PXXXXXX). Optional if the component
+      has a pagerduty.com/service-id annotation in its catalog metadata.
+    default: ""
   pagerduty_base_url:
     description: PagerDuty API base URL
     default: "https://api.pagerduty.com"
