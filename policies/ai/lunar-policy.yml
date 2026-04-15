@@ -1,0 +1,139 @@
+version: 0
+
+name: ai
+description: Enforce AI coding assistant standards across your organization
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "AI Guardrails"
+  long_description: |
+    Enforce cross-tool AI standards: code review bots, instruction files,
+    naming conventions, plans directories, and authorship annotations.
+  category: "devex-build-and-ci"
+  icon: "assets/ai.svg"
+  status: "experimental"
+  requires:
+    - slug: "ai"
+      type: "collector"
+      reason: "Provides instruction files, plans dirs, and authorship data"
+    - slug: "claude"
+      type: "collector"
+      reason: "Provides Claude code review detection data for code-reviewer policy check"
+    - slug: "coderabbit"
+      type: "collector"
+      reason: "Provides CodeRabbit code review detection data"
+  related: []
+
+policies:
+  - name: code-reviewer
+    description: |
+      Verifies that at least one AI code reviewer is active on the component.
+      Checks ai.code_reviewers[] for any entry with detected: true. Tool-agnostic —
+      doesn't care which reviewer is active, just that something is reviewing code.
+      Skips if no code reviewer data exists (no tool-specific collectors configured).
+    mainPython: code_reviewer.py
+    keywords: ["code review", "ai review", "coderabbit", "claude", "pull request"]
+
+  - name: instruction-file-exists
+    description: |
+      Verifies that an agent instruction file exists at the repository root. Checks
+      ai.instructions.all[] which is populated by the ai collector (AGENTS.md) and
+      tool-specific collectors via array append (CLAUDE.md, CODEX.md, GEMINI.md).
+      Passes if any entry exists.
+    mainPython: instruction_file_exists.py
+    keywords: ["agents.md", "claude.md", "ai instructions", "agent context"]
+
+  - name: canonical-naming
+    description: |
+      Verifies the root instruction file uses the canonical vendor-neutral name (AGENTS.md by
+      default). Repos with only CLAUDE.md pass the existence check but fail this naming check.
+    mainPython: canonical_naming.py
+    keywords: ["agents.md", "naming convention", "vendor neutral"]
+
+  - name: instruction-file-length
+    description: |
+      Validates that the root instruction file is within reasonable length bounds. Too short
+      means insufficient context; too long wastes context window budget and can reduce AI
+      task success rates.
+    mainPython: instruction_file_length.py
+    keywords: ["agents.md length", "context window", "token budget"]
+
+  - name: instruction-file-sections
+    description: |
+      Ensures the root instruction file contains required section headings. Validates that
+      essential information like project overview and build commands is documented for AI agents.
+    mainPython: instruction_file_sections.py
+    keywords: ["agents.md sections", "documentation structure", "agent context"]
+
+  - name: plans-dir-exists
+    description: |
+      Verifies that a dedicated plans directory exists for AI agent task planning.
+      A dedicated directory keeps AI-generated plans organized and reviewable.
+    mainPython: plans_dir_exists.py
+    keywords: ["ai plans", "agent planning", "task management"]
+
+  - name: ai-authorship-annotated
+    description: |
+      Verifies that commits include AI authorship annotations. Supports the Git AI standard
+      (usegitai.com) for automated line-level tracking and git trailers as a lightweight
+      manual alternative.
+    mainPython: ai_authorship_annotated.py
+    keywords: ["ai authorship", "git ai", "code attribution", "ai tracking"]
+
+inputs:
+  canonical_filename:
+    description: The canonical (vendor-neutral) instruction filename
+    default: "AGENTS.md"
+  min_lines:
+    description: Minimum number of lines for the root instruction file (0 to disable)
+    default: "10"
+  max_lines:
+    description: Maximum number of lines for the root instruction file (0 to disable)
+    default: "300"
+  max_total_bytes:
+    description: Maximum combined bytes across all instruction files (0 to disable)
+    default: "32768"
+  required_sections:
+    description: Comma-separated required section heading substrings (case-insensitive)
+    default: "Project Overview,Build Commands"
+  min_annotation_percentage:
+    description: Minimum percentage of commits that should have AI annotations (0 = awareness mode)
+    default: "0"
+
+example_component_json: |
+  {
+    "ai": {
+      "code_reviewers": [
+        {
+          "tool": "coderabbit",
+          "check_name": "coderabbitai",
+          "detected": true,
+          "last_seen": "2024-01-15T10:30:00Z"
+        }
+      ],
+      "instructions": {
+        "root": {
+          "exists": true,
+          "filename": "AGENTS.md",
+          "lines": 85,
+          "bytes": 3200,
+          "sections": ["Project Overview", "Architecture", "Build Commands", "Testing"]
+        },
+        "all": [],
+        "count": 2,
+        "total_bytes": 3200
+      },
+      "plans_dir": {
+        "exists": true,
+        "path": ".agents/plans",
+        "file_count": 3
+      },
+      "authorship": {
+        "provider": "git-ai",
+        "total_commits": 12,
+        "annotated_commits": 8
+      }
+    }
+  }

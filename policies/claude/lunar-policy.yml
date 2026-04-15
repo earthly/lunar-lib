@@ -1,0 +1,79 @@
+version: 0
+
+name: claude
+description: Claude-specific CI safety, instruction file, and conventions guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Claude Guardrails"
+  long_description: |
+    Enforces Claude-specific standards: CI safety flags, structured output,
+    and CLAUDE.md symlink compatibility alongside AGENTS.md.
+  category: "devex-build-and-ci"
+  icon: "assets/claude.svg"
+  status: "experimental"
+  requires:
+    - slug: "claude"
+      type: "collector"
+      reason: "Provides Claude CI command data and CLAUDE.md instruction file detection"
+  related: []
+
+policies:
+  - name: cli-safe-flags
+    description: |
+      Ensures Claude CLI invocations in CI do not use dangerous permission-bypassing
+      flags. Flags like --dangerously-skip-permissions remove safety guardrails that
+      prevent the AI from executing arbitrary code without human approval.
+    mainPython: cli_safe_flags.py
+    keywords: ["claude", "ci safety", "dangerous flags", "permissions"]
+
+  - name: cli-structured-output
+    description: |
+      Ensures Claude CLI invocations in CI headless mode use structured JSON output
+      (--output-format json) instead of plain text. JSON output makes AI automation
+      deterministic and parseable.
+    mainPython: cli_structured_output.py
+    keywords: ["claude", "json output", "structured output", "ci automation"]
+
+  - name: symlinked-aliases
+    description: |
+      Verifies that CLAUDE.md exists as a symlink to AGENTS.md. Claude Code does not
+      support the AGENTS.md filename natively, so a symlink is required for compatibility.
+      Reads from ai.native.claude.instruction_file to check symlink status.
+    mainPython: symlinked_aliases.py
+    keywords: ["claude.md", "symlink", "agents.md", "compatibility"]
+
+inputs:
+  dangerous_flags:
+    description: Comma-separated dangerous flags for Claude CLI
+    default: "--dangerously-skip-permissions,--allow-dangerously-skip-permissions"
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "claude": {
+          "instruction_file": {
+            "exists": true,
+            "path": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          },
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
+                "tool": "claude",
+                "version": "1.0.20",
+                "allowed_tools": "Bash(git*) Read"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }

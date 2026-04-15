@@ -1,0 +1,61 @@
+version: 0
+
+name: codex
+description: Codex-specific CI safety and conventions guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Codex Guardrails"
+  long_description: |
+    Enforces Codex-specific CI safety standards. Validates that Codex CLI
+    invocations do not use dangerous flags and use structured JSON output.
+  category: "devex-build-and-ci"
+  icon: "assets/codex.svg"
+  status: "experimental"
+  requires:
+    - slug: "codex"
+      type: "collector"
+      reason: "Provides Codex CI command data from ai.native.codex.cicd"
+  related: []
+
+policies:
+  - name: cli-safe-flags
+    description: |
+      Ensures Codex CLI invocations in CI do not use dangerous permission-bypassing
+      flags. Flags like --full-auto remove safety guardrails that prevent the AI
+      from executing arbitrary code without human approval.
+    mainPython: cli_safe_flags.py
+    keywords: ["codex", "ci safety", "dangerous flags", "permissions"]
+
+  - name: cli-structured-output
+    description: |
+      Ensures Codex CLI invocations in CI use structured JSON output instead of
+      plain text. JSON output makes AI automation deterministic and parseable.
+    mainPython: cli_structured_output.py
+    keywords: ["codex", "json output", "structured output", "ci automation"]
+
+inputs:
+  dangerous_flags:
+    description: Comma-separated dangerous flags for Codex CLI
+    default: "--dangerously-bypass-approvals-and-sandbox,--yolo,--full-auto"
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "codex": {
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "codex exec --json 'review this PR'",
+                "tool": "codex",
+                "version": "0.1.0"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
