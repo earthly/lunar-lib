@@ -1,58 +1,95 @@
 # Claude Collector
 
-Run Claude AI prompts against repository code and collect structured results for policy evaluation.
+Detect Claude code review activity, CI usage, instruction files, and run AI prompts against repository code.
 
 ## Overview
 
-This collector executes Claude AI prompts against your repository to extract insights, detect patterns, and analyze code that's difficult to capture with traditional pattern matching. It runs on code changes and writes results to a configurable Component JSON path.
+This collector detects Claude Code Review on pull requests, captures Claude CLI invocations in CI pipelines, discovers CLAUDE.md instruction files, and can run custom Claude AI prompts or code review against PRs.
 
-Use cases include:
-- Feature flag detection and inventory
-- Documentation quality analysis
-- Graceful shutdown handling verification
-- Architecture pattern detection
-- API documentation completeness checks
+Code reviewer data writes to normalized `ai.code_reviewers[]`; instruction files write to both `ai.native.claude.instruction_file` and `ai.instructions.all[]` via array append. CI data writes to `ai.native.claude.cicd`, run-code-review to `ai.native.claude.code_review`, and run-prompt to a user-configurable path.
 
 ## Collected Data
 
-This collector writes to a user-specified Component JSON path via the `path` input:
+This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `{path}` | any | Claude's response, optionally conforming to a JSON schema |
+| `.ai.code_reviewers[]` | array append | Claude Code Review detection entry with check name and timestamp |
+| `.ai.instructions.all[]` | array append | CLAUDE.md entry appended to the normalized instruction files array |
+| `.ai.native.claude.instruction_file` | object | CLAUDE.md file: existence, path, line count, byte size, symlink status |
+| `.ai.native.claude.cicd.cmds[]` | array | Claude CLI invocations in CI: command string, version, allowed/disallowed tools, MCP config |
+| `.ai.native.claude.code_review` | object | Claude CLI review mode results: findings count, severity, affected files |
+| `{path}` (configurable) | any | Claude prompt response from run-prompt, optionally conforming to a JSON schema |
 
 ## Collectors
 
-This integration provides the following collector:
+This integration provides the following collectors:
 
-| Collector | Description |
-|-----------|-------------|
-| `claude` | Runs a Claude prompt and collects structured results |
+| Collector | Hook | Description |
+|-----------|------|-------------|
+| `code-reviewer` | `code` (PRs only) | Detects Claude Code Review check-runs on pull requests |
+| `run-code-review` | `code` (PRs only) | Runs Claude CLI in review mode against PR diffs |
+| `instruction-file` | `code` | Discovers CLAUDE.md instruction files with metadata and symlink status |
+| `cicd` | `ci-after-command` (binary: claude) | Captures Claude CLI invocations in CI with flag extraction |
+| `run-prompt` | `code` | Runs a Claude AI prompt against the repo and collects structured results |
 
 ## Installation
 
-Add to your `lunar-config.yml`:
+### Code Review Detection
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
+    include: [code-reviewer]
+    secrets:
+      GH_TOKEN: "${{ secrets.GH_TOKEN }}"
+```
+
+### Run Code Review (AI-Powered)
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/claude@main
+    on: ["domain:your-domain"]
+    include: [run-code-review]
+    secrets:
+      ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
+      GH_TOKEN: "${{ secrets.GH_TOKEN }}"
+```
+
+### CI Detection + Instruction Files
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/claude@main
+    on: ["domain:your-domain"]
+```
+
+### Run Prompt (AI-Powered Analysis)
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/claude@main
+    on: ["domain:your-domain"]
+    include: [run-prompt]
     with:
       path: ".code_patterns.feature_flags"
       prompt: "Find all feature flags in this repository and return them as a list"
+    secrets:
+      ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
 ```
 
 ### With JSON Schema Enforcement
 
-For structured output, provide a JSON schema:
-
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/claude@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/claude@main
     on: [backend]
+    include: [run-prompt]
     with:
       path: ".code_patterns.lifecycle"
-      prompt: "Analyze this codebase for graceful shutdown handling. Check if SIGTERM signals are properly handled."
+      prompt: "Analyze this codebase for graceful shutdown handling."
       json_schema: |
         {
           "type": "object",
@@ -62,4 +99,6 @@ collectors:
             "files": {"type": "array", "items": {"type": "string"}}
           }
         }
+    secrets:
+      ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
 ```

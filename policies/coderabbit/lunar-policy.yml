@@ -1,0 +1,42 @@
+version: 0
+
+name: coderabbit
+description: CodeRabbit configuration and best-practices guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "CodeRabbit Guardrails"
+  long_description: |
+    Enforces CodeRabbit configuration standards. Validates that a CodeRabbit
+    configuration file exists for customizing review behavior.
+  category: "devex-build-and-ci"
+  icon: "assets/coderabbit.svg"
+  status: "experimental"
+  requires:
+    - slug: "coderabbit"
+      type: "collector"
+      reason: "Provides CodeRabbit config detection data from ai.native.coderabbit"
+  related: []
+
+policies:
+  - name: config-exists
+    description: |
+      Ensures a CodeRabbit configuration file (.coderabbit.yaml or .coderabbit.yml)
+      exists at the repository root. A config file allows teams to customize review
+      behavior, set path filters, and configure review instructions.
+    mainPython: config_exists.py
+    keywords: ["coderabbit", "config", "yaml", "configuration"]
+
+example_component_json: |
+  {
+    "ai": {
+      "native": {
+        "coderabbit": {
+          "config_file": ".coderabbit.yaml",
+          "config_exists": true
+        }
+      }
+    }
+  }

@@ -1,0 +1,91 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: Baseline
+# ============================================================================
+
+collectors:
+  # --- Language collectors (only trigger when language is detected) ---
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/java@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+
+  # --- Repo health ---
+  - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
+  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+
+  # --- Security ---
+  - uses: github://earthly/lunar-lib/collectors/gitleaks@main
+  - uses: github://earthly/lunar-lib/collectors/trivy@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/syft@v1.0.5
+
+  # --- Infrastructure ---
+  - uses: github://earthly/lunar-lib/collectors/docker@v1.0.5
+
+policies:
+  # --- Secret detection ---
+  - uses: github://earthly/lunar-lib/policies/secrets@main
+    enforcement: report-pr
+    include:
+      - no-hardcoded-secrets
+
+  # --- Repo basics ---
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
+    enforcement: score
+    include:
+      - readme-exists
+      - codeowners-exists
+      - codeowners-valid
+      - gitignore-exists
+      - license-exists
+
+  # --- VCS ---
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Testing ---
+  - uses: github://earthly/lunar-lib/policies/testing@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - passing
+
+  # --- Linting ---
+  - uses: github://earthly/lunar-lib/policies/linter@v1.0.5
+    enforcement: score
+    include:
+      - ran
+
+  # --- SCA ---
+  - uses: github://earthly/lunar-lib/policies/sca@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - max-severity
+    with:
+      min_severity: "critical"
+
+  # --- SBOM ---
+  - uses: github://earthly/lunar-lib/policies/sbom@v1.0.5
+    enforcement: score
+    include:
+      - sbom-exists
+
+  # --- Container ---
+  - uses: github://earthly/lunar-lib/policies/container@v1.0.5
+    enforcement: score
+    include:
+      - no-latest
+      - user
+      - healthcheck

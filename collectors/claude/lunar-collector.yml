@@ -1,67 +1,159 @@
 version: 0
 
 name: claude
-description: Run Claude AI prompts against repository code and collect structured results
-author: earthly
+description: Detect Claude code review activity, CI usage, instruction files, and run AI prompts against code
+author: support@earthly.dev
 
-image: +image
+default_image: earthly/lunar-lib:claude-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Claude Collector"
   long_description: |
-    Execute Claude AI prompts against your repository to extract insights, detect patterns,
-    and analyze code that's difficult to capture with traditional pattern matching.
+    Detects Claude Code Review on pull requests, captures Claude CLI invocations
+    in CI, discovers CLAUDE.md instruction files, and runs custom Claude prompts
+    against code. Writes to normalized ai.code_reviewers[] plus Claude-specific
+    data in ai.native.claude.
   category: "code-analysis"
   icon: "assets/claude.svg"
-  status: "beta"
+  status: "experimental"
   related:
+    - slug: "ai"
+      type: "policy"
+      reason: "Enforces code reviewer presence and instruction file standards"
     - slug: "ast-grep"
       type: "collector"
       reason: "Use ast-grep for syntax-aware pattern matching without AI"
 
 collectors:
-  - name: claude
+  - name: code-reviewer
+    description: |
+      Detects Claude Code Review check-runs on pull requests by querying the
+      GitHub check-runs API. Waits for scan completion and writes a normalized
+      entry to ai.code_reviewers[].
+    mainBash: code-reviewer.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request"]
+
+  - name: run-code-review
+    description: |
+      Runs the Claude CLI in review mode against pull request diffs. Captures
+      review findings, severity levels, and affected files. Writes results to
+      ai.native.claude.code_review for Claude-specific policy evaluation.
+    mainBash: run-code-review.sh
+    hook:
+      type: code
+      runs_on: [prs]
+    keywords: ["claude", "code review", "ai review", "pull request", "claude cli"]
+
+  - name: cicd
+    description: |
+      Detects Claude Code CLI invocations in CI pipelines. Records the command
+      string, version, and extracted flags (--allowedTools, --disallowedTools,
+      --mcp-config) for policy-level analysis. Also appends to ai.code_reviewers[]
+      when it detects review-mode invocations (e.g. claude --review).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: claude
+    keywords: ["claude", "claude code", "ai ci", "ci safety"]
+
+  - name: instruction-file
+    description: |
+      Discovers CLAUDE.md instruction files across the repository. Records file path,
+      line count, byte size, and whether it is a symlink to AGENTS.md. Writes to
+      ai.native.claude.instruction_file and appends to ai.instructions.all[] for
+      normalized cross-tool access.
+    mainBash: instruction-file.sh
+    hook:
+      type: code
+    keywords: ["claude.md", "instruction file", "agent context"]
+
+  - name: run-prompt
     description: |
       Runs a Claude AI prompt against the repository and collects the results.
       Supports optional JSON schema enforcement for structured output.
-      Use cases include:
-      - Feature flag detection and inventory
-      - Documentation quality analysis
-      - Graceful shutdown handling verification
-      - Architecture pattern detection
-    mainBash: main.sh
+      Use cases include feature flag detection, documentation quality analysis,
+      and architecture pattern detection.
+    mainBash: run-prompt.sh
     hook:
       type: code
     keywords: ["claude", "ai", "llm", "code analysis", "pattern detection", "anthropic"]
 
 inputs:
   path:
-    description: JSON component path to write the results to (e.g., ".code_patterns.feature_flags")
+    description: JSON component path for run-prompt results (e.g., ".code_patterns.feature_flags")
   prompt:
-    description: Prompt for Claude to run on the component repository
+    description: Prompt for Claude to run on the component repository (run-prompt only)
   json_schema:
-    description: Optional JSON schema for structured output. If provided, Claude will return results conforming to this schema.
+    description: Optional JSON schema for structured output in run-prompt
 
 secrets:
+  GH_TOKEN:
+    description: GitHub token for API access (required for code-reviewer check-runs query)
   ANTHROPIC_API_KEY:
-    description: Anthropic API key for Claude authentication
+    description: Anthropic API key for Claude authentication (required for run-prompt and run-code-review)
 
 example_component_json: |
   {
-    "code_patterns": {
-      "feature_flags": {
-        "library": "custom",
-        "flags": [
+    "ai": {
+      "code_reviewers": [
+        {
+          "tool": "claude",
+          "check_name": "Claude Code Review",
+          "detected": true,
+          "last_seen": "2024-01-14T08:00:00Z"
+        }
+      ],
+      "instructions": {
+        "all": [
           {
-            "key": "enable_new_checkout",
-            "file": "src/checkout/handler.go",
-            "line": 42,
-            "variation_type": "bool"
+            "path": "CLAUDE.md",
+            "dir": ".",
+            "filename": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
           }
-        ],
-        "count": 1
+        ]
+      },
+      "native": {
+        "claude": {
+          "instruction_file": {
+            "exists": true,
+            "path": "CLAUDE.md",
+            "lines": 85,
+            "bytes": 3200,
+            "is_symlink": true,
+            "symlink_target": "AGENTS.md"
+          },
+          "cicd": {
+            "cmds": [
+              {
+                "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
+                "tool": "claude",
+                "version": "1.0.20",
+                "allowed_tools": "Bash(git*) Read"
+              }
+            ]
+          },
+          "code_review": {
+            "ran": true,
+            "findings_count": 3,
+            "findings": [
+              {
+                "severity": "warning",
+                "file": "src/auth.ts",
+                "line": 42,
+                "message": "Token expiry not checked before use"
+              }
+            ]
+          }
+        }
       }
     }
   }
-
-
