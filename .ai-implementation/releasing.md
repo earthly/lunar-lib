@@ -1,6 +1,8 @@
 # Releasing lunar-lib
 
-Step-by-step guide for AI agents performing a lunar-lib release. Only run a release when a human explicitly asks for one.
+Step-by-step guide for performing a lunar-lib release. Only run a release when a human explicitly asks for one.
+
+> **Permissions:** Requires `git push` access (SSH/GPG keys or token auth). AI agents should use `required_permissions: ["all"]`.
 
 ---
 
