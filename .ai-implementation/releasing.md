@@ -183,6 +183,41 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 
 **On failure or questions:** DM the person who requested the release directly — don't spam the team channel with problems.
 
+### Step 7: Update cronos to the new version
+
+After a successful release, update the cronos staging environment to reference the new version:
+
+1. **Open the cronos lunar config:**
+
+   ```bash
+   cd ~/repos/pantalasa-cronos
+   git checkout main && git pull origin main
+   ```
+
+   Edit `lunar/lunar-config.yml`.
+
+2. **Update pinned version references:**
+
+   Replace all `@v<old-version>` references with `@vX.Y.Z`:
+
+   ```bash
+   sed -i 's|@v<old-version>|@vX.Y.Z|g' lunar/lunar-config.yml
+   ```
+
+   This updates collectors and policies that were pinned to the previous release. Plugins still on `@main` are tracking the main branch and don't need changes.
+
+3. **Commit and push:**
+
+   ```bash
+   git add lunar/lunar-config.yml
+   git commit -m "Pin cronos lunar config to vX.Y.Z"
+   git push
+   ```
+
+4. **Verify the "Sync Lunar Config" CI workflow passes** — if it fails, the hub won't pick up the new configuration.
+
+**Note:** Only update `@v<old>` → `@vX.Y.Z`. Do not change `@main` references — those are either development plugins being tested or plugins that intentionally track latest.
+
 ---
 
 ## What the CI Workflow Does
