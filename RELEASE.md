@@ -1,22 +1,27 @@
 # Releasing lunar-lib
 
-## Quick reference
+## Usage
 
 From the repo root, on `main`, with a clean working tree:
 
 ```bash
-./scripts/release.sh v1.1.0
+./scripts/release.sh v0.42.0
 ```
 
-This creates a branch + tag, rewrites all manifests and starter packs to pin the version, pushes to origin, and CI publishes Docker images.
+## What it does
 
-## Full guide
+1. Creates branch and tag `vX.Y.Z` from current `HEAD`
+2. Rewrites all `lunar-*.yml` files: `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
+3. Rewrites all starter-pack refs: `@<anything>` → `@vX.Y.Z`
+4. Commits, pushes branch + tag to `origin`, restores your previous branch
 
-See [`.ai-implementation/releasing.md`](.ai-implementation/releasing.md) for the complete release process including:
+After that, CI builds and publishes images for the new tag. Consumers can then pin `@vX.Y.Z`.
 
-- Pre-flight checks and version numbering
-- What the release script does internally
-- CI workflow and image verification
-- GitHub Release creation with categorized release notes
-- Post-release notifications and cronos updates
-- Troubleshooting common failures
+## Before you run
+
+- Make sure `HEAD` is what you want to release
+- The script validates everything else (semver format, clean tree, no duplicate branch/tag, no leftover `-main` refs)
+
+## AI agents
+
+See [`.ai-implementation/releasing.md`](.ai-implementation/releasing.md) for the full release workflow — version proposals, CI monitoring, GitHub Release creation, notifications, and cronos updates.
