@@ -31,7 +31,7 @@ collectors:
     mainBash: oncall.sh
     hook:
       type: cron
-      schedule: "0 2 * * *"
+      schedule: "0 2 * * *"  # Daily at 2:00 AM UTC
       clone-code: false
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
 
