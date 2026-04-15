@@ -273,6 +273,12 @@ Push a commit to the component repo you're testing against. This triggers CI, wh
 
 **For CI collectors** (hooks like `ci-after-job`, `ci-after-command`): local `lunar collector dev` is **not sufficient**. CI hooks only fire during actual CI runs. You must go through this full deploy+trigger cycle.
 
+**For cron collectors** (hooks with `type: cron`): pushing a commit does NOT trigger collection. Cron collectors run on their configured schedule (e.g. `0 2 * * *` = daily at 2am UTC). To test on cronos:
+- **Temporarily shorten the schedule** in the cronos config (e.g. `*/5 * * * *` for every 5 minutes) to get faster feedback.
+- Wait for the cron to fire, then verify collected data normally.
+- Revert the schedule to the real cadence once verified.
+- Cron collectors with `clone-code: false` don't need the repo — they query external APIs directly, so no commit push is needed or useful.
+
 ### Step 6: Run local dev tests
 
 All `lunar` commands must be run from the `pantalasa-cronos/lunar` directory with `LUNAR_HUB_TOKEN` set:
