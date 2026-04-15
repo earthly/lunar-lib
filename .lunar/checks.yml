@@ -65,3 +65,14 @@ checks:
     on: "policies/**/*.py"
     run: "exit 1"
     message: "Reminder: Skip vs fail matters: skip = category does not apply to this component (e.g. Go policy on a Python repo). fail = category applies but condition not met. Skipping when you should fail inflates compliance scores."
+
+  - name: screenshot-quality-reminder
+    on: "**/*screenshot*"
+    run: "exit 1"
+    message: >-
+      Reminder: Screenshots uploaded to PRs must be scrolled to show the
+      RELEVANT data, not the default top-of-page view. Dashboard screenshots
+      should show the specific collector/policy results being tested. Component
+      JSON screenshots should show the namespace/keys being verified. If the
+      data is too large for one screen, capture the section that serves as an
+      end-to-end smoke test.
