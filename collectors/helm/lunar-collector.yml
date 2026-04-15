@@ -12,7 +12,7 @@ landing_page:
     Parse Helm charts to extract chart metadata, lint validation results, values schema
     presence, and dependency version constraints. Runs helm lint on discovered charts
     and normalizes results for policy evaluation.
-  categories: ["orchestration", "deployment"]
+  categories: ["orchestration"]
   icon: "assets/helm.svg"
   status: "beta"
   related:
