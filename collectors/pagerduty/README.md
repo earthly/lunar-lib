@@ -1,4 +1,4 @@
-# `pagerduty` Collector
+# PagerDuty Collector
 
 Collect on-call schedule and escalation data from the PagerDuty API.
 

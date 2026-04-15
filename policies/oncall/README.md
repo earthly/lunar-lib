@@ -1,4 +1,4 @@
-# `oncall` Guardrails
+# On-Call Guardrails
 
 Enforce on-call schedule, escalation, and staffing standards for production services.
 
