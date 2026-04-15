@@ -1,0 +1,51 @@
+version: 0
+
+name: helm
+description: Helm chart validation and best practices policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Helm Guardrails"
+  long_description: |
+    Enforce Helm chart best practices including lint validation, semantic versioning,
+    values schema presence, and dependency version pinning. Helps ensure charts are
+    production-ready and maintainable.
+  category: "deployment-and-infrastructure"
+  icon: "assets/helm.svg"
+  status: "beta"
+  requires:
+    - slug: "helm"
+      type: "collector"
+      reason: "Provides parsed Helm chart data that these policies evaluate"
+
+policies:
+  - name: lint-passed
+    description: |
+      Validates that all Helm charts pass helm lint. Charts that fail linting may
+      have template errors, missing required values, or invalid YAML that will
+      cause deployment failures.
+    mainPython: lint_passed.py
+    keywords: ["helm lint", "chart validation", "template errors"]
+
+  - name: version-semver
+    description: |
+      Ensures Helm chart versions follow semantic versioning (semver). Consistent
+      versioning enables reliable dependency resolution and rollback strategies.
+    mainPython: version_semver.py
+    keywords: ["semver", "semantic versioning", "chart version"]
+
+  - name: values-schema
+    description: |
+      Requires Helm charts to include a values.schema.json file. A values schema
+      validates user-provided values at install time, preventing misconfiguration.
+    mainPython: values_schema.py
+    keywords: ["values schema", "values.schema.json", "input validation"]
+
+  - name: dependencies-pinned
+    description: |
+      Ensures all Helm chart dependencies specify version constraints. Unpinned
+      dependencies (using * or empty version) can pull breaking changes unexpectedly.
+    mainPython: dependencies_pinned.py
+    keywords: ["dependencies", "version pinning", "chart dependencies"]

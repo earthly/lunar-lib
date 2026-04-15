@@ -1,0 +1,82 @@
+version: 0
+
+name: helm
+description: Parse Helm charts and collect chart metadata, lint results, and dependency information
+author: earthly
+
+default_image: earthly/lunar-lib:helm-main
+
+landing_page:
+  display_name: "Helm Collector"
+  long_description: |
+    Parse Helm charts to extract chart metadata, lint validation results, values schema
+    presence, and dependency version constraints. Runs helm lint on discovered charts
+    and normalizes results for policy evaluation.
+  categories: ["orchestration", "deployment"]
+  icon: "assets/helm.svg"
+  status: "beta"
+  related:
+    - slug: "helm"
+      type: "policy"
+      reason: "Enforces Helm chart best practices using this collector's data"
+    - slug: "k8s"
+      type: "collector"
+      reason: "Collects Kubernetes manifest data that Helm charts generate"
+
+collectors:
+  - name: helm
+    description: |
+      Finds all Helm charts in the repository (directories containing Chart.yaml) and collects:
+      - Chart metadata (name, version, appVersion)
+      - Helm lint validation results and errors
+      - Values schema presence (values.schema.json)
+      - Chart dependencies with version constraints
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["helm", "helm chart", "chart.yaml", "values.yaml", "values schema", "helm lint", "helm dependencies"]
+
+inputs:
+  find_command:
+    description: Command to find Chart.yaml files (must output one file path per line)
+    default: "find . -type f -name 'Chart.yaml'"
+  lint_strict:
+    description: Enable strict mode for helm lint (true/false)
+    default: "false"
+
+example_component_json: |
+  {
+    "helm": {
+      "source": {
+        "tool": "helm",
+        "version": "3.14.0"
+      },
+      "charts": [
+        {
+          "path": "charts/api",
+          "name": "api",
+          "version": "1.2.3",
+          "app_version": "2.0.0",
+          "version_is_semver": true,
+          "lint_passed": true,
+          "lint_errors": [],
+          "has_values_schema": true,
+          "schema_path": "charts/api/values.schema.json",
+          "dependencies": [
+            {
+              "name": "postgresql",
+              "version": "~11.9.0",
+              "repository": "https://charts.bitnami.com/bitnami",
+              "is_pinned": true
+            },
+            {
+              "name": "redis",
+              "version": "*",
+              "repository": "https://charts.bitnami.com/bitnami",
+              "is_pinned": false
+            }
+          ]
+        }
+      ]
+    }
+  }
