@@ -114,22 +114,16 @@ gh run view <run-id> --log-failed
 
 Read the logs, diagnose, and report to the human. **Do not attempt fixes on the release branch** — fixes should go to `main`, and a new release cut after they land.
 
-### Step 4: Verify images
+### Step 4: Verify images exist
 
-After CI passes, confirm the images are on Docker Hub:
-
-```bash
-# Spot-check a few key images
-docker pull earthly/lunar-lib:base-vX.Y.Z
-docker pull earthly/lunar-lib:golang-vX.Y.Z
-docker pull earthly/lunar-lib:docker-vX.Y.Z
-```
-
-Or check via Docker Hub API (no auth needed for public images):
+After CI passes, confirm the images were published to Docker Hub. **Do not pull them** — just check they exist via the API (no auth needed for public images):
 
 ```bash
-curl -s "https://hub.docker.com/v2/repositories/earthly/lunar-lib/tags/?name=vX.Y.Z&page_size=100" | jq '.results[].name'
+# List all tags matching this version
+curl -s "https://hub.docker.com/v2/repositories/earthly/lunar-lib/tags/?name=vX.Y.Z&page_size=100" | jq '.count, [.results[].name]'
 ```
+
+Verify the count matches the number of `+image` targets in the root `Earthfile` `+all` target (base image + all plugins). If any are missing, check the CI build logs for that specific plugin.
 
 ### Step 5: Create a GitHub Release with release notes
 
