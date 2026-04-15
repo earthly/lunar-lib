@@ -26,6 +26,8 @@ This collector writes to the following Component JSON paths:
 | `.helm.charts[].dependencies[].name` | string | Dependency name |
 | `.helm.charts[].dependencies[].version` | string | Version constraint |
 | `.helm.charts[].dependencies[].is_pinned` | boolean | Whether version is constrained (not `*` or empty) |
+| `.helm.native.helm.cicd.cmds[]` | array | Helm commands executed in CI |
+| `.helm.native.helm.cicd.source` | object | CI integration metadata |
 
 ## Collectors
 
@@ -34,6 +36,7 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |-----------|-------------|
 | `helm` | Collects Helm chart metadata, lint results, schema presence, and dependencies |
+| `cicd` | Tracks helm commands executed in CI (install, upgrade, template, package) |
 
 ## Installation
 
