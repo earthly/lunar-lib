@@ -517,33 +517,52 @@ def main(node=None):
 
 `get_value_or_default` catches both `ValueError` and `NoDataError`, returning the default when data is absent — regardless of whether collectors are still running.
 
+### Universal vs Vendor-Specific Policies
+
+The choice between skip and fail depends on whether the policy is **universal** (applies to all components that opted in) or **vendor-specific** (only applies when a particular tool is detected):
+
+**Universal policies** enforce structural requirements that apply regardless of which specific tool is in use. When the collector data is absent, these should **fail** — the user opted into this policy, so absence is a violation. If the policy doesn't apply to a component, the user should exclude it or not apply it.
+
+**Vendor-specific policies** only make sense when a particular tool is detected. When the tool's collector data is absent, these should **skip** — the check simply doesn't apply.
+
+| Policy type | No collector data | Example |
+|-------------|-------------------|---------|
+| Universal (e.g., `ai/instruction-file-exists`) | **Fail** — user opted in, absence is a violation | "Must have AGENTS.md" applies to all repos |
+| Vendor-specific (e.g., `claude/cli-safe-flags`) | **Skip** — tool not in use, check doesn't apply | Claude CLI flags only matter if Claude is used |
+
 ### Decision Rules
 
 | Situation | Action | Example |
 |-----------|--------|---------|
-| Wrong tech stack — collector never ran for this technology | `c.skip(reason)` | Go policy on a Python repo |
-| Right tech stack, optional feature/tool not in use | `c.skip(reason)` | AI CLI policy when no CLI usage detected in CI |
+| Universal policy, no collector data | `c.fail(reason)` | AI instruction file policy — repo should have AGENTS.md |
+| Vendor-specific policy, vendor not detected | `c.skip(reason)` | Claude CLI policy when no Claude usage in CI |
+| Wrong tech stack entirely | `c.skip(reason)` | Go policy on a Python repo |
 | Technology confirmed present, required sub-data missing | `c.fail(reason)` | Go project with no test coverage data |
 | Required artifact should exist for all components | `c.assert_exists(path, msg)` | SAST scanner should run in every CI pipeline |
 | Nothing to check, absence is acceptable | `return c` (pass) | No containers found — pass, not skip |
 
-**Rule of thumb:** Skip = "this check doesn't apply to this component" (applicability). Fail = "this check applies and the component doesn't meet it" (violation).
+**Rule of thumb:** Skip = "this check doesn't apply to this component" (applicability). Fail = "this check applies and the component doesn't meet it" (violation). When in doubt: if the user has to explicitly opt into the policy, absent data is a fail. If the policy is auto-applied broadly, absent data for a specific tool is a skip.
 
 ### Examples from Existing Policies
 
-**Skip — wrong tech stack:**
+**Fail — universal policy, no collector data:**
 ```python
 # From: policies/ai/instruction_file_exists.py
+# This policy enforces that AGENTS.md exists — it applies to all opted-in components
 instructions = c.get_node(".ai.instructions")
 instr_data = instructions.get_value_or_default(".", None)
 if instr_data is None:
-    c.skip("No instruction file data collected — enable the ai collector")
+    c.fail(
+        "No instruction file data found — ensure the ai collector is enabled. "
+        "Exclude this policy if instruction files are not required for this component."
+    )
     return c
 ```
 
-**Skip — optional feature not detected:**
+**Skip — vendor-specific, tool not detected:**
 ```python
 # From: policies/claude/cli_structured_output.py
+# This policy only applies when Claude CLI is actually used in CI
 cmds_node = c.get_node(".ai.native.claude.cicd.cmds")
 cmds_list = cmds_node.get_value_or_default(".", None)
 if cmds_list is None:

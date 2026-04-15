@@ -7,7 +7,10 @@ def main(node=None):
         plans_dir = c.get_node(".ai.plans_dir")
         plans_data = plans_dir.get_value_or_default(".", None)
         if plans_data is None:
-            c.skip("No plans directory data collected — enable the ai collector")
+            c.fail(
+                "No plans directory data found — ensure the ai collector is enabled. "
+                "Exclude this policy if a plans directory is not required for this component."
+            )
             return c
 
         exists = plans_dir.get_value_or_default(".exists", False)

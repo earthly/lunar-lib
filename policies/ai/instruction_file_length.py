@@ -7,7 +7,10 @@ def main(node=None):
         instructions = c.get_node(".ai.instructions")
         instr_data = instructions.get_value_or_default(".", None)
         if instr_data is None:
-            c.skip("No instruction file data collected — enable the ai collector")
+            c.fail(
+                "No instruction file data found — ensure the ai collector is enabled. "
+                "Exclude this policy if instruction files are not required for this component."
+            )
             return c
 
         exists = instructions.get_value_or_default(".root.exists", False)

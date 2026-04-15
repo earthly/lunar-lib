@@ -7,7 +7,10 @@ def main(node=None):
         authorship = c.get_node(".ai.authorship")
         authorship_data = authorship.get_value_or_default(".", None)
         if authorship_data is None:
-            c.skip("No authorship data collected — enable the ai collector")
+            c.fail(
+                "No authorship data found — ensure the ai collector is enabled. "
+                "Exclude this policy if authorship tracking is not required for this component."
+            )
             return c
 
         total = authorship.get_value_or_default(".total_commits", 0)
