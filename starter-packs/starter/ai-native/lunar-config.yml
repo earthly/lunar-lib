@@ -1,0 +1,97 @@
+version: 0
+
+# ============================================================================
+# Starter Pack: AI Native
+# ============================================================================
+
+collectors:
+  # --- Language collectors (only trigger when language is detected) ---
+  - uses: github://earthly/lunar-lib/collectors/golang@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/java@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/python@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/rust@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/php@v1.0.5
+  - uses: github://earthly/lunar-lib/collectors/cpp@main
+  - uses: github://earthly/lunar-lib/collectors/dotnet@main
+  - uses: github://earthly/lunar-lib/collectors/html@main
+  - uses: github://earthly/lunar-lib/collectors/shell@main
+  - uses: github://earthly/lunar-lib/collectors/ruby@main
+
+  # --- AI ---
+  - uses: github://earthly/lunar-lib/collectors/ai@main
+  - uses: github://earthly/lunar-lib/collectors/claude@main
+  - uses: github://earthly/lunar-lib/collectors/codex@main
+  - uses: github://earthly/lunar-lib/collectors/gemini@main
+  - uses: github://earthly/lunar-lib/collectors/coderabbit@main
+
+  # --- Security ---
+  - uses: github://earthly/lunar-lib/collectors/gitleaks@main
+  - uses: github://earthly/lunar-lib/collectors/github-actions@main
+
+  # --- Repo context ---
+  - uses: github://earthly/lunar-lib/collectors/github@v1.0.5
+
+policies:
+  # --- AI guardrails (shared) ---
+  - uses: github://earthly/lunar-lib/policies/ai@main
+    enforcement: score
+    include:
+      - instruction-file-exists
+      - canonical-naming
+      - instruction-file-length
+      - ai-authorship-annotated
+
+  # --- Claude ---
+  - uses: github://earthly/lunar-lib/policies/claude@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
+
+  # --- Codex ---
+  - uses: github://earthly/lunar-lib/policies/codex@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
+
+  # --- Gemini ---
+  - uses: github://earthly/lunar-lib/policies/gemini@main
+    enforcement: score
+    include:
+      - cli-safe-flags
+      - cli-structured-output
+
+  # --- Secret detection ---
+  - uses: github://earthly/lunar-lib/policies/secrets@main
+    enforcement: report-pr
+    include:
+      - no-hardcoded-secrets
+
+  # --- CI security ---
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
+    enforcement: score
+    include:
+      - no-script-injection
+      - permissions-declared
+
+  # --- VCS ---
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.5
+    enforcement: score
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+
+  # --- Testing ---
+  - uses: github://earthly/lunar-lib/policies/testing@v1.0.5
+    enforcement: score
+    include:
+      - executed
+      - passing
+
+  # --- Linting ---
+  - uses: github://earthly/lunar-lib/policies/linter@v1.0.5
+    enforcement: score
+    include:
+      - ran

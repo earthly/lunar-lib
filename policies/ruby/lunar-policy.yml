@@ -1,0 +1,99 @@
+version: 0
+
+name: ruby
+description: Enforces Ruby project structure, dependency management, and security standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Ruby Project Guardrails"
+  long_description: |
+    Enforce Ruby-specific project standards including Gemfile presence, lockfile
+    management, Ruby version pinning, and bundler-audit vulnerability compliance.
+  category: "devex-build-and-ci"
+  icon: "assets/ruby.svg"
+  status: "beta"
+  requires:
+    - slug: "ruby"
+      type: "collector"
+      reason: "Provides Ruby project metadata"
+  related: []
+
+policies:
+  - name: gemfile-exists
+    description: |
+      Ensures the project has a Gemfile for dependency management. Required for
+      all Ruby projects using Bundler.
+    mainPython: gemfile_exists.py
+    keywords: ["Gemfile", "bundler", "ruby project", "dependency management"]
+
+  - name: lockfile-exists
+    description: |
+      Ensures the project has a Gemfile.lock for reproducible dependency
+      resolution. Pinned dependencies prevent unexpected version drift across
+      environments.
+    mainPython: lockfile_exists.py
+    keywords: ["Gemfile.lock", "lockfile", "dependencies", "reproducibility"]
+
+  - name: ruby-version-set
+    description: |
+      Ensures the Ruby version is explicitly specified via a .ruby-version file
+      or a ruby directive in the Gemfile. Pinning the Ruby version prevents
+      environment inconsistencies between development, CI, and production.
+    mainPython: ruby_version_set.py
+    keywords: ["ruby version", ".ruby-version", "version pinning", "rbenv", "rvm"]
+
+  - name: bundler-audit-clean
+    description: |
+      Ensures bundler-audit reports no known vulnerabilities in the project's
+      gem dependencies. Skips gracefully if bundler-audit has not been run.
+      Requires the bundler-audit-cicd collector to capture audit results from CI.
+    mainPython: bundler_audit_clean.py
+    keywords: ["bundler-audit", "vulnerabilities", "security", "CVE", "advisory"]
+
+  - name: min-ruby-version
+    description: |
+      Ensures the project uses at least the minimum required Ruby version.
+      Helps maintain security and compatibility standards.
+    mainPython: min_ruby_version.py
+    keywords: ["ruby version", "compatibility", "security"]
+
+  - name: min-ruby-version-cicd
+    description: |
+      Ensures the Ruby version used in CI/CD commands meets the minimum
+      required version for build environments.
+    mainPython: min_ruby_version_cicd.py
+    keywords: ["ruby version", "ci/cd", "compatibility", "security"]
+
+  - name: min-bundler-version-cicd
+    description: |
+      Ensures the Bundler version used in CI/CD commands meets the minimum
+      required version. Outdated Bundler versions may have security issues
+      or lack features needed for reliable dependency resolution.
+    mainPython: min_bundler_version_cicd.py
+    keywords: ["bundler version", "ci/cd", "compatibility", "security"]
+
+  - name: min-rake-version-cicd
+    description: |
+      Ensures the Rake version used in CI/CD commands meets the minimum
+      required version for build automation.
+    mainPython: min_rake_version_cicd.py
+    keywords: ["rake version", "ci/cd", "compatibility", "security"]
+
+inputs:
+  max_audit_vulnerabilities:
+    description: Maximum allowed known vulnerabilities from bundler-audit (0 = must be clean)
+    default: "0"
+  min_ruby_version:
+    description: Minimum required Ruby version (e.g., "3.0", "3.2")
+    default: "3.0"
+  min_ruby_version_cicd:
+    description: Minimum required Ruby version for CI/CD commands
+    default: "3.0"
+  min_bundler_version_cicd:
+    description: Minimum required Bundler version for CI/CD commands
+    default: "2.4"
+  min_rake_version_cicd:
+    description: Minimum required Rake version for CI/CD commands
+    default: "13.0"
