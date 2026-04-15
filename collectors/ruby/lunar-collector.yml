@@ -1,0 +1,164 @@
+version: 0
+
+name: ruby
+description: Collect Ruby project information, CI/CD commands, and dependencies
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:ruby-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Ruby Collector"
+  long_description: |
+    Analyze Ruby projects to collect Bundler metadata, dependencies, Ruby version,
+    and CI/CD command tracking. Detects Gemfile, .ruby-version, Rakefile, and gemspec files.
+  categories: ["languages", "build"]
+  icon: "assets/ruby.svg"
+  status: "beta"
+  related:
+    - slug: "ruby"
+      type: "policy"
+      reason: "Ruby project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Ruby project structure by detecting Gemfile, Gemfile.lock,
+      .ruby-version, Rakefile, and .gemspec files. Extracts the Ruby version
+      from .ruby-version or the Gemfile ruby directive. Detects build systems
+      (Bundler, Rake). Writes project metadata to .lang.ruby.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["ruby", "gemfile", "bundler", "project structure", "ruby-version"]
+
+  - name: dependencies
+    description: |
+      Extracts direct and development dependencies from Gemfile and Gemfile.lock.
+      Captures gem name, version constraint, and dependency group (default,
+      development, test). Writes dependency data to .lang.ruby.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["ruby dependencies", "bundler", "gems", "supply chain", "packages"]
+
+  - name: cicd
+    description: |
+      Records every ruby command executed in CI pipelines along with the Ruby
+      runtime version. Writes command strings and version info to .lang.ruby.cicd
+      for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: ruby
+    keywords: ["ruby ci", "ruby version", "ci commands", "build tracking"]
+
+  - name: bundler-cicd
+    description: |
+      Records every bundle command executed in CI pipelines along with the
+      Bundler version. Writes command strings and version info to
+      .lang.ruby.bundler.cicd.
+    mainBash: bundler-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: bundle
+    keywords: ["bundler ci", "bundle version", "ci commands", "dependency management"]
+
+  - name: rake-cicd
+    description: |
+      Records every rake command executed in CI pipelines along with the Rake
+      version. Writes command strings and version info to .lang.ruby.rake.cicd.
+    mainBash: rake-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: rake
+    keywords: ["rake ci", "rake version", "ci commands", "build automation"]
+
+  - name: bundler-audit
+    description: |
+      Runs bundler-audit against Gemfile.lock to check for known vulnerabilities
+      in gem dependencies. Requires Gemfile.lock to be present. Writes advisory
+      details including gem name, version, CVE, and severity to
+      .lang.ruby.bundler_audit.
+    mainBash: bundler-audit.sh
+    hook:
+      type: code
+    keywords: ["bundler-audit", "vulnerabilities", "security", "gem audit", "CVE"]
+
+  - name: bundler-audit-cicd
+    description: |
+      Parses bundle audit results after the command completes in CI. Extracts
+      vulnerability advisories including gem name, installed version, advisory ID,
+      and severity. Writes results to .lang.ruby.bundler_audit.
+    mainBash: bundler-audit-cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: bundle
+      args:
+        - value: audit
+    keywords: ["bundler-audit", "vulnerabilities", "security", "gem audit"]
+
+example_component_json: |
+  {
+    "lang": {
+      "ruby": {
+        "version": "3.2.2",
+        "build_systems": ["bundler", "rake"],
+        "gemfile_exists": true,
+        "gemfile_lock_exists": true,
+        "ruby_version_file_exists": true,
+        "rakefile_exists": true,
+        "gemspec_files": ["my_gem.gemspec"],
+        "source": { "tool": "ruby", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "ruby app.rb", "version": "3.2.2" }
+          ]
+        },
+        "bundler": {
+          "cicd": {
+            "cmds": [
+              { "cmd": "bundle install", "version": "2.4.22" }
+            ]
+          }
+        },
+        "rake": {
+          "cicd": {
+            "cmds": [
+              { "cmd": "rake test", "version": "13.1.0" }
+            ]
+          }
+        },
+        "bundler_audit": {
+          "vulnerabilities": [
+            {
+              "gem": "actionpack",
+              "version": "7.0.4",
+              "advisory": "CVE-2023-22795",
+              "title": "ReDoS vulnerability in Accept header parsing",
+              "criticality": "High"
+            }
+          ],
+          "source": { "tool": "bundler-audit", "integration": "ci" }
+        },
+        "dependencies": {
+          "direct": [
+            { "name": "rails", "version": "7.1.3", "group": "default" },
+            { "name": "pg", "version": "1.5.4", "group": "default" }
+          ],
+          "development": [
+            { "name": "rspec", "version": "3.12.0", "group": "development" },
+            { "name": "rubocop", "version": "1.60.0", "group": "development" }
+          ],
+          "source": { "tool": "bundler", "integration": "code" }
+        }
+      }
+    }
+  }
