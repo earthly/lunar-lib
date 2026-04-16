@@ -1,0 +1,54 @@
+version: 0
+
+name: renovate
+description: Parse Renovate configuration and collect dependency update settings
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Renovate Collector"
+  long_description: |
+    Parses Renovate configuration files (renovate.json, .renovaterc, .renovaterc.json,
+    or the renovate key in package.json) to collect dependency update settings including
+    preset extensions, enabled managers, and package rule counts. Enables enforcement
+    of dependency automation standards.
+  categories: ["supply-chain"]
+  icon: "assets/renovate.svg"
+  status: "beta"
+  related:
+    - slug: "dep-automation"
+      type: "policy"
+      reason: "Enforces dependency automation standards using collected Renovate data"
+
+collectors:
+  - name: config
+    description: |
+      Scans the repository for Renovate configuration in standard locations:
+      renovate.json, .renovaterc, .renovaterc.json, or the "renovate" key
+      in package.json. Parses the JSON to extract preset extensions, enabled
+      managers, and package rule counts. Writes structured data to
+      .dep_automation.renovate.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["renovate", "dependency updates", "automated PRs", "supply chain", "dependency automation"]
+
+inputs:
+  paths:
+    description: Comma-separated list of Renovate config file paths to check (first match wins). package.json is always checked as a fallback for the "renovate" key.
+    default: "renovate.json,.renovaterc,.renovaterc.json,renovate.json5"
+
+example_component_json: |
+  {
+    "dep_automation": {
+      "renovate": {
+        "exists": true,
+        "valid": true,
+        "path": "renovate.json",
+        "extends": ["config:base", "group:recommended"],
+        "all_managers_enabled": true,
+        "enabled_managers": [],
+        "package_rules_count": 3
+      }
+    }
+  }

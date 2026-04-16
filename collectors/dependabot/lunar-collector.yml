@@ -1,0 +1,72 @@
+version: 0
+
+name: dependabot
+description: Parse Dependabot configuration and collect dependency update settings
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Dependabot Collector"
+  long_description: |
+    Parses .github/dependabot.yml to collect dependency update configuration
+    including covered ecosystems, update schedules, and directory targets.
+    Enables enforcement of dependency automation standards.
+  categories: ["supply-chain"]
+  icon: "assets/dependabot.svg"
+  status: "beta"
+  related:
+    - slug: "dep-automation"
+      type: "policy"
+      reason: "Enforces dependency automation standards using collected Dependabot data"
+
+collectors:
+  - name: config
+    description: |
+      Scans the repository for a Dependabot configuration file at
+      .github/dependabot.yml (or .yaml variant). Parses the YAML to extract
+      the schema version, update entries (ecosystem, directory, schedule),
+      and a normalized list of covered ecosystems. Writes structured data
+      to .dep_automation.dependabot.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["dependabot", "dependency updates", "automated PRs", "supply chain", "dependency automation"]
+
+inputs:
+  paths:
+    description: Comma-separated list of Dependabot config file paths to check (first match wins)
+    default: ".github/dependabot.yml,.github/dependabot.yaml"
+
+example_component_json: |
+  {
+    "dep_automation": {
+      "dependabot": {
+        "exists": true,
+        "valid": true,
+        "path": ".github/dependabot.yml",
+        "version": 2,
+        "updates": [
+          {
+            "package_ecosystem": "npm",
+            "directory": "/",
+            "schedule": "weekly",
+            "open_pull_requests_limit": 5
+          },
+          {
+            "package_ecosystem": "docker",
+            "directory": "/",
+            "schedule": "weekly",
+            "open_pull_requests_limit": 5
+          },
+          {
+            "package_ecosystem": "github-actions",
+            "directory": "/",
+            "schedule": "weekly",
+            "open_pull_requests_limit": 5
+          }
+        ],
+        "ecosystems": ["docker", "github-actions", "npm"],
+        "update_count": 3
+      }
+    }
+  }
