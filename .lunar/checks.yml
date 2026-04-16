@@ -11,25 +11,16 @@ checks:
     run: "! grep -qE '<title>' {file}"
     message: "Strip <title> tags from SVG icons. They add unnecessary metadata."
 
+  # ── Stop-phase checks (run once at end of session, not per-file) ──
+  # These use "hook: stop" to run in the Stop hook instead of PostToolUse.
+  # The Stop hook checks if any changed file matches the "on" pattern,
+  # then runs the command once (not per-file). Use for expensive checks.
+
   - name: lint
-    on: "**/lunar-collector.yml"
-    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
-    message: "Linter failed. Fix the errors above before committing."
-
-  - name: lint-policy
-    on: "**/lunar-policy.yml"
-    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
-    message: "Linter failed. Fix the errors above before committing."
-
-  - name: lint-readme
-    on: "collectors/*/README.md"
-    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
-    message: "Linter failed. Fix the errors above before committing."
-
-  - name: lint-policy-readme
-    on: "policies/*/README.md"
-    run: "cd $(git rev-parse --show-toplevel) && earthly +lint 2>&1 | tail -5"
-    message: "Linter failed. Fix the errors above before committing."
+    hook: stop
+    on: "**/*.yml"
+    run: "earthly +lint 2>&1 | tail -10"
+    message: "Linter failed. Fix errors before pushing."
 
   - name: earthfile-wired-into-all
     on: "collectors/*/Earthfile"
