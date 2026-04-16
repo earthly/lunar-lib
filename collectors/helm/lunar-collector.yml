@@ -91,16 +91,12 @@ example_component_json: |
             ]
           }
         ],
-        "native": {
-          "helm": {
-            "cicd": {
-              "cmds": [
-                {"cmd": "helm upgrade --install api ./charts/api -f values-prod.yaml", "version": "3.14.0"},
-                {"cmd": "helm template api ./charts/api", "version": "3.14.0"}
-              ],
-              "source": {"tool": "helm", "integration": "ci"}
-            }
-          }
+        "cicd": {
+          "cmds": [
+            {"cmd": "helm upgrade --install api ./charts/api -f values-prod.yaml", "version": "3.14.0"},
+            {"cmd": "helm template api ./charts/api", "version": "3.14.0"}
+          ],
+          "source": {"tool": "helm", "integration": "ci"}
         }
       }
     }

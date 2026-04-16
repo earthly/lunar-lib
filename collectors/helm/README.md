@@ -20,14 +20,16 @@ This collector writes to the following Component JSON paths:
 | `.k8s.helm.charts[].version_is_semver` | boolean | Whether version follows semver |
 | `.k8s.helm.charts[].lint_passed` | boolean | Whether helm lint passed |
 | `.k8s.helm.charts[].lint_errors` | array | Lint error messages (empty if passed) |
+| `.k8s.helm.charts[].app_version` | string | App version from Chart.yaml (appVersion field) |
 | `.k8s.helm.charts[].has_values_schema` | boolean | Whether values.schema.json exists |
 | `.k8s.helm.charts[].schema_path` | string | Path to values schema file |
 | `.k8s.helm.charts[].dependencies[]` | array | Chart dependencies from Chart.yaml |
 | `.k8s.helm.charts[].dependencies[].name` | string | Dependency name |
 | `.k8s.helm.charts[].dependencies[].version` | string | Version constraint |
+| `.k8s.helm.charts[].dependencies[].repository` | string | Repository URL for the dependency |
 | `.k8s.helm.charts[].dependencies[].is_pinned` | boolean | Whether version is constrained (not `*` or empty) |
-| `.k8s.helm.native.helm.cicd.cmds[]` | array | Helm commands executed in CI |
-| `.k8s.helm.native.helm.cicd.source` | object | CI integration metadata |
+| `.k8s.helm.cicd.cmds[]` | array | Helm commands executed in CI |
+| `.k8s.helm.cicd.source` | object | CI integration metadata |
 
 ## Collectors
 
