@@ -1,4 +1,4 @@
-# `dep-automation` Guardrails
+# Dependency Automation Guardrails
 
 Enforces that repositories have automated dependency updates configured via Dependabot or Renovate.
 

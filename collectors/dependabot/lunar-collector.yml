@@ -11,7 +11,7 @@ landing_page:
     Parses .github/dependabot.yml to collect dependency update configuration
     including covered ecosystems, update schedules, and directory targets.
     Enables enforcement of dependency automation standards.
-  categories: ["supply-chain"]
+  categories: ["security"]
   icon: "assets/dependabot.svg"
   status: "beta"
   related:

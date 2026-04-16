@@ -1,4 +1,4 @@
-# `dependabot` Collector
+# Dependabot Collector
 
 Parses Dependabot configuration to collect dependency update settings and covered ecosystems.
 

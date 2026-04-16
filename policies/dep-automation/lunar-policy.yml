@@ -11,7 +11,7 @@ landing_page:
     Enforce that repositories have automated dependency updates configured
     via Dependabot or Renovate. Checks that at least one tool is present
     and that all detected package ecosystems have update rules defined.
-  category: "supply-chain"
+  category: "security-and-compliance"
   icon: "assets/dep-automation.svg"
   status: "beta"
   requires:

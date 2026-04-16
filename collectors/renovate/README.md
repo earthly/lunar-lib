@@ -1,4 +1,4 @@
-# `renovate` Collector
+# Renovate Collector
 
 Parses Renovate configuration to collect dependency update settings and enabled managers.
 

@@ -12,7 +12,7 @@ landing_page:
     or the renovate key in package.json) to collect dependency update settings including
     preset extensions, enabled managers, and package rule counts. Enables enforcement
     of dependency automation standards.
-  categories: ["supply-chain"]
+  categories: ["security"]
   icon: "assets/renovate.svg"
   status: "beta"
   related:
