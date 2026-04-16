@@ -6,12 +6,6 @@ Parses and lints Backstage `catalog-info.yaml` files to collect service catalog 
 
 This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. It extracts entity metadata, annotations, API declarations, and dependencies. Data is written to the `.catalog` Component JSON category, enabling backstage policy enforcement. The search paths are configurable via the `paths` input.
 
-## Sub-collectors
-
-| Name | Description |
-|------|-------------|
-| `catalog-info` | Parses and lints `catalog-info.yaml`; writes parsed metadata and lint results |
-
 ## Collected Data
 
 This collector writes to the following Component JSON paths:
@@ -26,6 +20,14 @@ This collector writes to the following Component JSON paths:
 | `.catalog.annotations` | object | Normalized annotations (`pagerduty_service`, `grafana_dashboard`, `runbook`, `slack_channel`) |
 | `.catalog.apis` | object | API declarations (`provides[]`, `consumes[]`) |
 | `.catalog.dependencies` | array | Declared runtime dependencies |
+
+## Collectors
+
+This plugin provides the following collectors (use `include` to select a subset):
+
+| Collector | Hook Type | Description |
+|-----------|-----------|-------------|
+| `catalog-info` | code | Parses and lints `catalog-info.yaml`; writes parsed metadata and lint results |
 
 ## Installation
 
