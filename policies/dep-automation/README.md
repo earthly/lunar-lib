@@ -26,6 +26,7 @@ This policy reads from the following Component JSON paths:
 | `.dep_automation.renovate.exists` | boolean | `renovate` collector |
 | `.dep_automation.renovate.all_managers_enabled` | boolean | `renovate` collector |
 | `.dep_automation.renovate.enabled_managers` | array | `renovate` collector |
+| `.dep_automation.native.renovate` | object | `renovate` collector (raw config for reference) |
 | `.lang.*` | object | Language collectors (go, nodejs, python, etc.) |
 | `.containers.definitions` | array | Container collector |
 | `.ci.native.github_actions` | object | GitHub Actions collector |
@@ -143,18 +144,19 @@ When this policy fails, you can resolve it by:
 
 ### Ecosystem mapping
 
-The policy maps detected component data to Dependabot ecosystem names:
+The `all-ecosystems-covered` check is **scoped to ecosystems that map to an existing lunar-lib collector**. If a language has no collector in this repo, the policy has no signal to cross-reference against and won't flag missing coverage for it. Dependabot ecosystems like `pub` (Dart), `mix` (Elixir), `swift`, `elm`, and `gitsubmodule` are intentionally out of scope until the corresponding language collectors exist.
 
-| Component Signal | Ecosystem Name |
-|-----------------|----------------|
-| `.lang.nodejs` | `npm` |
-| `.lang.python` | `pip` |
-| `.lang.go` | `gomod` |
-| `.lang.java` (maven) | `maven` |
-| `.lang.java` (gradle) | `gradle` |
-| `.lang.ruby` | `bundler` |
-| `.lang.rust` | `cargo` |
-| `.lang.dotnet` | `nuget` |
-| `.containers.definitions` | `docker` |
-| `.ci.native.github_actions` | `github-actions` |
-| `.iac` (terraform) | `terraform` |
+| Component Signal | Ecosystem Name | Provided By |
+|-----------------|----------------|-------------|
+| `.lang.nodejs` | `npm` | `nodejs` collector |
+| `.lang.python` | `pip` | `python` collector |
+| `.lang.go` | `gomod` | `golang` collector |
+| `.lang.java` (maven) | `maven` | `java` collector |
+| `.lang.java` (gradle) | `gradle` | `java` collector |
+| `.lang.ruby` | `bundler` | `ruby` collector |
+| `.lang.rust` | `cargo` | `rust` collector |
+| `.lang.dotnet` | `nuget` | `dotnet` collector |
+| `.lang.php` | `composer` | `php` collector |
+| `.containers.definitions` | `docker` | `docker` collector |
+| `.ci.native.github_actions` | `github-actions` | `github-actions` collector |
+| `.iac` (terraform) | `terraform` | `terraform` collector |

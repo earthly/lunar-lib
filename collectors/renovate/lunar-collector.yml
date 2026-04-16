@@ -8,10 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Renovate Collector"
   long_description: |
-    Parses Renovate configuration files (renovate.json, .renovaterc, .renovaterc.json,
-    or the renovate key in package.json) to collect dependency update settings including
-    preset extensions, enabled managers, and package rule counts. Enables enforcement
-    of dependency automation standards.
+    Parses Renovate config (renovate.json, .renovaterc, .renovaterc.json, or the
+    renovate key in package.json). Slurps the full parsed config to
+    .dep_automation.native.renovate and exposes normalized fields
+    (extends, enabled managers) at .dep_automation.renovate for policy use.
   categories: ["security"]
   icon: "assets/renovate.svg"
   status: "beta"
@@ -25,9 +25,9 @@ collectors:
     description: |
       Scans the repository for Renovate configuration in standard locations:
       renovate.json, .renovaterc, .renovaterc.json, or the "renovate" key
-      in package.json. Parses the JSON to extract preset extensions, enabled
-      managers, and package rule counts. Writes structured data to
-      .dep_automation.renovate.
+      in package.json. Writes the full parsed config verbatim to
+      .dep_automation.native.renovate and extracts a normalized summary
+      (extends, enabled managers) to .dep_automation.renovate for policies.
     mainBash: main.sh
     hook:
       type: code
@@ -47,8 +47,19 @@ example_component_json: |
         "path": "renovate.json",
         "extends": ["config:base", "group:recommended"],
         "all_managers_enabled": true,
-        "enabled_managers": [],
-        "package_rules_count": 3
+        "enabled_managers": []
+      },
+      "native": {
+        "renovate": {
+          "extends": ["config:base", "group:recommended"],
+          "packageRules": [
+            {"matchUpdateTypes": ["minor", "patch"], "automerge": true},
+            {"matchPackagePatterns": ["^@types/"], "groupName": "type definitions"},
+            {"matchDepTypes": ["devDependencies"], "rangeStrategy": "pin"}
+          ],
+          "schedule": ["before 9am on monday"],
+          "labels": ["dependencies"]
+        }
       }
     }
   }
