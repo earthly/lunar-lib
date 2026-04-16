@@ -1,0 +1,52 @@
+version: 0
+
+name: backstage
+description: Enforce Backstage service catalog standards
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage Guardrails"
+  long_description: |
+    Validates Backstage catalog-info.yaml entries for completeness and
+    compliance. Checks that the catalog file exists, owner is set,
+    lifecycle stage is defined, and system grouping is assigned.
+  category: "repository-and-ownership"
+  icon: "assets/backstage.svg"
+  status: "beta"
+  requires:
+    - slug: "backstage"
+      type: "collector"
+      reason: "Provides parsed Backstage catalog metadata at .catalog"
+
+policies:
+  - name: catalog-info-exists
+    description: |
+      Verifies that a catalog-info.yaml file exists in the repository.
+      Every Backstage-managed service must have a catalog definition file.
+    mainPython: ./catalog-info-exists.py
+    keywords: ["backstage", "catalog-info", "service catalog", "file exists"]
+
+  - name: owner-set
+    description: |
+      Validates that the owner field (spec.owner) is populated in the
+      catalog-info.yaml. Ownership is required for incident routing
+      and accountability.
+    mainPython: ./owner-set.py
+    keywords: ["backstage", "ownership", "owner", "accountability"]
+
+  - name: lifecycle-set
+    description: |
+      Validates that the lifecycle stage (spec.lifecycle) is defined in
+      the catalog-info.yaml. Lifecycle stages (production, experimental,
+      deprecated) inform operational expectations and SLO requirements.
+    mainPython: ./lifecycle-set.py
+    keywords: ["backstage", "lifecycle", "production", "deprecated"]
+
+  - name: system-set
+    description: |
+      Validates that the system grouping (spec.system) is defined in
+      the catalog-info.yaml. System assignment enables dependency mapping
+      and architectural visibility.
+    mainPython: ./system-set.py
+    keywords: ["backstage", "system", "grouping", "architecture"]

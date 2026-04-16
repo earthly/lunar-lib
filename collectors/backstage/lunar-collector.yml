@@ -1,0 +1,72 @@
+version: 0
+
+name: backstage
+description: Parse catalog-info.yaml for Backstage service catalog metadata
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage Collector"
+  long_description: |
+    Parses Backstage catalog-info.yaml files to collect service catalog metadata
+    including entity information, ownership, lifecycle stage, system grouping,
+    annotations, API declarations, and dependencies. Writes to the normalized
+    .catalog Component JSON category for use with catalog and backstage policies.
+  categories: ["repository-and-ownership"]
+  icon: "assets/backstage.svg"
+  status: "beta"
+  related:
+    - slug: "backstage"
+      type: "policy"
+      reason: "Enforces Backstage catalog standards based on collected metadata"
+    - slug: "catalog"
+      type: "policy"
+      reason: "Normalized catalog policy that checks for service catalog registration"
+
+collectors:
+  - name: backstage
+    description: |
+      Scans the repository for a catalog-info.yaml file (configurable paths)
+      and parses its contents. Extracts entity metadata (name, type, description,
+      owner, system, lifecycle, tags), annotations, API declarations, and
+      dependencies. Writes structured data to `.catalog`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system"]
+
+inputs:
+  paths:
+    description: Comma-separated list of catalog file paths to check (first match wins)
+    default: "catalog-info.yaml,catalog-info.yml"
+
+example_component_json: |
+  {
+    "catalog": {
+      "exists": true,
+      "source": {
+        "tool": "backstage",
+        "file": "catalog-info.yaml"
+      },
+      "entity": {
+        "name": "payment-api",
+        "type": "service",
+        "description": "Payment processing API",
+        "owner": "team-payments",
+        "system": "payment-platform",
+        "lifecycle": "production",
+        "tags": ["payments", "api", "tier1"]
+      },
+      "annotations": {
+        "pagerduty_service": "PXXXXXX",
+        "grafana_dashboard": "https://grafana.example.com/d/abc123",
+        "runbook": "https://wiki.example.com/runbooks/payment-api",
+        "slack_channel": "#payments-oncall"
+      },
+      "apis": {
+        "provides": ["payment-api"],
+        "consumes": ["user-api", "notification-api"]
+      },
+      "dependencies": ["database-payments", "cache-redis"]
+    }
+  }
