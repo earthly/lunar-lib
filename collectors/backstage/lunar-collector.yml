@@ -8,9 +8,9 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Backstage Collector"
   long_description: |
-    Parses and lints Backstage catalog-info.yaml files to collect service
-    catalog metadata: entity info, ownership, lifecycle, system, annotations,
-    APIs, and dependencies. Writes to the .catalog Component JSON category.
+    Parses and lints Backstage catalog-info.yaml files. Writes the raw
+    Backstage descriptor (apiVersion, kind, metadata, spec) to the
+    .backstage Component JSON category, preserving annotations as-is.
   categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "beta"
@@ -23,11 +23,11 @@ collectors:
   - name: catalog-info
     description: |
       Scans the repository for a catalog-info.yaml file (configurable paths)
-      and parses its contents. Extracts entity metadata (name, type, description,
-      owner, system, lifecycle, tags), annotations, API declarations, and
-      dependencies. Lints the file for schema/syntax issues and writes any
-      findings to `.catalog.valid` and `.catalog.errors[]`. Writes structured
-      data to `.catalog`.
+      and parses its contents as-is into `.backstage` (apiVersion, kind,
+      metadata, spec). Annotations are preserved verbatim with their
+      `backstage.io/` or vendor prefixes. Lints the file for schema/syntax
+      issues and writes any findings to `.backstage.valid` and
+      `.backstage.errors[]`.
     mainBash: main.sh
     hook:
       type: code
@@ -40,33 +40,32 @@ inputs:
 
 example_component_json: |
   {
-    "catalog": {
+    "backstage": {
       "exists": true,
       "valid": true,
       "errors": [],
-      "source": {
-        "tool": "backstage",
-        "file": "catalog-info.yaml"
-      },
-      "entity": {
+      "path": "catalog-info.yaml",
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
         "name": "payment-api",
-        "type": "service",
         "description": "Payment processing API",
-        "owner": "team-payments",
-        "system": "payment-platform",
-        "lifecycle": "production",
+        "annotations": {
+          "backstage.io/techdocs-ref": "dir:.",
+          "pagerduty.com/integration-key": "PXXXXXX",
+          "grafana/dashboard-selector": "https://grafana.example.com/d/abc123",
+          "backstage.io/source-location": "url:https://github.com/acme/payment-api"
+        },
         "tags": ["payments", "api", "tier1"]
       },
-      "annotations": {
-        "pagerduty_service": "PXXXXXX",
-        "grafana_dashboard": "https://grafana.example.com/d/abc123",
-        "runbook": "https://wiki.example.com/runbooks/payment-api",
-        "slack_channel": "#payments-oncall"
-      },
-      "apis": {
-        "provides": ["payment-api"],
-        "consumes": ["user-api", "notification-api"]
-      },
-      "dependencies": ["database-payments", "cache-redis"]
+      "spec": {
+        "type": "service",
+        "owner": "team-payments",
+        "lifecycle": "production",
+        "system": "payment-platform",
+        "providesApis": ["payment-api"],
+        "consumesApis": ["user-api", "notification-api"],
+        "dependsOn": ["resource:database-payments", "resource:cache-redis"]
+      }
     }
   }

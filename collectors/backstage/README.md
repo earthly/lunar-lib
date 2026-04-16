@@ -1,10 +1,10 @@
 # Backstage Collector
 
-Parses and lints Backstage `catalog-info.yaml` files to collect service catalog metadata.
+Parses and lints Backstage `catalog-info.yaml` files.
 
 ## Overview
 
-This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. It extracts entity metadata, annotations, API declarations, and dependencies. Data is written to the `.catalog` Component JSON category, enabling backstage policy enforcement. The search paths are configurable via the `paths` input.
+This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. The raw Backstage descriptor (apiVersion, kind, metadata, spec) is written to the `.backstage` Component JSON category as-is — annotations keep their original `backstage.io/` or vendor prefixes. The search paths are configurable via the `paths` input.
 
 ## Collected Data
 
@@ -12,14 +12,14 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.catalog.exists` | boolean | Whether a catalog-info file was found |
-| `.catalog.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
-| `.catalog.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
-| `.catalog.source` | object | Source metadata (`tool`, `file` path) |
-| `.catalog.entity` | object | Entity metadata (`name`, `type`, `description`, `owner`, `system`, `lifecycle`, `tags`) |
-| `.catalog.annotations` | object | Normalized annotations (`pagerduty_service`, `grafana_dashboard`, `runbook`, `slack_channel`) |
-| `.catalog.apis` | object | API declarations (`provides[]`, `consumes[]`) |
-| `.catalog.dependencies` | array | Declared runtime dependencies |
+| `.backstage.exists` | boolean | Whether a catalog-info file was found |
+| `.backstage.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
+| `.backstage.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
+| `.backstage.path` | string | Relative path to the file that was parsed |
+| `.backstage.apiVersion` | string | Backstage API version (e.g. `backstage.io/v1alpha1`) |
+| `.backstage.kind` | string | Entity kind (e.g. `Component`, `System`, `API`) |
+| `.backstage.metadata` | object | Raw `metadata` block (`name`, `description`, `annotations`, `tags`, etc.) |
+| `.backstage.spec` | object | Raw `spec` block (`type`, `owner`, `lifecycle`, `system`, `providesApis`, `consumesApis`, `dependsOn`, etc.) |
 
 ## Collectors
 
