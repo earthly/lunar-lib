@@ -8,11 +8,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Backstage Collector"
   long_description: |
-    Parses Backstage catalog-info.yaml files to collect service catalog metadata
-    including entity information, ownership, lifecycle stage, system grouping,
-    annotations, API declarations, and dependencies. Writes to the normalized
-    .catalog Component JSON category for use with catalog and backstage policies.
-  categories: ["repository-and-ownership"]
+    Parses Backstage catalog-info.yaml files to collect service catalog metadata:
+    entity info, ownership, lifecycle, system, annotations, APIs, and dependencies.
+    Writes to the normalized .catalog category for catalog and backstage policies.
+  categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "beta"
   related:
