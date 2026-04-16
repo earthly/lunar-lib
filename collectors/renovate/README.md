@@ -4,7 +4,7 @@ Parses Renovate configuration and writes both a normalized summary and the full 
 
 ## Overview
 
-This collector scans the repository for Renovate configuration files in standard locations (`renovate.json`, `.renovaterc`, `.renovaterc.json`, or the `renovate` key in `package.json`). The full parsed config is slurped verbatim to `.dep_automation.native.renovate` for reference, and a small normalized summary (extends, enabled managers) is written to `.dep_automation.renovate` for the `dep-automation` policy to consume. Policies that need details beyond the summary (e.g. `packageRules`, `schedule`, `ignoreDeps`) can read them directly from the native config.
+Scans the repository for Renovate configuration in every location Renovate itself reads. The full parsed config is slurped verbatim to `.dep_automation.native.renovate` for reference, and a small normalized summary (extends, enabled managers) is written to `.dep_automation.renovate` for the `dep-automation` policy. Config location depends on the SCM host (GitHub, GitLab, Bitbucket, Azure DevOps), not the CI environment.
 
 ## Collected Data
 
@@ -34,4 +34,23 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/renovate@v1.0.0
     on: ["domain:your-domain"]
+    # with:
+    #   paths: "renovate.json,.github/renovate.json"  # Override default search paths
 ```
+
+### Default search paths
+
+First match wins. `package.json` is always checked last as a fallback for the `renovate` key.
+
+| Path | When Renovate uses it |
+|------|------------------------|
+| `renovate.json` | Any host |
+| `renovate.json5` | Any host |
+| `.github/renovate.json` | GitHub-hosted repos |
+| `.github/renovate.json5` | GitHub-hosted repos |
+| `.gitlab/renovate.json` | GitLab-hosted repos |
+| `.gitlab/renovate.json5` | GitLab-hosted repos |
+| `.renovaterc` | Any host |
+| `.renovaterc.json` | Any host |
+| `.renovaterc.json5` | Any host |
+| `package.json` (`renovate` key) | Any host (fallback) |
