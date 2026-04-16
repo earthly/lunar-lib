@@ -3,6 +3,14 @@
 set -eo pipefail
 export ANTHROPIC_API_KEY="$LUNAR_SECRET_ANTHROPIC_API_KEY"
 
+# Skip when no prompt/path is configured — run-prompt only makes sense when
+# the caller provides `with: { prompt, path }`. Without them the sub-collector
+# has nothing to do, so skip gracefully instead of failing the whole run.
+if [ -z "${LUNAR_VAR_PROMPT:-}" ] || [ -z "${LUNAR_VAR_PATH:-}" ]; then
+    echo "No prompt/path configured; skipping run-prompt" >&2
+    exit 0
+fi
+
 # Validate required environment variables
 validateRequiredEnv() {
     local var="$1"
@@ -12,8 +20,6 @@ validateRequiredEnv() {
     fi
 }
 
-validateRequiredEnv "LUNAR_VAR_PATH"
-validateRequiredEnv "LUNAR_VAR_PROMPT"
 validateRequiredEnv "ANTHROPIC_API_KEY"
 
 # https://linear.app/earthly-technologies/issue/ENG-163/dollarshell-is-incorrect-in-snippet-runs
