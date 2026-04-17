@@ -5,6 +5,7 @@ description: Parses Terraform HCL files and collects IaC configuration data
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:terraform-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Terraform Collector"
@@ -35,6 +36,18 @@ collectors:
     hook:
       type: code
     keywords: ["terraform", "iac", "infrastructure", "hcl", "aws", "providers", "modules", "backend"]
+
+  - name: cicd
+    description: |
+      Records every terraform command executed in CI pipelines along with the
+      Terraform CLI version. Writes command strings and version info to
+      .iac.native.terraform.cicd for audit trails and build reproducibility.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: terraform
+    keywords: ["terraform ci", "terraform version", "ci commands", "iac tracking", "deployment tracking"]
 
 example_component_json: |
   {
@@ -71,7 +84,15 @@ example_component_json: |
                 "resource": {"aws_db_instance": {"main": [{"engine": "postgres"}]}}
               }
             }
-          ]
+          ],
+          "cicd": {
+            "cmds": [
+              {"cmd": "terraform init", "version": "1.9.8"},
+              {"cmd": "terraform plan -out=tfplan", "version": "1.9.8"},
+              {"cmd": "terraform apply -auto-approve tfplan", "version": "1.9.8"}
+            ],
+            "source": {"tool": "terraform", "integration": "ci"}
+          }
         }
       }
     }
