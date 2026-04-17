@@ -24,12 +24,14 @@ collectors:
   - name: oncall
     description: |
       Queries the PagerDuty REST API for the component's service. Discovers
-      the service ID from component metadata annotations
-      (pagerduty.com/service-id) or falls back to the explicit service_id
-      input. Fetches service details, on-call schedule participants, and
-      escalation policy. Writes normalized data to .oncall.service,
-      .oncall.schedule, .oncall.escalation, and .oncall.summary. Stores the
-      raw API response under .oncall.native.pagerduty.
+      the service ID from the component's `pagerduty/service-id` meta
+      annotation (typically set by a company-specific cataloger via
+      `lunar catalog component --meta pagerduty/service-id <id>`), or falls
+      back to the explicit service_id input for static org-wide cases.
+      Fetches service details, on-call schedule participants, and escalation
+      policy. Writes normalized data to .oncall.service, .oncall.schedule,
+      .oncall.escalation, and .oncall.summary. Stores the raw API response
+      under .oncall.native.pagerduty.
     mainBash: oncall.sh
     hook:
       type: cron
@@ -41,7 +43,7 @@ inputs:
   service_id:
     description: >
       PagerDuty service ID to query (e.g. PXXXXXX). Optional if the component
-      has a pagerduty.com/service-id annotation in its catalog metadata.
+      has a `pagerduty/service-id` meta annotation set by a cataloger.
     default: ""
   pagerduty_base_url:
     description: PagerDuty API base URL
