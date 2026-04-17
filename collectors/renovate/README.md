@@ -42,6 +42,10 @@ collectors:
 
 First match wins. When the match is `package.json`, the collector looks for a top-level `renovate` key; absence of that key is treated as "not a renovate config" before moving to the next path.
 
+### JSON5 support
+
+`.json5` / `.renovaterc.json5` files are parsed after stripping line (`//`) and block (`/* */`) comments and trailing commas — the common JSON5 extensions Renovate users reach for. Unquoted object keys (also allowed by JSON5) are not supported; keys must be double-quoted.
+
 | Path | When Renovate uses it |
 |------|------------------------|
 | `renovate.json` | Any host |
