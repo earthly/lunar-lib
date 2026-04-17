@@ -1,0 +1,44 @@
+version: 0
+
+name: dep-automation
+description: Enforce dependency automation standards (Dependabot or Renovate)
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Dependency Automation Guardrails"
+  long_description: |
+    Enforce that repositories have automated dependency updates configured
+    via Dependabot or Renovate. Checks that at least one tool is present
+    and that all detected package ecosystems have update rules defined.
+  category: "security-and-compliance"
+  icon: "assets/dep-automation.svg"
+  status: "beta"
+  requires:
+    - slug: "dependabot"
+      type: "collector"
+      reason: "Provides parsed Dependabot configuration data"
+    - slug: "renovate"
+      type: "collector"
+      reason: "Provides parsed Renovate configuration data"
+
+policies:
+  - name: dep-update-tool-configured
+    description: |
+      Requires at least one dependency update tool (Dependabot or Renovate)
+      to be configured in the repository. Fails if neither tool's config
+      file is found.
+    mainPython: dep_update_tool_configured.py
+    keywords: ["dependabot", "renovate", "dependency updates", "supply chain", "automation"]
+
+  - name: all-ecosystems-covered
+    description: |
+      Checks that all detected package ecosystems in the component have
+      corresponding update rules in the dependency automation config.
+      For example, if the component uses npm and Docker, both should
+      have update entries in Dependabot or be covered by Renovate's
+      enabled managers. Skips if no dependency automation tool is configured.
+    mainPython: all_ecosystems_covered.py
+    keywords: ["ecosystem coverage", "dependabot", "renovate", "dependency updates", "completeness"]
+
+inputs: {}

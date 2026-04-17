@@ -1,0 +1,69 @@
+version: 0
+
+name: renovate
+description: Parse Renovate configuration and collect dependency update settings
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Renovate Collector"
+  long_description: |
+    Parses Renovate config (renovate.json, .renovaterc, .renovaterc.json, or the
+    renovate key in package.json). Slurps the full parsed config to
+    .dep_automation.native.renovate and exposes normalized fields
+    (extends, enabled managers) at .dep_automation.renovate for policy use.
+  categories: ["security"]
+  icon: "assets/renovate.svg"
+  status: "beta"
+  related:
+    - slug: "dep-automation"
+      type: "policy"
+      reason: "Enforces dependency automation standards using collected Renovate data"
+
+collectors:
+  - name: config
+    description: |
+      Scans the repository for Renovate configuration in standard locations:
+      renovate.json, .renovaterc, .renovaterc.json, or the "renovate" key
+      in package.json. Writes the full parsed config verbatim to
+      .dep_automation.native.renovate and extracts a normalized summary
+      (extends, enabled managers) to .dep_automation.renovate for policies.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["renovate", "dependency updates", "automated PRs", "supply chain", "dependency automation"]
+
+inputs:
+  paths:
+    description: |
+      Comma-separated list of Renovate config file paths to check (first match wins).
+      Default covers every location Renovate itself reads, across GitHub/GitLab/Bitbucket/
+      Azure DevOps and self-hosted installs — config location depends on SCM host, not CI
+      environment. When the path is package.json, the collector extracts the top-level
+      "renovate" key (and treats its absence as "not a renovate config" before moving on).
+    default: "renovate.json,renovate.json5,.github/renovate.json,.github/renovate.json5,.gitlab/renovate.json,.gitlab/renovate.json5,.renovaterc,.renovaterc.json,.renovaterc.json5,package.json"
+
+example_component_json: |
+  {
+    "dep_automation": {
+      "renovate": {
+        "valid": true,
+        "path": "renovate.json",
+        "extends": ["config:base", "group:recommended"],
+        "all_managers_enabled": true,
+        "enabled_managers": []
+      },
+      "native": {
+        "renovate": {
+          "extends": ["config:base", "group:recommended"],
+          "packageRules": [
+            {"matchUpdateTypes": ["minor", "patch"], "automerge": true},
+            {"matchPackagePatterns": ["^@types/"], "groupName": "type definitions"},
+            {"matchDepTypes": ["devDependencies"], "rangeStrategy": "pin"}
+          ],
+          "schedule": ["before 9am on monday"],
+          "labels": ["dependencies"]
+        }
+      }
+    }
+  }
