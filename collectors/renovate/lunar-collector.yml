@@ -39,8 +39,9 @@ inputs:
       Comma-separated list of Renovate config file paths to check (first match wins).
       Default covers every location Renovate itself reads, across GitHub/GitLab/Bitbucket/
       Azure DevOps and self-hosted installs — config location depends on SCM host, not CI
-      environment. package.json is always checked as a fallback for the "renovate" key.
-    default: "renovate.json,renovate.json5,.github/renovate.json,.github/renovate.json5,.gitlab/renovate.json,.gitlab/renovate.json5,.renovaterc,.renovaterc.json,.renovaterc.json5"
+      environment. When the path is package.json, the collector extracts the top-level
+      "renovate" key (and treats its absence as "not a renovate config" before moving on).
+    default: "renovate.json,renovate.json5,.github/renovate.json,.github/renovate.json5,.gitlab/renovate.json,.gitlab/renovate.json5,.renovaterc,.renovaterc.json,.renovaterc.json5,package.json"
 
 example_component_json: |
   {

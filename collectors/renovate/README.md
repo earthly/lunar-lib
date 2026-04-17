@@ -40,7 +40,7 @@ collectors:
 
 ### Default search paths
 
-First match wins. `package.json` is always checked last as a fallback for the `renovate` key.
+First match wins. When the match is `package.json`, the collector looks for a top-level `renovate` key; absence of that key is treated as "not a renovate config" before moving to the next path.
 
 | Path | When Renovate uses it |
 |------|------------------------|
