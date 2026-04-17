@@ -16,6 +16,7 @@ This collector writes to the following Component JSON paths:
 | `.iac.files[]` | array | File validity: `{path, valid, error?}` |
 | `.iac.modules[]` | array | Normalized modules: `{path, resources[], analysis}` |
 | `.iac.native.terraform.files[]` | array | Full parsed HCL per file: `{path, hcl}` |
+| `.iac.native.terraform.cicd` | object | CI command tracking: `{cmds[], source}` |
 
 ## Collectors
 
@@ -24,6 +25,7 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |-----------|-------------|
 | `terraform` | Parses `.tf` files, writes validity and full HCL JSON |
+| `cicd` | Records every `terraform` command run in CI with the CLI version |
 
 ## Installation
 
