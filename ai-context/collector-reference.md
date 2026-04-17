@@ -1009,7 +1009,7 @@ if [ -z "$LUNAR_CI_COMMAND" ]; then
   exit 0
 fi
 # Command detected — collect it
-echo "[$JSON]" | lunar collect -j ".ai_use.cicd.cmds" -
+echo "[$JSON]" | lunar collect -j ".ai.native.claude.cicd.cmds" -
 ```
 
 ```bash
