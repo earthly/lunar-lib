@@ -1,10 +1,23 @@
-# Category: `.ai_use`
+# Category: `.ai`
 
-AI coding assistant usage — instruction files, plans directories, CI tool invocations, and authorship annotations.
+AI coding assistant usage — code reviewers, instruction files, plans directories, and authorship annotations.
 
 ```json
 {
-  "ai_use": {
+  "ai": {
+    "code_reviewers": [
+      {
+        "tool": "coderabbit",
+        "check_name": "coderabbitai",
+        "detected": true,
+        "last_seen": "2024-01-15T10:30:00Z"
+      },
+      {
+        "tool": "claude",
+        "check_name": "claude-code-review",
+        "detected": false
+      }
+    ],
     "instructions": {
       "root": {
         "exists": true,
@@ -69,22 +82,6 @@ AI coding assistant usage — instruction files, plans directories, CI tool invo
       "path": ".agents/plans",
       "file_count": 3
     },
-    "cicd": {
-      "cmds": [
-        {
-          "cmd": "claude -p --output-format json --allowedTools Bash(git*) Read 'review this PR'",
-          "tool": "claude",
-          "version": "1.0.20",
-          "allowed_tools": "Bash(git*) Read"
-        },
-        {
-          "cmd": "codex exec --json --sandbox workspace-write 'run tests'",
-          "tool": "codex",
-          "version": "0.25.0",
-          "sandbox": "workspace-write"
-        }
-      ]
-    },
     "authorship": {
       "provider": "git-ai",
       "total_commits": 12,
@@ -98,20 +95,26 @@ AI coding assistant usage — instruction files, plans directories, CI tool invo
 }
 ```
 
+## Sources
+
+The `.ai` namespace is populated by multiple collectors working together:
+
+- **[`ai`](../../collectors/ai)** collector — tool-agnostic data: `instructions`, `plans_dir`, `authorship`
+- **[`claude`](../../collectors/claude)** collector — appends to `code_reviewers[]` and `instructions.all[]` (CLAUDE.md), adds Claude-specific CI detection
+- **[`coderabbit`](../../collectors/coderabbit)** collector — appends to `code_reviewers[]`, adds CodeRabbit config
+- **[`codex`](../../collectors/codex)** / **[`gemini`](../../collectors/gemini)** collectors — append their own instruction files and CI invocations
+
 ## Key Policy Paths
 
-- `.ai_use.instructions.root.exists` — Any instruction file at repo root
-- `.ai_use.instructions.root.filename` — Which file (AGENTS.md, CLAUDE.md, etc.)
-- `.ai_use.instructions.root.lines` — Line count for length checks
-- `.ai_use.instructions.root.sections` — Section headings for content requirements
-- `.ai_use.instructions.total_bytes` — Combined size for context window budget
-- `.ai_use.instructions.directories[]` — Per-directory files with symlink status
-- `.ai_use.plans_dir.exists` — Dedicated plans directory present
-- `.ai_use.cicd.cmds[]` — AI CLI invocations in CI (cmd, tool, version, config flags)
-- `.ai_use.cicd.cmds[].tool` — Which tool (claude, codex, gemini)
-- `.ai_use.cicd.cmds[].allowed_tools` — Claude: tools allowed without permission
-- `.ai_use.cicd.cmds[].sandbox` — Codex/Gemini: sandbox mode
-- `.ai_use.cicd.cmds[].approval_mode` — Codex/Gemini: approval mode
-- `.ai_use.authorship.total_commits` — Commits in scope
-- `.ai_use.authorship.annotated_commits` — Commits with AI annotations
-- `.ai_use.authorship.provider` — Detection method (`git-ai` or `trailers`)
+- `.ai.code_reviewers[]` — Active AI code reviewers (tool, check_name, detected)
+- `.ai.code_reviewers[].detected` — Whether this reviewer is currently active on the component
+- `.ai.instructions.root.exists` — Any instruction file at repo root
+- `.ai.instructions.root.filename` — Which file (AGENTS.md, CLAUDE.md, etc.)
+- `.ai.instructions.root.lines` — Line count for length checks
+- `.ai.instructions.root.sections` — Section headings for content requirements
+- `.ai.instructions.total_bytes` — Combined size for context window budget
+- `.ai.instructions.directories[]` — Per-directory files with symlink status
+- `.ai.plans_dir.exists` — Dedicated plans directory present
+- `.ai.authorship.total_commits` — Commits in scope
+- `.ai.authorship.annotated_commits` — Commits with AI annotations
+- `.ai.authorship.provider` — Detection method (`git-ai` or `trailers`)
