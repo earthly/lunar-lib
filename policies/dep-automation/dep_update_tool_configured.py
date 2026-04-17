@@ -1,13 +1,6 @@
 from lunar_policy import Check
 
 
-def _bool_true(c, path):
-    node = c.get_node(path)
-    if not node.exists():
-        return False
-    return bool(node.get_value())
-
-
 def main(node=None):
     c = Check(
         "dep-update-tool-configured",
@@ -15,10 +8,16 @@ def main(node=None):
         node=node,
     )
     with c:
-        dependabot = _bool_true(c, ".dep_automation.dependabot.exists")
-        renovate = _bool_true(c, ".dep_automation.renovate.exists")
+        dependabot = (
+            c.get_node(".dep_automation.dependabot")
+            .get_value_or_default(".", None)
+        )
+        renovate = (
+            c.get_node(".dep_automation.renovate")
+            .get_value_or_default(".", None)
+        )
 
-        if not dependabot and not renovate:
+        if dependabot is None and renovate is None:
             c.fail(
                 "No dependency update tool configured. Add a "
                 ".github/dependabot.yml or renovate.json to automate "

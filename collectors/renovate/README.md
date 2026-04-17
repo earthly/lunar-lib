@@ -8,17 +8,18 @@ Scans the repository for Renovate configuration in every location Renovate itsel
 
 ## Collected Data
 
-This collector writes to the following Component JSON paths:
+When no Renovate config file is found, this collector writes nothing — object presence at `.dep_automation.renovate` is itself the signal that Renovate is configured. See [collector-reference.md § Write Nothing When Technology Not Detected](../../ai-context/collector-reference.md).
+
+When a config file is found, this collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.dep_automation.renovate.exists` | boolean | Whether a Renovate config file was found |
 | `.dep_automation.renovate.valid` | boolean | Whether the JSON config has valid syntax |
 | `.dep_automation.renovate.path` | string | Path to the config file |
-| `.dep_automation.renovate.extends` | array | Preset configuration names (e.g., `config:base`) |
-| `.dep_automation.renovate.all_managers_enabled` | boolean | Whether all package managers are enabled (default Renovate behavior) |
-| `.dep_automation.renovate.enabled_managers` | array | Explicitly enabled managers (empty if all enabled) |
-| `.dep_automation.native.renovate` | object | Full parsed Renovate config (verbatim JSON) |
+| `.dep_automation.renovate.extends` | array | Preset configuration names (e.g., `config:base`) — present when `valid: true` |
+| `.dep_automation.renovate.all_managers_enabled` | boolean | Whether all package managers are enabled (default Renovate behavior) — present when `valid: true` |
+| `.dep_automation.renovate.enabled_managers` | array | Explicitly enabled managers (empty if all enabled) — present when `valid: true` |
+| `.dep_automation.native.renovate` | object | Full parsed Renovate config (verbatim JSON) — present when `valid: true` |
 
 ## Collectors
 

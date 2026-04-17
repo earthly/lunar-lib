@@ -41,7 +41,6 @@ example_component_json: |
   {
     "dep_automation": {
       "dependabot": {
-        "exists": true,
         "valid": true,
         "path": ".github/dependabot.yml",
         "version": 2,

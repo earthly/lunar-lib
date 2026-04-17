@@ -30,16 +30,20 @@ for candidate in "${CANDIDATES[@]}"; do
   fi
 done
 
+# No Renovate config → skip silently. Object presence in Component JSON IS
+# the signal — see ai-context/collector-reference.md "Write Nothing When
+# Technology Not Detected".
 if [ -z "$CONFIG_FILE" ]; then
-  lunar collect -j ".dep_automation.renovate.exists" false
   exit 0
 fi
 
 PATH_NORMALIZED="${CONFIG_FILE#./}"
 
+# File exists but malformed → record valid:false so the policy can flag the
+# broken config (this IS detected technology, just busted).
 if [ -z "$CONFIG_JSON" ]; then
   jq -n --arg path "$PATH_NORMALIZED" \
-    '{exists: true, valid: false, path: $path, extends: [], all_managers_enabled: false, enabled_managers: []}' \
+    '{valid: false, path: $path}' \
     | lunar collect -j ".dep_automation.renovate" -
   exit 0
 fi
@@ -63,7 +67,6 @@ jq -n \
   --argjson all_managers_enabled "$ALL_MANAGERS_ENABLED" \
   --argjson enabled_managers "$ENABLED_MANAGERS" \
   '{
-    exists: true,
     valid: true,
     path: $path,
     extends: $extends,

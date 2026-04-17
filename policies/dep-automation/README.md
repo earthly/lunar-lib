@@ -15,15 +15,13 @@ Keeping dependencies up to date is a core supply-chain hygiene practice. This po
 
 ## Required Data
 
-This policy reads from the following Component JSON paths:
+The `dependabot` and `renovate` collectors write **nothing** when their respective config files aren't present — object presence at `.dep_automation.dependabot` or `.dep_automation.renovate` is itself the detection signal (per [collector-reference.md § Write Nothing When Technology Not Detected](../../ai-context/collector-reference.md)). This policy uses `get_value_or_default(".", None)` to detect absent collector data.
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.dep_automation.dependabot` | object | `dependabot` collector |
-| `.dep_automation.dependabot.exists` | boolean | `dependabot` collector |
+| `.dep_automation.dependabot` | object | `dependabot` collector (absent when no config file) |
 | `.dep_automation.dependabot.ecosystems` | array | `dependabot` collector |
-| `.dep_automation.renovate` | object | `renovate` collector |
-| `.dep_automation.renovate.exists` | boolean | `renovate` collector |
+| `.dep_automation.renovate` | object | `renovate` collector (absent when no config file) |
 | `.dep_automation.renovate.all_managers_enabled` | boolean | `renovate` collector |
 | `.dep_automation.renovate.enabled_managers` | array | `renovate` collector |
 | `.dep_automation.native.renovate` | object | `renovate` collector (raw config for reference) |
@@ -50,15 +48,14 @@ policies:
 
 ### Passing Example — Dependabot covers all ecosystems
 
+`.dep_automation.renovate` is absent (no Renovate config file present).
+
 ```json
 {
   "dep_automation": {
     "dependabot": {
-      "exists": true,
+      "valid": true,
       "ecosystems": ["docker", "github-actions", "npm"]
-    },
-    "renovate": {
-      "exists": false
     }
   },
   "lang": {
@@ -77,14 +74,13 @@ policies:
 
 ### Passing Example — Renovate with all managers enabled
 
+`.dep_automation.dependabot` is absent (no Dependabot config file present).
+
 ```json
 {
   "dep_automation": {
-    "dependabot": {
-      "exists": false
-    },
     "renovate": {
-      "exists": true,
+      "valid": true,
       "all_managers_enabled": true,
       "enabled_managers": []
     }
@@ -98,17 +94,10 @@ policies:
 
 ### Failing Example — No tool configured
 
+Both `.dep_automation.dependabot` and `.dep_automation.renovate` are absent — neither collector wrote anything because neither config file exists.
+
 ```json
-{
-  "dep_automation": {
-    "dependabot": {
-      "exists": false
-    },
-    "renovate": {
-      "exists": false
-    }
-  }
-}
+{}
 ```
 
 **Failure message:** `"No dependency update tool configured. Add a .github/dependabot.yml or renovate.json to automate dependency updates."`
@@ -119,11 +108,8 @@ policies:
 {
   "dep_automation": {
     "dependabot": {
-      "exists": true,
+      "valid": true,
       "ecosystems": ["npm"]
-    },
-    "renovate": {
-      "exists": false
     }
   },
   "lang": {
@@ -133,7 +119,7 @@ policies:
 }
 ```
 
-**Failure message:** `"Missing dependency update coverage for: pip (python). Add update entries to Dependabot or configure Renovate."`
+**Failure message:** `"Missing dependency update coverage for: pip. Add update entries to Dependabot or configure Renovate."`
 
 ## Remediation
 

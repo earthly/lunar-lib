@@ -11,17 +11,20 @@ for candidate in "${CANDIDATES[@]}"; do
   fi
 done
 
+# No Dependabot config → skip silently. Object presence in Component JSON IS
+# the signal — see ai-context/collector-reference.md "Write Nothing When
+# Technology Not Detected".
 if [ -z "$CONFIG_FILE" ]; then
-  lunar collect -j ".dep_automation.dependabot.exists" false
   exit 0
 fi
 
 PATH_NORMALIZED="${CONFIG_FILE#./}"
 
-# Parse YAML → JSON
+# Parse YAML → JSON. File exists but malformed → record valid:false so the
+# policy can flag the broken config (this IS detected technology, just busted).
 if ! CONFIG_JSON=$(yq -o json "$CONFIG_FILE" 2>/dev/null) || [ -z "$CONFIG_JSON" ] || [ "$CONFIG_JSON" = "null" ]; then
   jq -n --arg path "$PATH_NORMALIZED" \
-    '{exists: true, valid: false, path: $path, updates: [], ecosystems: [], update_count: 0}' \
+    '{valid: false, path: $path}' \
     | lunar collect -j ".dep_automation.dependabot" -
   exit 0
 fi
@@ -52,7 +55,6 @@ if [ -n "$VERSION" ]; then
     --argjson ecosystems "$ECOSYSTEMS" \
     --argjson update_count "$UPDATE_COUNT" \
     '{
-      exists: true,
       valid: true,
       path: $path,
       version: ($version | tonumber? // $version),
@@ -67,7 +69,6 @@ else
     --argjson ecosystems "$ECOSYSTEMS" \
     --argjson update_count "$UPDATE_COUNT" \
     '{
-      exists: true,
       valid: true,
       path: $path,
       updates: $updates,

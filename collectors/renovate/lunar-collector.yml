@@ -47,7 +47,6 @@ example_component_json: |
   {
     "dep_automation": {
       "renovate": {
-        "exists": true,
         "valid": true,
         "path": "renovate.json",
         "extends": ["config:base", "group:recommended"],

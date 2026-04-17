@@ -20,17 +20,9 @@ ECOSYSTEM_MAP = [
 JAVA_BUILD_ECOSYSTEMS = {"maven", "gradle"}
 
 
-def _bool_true(c, path):
-    """True if path exists AND its value is truthy (for boolean flags)."""
-    node = c.get_node(path)
-    if not node.exists():
-        return False
-    return bool(node.get_value())
-
-
 def _path_present(c, path):
     """True if path exists in the data (for presence/detection)."""
-    return c.get_node(path).exists()
+    return c.get_node(path).get_value_or_default(".", None) is not None
 
 
 def _detect_required_ecosystems(c):
@@ -41,11 +33,12 @@ def _detect_required_ecosystems(c):
 
     # Java: require matching build tool ecosystem (maven or gradle)
     if _path_present(c, ".lang.java"):
-        build_tool_node = c.get_node(".lang.java.build_tool")
-        if build_tool_node.exists():
-            build_tool = build_tool_node.get_value()
-            if isinstance(build_tool, str) and build_tool in JAVA_BUILD_ECOSYSTEMS:
-                required.add(build_tool)
+        build_tool = (
+            c.get_node(".lang.java")
+            .get_value_or_default(".build_tool", None)
+        )
+        if isinstance(build_tool, str) and build_tool in JAVA_BUILD_ECOSYSTEMS:
+            required.add(build_tool)
         else:
             required.add("maven")
 
@@ -59,38 +52,37 @@ def main(node=None):
         node=node,
     )
     with c:
-        dependabot_exists = _bool_true(c, ".dep_automation.dependabot.exists")
-        renovate_exists = _bool_true(c, ".dep_automation.renovate.exists")
+        dependabot = (
+            c.get_node(".dep_automation.dependabot")
+            .get_value_or_default(".", None)
+        )
+        renovate = (
+            c.get_node(".dep_automation.renovate")
+            .get_value_or_default(".", None)
+        )
 
-        if not dependabot_exists and not renovate_exists:
+        if dependabot is None and renovate is None:
             c.skip(
                 "No dependency update tool configured "
                 "(dep-update-tool-configured covers this case)"
             )
+            return c
 
         # Renovate with all managers enabled covers every ecosystem by default
-        renovate_covers_all = False
-        if renovate_exists:
-            all_managers_node = c.get_node(
-                ".dep_automation.renovate.all_managers_enabled"
-            )
-            if all_managers_node.exists() and all_managers_node.get_value():
-                renovate_covers_all = True
+        renovate_covers_all = bool(
+            renovate and renovate.get("all_managers_enabled")
+        )
 
         if not renovate_covers_all:
             covered = set()
-            if dependabot_exists:
-                eco_node = c.get_node(".dep_automation.dependabot.ecosystems")
-                if eco_node.exists():
-                    val = eco_node.get_value()
-                    if isinstance(val, list):
-                        covered.update(val)
-            if renovate_exists:
-                mgr_node = c.get_node(".dep_automation.renovate.enabled_managers")
-                if mgr_node.exists():
-                    val = mgr_node.get_value()
-                    if isinstance(val, list):
-                        covered.update(val)
+            if dependabot:
+                eco = dependabot.get("ecosystems")
+                if isinstance(eco, list):
+                    covered.update(eco)
+            if renovate:
+                mgrs = renovate.get("enabled_managers")
+                if isinstance(mgrs, list):
+                    covered.update(mgrs)
 
             required = _detect_required_ecosystems(c)
             missing = sorted(required - covered)
