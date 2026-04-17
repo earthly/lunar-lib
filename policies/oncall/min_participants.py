@@ -4,8 +4,8 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("min-participants", "On-call rotation has enough participants", node=node)
     with c:
-        if not c.exists(".oncall"):
-            c.skip("No oncall data — collector has not run or produced no data")
+        if not c.exists(".oncall.source"):
+            c.skip("No oncall source data — collector has not run or produced no data")
 
         if not c.get_value_or_default(".oncall.schedule.exists", False):
             c.skip("No on-call schedule — covered by schedule-configured check")

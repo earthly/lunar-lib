@@ -35,7 +35,7 @@ collectors:
     mainBash: oncall.sh
     hook:
       type: cron
-      schedule: "*/10 * * * *"  # TEMP: every 10 min for ENG-495 testing (revert to "0 2 * * *" before merge)
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
       clone-code: false
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
 
