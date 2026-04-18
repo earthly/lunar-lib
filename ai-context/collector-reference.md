@@ -963,6 +963,43 @@ lunar collector dev <plugin-name> --component-dir <path> | \
 
 **Note:** The name argument uses prefix matching — `my-plugin` runs all subcollectors named `my-plugin.*`.
 
+### 6.1. Testing Cron Collectors
+
+Cron collectors (hooks with `type: cron`) query external APIs on a schedule rather than responding to code pushes. Testing them requires a different approach:
+
+**Local smoke testing with `lunar collector dev`:**
+
+`lunar collector dev` simulates a **code hook context** (cloned repo, commit SHA). It can still run cron collector scripts for basic validation — verifying the script doesn't crash, API calls work, and `lunar collect` writes the expected paths. However, it doesn't replicate true cron behavior (no schedule, always has repo context).
+
+```bash
+# Smoke-test a cron collector locally — verifies script logic and API calls
+lunar collector dev pagerduty.oncall --component github.com/org/repo --verbose
+```
+
+**Key differences from code-hook testing:**
+
+| Aspect | Code Hook | Cron Hook |
+|--------|-----------|-----------|
+| Triggered by | Commit push | Schedule (e.g. daily at 2am UTC) |
+| Repo clone | Always available | Only if `clone-code: true` |
+| PR context | Available (`LUNAR_COMPONENT_PR`) | Not available |
+| Local dev test | Fully representative | Smoke test only — schedule not simulated |
+| Cronos trigger | Push a commit | Wait for scheduled run or trigger manually |
+
+**Testing on cronos (real environment):**
+
+1. Deploy the collector to the cronos config as usual.
+2. Cron collectors do NOT fire on code push. You must either:
+   - **Wait for the scheduled time** — if the schedule is `0 2 * * *`, the next run is at 2am UTC.
+   - **Use a short schedule for testing** — temporarily set `schedule: "*/5 * * * *"` (every 5 minutes) in the cronos config to get faster feedback. Revert to the real schedule after verifying.
+3. Once the cron fires, verify collected data the same way as code collectors: check Component JSON, dashboards, and policy results.
+
+**What to watch for:**
+
+- Cron collectors that query external APIs need valid secrets (e.g. `PAGERDUTY_API_KEY`) configured in the cronos environment.
+- If `clone-code: false`, the script has no repo filesystem — don't reference files or git state.
+- The `LUNAR_COMPONENT_ID` environment variable is still set, so the script knows which component it's collecting for.
+
 ### 7. Document Component JSON Schema
 
 Document what paths your collector writes to, so policy authors know what to expect.
