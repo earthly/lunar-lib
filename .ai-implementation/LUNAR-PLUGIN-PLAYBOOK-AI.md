@@ -274,10 +274,35 @@ Push a commit to the component repo you're testing against. This triggers CI, wh
 **For CI collectors** (hooks like `ci-after-job`, `ci-after-command`): local `lunar collector dev` is **not sufficient**. CI hooks only fire during actual CI runs. You must go through this full deploy+trigger cycle.
 
 **For cron collectors** (hooks with `type: cron`): pushing a commit does NOT trigger collection. Cron collectors run on their configured schedule (e.g. `0 2 * * *` = daily at 2am UTC). To test on cronos:
-- **Temporarily shorten the schedule** in the cronos config (e.g. `*/5 * * * *` for every 5 minutes) to get faster feedback.
-- Wait for the cron to fire, then verify collected data normally.
+- **Temporarily shorten the schedule** in the cronos config (e.g. `*/5 * * * *` for every 5 minutes) to get faster feedback. **The hub enforces a minimum cron interval of 10 minutes** — anything shorter gets bumped, so don't expect a 5-minute schedule to actually fire every 5 minutes.
+- Wait for the cron to fire, then verify the run happened (see "Verifying cron collector runs" below).
 - Revert the schedule to the real cadence once verified.
 - Cron collectors with `clone-code: false` don't need the repo — they query external APIs directly, so no commit push is needed or useful.
+
+**⚠️ Verifying cron collector runs — DO NOT use `components_latest` as the source of truth.**
+
+`components_latest` reflects the **current** manifest, not the run history. The hub drops data from collectors that are no longer registered, so as soon as you remove a cron collector from the cronos manifest (e.g. during cleanup after testing), the `.your_category.*` JSON disappears from `components_latest` even though the collector ran successfully N times before. **An empty `components_latest` after cleanup is NOT evidence that cron didn't fire.** (Real mistake from ENG-495 testing: I committed a manifest cleanup 5 minutes after the 3rd successful pagerduty.oncall cron run, then queried `components_latest`, saw nothing, and incorrectly concluded "cron is broken" on the PR. Cron had fired three times perfectly.)
+
+The truth source is the `hub` schema in the cronos PostgreSQL DB (Grafana datasource UID `PCC52D03280B7034C`):
+- **`hub.snippet_runs`** — every actual collector/policy invocation. `status='finished' AND exit_code=0` confirms the run succeeded. `started_at` tells you when it fired.
+- **`hub.collection_records`** — what each collector actually wrote (`blob` = the JSONB merged into the component). `collection_source='cron'` confirms the run was cron-triggered, not a manual `lunar collector dev`.
+
+```sql
+-- "Did my cron collector ever fire, and when?"
+SELECT s.name, COUNT(r.id) AS runs, MIN(r.started_at), MAX(r.started_at)
+FROM hub.snippets s
+LEFT JOIN hub.snippet_runs r ON r.snippet_id = s.id
+WHERE s.name LIKE 'YOUR_COLLECTOR%'
+GROUP BY s.name;
+
+-- "What did it write, and was it cron-triggered?"
+SELECT cr.created_at, cr.collection_source, cr.dimensions, cr.blob
+FROM hub.collection_records cr
+JOIN hub.snippets s ON s.id = cr.collector_id
+WHERE s.name = 'YOUR_COLLECTOR' ORDER BY cr.created_at DESC LIMIT 10;
+```
+
+You can also use the Grafana **Runs** dashboard (`/d/den5tflglaolcd/runs-listing?var-snippet_name=YOUR_COLLECTOR`) — note the template var is `snippet_name`, not `name`. **If you must verify cron history, do it BEFORE you commit any manifest cleanup**, otherwise you'll need to query `hub.*` to recover the history.
 
 ### Step 6: Run local dev tests
 
@@ -433,7 +458,7 @@ All of these are **required** and must be attached to the PR:
        "rawSql":"SELECT component_json->'"'"'<category>'"'"' FROM components WHERE component_id = '"'"'github.com/pantalasa-cronos/<component>'"'"' AND git_sha = '"'"'<sha>'"'"'",
        "format":"table"}],"from":"now-1h","to":"now"}'
    ```
-   The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results.
+   The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results. **For cron collectors specifically, `components_latest` is also wiped when you remove the collector from the manifest** — see "Verifying cron collector runs" in Step 5 for the right way to check run history (`hub.snippet_runs` + `hub.collection_records`).
 
 5. **Validate in the UI and capture evidence** — Check the cronos Grafana dashboards to confirm the collector and policy are working. This is a smoke test — you need to prove things are actually showing up in the UI, not just take random screenshots.
 
