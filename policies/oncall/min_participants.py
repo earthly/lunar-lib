@@ -4,26 +4,26 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("min-participants", "On-call rotation has enough participants", node=node)
     with c:
-        oncall_source = c.get_node(".oncall.source")
-        if not oncall_source.exists():
-            c.skip("No oncall source data — collector has not run or produced no data")
-
-        if not c.get_value_or_default(".oncall.schedule.exists", False):
-            c.skip("No on-call schedule — covered by schedule-configured check")
-
         try:
             min_required = int(variable_or_default("min_participants", "2"))
         except ValueError:
             c.skip("Invalid min_participants configuration")
 
-        participants = int(c.get_value_or_default(".oncall.schedule.participants", 0))
-
-        c.assert_true(
-            participants >= min_required,
-            f"On-call rotation has {participants} participant(s); "
-            f"at least {min_required} required. Add more people to the "
-            f"rotation to avoid single-person burnout and coverage gaps.",
-        )
+        participants_node = c.get_node(".oncall.schedule.participants")
+        if not participants_node.exists():
+            c.fail(
+                f"On-call rotation has no participants configured; at least "
+                f"{min_required} required. Add people to your rotation to "
+                f"avoid single-person burnout and coverage gaps."
+            )
+        else:
+            participants = int(participants_node.get_value())
+            c.assert_true(
+                participants >= min_required,
+                f"On-call rotation has {participants} participant(s); "
+                f"at least {min_required} required. Add more people to the "
+                f"rotation to avoid single-person burnout and coverage gaps.",
+            )
     return c
 
 
