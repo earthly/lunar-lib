@@ -27,15 +27,16 @@ policies:
   - name: schedule-configured
     description: |
       Verifies that the service has an active on-call schedule by checking
-      .oncall.schedule.exists is true. Skips if no oncall data is present.
+      .oncall.schedule.exists is true. Fails if no on-call schedule data is
+      present.
     mainPython: ./schedule_configured.py
     keywords: ["oncall", "schedule", "rotation", "incident response"]
 
   - name: escalation-defined
     description: |
       Verifies that an escalation policy is configured for the service by
-      checking .oncall.escalation.exists is true. Skips if no oncall data
-      is present.
+      checking .oncall.escalation.exists is true. Fails if no escalation
+      data is present.
     mainPython: ./escalation_defined.py
     keywords: ["escalation", "incident", "pagerduty", "response"]
 
