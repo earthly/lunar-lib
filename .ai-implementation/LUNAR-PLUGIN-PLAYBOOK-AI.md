@@ -283,7 +283,7 @@ Push a commit to the component repo you're testing against. This triggers CI, wh
 
 `components_latest` reflects the **current** manifest, not the run history. The hub drops data from collectors that are no longer registered, so as soon as you remove a cron collector from the cronos manifest (e.g. during cleanup after testing), the `.your_category.*` JSON disappears from `components_latest` even though the collector ran successfully N times before. **An empty `components_latest` after cleanup is NOT evidence that cron didn't fire.** (Real mistake from ENG-495 testing: I committed a manifest cleanup 5 minutes after the 3rd successful pagerduty.oncall cron run, then queried `components_latest`, saw nothing, and incorrectly concluded "cron is broken" on the PR. Cron had fired three times perfectly.)
 
-The truth source is the `hub` schema in the cronos PostgreSQL DB (Grafana datasource UID `PCC52D03280B7034C`):
+The truth source is the `hub` schema in the cronos PostgreSQL DB. Query it via the Grafana PostgreSQL datasource (discover the UID with `curl -s -b /tmp/cookies.txt https://cronos.demo.earthly.dev/api/datasources | jq '.[] | select(.type=="grafana-postgresql-datasource") | .uid'` — don't hardcode it, it differs per Grafana instance and can change when a datasource is recreated):
 - **`hub.snippet_runs`** — every actual collector/policy invocation. `status='finished' AND exit_code=0` confirms the run succeeded. `started_at` tells you when it fired.
 - **`hub.collection_records`** — what each collector actually wrote (`blob` = the JSONB merged into the component). `collection_source='cron'` confirms the run was cron-triggered, not a manual `lunar collector dev`.
 
@@ -451,12 +451,16 @@ All of these are **required** and must be attached to the PR:
      -X POST -H "Content-Type: application/json" \
      -d '{"user":"admin","password":"<password>"}'
 
+   # Discover the PostgreSQL datasource UID (don't hardcode — it differs per instance)
+   DS_UID=$(curl -s -b /tmp/cookies.txt "https://cronos.demo.earthly.dev/api/datasources" \
+     | jq -r '.[] | select(.type=="grafana-postgresql-datasource") | .uid' | head -1)
+
    # Query component JSON for your category
    curl -s -b /tmp/cookies.txt "https://cronos.demo.earthly.dev/api/ds/query" \
      -X POST -H "Content-Type: application/json" \
-     -d '{"queries":[{"refId":"A","datasource":{"uid":"PCC52D03280B7034C","type":"grafana-postgresql-datasource"},
-       "rawSql":"SELECT component_json->'"'"'<category>'"'"' FROM components WHERE component_id = '"'"'github.com/pantalasa-cronos/<component>'"'"' AND git_sha = '"'"'<sha>'"'"'",
-       "format":"table"}],"from":"now-1h","to":"now"}'
+     -d "{\"queries\":[{\"refId\":\"A\",\"datasource\":{\"uid\":\"$DS_UID\",\"type\":\"grafana-postgresql-datasource\"},
+       \"rawSql\":\"SELECT component_json->'<category>' FROM components WHERE component_id = 'github.com/pantalasa-cronos/<component>' AND git_sha = '<sha>'\",
+       \"format\":\"table\"}],\"from\":\"now-1h\",\"to\":\"now\"}"
    ```
    The `components_latest` materialized view may lag — query the `components` table directly with the specific `git_sha` for immediate results. **For cron collectors specifically, `components_latest` is also wiped when you remove the collector from the manifest** — see "Verifying cron collector runs" in Step 5 for the right way to check run history (`hub.snippet_runs` + `hub.collection_records`).
 
