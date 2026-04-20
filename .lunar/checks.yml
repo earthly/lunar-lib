@@ -71,10 +71,9 @@ checks:
       vendor isn't in use). fail = category applies but condition not met
       (e.g. oncall policy with no oncall data — the user opted in, so
       absence IS the violation). Skipping when you should fail inflates
-      compliance scores. See
-      ai-context/policy-reference.md §"Universal vs Vendor-Specific
-      Policies" (around line 520) and the skip() docs (around line 342)
-      for the full decision tree.
+      compliance scores. See ai-context/policy-reference.md — sections
+      "Universal vs Vendor-Specific Policies" and "skip(reason)" — for
+      the full decision tree.
 
   - name: screenshot-quality-reminder
     on: "**/*screenshot*"
