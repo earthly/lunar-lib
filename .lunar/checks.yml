@@ -63,8 +63,18 @@ checks:
 
   - name: policy-skip-vs-fail
     on: "policies/**/*.py"
-    run: "exit 1"
-    message: "Reminder: Skip vs fail matters: skip = category does not apply to this component (e.g. Go policy on a Python repo). fail = category applies but condition not met. Skipping when you should fail inflates compliance scores."
+    run: "! grep -qE '\\.skip\\s*\\(' {file}"
+    message: >-
+      This policy file contains a .skip() call — is skip appropriate here?
+      Rule of thumb: skip = category does not apply to this component
+      (e.g. Go policy on a Python repo, vendor-specific policy when the
+      vendor isn't in use). fail = category applies but condition not met
+      (e.g. oncall policy with no oncall data — the user opted in, so
+      absence IS the violation). Skipping when you should fail inflates
+      compliance scores. See
+      ai-context/policy-reference.md §"Universal vs Vendor-Specific
+      Policies" (around line 520) and the skip() docs (around line 342)
+      for the full decision tree.
 
   - name: screenshot-quality-reminder
     on: "**/*screenshot*"
