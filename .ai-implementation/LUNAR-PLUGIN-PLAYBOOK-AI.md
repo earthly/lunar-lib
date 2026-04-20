@@ -274,7 +274,7 @@ Push a commit to the component repo you're testing against. This triggers CI, wh
 **For CI collectors** (hooks like `ci-after-job`, `ci-after-command`): local `lunar collector dev` is **not sufficient**. CI hooks only fire during actual CI runs. You must go through this full deploy+trigger cycle.
 
 **For cron collectors** (hooks with `type: cron`): pushing a commit does NOT trigger collection. Cron collectors run on their configured schedule (e.g. `0 2 * * *` = daily at 2am UTC). To test on cronos:
-- **Temporarily shorten the schedule** in the cronos config (e.g. `*/5 * * * *` for every 5 minutes) to get faster feedback. **The hub enforces a minimum cron interval of 10 minutes** — anything shorter gets bumped, so don't expect a 5-minute schedule to actually fire every 5 minutes.
+- **Temporarily shorten the schedule** in the cronos config to `*/10 * * * *` (every 10 minutes). 10 min is the hub-enforced minimum — anything shorter gets silently bumped up to 10, so there's no point writing `*/5` or `*/1`.
 - Wait for the cron to fire, then verify the run happened (see "Verifying cron collector runs" below).
 - Revert the schedule to the real cadence once verified.
 - Cron collectors with `clone-code: false` don't need the repo — they query external APIs directly, so no commit push is needed or useful.
