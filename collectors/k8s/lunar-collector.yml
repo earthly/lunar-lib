@@ -5,13 +5,15 @@ description: Parses Kubernetes manifests and collects workload, PDB, and HPA met
 author: earthly
 
 default_image: earthly/lunar-lib:k8s-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
     Parse Kubernetes YAML manifests to extract workloads, containers, resource limits,
-    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers.
-  categories: ["orchestration", "containers"]
+    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. Capture kubectl
+    commands in CI for deployment traceability.
+  categories: ["orchestration", "containers", "ci-cd"]
   icon: "assets/k8s.svg"
   status: "stable"
   related:
@@ -35,6 +37,19 @@ collectors:
     hook:
       type: code
     keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa"]
+
+  - name: cicd
+    description: |
+      Records every kubectl command executed in CI pipelines along with the
+      kubectl client version. Writes command strings and version info to
+      .k8s.cicd for audit trails and deployment traceability (kubectl apply,
+      kubectl rollout, etc.).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: kubectl
+    keywords: ["kubectl", "kubernetes ci", "kubectl apply", "kubectl rollout", "deployment tracking", "ci commands"]
 
 inputs:
   find_command:
@@ -102,7 +117,14 @@ example_component_json: |
           "min_replicas": 3,
           "max_replicas": 10
         }
-      ]
+      ],
+      "cicd": {
+        "cmds": [
+          {"cmd": "kubectl apply -f deploy/", "version": "1.29.2"},
+          {"cmd": "kubectl rollout status deployment/payment-api", "version": "1.29.2"}
+        ],
+        "source": {"tool": "kubectl", "integration": "ci"}
+      }
     }
   }
 

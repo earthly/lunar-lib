@@ -1,10 +1,10 @@
 # Kubernetes Collector
 
-Parses Kubernetes manifests and collects workload, PodDisruptionBudget, and HorizontalPodAutoscaler metadata.
+Parses Kubernetes manifests and tracks kubectl commands in CI.
 
 ## Overview
 
-This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. The collector runs on code changes and outputs normalized data for K8s-related policies.
+This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. It also intercepts `kubectl` commands during CI runs so deployment invocations (apply, rollout, etc.) are recorded alongside the manifest data.
 
 ## Collected Data
 
@@ -17,6 +17,7 @@ This collector writes to the following Component JSON paths:
 | `.k8s.workloads[]` | array | Workload resources with container specs |
 | `.k8s.pdbs[]` | array | PodDisruptionBudgets |
 | `.k8s.hpas[]` | array | HorizontalPodAutoscalers |
+| `.k8s.cicd` | object | kubectl CI command tracking (commands + client version) |
 
 ## Collectors
 
@@ -24,7 +25,8 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Description |
 |-----------|-------------|
-| `k8s` | Collects Kubernetes manifests, workloads, PodDisruptionBudgets, and HorizontalPodAutoscalers |
+| `k8s` | Parses Kubernetes manifests, workloads, PodDisruptionBudgets, and HorizontalPodAutoscalers |
+| `cicd` | Tracks all kubectl commands executed in CI pipelines (apply, rollout, etc.) |
 
 ## Installation
 
