@@ -4,7 +4,8 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("schedule-configured", "Service has an on-call schedule", node=node)
     with c:
-        if not c.exists(".oncall.source"):
+        oncall_source = c.get_node(".oncall.source")
+        if not oncall_source.exists():
             c.skip("No oncall source data — collector has not run or produced no data")
 
         exists = c.get_value_or_default(".oncall.schedule.exists", False)
