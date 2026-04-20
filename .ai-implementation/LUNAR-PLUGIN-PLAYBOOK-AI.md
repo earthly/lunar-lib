@@ -302,7 +302,23 @@ JOIN hub.snippets s ON s.id = cr.collector_id
 WHERE s.name = 'YOUR_COLLECTOR' ORDER BY cr.created_at DESC LIMIT 10;
 ```
 
-You can also use the Grafana **Runs** dashboard (`/d/den5tflglaolcd/runs-listing?var-snippet_name=YOUR_COLLECTOR`) — note the template var is `snippet_name`, not `name`. **If you must verify cron history, do it BEFORE you commit any manifest cleanup**, otherwise you'll need to query `hub.*` to recover the history.
+**Order of operations: verify the cron ran, THEN undeploy.** Do your cron verification (and any screenshots) BEFORE you push the manifest-cleanup commit that removes your collector from cronos. Once the collector is out of the manifest, `components_latest` is wiped and the only recourse is to go spelunking in the `hub.*` tables. Run the verification first, screenshot the evidence, THEN commit the cleanup.
+
+**The Grafana UI screens to capture for cron-collector evidence:**
+
+Both live on the same dashboard — `/d/den5tflglaolcd/runs-listing` — just with a different template-var filter each time. The var is `snippet_name` (not `name`).
+
+1. **Collector runs** — `/d/den5tflglaolcd/runs-listing?var-snippet_name=YOUR_COLLECTOR`
+   - Confirms the cron collector itself fired. Expect: one row per (component, run), `Runs ≥ 1`, `Errors = 0`, a recent `Latest` timestamp, and a reasonable `Avg Duration`. If you shortened the schedule for testing, you should see N rows matching the N fires you expected (remember the 10-min minimum interval).
+   - Screenshot this with the filter visible at the top (proves it's your collector, not a whole-hub view).
+
+2. **Policy runs** — `/d/den5tflglaolcd/runs-listing?var-snippet_name=YOUR_POLICY` (one URL per check if you have multiple — e.g. `oncall.schedule-configured`, `oncall.escalation-defined`, `oncall.min-participants`)
+   - Confirms each policy check ran against every matching component. Expect: one row per component the policy applied to, `Errors = 0`. A row where `Errors > 0` means the policy crashed on that component — fix it, don't post evidence with errors.
+   - Screenshot at least one check; if there are multiple and they exercise different code paths, screenshot each.
+
+For a single-component deep dive (did the right JSON land?), the **Collector Details** dashboard at `/d/aepjhg9he4wlcc/collector-details?var-snippet_name=YOUR_COLLECTOR` shows the `collection_records` blobs the collector wrote — expand one to verify the JSON payload matches what you expect.
+
+**Login note**: Grafana on cronos uses form auth (POST to `/login`), NOT HTTP Basic — Playwright's `httpCredentials` won't work. Fill `input[name="user"]` and `input[name="password"]` and submit. Credentials are in `~/.bender/grafana-credentials`.
 
 ### Step 6: Run local dev tests
 
