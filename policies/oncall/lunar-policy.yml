@@ -1,0 +1,85 @@
+version: 0
+
+name: oncall
+description: Enforce on-call schedule, escalation, and staffing standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "On-Call Guardrails"
+  long_description: |
+    Enforce on-call operational readiness standards. Verify that services have
+    an active on-call schedule, a multi-level escalation policy, and a minimum
+    number of rotation participants. Works with any oncall-category collector
+    (PagerDuty, OpsGenie, etc.).
+  category: "operational-readiness"
+  icon: "assets/oncall.svg"
+  status: "beta"
+  requires:
+    - slug: "pagerduty"
+      type: "collector"
+      reason: "Provides on-call and escalation data (PagerDuty implementation)"
+  related: []
+  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "operational readiness"]
+
+policies:
+  - name: schedule-configured
+    description: |
+      Verifies that the service has an active on-call schedule by checking
+      .oncall.schedule.exists is true. Fails if no on-call schedule data is
+      present.
+    mainPython: ./schedule_configured.py
+    keywords: ["oncall", "schedule", "rotation", "incident response"]
+
+  - name: escalation-defined
+    description: |
+      Verifies that an escalation policy is configured for the service by
+      checking .oncall.escalation.exists is true. Fails if no escalation
+      data is present.
+    mainPython: ./escalation_defined.py
+    keywords: ["escalation", "incident", "pagerduty", "response"]
+
+  - name: min-participants
+    description: |
+      Ensures the on-call rotation has at least a minimum number of
+      participants to avoid single-person burnout. Checks
+      .oncall.schedule.participants against the configurable min_participants
+      threshold (default: 2).
+    mainPython: ./min_participants.py
+    keywords: ["oncall", "rotation", "staffing", "burnout", "team size"]
+
+inputs:
+  min_participants:
+    description: Minimum number of on-call rotation participants required
+    default: "2"
+
+example_component_json: |
+  {
+    "oncall": {
+      "source": {
+        "tool": "pagerduty",
+        "integration": "api"
+      },
+      "service": {
+        "id": "PXXXXXX",
+        "name": "Payment API",
+        "status": "active"
+      },
+      "schedule": {
+        "exists": true,
+        "participants": 4,
+        "rotation": "weekly"
+      },
+      "escalation": {
+        "exists": true,
+        "levels": 3,
+        "policy_name": "Payment API Escalation"
+      },
+      "summary": {
+        "has_oncall": true,
+        "has_escalation": true,
+        "min_participants": 4
+      }
+    }
+  }
