@@ -4,10 +4,7 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("min-participants", "On-call rotation has enough participants", node=node)
     with c:
-        try:
-            min_required = int(variable_or_default("min_participants", "2"))
-        except ValueError:
-            c.skip("Invalid min_participants configuration")
+        min_required = int(variable_or_default("min_participants", "2"))
 
         participants_node = c.get_node(".oncall.schedule.participants")
         if not participants_node.exists():
