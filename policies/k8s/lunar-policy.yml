@@ -62,6 +62,13 @@ policies:
     mainPython: non_root.py
     keywords: ["security context", "non-root", "runAsNonRoot", "least privilege"]
 
+  - name: min-kubectl-version
+    description: |
+      Ensures the kubectl version used in CI meets the minimum required version.
+      Old kubectl clients may miss security fixes or lack support for current cluster APIs.
+    mainPython: min_kubectl_version.py
+    keywords: ["kubectl", "version", "ci/cd", "compatibility", "security"]
+
 inputs:
   min_replicas:
     description: Minimum replicas required for HPAs (default 3)
@@ -69,4 +76,7 @@ inputs:
   max_limit_to_request_ratio:
     description: Maximum ratio of limits to requests for CPU/memory (default 4)
     default: "4"
+  min_kubectl_version:
+    description: Minimum kubectl version required in CI (semver, e.g. "1.28")
+    default: "1.28"
 
