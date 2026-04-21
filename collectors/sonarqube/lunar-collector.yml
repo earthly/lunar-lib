@@ -1,18 +1,19 @@
 version: 0
 
 name: sonarqube
-description: Collect code quality metrics and quality gate status from SonarQube or SonarCloud
+description: Collect SonarQube/SonarCloud data via API, in-repo config, CI scanner runs, and GitHub App checks
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
 
 landing_page:
   display_name: "SonarQube Collector"
   long_description: |
-    Query the SonarQube/SonarCloud Web API to collect quality gate status,
-    ratings, and metrics (bugs, vulnerabilities, code smells, coverage,
-    duplication). Normalizes results into .code_quality for tool-agnostic
-    policy evaluation.
+    Detects SonarQube/SonarCloud across four integration points: Web API
+    snapshots, in-repo config detection, CI scanner runs, and the GitHub App
+    PR check. Normalizes results into .code_quality for tool-agnostic policy
+    evaluation.
   categories: ["code-analysis"]
   icon: "assets/sonarqube.svg"
   status: "experimental"
@@ -38,12 +39,54 @@ collectors:
       clone-code: false
     keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "code-smells", "quality-gate"]
 
+  - name: config
+    description: |
+      Detects SonarQube/SonarCloud configuration in the repository — the
+      `sonar-project.properties` file, the `sonar-maven-plugin` in `pom.xml`,
+      the `org.sonarqube` plugin in `build.gradle`/`build.gradle.kts`, or
+      `<SonarQubeEnabled>` in a `.csproj`. Writes discovered config file
+      paths under `.code_quality.native.sonarqube.config`. Presence of this
+      data signals that SonarQube is wired up for the component even when
+      the `api` cron has not run yet or cannot reach the project.
+    mainBash: config.sh
+    hook:
+      type: code
+    keywords: ["sonarqube", "sonar-project.properties", "config detection", "sonar-maven-plugin"]
+
+  - name: cicd
+    description: |
+      Detects `sonar-scanner` invocations in CI pipelines via a
+      `ci-after-command` hook. Captures the command string, exit code, and
+      scanner version. Writes to `.code_quality.native.sonarqube.cicd.cmds[]`,
+      mirroring the `snyk/cli` pattern. Maven (`mvn sonar:sonar`) and Gradle
+      (`gradle sonarqube`) launchers are not covered in V1 — those need
+      separate binary-match rules and will be added in follow-up PRs.
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: sonar-scanner
+    keywords: ["sonarqube", "sonar-scanner", "ci integration", "cicd"]
+
+  - name: github-app
+    description: |
+      Detects the SonarCloud (or SonarQube-for-GitHub) PR analysis check on
+      pull requests by querying the GitHub check runs API. Writes check state,
+      conclusion, and target URL to `.code_quality.native.sonarqube.github_app`.
+      Mirrors the `snyk/github-app` pattern. Only runs on PRs. Requires
+      `GH_TOKEN` to read check runs.
+    mainBash: github-app.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["sonarqube", "sonarcloud", "github app", "pr check"]
+
 inputs:
   project_key:
     description: >
-      SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Optional if
-      the component has a `sonarqube/project-key` meta annotation set by a
-      cataloger.
+      SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Used by the
+      `api` sub-collector. Optional if the component has a
+      `sonarqube/project-key` meta annotation set by a cataloger.
     default: ""
   sonarqube_base_url:
     description: >
@@ -55,8 +98,12 @@ secrets:
   SONARQUBE_TOKEN:
     description: >
       SonarQube/SonarCloud user token with `Browse` permission on the target
-      project. Sent as the HTTP Basic username with an empty password, per the
-      SonarQube Web API convention.
+      project. Used by the `api` sub-collector. Sent as the HTTP Basic username
+      with an empty password, per the SonarQube Web API convention.
+  GH_TOKEN:
+    description: >
+      GitHub token for the GitHub Checks API. Used by the `github-app`
+      sub-collector to read SonarCloud / SonarQube check runs on PRs.
 
 example_component_json: |
   {
@@ -94,6 +141,19 @@ example_component_json: |
             "vulnerabilities": 1,
             "code_smells": 42,
             "lines_of_code": 12500
+          },
+          "config": {
+            "files": ["sonar-project.properties"]
+          },
+          "cicd": {
+            "cmds": [
+              {"cmd": "sonar-scanner -Dsonar.projectKey=my-org_my-service", "version": "5.0.1", "exit_code": 0}
+            ]
+          },
+          "github_app": {
+            "state": "success",
+            "context": "SonarCloud Code Analysis",
+            "target_url": "https://sonarcloud.io/dashboard?id=my-org_my-service&pullRequest=42"
           }
         }
       }

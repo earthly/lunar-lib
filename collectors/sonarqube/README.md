@@ -1,46 +1,51 @@
 # SonarQube Collector
 
-Collect quality gate status, ratings, and code quality metrics from the
-SonarQube or SonarCloud Web API.
+Detect SonarQube/SonarCloud across four integration points — Web API,
+in-repo config, CI scanner runs, and the GitHub App PR check.
 
 ## Overview
 
-This collector queries the SonarQube/SonarCloud Web API on a daily cron
-schedule to gather quality gate status, ratings, and key metrics (bugs,
-vulnerabilities, code smells, coverage, duplication). The project key is
-resolved from the component's `sonarqube/project-key` meta annotation or the
-`project_key` input.
-
-Results are written to the `.code_quality` category in a tool-agnostic format,
-so a future `code-quality` policy can evaluate the same paths regardless of
-which scanner produced the data. The same collector works against both
-SonarQube (self-hosted) and SonarCloud — only the `sonarqube_base_url` input
-differs.
+Four sub-collectors give a complete picture of SonarQube usage for a
+component: `api` (daily cron, Web API snapshot), `config` (detects in-repo
+SonarQube configuration), `cicd` (captures `sonar-scanner` runs), and
+`github-app` (reads SonarCloud's GitHub App PR check). Results land in the
+tool-agnostic `.code_quality` category, with SonarQube-specific structure
+stashed under `.code_quality.native.sonarqube`. Works against both SonarQube
+self-hosted and SonarCloud — only `sonarqube_base_url` differs.
 
 ## Collected Data
 
 This collector writes to the following Component JSON paths. The top-level
 `.code_quality.*` fields are **tool-agnostic** and intended for a generic
 code-quality policy. SonarQube-specific structure (the rating split, quality
-gate detail, SQALE debt, native metric names) lives under
-`.code_quality.native.sonarqube` for SonarQube-aware policies.
+gate detail, SQALE debt, native metric names, config/CI/GitHub-App payloads)
+lives under `.code_quality.native.sonarqube` for SonarQube-aware policies.
 
-| Path | Type | Description |
-|------|------|-------------|
-| `.code_quality.source` | object | Tool, integration, project key, and API URL |
-| `.code_quality.passing` | bool | Overall pass/fail signal — derived from SonarQube's quality gate status |
-| `.code_quality.coverage_percentage` | number | Line coverage percentage (0–100), if measured |
-| `.code_quality.duplication_percentage` | number | Duplicated lines percentage (0–100), if measured |
-| `.code_quality.issue_counts` | object | Severity buckets: `total`, `critical`, `high`, `medium`, `low` (same shape as `.sca` / `.sast`) |
-| `.code_quality.native.sonarqube` | object | Raw SonarQube/SonarCloud API responses: quality gate detail, reliability/security/maintainability rating split, SQALE debt, native metric names |
+| Path | Type | Written by | Description |
+|------|------|-----------|-------------|
+| `.code_quality.source` | object | `api` | Tool, integration, project key, and API URL |
+| `.code_quality.passing` | bool | `api` | Overall pass/fail signal — derived from SonarQube's quality gate status |
+| `.code_quality.coverage_percentage` | number | `api` | Line coverage percentage (0–100), if measured |
+| `.code_quality.duplication_percentage` | number | `api` | Duplicated lines percentage (0–100), if measured |
+| `.code_quality.issue_counts` | object | `api` | Severity buckets: `total`, `critical`, `high`, `medium`, `low` (same shape as `.sca` / `.sast`) |
+| `.code_quality.native.sonarqube.quality_gate` | object | `api` | Quality gate status (`OK`/`WARN`/`ERROR`) and failed condition count |
+| `.code_quality.native.sonarqube.ratings` | object | `api` | SonarQube letter ratings (A–E) per dimension: reliability, security, maintainability, security review |
+| `.code_quality.native.sonarqube.metrics` | object | `api` | SonarQube-native metric names: bugs, vulnerabilities, code smells, lines of code |
+| `.code_quality.native.sonarqube.config` | object | `config` | Paths to SonarQube config files discovered in the repo |
+| `.code_quality.native.sonarqube.cicd` | object | `cicd` | `sonar-scanner` invocations captured in CI: command, version, exit code |
+| `.code_quality.native.sonarqube.github_app` | object | `github-app` | SonarCloud GitHub App PR check: state, context, target URL |
 
 ## Collectors
 
-This integration provides the following collectors:
+This integration provides the following sub-collectors. Use `include` in
+`lunar-config.yml` to select a subset.
 
-| Collector | Description |
-|-----------|-------------|
-| `api` | Queries the SonarQube/SonarCloud Web API for quality gate status and metrics, writes a tool-agnostic summary at `.code_quality.*` with raw responses under `.code_quality.native.sonarqube` |
+| Collector | Hook | Description |
+|-----------|------|-------------|
+| `api` | cron (daily) | Queries the SonarQube/SonarCloud Web API for quality gate status, ratings, and metrics |
+| `config` | code | Detects `sonar-project.properties`, `sonar-maven-plugin`, `org.sonarqube` Gradle plugin, or `<SonarQubeEnabled>` in `.csproj` |
+| `cicd` | `ci-after-command` on `sonar-scanner` | Captures `sonar-scanner` invocations in CI (mirrors `snyk/cli`). Maven and Gradle launchers are follow-ups. |
+| `github-app` | code (PRs only) | Reads the SonarCloud GitHub App's check run on each PR (mirrors `snyk/github-app`) |
 
 ## Installation
 
@@ -56,7 +61,8 @@ collectors:
 ```
 
 Required secrets:
-- `SONARQUBE_TOKEN` — SonarQube/SonarCloud user token with `Browse` permission on the target project. Sent as the HTTP Basic username with an empty password (per the SonarQube Web API convention).
+- `SONARQUBE_TOKEN` — SonarQube/SonarCloud user token with `Browse` permission on the target project (used by the `api` sub-collector). Sent as the HTTP Basic username with an empty password, per the SonarQube Web API convention.
+- `GH_TOKEN` — GitHub token with read access to PR check runs (used by the `github-app` sub-collector).
 
 ### Project key discovery
 
