@@ -1,0 +1,70 @@
+version: 0
+
+name: sonarqube
+description: Enforce SonarQube/SonarCloud-specific code-quality standards — quality gate and letter-rating thresholds
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "SonarQube Guardrails"
+  long_description: |
+    SonarQube-specific code-quality checks. Enforces letter-rating minimums
+    (A best, E worst) for reliability, security, and maintainability, plus
+    a strict quality-gate check that surfaces failed-condition counts.
+  category: "testing-and-quality"
+  icon: "assets/sonarqube.svg"
+  status: "experimental"
+  requires:
+    - slug: "sonarqube"
+      type: "collector"
+      reason: "Provides SonarQube/SonarCloud quality-gate status and letter ratings"
+
+  related:
+    - slug: "code-quality"
+      type: "policy"
+      reason: "Tool-agnostic code-quality checks that also cover SonarQube"
+
+policies:
+  - name: quality-gate-passing
+    description: |
+      Verifies the SonarQube quality gate is green — `status` is `OK` and no
+      failed conditions. Reads `.code_quality.native.sonarqube.quality_gate`.
+      Skips if SonarQube data is not present for the component.
+    mainPython: quality_gate_passing.py
+    keywords: ["sonarqube", "quality-gate", "conditions", "pass-fail"]
+
+  - name: min-reliability-rating
+    description: |
+      Ensures the SonarQube reliability rating meets a configurable minimum
+      (A best, E worst; default `A`). Reads
+      `.code_quality.native.sonarqube.ratings.reliability`.
+    mainPython: min_reliability_rating.py
+    keywords: ["sonarqube", "reliability", "rating", "bugs"]
+
+  - name: min-security-rating
+    description: |
+      Ensures the SonarQube security rating meets a configurable minimum
+      (A best, E worst; default `A`). Reads
+      `.code_quality.native.sonarqube.ratings.security`.
+    mainPython: min_security_rating.py
+    keywords: ["sonarqube", "security", "rating", "vulnerabilities"]
+
+  - name: min-maintainability-rating
+    description: |
+      Ensures the SonarQube maintainability rating meets a configurable
+      minimum (A best, E worst; default `A`). Reads
+      `.code_quality.native.sonarqube.ratings.maintainability`.
+    mainPython: min_maintainability_rating.py
+    keywords: ["sonarqube", "maintainability", "rating", "code-smells", "technical-debt"]
+
+inputs:
+  min_reliability_rating:
+    description: "Minimum reliability letter rating (A, B, C, D, E). A is best."
+    default: "A"
+  min_security_rating:
+    description: "Minimum security letter rating (A, B, C, D, E). A is best."
+    default: "A"
+  min_maintainability_rating:
+    description: "Minimum maintainability letter rating (A, B, C, D, E). A is best."
+    default: "A"
