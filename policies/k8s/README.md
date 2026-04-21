@@ -18,6 +18,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `min-replicas` | Enforces minimum HPA replicas | HPA minReplicas below threshold |
 | `pdb` | Requires PodDisruptionBudgets | Deployment/StatefulSet missing PDB |
 | `non-root` | Requires non-root security context | Container may run as root |
+| `min-kubectl-version` | Enforces minimum kubectl version in CI | kubectl client used in CI is below threshold |
 
 ## Required Data
 
@@ -29,6 +30,7 @@ This policy reads from the following Component JSON paths:
 | `.k8s.workloads[]` | array | `k8s` collector |
 | `.k8s.hpas[]` | array | `k8s` collector |
 | `.k8s.pdbs[]` | array | `k8s` collector |
+| `.k8s.cicd.cmds[]` | array | `k8s` collector (cicd sub-collector) |
 
 **Note:** Ensure the `k8s` collector is configured before enabling this policy.
 
@@ -49,6 +51,7 @@ policies:
     # with:
     #   min_replicas: "3"
     #   max_limit_to_request_ratio: "4"
+    #   min_kubectl_version: "1.28"
 ```
 
 ## Examples
@@ -135,4 +138,5 @@ When this policy fails, resolve it by:
 4. **For `min-replicas` failures:** Increase `spec.minReplicas` in your HPA to meet the threshold
 5. **For `pdb` failures:** Create a PodDisruptionBudget that selects your workload's pods
 6. **For `non-root` failures:** Add `securityContext.runAsNonRoot: true` to the container or pod spec
+7. **For `min-kubectl-version` failures:** Upgrade the kubectl client in your CI pipeline (e.g., pin `azure/setup-kubectl@v4` or `setup-kubectl` action to a newer version, or update the installed kubectl on self-hosted runners)
 
