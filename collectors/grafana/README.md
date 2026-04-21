@@ -13,6 +13,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.observability.source` | object | Tool and integration metadata |
+| `.observability.dashboard.uid` | string | Resolved Grafana dashboard UID (set even when the dashboard no longer exists) |
 | `.observability.dashboard.exists` | boolean | Whether the linked Grafana dashboard exists |
 | `.observability.dashboard.url` | string | Direct URL to the dashboard |
 | `.observability.alerts.configured` | boolean | Whether any alert rules are configured for the dashboard's folder |
