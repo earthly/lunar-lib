@@ -18,8 +18,7 @@ CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 # Use the exact traced binary for version extraction
 KUBECTL_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-kubectl}"
 
-# `kubectl version --client` prints e.g. "Client Version: v1.29.2"
-# Fall back to older output formats ("Client Version: version.Info{...GitVersion:\"v1.29.2\"...}")
+# `kubectl version --client` prints e.g. "Client Version: v1.29.2" (kubectl v1.20+, released Dec 2020)
 VERSION=$("$KUBECTL_BIN" version --client 2>/dev/null \
   | awk '/Client Version/ {for (i=1; i<=NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) {gsub(/[",}]/, "", $i); sub(/^v/, "", $i); print $i; exit}}' \
   || echo "")
