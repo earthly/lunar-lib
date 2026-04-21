@@ -25,7 +25,7 @@ Monitoring, logging, tracing configuration.
     "dashboard": {
       "id": "abc123",
       "exists": true,
-      "url": "https://grafana.example.com/d/abc123"
+      "url": "https://grafana.example.com/d/abc123/payment-api"
     },
     "alerts": {
       "configured": true,

@@ -34,7 +34,12 @@ collectors:
       tool-agnostic) so the full link is visible in the component JSON
       even when the dashboard is missing. If
       the UID is set but the dashboard does not exist in Grafana, writes
-      `.observability.dashboard.exists=false`. For alerts: fetches the
+      `.observability.dashboard.exists=false` **and** also writes
+      `.observability.alerts.configured=false` and
+      `.observability.alerts.count=0` without querying the alerts API —
+      the alerts block is always present when the dashboard sub-collector
+      runs, so policies see a consistent shape regardless of whether the
+      dashboard resolved. When the dashboard does exist: fetches the
       dashboard's folder UID from `meta.folderUid` on the dashboard API
       response, then lists alert rules via Grafana's alerting API
       (`/api/v1/provisioning/alert-rules`) and filters to rules whose

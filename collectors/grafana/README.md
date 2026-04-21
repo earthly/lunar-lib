@@ -52,7 +52,7 @@ The `dashboard` sub-collector resolves the component's Grafana dashboard UID **o
 
 1. Set via `lunar catalog component --meta grafana/dashboard-uid <uid>`, typically by a company-specific cataloger that knows which components map to which dashboards.
 2. If no meta annotation is set, the sub-collector exits cleanly with no data written.
-3. If the meta is set but the dashboard does not exist in Grafana, it writes `.observability.dashboard.exists=false` so policies can flag the stale link.
+3. If the meta is set but the dashboard does not exist in Grafana, it writes `.observability.dashboard.exists=false` so policies can flag the stale link. In that case it also writes `.observability.alerts.configured=false` and `.observability.alerts.count=0` without querying the alerts API — the alerts block is always populated when the sub-collector runs, so policies see a consistent shape.
 
 There is intentionally no explicit `dashboard_uid` input override. Orgs that want file-driven registration can write their own cataloger that reads a repo file and calls `lunar catalog component --meta`.
 

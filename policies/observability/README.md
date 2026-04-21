@@ -46,7 +46,7 @@ policies:
 {
   "observability": {
     "source": { "tool": "grafana", "integration": "api" },
-    "dashboard": { "id": "abc123", "exists": true, "url": "https://grafana.example.com/d/abc123" },
+    "dashboard": { "id": "abc123", "exists": true, "url": "https://grafana.example.com/d/abc123/payment-api" },
     "alerts": { "configured": true, "count": 5 }
   }
 }

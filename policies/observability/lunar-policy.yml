@@ -28,10 +28,10 @@ policies:
     description: |
       Verifies that the service has a linked monitoring dashboard by
       checking .observability.dashboard.exists is true. Fails if
-      .observability.dashboard.exists is false (the UID is registered but
-      the dashboard is gone) or if the data is missing entirely. Skips
-      cleanly when no observability source has written data for this
-      component.
+      observability data is present but .observability.dashboard.exists
+      is false (the UID is registered but the dashboard is gone in
+      Grafana). Skips cleanly when no observability source has written
+      data for this component.
     mainPython: ./dashboard_exists.py
     keywords: ["observability", "dashboard", "monitoring", "grafana", "datadog"]
 
