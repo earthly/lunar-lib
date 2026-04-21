@@ -56,6 +56,8 @@ The `dashboard` sub-collector resolves the component's Grafana dashboard UID **o
 
 There is intentionally no explicit `dashboard_uid` input override. Orgs that want file-driven registration can write their own cataloger that reads a repo file and calls `lunar catalog component --meta`.
 
+**Alerts detection.** Alert rules in Grafana live in folders (not on dashboards directly), so the sub-collector reads the dashboard's folder UID from `meta.folderUid` on the `/api/dashboards/uid/<uid>` response, then lists alert rules via `/api/v1/provisioning/alert-rules` and filters to rules whose `folderUID` matches. `.observability.alerts.count` is the number of matching rules; `.observability.alerts.configured` is `true` when count > 0. This folder-scoped model reflects how Grafana teams typically organize alerting around dashboards.
+
 ### Repo dashboard discovery (the `repo-dashboards` sub-collector)
 
 The `repo-dashboards` sub-collector walks the cloned component repo and identifies Grafana dashboard JSON files by content fingerprint: any `.json` file whose top-level object contains both a `schemaVersion` (integer) and a `panels` (array) field is treated as a dashboard and its raw contents are captured.

@@ -33,10 +33,15 @@ collectors:
       the resolved UID to `.observability.dashboard.uid` so the full link is
       visible in the component JSON even when the dashboard is missing. If
       the UID is set but the dashboard does not exist in Grafana, writes
-      `.observability.dashboard.exists=false`. Counts alert rules scoped to
-      the dashboard's folder. Writes normalized data to
-      .observability.dashboard, .observability.alerts, .observability.source,
-      and the raw Grafana API responses to .observability.native.grafana.api.
+      `.observability.dashboard.exists=false`. For alerts: fetches the
+      dashboard's folder UID from `meta.folderUid` on the dashboard API
+      response, then lists alert rules via Grafana's alerting API
+      (`/api/v1/provisioning/alert-rules`) and filters to rules whose
+      `folderUID` matches. `.observability.alerts.count` is the count of
+      matching rules; `.observability.alerts.configured` is `true` when
+      count > 0. Writes normalized data to .observability.dashboard,
+      .observability.alerts, .observability.source, and the raw Grafana API
+      responses to .observability.native.grafana.api.
     mainBash: dashboard.sh
     hook:
       type: code
