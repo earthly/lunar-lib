@@ -9,12 +9,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Grafana Collector"
   long_description: |
-    Query the Grafana API for the dashboard and alert rules linked to each
-    component, and scan the component repository for Grafana dashboard JSON
-    files committed as code. Normalizes results into the .observability
-    category for tool-agnostic policy evaluation, and stashes raw API
-    responses and discovered dashboard files under .observability.native.grafana.
-  categories: ["observability"]
+    Query the Grafana API for dashboards and alerts linked to each component,
+    and scan the component repo for Grafana dashboard JSON files. Normalizes
+    to .observability for tool-agnostic policies; raw data at
+    .observability.native.grafana.
+  categories: ["service-catalog"]
   icon: "assets/grafana.svg"
   status: "beta"
   related:

@@ -9,11 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Observability Guardrails"
   long_description: |
-    Enforce baseline observability for production services. Verify that each
+    Enforce baseline observability for production services. Verify each
     service has a linked monitoring dashboard and at least one alert rule
     configured. Works with any observability-category collector (Grafana,
-    Datadog, etc.), reading from the tool-agnostic .observability paths so
-    the same guardrails apply regardless of the underlying monitoring tool.
+    Datadog, etc.) via the tool-agnostic .observability paths.
   category: "operational-readiness"
   icon: "assets/observability.svg"
   status: "beta"
