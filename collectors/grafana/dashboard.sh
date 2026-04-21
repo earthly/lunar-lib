@@ -6,8 +6,12 @@ if [ -n "${LUNAR_COMPONENT_META:-}" ]; then
   DASHBOARD_UID="$(echo "$LUNAR_COMPONENT_META" | jq -r '."grafana/dashboard-uid" // empty')"
 fi
 
+if [ -z "$DASHBOARD_UID" ] && [ -n "${LUNAR_VAR_DASHBOARD_UID:-}" ]; then
+  DASHBOARD_UID="$LUNAR_VAR_DASHBOARD_UID"
+fi
+
 if [ -z "$DASHBOARD_UID" ]; then
-  echo "No grafana/dashboard-uid meta annotation set on this component." >&2
+  echo "No Grafana dashboard UID found. Set 'grafana/dashboard-uid' meta or the dashboard_uid input." >&2
   exit 0
 fi
 

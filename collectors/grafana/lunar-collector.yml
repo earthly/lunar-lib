@@ -28,8 +28,10 @@ collectors:
       alert rules. Discovers the dashboard UID from the component's
       `grafana/dashboard-uid` meta annotation (typically set by a
       company-specific cataloger via
-      `lunar catalog component --meta grafana/dashboard-uid <uid>`). If no
-      meta is set, the collector exits cleanly with no data written. Writes
+      `lunar catalog component --meta grafana/dashboard-uid <uid>`), or
+      falls back to the explicit `dashboard_uid` input for static cases.
+      If no UID is found, the collector exits cleanly with no data written.
+      Writes
       the resolved UID to `.observability.dashboard.id` (normalized,
       tool-agnostic) so the full link is visible in the component JSON
       even when the dashboard is missing. If
@@ -75,6 +77,12 @@ inputs:
       Grafana API base URL (e.g. `https://grafana.example.com`). Required
       for the `dashboard` sub-collector. If empty, the sub-collector exits
       cleanly with no data written.
+    default: ""
+  dashboard_uid:
+    description: >
+      Grafana dashboard UID to query (e.g. `payment-api`). Optional if the
+      component has a `grafana/dashboard-uid` meta annotation set by a
+      cataloger.
     default: ""
   find_command:
     description: >

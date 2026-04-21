@@ -48,13 +48,13 @@ Required secrets:
 
 ### Dashboard discovery (the `dashboard` sub-collector)
 
-The `dashboard` sub-collector resolves the component's Grafana dashboard UID **only** from the component's `grafana/dashboard-uid` meta annotation:
+The `dashboard` sub-collector resolves the component's Grafana dashboard UID in this order:
 
-1. Set via `lunar catalog component --meta grafana/dashboard-uid <uid>`, typically by a company-specific cataloger that knows which components map to which dashboards.
-2. If no meta annotation is set, the sub-collector exits cleanly with no data written.
-3. If the meta is set but the dashboard does not exist in Grafana, it writes `.observability.dashboard.exists=false` so policies can flag the stale link. In that case it also writes `.observability.alerts.configured=false` and `.observability.alerts.count=0` without querying the alerts API — the alerts block is always populated when the sub-collector runs, so policies see a consistent shape.
+1. **Catalog meta annotation** — reads `grafana/dashboard-uid` from the component's lunar catalog meta. Set via `lunar catalog component --meta grafana/dashboard-uid <uid>`, typically by a company-specific cataloger that knows which components map to which dashboards. This is the recommended approach for orgs where each component has its own dashboard.
+2. **`dashboard_uid` input** — explicit value passed via `with: dashboard_uid: <uid>` in `lunar-config.yml`. Useful for static cases or for orgs that don't run a cataloger.
+3. If neither is set, the sub-collector exits cleanly with no data written.
 
-There is intentionally no explicit `dashboard_uid` input override. Orgs that want file-driven registration can write their own cataloger that reads a repo file and calls `lunar catalog component --meta`.
+If the UID resolves but the dashboard does not exist in Grafana, the collector writes `.observability.dashboard.exists=false` so policies can flag the stale link. In that case it also writes `.observability.alerts.configured=false` and `.observability.alerts.count=0` without querying the alerts API — the alerts block is always populated when the sub-collector runs, so policies see a consistent shape.
 
 **Alerts detection.** Alert rules in Grafana live in folders (not on dashboards directly), so the sub-collector reads the dashboard's folder UID from `meta.folderUid` on the `/api/dashboards/uid/<uid>` response, then lists alert rules via `/api/v1/provisioning/alert-rules` and filters to rules whose `folderUID` matches. `.observability.alerts.count` is the number of matching rules; `.observability.alerts.configured` is `true` when count > 0. This folder-scoped model reflects how Grafana teams typically organize alerting around dashboards.
 
