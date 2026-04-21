@@ -17,7 +17,7 @@ landing_page:
   requires:
     - slug: "backstage"
       type: "collector"
-      reason: "Provides parsed Backstage catalog metadata at .backstage"
+      reason: "Provides parsed Backstage catalog metadata at .catalog.native.backstage"
 
 policies:
   - name: catalog-info-exists

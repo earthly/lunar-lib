@@ -26,12 +26,12 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.backstage.exists` | boolean | `backstage` collector |
-| `.backstage.valid` | boolean | `backstage` collector |
-| `.backstage.errors[]` | array | `backstage` collector |
-| `.backstage.spec.owner` | string | `backstage` collector |
-| `.backstage.spec.lifecycle` | string | `backstage` collector |
-| `.backstage.spec.system` | string | `backstage` collector |
+| `.catalog.native.backstage.exists` | boolean | `backstage` collector |
+| `.catalog.native.backstage.valid` | boolean | `backstage` collector |
+| `.catalog.native.backstage.errors[]` | array | `backstage` collector |
+| `.catalog.native.backstage.spec.owner` | string | `backstage` collector |
+| `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector |
+| `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 
 **Note:** Ensure the `backstage` collector is configured before enabling this policy.
 
@@ -53,19 +53,23 @@ policies:
 
 ```json
 {
-  "backstage": {
-    "exists": true,
-    "valid": true,
-    "errors": [],
-    "path": "catalog-info.yaml",
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Component",
-    "metadata": { "name": "payment-api" },
-    "spec": {
-      "type": "service",
-      "owner": "team-payments",
-      "lifecycle": "production",
-      "system": "payment-platform"
+  "catalog": {
+    "native": {
+      "backstage": {
+        "exists": true,
+        "valid": true,
+        "errors": [],
+        "path": "catalog-info.yaml",
+        "apiVersion": "backstage.io/v1alpha1",
+        "kind": "Component",
+        "metadata": { "name": "payment-api" },
+        "spec": {
+          "type": "service",
+          "owner": "team-payments",
+          "lifecycle": "production",
+          "system": "payment-platform"
+        }
+      }
     }
   }
 }
@@ -75,16 +79,20 @@ policies:
 
 ```json
 {
-  "backstage": {
-    "exists": true,
-    "valid": true,
-    "errors": [],
-    "path": "catalog-info.yaml",
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Component",
-    "metadata": { "name": "payment-api" },
-    "spec": {
-      "type": "service"
+  "catalog": {
+    "native": {
+      "backstage": {
+        "exists": true,
+        "valid": true,
+        "errors": [],
+        "path": "catalog-info.yaml",
+        "apiVersion": "backstage.io/v1alpha1",
+        "kind": "Component",
+        "metadata": { "name": "payment-api" },
+        "spec": {
+          "type": "service"
+        }
+      }
     }
   }
 }
@@ -102,7 +110,7 @@ policies:
 When this policy fails, resolve it by updating your `catalog-info.yaml`:
 
 1. **Missing file** - Create a `catalog-info.yaml` in the repository root following the [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format)
-2. **Lint errors** - Review `.backstage.errors[]` in the component payload and fix the reported issues
+2. **Lint errors** - Review `.catalog.native.backstage.errors[]` in the component payload and fix the reported issues
 3. **Missing owner** - Add `spec.owner` with a valid team or user reference (e.g., `team-payments`)
 4. **Missing lifecycle** - Add `spec.lifecycle` with a stage: `production`, `experimental`, or `deprecated`
 5. **Missing system** - Add `spec.system` referencing the parent system that groups related components
