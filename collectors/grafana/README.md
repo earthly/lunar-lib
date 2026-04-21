@@ -4,7 +4,7 @@ Collect dashboard and alert rule data from Grafana via the API, and discover Gra
 
 ## Overview
 
-This plugin provides two sub-collectors. The `dashboard` sub-collector queries the Grafana REST API on a daily cron for the dashboard and alert rules linked to each component via the component's `grafana/dashboard-uid` meta annotation (typically set by a cataloger). The `repo-dashboards` sub-collector walks the component repo looking for Grafana dashboard JSON files by content fingerprint and stashes their raw contents for custom policies. Both write under the tool-agnostic `.observability` category, so the shared `observability` policy works regardless of whether the data comes from Grafana, Datadog, or another provider.
+This plugin provides two sub-collectors. The `dashboard` sub-collector queries the Grafana REST API on every code event for the dashboard and alert rules linked to each component via the component's `grafana/dashboard-uid` meta annotation (typically set by a cataloger). The `repo-dashboards` sub-collector walks the component repo looking for Grafana dashboard JSON files by content fingerprint and stashes their raw contents for custom policies. Both write under the tool-agnostic `.observability` category, so the shared `observability` policy works regardless of whether the data comes from Grafana, Datadog, or another provider.
 
 ## Collected Data
 
@@ -27,7 +27,7 @@ This plugin provides the following sub-collectors:
 
 | Collector | Description |
 |-----------|-------------|
-| `dashboard` | Queries Grafana API for the dashboard and alert rules linked via the `grafana/dashboard-uid` meta annotation (cron, daily at 02:00 UTC) |
+| `dashboard` | Queries Grafana API for the dashboard and alert rules linked via the `grafana/dashboard-uid` meta annotation (code hook) |
 | `repo-dashboards` | Discovers Grafana dashboard JSON files in the repo by content fingerprint (code hook) |
 
 ## Installation
@@ -64,7 +64,6 @@ By default the full repo is walked. Set the `find_command` input to narrow the s
 
 ### Notes on behavior
 
-- The `dashboard` sub-collector uses `clone-code: false` — it does not require the repo.
-- The `repo-dashboards` sub-collector uses the `code` hook and does require the repo.
+- Both sub-collectors run on the `code` hook, so they fire on each push rather than a schedule. The `dashboard` sub-collector does not actually read from the repo, but the clone is cheap and keeps the hook model consistent across the plugin.
 - `.observability.native.grafana.repo_dashboards` is intentionally raw — users write their own policies against the dashboard JSON if they care about panel shapes, datasource usage, etc.
 - Example Component JSON is defined in `lunar-collector.yml` under `example_component_json`.

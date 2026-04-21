@@ -39,9 +39,7 @@ collectors:
       and the raw Grafana API responses to .observability.native.grafana.api.
     mainBash: dashboard.sh
     hook:
-      type: cron
-      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
-      clone-code: false
+      type: code
     keywords: ["grafana", "dashboard", "alerts", "observability", "monitoring"]
 
   - name: repo-dashboards
