@@ -1,0 +1,94 @@
+version: 0
+
+name: sonarqube
+description: Collect code quality metrics and quality gate status from SonarQube or SonarCloud
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "SonarQube Collector"
+  long_description: |
+    Query the SonarQube/SonarCloud Web API to collect quality gate status,
+    ratings, and metrics (bugs, vulnerabilities, code smells, coverage,
+    duplication). Normalizes results into .code_quality for tool-agnostic
+    policy evaluation.
+  categories: ["code-analysis"]
+  icon: "assets/sonarqube.svg"
+  status: "experimental"
+
+collectors:
+  - name: metrics
+    description: |
+      Queries the SonarQube/SonarCloud Web API for the component's project.
+      Discovers the project key from the component's `sonarqube/project-key`
+      meta annotation (typically set by a company-specific cataloger via
+      `lunar catalog component --meta sonarqube/project-key <key>`), or falls
+      back to the explicit project_key input for static org-wide cases.
+      Fetches quality gate status, ratings, and normalized metrics. Writes
+      to .code_quality.quality_gate, .code_quality.ratings,
+      .code_quality.metrics, and .code_quality.summary. Stores the raw API
+      responses under .code_quality.native.sonarqube.
+    mainBash: metrics.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
+      clone-code: false
+    keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "code-smells", "quality-gate"]
+
+inputs:
+  project_key:
+    description: >
+      SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Optional if
+      the component has a `sonarqube/project-key` meta annotation set by a
+      cataloger.
+    default: ""
+  sonarqube_base_url:
+    description: >
+      SonarQube/SonarCloud API base URL. Defaults to SonarCloud. Set to your
+      SonarQube server URL (e.g. `https://sonar.example.com`) for self-hosted.
+    default: "https://sonarcloud.io"
+
+secrets:
+  SONARQUBE_TOKEN:
+    description: >
+      SonarQube/SonarCloud user token with `Browse` permission on the target
+      project. Sent as the HTTP Basic username with an empty password, per the
+      SonarQube Web API convention.
+
+example_component_json: |
+  {
+    "code_quality": {
+      "source": {
+        "tool": "sonarqube",
+        "integration": "api",
+        "project_key": "my-org_my-service",
+        "api_url": "https://sonarcloud.io"
+      },
+      "quality_gate": {
+        "status": "OK",
+        "conditions_failed": 0
+      },
+      "ratings": {
+        "reliability": "A",
+        "security": "B",
+        "maintainability": "A",
+        "security_review": "A"
+      },
+      "metrics": {
+        "bugs": 3,
+        "vulnerabilities": 1,
+        "code_smells": 42,
+        "coverage_percentage": 78.3,
+        "duplication_percentage": 3.1,
+        "lines_of_code": 12500
+      },
+      "summary": {
+        "has_quality_gate": true,
+        "quality_gate_passing": true
+      },
+      "native": {
+        "sonarqube": { "...full SonarQube Web API responses..." }
+      }
+    }
+  }
