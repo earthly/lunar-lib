@@ -42,7 +42,7 @@ This integration provides the following sub-collectors. Use `include` in
 
 | Collector | Hook | Description |
 |-----------|------|-------------|
-| `api` | cron (daily) | Queries the SonarQube/SonarCloud Web API for quality gate status, ratings, and metrics |
+| `api` | code | Queries the SonarQube/SonarCloud Web API per-commit, scoping with `branch=` on the default branch and `pullRequest=` on PRs so data tracks the commit being evaluated |
 | `config` | code | Detects `sonar-project.properties`, `sonar-maven-plugin`, `org.sonarqube` Gradle plugin, or `<SonarQubeEnabled>` in `.csproj` |
 | `cicd` | `ci-after-command` on `sonar-scanner` | Captures `sonar-scanner` invocations in CI (mirrors `snyk/cli`). Maven and Gradle launchers are follow-ups. |
 | `github-app` | code (PRs only) | Reads the SonarCloud GitHub App's check run on each PR (mirrors `snyk/github-app`) |

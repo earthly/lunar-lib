@@ -21,22 +21,24 @@ landing_page:
 collectors:
   - name: api
     description: |
-      Queries the SonarQube/SonarCloud Web API for the component's project.
-      Discovers the project key from the component's `sonarqube/project-key`
-      meta annotation (typically set by a company-specific cataloger via
-      `lunar catalog component --meta sonarqube/project-key <key>`), or falls
-      back to the explicit project_key input for static org-wide cases.
-      Writes a tool-agnostic `passing` signal, coverage and duplication
-      percentages, and severity-bucketed issue counts at the `.code_quality.*`
-      top level. SonarQube-specific structure (quality gate detail, the
-      reliability/security/maintainability rating split, SQALE debt, native
-      metric names) lands under `.code_quality.native.sonarqube` for
-      SonarQube-specific policies that need it.
+      Queries the SonarQube/SonarCloud Web API for the component's project on
+      every collection. On the default branch the API is queried with
+      `branch=<default-branch>`; on a PR with `pullRequest=$LUNAR_COMPONENT_PR`,
+      so the data is aligned with the commit being evaluated rather than a
+      daily snapshot. Discovers the project key from the component's
+      `sonarqube/project-key` meta annotation (typically set by a
+      company-specific cataloger via `lunar catalog component --meta
+      sonarqube/project-key <key>`), or falls back to the explicit project_key
+      input for static org-wide cases. Writes a tool-agnostic `passing`
+      signal, coverage and duplication percentages, and severity-bucketed
+      issue counts at the `.code_quality.*` top level. SonarQube-specific
+      structure (quality gate detail, the reliability/security/maintainability
+      rating split, SQALE debt, native metric names) lands under
+      `.code_quality.native.sonarqube` for SonarQube-specific policies that
+      need it.
     mainBash: api.sh
     hook:
-      type: cron
-      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
-      clone-code: false
+      type: code
     keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "code-smells", "quality-gate"]
 
   - name: config
