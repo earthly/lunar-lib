@@ -1,0 +1,20 @@
+VERSION 0.8
+# Build the helm collector image
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Helm CLI
+    ARG TARGETARCH
+    ARG HELM_VERSION=3.14.0
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+        curl -sSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar xz && \
+        mv "linux-${ARCH}/helm" /usr/local/bin/ && \
+        rm -rf "linux-${ARCH}" && \
+        chmod +x /usr/local/bin/helm
+
+    # Install GNU parallel for parallel chart processing
+    RUN apk add --no-cache parallel && \
+        mkdir -p ~/.parallel && touch ~/.parallel/will-cite
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:helm-$VERSION
