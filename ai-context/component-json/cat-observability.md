@@ -23,6 +23,7 @@ Monitoring, logging, tracing configuration.
       "configured": true
     },
     "dashboard": {
+      "id": "abc123",
       "exists": true,
       "url": "https://grafana.example.com/d/abc123"
     },

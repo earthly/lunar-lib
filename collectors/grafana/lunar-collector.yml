@@ -30,8 +30,9 @@ collectors:
       company-specific cataloger via
       `lunar catalog component --meta grafana/dashboard-uid <uid>`). If no
       meta is set, the collector exits cleanly with no data written. Writes
-      the resolved UID to `.observability.dashboard.uid` so the full link is
-      visible in the component JSON even when the dashboard is missing. If
+      the resolved UID to `.observability.dashboard.id` (normalized,
+      tool-agnostic) so the full link is visible in the component JSON
+      even when the dashboard is missing. If
       the UID is set but the dashboard does not exist in Grafana, writes
       `.observability.dashboard.exists=false`. For alerts: fetches the
       dashboard's folder UID from `meta.folderUid` on the dashboard API
@@ -92,7 +93,7 @@ example_component_json: |
         "integration": "api"
       },
       "dashboard": {
-        "uid": "abc123",
+        "id": "abc123",
         "exists": true,
         "url": "https://grafana.example.com/d/abc123/payment-api"
       },

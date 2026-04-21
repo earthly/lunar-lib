@@ -45,7 +45,8 @@ policies:
 ```json
 {
   "observability": {
-    "dashboard": { "exists": true, "url": "https://grafana.example.com/d/abc123" },
+    "source": { "tool": "grafana", "integration": "api" },
+    "dashboard": { "id": "abc123", "exists": true, "url": "https://grafana.example.com/d/abc123" },
     "alerts": { "configured": true, "count": 5 }
   }
 }
@@ -56,7 +57,8 @@ policies:
 ```json
 {
   "observability": {
-    "dashboard": { "exists": false },
+    "source": { "tool": "grafana", "integration": "api" },
+    "dashboard": { "id": "abc123", "exists": false },
     "alerts": { "configured": false, "count": 0 }
   }
 }
