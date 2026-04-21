@@ -2,9 +2,13 @@ from lunar_policy import Check, variable_or_default
 
 
 def parse_version(v):
-    """Parse version string like '1.29.2' into tuple for comparison."""
+    """Parse version string like '1.29.2' into tuple for comparison.
+
+    Strips vendor build-metadata suffixes (e.g. EKS '1.28.2-eks-4ea7009',
+    GKE '1.28.4-gke.10083003') by splitting each component on '-' before int().
+    """
     parts = str(v).lstrip("vV").split(".")
-    return tuple(int(p) for p in parts)
+    return tuple(int(p.split("-")[0]) for p in parts)
 
 
 def check_min_kubectl_version(min_version=None, node=None):
@@ -37,7 +41,10 @@ def check_min_kubectl_version(min_version=None, node=None):
                 continue
             try:
                 actual = parse_version(version)
-                if actual[:len(minimum)] < minimum:
+                max_len = max(len(actual), len(minimum))
+                padded_actual = actual + (0,) * (max_len - len(actual))
+                padded_minimum = minimum + (0,) * (max_len - len(minimum))
+                if padded_actual < padded_minimum:
                     violations.append(f"'{cmd_name}' used kubectl {version}")
             except (ValueError, TypeError):
                 violations.append(f"'{cmd_name}' has unparseable version '{version}'")
