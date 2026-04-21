@@ -18,18 +18,20 @@ landing_page:
   status: "experimental"
 
 collectors:
-  - name: metrics
+  - name: api
     description: |
       Queries the SonarQube/SonarCloud Web API for the component's project.
       Discovers the project key from the component's `sonarqube/project-key`
       meta annotation (typically set by a company-specific cataloger via
       `lunar catalog component --meta sonarqube/project-key <key>`), or falls
       back to the explicit project_key input for static org-wide cases.
-      Fetches quality gate status, ratings, and normalized metrics. Writes
-      to .code_quality.quality_gate, .code_quality.ratings,
-      .code_quality.metrics, and .code_quality.summary. Stores the raw API
-      responses under .code_quality.native.sonarqube.
-    mainBash: metrics.sh
+      Writes a tool-agnostic `passing` signal, coverage and duplication
+      percentages, and severity-bucketed issue counts at the `.code_quality.*`
+      top level. SonarQube-specific structure (quality gate detail, the
+      reliability/security/maintainability rating split, SQALE debt, native
+      metric names) lands under `.code_quality.native.sonarqube` for
+      SonarQube-specific policies that need it.
+    mainBash: api.sh
     hook:
       type: cron
       schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
@@ -65,30 +67,35 @@ example_component_json: |
         "project_key": "my-org_my-service",
         "api_url": "https://sonarcloud.io"
       },
-      "quality_gate": {
-        "status": "OK",
-        "conditions_failed": 0
-      },
-      "ratings": {
-        "reliability": "A",
-        "security": "B",
-        "maintainability": "A",
-        "security_review": "A"
-      },
-      "metrics": {
-        "bugs": 3,
-        "vulnerabilities": 1,
-        "code_smells": 42,
-        "coverage_percentage": 78.3,
-        "duplication_percentage": 3.1,
-        "lines_of_code": 12500
-      },
-      "summary": {
-        "has_quality_gate": true,
-        "quality_gate_passing": true
+      "passing": true,
+      "coverage_percentage": 78.3,
+      "duplication_percentage": 3.1,
+      "issue_counts": {
+        "total": 46,
+        "critical": 0,
+        "high": 1,
+        "medium": 3,
+        "low": 42
       },
       "native": {
-        "sonarqube": { "...full SonarQube Web API responses..." }
+        "sonarqube": {
+          "quality_gate": {
+            "status": "OK",
+            "conditions_failed": 0
+          },
+          "ratings": {
+            "reliability": "A",
+            "security": "B",
+            "maintainability": "A",
+            "security_review": "A"
+          },
+          "metrics": {
+            "bugs": 3,
+            "vulnerabilities": 1,
+            "code_smells": 42,
+            "lines_of_code": 12500
+          }
+        }
       }
     }
   }

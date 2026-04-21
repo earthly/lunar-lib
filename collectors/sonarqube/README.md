@@ -19,16 +19,20 @@ differs.
 
 ## Collected Data
 
-This collector writes to the following Component JSON paths:
+This collector writes to the following Component JSON paths. The top-level
+`.code_quality.*` fields are **tool-agnostic** and intended for a generic
+code-quality policy. SonarQube-specific structure (the rating split, quality
+gate detail, SQALE debt, native metric names) lives under
+`.code_quality.native.sonarqube` for SonarQube-aware policies.
 
 | Path | Type | Description |
 |------|------|-------------|
 | `.code_quality.source` | object | Tool, integration, project key, and API URL |
-| `.code_quality.quality_gate` | object | Quality gate status (`OK`/`WARN`/`ERROR`) and failed condition count |
-| `.code_quality.ratings` | object | Letter ratings (A–E) for reliability, security, maintainability, security review |
-| `.code_quality.metrics` | object | Normalized metrics: bugs, vulnerabilities, code smells, coverage, duplication, lines of code |
-| `.code_quality.summary` | object | Summary booleans for quick policy evaluation |
-| `.code_quality.native.sonarqube` | object | Raw SonarQube/SonarCloud API responses |
+| `.code_quality.passing` | bool | Overall pass/fail signal — derived from SonarQube's quality gate status |
+| `.code_quality.coverage_percentage` | number | Line coverage percentage (0–100), if measured |
+| `.code_quality.duplication_percentage` | number | Duplicated lines percentage (0–100), if measured |
+| `.code_quality.issue_counts` | object | Severity buckets: `total`, `critical`, `high`, `medium`, `low` (same shape as `.sca` / `.sast`) |
+| `.code_quality.native.sonarqube` | object | Raw SonarQube/SonarCloud API responses: quality gate detail, reliability/security/maintainability rating split, SQALE debt, native metric names |
 
 ## Collectors
 
@@ -36,7 +40,7 @@ This integration provides the following collectors:
 
 | Collector | Description |
 |-----------|-------------|
-| `metrics` | Fetches quality gate status, ratings, and key metrics from the SonarQube/SonarCloud Web API |
+| `api` | Queries the SonarQube/SonarCloud Web API for quality gate status and metrics, writes a tool-agnostic summary at `.code_quality.*` with raw responses under `.code_quality.native.sonarqube` |
 
 ## Installation
 
