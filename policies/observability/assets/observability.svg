@@ -1,3 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <path fill="black" d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
+  <rect x="3" y="14" width="3" height="6" fill="black"/>
+  <rect x="8" y="10" width="3" height="10" fill="black"/>
+  <rect x="13" y="12" width="3" height="8" fill="black"/>
+  <rect x="18" y="6" width="3" height="14" fill="black"/>
+  <polyline points="4.5,12 9.5,7 14.5,9 19.5,3" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
