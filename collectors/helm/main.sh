@@ -106,7 +106,9 @@ charts_json=$(eval "$FIND_CMD" 2>/dev/null | \
 
 chart_count=$(echo "$charts_json" | jq 'length' 2>/dev/null || echo 0)
 if [ "$chart_count" -gt 0 ]; then
-    echo "$charts_json" | jq '{charts: .}' | lunar collect -j ".k8s.helm" -
+    # Write the charts array at its leaf path so re-runs replace it instead of
+    # deep-merging into an ever-growing list.
+    echo "$charts_json" | lunar collect -j ".k8s.helm.charts" -
 
     HELM_VERSION=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/^v//' || echo "unknown")
     jq -n --arg tool "helm" --arg version "$HELM_VERSION" \
