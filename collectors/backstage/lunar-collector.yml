@@ -43,7 +43,6 @@ example_component_json: |
     "catalog": {
       "native": {
         "backstage": {
-          "exists": true,
           "valid": true,
           "errors": [],
           "path": "catalog-info.yaml",

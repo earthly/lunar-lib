@@ -8,11 +8,10 @@ This collector scans the repository for a Backstage catalog definition file (`ca
 
 ## Collected Data
 
-This collector writes to the following Component JSON paths:
+When a catalog-info file is found, this collector writes to the following Component JSON paths. When no file is found, the `.catalog.native.backstage` namespace is **not written** — absence of the namespace is the signal.
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.catalog.native.backstage.exists` | boolean | Whether a catalog-info file was found |
 | `.catalog.native.backstage.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
 | `.catalog.native.backstage.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
 | `.catalog.native.backstage.path` | string | Relative path to the file that was parsed |

@@ -4,12 +4,13 @@ Service catalog entries. Reserved namespace for data from catalog tools (Backsta
 
 Each catalog tool writes its raw descriptor under `.catalog.native.<tool>`, following the same `.native` convention used by `.api.native.openapi`, `.iac.native.terraform`, and `.sbom.native.spdx`. This keeps multi-tool coexistence collision-free: a company running both Backstage and ServiceNow for different purposes lands each tool's data in its own `.catalog.native.<tool>` bucket without overwriting the other.
 
+**Presence as the signal.** If a catalog tool finds no descriptor file, it writes nothing to component JSON — the absence of `.catalog.native.<tool>` means "this tool did not find data for this component." No redundant `exists: false` sentinel. Policies use `Check.exists(".catalog.native.<tool>")` to detect file-level presence.
+
 ```json
 {
   "catalog": {
     "native": {
       "backstage": {
-        "exists": true,
         "valid": true,
         "errors": [],
         "path": "catalog-info.yaml",
@@ -56,7 +57,7 @@ If a future cataloger lands and a clear normalization pattern emerges (e.g. "`.c
 
 ## Key Policy Paths
 
-- `.catalog.native.backstage.exists` — Backstage catalog entry present
+- `.catalog.native.backstage` — namespace present ⇔ catalog-info.yaml was found (use `Check.exists(...)`)
 - `.catalog.native.backstage.valid` — catalog-info.yaml passes lint checks
 - `.catalog.native.backstage.spec.owner` — Owner defined in Backstage
 - `.catalog.native.backstage.spec.lifecycle` — Lifecycle stage in Backstage

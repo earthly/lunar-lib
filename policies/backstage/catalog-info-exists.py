@@ -8,8 +8,8 @@ def main(node=None):
         node=node,
     )
     with c:
-        c.assert_true(
-            c.get_value(".catalog.native.backstage.exists"),
+        c.assert_exists(
+            ".catalog.native.backstage",
             "No catalog-info.yaml found. Add a catalog-info.yaml file to the repository root "
             "(or customize paths via the collector's `paths` input).",
         )

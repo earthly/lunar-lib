@@ -22,11 +22,11 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ## Required Data
 
-This policy reads from the following Component JSON paths:
+This policy reads from the following Component JSON paths. The presence of `.catalog.native.backstage` indicates that a catalog-info file was found; its absence means no file exists.
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.catalog.native.backstage.exists` | boolean | `backstage` collector |
+| `.catalog.native.backstage` | object | `backstage` collector (namespace present ⇔ file found) |
 | `.catalog.native.backstage.valid` | boolean | `backstage` collector |
 | `.catalog.native.backstage.errors[]` | array | `backstage` collector |
 | `.catalog.native.backstage.spec.owner` | string | `backstage` collector |
@@ -56,7 +56,6 @@ policies:
   "catalog": {
     "native": {
       "backstage": {
-        "exists": true,
         "valid": true,
         "errors": [],
         "path": "catalog-info.yaml",
@@ -75,14 +74,13 @@ policies:
 }
 ```
 
-### Failing Example
+### Failing Example (spec fields missing)
 
 ```json
 {
   "catalog": {
     "native": {
       "backstage": {
-        "exists": true,
         "valid": true,
         "errors": [],
         "path": "catalog-info.yaml",
@@ -97,6 +95,14 @@ policies:
   }
 }
 ```
+
+### Failing Example (no catalog-info.yaml)
+
+```json
+{}
+```
+
+The `.catalog.native.backstage` namespace is simply absent. All five checks fail.
 
 **Failure messages:**
 - `"No catalog-info.yaml found"`

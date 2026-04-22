@@ -15,7 +15,8 @@ for candidate in "${CANDIDATES[@]}"; do
 done
 
 if [ -z "$CATALOG_FILE" ]; then
-  lunar collect -j ".catalog.native.backstage.exists" false
+  # No catalog-info.yaml found — write nothing. Absence of `.catalog.native.backstage`
+  # IS the signal. Policies use Check.exists(".catalog.native.backstage") to detect.
   exit 0
 fi
 
@@ -33,7 +34,6 @@ else
     --arg path "$PATH_NORMALIZED" \
     --arg msg "$ERR_MSG" \
     '{
-      exists: true,
       valid: false,
       errors: [{line: 0, message: $msg, severity: "error"}],
       path: $path

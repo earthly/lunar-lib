@@ -56,8 +56,9 @@ class TestValidComponent(unittest.TestCase):
     def test_path_preserved(self):
         self.assertEqual(self.result["path"], "catalog-info.yaml")
 
-    def test_exists_true(self):
-        self.assertTrue(self.result["exists"])
+    def test_no_exists_field(self):
+        # Object presence IS the signal; no redundant `exists: true` field.
+        self.assertNotIn("exists", self.result)
 
 
 class TestMinimalValid(unittest.TestCase):

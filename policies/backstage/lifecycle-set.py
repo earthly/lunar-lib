@@ -8,7 +8,7 @@ def main(node=None):
         node=node,
     )
     with c:
-        if not c.get_value(".catalog.native.backstage.exists"):
+        if not c.exists(".catalog.native.backstage"):
             c.fail(
                 "No catalog-info.yaml found. Add the file with a spec.lifecycle "
                 "stage (e.g. `production`, `experimental`, `deprecated`)."

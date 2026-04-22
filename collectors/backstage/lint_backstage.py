@@ -42,7 +42,6 @@ def lint(parsed, path):
     if not isinstance(parsed, dict):
         _err(errors, "Top-level must be a YAML mapping")
         return {
-            "exists": True,
             "valid": False,
             "errors": errors,
             "path": path,
@@ -103,7 +102,6 @@ def lint(parsed, path):
     valid = not any(e["severity"] == "error" for e in errors)
 
     output = {
-        "exists": True,
         "valid": valid,
         "errors": errors,
         "path": path,
@@ -129,7 +127,6 @@ def main():
         parsed = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         result = {
-            "exists": True,
             "valid": False,
             "errors": [
                 {"line": 0, "message": f"Invalid parser output: {e}", "severity": "error"}
