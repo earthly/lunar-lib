@@ -36,8 +36,10 @@ policies:
     enforcement: report-pr
     # include: [executed, no-hardcoded-secrets]  # Only run specific checks
     with:
-      max_issues_threshold: "5"   # Fail if more than 5 issues
+      max_issues_threshold: "10"  # Default — fails only when issue count exceeds this
 ```
+
+**Threshold semantics.** `max_issues_threshold` is a remediation lever: `max-issues` fails only when the number of findings *exceeds* the threshold. It must be a positive integer — for zero-tolerance enforcement, enable the `no-hardcoded-secrets` check instead (it's unconditional and has no threshold to misconfigure). The default of `"10"` is a safe starting point for most teams; pair it with `no-hardcoded-secrets` to keep zero-tolerance pressure on new commits while `max-issues` acts as a ceiling for gradual remediation of existing findings.
 
 ## Examples
 
