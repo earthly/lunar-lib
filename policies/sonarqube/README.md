@@ -23,11 +23,11 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.code_quality.native.sonarqube.quality_gate.status` | string | `sonarqube` collector (`api` sub-collector) |
-| `.code_quality.native.sonarqube.quality_gate.conditions_failed` | number | `sonarqube` collector (`api` sub-collector) |
-| `.code_quality.native.sonarqube.ratings.reliability` | string | `sonarqube` collector (`api` sub-collector) |
-| `.code_quality.native.sonarqube.ratings.security` | string | `sonarqube` collector (`api` sub-collector) |
-| `.code_quality.native.sonarqube.ratings.maintainability` | string | `sonarqube` collector (`api` sub-collector) |
+| `.code_quality.native.sonarqube.quality_gate.status` | string | `sonarqube` collector (`branch` or `pr` sub-collector) |
+| `.code_quality.native.sonarqube.quality_gate.conditions_failed` | number | `sonarqube` collector (`branch` or `pr` sub-collector) |
+| `.code_quality.native.sonarqube.ratings.reliability` | string | `sonarqube` collector (`branch` or `pr` sub-collector) |
+| `.code_quality.native.sonarqube.ratings.security` | string | `sonarqube` collector (`branch` or `pr` sub-collector) |
+| `.code_quality.native.sonarqube.ratings.maintainability` | string | `sonarqube` collector (`branch` or `pr` sub-collector) |
 
 **Note:** All checks skip if `.code_quality.native.sonarqube` is absent — components without SonarQube configured will not fail. Apply the `code-quality` policy alongside this one to enforce "a scanner ran" regardless of which tool.
 
