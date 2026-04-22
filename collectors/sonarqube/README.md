@@ -6,25 +6,16 @@ config, CI scanner runs, and the GitHub App PR check.
 
 ## Overview
 
-Seven sub-collectors give a complete picture of SonarQube usage for a
-component: `api-default` and `api-pr` read the SonarQube/SonarCloud Web
-API for an existing analysis (the caller runs the scanner, either in CI or
-out-of-band); `auto-default` and `auto-pr` run `sonar-scanner` on the
-checked-out source themselves and then read the results back (for users
-who don't wire SonarQube into their own CI); `config` detects in-repo
-SonarQube configuration; `cicd` captures `sonar-scanner` runs observed in
-CI; and `github-app` reads SonarCloud's GitHub App PR check.
-
-The `api-*` and `auto-*` pairs are two paths to the same `.code_quality.*`
-data — pick one per context. Users with SonarQube already wired into CI
-include `api-default` / `api-pr` and exclude the `auto-*` pair; users who
-want the collector to drive the scan include the `auto-*` pair and exclude
-`api-*` (and `cicd`). Users who don't gate PRs with SonarQube can simply
-exclude the `api-pr` / `auto-pr` / `github-app` sub-collectors from
-`lunar-config.yml`. Results land in the tool-agnostic `.code_quality`
-category, with SonarQube-specific structure stashed under
-`.code_quality.native.sonarqube`. Works against both SonarQube self-hosted
-and SonarCloud — only `sonarqube_base_url` differs.
+Seven sub-collectors cover SonarQube: `api-default` / `api-pr` read an
+existing analysis via the Web API, `auto-default` / `auto-pr` run
+`sonar-scanner` themselves and then read results back, `config` flags
+in-repo configuration, `cicd` captures CI scanner runs, and `github-app`
+reads the SonarCloud GitHub App PR check. The `api-*` and `auto-*` pairs
+are alternate paths to the same `.code_quality.*` data — pick one per
+context (see the include/exclude matrix under [Auto-run vs API-read](#auto-run-vs-api-read)).
+Tool-agnostic fields land at `.code_quality.*`; SonarQube-specific
+structure lives under `.code_quality.native.sonarqube`. Both self-hosted
+SonarQube and SonarCloud are supported via `sonarqube_base_url`.
 
 ## Collected Data
 
