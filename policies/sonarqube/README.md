@@ -4,7 +4,7 @@ SonarQube/SonarCloud-specific code-quality checks — quality gate and letter-ra
 
 ## Overview
 
-Enforces SonarQube's native affordances — quality-gate `OK` status with zero failed conditions, and letter-rating minimums (A–E, A best) for reliability, security, and maintainability. Skips cleanly when SonarQube data is absent for a component, so it's safe to apply broadly. For tool-agnostic checks that apply across any code-quality scanner (SonarQube, CodeClimate, Codacy), use the `code-quality` policy instead.
+Enforces SonarQube's native affordances — quality-gate `OK` status with zero failed conditions, and letter-rating minimums (A–E, A best) for reliability, security, and maintainability. Skips cleanly when SonarQube data is absent for a component, so it's safe to apply broadly. For checks against the tool-agnostic `.code_quality.*` path (coverage, duplication, issue counts, overall pass/fail), use the `code-quality` policy instead.
 
 ## Policies
 
