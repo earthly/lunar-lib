@@ -68,6 +68,7 @@ plugin-source:
 
 test:
     BUILD ./collectors/codeowners+test
+    BUILD ./collectors/backstage+test
 
 lint:
     FROM python:3.12-alpine

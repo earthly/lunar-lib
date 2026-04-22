@@ -1,0 +1,74 @@
+version: 0
+
+name: backstage
+description: Parse catalog-info.yaml for Backstage service catalog metadata
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage Collector"
+  long_description: |
+    Parses and lints Backstage catalog-info.yaml files. Writes the raw
+    Backstage descriptor (apiVersion, kind, metadata, spec) to
+    .catalog.native.backstage, preserving annotations as-is.
+  categories: ["service-catalog"]
+  icon: "assets/backstage.svg"
+  status: "beta"
+  related:
+    - slug: "backstage"
+      type: "policy"
+      reason: "Enforces Backstage catalog standards based on collected metadata"
+
+collectors:
+  - name: catalog-info
+    description: |
+      Scans the repository for a catalog-info.yaml file (configurable paths)
+      and parses its contents as-is into `.catalog.native.backstage`
+      (apiVersion, kind, metadata, spec). Annotations are preserved verbatim
+      with their `backstage.io/` or vendor prefixes. Lints the file for
+      schema/syntax issues and writes any findings to
+      `.catalog.native.backstage.valid` and `.catalog.native.backstage.errors[]`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint"]
+
+inputs:
+  paths:
+    description: Comma-separated list of catalog file paths to check (first match wins)
+    default: "catalog-info.yaml,catalog-info.yml"
+
+example_component_json: |
+  {
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "errors": [],
+          "path": "catalog-info.yaml",
+          "apiVersion": "backstage.io/v1alpha1",
+          "kind": "Component",
+          "metadata": {
+            "name": "payment-api",
+            "description": "Payment processing API",
+            "annotations": {
+              "backstage.io/techdocs-ref": "dir:.",
+              "pagerduty.com/integration-key": "PXXXXXX",
+              "grafana/dashboard-selector": "https://grafana.example.com/d/abc123",
+              "backstage.io/source-location": "url:https://github.com/acme/payment-api"
+            },
+            "tags": ["payments", "api", "tier1"]
+          },
+          "spec": {
+            "type": "service",
+            "owner": "team-payments",
+            "lifecycle": "production",
+            "system": "payment-platform",
+            "providesApis": ["payment-api"],
+            "consumesApis": ["user-api", "notification-api"],
+            "dependsOn": ["resource:database-payments", "resource:cache-redis"]
+          }
+        }
+      }
+    }
+  }

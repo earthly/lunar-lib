@@ -1,0 +1,62 @@
+version: 0
+
+name: backstage
+description: Enforce Backstage service catalog standards
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage Guardrails"
+  long_description: |
+    Validates Backstage catalog-info.yaml entries for completeness and
+    compliance. Checks that the catalog file exists and is valid, owner
+    is set, lifecycle stage is defined, and system grouping is assigned.
+  category: "repository-and-ownership"
+  icon: "assets/backstage.svg"
+  status: "beta"
+  requires:
+    - slug: "backstage"
+      type: "collector"
+      reason: "Provides parsed Backstage catalog metadata at .catalog.native.backstage"
+
+policies:
+  - name: catalog-info-exists
+    description: |
+      Verifies that a catalog-info.yaml file exists in the repository.
+      Every Backstage-managed service must have a catalog definition file.
+      Fails if the `backstage` collector reports no catalog file found.
+    mainPython: ./catalog-info-exists.py
+    keywords: ["backstage", "catalog-info", "service catalog", "file exists"]
+
+  - name: catalog-info-valid
+    description: |
+      Verifies that the catalog-info.yaml file is syntactically valid and
+      passes Backstage descriptor schema checks (no lint errors reported
+      by the collector). Fails if the file is missing or has lint errors.
+    mainPython: ./catalog-info-valid.py
+    keywords: ["backstage", "catalog-info", "lint", "schema", "validation"]
+
+  - name: owner-set
+    description: |
+      Validates that the owner field (spec.owner) is populated in the
+      catalog-info.yaml. Ownership is required for incident routing
+      and accountability. Fails if no catalog file is present.
+    mainPython: ./owner-set.py
+    keywords: ["backstage", "ownership", "owner", "accountability"]
+
+  - name: lifecycle-set
+    description: |
+      Validates that the lifecycle stage (spec.lifecycle) is defined in
+      the catalog-info.yaml. Lifecycle stages (production, experimental,
+      deprecated) inform operational expectations and SLO requirements.
+      Fails if no catalog file is present.
+    mainPython: ./lifecycle-set.py
+    keywords: ["backstage", "lifecycle", "production", "deprecated"]
+
+  - name: system-set
+    description: |
+      Validates that the system grouping (spec.system) is defined in
+      the catalog-info.yaml. System assignment enables dependency mapping
+      and architectural visibility. Fails if no catalog file is present.
+    mainPython: ./system-set.py
+    keywords: ["backstage", "system", "grouping", "architecture"]
