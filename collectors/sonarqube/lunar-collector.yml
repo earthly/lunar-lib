@@ -112,15 +112,19 @@ collectors:
   - name: github-app
     description: |
       Detects the SonarCloud (or SonarQube-for-GitHub) PR analysis check on
-      pull requests by querying the GitHub check runs API. Writes check state,
-      conclusion, and target URL to `.code_quality.native.sonarqube.github_app`.
-      Mirrors the `snyk/github-app` pattern. Only runs on PRs. Requires
-      `GH_TOKEN` to read check runs. Because SonarCloud publishes the check run
-      only after analysis completes, this sub-collector polls the Checks API for
-      up to `github_app_poll_timeout_seconds` (default 180s) for a SonarCloud
-      check run on the PR head SHA. If it never appears, writes
-      `.code_quality.native.sonarqube.github_app.status = "pending"` and exits
-      cleanly.
+      pull requests by querying the GitHub commit status API. Writes check
+      `state`, `context`, and `target_url` to
+      `.code_quality.native.sonarqube.github_app`, plus a `status` field set
+      to `"complete"` on success or `"pending"` on timeout (mirrors the
+      sibling `source.analysis_status` and `auto.status` pattern). Mirrors
+      the `snyk/github-app` pattern. Only runs on PRs. Requires `GH_TOKEN`
+      to read commit statuses. Because SonarCloud publishes its status
+      check only after analysis completes, this sub-collector polls
+      `/repos/<owner>/<repo>/commits/<sha>/status` for up to
+      `github_app_poll_timeout_seconds` (default 180s) for a SonarCloud
+      status on the PR head SHA. If it never appears, writes
+      `.code_quality.native.sonarqube.github_app.status = "pending"` and
+      exits cleanly.
     mainBash: github-app.sh
     runs_on: [prs]
     hook:
@@ -207,7 +211,7 @@ example_component_json: |
       "passing": true,
       "coverage_percentage": 78.3,
       "duplication_percentage": 3.1,
-      "issue_counts": {
+      "issues": {
         "total": 46,
         "critical": 0,
         "high": 1,
@@ -247,6 +251,7 @@ example_component_json: |
             ]
           },
           "github_app": {
+            "status": "complete",
             "state": "success",
             "context": "SonarCloud Code Analysis",
             "target_url": "https://sonarcloud.io/dashboard?id=my-org_my-service&pullRequest=42"

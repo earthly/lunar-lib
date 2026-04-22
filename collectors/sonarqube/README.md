@@ -32,14 +32,14 @@ lives under `.code_quality.native.sonarqube` for SonarQube-aware policies.
 | `.code_quality.passing` | bool | `api` / `auto` | Overall pass/fail signal — derived from SonarQube's quality gate status |
 | `.code_quality.coverage_percentage` | number | `api` / `auto` | Line coverage percentage (0–100), if measured |
 | `.code_quality.duplication_percentage` | number | `api` / `auto` | Duplicated lines percentage (0–100), if measured |
-| `.code_quality.issue_counts` | object | `api` / `auto` | Severity buckets: `total`, `critical`, `high`, `medium`, `low` (same shape as `.sca` / `.sast`) |
+| `.code_quality.issues` | object | `api` / `auto` | Severity buckets: `total`, `critical`, `high`, `medium`, `low` (same shape as `.sca.vulnerabilities` / `.sast.findings`) |
 | `.code_quality.native.sonarqube.quality_gate` | object | `api` / `auto` | Quality gate status (`OK`/`WARN`/`ERROR`) and failed condition count |
 | `.code_quality.native.sonarqube.ratings` | object | `api` / `auto` | SonarQube letter ratings (A–E) per dimension: reliability, security, maintainability, security review |
 | `.code_quality.native.sonarqube.metrics` | object | `api` / `auto` | SonarQube-native metric names: bugs, vulnerabilities, code smells, lines of code |
 | `.code_quality.native.sonarqube.auto` | object | `auto` | Scanner run metadata: `version`, `exit_code`, `duration_seconds`, and `status` (`complete` or `scanner-failed`) |
 | `.code_quality.native.sonarqube.config` | object | `config` | Paths to SonarQube config files discovered in the repo |
 | `.code_quality.native.sonarqube.cicd` | object | `cicd` | `sonar-scanner` invocations captured in CI: command, version, exit code |
-| `.code_quality.native.sonarqube.github_app` | object | `github-app` | SonarCloud GitHub App PR check: state, context, target URL, and `status` (`complete` or `pending`) |
+| `.code_quality.native.sonarqube.github_app` | object | `github-app` | SonarCloud GitHub App PR check: `state`, `context`, `target_url` (from the GitHub commit status API), and `status` (`complete` on success, `pending` on timeout) |
 
 ## Collectors
 
@@ -135,10 +135,11 @@ the `config` sub-collector's output, and policies that want to gate on
 fresh results can treat `analysis_status == "pending"` as a skip rather
 than a fail.
 
-The same principle applies to `github-app`: the SonarCloud check run on a PR
-appears only after analysis completes, so the sub-collector polls the GitHub
-Checks API up to `github_app_poll_timeout_seconds` and writes
-`.code_quality.native.sonarqube.github_app.status = "pending"` on timeout.
+The same principle applies to `github-app`: the SonarCloud status check on
+a PR appears only after analysis completes, so the sub-collector polls the
+GitHub commit status API up to `github_app_poll_timeout_seconds` and writes
+`.code_quality.native.sonarqube.github_app.status = "complete"` on success
+or `"pending"` on timeout.
 
 ### Inputs
 

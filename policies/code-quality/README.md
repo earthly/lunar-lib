@@ -29,11 +29,11 @@ This policy reads from the following Component JSON paths:
 | `.code_quality.passing` | bool | `sonarqube` collector (derived from the tool's quality gate) |
 | `.code_quality.coverage_percentage` | number | `sonarqube` collector |
 | `.code_quality.duplication_percentage` | number | `sonarqube` collector |
-| `.code_quality.issue_counts.total` | number | `sonarqube` collector |
-| `.code_quality.issue_counts.critical` | number | `sonarqube` collector |
-| `.code_quality.issue_counts.high` | number | `sonarqube` collector |
-| `.code_quality.issue_counts.medium` | number | `sonarqube` collector |
-| `.code_quality.issue_counts.low` | number | `sonarqube` collector |
+| `.code_quality.issues.total` | number | `sonarqube` collector |
+| `.code_quality.issues.critical` | number | `sonarqube` collector |
+| `.code_quality.issues.high` | number | `sonarqube` collector |
+| `.code_quality.issues.medium` | number | `sonarqube` collector |
+| `.code_quality.issues.low` | number | `sonarqube` collector |
 
 ## Installation
 
@@ -63,7 +63,7 @@ policies:
     "passing": true,
     "coverage_percentage": 82.5,
     "duplication_percentage": 3.1,
-    "issue_counts": { "total": 12, "critical": 0, "high": 0, "medium": 2, "low": 10 }
+    "issues": { "total": 12, "critical": 0, "high": 0, "medium": 2, "low": 10 }
   }
 }
 ```
@@ -77,7 +77,7 @@ policies:
     "passing": false,
     "coverage_percentage": 61.4,
     "duplication_percentage": 8.2,
-    "issue_counts": { "total": 120, "critical": 2, "high": 5, "medium": 30, "low": 83 }
+    "issues": { "total": 120, "critical": 2, "high": 5, "medium": 30, "low": 83 }
   }
 }
 ```
