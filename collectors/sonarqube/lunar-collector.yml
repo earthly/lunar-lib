@@ -1,7 +1,7 @@
 version: 0
 
 name: sonarqube
-description: Collect SonarQube/SonarCloud data via API (default-branch + PR), in-repo config, CI scanner runs, and GitHub App checks
+description: Collect SonarQube/SonarCloud data via API (default-branch + PR), auto-run scanner (default-branch + PR), in-repo config, CI scanner runs, and GitHub App checks
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -10,10 +10,12 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "SonarQube Collector"
   long_description: |
-    Detects SonarQube/SonarCloud across five integration points: default-branch
-    Web API, PR Web API, in-repo config detection, CI scanner runs, and the
-    GitHub App PR check. Normalizes results into .code_quality for tool-agnostic
-    policy evaluation.
+    Detects SonarQube/SonarCloud across multiple integration points: read-only
+    Web API queries on the default branch and on PRs, optional auto-run of
+    `sonar-scanner` on default-branch and PR commits (for users who don't run
+    SonarQube in CI themselves), in-repo config detection, CI scanner runs,
+    and the GitHub App PR check. Normalizes results into .code_quality for
+    tool-agnostic policy evaluation.
   categories: ["code-analysis"]
   icon: "assets/sonarqube.svg"
   status: "experimental"
@@ -60,6 +62,50 @@ collectors:
     hook:
       type: code
     keywords: ["sonarqube", "sonarcloud", "code-quality", "pull-request"]
+
+  - name: auto-default
+    description: |
+      Runs `sonar-scanner` on the checked-out default-branch source against the
+      configured SonarQube/SonarCloud server, then polls the Web API for
+      results — an all-in-one alternative to `api-default` for users who don't
+      trigger SonarQube from their own CI. The scanner is invoked with
+      `-Dsonar.branch.name=<default-branch>` so the analysis targets the
+      default branch on the server. Scanner invocation metadata (version,
+      exit code, duration) is captured under
+      `.code_quality.native.sonarqube.auto`. Once the scanner exits, the same
+      polling path used by `api-default` reads the published analysis and
+      writes the tool-agnostic `.code_quality.*` fields with
+      `"integration": "auto-default"`. If the scanner fails, writes
+      `.code_quality.native.sonarqube.auto.status = "scanner-failed"` with the
+      exit code and no downstream metrics. Requires `SONARQUBE_TOKEN` with
+      `Execute Analysis` permission (read-only `Browse` is not sufficient).
+      Mutually exclusive with `api-default` and with a user-run
+      `sonar-scanner` in CI on the same commit — enabling both means the
+      scanner runs twice. A future collector-dependency feature will let
+      `auto-default` fire only when the `cicd` sub-collector did not capture
+      a scan for the same `head_sha`.
+    mainBash: auto-default.sh
+    runs_on: [default-branch]
+    hook:
+      type: code
+    keywords: ["sonarqube", "sonarcloud", "code-quality", "auto-scan", "sonar-scanner", "default-branch"]
+
+  - name: auto-pr
+    description: |
+      Same contract as `auto-default` but scoped to pull requests — runs
+      `sonar-scanner` on the PR head with
+      `-Dsonar.pullrequest.key=$LUNAR_COMPONENT_PR`,
+      `-Dsonar.pullrequest.branch=$LUNAR_COMPONENT_HEAD_BRANCH`, and
+      `-Dsonar.pullrequest.base=$LUNAR_COMPONENT_BASE_BRANCH`, then polls
+      the Web API for the PR analysis. Writes `"integration": "auto-pr"`.
+      Exclude this sub-collector if users run `sonar-scanner` themselves on
+      PRs (in which case the `cicd` and `api-pr` sub-collectors cover the
+      read path) or if PR-level SonarQube gating is not in use.
+    mainBash: auto-pr.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["sonarqube", "sonarcloud", "code-quality", "auto-scan", "sonar-scanner", "pull-request"]
 
   - name: config
     description: |
@@ -113,8 +159,9 @@ inputs:
   project_key:
     description: >
       SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Used by the
-      `api-default` and `api-pr` sub-collectors. Optional if the component has
-      a `sonarqube/project-key` meta annotation set by a cataloger.
+      `api-default`, `api-pr`, `auto-default`, and `auto-pr` sub-collectors.
+      Optional if the component has a `sonarqube/project-key` meta annotation
+      set by a cataloger.
     default: ""
   sonarqube_base_url:
     description: >
@@ -123,19 +170,39 @@ inputs:
     default: "https://sonarcloud.io"
   api_poll_timeout_seconds:
     description: >
-      Total seconds the `api-default` and `api-pr` sub-collectors will wait
-      for a SonarQube analysis matching the current `head_sha` to appear
-      before giving up and emitting `analysis_status: "pending"`. SonarQube's
-      Compute Engine queues analyses asynchronously; results typically publish
-      10–60s after `sonar-scanner` exits, longer for large projects. Set to
-      `0` to disable polling (single-shot query — useful when the CI pipeline
-      already waits for analysis completion before invoking `lunar`).
+      Total seconds the `api-default`, `api-pr`, `auto-default`, and `auto-pr`
+      sub-collectors will wait for a SonarQube analysis matching the current
+      `head_sha` to appear before giving up and emitting `analysis_status:
+      "pending"`. SonarQube's Compute Engine queues analyses asynchronously;
+      results typically publish 10–60s after `sonar-scanner` exits, longer
+      for large projects. Set to `0` to disable polling (single-shot query —
+      useful when the CI pipeline already waits for analysis completion
+      before invoking `lunar`).
     default: "180"
   api_poll_interval_seconds:
     description: >
-      Seconds between polls while the `api-default` and `api-pr` sub-collectors
-      wait for SonarQube analysis to complete.
+      Seconds between polls while the `api-default`, `api-pr`, `auto-default`,
+      and `auto-pr` sub-collectors wait for SonarQube analysis to complete.
     default: "10"
+  auto_scanner_version:
+    description: >
+      Version of the `sonar-scanner` CLI downloaded and executed by
+      `auto-default` and `auto-pr`. Pinned for reproducibility. If the
+      collector image already ships with `sonar-scanner` on PATH, this input
+      is ignored.
+    default: "7.0.0.4796"
+  auto_sources:
+    description: >
+      Source root passed to `sonar-scanner` as `-Dsonar.sources=<value>` by
+      `auto-default` and `auto-pr`. Defaults to the repo root. Override for
+      monorepos where only a sub-tree should be analysed.
+    default: "."
+  auto_extra_args:
+    description: >
+      Extra command-line arguments appended to every `sonar-scanner`
+      invocation (e.g. `-Dsonar.exclusions=**/*.min.js`). Applied to both
+      `auto-default` and `auto-pr`.
+    default: ""
   github_app_poll_timeout_seconds:
     description: >
       Total seconds the `github-app` sub-collector will wait for the
@@ -151,10 +218,12 @@ inputs:
 secrets:
   SONARQUBE_TOKEN:
     description: >
-      SonarQube/SonarCloud user token with `Browse` permission on the target
-      project. Used by the `api-default` and `api-pr` sub-collectors. Sent as
-      the HTTP Basic username with an empty password, per the SonarQube Web
-      API convention.
+      SonarQube/SonarCloud user token. For the read-only `api-default` and
+      `api-pr` sub-collectors, `Browse` permission on the target project is
+      sufficient. For `auto-default` and `auto-pr`, which run `sonar-scanner`
+      themselves, the token must additionally have `Execute Analysis`
+      permission. Sent as the HTTP Basic username with an empty password,
+      per the SonarQube Web API convention.
   GH_TOKEN:
     description: >
       GitHub token for the GitHub Checks API. Used by the `github-app`
@@ -197,6 +266,12 @@ example_component_json: |
             "vulnerabilities": 1,
             "code_smells": 42,
             "lines_of_code": 12500
+          },
+          "auto": {
+            "status": "complete",
+            "version": "7.0.0.4796",
+            "exit_code": 0,
+            "duration_seconds": 47
           },
           "config": {
             "files": ["sonar-project.properties"]
