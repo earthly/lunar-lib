@@ -38,7 +38,7 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 
 | # | Plugin | Category | Notes |
 |---|--------|----------|-------|
-| 1 | `repo-boilerplate` | Repo health + ownership | Consolidates readme, codeowners, and standard file scanning. Every repo. |
+| 1 | ✅ `repo-boilerplate` | Repo health + ownership | Shipped. Consolidates readme + codeowners and scans standard files (.gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, .editorconfig). Every repo. |
 | 3 | `github` | VCS settings | Branch protection, repo settings |
 | 4 | `docker` | Containers | Skips if no Dockerfiles. 🆕 Add `hadolint` sub-collector for auto-run Dockerfile linting. |
 | 5 | `k8s` | Infrastructure | Skips if no K8s manifests |
@@ -62,7 +62,6 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 | 23 | 🆕 `actionlint` | GHA linting | Auto-lints GitHub Actions workflow files for syntax errors, type mismatches, deprecated features. Different from `gha-security` (which checks permissions/pinning). |
 | 25 | 🆕 `gha-security` | CI security | Parses GHA workflows for pinned actions, permissions, `pull_request_target` misuse. Skips if no `.github/workflows/`. |
 | 26 | 🆕 `api-docs` | API specs | Detects OpenAPI/Swagger specs, skips if none |
-| 27 | ✅ `repo-boilerplate` | Repo health | Shipped. Consolidates readme + codeowners; also scans standard files (.gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, .editorconfig) |
 
 ### Policies
 
