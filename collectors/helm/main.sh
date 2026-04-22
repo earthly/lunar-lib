@@ -64,7 +64,7 @@ process_chart() {
 
     # Build chart object
     local chart_obj
-    chart_obj=$(jq -n \
+    chart_obj=$(jq -nc \
         --arg path "$rel_dir" \
         --arg name "$name" \
         --arg version "$version" \
