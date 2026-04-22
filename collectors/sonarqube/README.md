@@ -140,20 +140,16 @@ appears only after analysis completes, so the sub-collector polls the GitHub
 Checks API up to `github_app_poll_timeout_seconds` and writes
 `.code_quality.native.sonarqube.github_app.status = "pending"` on timeout.
 
-If your CI already waits for SonarQube analysis to complete before invoking
-`lunar` (e.g. using `sonar-scanner`'s `-Dsonar.qualitygate.wait=true`), set
-the relevant `*_poll_timeout_seconds` input to `0` for a single-shot query.
-
 ### Inputs
 
 | Input | Default | Description |
 |-------|---------|-------------|
 | `project_key` | *(empty — falls back to catalog meta)* | SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Optional if `sonarqube/project-key` meta annotation is set. |
 | `sonarqube_base_url` | `https://sonarcloud.io` | API base URL. Override for self-hosted SonarQube. |
-| `api_poll_timeout_seconds` | `180` | Total seconds `api`/`auto` wait for a SonarQube analysis matching `head_sha`. `0` disables polling. |
+| `api_poll_timeout_seconds` | `180` | Total seconds `api`/`auto` wait for a SonarQube analysis matching `head_sha`. |
 | `api_poll_interval_seconds` | `10` | Seconds between polls while waiting for SonarQube analysis. |
 | `auto_scanner_version` | `7.0.0.4796` | Pinned version of `sonar-scanner` used by `auto`. Ignored if the collector image already ships with `sonar-scanner` on PATH. |
 | `auto_sources` | `.` | Value passed to `-Dsonar.sources=` by `auto`. Override for monorepos. |
 | `auto_extra_args` | *(empty)* | Extra command-line args appended to every `auto` `sonar-scanner` invocation (e.g. `-Dsonar.exclusions=**/*.min.js`). |
-| `github_app_poll_timeout_seconds` | `180` | Total seconds `github-app` waits for the SonarCloud GitHub check run on the PR head SHA. `0` disables polling. |
+| `github_app_poll_timeout_seconds` | `180` | Total seconds `github-app` waits for the SonarCloud GitHub check run on the PR head SHA. |
 | `github_app_poll_interval_seconds` | `10` | Seconds between polls while waiting for the SonarCloud check run. |

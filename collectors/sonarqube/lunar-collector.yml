@@ -145,9 +145,7 @@ inputs:
       SonarQube analysis matching the current `head_sha` to appear before
       giving up and emitting `analysis_status: "pending"`. SonarQube's Compute
       Engine queues analyses asynchronously; results typically publish 10–60s
-      after `sonar-scanner` exits, longer for large projects. Set to `0` to
-      disable polling (single-shot query — useful when the CI pipeline already
-      waits for analysis completion before invoking `lunar`).
+      after `sonar-scanner` exits, longer for large projects.
     default: "180"
   api_poll_interval_seconds:
     description: >
@@ -175,8 +173,7 @@ inputs:
   github_app_poll_timeout_seconds:
     description: >
       Total seconds the `github-app` sub-collector will wait for the
-      SonarCloud GitHub check run to appear on the PR head SHA. Set to `0` to
-      disable polling.
+      SonarCloud GitHub check run to appear on the PR head SHA.
     default: "180"
   github_app_poll_interval_seconds:
     description: >
