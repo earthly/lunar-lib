@@ -67,7 +67,7 @@ plugin-source:
     SAVE ARTIFACT policies
 
 test:
-    BUILD ./collectors/codeowners+test
+    BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
 
 lint:

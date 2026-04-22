@@ -855,7 +855,7 @@ if __name__ == "__main__":
 Users can then selectively enable checks:
 ```yaml
 policies:
-  - uses: ./policies/readme
+  - uses: ./policies/my-plugin
     include: [readme-exists]  # Only run readme-exists, skip readme-length
 ```
 
