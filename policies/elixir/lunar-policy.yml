@@ -1,0 +1,71 @@
+version: 0
+
+name: elixir
+description: Enforces Elixir project structure, tooling, and dependency standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Elixir Project Guardrails"
+  long_description: |
+    Enforce Elixir-specific project standards including mix manifest presence,
+    Elixir version requirement, lockfile commit, test directory layout,
+    Credo/Dialyzer configuration, and umbrella app detection.
+  category: "devex-build-and-ci"
+  icon: "assets/elixir.svg"
+  status: "beta"
+  requires:
+    - slug: "elixir"
+      type: "collector"
+      reason: "Provides Elixir project metadata"
+  related: []
+
+policies:
+  - name: mix-project-exists
+    description: |
+      Ensures the project has a mix.exs file. Required for all Elixir
+      projects managed with Mix.
+    mainPython: mix_project_exists.py
+    keywords: ["mix.exs", "elixir project", "mix manifest"]
+
+  - name: elixir-version-constraint-set
+    description: |
+      Ensures the project declares an Elixir version requirement
+      (e.g., `elixir: "~> 1.15"`) in mix.exs. Pinning a minimum Elixir
+      version prevents drift and surprises on build machines.
+    mainPython: elixir_version_constraint_set.py
+    keywords: ["elixir version", "version requirement", "mix.exs"]
+
+  - name: dependencies-locked
+    description: |
+      Ensures mix.lock is committed for reproducible dependency resolution.
+      Without a lockfile, builds can pull different Hex versions over time.
+    mainPython: dependencies_locked.py
+    keywords: ["mix.lock", "lockfile", "reproducibility", "hex"]
+
+  - name: test-directory-exists
+    description: |
+      Ensures a `test/` directory exists. Projects without tests skip quietly
+      only when they also lack test helper config — an explicit test dir is
+      the conventional layout for ExUnit.
+    mainPython: test_directory_exists.py
+    keywords: ["test/", "exunit", "testing", "test layout"]
+
+  - name: credo-or-dialyzer-configured
+    description: |
+      Ensures Credo (`.credo.exs`) or Dialyzer (dialyxir dep / `dialyzer/0`
+      config block) is configured. Static analysis catches bugs and enforces
+      consistent idiomatic Elixir.
+    mainPython: credo_or_dialyzer_configured.py
+    keywords: ["credo", "dialyzer", "dialyxir", "static analysis", "code quality"]
+
+  - name: umbrella-app-detected
+    description: |
+      Reports whether the project is an umbrella application. Informational —
+      passes if the project is NOT an umbrella or if umbrella structure is
+      correctly detected.
+    mainPython: umbrella_app_detected.py
+    keywords: ["umbrella", "apps", "monorepo", "elixir umbrella"]
+
+inputs: {}
