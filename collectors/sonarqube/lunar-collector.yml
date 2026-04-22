@@ -10,11 +10,9 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "SonarQube Collector"
   long_description: |
-    Detects SonarQube/SonarCloud across multiple integration points: read-only
-    Web API queries on the default branch and on PRs, optional auto-run of
-    `sonar-scanner` on default-branch and PR commits (for users who don't run
-    SonarQube in CI themselves), in-repo config detection, CI scanner runs,
-    and the GitHub App PR check. Normalizes results into .code_quality for
+    Detects SonarQube/SonarCloud via Web API reads (default + PR), auto-run
+    of `sonar-scanner` (default + PR), in-repo config, CI scanner runs, and
+    the GitHub App PR check. Normalizes results into `.code_quality` for
     tool-agnostic policy evaluation.
   categories: ["code-analysis"]
   icon: "assets/sonarqube.svg"
