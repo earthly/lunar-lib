@@ -95,6 +95,7 @@ all:
     BUILD --pass-args ./collectors/claude+image
     BUILD --pass-args ./collectors/docker+image
     BUILD --pass-args ./collectors/k8s+image
+    BUILD --pass-args ./collectors/helm+image
     BUILD --pass-args ./collectors/golang+image
     BUILD --pass-args ./collectors/nodejs+image
     BUILD --pass-args ./collectors/syft+image
