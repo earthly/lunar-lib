@@ -37,7 +37,7 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Description |
 |-----------|-------------|
-| `helm` | Collects Helm chart metadata, lint results, schema presence, and dependencies |
+| `charts` | Collects Helm chart metadata, lint results, schema presence, and dependencies |
 | `cicd` | Tracks helm commands executed in CI (install, upgrade, template, package) |
 
 ## Installation

@@ -25,7 +25,7 @@ landing_page:
       reason: "Collects Kubernetes manifest data that Helm charts generate"
 
 collectors:
-  - name: helm
+  - name: charts
     description: |
       Finds all Helm charts in the repository (directories containing Chart.yaml) and collects:
       - Chart metadata (name, version, appVersion)
