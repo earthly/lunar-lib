@@ -4,7 +4,7 @@ Enforce code-quality standards across any scanner that writes to `.code_quality`
 
 ## Overview
 
-Validates that a code-quality scanner ran, the tool's overall pass/fail signal is green, and that coverage, duplication, and severity-bucketed issue counts meet configurable thresholds. Reads the tool-agnostic `.code_quality` Component JSON path, which is populated by the `sonarqube` collector. Apply broadly as a "code quality happens" guardrail, or bring-your-own thresholds per domain.
+Validates that a code-quality scanner ran, the tool's overall pass/fail signal is green, and that coverage, duplication, and severity-bucketed issue counts meet configurable thresholds. Reads the tool-agnostic `.code_quality` Component JSON path, which is populated by code quality collectors such as `sonarqube`. Apply broadly as a "code quality happens" guardrail, or bring-your-own thresholds per domain.
 
 ## Policies
 

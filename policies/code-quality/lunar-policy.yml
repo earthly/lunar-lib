@@ -1,7 +1,7 @@
 version: 0
 
 name: code-quality
-description: Enforce code-quality standards via the tool-agnostic `.code_quality` path (populated by the `sonarqube` collector)
+description: Enforce code-quality standards via the tool-agnostic `.code_quality` path (populated by code quality collectors like `sonarqube`)
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
