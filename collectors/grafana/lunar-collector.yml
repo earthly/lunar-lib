@@ -1,0 +1,132 @@
+version: 0
+
+name: grafana
+description: Collect dashboard and alert rule data from Grafana via the API and from dashboard JSON files in the component repo
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Grafana Collector"
+  long_description: |
+    Query the Grafana API for dashboards and alerts linked to each component,
+    and scan the component repo for Grafana dashboard JSON files. Normalizes
+    to .observability for tool-agnostic policies; raw data at
+    .observability.native.grafana.
+  categories: ["service-catalog"]
+  icon: "assets/grafana.svg"
+  status: "beta"
+  related:
+    - slug: "observability"
+      type: "policy"
+      reason: "Enforces dashboard and alert configuration standards using this collector's data"
+
+collectors:
+  - name: dashboard
+    description: |
+      Queries the Grafana REST API for the component's linked dashboard and
+      alert rules. Discovers the dashboard UID from the component's
+      `grafana/dashboard-uid` meta annotation (typically set by a
+      company-specific cataloger via
+      `lunar catalog component --meta grafana/dashboard-uid <uid>`), or
+      falls back to the explicit `dashboard_uid` input for static cases.
+      If no UID is found, the collector exits cleanly with no data written.
+      Writes
+      the resolved UID to `.observability.dashboard.id` (normalized,
+      tool-agnostic) so the full link is visible in the component JSON
+      even when the dashboard is missing. If
+      the UID is set but the dashboard does not exist in Grafana, writes
+      `.observability.dashboard.exists=false` **and** also writes
+      `.observability.alerts.configured=false` and
+      `.observability.alerts.count=0` without querying the alerts API —
+      the alerts block is always present when the dashboard sub-collector
+      runs, so policies see a consistent shape regardless of whether the
+      dashboard resolved. When the dashboard does exist: fetches the
+      dashboard's folder UID from `meta.folderUid` on the dashboard API
+      response, then lists alert rules via Grafana's alerting API
+      (`/api/v1/provisioning/alert-rules`) and filters to rules whose
+      `folderUID` matches. `.observability.alerts.count` is the count of
+      matching rules; `.observability.alerts.configured` is `true` when
+      count > 0. Writes normalized data to .observability.dashboard,
+      .observability.alerts, .observability.source, and the raw Grafana API
+      responses to .observability.native.grafana.api.
+    mainBash: dashboard.sh
+    hook:
+      type: code
+    keywords: ["grafana", "dashboard", "alerts", "observability", "monitoring"]
+
+  - name: repo-dashboards
+    description: |
+      Walks the component repository looking for Grafana dashboard JSON files
+      by content fingerprint (top-level `schemaVersion` and `panels` fields).
+      Users can narrow the scan by setting the `find_command` input (e.g. to
+      restrict to a `dashboards/` directory); by default the full repo is
+      walked. Writes each matching file's raw JSON (plus its repo path) into
+      .observability.native.grafana.repo_dashboards for users to build
+      custom policies against. This sub-collector does not write to
+      normalized .observability.dashboard paths — the API sub-collector owns
+      those.
+    mainBash: repo_dashboards.sh
+    hook:
+      type: code
+    keywords: ["grafana", "dashboard-as-code", "repo", "json"]
+
+inputs:
+  grafana_base_url:
+    description: >
+      Grafana API base URL (e.g. `https://grafana.example.com`). Required
+      for the `dashboard` sub-collector. If empty, the sub-collector exits
+      cleanly with no data written.
+    default: ""
+  dashboard_uid:
+    description: >
+      Grafana dashboard UID to query (e.g. `payment-api`). Optional if the
+      component has a `grafana/dashboard-uid` meta annotation set by a
+      cataloger.
+    default: ""
+  find_command:
+    description: >
+      Command used by the `repo-dashboards` sub-collector to enumerate
+      candidate JSON files (must output one path per line). Narrow this to
+      restrict the scan to a subdirectory, e.g.
+      `find ./dashboards -type f -name '*.json'`.
+    default: "find . -type f -name '*.json'"
+
+secrets:
+  GRAFANA_API_KEY:
+    description: >
+      Grafana API token with `dashboards:read` and `alerting.rules:read`
+      scopes. Used by the `dashboard` sub-collector only.
+
+example_component_json: |
+  {
+    "observability": {
+      "source": {
+        "tool": "grafana",
+        "integration": "api"
+      },
+      "dashboard": {
+        "id": "abc123",
+        "exists": true,
+        "url": "https://grafana.example.com/d/abc123/payment-api"
+      },
+      "alerts": {
+        "configured": true,
+        "count": 5
+      },
+      "native": {
+        "grafana": {
+          "api": {
+            "dashboard": { "...full Grafana dashboard API response..." },
+            "alert_rules": [ "...list of alert rule objects..." ]
+          },
+          "repo_dashboards": [
+            {
+              "path": "dashboards/payment-api.json",
+              "dashboard": { "schemaVersion": 39, "title": "Payment API", "panels": [] }
+            }
+          ]
+        }
+      }
+    }
+  }

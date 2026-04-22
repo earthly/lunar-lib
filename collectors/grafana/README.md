@@ -1,0 +1,71 @@
+# Grafana Collector
+
+Collect dashboard and alert rule data from Grafana via the API, and discover Grafana dashboard JSON files committed in the component repository.
+
+## Overview
+
+This plugin provides two sub-collectors. The `dashboard` sub-collector queries the Grafana REST API on every code event for the dashboard and alert rules linked to each component via the component's `grafana/dashboard-uid` meta annotation (typically set by a cataloger). The `repo-dashboards` sub-collector walks the component repo looking for Grafana dashboard JSON files by content fingerprint and stashes their raw contents for custom policies. Both write under the tool-agnostic `.observability` category, so the shared `observability` policy works regardless of whether the data comes from Grafana, Datadog, or another provider.
+
+## Collected Data
+
+This collector writes to the following Component JSON paths:
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.observability.source` | object | Tool and integration metadata |
+| `.observability.dashboard.id` | string | Tool-agnostic dashboard identifier (for Grafana, this is the dashboard UID; set even when the dashboard no longer exists) |
+| `.observability.dashboard.exists` | boolean | Whether the linked Grafana dashboard exists |
+| `.observability.dashboard.url` | string | Direct URL to the dashboard |
+| `.observability.alerts.configured` | boolean | Whether any alert rules are configured for the dashboard's folder |
+| `.observability.alerts.count` | number | Number of alert rules scoped to the dashboard's folder |
+| `.observability.native.grafana.api` | object | Raw Grafana API responses (dashboard + alert rules) |
+| `.observability.native.grafana.repo_dashboards` | array | Raw JSON of each Grafana dashboard file discovered in the repo, with its path |
+
+## Collectors
+
+This plugin provides the following sub-collectors:
+
+| Collector | Description |
+|-----------|-------------|
+| `dashboard` | Queries Grafana API for the dashboard and alert rules linked via the `grafana/dashboard-uid` meta annotation (code hook) |
+| `repo-dashboards` | Discovers Grafana dashboard JSON files in the repo by content fingerprint (code hook) |
+
+## Installation
+
+Add to your `lunar-config.yml`:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/grafana@v1.0.0
+    on: ["domain:your-domain"]
+    with:
+      grafana_base_url: "https://grafana.example.com"
+      # find_command: "find ./dashboards -type f -name '*.json'"  # Optional, narrows repo scan
+```
+
+Required secrets:
+- `GRAFANA_API_KEY` — Grafana API token with `dashboards:read` and `alerting.rules:read` scopes
+
+### Dashboard discovery (the `dashboard` sub-collector)
+
+The `dashboard` sub-collector resolves the component's Grafana dashboard UID in this order:
+
+1. **Catalog meta annotation** — reads `grafana/dashboard-uid` from the component's lunar catalog meta. Set via `lunar catalog component --meta grafana/dashboard-uid <uid>`, typically by a company-specific cataloger that knows which components map to which dashboards. This is the recommended approach for orgs where each component has its own dashboard.
+2. **`dashboard_uid` input** — explicit value passed via `with: dashboard_uid: <uid>` in `lunar-config.yml`. Useful for static cases or for orgs that don't run a cataloger.
+3. If neither is set, the sub-collector exits cleanly with no data written.
+
+If the UID resolves but the dashboard does not exist in Grafana, the collector writes `.observability.dashboard.exists=false` so policies can flag the stale link. In that case it also writes `.observability.alerts.configured=false` and `.observability.alerts.count=0` without querying the alerts API — the alerts block is always populated when the sub-collector runs, so policies see a consistent shape.
+
+**Alerts detection.** Alert rules in Grafana live in folders (not on dashboards directly), so the sub-collector reads the dashboard's folder UID from `meta.folderUid` on the `/api/dashboards/uid/<uid>` response, then lists alert rules via `/api/v1/provisioning/alert-rules` and filters to rules whose `folderUID` matches. `.observability.alerts.count` is the number of matching rules; `.observability.alerts.configured` is `true` when count > 0. This folder-scoped model reflects how Grafana teams typically organize alerting around dashboards.
+
+### Repo dashboard discovery (the `repo-dashboards` sub-collector)
+
+The `repo-dashboards` sub-collector walks the cloned component repo and identifies Grafana dashboard JSON files by content fingerprint: any `.json` file whose top-level object contains both a `schemaVersion` (integer) and a `panels` (array) field is treated as a dashboard and its raw contents are captured.
+
+By default the full repo is walked. Set the `find_command` input to narrow the search to a specific directory (for example `find ./dashboards -type f -name '*.json'`). This mirrors the pattern used by the `k8s` collector for YAML manifest discovery. Files that do not match the fingerprint are silently skipped. If no dashboards are found, nothing is written.
+
+### Notes on behavior
+
+- Both sub-collectors run on the `code` hook, so they fire on each push rather than a schedule. The `dashboard` sub-collector does not actually read from the repo, but the clone is cheap and keeps the hook model consistent across the plugin.
+- `.observability.native.grafana.repo_dashboards` is intentionally raw — users write their own policies against the dashboard JSON if they care about panel shapes, datasource usage, etc.
+- Example Component JSON is defined in `lunar-collector.yml` under `example_component_json`.

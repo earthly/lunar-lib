@@ -1,0 +1,64 @@
+version: 0
+
+name: observability
+description: Enforce dashboard and alerting configuration standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Observability Guardrails"
+  long_description: |
+    Enforce baseline observability for production services. Verify each
+    service has a linked monitoring dashboard and at least one alert rule
+    configured. Works with any observability-category collector (Grafana,
+    Datadog, etc.) via the tool-agnostic .observability paths.
+  category: "operational-readiness"
+  icon: "assets/observability.svg"
+  status: "beta"
+  requires:
+    - slug: "grafana"
+      type: "collector"
+      reason: "Provides dashboard and alert rule data (Grafana implementation)"
+  related: []
+  keywords: ["observability", "monitoring", "dashboard", "alerts", "grafana", "datadog", "operational readiness"]
+
+policies:
+  - name: dashboard-exists
+    description: |
+      Verifies that the service has a linked monitoring dashboard by
+      checking .observability.dashboard.exists is true. Fails if
+      observability data is present but .observability.dashboard.exists
+      is false (the UID is registered but the dashboard is gone in
+      Grafana). Skips cleanly when no observability source has written
+      data for this component.
+    mainPython: ./dashboard_exists.py
+    keywords: ["observability", "dashboard", "monitoring", "grafana", "datadog"]
+
+  - name: alerts-configured
+    description: |
+      Verifies that at least one alert rule is configured for the service
+      by checking .observability.alerts.configured is true. Fails if
+      alerting data is present but no rules are configured. Skips cleanly
+      when no observability source has written data for this component.
+    mainPython: ./alerts_configured.py
+    keywords: ["observability", "alerts", "alerting", "monitoring", "grafana", "datadog"]
+
+example_component_json: |
+  {
+    "observability": {
+      "source": {
+        "tool": "grafana",
+        "integration": "api"
+      },
+      "dashboard": {
+        "id": "abc123",
+        "exists": true,
+        "url": "https://grafana.example.com/d/abc123/payment-api"
+      },
+      "alerts": {
+        "configured": true,
+        "count": 5
+      }
+    }
+  }
