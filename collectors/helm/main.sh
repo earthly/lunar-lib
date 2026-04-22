@@ -98,17 +98,17 @@ FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name 'Chart.yaml' -o -nam
 
 # Skip charts unpacked inside another chart's `charts/` dependency dir
 # (path contains two `/charts/` segments, e.g. charts/api/charts/postgresql/Chart.yaml).
-charts_json=$(eval "$FIND_CMD" 2>/dev/null | \
+charts_output=$(eval "$FIND_CMD" 2>/dev/null | \
     grep -vE '/charts/[^/]+/charts/[^/]+/Chart\.ya?ml$' | \
     sort -u | \
-    parallel -j 4 process_chart 2>/dev/null | \
-    jq -s '.')
+    parallel -j 4 process_chart 2>/dev/null)
 
-chart_count=$(echo "$charts_json" | jq 'length' 2>/dev/null || echo 0)
+chart_count=$(printf '%s\n' "$charts_output" | grep -c '^{' || true)
 if [ "$chart_count" -gt 0 ]; then
-    # Write the charts array at its leaf path so re-runs replace it instead of
-    # deep-merging into an ever-growing list.
-    echo "$charts_json" | lunar collect -j ".k8s.helm.charts" -
+    while IFS= read -r chart_obj; do
+        [ -z "$chart_obj" ] && continue
+        printf '%s' "$chart_obj" | lunar collect -j --array-append ".k8s.helm.charts" -
+    done <<< "$charts_output"
 
     HELM_VERSION=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/^v//' || echo "unknown")
     jq -n --arg tool "helm" --arg version "$HELM_VERSION" \
