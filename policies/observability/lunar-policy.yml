@@ -10,9 +10,10 @@ landing_page:
   display_name: "Observability Guardrails"
   long_description: |
     Enforce baseline observability for production services. Verify each
-    service has a linked monitoring dashboard and at least one alert rule
-    configured. Works with any observability-category collector (Grafana,
-    Datadog, etc.) via the tool-agnostic .observability paths.
+    service has a linked monitoring dashboard, at least one alert rule
+    configured, and an SLO defined. Works with any observability-category
+    collector (Grafana, Datadog, etc.) via the tool-agnostic .observability
+    paths.
   category: "operational-readiness"
   icon: "assets/observability.svg"
   status: "beta"
@@ -20,8 +21,11 @@ landing_page:
     - slug: "grafana"
       type: "collector"
       reason: "Provides dashboard and alert rule data (Grafana implementation)"
+    - slug: "datadog"
+      type: "collector"
+      reason: "Provides dashboard, monitor, and SLO data (Datadog implementation)"
   related: []
-  keywords: ["observability", "monitoring", "dashboard", "alerts", "grafana", "datadog", "operational readiness"]
+  keywords: ["observability", "monitoring", "dashboard", "alerts", "slo", "grafana", "datadog", "operational readiness"]
 
 policies:
   - name: dashboard-exists
@@ -41,24 +45,43 @@ policies:
       by checking .observability.alerts.configured is true. Fails if
       alerting data is present but no rules are configured. Skips cleanly
       when no observability source has written data for this component.
+      For Datadog, "monitors" map to this check — Datadog monitors are
+      normalized to .observability.alerts.
     mainPython: ./alerts_configured.py
-    keywords: ["observability", "alerts", "alerting", "monitoring", "grafana", "datadog"]
+    keywords: ["observability", "alerts", "alerting", "monitors", "monitoring", "grafana", "datadog"]
+
+  - name: slo-defined
+    description: |
+      Verifies that at least one Service Level Objective is defined for
+      the service by checking .observability.slo.defined is true. Fails
+      if observability data is present but no SLOs are configured. Skips
+      cleanly when no observability source has written data for this
+      component. SLO data is provided by collectors that support SLOs
+      (e.g. Datadog). Grafana-only deployments will skip this check
+      unless SLO data is populated from another source.
+    mainPython: ./slo_defined.py
+    keywords: ["observability", "slo", "sli", "error budget", "reliability", "datadog"]
 
 example_component_json: |
   {
     "observability": {
       "source": {
-        "tool": "grafana",
+        "tool": "datadog",
         "integration": "api"
       },
       "dashboard": {
-        "id": "abc123",
+        "id": "abc-123-def",
         "exists": true,
-        "url": "https://grafana.example.com/d/abc123/payment-api"
+        "url": "https://app.datadoghq.com/dashboard/abc-123-def"
       },
       "alerts": {
         "configured": true,
-        "count": 5
+        "count": 7
+      },
+      "slo": {
+        "defined": true,
+        "count": 2,
+        "has_error_budget": true
       }
     }
   }

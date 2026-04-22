@@ -1,0 +1,110 @@
+version: 0
+
+name: datadog
+description: Collect dashboard, monitor, and SLO data from Datadog via the API
+
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Datadog Collector"
+  long_description: |
+    Query the Datadog API for dashboards, monitors, and SLOs linked to each
+    component. Normalizes to .observability for tool-agnostic policies;
+    raw data at .observability.native.datadog.
+  categories: ["service-catalog"]
+  icon: "assets/datadog.svg"
+  status: "experimental"
+  related:
+    - slug: "observability"
+      type: "policy"
+      reason: "Enforces dashboard, monitor, and SLO standards using this collector's data"
+
+collectors:
+  - name: service
+    description: |
+      Queries the Datadog REST API for the component's monitors, dashboard,
+      and SLOs. Discovers the Datadog service tag from the component's
+      `datadog/service-name` meta annotation (typically set by a
+      company-specific cataloger via
+      `lunar catalog component --meta datadog/service-name <name>`), or
+      falls back to the explicit `service_name` input for static cases.
+      Optionally resolves a dashboard UUID from the `datadog/dashboard-id`
+      meta or the `dashboard_id` input — dashboards in Datadog are not
+      universally tagged with `service:`, so they must be mapped explicitly.
+      Monitors (via `/api/v1/monitor`) and SLOs (via `/api/v1/slo`) are
+      filtered by the `service:<name>` tag; dashboard is fetched by UUID
+      when set. Writes normalized data to .observability.dashboard,
+      .observability.alerts (monitors), .observability.slo, and
+      .observability.source, with raw API responses under
+      .observability.native.datadog.api.
+    mainBash: service.sh
+    hook:
+      type: code
+    keywords: ["datadog", "monitors", "alerts", "dashboards", "slo", "observability"]
+
+inputs:
+  datadog_site:
+    description: >
+      Datadog site (e.g. `datadoghq.com`, `datadoghq.eu`, `us3.datadoghq.com`).
+      Used to build API URLs and dashboard links. Defaults to the US1 site.
+    default: "datadoghq.com"
+  service_name:
+    description: >
+      Datadog service tag value (e.g. `payment-api`). Optional if the
+      component has a `datadog/service-name` meta annotation set by a
+      cataloger. Monitors and SLOs are filtered by `service:<name>`.
+    default: ""
+  dashboard_id:
+    description: >
+      Datadog dashboard UUID (e.g. `abc-123-def`). Optional if the component
+      has a `datadog/dashboard-id` meta annotation. Dashboards in Datadog
+      are not universally tagged with `service:`, so they must be mapped
+      explicitly.
+    default: ""
+
+secrets:
+  DATADOG_API_KEY:
+    description: >
+      Datadog API key (from Organization Settings → API Keys). Used with
+      `DD-API-KEY` header on all requests.
+  DATADOG_APP_KEY:
+    description: >
+      Datadog application key (from Organization Settings → Application
+      Keys). Required for monitor, dashboard, and SLO reads — these
+      endpoints require both `DD-API-KEY` and `DD-APPLICATION-KEY` headers.
+
+example_component_json: |
+  {
+    "observability": {
+      "source": {
+        "tool": "datadog",
+        "integration": "api"
+      },
+      "dashboard": {
+        "id": "abc-123-def",
+        "exists": true,
+        "url": "https://app.datadoghq.com/dashboard/abc-123-def"
+      },
+      "alerts": {
+        "configured": true,
+        "count": 7
+      },
+      "slo": {
+        "defined": true,
+        "count": 2,
+        "has_error_budget": true
+      },
+      "native": {
+        "datadog": {
+          "api": {
+            "service_tag": "payment-api",
+            "monitors": [ "...list of Datadog monitor objects..." ],
+            "dashboard": { "...full Datadog dashboard API response..." },
+            "slos": [ "...list of SLO objects..." ]
+          }
+        }
+      }
+    }
+  }
