@@ -61,7 +61,7 @@ policies:
 ```json
 {
   "code_quality": {
-    "source": { "tool": "sonarqube", "integration": "branch" },
+    "source": { "tool": "sonarqube", "integration": "api-default" },
     "passing": true,
     "coverage_percentage": 82.5,
     "duplication_percentage": 3.1,
@@ -75,7 +75,7 @@ policies:
 ```json
 {
   "code_quality": {
-    "source": { "tool": "sonarqube", "integration": "branch" },
+    "source": { "tool": "sonarqube", "integration": "api-default" },
     "passing": false,
     "coverage_percentage": 61.4,
     "duplication_percentage": 8.2,

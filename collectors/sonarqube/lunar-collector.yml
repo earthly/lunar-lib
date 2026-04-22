@@ -19,7 +19,7 @@ landing_page:
   status: "experimental"
 
 collectors:
-  - name: branch
+  - name: api-default
     description: |
       Queries the SonarQube/SonarCloud Web API for the component's default-branch
       analysis. Runs on default-branch commits only, scoping the API query with
@@ -41,21 +41,21 @@ collectors:
       (quality gate detail, the reliability/security/maintainability rating split,
       SQALE debt, native metric names) lands under `.code_quality.native.sonarqube`
       for SonarQube-specific policies that need it.
-    mainBash: branch.sh
+    mainBash: api-default.sh
     runs_on: [default-branch]
     hook:
       type: code
     keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "quality-gate", "default-branch"]
 
-  - name: pr
+  - name: api-pr
     description: |
-      Same contract as the `branch` sub-collector but scoped to pull requests —
+      Same contract as the `api-default` sub-collector but scoped to pull requests —
       queries the Web API with `pullRequest=$LUNAR_COMPONENT_PR`, runs only on
       PR commits, and polls for PR-analysis completion (see
       `api_poll_timeout_seconds`) before returning metrics. Users who don't
       want SonarQube gating on PRs can simply exclude this sub-collector in
       their `lunar-config.yml` without affecting default-branch collection.
-    mainBash: pr.sh
+    mainBash: api-pr.sh
     runs_on: [prs]
     hook:
       type: code
@@ -69,8 +69,8 @@ collectors:
       `<SonarQubeEnabled>` in a `.csproj`. Writes discovered config file
       paths under `.code_quality.native.sonarqube.config`. Presence of this
       data signals that SonarQube is wired up for the component even when
-      the `branch`/`pr` sub-collectors cannot reach the project or no
-      analysis has been published yet.
+      the `api-default`/`api-pr` sub-collectors cannot reach the project or
+      no analysis has been published yet.
     mainBash: config.sh
     hook:
       type: code
@@ -113,8 +113,8 @@ inputs:
   project_key:
     description: >
       SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Used by the
-      `branch` and `pr` sub-collectors. Optional if the component has a
-      `sonarqube/project-key` meta annotation set by a cataloger.
+      `api-default` and `api-pr` sub-collectors. Optional if the component has
+      a `sonarqube/project-key` meta annotation set by a cataloger.
     default: ""
   sonarqube_base_url:
     description: >
@@ -123,18 +123,18 @@ inputs:
     default: "https://sonarcloud.io"
   api_poll_timeout_seconds:
     description: >
-      Total seconds the `branch` and `pr` sub-collectors will wait for a
-      SonarQube analysis matching the current `head_sha` to appear before
-      giving up and emitting `analysis_status: "pending"`. SonarQube's Compute
-      Engine queues analyses asynchronously; results typically publish 10–60s
-      after `sonar-scanner` exits, longer for large projects. Set to `0` to
-      disable polling (single-shot query — useful when the CI pipeline already
-      waits for analysis completion before invoking `lunar`).
+      Total seconds the `api-default` and `api-pr` sub-collectors will wait
+      for a SonarQube analysis matching the current `head_sha` to appear
+      before giving up and emitting `analysis_status: "pending"`. SonarQube's
+      Compute Engine queues analyses asynchronously; results typically publish
+      10–60s after `sonar-scanner` exits, longer for large projects. Set to
+      `0` to disable polling (single-shot query — useful when the CI pipeline
+      already waits for analysis completion before invoking `lunar`).
     default: "180"
   api_poll_interval_seconds:
     description: >
-      Seconds between polls while the `branch` and `pr` sub-collectors wait
-      for SonarQube analysis to complete.
+      Seconds between polls while the `api-default` and `api-pr` sub-collectors
+      wait for SonarQube analysis to complete.
     default: "10"
   github_app_poll_timeout_seconds:
     description: >
@@ -152,9 +152,9 @@ secrets:
   SONARQUBE_TOKEN:
     description: >
       SonarQube/SonarCloud user token with `Browse` permission on the target
-      project. Used by the `branch` and `pr` sub-collectors. Sent as the HTTP
-      Basic username with an empty password, per the SonarQube Web API
-      convention.
+      project. Used by the `api-default` and `api-pr` sub-collectors. Sent as
+      the HTTP Basic username with an empty password, per the SonarQube Web
+      API convention.
   GH_TOKEN:
     description: >
       GitHub token for the GitHub Checks API. Used by the `github-app`
@@ -165,7 +165,7 @@ example_component_json: |
     "code_quality": {
       "source": {
         "tool": "sonarqube",
-        "integration": "branch",
+        "integration": "api-default",
         "project_key": "my-org_my-service",
         "api_url": "https://sonarcloud.io",
         "analysis_status": "complete"
