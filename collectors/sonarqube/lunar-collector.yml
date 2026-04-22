@@ -1,7 +1,7 @@
 version: 0
 
 name: sonarqube
-description: Collect SonarQube/SonarCloud data via API (default-branch + PR), auto-run scanner (default-branch + PR), in-repo config, CI scanner runs, and GitHub App checks
+description: Collect SonarQube/SonarCloud data via Web API read, auto-run scanner, in-repo config, CI scanner runs, and GitHub App checks
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -10,100 +10,74 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "SonarQube Collector"
   long_description: |
-    Detects SonarQube/SonarCloud via Web API reads (default + PR), auto-run
-    of `sonar-scanner` (default + PR), in-repo config, CI scanner runs, and
-    the GitHub App PR check. Normalizes results into `.code_quality` for
-    tool-agnostic policy evaluation.
+    Detects SonarQube/SonarCloud via Web API reads, auto-run of
+    `sonar-scanner`, in-repo config, CI scanner runs, and the GitHub App PR
+    check. Normalizes results into `.code_quality` for tool-agnostic policy
+    evaluation.
   categories: ["code-analysis"]
   icon: "assets/sonarqube.svg"
   status: "experimental"
 
 collectors:
-  - name: api-default
+  - name: api
     description: |
-      Queries the SonarQube/SonarCloud Web API for the component's default-branch
-      analysis. Runs on default-branch commits only, scoping the API query with
-      `branch=<default-branch>` so results track the commit being evaluated rather
-      than a daily snapshot. Because SonarQube's Compute Engine queues analyses
-      asynchronously — they typically publish 10–60s after `sonar-scanner` exits,
-      longer for big repos — this sub-collector polls
-      `api/project_analyses/search?project=<key>&branch=<branch>&ps=1` for up to
-      `api_poll_timeout_seconds` (default 180s) waiting for an analysis whose
-      `revision` matches the current `head_sha`. If the matching analysis never
-      appears, writes `.code_quality.source.analysis_status = "pending"` and no
-      metrics, so policies can distinguish "SonarQube hasn't finished yet" from
-      "SonarQube isn't configured". Discovers the project key from the
-      `sonarqube/project-key` meta annotation (typically set by a company-specific
-      cataloger via `lunar catalog component --meta sonarqube/project-key <key>`),
-      or falls back to the explicit `project_key` input. Writes a tool-agnostic
-      `passing` signal, coverage and duplication percentages, and severity-bucketed
-      issue counts at the `.code_quality.*` top level. SonarQube-specific structure
-      (quality gate detail, the reliability/security/maintainability rating split,
-      SQALE debt, native metric names) lands under `.code_quality.native.sonarqube`
-      for SonarQube-specific policies that need it.
-    mainBash: api-default.sh
-    runs_on: [default-branch]
+      Queries the SonarQube/SonarCloud Web API for code-quality metrics, scoped
+      per-commit. On default-branch commits the query uses `branch=<default>`;
+      on PR commits it uses `pullRequest=$LUNAR_COMPONENT_PR` — the only
+      difference between the two paths is the query param, so they share one
+      sub-collector. Because SonarQube's Compute Engine queues analyses
+      asynchronously — typically publishing 10–60s after `sonar-scanner` exits,
+      longer for large projects — this sub-collector polls
+      `api/project_analyses/search` for up to `api_poll_timeout_seconds`
+      (default 180s) waiting for an analysis whose `revision` matches the
+      current `head_sha`. If the matching analysis never appears, writes
+      `.code_quality.source.analysis_status = "pending"` and no metrics, so
+      policies can distinguish "SonarQube hasn't finished yet" from "SonarQube
+      isn't configured". Discovers the project key from the
+      `sonarqube/project-key` meta annotation (typically set by a
+      company-specific cataloger via `lunar catalog component --meta
+      sonarqube/project-key <key>`), or falls back to the explicit
+      `project_key` input. Writes a tool-agnostic `passing` signal, coverage
+      and duplication percentages, and severity-bucketed issue counts at the
+      `.code_quality.*` top level. SonarQube-specific structure (quality gate
+      detail, the reliability/security/maintainability rating split, SQALE
+      debt, native metric names) lands under `.code_quality.native.sonarqube`
+      for SonarQube-specific policies that need it. Runs on both default-branch
+      and PR commits by default — users who want only one can narrow
+      `runs_on` on their import in `lunar-config.yml`.
+    mainBash: api.sh
     hook:
       type: code
-    keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "quality-gate", "default-branch"]
+    keywords: ["sonarqube", "sonarcloud", "code-quality", "coverage", "bugs", "vulnerabilities", "quality-gate"]
 
-  - name: api-pr
+  - name: auto
     description: |
-      Same contract as the `api-default` sub-collector but scoped to pull requests —
-      queries the Web API with `pullRequest=$LUNAR_COMPONENT_PR`, runs only on
-      PR commits, and polls for PR-analysis completion (see
-      `api_poll_timeout_seconds`) before returning metrics. Users who don't
-      want SonarQube gating on PRs can simply exclude this sub-collector in
-      their `lunar-config.yml` without affecting default-branch collection.
-    mainBash: api-pr.sh
-    runs_on: [prs]
-    hook:
-      type: code
-    keywords: ["sonarqube", "sonarcloud", "code-quality", "pull-request"]
-
-  - name: auto-default
-    description: |
-      Runs `sonar-scanner` on the checked-out default-branch source against the
-      configured SonarQube/SonarCloud server, then polls the Web API for
-      results — an all-in-one alternative to `api-default` for users who don't
-      trigger SonarQube from their own CI. The scanner is invoked with
-      `-Dsonar.branch.name=<default-branch>` so the analysis targets the
-      default branch on the server. Scanner invocation metadata (version,
-      exit code, duration) is captured under
+      Runs `sonar-scanner` on the checked-out source against the configured
+      SonarQube/SonarCloud server, then polls the Web API for results — an
+      all-in-one alternative to `api` for users who don't trigger SonarQube
+      from their own CI. On default-branch commits the scanner is invoked with
+      `-Dsonar.branch.name=<default>`; on PR commits with
+      `-Dsonar.pullrequest.key=$LUNAR_COMPONENT_PR`,
+      `-Dsonar.pullrequest.branch=$LUNAR_COMPONENT_HEAD_BRANCH`, and
+      `-Dsonar.pullrequest.base=$LUNAR_COMPONENT_BASE_BRANCH`. Scanner
+      invocation metadata (version, exit code, duration) is captured under
       `.code_quality.native.sonarqube.auto`. Once the scanner exits, the same
-      polling path used by `api-default` reads the published analysis and
-      writes the tool-agnostic `.code_quality.*` fields with
-      `"integration": "auto-default"`. If the scanner fails, writes
+      polling path used by `api` reads the published analysis and writes the
+      tool-agnostic `.code_quality.*` fields with `"integration": "auto"`. If
+      the scanner fails, writes
       `.code_quality.native.sonarqube.auto.status = "scanner-failed"` with the
       exit code and no downstream metrics. Requires `SONARQUBE_TOKEN` with
       `Execute Analysis` permission (read-only `Browse` is not sufficient).
-      Mutually exclusive with `api-default` and with a user-run
-      `sonar-scanner` in CI on the same commit — enabling both means the
-      scanner runs twice. A future collector-dependency feature will let
-      `auto-default` fire only when the `cicd` sub-collector did not capture
-      a scan for the same `head_sha`.
-    mainBash: auto-default.sh
-    runs_on: [default-branch]
+      Mutually exclusive with `api` and with a user-run `sonar-scanner` in CI
+      on the same commit — enabling both means the scanner runs twice. A
+      future collector-dependency feature will let `auto` fire only when the
+      `cicd` sub-collector did not capture a scan for the same `head_sha`.
+      Runs on both default-branch and PR commits by default — narrow `runs_on`
+      on the import to restrict the scope.
+    mainBash: auto.sh
     hook:
       type: code
-    keywords: ["sonarqube", "sonarcloud", "code-quality", "auto-scan", "sonar-scanner", "default-branch"]
-
-  - name: auto-pr
-    description: |
-      Same contract as `auto-default` but scoped to pull requests — runs
-      `sonar-scanner` on the PR head with
-      `-Dsonar.pullrequest.key=$LUNAR_COMPONENT_PR`,
-      `-Dsonar.pullrequest.branch=$LUNAR_COMPONENT_HEAD_BRANCH`, and
-      `-Dsonar.pullrequest.base=$LUNAR_COMPONENT_BASE_BRANCH`, then polls
-      the Web API for the PR analysis. Writes `"integration": "auto-pr"`.
-      Exclude this sub-collector if users run `sonar-scanner` themselves on
-      PRs (in which case the `cicd` and `api-pr` sub-collectors cover the
-      read path) or if PR-level SonarQube gating is not in use.
-    mainBash: auto-pr.sh
-    runs_on: [prs]
-    hook:
-      type: code
-    keywords: ["sonarqube", "sonarcloud", "code-quality", "auto-scan", "sonar-scanner", "pull-request"]
+    keywords: ["sonarqube", "sonarcloud", "code-quality", "auto-scan", "sonar-scanner"]
 
   - name: config
     description: |
@@ -113,8 +87,8 @@ collectors:
       `<SonarQubeEnabled>` in a `.csproj`. Writes discovered config file
       paths under `.code_quality.native.sonarqube.config`. Presence of this
       data signals that SonarQube is wired up for the component even when
-      the `api-default`/`api-pr` sub-collectors cannot reach the project or
-      no analysis has been published yet.
+      the `api` sub-collector cannot reach the project or no analysis has
+      been published yet.
     mainBash: config.sh
     hook:
       type: code
@@ -157,9 +131,8 @@ inputs:
   project_key:
     description: >
       SonarQube/SonarCloud project key (e.g. `my-org_my-service`). Used by the
-      `api-default`, `api-pr`, `auto-default`, and `auto-pr` sub-collectors.
-      Optional if the component has a `sonarqube/project-key` meta annotation
-      set by a cataloger.
+      `api` and `auto` sub-collectors. Optional if the component has a
+      `sonarqube/project-key` meta annotation set by a cataloger.
     default: ""
   sonarqube_base_url:
     description: >
@@ -168,38 +141,36 @@ inputs:
     default: "https://sonarcloud.io"
   api_poll_timeout_seconds:
     description: >
-      Total seconds the `api-default`, `api-pr`, `auto-default`, and `auto-pr`
-      sub-collectors will wait for a SonarQube analysis matching the current
-      `head_sha` to appear before giving up and emitting `analysis_status:
-      "pending"`. SonarQube's Compute Engine queues analyses asynchronously;
-      results typically publish 10–60s after `sonar-scanner` exits, longer
-      for large projects. Set to `0` to disable polling (single-shot query —
-      useful when the CI pipeline already waits for analysis completion
-      before invoking `lunar`).
+      Total seconds the `api` and `auto` sub-collectors will wait for a
+      SonarQube analysis matching the current `head_sha` to appear before
+      giving up and emitting `analysis_status: "pending"`. SonarQube's Compute
+      Engine queues analyses asynchronously; results typically publish 10–60s
+      after `sonar-scanner` exits, longer for large projects. Set to `0` to
+      disable polling (single-shot query — useful when the CI pipeline already
+      waits for analysis completion before invoking `lunar`).
     default: "180"
   api_poll_interval_seconds:
     description: >
-      Seconds between polls while the `api-default`, `api-pr`, `auto-default`,
-      and `auto-pr` sub-collectors wait for SonarQube analysis to complete.
+      Seconds between polls while the `api` and `auto` sub-collectors wait for
+      SonarQube analysis to complete.
     default: "10"
   auto_scanner_version:
     description: >
-      Version of the `sonar-scanner` CLI downloaded and executed by
-      `auto-default` and `auto-pr`. Pinned for reproducibility. If the
-      collector image already ships with `sonar-scanner` on PATH, this input
-      is ignored.
+      Version of the `sonar-scanner` CLI downloaded and executed by the
+      `auto` sub-collector. Pinned for reproducibility. If the collector image
+      already ships with `sonar-scanner` on PATH, this input is ignored.
     default: "7.0.0.4796"
   auto_sources:
     description: >
       Source root passed to `sonar-scanner` as `-Dsonar.sources=<value>` by
-      `auto-default` and `auto-pr`. Defaults to the repo root. Override for
+      the `auto` sub-collector. Defaults to the repo root. Override for
       monorepos where only a sub-tree should be analysed.
     default: "."
   auto_extra_args:
     description: >
       Extra command-line arguments appended to every `sonar-scanner`
-      invocation (e.g. `-Dsonar.exclusions=**/*.min.js`). Applied to both
-      `auto-default` and `auto-pr`.
+      invocation (e.g. `-Dsonar.exclusions=**/*.min.js`). Applied by the
+      `auto` sub-collector on both default-branch and PR paths.
     default: ""
   github_app_poll_timeout_seconds:
     description: >
@@ -216,12 +187,11 @@ inputs:
 secrets:
   SONARQUBE_TOKEN:
     description: >
-      SonarQube/SonarCloud user token. For the read-only `api-default` and
-      `api-pr` sub-collectors, `Browse` permission on the target project is
-      sufficient. For `auto-default` and `auto-pr`, which run `sonar-scanner`
-      themselves, the token must additionally have `Execute Analysis`
-      permission. Sent as the HTTP Basic username with an empty password,
-      per the SonarQube Web API convention.
+      SonarQube/SonarCloud user token. For the read-only `api` sub-collector,
+      `Browse` permission on the target project is sufficient. For `auto`,
+      which runs `sonar-scanner` itself, the token must additionally have
+      `Execute Analysis` permission. Sent as the HTTP Basic username with an
+      empty password, per the SonarQube Web API convention.
   GH_TOKEN:
     description: >
       GitHub token for the GitHub Checks API. Used by the `github-app`
@@ -232,7 +202,7 @@ example_component_json: |
     "code_quality": {
       "source": {
         "tool": "sonarqube",
-        "integration": "api-default",
+        "integration": "api",
         "project_key": "my-org_my-service",
         "api_url": "https://sonarcloud.io",
         "analysis_status": "complete"
