@@ -1,0 +1,131 @@
+version: 0
+
+name: elixir
+description: Collect Elixir project information, dependencies, CI/CD commands, and test coverage
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:elixir-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Elixir Collector"
+  long_description: |
+    Analyze Elixir/Mix projects to collect project metadata, Hex dependencies,
+    CI/CD command tracking, and test coverage. Detects Phoenix, LiveView, and
+    Ecto frameworks, and handles umbrella projects by walking `apps/*/mix.exs`.
+  categories: ["languages", "build"]
+  icon: "assets/elixir.svg"
+  status: "beta"
+  related:
+    - slug: "elixir"
+      type: "policy"
+      reason: "Elixir project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Elixir project structure by detecting mix.exs, mix.lock,
+      .credo.exs, .formatter.exs, dialyzer config, and test directory.
+      Parses project name/version, Elixir version requirement, OTP apps,
+      umbrella members, and framework usage (Phoenix, LiveView, Ecto).
+      Writes project metadata to .lang.elixir.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["elixir", "mix", "mix.exs", "phoenix", "liveview", "ecto", "umbrella", "otp"]
+
+  - name: dependencies
+    description: |
+      Extracts direct dependencies from mix.exs and resolved transitive
+      versions from mix.lock when present. Captures Hex package name and
+      version for each dependency. Writes dependency data to
+      .lang.elixir.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["elixir dependencies", "hex", "mix.lock", "supply chain", "packages"]
+
+  - name: cicd
+    description: |
+      Records every mix command executed in CI pipelines along with the
+      Elixir runtime version. Writes command strings and version info to
+      .lang.elixir.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name: mix
+    keywords: ["elixir ci", "mix ci", "ci commands", "build tracking"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from excoveralls or mix test --cover output
+      after tests complete. Parses coverage reports and writes results to
+      .lang.elixir.tests.coverage.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: mix
+      args:
+        - value_pattern: ^(test|coveralls|coveralls\..+)$
+    keywords: ["excoveralls", "mix test", "test coverage", "coverage metrics"]
+
+example_component_json: |
+  {
+    "lang": {
+      "elixir": {
+        "version": "1.16.2",
+        "otp_version": "26",
+        "build_systems": ["mix"],
+        "mix_exs_exists": true,
+        "mix_lock_exists": true,
+        "project_name": "my_app",
+        "project_version": "0.1.0",
+        "elixir_requirement": "~> 1.15",
+        "otp_apps": ["my_app"],
+        "test_directory_exists": true,
+        "credo_configured": true,
+        "dialyzer_configured": true,
+        "formatter_configured": true,
+        "frameworks": ["phoenix", "phoenix_live_view", "ecto"],
+        "umbrella": {
+          "is_umbrella": true,
+          "apps": ["my_app_web", "my_app_core"]
+        },
+        "source": { "tool": "mix", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "mix test --cover", "version": "1.16.2" },
+            { "cmd": "mix deps.get", "version": "1.16.2" }
+          ]
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 85.0,
+            "source": { "tool": "excoveralls", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "phoenix", "version": "~> 1.7" },
+            { "path": "phoenix_live_view", "version": "~> 0.20" },
+            { "path": "ecto_sql", "version": "~> 3.10" }
+          ],
+          "transitive": [
+            { "path": "telemetry", "version": "1.2.1" }
+          ],
+          "source": { "tool": "hex", "integration": "code" }
+        }
+      }
+    },
+    "testing": {
+      "coverage": {
+        "percentage": 85.0,
+        "source": { "tool": "excoveralls", "integration": "ci" }
+      }
+    }
+  }
