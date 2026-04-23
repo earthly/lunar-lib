@@ -1,0 +1,13 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Elixir (pulls in erlang/OTP as a dep on Alpine).
+    RUN apk add --no-cache elixir
+
+    # Verify installations
+    RUN elixir --version && mix --version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:elixir-$VERSION
