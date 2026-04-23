@@ -5,27 +5,25 @@ Thanks for taking the time to contribute. This repo holds the official collector
 ## Before You Start
 
 - New to Lunar? Read [earthly.dev/lunar](https://earthly.dev/lunar) first.
-- **Using an AI agent** (Claude Code, Cursor, Codex, …) to write your plugin? Point it at [`AGENTS.md`](./AGENTS.md) — that's the AI-first entry point, and it links every authoring guide, schema reference, and convention doc the agent will need. Writing by hand? It's still the fastest way to find those same docs yourself.
+- **Using an AI agent** (Claude Code, Cursor, Codex, …) to write your plugin? Point it at [`AGENTS.md`](./AGENTS.md) — that's the AI-first entry point. It links every authoring guide, schema reference, convention doc, and the recommended contribution workflow your agent should discover and follow on its own. Writing by hand? Same doc is still the fastest way to find those references yourself.
 - Browse a few existing entries in [`collectors/`](./collectors) and [`policies/`](./policies) that are similar to what you want to build — consistency with existing patterns is the #1 thing reviewers look for.
 
-## The Workflow: Spec-First
+## Recommended Workflow: Spec First
 
-Plugins ship on a two-phase workflow so reviewers can catch design issues before implementation time is spent.
+For non-trivial plugins, we've found a two-phase workflow saves everyone time. It's a suggestion, not a hard requirement:
 
-1. **Open a `[Spec Only]` draft PR.** Include the plugin manifest, README, example Component JSON, and any policy requirements — but **no implementation code** (no scripts in `collectors/<name>/`, no `*.py` in `policies/<name>/`).
-2. **Get reviewer go-ahead on the spec.** A secondary reviewer's approval on the spec PR is the signal to start implementing. Do **not** open a separate PR for the implementation — it goes on the same branch.
-3. **Implement on the same PR.** Remove the `[Spec Only]` marker from the title and push the implementation.
-4. **Post integration-test evidence.** For CI-hook collectors, run a full cronos round-trip and attach the Component JSON + screenshots. Local `lunar collector dev` runs alone aren't enough.
-5. **Merge.** Squash-merge once all assigned reviewers approve and CI is green.
+1. **Open a draft PR with just the spec** — the plugin manifest, README, example Component JSON, and (for policies) `requirements.txt`. Hold off on implementation code.
+2. **Get reviewer feedback on the spec** before investing implementation time. Design issues are cheaper to fix when there's no code to rewrite.
+3. **Add the implementation on the same branch** once the spec looks good, and mark the PR ready for review.
 
-The end-to-end playbook — including testing requirements, common mistakes, and phase transitions — lives in [`.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`](./.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md).
+Small fixes, doc updates, and tweaks to existing plugins don't need the spec-first dance — just open a PR.
 
 ## PR Basics
 
-- **Branch prefix:** any descriptive name is fine; `bender/` is reserved for the automated agent.
-- **PRs open as drafts** and are marked ready for review once the spec (or implementation) is complete.
+- **PRs open as drafts** and are marked ready for review once they're complete.
 - **One plugin per PR.** Bundling multiple plugins makes review slow and risky.
-- **Keep the README template.** Plugin READMEs follow the templates in `ai-context/` (linked from `AGENTS.md`) — reviewers rely on consistent structure.
+- **Keep the README template.** Plugin READMEs follow the templates linked from [`AGENTS.md`](./AGENTS.md) — reviewers rely on consistent structure.
+- **Include test evidence for collectors.** For CI-hook collectors in particular, show the collector actually produced the expected Component JSON on a representative repo.
 
 ## Starter Packs
 
