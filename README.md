@@ -62,16 +62,6 @@ lunar-lib/
 
 ---
 
-## Contributing
-
-For non-trivial plugins we recommend a **spec-first** workflow: draft PR with manifests and README first, reviewer feedback on the spec, then implementation on the same branch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for details. Using an AI agent? Point it at [`AGENTS.md`](./AGENTS.md) — that's the AI-first entry point, and it covers the same workflow an agent should discover and follow on its own.
-
----
-
-## License
-
-[Mozilla Public License 2.0](./LICENSE) — see file for details.
-
 <div align="center">
 
 Built and maintained by the team behind [Earthly](https://earthly.dev).
