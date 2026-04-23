@@ -27,46 +27,76 @@ hardcode; it rotates when datasources are recreated.
 
 | Table | What's in it | Key columns |
 |---|---|---|
-| `hub.snippets` | One row per registered collector/policy, per manifest version | `id`, `name`, `code_path` (which script ran) |
-| `hub.snippet_runs` | Every actual collector/policy invocation | `snippet_id`, `status` (`finished`/`error`/`queued`), `exit_code`, `started_at`, `finished_at`, `collection_source` (`cron`/`code`/`ci`) |
-| `hub.collection_records` | What each collector actually wrote | `snippet_id`, `component_id` (UUID), `blob` (JSONB), `created_at`, `collection_source` |
-| `hub.policy_runs` | Every policy-check invocation | `snippet_id`, `component_id`, `status`, `run_data` (assertions JSONB) |
-| `hub.merged_collection_blobs` | Per-component merged JSON (what `lunar component get-json` returns) | `component_id` (UUID!), `head_sha`, `merged_blob`, `last_record_at` |
-| `hub.components` | Component registry | `id` (UUID), `name` (e.g. `github.com/pantalasa-cronos/backend`) |
-| `grafana.checks` (view) | UI-surfaced per-check state | `name`, `component_id` (NAME, not UUID), `git_sha`, `status`, `manifest_version`, `staleness` |
+| `hub.snippets` | One row per registered collector/policy, per manifest version | `id` (UUID), `name`, `code_path` (which script ran), `manifest_id` |
+| `hub.snippet_runs` | Every actual collector/policy invocation | `id` (UUID), `snippet_id` (UUID → `snippets.id`), `component_name` (text, e.g. `github.com/pantalasa-cronos/backend`), `status` (`finished`/`error`/`queued`), `exit_code`, `started_at`, `finished_at`, `dim_pr`, `dim_head_sha` |
+| `hub.collection_records` | What each collector actually wrote | `snippet_run_id` (UUID → `snippet_runs.id`), `component_id` (UUID → `components.id`), `blob` (JSONB), `collection_source` (`cron`/`code`/`ci`), `created_at` |
+| `hub.policy_runs` | Every policy-check invocation (one row per check per component per run) | `id` (UUID), `component_id` (UUID → `components.id`), `policy_check_id` (UUID → `policy_checks.id`), `snippet_run_id`, `workflows_finished`, `created_at` — **no** `status` / `run_data` column here (see `run_data` / `policy_run_rollups` below) |
+| `hub.run_data` | Assertion results keyed by policy run | `policy_run_id` (UUID → `policy_runs.id`), `status` (`pass`/`fail`/`error`/`skipped`), `failure_messages` (text[]), `metadata` (json) |
+| `hub.policy_assertions` | Individual assertion op/result rows | `policy_run_id`, `op`, `args` (text[]), `result`, `failure_message` |
+| `hub.policy_checks` | Check-definition registry | `id` (UUID), `name` (e.g. `readme-min-line-count`), `policy_id`, `paths` (text[]) |
+| `hub.policy_run_rollups` | Pre-joined policy view (use this over manual joins when you can) | `policy_run_id`, `check_id`, `status`, `failure_messages`, `metadata`, `pr_number`, `repository_id`, `committed_at`, `run_created_at` |
+| `hub.merged_collection_blobs` | Per-component merged JSON (what `lunar component get-json` returns) | `component_id` (UUID → `components.id`), `head_sha`, `merged_blob`, `last_record_at` |
+| `hub.components` | Component registry | `id` (UUID), `name` (e.g. `github.com/pantalasa-cronos/backend`), `manifest_id` |
+| `grafana.checks` / `public.checks` (views) | UI-surfaced per-check state | `component_id` (**text NAME**, not UUID — e.g. `github.com/pantalasa-cronos/backend`), `name`, `git_sha`, `status`, `policy_name`, `staleness` |
 
-**Schema mismatch to watch for**: `snippet_runs` / `policy_runs` /
-`grafana.checks` use the component NAME string as `component_id` —
-but `merged_collection_blobs` / `hub.components.id` use the UUID.
-Always check `information_schema.columns` before writing a join
-instead of guessing.
+**The NAME-vs-UUID split**: `grafana.checks.component_id` and
+`hub.snippet_runs.component_name` are both **text NAME strings** in
+the full `github.com/<org>/<repo>` format. Every `component_id` column
+inside `hub.*` (`collection_records`, `policy_runs`,
+`merged_collection_blobs`, `policy_queue`, etc.) is a **UUID** that
+joins to `hub.components.id`. So when you filter `grafana.checks` you
+pass the name string; when you join `hub.policy_runs` you go through
+`hub.components` to translate. Use this table as your source of truth;
+if a column isn't covered above, fall back to
+`information_schema.columns` once rather than guessing.
 
 ### Canonical queries
 
 ```sql
 -- "Did my collector ever fire, and when?"
 SELECT s.name, COUNT(r.id) AS runs,
-       MIN(r.started_at), MAX(r.started_at)
+       MIN(r.started_at) AS first_run,
+       MAX(r.started_at) AS last_run
 FROM hub.snippets s
 LEFT JOIN hub.snippet_runs r ON r.snippet_id = s.id
 WHERE s.name LIKE 'YOUR_COLLECTOR%'
-GROUP BY s.name;
+GROUP BY s.name
+ORDER BY last_run DESC NULLS LAST;
 
--- "What did it write, and was it cron-triggered?"
+-- "What did my collector write for this component, and how?"
 SELECT cr.created_at, cr.collection_source, cr.dimensions, cr.blob
 FROM hub.collection_records cr
-JOIN hub.snippets s ON s.id = cr.snippet_id
+JOIN hub.snippet_runs sr ON sr.id = cr.snippet_run_id
+JOIN hub.snippets s      ON s.id  = sr.snippet_id
+JOIN hub.components c    ON c.id  = cr.component_id
 WHERE s.name = 'YOUR_COLLECTOR'
+  AND c.name = 'github.com/pantalasa-cronos/YOUR_COMPONENT'
 ORDER BY cr.created_at DESC LIMIT 10;
 
--- "Did my policy produce assertions for this component?"
-SELECT pr.status, pr.run_data, pr.started_at
-FROM hub.policy_runs pr
-JOIN hub.snippets s ON s.id = pr.snippet_id
-JOIN hub.components c ON c.id = pr.component_id
-WHERE s.name LIKE 'YOUR_POLICY%'
+-- "Did my policy fire on this component, and what assertions fired?"
+-- Prefer policy_run_rollups (pre-joined, fast) for the pass/fail + messages.
+SELECT prr.status,
+       prr.failure_messages,
+       pc.name AS check_name,
+       prr.pr_number,
+       prr.run_created_at
+FROM hub.policy_run_rollups prr
+JOIN hub.policy_checks pc ON pc.id = prr.check_id
+JOIN hub.policy_runs pr   ON pr.id = prr.policy_run_id
+JOIN hub.components c     ON c.id  = pr.component_id
+WHERE pc.name LIKE 'YOUR_POLICY%'
   AND c.name = 'github.com/pantalasa-cronos/YOUR_COMPONENT'
-ORDER BY pr.started_at DESC LIMIT 10;
+ORDER BY prr.run_created_at DESC LIMIT 10;
+
+-- Need the individual assertion rows (op/args/result), not just the rollup?
+SELECT pa.op, pa.args, pa.result, pa.failure_message
+FROM hub.policy_assertions pa
+JOIN hub.policy_runs pr   ON pr.id = pa.policy_run_id
+JOIN hub.policy_checks pc ON pc.id = pr.policy_check_id
+JOIN hub.components c     ON c.id  = pr.component_id
+WHERE pc.name = 'YOUR_CHECK_NAME'
+  AND c.name  = 'github.com/pantalasa-cronos/YOUR_COMPONENT'
+ORDER BY pa.created_at DESC LIMIT 20;
 
 -- "What's in the latest merged blob for this component?"
 SELECT mcb.head_sha, mcb.last_record_at,
@@ -75,6 +105,13 @@ FROM hub.merged_collection_blobs mcb
 JOIN hub.components c ON c.id = mcb.component_id
 WHERE c.name = 'github.com/pantalasa-cronos/YOUR_COMPONENT'
 ORDER BY mcb.last_record_at DESC LIMIT 1;
+
+-- Quick-filter snippet_runs by component (no JOIN needed: component_name is the filter column):
+SELECT status, exit_code, started_at, finished_at, dim_pr, dim_head_sha
+FROM hub.snippet_runs
+WHERE component_name = 'github.com/pantalasa-cronos/YOUR_COMPONENT'
+  AND started_at > now() - interval '1 hour'
+ORDER BY started_at DESC;
 ```
 
 ### Grafana dashboard URLs + variables
@@ -116,18 +153,26 @@ new commits.
 
 ### Known traps
 
-- `components_latest` gets wiped when you remove a collector from the
-  manifest. Don't use it for run history; use `hub.snippet_runs` +
-  `hub.collection_records` directly.
-- A new manifest sync registers a NEW `snippets` row with a different
-  `snippet_id`. Runs queued before the sync land against the OLD id.
-  Filter `snippet_runs` by `snippet_id`, not by name, when verifying
-  that a specific manifest version fired.
-- `grafana.checks` filters `WHERE status <> 'skipped'` AND `WHERE
-  s.manifest_id = latest(hub.manifests)`. A correct skip OR a revert
-  to `@main` before the new policy is in `@main` both make the row
-  disappear from the UI — go to `public.checks` directly.
-- The checks-panel SQL takes ~27s on cronos at the 30s Grafana query
-  timeout edge. "No data" in the UI can hide a working query; confirm
-  via `/api/ds/query` before concluding the backend is broken.
+- `public.components_latest` (a view; NOT `hub.components_latest`) gets
+  wiped when you remove a collector from the manifest. Don't use it
+  for run history; use `hub.snippet_runs` + `hub.collection_records`
+  directly.
+- A new manifest sync registers a NEW `hub.snippets` row with a
+  different `snippet_id` for the same plugin name. Runs queued before
+  the sync land against the OLD id. Join on `snippets.name` (not a
+  cached snippet_id) when verifying "the latest manifest fired at
+  least once".
+- `grafana.checks` filters out `status = 'skipped'` AND restricts to
+  the latest manifest. A correct skip OR a revert to `@main` before
+  the new policy is in `@main` both make the row disappear from the
+  UI — query `hub.policy_run_rollups` / `hub.run_data` directly if
+  you need the full history.
+- The checks-panel SQL in Grafana takes ~27s on cronos, right at the
+  30s datasource timeout edge. "No data" in the UI can hide a working
+  query; confirm via `/api/ds/query` before concluding the backend is
+  broken.
+- `hub.policy_runs` has no `status` or `run_data` column of its own —
+  the outcome lives in `hub.run_data` (one-to-one by `policy_run_id`)
+  or in the pre-joined `hub.policy_run_rollups`. If you reach for
+  `pr.status` you'll get a "column does not exist" error.
 EOF
