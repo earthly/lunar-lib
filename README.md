@@ -25,7 +25,7 @@ Lunar enforces engineering standards across every repo, every PR, and every AI c
 - **Catalogers** — sync component and ownership data from external systems (GitHub orgs, service catalogs, etc.)
 - **Starter packs** — opinionated, ready-to-import bundles of the above for common scenarios
 
-Browse [`collectors/`](./collectors), [`policies/`](./policies), and [`catalogers/`](./catalogers) for the full, always-current list.
+Browse the full catalog at [**earthly.dev/lunar/guardrails/**](https://earthly.dev/lunar/guardrails/), or dive into the source in [`collectors/`](./collectors), [`policies/`](./policies), and [`catalogers/`](./catalogers).
 
 > New to Lunar itself? Start at [**earthly.dev/lunar**](https://earthly.dev/lunar) for the platform overview.
 
