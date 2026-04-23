@@ -852,11 +852,13 @@ if __name__ == "__main__":
     main()
 ```
 
-Users can then selectively enable checks:
+Users can then selectively enable checks. For example, the real `repo-boilerplate` policy ships ~15 checks (readme, codeowners, gitignore, license, etc.); a consumer can opt in to just the two they care about:
 ```yaml
 policies:
-  - uses: ./policies/readme
-    include: [readme-exists]  # Only run readme-exists, skip readme-length
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@v1.1.0
+    include:
+      - readme-exists
+      - codeowners-exists
 ```
 
 ### Pattern 4: Configurable Thresholds

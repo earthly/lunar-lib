@@ -26,9 +26,9 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 
 ## Current Inventory (as of March 2026)
 
-**21 collectors:** ai-use, ast-grep, ci-otel, claude, codecov, codeowners, docker, dr-docs, github, golang, java, jira, k8s, nodejs, python, readme, rust, semgrep, snyk, syft, terraform
+**20 collectors:** ai-use, ast-grep, ci-otel, claude, codecov, docker, dr-docs, github, golang, java, jira, k8s, nodejs, python, repo-boilerplate, rust, semgrep, snyk, syft, terraform
 
-**24 policies:** ai-use, codeowners, compliance-docs, container, container-scan, dependencies, feature-flags, golang, iac, iac-scan, java, k8s, linter, nodejs, python, readme, rust, sast, sbom, sca, terraform, testing, ticket, vcs
+**23 policies:** ai-use, compliance-docs, container, container-scan, dependencies, feature-flags, golang, iac, iac-scan, java, k8s, linter, nodejs, python, repo-boilerplate, rust, sast, sbom, sca, terraform, testing, ticket, vcs
 
 ---
 
@@ -38,8 +38,7 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 
 | # | Plugin | Category | Notes |
 |---|--------|----------|-------|
-| 1 | `readme` | Repo health | Every repo |
-| 2 | `codeowners` | Ownership | Every repo |
+| 1 | ✅ `repo-boilerplate` | Repo health + ownership | Shipped. Consolidates readme + codeowners and scans standard files (.gitignore, LICENSE, SECURITY.md, CONTRIBUTING.md, .editorconfig). Every repo. |
 | 3 | `github` | VCS settings | Branch protection, repo settings |
 | 4 | `docker` | Containers | Skips if no Dockerfiles. 🆕 Add `hadolint` sub-collector for auto-run Dockerfile linting. |
 | 5 | `k8s` | Infrastructure | Skips if no K8s manifests |
@@ -63,13 +62,12 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 | 23 | 🆕 `actionlint` | GHA linting | Auto-lints GitHub Actions workflow files for syntax errors, type mismatches, deprecated features. Different from `gha-security` (which checks permissions/pinning). |
 | 25 | 🆕 `gha-security` | CI security | Parses GHA workflows for pinned actions, permissions, `pull_request_target` misuse. Skips if no `.github/workflows/`. |
 | 26 | 🆕 `api-docs` | API specs | Detects OpenAPI/Swagger specs, skips if none |
-| 27 | 🆕 `repo-hygiene` | Repo health | Scans for standard files (.gitignore, LICENSE, CI config, .dockerignore, SECURITY.md, CONTRIBUTING.md, .editorconfig) |
 
 ### Policies
 
 | # | Plugin | Checks | Notes |
 |---|--------|--------|-------|
-| 28 | 🆕 `repo-hygiene` | `readme-exists`, `readme-min-length`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `gitignore-exists`, `license-exists`, `ci-config-exists`, `dockerignore-exists`, `security-md-exists`, `contributing-md-exists`, `editorconfig-exists` | Consolidates `readme` + `codeowners` + new standard file checks |
+| 28 | ✅ `repo-boilerplate` | `readme-exists`, `readme-min-line-count`, `readme-required-sections`, `codeowners-exists`, `codeowners-valid`, `codeowners-catchall`, `codeowners-min-owners`, `codeowners-no-individuals-only`, `codeowners-team-owners`, `codeowners-no-empty-rules`, `codeowners-max-owners`, `gitignore-exists`, `license-exists`, `security-exists`, `contributing-exists`, `editorconfig-exists` | Shipped. Consolidates `readme` + `codeowners` + standard file checks |
 | 29 | `vcs` | Branch protection, approvals, no force push | You should have branch protection |
 | 30 | `container` | Dockerfile best practices | Skips if no Dockerfiles |
 | 31 | `container-scan` | No critical image vulns | Skips if no scan data |
@@ -95,21 +93,19 @@ For specific use cases or requires meaningful configuration to be useful. Exampl
 | 51 | 🆕 `ci-security` | Pinned actions, minimal permissions | Skips if no GHA workflows |
 | 52 | 🆕 `api-docs` | OpenAPI/Swagger spec exists, valid | Skips if no API spec detected |
 
-### Planned change: `repo-hygiene` consolidation
+### Shipped: `repo-boilerplate` consolidation
 
-The `repo-hygiene` plugin is a new collector + policy pair that consolidates the existing `readme` and `codeowners` policies and adds standard file checks:
+The `repo-boilerplate` collector + policy pair consolidates what used to be standalone `readme` and `codeowners` plugins and adds scanning for other standard boilerplate files.
 
-**Collector** scans for standard files and writes presence data. **Policy** folds existing `readme` + `codeowners` policy checks and adds:
+**Collector** writes to `.repo.readme.*`, `.ownership.codeowners.*`, `.repo.gitignore.*`, `.repo.license.*`, `.repo.security.*`, `.repo.contributing.*`, `.repo.editorconfig.*`.
 
-- `gitignore-exists` — `.gitignore` file present
-- `license-exists` — `LICENSE` or `LICENSE.md` present
-- `ci-config-exists` — `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/`, or `buildkite/` detected
-- `dockerignore-exists` — `.dockerignore` present when Dockerfiles exist (conditional)
-- `security-md-exists` — `SECURITY.md` present
-- `contributing-md-exists` — `CONTRIBUTING.md` present
-- `editorconfig-exists` — `.editorconfig` present
+**Policy** includes:
 
-The existing `readme` and `codeowners` collector plugins remain separate (they collect different data). Only the policies merge into `repo-hygiene`.
+- `readme-*` — existence, minimum line count, required sections
+- `codeowners-*` — existence, syntax validity, catch-all, min/max owners, team-based ownership, no empty rules
+- `gitignore-exists`, `license-exists`, `security-exists`, `contributing-exists`, `editorconfig-exists`
+
+The standalone `readme` and `codeowners` collector/policy directories have been removed; all users should reference `repo-boilerplate` instead.
 
 ---
 
@@ -271,7 +267,7 @@ Requires significant configuration, custom rules, or is for very specific use ca
 |----------|------|-----|-----------|
 | P1 | **Gitleaks collector + secrets policy** | Fills biggest schema gap, every repo benefits | 2–3 |
 | P2 | **Trivy collector** (filesystem + config) | Free SCA + container scan for everyone | 3–4 |
-| P3 | **repo-hygiene collector + policy** | Consolidates readme + codeowners + new file checks | 2–3 |
+| P3 | ~~**repo-boilerplate collector + policy**~~ | Consolidates readme + codeowners + new file checks | ✅ Done |
 | P4 | **GHA security collector + ci-security policy** | Supply chain security, ~65% of market | 2–3 |
 | P5 | **hadolint sub-collector** (add to existing `docker` plugin) | Auto-run Dockerfile linting as new sub-collector | 1–2 |
 | P6 | **ShellCheck / shell collector** | Auto-run shell script linting + bash language detection | 2 |

@@ -270,7 +270,7 @@ components:
     tags: [go, backend]
 
 collectors:
-  - uses: ./collectors/readme
+  - uses: ./collectors/repo-boilerplate
     on: ["domain:payments"]
   - name: inline-collector
     runBash: lunar collect -j ".example" "value"
@@ -279,7 +279,7 @@ collectors:
       type: code
 
 policies:
-  - uses: ./policies/readme
+  - uses: ./policies/repo-boilerplate
     on: ["domain:payments"]
     enforcement: block-pr
   - name: inline-policy
