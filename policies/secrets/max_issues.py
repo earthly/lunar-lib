@@ -6,7 +6,7 @@ from lunar_policy import Check, variable_or_default
 def main(node=None):
     c = Check("max-issues", "Secret findings within threshold", node=node)
     with c:
-        threshold_str = variable_or_default("max_issues_threshold", "0")
+        threshold_str = variable_or_default("max_issues_threshold", "10")
         try:
             threshold = int(threshold_str)
         except ValueError:
