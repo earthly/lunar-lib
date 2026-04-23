@@ -8,7 +8,7 @@
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](./LICENSE)
 [![Lunar Platform](https://img.shields.io/badge/platform-Lunar-7c3aed)](https://earthly.dev/lunar)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](#contributing)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](./CONTRIBUTING.md)
 
 </div>
 
@@ -64,14 +64,7 @@ lunar-lib/
 
 ## Contributing
 
-Plugins in `lunar-lib` are reviewed and shipped continuously. The workflow is **spec-first**:
-
-1. **Open a `[Spec Only]` draft PR** with manifests, README, and examples — no implementation code yet.
-2. **Get reviewer go-ahead** on the spec.
-3. **Implement on the same PR.**
-4. **Merge** once approvals land.
-
-Plugin authors — humans and AI agents alike — should start with [`AGENTS.md`](./AGENTS.md), which links to the full set of authoring guides and conventions.
+Plugins ship on a **spec-first** workflow: open a draft PR with manifests and README, get reviewer go-ahead, then add the implementation on the same PR. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full process, and [`AGENTS.md`](./AGENTS.md) for the authoring guides and conventions both humans and AI agents should follow.
 
 ---
 
