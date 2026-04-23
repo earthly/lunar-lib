@@ -35,11 +35,11 @@ Browse the full catalog at [**earthly.dev/lunar/guardrails/**](https://earthly.d
 
 Start with a **starter pack** — a curated `lunar-config.yml` that's wired up and ready to drop into your repo. You can absolutely cherry-pick individual plugins instead, but most teams get going faster from a bundle and tune from there.
 
-| Tier | What you get | Setup |
-|------|--------------|-------|
-| **[Starter](./starter-packs/starter/)** | Zero config, zero secrets. Themed packs for Security, Code Quality, Cloud Native, AI Native, plus a Baseline. | Copy → done. |
-| **[Starter Plus](./starter-packs/starter-plus/)** | Adds vendor integrations (Snyk, SonarQube, Jira, PagerDuty, …). | One token or URL per integration. |
-| **[Advanced](./starter-packs/advanced/)** | Specialized workflows (custom AST rules, OTel, GitOps, AI governance). | Real configuration required. |
+| Tier | What you get | Status |
+|------|--------------|--------|
+| **[Starter](./starter-packs/starter/)** | Zero config, zero secrets. Themed packs for Security, Code Quality, Cloud Native, AI Native, plus a Baseline. | **Available** — copy the `lunar-config.yml` and you're done. |
+| **[Starter Plus](./starter-packs/starter-plus/)** | Adds vendor integrations (Snyk, SonarQube, Jira, PagerDuty, …). Light configuration, typically one token or URL per integration. | _Coming soon — [planned packs listed here](./starter-packs/starter-plus/)._ |
+| **[Advanced](./starter-packs/advanced/)** | Specialized workflows (custom AST rules, OTel, GitOps, AI governance) that need meaningful configuration to be useful. | _Coming soon — [planned packs listed here](./starter-packs/advanced/)._ |
 
 **Recommended path for new users:**
 
