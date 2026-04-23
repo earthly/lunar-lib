@@ -20,6 +20,9 @@ landing_page:
     - slug: "observability"
       type: "policy"
       reason: "Enforces dashboard, monitor, and SLO standards using this collector's data"
+    - slug: "datadog"
+      type: "policy"
+      reason: "Datadog-specific monitor and SLO guardrails using this collector's native data"
 
 collectors:
   - name: service

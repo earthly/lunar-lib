@@ -1,7 +1,7 @@
 version: 0
 
 name: observability
-description: Enforce dashboard and alerting configuration standards
+description: Enforce dashboard, alerting, and SLO configuration standards
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main

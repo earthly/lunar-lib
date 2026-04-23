@@ -1,0 +1,105 @@
+version: 0
+
+name: datadog
+description: Datadog-specific monitor and SLO guardrails
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Datadog Guardrails"
+  long_description: |
+    Datadog-specific guardrails. Verifies monitors route to a pager
+    via @handle syntax and that declared SLOs have a matching
+    burn-rate alert monitor. Complements the tool-agnostic
+    observability policy.
+  category: "operational-readiness"
+  icon: "assets/datadog.svg"
+  status: "experimental"
+  requires:
+    - slug: "datadog"
+      type: "collector"
+      reason: "Provides Datadog monitor and SLO data at .observability.native.datadog.api"
+  related: []
+  keywords: ["datadog", "monitors", "slo", "pager", "operational readiness"]
+
+policies:
+  - name: monitor-has-pager-target
+    description: |
+      Verifies that every Datadog monitor for the service routes to at
+      least one pager target. Datadog monitors embed notification
+      handles directly in the monitor message body using @handle syntax
+      (e.g. `@pagerduty-core`, `@opsgenie-platform`, `@slack-oncall`).
+      The policy scans each monitor's message field and fails if any
+      monitor has no matching `@<pager_prefix>-*` handle. The prefix
+      list is configurable via the `pager_handle_prefixes` input so
+      teams can declare which notification routes count as "pager"
+      (defaults cover PagerDuty, Opsgenie, VictorOps). Skips cleanly
+      when the Datadog collector hasn't written native data.
+    mainPython: ./monitor_has_pager_target.py
+    keywords: ["datadog", "monitors", "pager", "pagerduty", "opsgenie", "notifications"]
+
+  - name: slo-burn-rate-alert
+    description: |
+      Verifies that every declared SLO has a matching burn-rate alert
+      monitor. Datadog offers a dedicated "SLO alert" monitor type that
+      references an SLO by ID and fires when the error-budget burn rate
+      exceeds a threshold, preventing fire-and-forget SLOs that silently
+      drift. Cross-references `.observability.native.datadog.api.slos`
+      against `.observability.native.datadog.api.monitors` and fails if
+      any SLO lacks a monitor of type `slo alert` bound to its ID.
+      Skips cleanly when no SLOs are defined or when the Datadog
+      collector hasn't written native data.
+    mainPython: ./slo_burn_rate_alert.py
+    keywords: ["datadog", "slo", "error budget", "burn rate", "monitors"]
+
+inputs:
+  pager_handle_prefixes:
+    description: >
+      Comma-separated list of Datadog notification handle prefixes that
+      count as a pager target. Any monitor message containing at least
+      one `@<prefix>-*` handle from this list passes the
+      `monitor-has-pager-target` check. Defaults cover PagerDuty,
+      Opsgenie, and VictorOps.
+    default: "pagerduty,opsgenie,victorops"
+
+example_component_json: |
+  {
+    "observability": {
+      "source": {
+        "tool": "datadog",
+        "integration": "api"
+      },
+      "native": {
+        "datadog": {
+          "api": {
+            "service_tag": "payment-api",
+            "monitors": [
+              {
+                "id": 12345,
+                "name": "High p99 latency",
+                "type": "metric alert",
+                "message": "Paging @pagerduty-payments — investigate latency spike.",
+                "query": "avg(last_5m):..."
+              },
+              {
+                "id": 67890,
+                "name": "Error budget burn (payment-api availability)",
+                "type": "slo alert",
+                "message": "Budget burn — @pagerduty-payments",
+                "query": "burn_rate(\"abc-slo-id\").over(\"7d\") > 2"
+              }
+            ],
+            "slos": [
+              {
+                "id": "abc-slo-id",
+                "name": "payment-api availability",
+                "type": "metric",
+                "target": 99.9
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
