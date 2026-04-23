@@ -25,7 +25,7 @@ Lunar enforces engineering standards across every repo, every PR, and every AI c
 
 Browse [`collectors/`](./collectors), [`policies/`](./policies), and [`catalogers/`](./catalogers) for the full, always-current list.
 
-> New to Lunar itself? Start with [**ai-context/about-lunar.md**](./ai-context/about-lunar.md) for the platform overview, then [**core-concepts.md**](./ai-context/core-concepts.md) for how collectors, policies, and the Component JSON fit together.
+> New to Lunar itself? Start at [**earthly.dev/lunar**](https://earthly.dev/lunar) for the platform overview.
 
 ---
 
@@ -52,27 +52,11 @@ Don't pick plugins one at a time. Start with a **starter pack** — a curated `l
 
 ```
 lunar-lib/
-├── ai-context/         📚 Platform docs, schemas, plugin authoring guides
-├── starter-packs/      🚀 Curated, ready-to-use lunar-config.yml bundles
-├── collectors/         🔍 Plugins that gather metadata into the Component JSON
-├── policies/           ✅ Plugins that evaluate that metadata against standards
-├── catalogers/         🗂️  Plugins that sync external component/ownership data
-└── .ai-implementation/ 🤖 Playbooks for AI agents contributing new plugins
+├── starter-packs/   🚀 Curated, ready-to-use lunar-config.yml bundles
+├── collectors/      🔍 Plugins that gather metadata into the Component JSON
+├── policies/        ✅ Plugins that evaluate that metadata against standards
+└── catalogers/      🗂️  Plugins that sync external component/ownership data
 ```
-
----
-
-## Documentation
-
-| Topic | Where to look |
-|-------|---------------|
-| What Lunar is and the problem it solves | [`ai-context/about-lunar.md`](./ai-context/about-lunar.md) |
-| Architecture, Component JSON, execution flow | [`ai-context/core-concepts.md`](./ai-context/core-concepts.md) |
-| Writing a collector | [`ai-context/collector-reference.md`](./ai-context/collector-reference.md) |
-| Writing a policy | [`ai-context/policy-reference.md`](./ai-context/policy-reference.md) |
-| Writing a cataloger | [`ai-context/cataloger-reference.md`](./ai-context/cataloger-reference.md) |
-| Component JSON schema conventions | [`ai-context/component-json/`](./ai-context/component-json/) |
-| End-to-end PR playbook (humans & agents) | [`.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`](./.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md) |
 
 ---
 
@@ -85,7 +69,7 @@ Plugins in `lunar-lib` are reviewed and shipped continuously. The workflow is **
 3. **Implement on the same PR.**
 4. **Merge** once approvals land.
 
-Full details, conventions, and reviewer expectations live in [`.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`](./.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md). AI agents authoring plugins should read [`AGENTS.md`](./AGENTS.md) first.
+Plugin authors — humans and AI agents alike — should start with [`AGENTS.md`](./AGENTS.md), which links to the full set of authoring guides and conventions.
 
 ---
 
