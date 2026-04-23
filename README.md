@@ -64,7 +64,7 @@ lunar-lib/
 
 ## Contributing
 
-Plugins ship on a **spec-first** workflow: open a draft PR with manifests and README, get reviewer go-ahead, then add the implementation on the same PR. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full process, and [`AGENTS.md`](./AGENTS.md) for the authoring guides and conventions both humans and AI agents should follow.
+Plugins ship on a **spec-first** workflow: open a draft PR with manifests and README, get reviewer go-ahead, then add the implementation on the same PR. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full process. Using an AI agent to write the plugin? Point it at [`AGENTS.md`](./AGENTS.md) — the authoring guides and conventions there are AI-first, but they're the same reference a human contributor would reach for.
 
 ---
 

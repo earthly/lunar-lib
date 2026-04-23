@@ -5,7 +5,7 @@ Thanks for taking the time to contribute. This repo holds the official collector
 ## Before You Start
 
 - New to Lunar? Read [earthly.dev/lunar](https://earthly.dev/lunar) first.
-- New to writing plugins? Start with [`AGENTS.md`](./AGENTS.md). It's the single entry point for both humans and AI agents and links to every authoring guide, schema reference, and convention doc you'll need.
+- **Using an AI agent** (Claude Code, Cursor, Codex, …) to write your plugin? Point it at [`AGENTS.md`](./AGENTS.md) — that's the AI-first entry point, and it links every authoring guide, schema reference, and convention doc the agent will need. Writing by hand? It's still the fastest way to find those same docs yourself.
 - Browse a few existing entries in [`collectors/`](./collectors) and [`policies/`](./policies) that are similar to what you want to build — consistency with existing patterns is the #1 thing reviewers look for.
 
 ## The Workflow: Spec-First
