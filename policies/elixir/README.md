@@ -32,6 +32,7 @@ This policy reads from the following Component JSON paths:
 | `.lang.elixir.test_directory_exists` | boolean | [`elixir`](https://github.com/earthly/lunar-lib/tree/main/collectors/elixir) collector |
 | `.lang.elixir.credo_configured` | boolean | [`elixir`](https://github.com/earthly/lunar-lib/tree/main/collectors/elixir) collector |
 | `.lang.elixir.dialyzer_configured` | boolean | [`elixir`](https://github.com/earthly/lunar-lib/tree/main/collectors/elixir) collector |
+| `.lang.elixir.cicd.cmds` | array | [`elixir`](https://github.com/earthly/lunar-lib/tree/main/collectors/elixir) collector (additional signal for Dialyzer — `mix dialyzer` invocations) |
 | `.lang.elixir.umbrella` | object | [`elixir`](https://github.com/earthly/lunar-lib/tree/main/collectors/elixir) collector |
 
 ## Installation
@@ -125,7 +126,7 @@ policies:
 1. Add Credo: `{:credo, "~> 1.7", only: [:dev, :test], runtime: false}` to deps
 2. Run `mix credo.gen.config` to create `.credo.exs`
 3. Or add Dialyzer: `{:dialyxir, "~> 1.4", only: [:dev], runtime: false}` to deps
-4. Run `mix dialyzer` to generate PLTs
+4. Run `mix dialyzer` to generate PLTs. The policy also passes if `mix dialyzer` is observed running in CI even without a local config block — wiring it into your pipeline counts.
 
 ### umbrella-app-detected
 Informational — no remediation needed. This check surfaces whether the project is structured as an umbrella app.

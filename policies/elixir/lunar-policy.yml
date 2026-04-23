@@ -54,8 +54,10 @@ policies:
 
   - name: credo-or-dialyzer-configured
     description: |
-      Ensures Credo (`.credo.exs`) or Dialyzer (dialyxir dep / `dialyzer/0`
-      config block) is configured. Static analysis catches bugs and enforces
+      Ensures Credo or Dialyzer is configured. Credo is detected via
+      `.credo.exs`. Dialyzer is detected via `{:dialyxir, ...}` dep, a
+      `dialyzer/0` block in mix.exs, or a `mix dialyzer` command
+      observed in CI. Static analysis catches bugs and enforces
       consistent idiomatic Elixir.
     mainPython: credo_or_dialyzer_configured.py
     keywords: ["credo", "dialyzer", "dialyxir", "static analysis", "code quality"]

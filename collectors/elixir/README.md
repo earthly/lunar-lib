@@ -26,11 +26,9 @@ This collector writes to the following Component JSON paths:
 | `.lang.elixir.otp_apps` | array | OTP application names (from `application/0`) |
 | `.lang.elixir.test_directory_exists` | boolean | `test/` directory detected |
 | `.lang.elixir.credo_configured` | boolean | `.credo.exs` detected |
-| `.lang.elixir.dialyzer_configured` | boolean | Dialyzer config detected (e.g. `:dialyxir` dep or `dialyzer/0` block) |
+| `.lang.elixir.dialyzer_configured` | boolean | Dialyzer configured via `:dialyxir` dep, `dialyzer/0` block in mix.exs, or a `mix dialyzer` invocation observed in CI |
 | `.lang.elixir.formatter_configured` | boolean | `.formatter.exs` detected |
-| `.lang.elixir.frameworks.phoenix` | boolean | Phoenix framework detected via `:phoenix` dep |
-| `.lang.elixir.frameworks.phoenix_live_view` | boolean | LiveView detected via `:phoenix_live_view` dep |
-| `.lang.elixir.frameworks.ecto` | boolean | Ecto detected via `:ecto` or `:ecto_sql` dep |
+| `.lang.elixir.frameworks` | array | Frameworks detected from deps (e.g. `["phoenix", "phoenix_live_view", "ecto"]`) |
 | `.lang.elixir.umbrella.is_umbrella` | boolean | Umbrella project flag |
 | `.lang.elixir.umbrella.apps` | array | Umbrella member app names (from `apps/*/mix.exs`) |
 | `.lang.elixir.cicd` | object | CI/CD command tracking with Elixir version |
@@ -65,5 +63,6 @@ collectors:
 ## Notes
 
 - **Umbrella projects**: `project.sh` detects umbrella projects via the `apps_path` declaration in the root `mix.exs` and walks `apps/*/mix.exs` to collect member app names.
-- **Framework detection**: Phoenix / LiveView / Ecto flags are derived from the `deps/0` list in `mix.exs` — so adding a dep like `{:phoenix, "~> 1.7"}` flips the corresponding boolean.
+- **Framework detection**: `.lang.elixir.frameworks` is populated from the `deps/0` list in `mix.exs` — adding a dep like `{:phoenix, "~> 1.7"}` appends `"phoenix"` to the array. Currently recognized: `phoenix`, `phoenix_live_view`, `ecto` (and `ecto_sql` → `ecto`). Extend the detection list as new frameworks land.
+- **Dialyzer detection**: `dialyzer_configured` is `true` when any of these is present — `{:dialyxir, ...}` in deps, a `dialyzer/0` keyword block in `mix.exs`, or a `mix dialyzer` command observed in `.lang.elixir.cicd.cmds` (captured by the CI hook).
 - **Skip-safe**: If no Elixir indicators are found (`mix.exs` absent), all sub-collectors exit 0 without writing data.

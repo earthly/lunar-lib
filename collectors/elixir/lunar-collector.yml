@@ -91,11 +91,7 @@ example_component_json: |
         "credo_configured": true,
         "dialyzer_configured": true,
         "formatter_configured": true,
-        "frameworks": {
-          "phoenix": true,
-          "phoenix_live_view": true,
-          "ecto": true
-        },
+        "frameworks": ["phoenix", "phoenix_live_view", "ecto"],
         "umbrella": {
           "is_umbrella": true,
           "apps": ["my_app_web", "my_app_core"]
