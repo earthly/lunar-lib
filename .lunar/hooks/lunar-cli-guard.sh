@@ -9,9 +9,13 @@ CWD=$(echo "$INPUT" | jq -r ".cwd // empty")
 
 # Extract actual lunar CLI invocations (not "lunar" appearing in paths,
 # filenames, string literals, etc). Match `lunar` only at the start of a
-# command word: beginning of line, after `&&`, `||`, `|`, `;`, or newline.
-# Then capture the rest of that command segment (up to the next separator).
-LUNAR_INVOCATIONS=$(echo "$COMMAND" | grep -oE '(^|[\&\|\;[:space:]])lunar([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
+# command word, which at the byte level means: beginning of line, or
+# immediately after a shell separator (`&`, `|`, `;`). We deliberately
+# DO NOT treat plain whitespace as a command-word boundary, because that
+# would also match "lunar" inside quoted strings (commit messages,
+# `echo`/`printf` arguments, `gh pr create --body ...`, etc.) — see
+# Claude-review feedback on PR #140.
+LUNAR_INVOCATIONS=$(echo "$COMMAND" | grep -oE '(^|[\&\|\;])[[:space:]]*lunar([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
 [ -z "$LUNAR_INVOCATIONS" ] && exit 0
 
 # If every lunar invocation is --help / --version / `lunar` alone, skip checks.
@@ -45,7 +49,14 @@ if [[ "$TRIMMED" =~ ^cd[[:space:]]+ ]]; then
   fi
   if [ -n "$CD_PATH" ]; then
     CD_PATH="${CD_PATH/#\~/$HOME}"
-    EFFECTIVE_CWD="$CD_PATH"
+    # Resolve relative paths against the payload-reported $CWD, not against
+    # the hook process's CWD (which depends on whatever shell Claude's
+    # hook runner inherited). Absolute paths and ~-expanded paths pass
+    # through unchanged. Fixes Claude-review comment 3 on PR #140.
+    case "$CD_PATH" in
+      /*) EFFECTIVE_CWD="$CD_PATH" ;;
+      *)  EFFECTIVE_CWD="$CWD/$CD_PATH" ;;
+    esac
   fi
 fi
 
