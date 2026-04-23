@@ -178,11 +178,24 @@ When the primary reviewer is satisfied, they will assign a **secondary reviewer*
 - If reviewers are discussing with each other (e.g. @-mentioning each other), **wait for them to reach a conclusion** before acting.
 - They may address you as "claude" or "devin" or "bender" in PR comments — treat that as a direct instruction.
 
-**When the secondary reviewer approves: start implementing immediately.** Their approval is the "go ahead" signal. Do not ask for permission or confirmation — begin Step 1 of the implementation checklist below.
+**When the secondary reviewer approves: start implementing immediately.** Their approval is the "go ahead" signal. Do not ask for permission or confirmation — begin the implementation work below.
+
+"Implementing" here means the **whole next unit**, not just writing code: write → push → run CI → **deploy to cronos → test → post evidence on the PR**. All of that happens under your own authority without further human input. The next time you should be "waiting" is after you've posted test evidence (Step 8).
 
 ---
 
 ## Implementation (same PR)
+
+> **Implementation and testing are one unbroken unit.** Do not stop after writing code, pushing, and confirming `+lint` / `+test` / `+all` pass on GitHub. **CI green is not the finish line.** The work is not done until you have also:
+>
+> 1. Deployed the branch to cronos (Step 3 below),
+> 2. Triggered collection against a real component (Step 5),
+> 3. Gathered evidence (Step 7), and
+> 4. Posted that evidence on the PR as a comment (Step 8).
+>
+> All of that happens under your own authority — it does NOT require reviewer approval, reviewer comments, or any human "go ahead." Keep going straight through.
+>
+> You are only "waiting for review" once the PR comment with test evidence is up. If you just wrote implementation code and pushed it, you are nowhere near waiting.
 
 ### What to produce
 
@@ -204,6 +217,10 @@ The actual scripts referenced in the YAML manifest:
 ## Testing
 
 Follow this checklist **in order**. Every step must be completed before moving to the next.
+
+**Start immediately after writing implementation code.** Don't wait for a reviewer to say "please test this" — cronos testing is your responsibility as the implementer, not something that gets triggered by review feedback. The moment you've pushed implementation code and watched `+lint` / `+test` / `+all` pass, go straight to Step 3 (deploy to cronos). You do not need approval to run these steps. If anything, **not** running these steps is the blocker that will make reviewers ask you to come back.
+
+Reviewers expect to see your test evidence on the PR before their review is meaningful. A PR comment with Grafana screenshots + Component JSON output (Step 8) is what unblocks implementation review — not vice versa.
 
 ### Step 1: Write implementation code
 
@@ -576,6 +593,8 @@ Unit tests are not required and should **not** be committed. The primary way to 
 ---
 
 ## Implementation review
+
+> **Precondition: you have posted test evidence on the PR (Step 8).** If you haven't — if you're here because you pushed implementation code and CI went green — you are not ready for this section. Go back to Step 3 and finish the Testing checklist. Implementation review does not start until evidence is posted.
 
 Claude will automatically review the PR via the `claude-code-action` GitHub Action. Address its feedback, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
 

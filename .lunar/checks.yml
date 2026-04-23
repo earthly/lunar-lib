@@ -1,60 +1,101 @@
+# Agent guardrail hooks for lunar-lib plugin authors.
+#
+# Every entry declares a `hook:` type that determines when it fires. Hook types
+# follow the `<env>-<before|after>-<noun>` convention used by Lunar collector
+# CI hooks (e.g. `ci-before-command`), except with the `agent-` prefix for the
+# agent-sandbox execution environment:
+#
+#   hook:                         When it fires                        Matcher
+#   ----------------------------  -----------------------------------  ---------------------------
+#   agent-session-start           When agent session begins (startup   (none — stdout becomes
+#                                 or resume); content in stdout or      additionalContext for the
+#                                 `message:` injected as extra          whole session)
+#                                 context.
+#   agent-after-file-edit         After agent writes/edits a file,     `on:` (file path glob)
+#                                 run `run:` as a validation. Non-
+#                                 zero exit surfaces `message:`.
+#   agent-after-file-edit-nudge   Like above, but no `run:` — always   `on:` (file path glob);
+#                                 surfaces `message:` when matched.    optional `when:` gate
+#                                 Optional `when:` runs a bash test;   (bash expression, {file}
+#                                 nudge fires only when it exits 0.    substituted)
+#   agent-before-command          Before agent runs a shell cmd        `binary:` (structured)
+#   agent-before-tool-call        Before agent invokes a named tool    `tool:` (framework tool)
+#   agent-session-end             When agent session ends              `on:` (any changed file
+#                                                                       matches the glob)
+#
+# Reserved for future use (schema documented, not yet dispatched by runners):
+#   agent-before-file-edit        Before agent writes/edits a file (can block/modify content)
+#   agent-after-command           After agent runs a shell command
+#   agent-after-tool-call         After agent invokes a named tool
+#   agent-before-prompt           Before agent processes a user prompt
+#
+# See .lunar/hooks/README.md for the full schema, dispatch semantics, and
+# how to contribute new hooks.
+
 checks:
-  # ── Hard validations ──
+  # ── Hard validations (agent-after-file-edit) ──
+  # `run:` is a real test. Non-zero exit surfaces the message to the agent.
 
   - name: svg-black-fill
+    hook: agent-after-file-edit
     on: "**/assets/*.svg"
     run: "grep -qE 'fill=\"black\"' {file} && ! grep -iqE 'fill=\"(white|#fff|#ffffff)\"' {file}"
     message: "SVG must use fill=\"black\". Website converts to white automatically."
 
   - name: svg-no-title-tag
+    hook: agent-after-file-edit
     on: "**/assets/*.svg"
     run: "! grep -qE '<title>' {file}"
     message: "Strip <title> tags from SVG icons. They add unnecessary metadata."
 
-  # ── Stop-phase checks (run once at end of session, not per-file) ──
-  # These use "hook: stop" to run in the Stop hook instead of PostToolUse.
-  # The Stop hook checks if any changed file matches the "on" pattern,
-  # then runs the command once (not per-file). Use for expensive checks.
-
-  - name: lint
-    hook: stop
-    on: "**/*.yml"
-    run: "earthly +lint 2>&1 | tail -10"
-    message: "Linter failed. Fix errors before pushing."
-
   - name: earthfile-wired-into-all
+    hook: agent-after-file-edit
     on: "collectors/*/Earthfile"
     run: "PLUGIN_DIR=$(dirname {file} | sed \"s|$(git rev-parse --show-toplevel)/||\"); ROOT_EF=$(git rev-parse --show-toplevel)/Earthfile; grep -q \"$PLUGIN_DIR\" \"$ROOT_EF\""
     message: "This plugin has an Earthfile but is not referenced in the root Earthfile's +all target. Add: BUILD --pass-args ./<plugin-path>+image"
 
   - name: collector-gnu-grep
+    hook: agent-after-file-edit
     on: "collectors/**/*.sh"
     run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
     message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
 
-  # ── Nudges (exit 1 to surface the message via additionalContext) ──
-  # The hook runner (lunar-verify.sh) collects findings from non-zero exits
-  # and returns them as additionalContext JSON. The hook itself always exits 0,
-  # so nudges never block the agent — they just surface reminders.
+  # ── Session-end checks (agent-session-end) ──
+  # Fire once at the end of a session if any changed file matches `on:`.
+  # Use for expensive validations whose cost doesn't scale with per-file granularity.
+
+  - name: lint
+    hook: agent-session-end
+    on: "**/*.yml"
+    run: "earthly +lint 2>&1 | tail -10"
+    message: "Linter failed. Fix errors before pushing."
+
+  # ── Nudges (agent-after-file-edit-nudge) ──
+  # Reminders shown alongside file edits. No `run:` — the `message:` is the
+  # whole hook. Optional `when:` field gates the nudge on a bash expression
+  # ({file} is substituted with the edited file path); the nudge fires only
+  # when `when:` exits 0.
 
   - name: svg-logo-sourcing
+    hook: agent-after-file-edit-nudge
     on: "**/assets/*.svg"
-    run: "exit 1"
     message: "Reminder: Is this a tech-specific collector or policy? Check simple-icons (https://github.com/simple-icons/simple-icons) for an official logo before creating a custom one."
 
   - name: ci-collector-testing-reminder
+    hook: agent-after-file-edit-nudge
     on: "collectors/*/lunar-collector.yml"
-    run: "if grep -q 'type: ci-' {file}; then exit 1; else exit 0; fi"
+    when: "grep -q 'type: ci-' {file}"
     message: "Reminder: This collector has CI hooks. Local 'lunar collector dev' is NOT sufficient -- you must test on cronos with a real CI run (push config, trigger component build, verify data on hub)."
 
   - name: manifest-example-json-freshness
+    hook: agent-after-file-edit-nudge
     on: "collectors/*/lunar-collector.yml"
-    run: "exit 1"
     message: "Reminder: Does example_component_json still match what the collector actually produces? Run 'lunar collector dev' and compare the output to the example in this manifest."
 
   - name: policy-skip-vs-fail
+    hook: agent-after-file-edit-nudge
     on: "policies/**/*.py"
-    run: "! grep -qE '\\.skip\\s*\\(' {file}"
+    when: "grep -qE '\\.skip\\s*\\(' {file}"
     message: >-
       This policy file contains a .skip() call — is skip appropriate here?
       Rule of thumb: skip = category does not apply to this component
@@ -67,8 +108,8 @@ checks:
       the full decision tree.
 
   - name: screenshot-quality-reminder
+    hook: agent-after-file-edit-nudge
     on: "**/*screenshot*"
-    run: "exit 1"
     message: >-
       Reminder: Screenshots uploaded to PRs must be scrolled to show the
       RELEVANT data, not the default top-of-page view. Dashboard screenshots
@@ -76,3 +117,58 @@ checks:
       JSON screenshots should show the namespace/keys being verified. If the
       data is too large for one screen, capture the section that serves as an
       end-to-end smoke test.
+
+  # ── Agent session-start hooks ──
+  # Fire once when an agent session begins (including `claude -p` headless
+  # resumes). Stdout becomes additionalContext the agent sees before its
+  # first turn. Use for orientation — what phase is this work in? which
+  # playbook section applies? — not for long-running checks.
+
+  - name: phase-guidance
+    hook: agent-session-start
+    run: .lunar/hooks/phase-guidance.sh
+    message: >-
+      Before doing PR work, identify the phase (spec-review /
+      implementing / impl-review / merging) and read the matching
+      section of `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`.
+      CI green is not the finish line for implementation PRs —
+      cronos round-trip testing is required.
+
+  # ── Agent before-command hooks ──
+  # Fire before an agent (e.g. Claude Code) executes a shell command in its
+  # sandbox. Hook exits 0 → allow; non-zero → block with stderr shown to the
+  # agent. The runner pipes the PreToolUse JSON payload to `run:` on stdin.
+  # Matcher shape mirrors Lunar collector `ci-before-command` hooks.
+
+  - name: lunar-cli-guard
+    hook: agent-before-command
+    binary:
+      name: lunar
+    run: .lunar/hooks/lunar-cli-guard.sh
+    message: >-
+      Block `lunar` CLI commands when context is wrong:
+      LUNAR_HUB_TOKEN must be set, and commands that talk to the hub
+      (collector|policy|component|catalog|sql|secret|hub) must run from a
+      directory with `lunar-config.yml`. Honours `cd <dir> && lunar ...`
+      prefixes; allows `--help` / `--version` freely.
+
+  # ── Agent before-tool-call hooks ──
+  # Fire before an agent invokes a named tool (any tool, not just shell).
+  # Matcher is the framework's literal tool name — portable in shape but not
+  # in values (ScheduleWakeup is Claude-specific; other frameworks have
+  # different tool names for their scheduling primitives, if any).
+
+  - name: block-schedule-wakeup
+    hook: agent-before-tool-call
+    tool:
+      name: ScheduleWakeup
+    run: "exit 2"
+    message: >-
+      ScheduleWakeup is a no-op in this agent environment — nothing picks up
+      at the scheduled time, so the worker would silently park until the next
+      human nudge. Instead:
+        - For short waits (<2 min): use Monitor, `gh pr checks --watch`, or
+          chained `sleep N && <check>` loops inside the current invocation.
+        - For long waits (CI, sync-manifest, cronos collection cycle):
+          exit and let the next webhook event (CI status, PR comment, etc.)
+          resume the session.
