@@ -1,0 +1,80 @@
+version: 0
+
+name: code-quality
+description: Enforce code-quality standards via the tool-agnostic `.code_quality` path (populated by code quality collectors like `sonarqube`)
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Code Quality Guardrails"
+  long_description: |
+    Enforce code-quality standards. Verifies a code-quality scanner ran,
+    the tool's pass/fail signal is green, and coverage, duplication, and
+    severity-bucketed issue counts meet configurable thresholds. Reads the
+    normalized `.code_quality` path populated by the `sonarqube` collector.
+  category: "testing-and-quality"
+  icon: "assets/code-quality.svg"
+  status: "experimental"
+  requires:
+    - slug: "sonarqube"
+      type: "collector"
+      reason: "Provides code-quality data via SonarQube/SonarCloud Web API"
+  related: []
+
+policies:
+  - name: executed
+    description: |
+      Verifies that a code-quality scanner was executed on the component.
+      Fails if no scanner has written to `.code_quality`.
+    mainPython: executed.py
+    keywords: ["code-quality", "sonarqube", "scanning", "quality-gate", "testing"]
+
+  - name: passing
+    description: |
+      Verifies the scanner's overall pass/fail signal is green. Reads the
+      tool-agnostic `.code_quality.passing` field, derived from the scanner's
+      own quality gate outcome.
+    mainPython: passing.py
+    keywords: ["code-quality", "quality-gate", "sonarqube", "pass-fail"]
+
+  - name: min-coverage
+    description: |
+      Ensures line-coverage percentage meets a configurable minimum. Reads
+      `.code_quality.coverage_percentage`. Fails if the field is missing.
+    mainPython: min_coverage.py
+    keywords: ["code-quality", "coverage", "line-coverage", "testing"]
+
+  - name: max-duplication
+    description: |
+      Ensures duplicated-lines percentage stays under a configurable maximum.
+      Reads `.code_quality.duplication_percentage`.
+    mainPython: max_duplication.py
+    keywords: ["code-quality", "duplication", "maintainability", "copy-paste"]
+
+  - name: max-severity
+    description: |
+      Ensures no code-quality issues at or above the configured severity
+      threshold. Configure `min_severity` to set the threshold (critical,
+      high, medium, low).
+    mainPython: max_severity.py
+    keywords: ["code-quality", "critical", "high", "issues", "severity"]
+
+  - name: max-total
+    description: |
+      Ensures total code-quality issues are under a configurable threshold.
+    mainPython: max_total.py
+    keywords: ["code-quality", "threshold", "issues", "total"]
+
+inputs:
+  min_severity:
+    description: "Minimum severity to fail on (critical, high, medium, low)"
+    default: "high"
+  max_total_threshold:
+    description: "Maximum total issues allowed (must be configured)"
+  min_coverage_percentage:
+    description: "Minimum line-coverage percentage (0-100)"
+    default: "80"
+  max_duplication_percentage:
+    description: "Maximum duplicated-lines percentage (0-100)"
+    default: "5"
