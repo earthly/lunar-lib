@@ -28,10 +28,11 @@ def main(node=None):
 
         failed_node = gate_node.get_node(".conditions_failed")
         if failed_node.exists():
+            failed_value = failed_node.get_value()
             c.assert_equals(
-                ".code_quality.native.sonarqube.quality_gate.conditions_failed",
+                failed_value,
                 0,
-                "SonarQube quality gate reports failed conditions even though status is OK",
+                f"SonarQube quality gate reports {failed_value} failed condition(s) even though status is OK",
             )
     return c
 

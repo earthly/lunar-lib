@@ -24,7 +24,7 @@ def main(node=None):
             return c
 
         c.assert_equals(
-            ".code_quality.passing",
+            passing_node.get_value(),
             True,
             "Code-quality scan is failing — scanner reported quality gate as not passing.",
         )
