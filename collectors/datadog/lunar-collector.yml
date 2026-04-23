@@ -44,6 +44,29 @@ collectors:
       type: code
     keywords: ["datadog", "monitors", "alerts", "dashboards", "slo", "observability"]
 
+  - name: repo-files
+    description: |
+      Walks the component repository looking for Datadog-as-code JSON files
+      by content fingerprint. Dashboards are identified by a top-level
+      `widgets` array plus a `layout_type` field (the shape produced by
+      Datadog's dashboard JSON export and the `datadog_dashboard_json`
+      Terraform resource). Monitors are identified by a top-level object
+      with `type` (e.g. `metric alert`, `query alert`, `service check`),
+      `query`, and `name` fields. Users can narrow the scan by setting the
+      `find_command` input (e.g. to restrict to a `datadog/` directory); by
+      default the full repo is walked. Writes each matching file's raw JSON
+      (plus its repo path) into
+      `.observability.native.datadog.repo_dashboards` and
+      `.observability.native.datadog.repo_monitors` for users to build
+      custom policies against. This sub-collector does not write to
+      normalized `.observability.dashboard` / `.observability.alerts` paths
+      — the API sub-collector owns those; repo files only surface raw
+      content.
+    mainBash: repo_files.sh
+    hook:
+      type: code
+    keywords: ["datadog", "dashboard-as-code", "monitors-as-code", "repo", "json"]
+
 inputs:
   datadog_site:
     description: >
@@ -63,6 +86,13 @@ inputs:
       are not universally tagged with `service:`, so they must be mapped
       explicitly.
     default: ""
+  find_command:
+    description: >
+      Command used by the `repo-files` sub-collector to enumerate candidate
+      JSON files (must output one path per line). Narrow this to restrict
+      the scan to a subdirectory, e.g.
+      `find ./datadog -type f -name '*.json'`.
+    default: "find . -type f -name '*.json'"
 
 secrets:
   DATADOG_API_KEY:
@@ -103,7 +133,19 @@ example_component_json: |
             "monitors": [ "...list of Datadog monitor objects..." ],
             "dashboard": { "...full Datadog dashboard API response..." },
             "slos": [ "...list of SLO objects..." ]
-          }
+          },
+          "repo_dashboards": [
+            {
+              "path": "datadog/payment-api-overview.json",
+              "dashboard": { "title": "Payment API", "layout_type": "ordered", "widgets": [] }
+            }
+          ],
+          "repo_monitors": [
+            {
+              "path": "datadog/monitors/latency.json",
+              "monitor": { "name": "High p99 latency", "type": "metric alert", "query": "avg(last_5m):..." }
+            }
+          ]
         }
       }
     }
