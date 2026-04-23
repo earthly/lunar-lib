@@ -1,15 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <!-- Helmet dome with flared brim -->
-  <path d="M32 10
-           C20 10 12 18 12 30
-           C12 33 10 35 8 37
-           L8 40
-           L56 40
-           L56 37
-           C54 35 52 33 52 30
-           C52 18 44 10 32 10 Z"
-        fill="black" stroke="black" stroke-width="1" stroke-linejoin="round"/>
+  <!-- Helmet dome -->
+  <path d="M32 10 C18 10 10 20 10 32 L10 35 L54 35 L54 32 C54 20 46 10 32 10 Z" fill="black"/>
+  <!-- Helmet brim (flared, separated from dome by 1-unit gap) -->
+  <path d="M8 37 Q8 40 12 41 L52 41 Q56 40 56 37 L56 36 L8 36 Z" fill="black"/>
   <!-- Chin strap -->
-  <path d="M22 40 L22 48 Q22 54 32 54 Q42 54 42 48 L42 40"
-        fill="none" stroke="black" stroke-width="2" stroke-linecap="round"/>
+  <path d="M22 41 L22 50 Q22 54 32 54 Q42 54 42 50 L42 41" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"/>
+  <!-- Strap buckle -->
+  <rect x="29" y="52" width="6" height="3" rx="0.5" fill="black"/>
 </svg>
