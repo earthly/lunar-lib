@@ -160,6 +160,19 @@ checks:
       directory with `lunar-config.yml`. Honours `cd <dir> && lunar ...`
       prefixes; allows `--help` / `--version` freely.
 
+  - name: gh-issue-guard
+    hook: agent-before-command
+    binary:
+      name: gh
+    run: .lunar/hooks/gh-issue-guard.sh
+    message: >-
+      Block `gh issue create|edit|delete|transfer|develop|lock|unlock` and
+      `gh label create|edit|delete|clone` (and the raw-API / GraphQL
+      equivalents). Earthly projects track issues in Linear; use
+      `bender-linear-create-issue` to create tickets. Read-only
+      `gh issue view|list|comment|close|reopen` and `gh label list` remain
+      allowed.
+
   # ── Agent before-tool-call hooks ──
   # Fire before an agent invokes a named tool (any tool, not just shell).
   # Matcher is the framework's literal tool name — portable in shape but not
