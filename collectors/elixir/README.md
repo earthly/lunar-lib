@@ -26,7 +26,7 @@ This collector writes to the following Component JSON paths:
 | `.lang.elixir.otp_apps` | array | OTP application names (from `application/0`) |
 | `.lang.elixir.test_directory_exists` | boolean | `test/` directory detected |
 | `.lang.elixir.credo_configured` | boolean | `.credo.exs` detected |
-| `.lang.elixir.dialyzer_configured` | boolean | Dialyzer configured via `:dialyxir` dep, `dialyzer/0` block in mix.exs, or a `mix dialyzer` invocation observed in CI |
+| `.lang.elixir.dialyzer_configured` | boolean | Dialyzer configured via `:dialyxir` dep or `dialyzer/0` block in mix.exs (file-based signals only). The bundled `credo-or-dialyzer-configured` policy additionally OR's in `mix dialyzer` invocations from `.lang.elixir.cicd.cmds` — custom policies reading this field directly should consult `cicd.cmds` separately. |
 | `.lang.elixir.formatter_configured` | boolean | `.formatter.exs` detected |
 | `.lang.elixir.frameworks` | array | Frameworks detected from deps (e.g. `["phoenix", "phoenix_live_view", "ecto"]`) |
 | `.lang.elixir.umbrella.is_umbrella` | boolean | Umbrella project flag |

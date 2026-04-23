@@ -46,9 +46,9 @@ policies:
 
   - name: test-directory-exists
     description: |
-      Ensures a `test/` directory exists. Projects without tests skip quietly
-      only when they also lack test helper config — an explicit test dir is
-      the conventional layout for ExUnit.
+      Ensures a `test/` directory exists. An explicit test dir is the
+      conventional layout for ExUnit. Skips on non-Elixir projects when
+      `.lang.elixir` is absent.
     mainPython: test_directory_exists.py
     keywords: ["test/", "exunit", "testing", "test layout"]
 
