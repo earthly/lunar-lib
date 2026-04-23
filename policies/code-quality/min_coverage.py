@@ -37,7 +37,7 @@ def main(node=None):
 
         coverage = float(coverage_node.get_value())
         c.assert_greater_or_equal(
-            ".code_quality.coverage_percentage",
+            coverage,
             threshold,
             f"Line coverage ({coverage}%) below minimum threshold ({threshold}%)",
         )

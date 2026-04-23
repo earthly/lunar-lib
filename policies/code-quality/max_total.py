@@ -37,7 +37,7 @@ def main(node=None):
 
         total_value = total_node.get_value()
         c.assert_less_or_equal(
-            ".code_quality.issues.total",
+            total_value,
             threshold,
             f"Total code-quality issues ({total_value}) exceeds threshold ({threshold})",
         )

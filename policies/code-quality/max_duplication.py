@@ -37,7 +37,7 @@ def main(node=None):
 
         duplication = float(dup_node.get_value())
         c.assert_less_or_equal(
-            ".code_quality.duplication_percentage",
+            duplication,
             threshold,
             f"Duplication ({duplication}%) exceeds maximum threshold ({threshold}%)",
         )
