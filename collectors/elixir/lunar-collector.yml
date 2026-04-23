@@ -4,7 +4,7 @@ name: elixir
 description: Collect Elixir project information, dependencies, CI/CD commands, and test coverage
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:elixir-main
+default_image: earthly/lunar-lib:elixir-bender-eng-544-elixir
 default_image_ci_collectors: native
 
 landing_page:
