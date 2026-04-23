@@ -133,6 +133,14 @@ checks:
       section of `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`.
       CI green is not the finish line for implementation PRs —
       cronos round-trip testing is required.
+  - name: cronos-cheat-sheet
+    hook: agent-session-start
+    run: .lunar/hooks/cronos-cheat-sheet.sh
+    message: >-
+      Cronos hub DB schema, Grafana dashboard UIDs, component-variable
+      gotchas, known traps. Use these instead of re-deriving the schema
+      with `information_schema.columns` queries every ticket.
+
 
   # ── Agent before-command hooks ──
   # Fire before an agent (e.g. Claude Code) executes a shell command in its

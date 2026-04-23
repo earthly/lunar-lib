@@ -132,6 +132,13 @@ Fires once at the start of every agent session (fresh or resumed). Emits a markd
 
 Keeps the playbook as the single source of truth — the hook's job is just to prompt the agent to identify the phase and read the right section. Prevents the "spent hours in spec phase, blew right past the implementation checklist" failure mode observed on ENG-494.
 
+### `cronos-cheat-sheet.sh` — `agent-session-start`
+
+Fires alongside `phase-guidance.sh` at every session start. Emits a reference distilling the non-obvious bits of the cronos testing flow — `hub.*` table schema, Grafana dashboard UIDs, canonical SQL queries, component-variable gotchas, known traps from past PRs.
+
+Exists because implementation-phase sessions kept re-discovering the schema: "which column is `component_id`? is it the UUID or the name? where does the merged blob live?" — 10-15 Bash calls per ticket of `information_schema.columns` queries that cost compute-time without producing evidence. Distilled from BENDER-JOURNAL entries so the knowledge doesn't get re-derived every ticket.
+
+
 ### `lunar-cli-guard.sh` — `agent-before-command`
 
 Blocks `lunar` CLI commands when context is wrong. Declared in `checks.yml` as `agent-before-command` matching `binary.name: lunar`. The script:
