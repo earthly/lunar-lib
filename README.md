@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🌙 lunar-lib
+<a href="https://earthly.dev/lunar"><img src="./.github/lunar-logo.png" alt="Earthly Lunar" width="420" /></a>
+
+# lunar-lib
 
 **The official plugin library for [Earthly Lunar](https://earthly.dev/lunar) — a guardrails engine for the AI era.**
 
