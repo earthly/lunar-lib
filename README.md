@@ -33,7 +33,7 @@ Browse the full catalog at [**earthly.dev/lunar/guardrails/**](https://earthly.d
 
 ## Where to Start
 
-Don't pick plugins one at a time. Start with a **starter pack** — a curated `lunar-config.yml` that's wired up and ready to drop into your repo.
+Start with a **starter pack** — a curated `lunar-config.yml` that's wired up and ready to drop into your repo. You can absolutely cherry-pick individual plugins instead, but most teams get going faster from a bundle and tune from there.
 
 | Tier | What you get | Setup |
 |------|--------------|-------|
