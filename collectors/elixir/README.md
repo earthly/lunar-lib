@@ -60,9 +60,3 @@ collectors:
     # include: [project, dependencies]  # Only include specific subcollectors
 ```
 
-## Notes
-
-- **Umbrella projects**: `project.sh` detects umbrella projects via the `apps_path` declaration in the root `mix.exs` and walks `apps/*/mix.exs` to collect member app names.
-- **Framework detection**: `.lang.elixir.frameworks` is populated from the `deps/0` list in `mix.exs` — adding a dep like `{:phoenix, "~> 1.7"}` appends `"phoenix"` to the array. Currently recognized: `phoenix`, `phoenix_live_view`, `ecto` (and `ecto_sql` → `ecto`). Extend the detection list as new frameworks land.
-- **Dialyzer detection**: `dialyzer_configured` is `true` when any of these is present — `{:dialyxir, ...}` in deps, a `dialyzer/0` keyword block in `mix.exs`, or a `mix dialyzer` command observed in `.lang.elixir.cicd.cmds` (captured by the CI hook).
-- **Skip-safe**: If no Elixir indicators are found (`mix.exs` absent), all sub-collectors exit 0 without writing data.
