@@ -81,6 +81,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.observability.metrics.golden_signals` | Four signals (`latency`, `traffic`, `errors`, `saturation`) |
 | `.observability.dashboard` | Dashboard info (`exists`, `url`) |
 | `.observability.alerts` | Alert config (`configured`, `count`) |
+| `.observability.slo` | SLO info (`defined`, `count`, `has_error_budget`) |
 | `.observability.summary` | Aggregated checks (`golden_signals_complete`, `has_dashboard`) |
 | **[`.oncall`](cat-oncall.md)** | **On-call, incident management, runbooks** |
 | `.oncall.schedule` | Schedule info (`exists`, `participants`, `rotation`) |

@@ -31,6 +31,11 @@ Monitoring, logging, tracing configuration.
       "configured": true,
       "count": 5
     },
+    "slo": {
+      "defined": true,
+      "count": 2,
+      "has_error_budget": true
+    },
     "summary": {
       "has_logging": true,
       "has_metrics": true,
@@ -48,4 +53,5 @@ Monitoring, logging, tracing configuration.
 - `.observability.metrics.golden_signals.<signal>` — Signal monitored
 - `.observability.dashboard.exists` — Dashboard configured
 - `.observability.alerts.configured` — Alerting enabled
+- `.observability.slo.defined` — At least one SLO configured for the service
 - `.observability.summary.golden_signals_complete` — All 4 signals
