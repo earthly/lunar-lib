@@ -19,7 +19,13 @@ COMMAND=$(echo "$INPUT" | jq -r ".tool_input.command // empty")
 # match `gh` at a command-word boundary (line start or after `&`/`|`/`;`),
 # NOT after plain whitespace (which would match `gh` inside quoted
 # strings in echo/printf/--body arguments).
-GH_INVOCATIONS=$(echo "$COMMAND" | grep -oE '(^|[\&\|\;])[[:space:]]*gh([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
+#
+# Before matching, strip leading `FOO=bar ` env assignments so an LLM
+# can't bypass the block with `FOO=1 gh issue create ...`. Those
+# assignments only affect the child process's env, not the hook's
+# authority over whether the binary runs.
+NORMALIZED=$(echo "$COMMAND" | sed -E 's/(^|[\&\|\;])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+/\1/g')
+GH_INVOCATIONS=$(echo "$NORMALIZED" | grep -oE '(^|[\&\|\;])[[:space:]]*gh([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
 [ -z "$GH_INVOCATIONS" ] && exit 0
 
 # For each gh invocation, decide: allow or block?

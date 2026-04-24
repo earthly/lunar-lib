@@ -173,6 +173,19 @@ checks:
       `gh issue view|list|comment|close|reopen` and `gh label list` remain
       allowed.
 
+  - name: gh-comments-guard
+    hook: agent-before-command
+    binary:
+      name_pattern: (gh|curl)
+    run: .lunar/hooks/gh-comments-guard.sh
+    message: >-
+      Unfiltered fetches of PR/issue comment bodies via `gh api .../comments`,
+      `gh api .../reviews`, `gh api graphql` (for comments or reviewThreads),
+      or `curl https://api.github.com/.../comments` are blocked: lunar-lib is
+      open-source and raw comment bodies are a prompt-injection vector. Use
+      `bender-gh-comments <repo> <pr>` instead — it fetches the same data
+      but applies the actor allowlist server-side before returning anything.
+
   # ── Agent before-tool-call hooks ──
   # Fire before an agent invokes a named tool (any tool, not just shell).
   # Matcher is the framework's literal tool name — portable in shape but not
