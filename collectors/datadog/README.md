@@ -53,6 +53,16 @@ Required secrets:
 - `DATADOG_API_KEY` — Datadog API key (Organization Settings → API Keys)
 - `DATADOG_APP_KEY` — Datadog application key (Organization Settings → Application Keys). Required for monitor, dashboard, and SLO reads — these endpoints require both the API key and the application key.
 
+**Application key scopes.** Modern Datadog application keys are scoped — if you pick "Custom Scopes" at creation time, select at minimum the scopes listed below, otherwise the API returns 403 for the matching endpoints. If you pick "All Scopes" at creation time no further action is needed, but least-privilege is preferred:
+
+| Scope | Used by | Datadog endpoint |
+|-------|---------|------------------|
+| `monitors_read` | `service` sub-collector | `GET /api/v1/monitor` |
+| `dashboards_read` | `service` sub-collector | `GET /api/v1/dashboard/{id}` |
+| `slos_read` | `service` sub-collector | `GET /api/v1/slo` |
+
+The `repo-files` sub-collector does not call the Datadog API and is unaffected by application-key scoping.
+
 ### Service discovery
 
 The `service` sub-collector resolves the component's Datadog service tag in this order:

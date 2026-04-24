@@ -106,7 +106,10 @@ secrets:
     description: >
       Datadog application key (from Organization Settings → Application
       Keys). Required for monitor, dashboard, and SLO reads — these
-      endpoints require both `DD-API-KEY` and `DD-APPLICATION-KEY` headers.
+      endpoints require both `DD-API-KEY` and `DD-APPLICATION-KEY`
+      headers. If created with custom scopes, the key must include
+      `monitors_read`, `dashboards_read`, and `slos_read`; otherwise
+      the corresponding endpoint returns 403.
 
 example_component_json: |
   {
