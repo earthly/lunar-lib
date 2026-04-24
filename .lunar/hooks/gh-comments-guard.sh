@@ -59,8 +59,15 @@ fi
 # affect the child process's env, not the hook's own env, so our
 # $BENDER_GH_COMMENTS_INTERNAL check below still remains the authority
 # on whether this is a sanctioned invocation.
-NORMALIZED=$(echo "$COMMAND" | sed -E 's/(^|[\&\|\;])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)+/\1/g')
-INVOCATIONS=$(echo "$NORMALIZED" | grep -oE '(^|[\&\|\;])[[:space:]]*(gh|curl)([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
+# Strip leading env-var assignments, but only when the value doesn't
+# start with `$(` or backtick — otherwise we'd chew into a command
+# substitution and miss the invocation inside it.
+NORMALIZED=$(echo "$COMMAND" | sed -E 's/(^|[\&\|\;\(`])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=([^[:space:]$`]|\$[^(])*[[:space:]]+)+/\1/g')
+# Boundary class includes `(` and backtick so command substitution
+# (`URL=$(gh api ...)`, backtick-gh-backtick) can't bypass the scanner.
+# Terminator class includes `)` and backtick so the capture stops at the
+# outer substitution boundary.
+INVOCATIONS=$(echo "$NORMALIZED" | grep -oE '(^|[\&\|\;\(`])[[:space:]]*(gh|curl)([[:space:]][^|&;)`]*)?' | sed -E 's/^[[:space:]&|;(`]*//')
 [ -z "$INVOCATIONS" ] && exit 0
 
 # Helper: emit the block message + exit 2. $1 is a short reason for the log.

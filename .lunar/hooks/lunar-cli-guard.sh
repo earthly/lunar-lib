@@ -10,12 +10,13 @@ CWD=$(echo "$INPUT" | jq -r ".cwd // empty")
 # Extract actual lunar CLI invocations (not "lunar" appearing in paths,
 # filenames, string literals, etc). Match `lunar` only at the start of a
 # command word, which at the byte level means: beginning of line, or
-# immediately after a shell separator (`&`, `|`, `;`). We deliberately
-# DO NOT treat plain whitespace as a command-word boundary, because that
-# would also match "lunar" inside quoted strings (commit messages,
-# `echo`/`printf` arguments, `gh pr create --body ...`, etc.) — see
-# Claude-review feedback on PR #140.
-LUNAR_INVOCATIONS=$(echo "$COMMAND" | grep -oE '(^|[\&\|\;])[[:space:]]*lunar([[:space:]][^|&;]*)?' | sed -E 's/^[[:space:]&|;]*//')
+# immediately after a shell separator (`&`, `|`, `;`), or after `(` or
+# backtick (command substitution: `$(lunar …)`, `` `lunar …` ``). We
+# deliberately DO NOT treat plain whitespace as a command-word boundary,
+# because that would also match "lunar" inside quoted strings (commit
+# messages, `echo`/`printf` arguments, `gh pr create --body ...`, etc.) —
+# see Claude-review feedback on PR #140 and #152.
+LUNAR_INVOCATIONS=$(echo "$COMMAND" | grep -oE '(^|[\&\|\;\(`])[[:space:]]*lunar([[:space:]][^|&;)`]*)?' | sed -E 's/^[[:space:]&|;(`]*//')
 [ -z "$LUNAR_INVOCATIONS" ] && exit 0
 
 # If every lunar invocation is --help / --version / `lunar` alone, skip checks.
