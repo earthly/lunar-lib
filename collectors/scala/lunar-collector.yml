@@ -1,0 +1,133 @@
+version: 0
+
+name: scala
+description: Collect Scala project information, dependencies, CI/CD commands, and test coverage
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:scala-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Scala Collector"
+  long_description: |
+    Analyze Scala projects to collect project metadata, dependencies, CI/CD
+    command tracking, and test coverage. Supports sbt (majority), Mill, and
+    Maven (via scala-maven-plugin). Detects cross-version builds, test
+    frameworks (ScalaTest, MUnit, Specs2), and data-engineering frameworks
+    (Spark, Akka, Cats).
+  categories: ["languages", "build"]
+  icon: "assets/scala.svg"
+  status: "beta"
+  related:
+    - slug: "scala"
+      type: "policy"
+      reason: "Scala project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Scala project structure by detecting build.sbt, project/build.properties,
+      build.sc (Mill), pom.xml (with scala-maven-plugin), build.gradle(.kts), .scalafmt.conf,
+      and the test source directory. Parses Scala version (`scalaVersion`), sbt version,
+      Mill version, project name/version, cross-build versions (`crossScalaVersions`),
+      detected test frameworks, and framework flags (Spark, Akka, Cats).
+      Writes project metadata to .lang.scala.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["scala", "sbt", "mill", "build.sbt", "build.sc", "scala-maven-plugin", "cross-version", "spark", "akka"]
+
+  - name: dependencies
+    description: |
+      Extracts direct dependencies from build.sbt (libraryDependencies),
+      build.sc (Mill ivyDeps), and pom.xml. When build.sbt.lock or sbt-lock
+      output is present, also extracts resolved transitive versions.
+      Writes dependency data to .lang.scala.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["scala dependencies", "sbt dependencies", "mill dependencies", "ivy", "supply chain"]
+
+  - name: cicd
+    description: |
+      Records every sbt and mill command executed in CI pipelines along with
+      the build tool version. Writes command strings and version info to
+      .lang.scala.cicd for audit trails and build reproducibility analysis.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(sbt|mill)$
+    keywords: ["scala ci", "sbt ci", "mill ci", "ci commands", "build tracking"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from scoverage XML reports
+      (target/scala-*/scoverage-report/scoverage.xml) after sbt or Mill
+      test runs complete. Parses coverage reports and writes results to
+      .lang.scala.tests.coverage and the normalized .testing.coverage path.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(sbt|mill)$
+      args:
+        - value_pattern: ^(test|coverage|coverageReport|.+/test|.+/coverage)$
+    keywords: ["scoverage", "scala test coverage", "sbt test", "mill test", "coverage metrics"]
+
+example_component_json: |
+  {
+    "lang": {
+      "scala": {
+        "version": "2.13.12",
+        "build_systems": ["sbt"],
+        "build_sbt_exists": true,
+        "build_properties_exists": true,
+        "build_sc_exists": false,
+        "pom_xml_exists": false,
+        "scalafmt_configured": true,
+        "lockfile_exists": true,
+        "test_directory_exists": true,
+        "project_name": "my-app",
+        "project_version": "0.1.0",
+        "sbt_version": "1.9.7",
+        "mill_version": null,
+        "cross_scala_versions": ["2.13.12", "3.3.1"],
+        "is_cross_build": true,
+        "test_frameworks": ["scalatest", "munit"],
+        "frameworks": ["spark", "cats"],
+        "source": { "tool": "sbt", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "sbt clean test", "version": "1.9.7" },
+            { "cmd": "sbt coverage test coverageReport", "version": "1.9.7" }
+          ]
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 78.4,
+            "source": { "tool": "scoverage", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "org.scalatest:scalatest", "version": "3.2.18" },
+            { "path": "org.apache.spark:spark-core", "version": "3.5.0" }
+          ],
+          "transitive": [
+            { "path": "org.scala-lang:scala-library", "version": "2.13.12" }
+          ],
+          "source": { "tool": "sbt", "integration": "code" }
+        }
+      }
+    },
+    "testing": {
+      "coverage": {
+        "percentage": 78.4,
+        "source": { "tool": "scoverage", "integration": "ci" }
+      }
+    }
+  }
