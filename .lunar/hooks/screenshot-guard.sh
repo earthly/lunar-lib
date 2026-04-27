@@ -16,16 +16,16 @@
 # of python/playwright/chromium. The matcher is intentionally narrow — running
 # a Playwright test suite or unrelated Python code is fine.
 #
+# Decisions are made per-invocation (each `&&`/`||`/`;`/`|`-separated segment
+# in the command), modelled on the sibling `gh-issue-guard.sh`. That way a
+# benign `bender-screenshot --help` cannot be chained to whitelist a follow-on
+# raw screenshot call (PR #153 review feedback).
+#
 # Exit 0 = allow, Exit 2 = block (stderr rendered to the agent).
 
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r ".tool_input.command // empty")
 [ -z "$COMMAND" ] && exit 0
-
-# Already routed through the validating wrapper → allow.
-if echo "$COMMAND" | grep -qE '(^|[[:space:]&|;(`])bender-screenshot([[:space:]]|$)'; then
-  exit 0
-fi
 
 emit_block() {
   local kind="$1"
@@ -57,26 +57,81 @@ emit_block() {
   exit 2
 }
 
-# (1) Inline python with playwright + page.screenshot(
-#     Match python -c "..." or python3 -c "..." OR python heredoc patterns.
-#     We grep the whole COMMAND text — quoting/escaping is the agent's
-#     problem; if `page.screenshot(` appears alongside `playwright`, that's
-#     a screenshot call regardless of how it's wrapped.
-if echo "$COMMAND" | grep -qE '(^|[[:space:]&|;(`])python3?([[:space:]]|$)' \
-   && echo "$COMMAND" | grep -qE 'playwright' \
-   && echo "$COMMAND" | grep -qE '\.screenshot[[:space:]]*\('; then
-  emit_block "inline Python with \`page.screenshot(...)\` (Playwright)"
-fi
+# ---------- Strip leading env-var assignments per segment ----------
+# Same approach as gh-issue-guard.sh: an LLM could otherwise bypass with
+# `FOO=1 chromium --screenshot=...`. KEY=VAL prefixes only affect the
+# child process's env, not whether the binary runs.
+NORMALIZED=$(echo "$COMMAND" | sed -E 's/(^|[\&\|\;\(`])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=([^[:space:]$`]|\$[^(])*[[:space:]]+)+/\1/g')
 
-# (2) `playwright` CLI with the `screenshot` verb
-#     `playwright screenshot URL output.png` is the documented invocation.
-if echo "$COMMAND" | grep -qE '(^|[[:space:]&|;(`])playwright[[:space:]]+screenshot([[:space:]]|$)'; then
-  emit_block "\`playwright screenshot\` CLI"
-fi
+# ---------- Capture each invocation of a binary we care about ----------
+# Boundary class includes `/` so path-prefixed binaries (`/usr/bin/python`)
+# anchor correctly. Optional path prefix `([^[:space:]&|;()`]*/)?` matches
+# any directory components before the basename. Python binary alternation
+# accepts versioned names (`python3.11`, `python3.10`, `python`) via
+# `python([0-9]+(\.[0-9]+)*)?`. Trailing args group greedy-matches up to
+# the next shell separator.
+INVOCATIONS=$(
+  echo "$NORMALIZED" \
+    | grep -oE '(^|[\&\|\;\(`])[[:space:]]*([^[:space:]&|;()`]*/)?(python([0-9]+(\.[0-9]+)*)?|playwright|chromium-browser|chromium|google-chrome|chrome|bender-screenshot)([[:space:]][^|&;)`]*)?' \
+    | sed -E 's/^[[:space:]&|;(`]*//'
+)
+[ -z "$INVOCATIONS" ] && exit 0
 
-# (3) Headless Chromium with --screenshot= flag
-if echo "$COMMAND" | grep -qE '(^|[[:space:]&|;(`])(chromium|chrome|google-chrome|chromium-browser)([[:space:]][^|&;)`]*)?--screenshot(=|[[:space:]])'; then
-  emit_block "headless Chromium \`--screenshot=\` flag"
-fi
+# ---------- Per-invocation decision ----------
+while IFS= read -r INVOCATION; do
+  [ -z "$INVOCATION" ] && continue
+
+  # First token is the binary (with optional path prefix).
+  FIRST_TOKEN=$(echo "$INVOCATION" | awk '{print $1}')
+  BIN=$(basename -- "$FIRST_TOKEN" 2>/dev/null)
+  [ -z "$BIN" ] && continue
+
+  case "$BIN" in
+    bender-screenshot)
+      # Already routed through the validating wrapper — pass this invocation.
+      continue
+      ;;
+
+    python|python[0-9]*)
+      # (1) Inline python with playwright + page.screenshot(
+      # We grep the WHOLE COMMAND text — quoting/escaping is the agent's
+      # problem; if `page.screenshot(` appears alongside `playwright`, that's
+      # a screenshot call regardless of how it's wrapped.
+      if echo "$COMMAND" | grep -qE 'playwright' \
+         && echo "$COMMAND" | grep -qE '\.screenshot[[:space:]]*\('; then
+        emit_block "inline Python with \`page.screenshot(...)\` (Playwright)"
+      fi
+      ;;
+
+    playwright)
+      # (2) `playwright screenshot URL output.png`
+      VERB=$(echo "$INVOCATION" | awk '{print $2}')
+      if [ "$VERB" = "screenshot" ]; then
+        emit_block "\`playwright screenshot\` CLI"
+      fi
+      ;;
+
+    chromium|chromium-browser|chrome|google-chrome)
+      # (3) Headless Chromium with --screenshot flag.
+      # Tokenize on whitespace (shell word-splitting) and check whether
+      # any token equals `--screenshot` or starts with `--screenshot=`.
+      # This avoids false-positives on URLs whose query strings happen to
+      # contain the literal substring `--screenshot=` (PR #153 review).
+      # shellcheck disable=SC2086  # deliberate word-splitting of the invocation
+      set -- $INVOCATION
+      shift  # drop the binary itself
+      for tok in "$@"; do
+        # Strip surrounding single/double quotes if any.
+        clean="${tok#\"}"; clean="${clean%\"}"
+        clean="${clean#\'}"; clean="${clean%\'}"
+        case "$clean" in
+          --screenshot|--screenshot=*)
+            emit_block "headless Chromium \`--screenshot=\` flag"
+            ;;
+        esac
+      done
+      ;;
+  esac
+done <<< "$INVOCATIONS"
 
 exit 0
