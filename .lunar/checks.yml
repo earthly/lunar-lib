@@ -111,12 +111,16 @@ checks:
     hook: agent-after-file-edit-nudge
     on: "**/*screenshot*"
     message: >-
-      Reminder: Screenshots uploaded to PRs must be scrolled to show the
-      RELEVANT data, not the default top-of-page view. Dashboard screenshots
-      should show the specific collector/policy results being tested. Component
-      JSON screenshots should show the namespace/keys being verified. If the
-      data is too large for one screen, capture the section that serves as an
-      end-to-end smoke test.
+      Reminder: PR-evidence screenshots must go through `bender-screenshot`
+      (not raw Playwright `page.screenshot()`). The wrapper takes a JSON spec
+      with `must_be_visible` strings and refuses to save unless every one is
+      actually inside the final viewport — which catches the recurring failure
+      mode of posting top-of-page screenshots that hide the tested data
+      (PR #142). Use `scroll_to_text` to land on the relevant row/key; for
+      virtualized tables (Grafana checks panel) the wrapper scrolls the grid
+      container until the row materializes. The `screenshot-guard`
+      agent-before-command hook will block raw `playwright`/`chromium`
+      screenshot calls — route them through `bender-screenshot --spec` instead.
 
   # ── Agent session-start hooks ──
   # Fire once when an agent session begins (including `claude -p` headless
@@ -172,6 +176,19 @@ checks:
       `bender-linear-create-issue` to create tickets. Read-only
       `gh issue view|list|comment|close|reopen` and `gh label list` remain
       allowed.
+
+  - name: screenshot-guard
+    hook: agent-before-command
+    binary:
+      name_pattern: (python|python3|playwright|chromium|chrome|google-chrome|chromium-browser)
+    run: .lunar/hooks/screenshot-guard.sh
+    message: >-
+      Block raw Playwright `page.screenshot(...)` and `chromium --screenshot=`
+      calls; force PR-evidence screenshots through `bender-screenshot --spec`,
+      which validates every string in `must_be_visible` is actually in the
+      final viewport before saving. Allows non-screenshot uses of
+      python/playwright/chromium and any invocation of `bender-screenshot`
+      itself.
 
   - name: gh-comments-guard
     hook: agent-before-command
