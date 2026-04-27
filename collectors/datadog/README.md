@@ -87,6 +87,8 @@ When the UUID resolves but the dashboard does not exist in Datadog, `.observabil
 
 The `datadog_site` input selects which Datadog region to call. Defaults to `datadoghq.com` (US1). Supported values include `datadoghq.eu` (EU1), `us3.datadoghq.com` (US3), `us5.datadoghq.com` (US5), and `ap1.datadoghq.com` (AP1). The collector builds API URLs as `https://api.<site>` and dashboard links as `https://app.<site>/dashboard/<id>`.
 
+If you are running outside of `lunar collect` and want to override the site without rewriting `lunar-config.yml`, set the `DATADOG_SITE` environment variable. Resolution order is `datadog_site` input → `DATADOG_SITE` env var → `datadoghq.com` default. Wrong-region requests return `401 Unauthorized`, which is the most common cause of 4xx errors when keys are otherwise valid.
+
 ### Repo file discovery (the `repo-files` sub-collector)
 
 The `repo-files` sub-collector walks the cloned component repo and identifies Datadog-as-code JSON files by content fingerprint:

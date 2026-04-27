@@ -27,7 +27,7 @@ if [ -z "${LUNAR_SECRET_DATADOG_API_KEY:-}" ] || [ -z "${LUNAR_SECRET_DATADOG_AP
   exit 0
 fi
 
-SITE="${LUNAR_VAR_DATADOG_SITE:-datadoghq.com}"
+SITE="${LUNAR_VAR_DATADOG_SITE:-${DATADOG_SITE:-datadoghq.com}}"
 API_BASE="https://api.${SITE}"
 APP_BASE="https://app.${SITE}"
 
