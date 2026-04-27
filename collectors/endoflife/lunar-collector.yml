@@ -1,0 +1,140 @@
+version: 0
+
+name: endoflife
+description: Detect runtime versions and check end-of-life status via the endoflife.date API
+
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "endoflife.date Collector"
+  long_description: |
+    Detects the runtime/SDK version a component pins (Node.js, Python, Ruby,
+    Go, Java, .NET, PHP) by inspecting standard repo files (`.go-version`,
+    `go.mod`, `.python-version`, `pyproject.toml`, `.ruby-version`, `Gemfile`,
+    `.nvmrc`, `package.json`, `.java-version`, `pom.xml`, `build.gradle`,
+    `global.json`, `*.csproj`, `composer.json`). Resolves each detected
+    version against https://endoflife.date for the matching cycle and writes
+    normalized EOL/support data to `.lang.<language>.eol`. Catches
+    components pinned to runtimes that are past end-of-life or out of
+    active support — typical "neglected legacy service" smell.
+  categories: ["dependencies"]
+  icon: "assets/endoflife.svg"
+  status: "beta"
+  related:
+    - slug: "endoflife"
+      type: "policy"
+      reason: "Enforces runtime EOL and active-support guardrails using this collector's data"
+
+collectors:
+  - name: runtime
+    description: |
+      Walks the cloned repo for runtime version pins across Node.js, Python,
+      Ruby, Go, Java, .NET, and PHP. For each detected runtime, queries
+      https://endoflife.date/api/<product>.json and matches the detected
+      version to a cycle (e.g. Go `1.21.5` → cycle `1.21`). Writes the
+      normalized result to `.lang.<language>.eol` with `cycle`,
+      `detected_version`, `is_eol`, `is_supported`, `eol_date`,
+      `support_until`, `lts`, `latest_in_cycle`, and `source`. Stores the
+      raw matched cycle object under `.lang.<language>.native.endoflife`.
+      Runs on the `code` hook so the data refreshes on every push without
+      depending on a separate cron schedule. If no runtime can be resolved
+      for a given language, the language is silently skipped — only
+      languages with a confirmed pin produce output.
+    mainBash: runtime.sh
+    hook:
+      type: code
+    keywords: ["endoflife", "eol", "runtime", "lifecycle", "support", "node", "python", "ruby", "go", "java", "dotnet", "php"]
+
+inputs:
+  endoflife_base_url:
+    description: >
+      endoflife.date API base URL. Override only if you proxy/mirror the
+      API internally.
+    default: "https://endoflife.date/api"
+  java_product:
+    description: >
+      endoflife.date product slug used for Java. There is no generic `java`
+      product — pick the JDK distribution that matches your runtime.
+      Common values: `eclipse-temurin` (default), `amazon-corretto`,
+      `azul-zulu`, `microsoft-build-of-openjdk`, `redhat-build-of-openjdk`,
+      `oracle-jdk`, `sapmachine`, `bellsoft-liberica`, `ibm-semeru-runtime`.
+    default: "eclipse-temurin"
+  dotnet_product:
+    description: >
+      endoflife.date product slug used for .NET. Use `dotnet` for modern
+      .NET (.NET 5+, .NET Core) or `dotnetfx` for legacy .NET Framework.
+    default: "dotnet"
+
+# No secrets — endoflife.date is a public API.
+
+example_component_json: |
+  {
+    "lang": {
+      "go": {
+        "version": "1.21",
+        "eol": {
+          "source": {
+            "tool": "endoflife.date",
+            "integration": "api",
+            "collected_at": "2026-04-27T12:00:00Z"
+          },
+          "product": "go",
+          "cycle": "1.21",
+          "detected_version": "1.21",
+          "is_eol": true,
+          "is_supported": false,
+          "eol_date": "2024-08-13",
+          "support_until": null,
+          "lts": false,
+          "latest_in_cycle": "1.21.13"
+        },
+        "native": {
+          "endoflife": {
+            "product": "go",
+            "cycle": {
+              "cycle": "1.21",
+              "releaseDate": "2023-08-08",
+              "eol": "2024-08-13",
+              "latest": "1.21.13",
+              "latestReleaseDate": "2024-08-06",
+              "lts": false
+            }
+          }
+        }
+      },
+      "nodejs": {
+        "version": "20.11.1",
+        "eol": {
+          "source": {
+            "tool": "endoflife.date",
+            "integration": "api",
+            "collected_at": "2026-04-27T12:00:00Z"
+          },
+          "product": "nodejs",
+          "cycle": "20",
+          "detected_version": "20.11.1",
+          "is_eol": false,
+          "is_supported": false,
+          "eol_date": "2026-04-30",
+          "support_until": "2024-10-22",
+          "lts": true,
+          "latest_in_cycle": "20.19.0"
+        },
+        "native": {
+          "endoflife": {
+            "product": "nodejs",
+            "cycle": {
+              "cycle": "20",
+              "releaseDate": "2023-04-18",
+              "lts": "2023-10-24",
+              "eol": "2026-04-30",
+              "latest": "20.19.0",
+              "support": "2024-10-22"
+            }
+          }
+        }
+      }
+    }
+  }
