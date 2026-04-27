@@ -1,7 +1,7 @@
 version: 0
 
 name: endoflife
-description: Detect runtime versions and check end-of-life status via the endoflife.date API
+description: Resolve detected runtime versions against endoflife.date for EOL and active-support status
 
 author: support@earthly.dev
 
@@ -10,11 +10,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "endoflife.date Collector"
   long_description: |
-    Detects pinned runtime versions (Node.js, Python, Ruby, Go, Java, .NET,
-    PHP) from standard repo files and resolves each against
-    https://endoflife.date. Writes EOL/support data to
-    `.lang.<language>.eol` so policies can flag services running on EOL
-    or out-of-support runtimes.
+    Reads `.lang.<language>.version` populated by per-language
+    collectors (golang, nodejs, python, ruby, java, dotnet, php, …) and
+    resolves each against https://endoflife.date. Writes EOL/support
+    data to `.lang.<language>.eol` so policies can flag services pinned
+    to EOL or out-of-support runtimes.
   categories: ["languages"]
   icon: "assets/endoflife.svg"
   status: "beta"
@@ -26,18 +26,20 @@ landing_page:
 collectors:
   - name: runtime
     description: |
-      Walks the cloned repo for runtime version pins across Node.js, Python,
-      Ruby, Go, Java, .NET, and PHP. For each detected runtime, queries
-      https://endoflife.date/api/<product>.json and matches the detected
-      version to a cycle (e.g. Go `1.21.5` → cycle `1.21`). Writes the
-      normalized result to `.lang.<language>.eol` with `cycle`,
-      `detected_version`, `is_eol`, `is_supported`, `eol_date`,
-      `support_until`, `lts`, `latest_in_cycle`, and `source`. Stores the
-      raw matched cycle object under `.lang.<language>.native.endoflife`.
-      Runs on the `code` hook so the data refreshes on every push without
-      depending on a separate cron schedule. If no runtime can be resolved
-      for a given language, the language is silently skipped — only
-      languages with a confirmed pin produce output.
+      Reads the persisted component JSON via `lunar component get-json
+      $LUNAR_COMPONENT_ID`, iterates the configured `language_products`
+      map, and for each entry where `.lang.<language>.version` is
+      populated by an upstream language collector, looks up the matching
+      cycle on `https://endoflife.date/api/<product>.json` (e.g. Go
+      `1.21.5` → cycle `1.21`). Writes the normalized result to
+      `.lang.<language>.eol` with `cycle`, `detected_version`, `is_eol`,
+      `is_supported`, `eol_date`, `support_until`, `lts`,
+      `latest_in_cycle`, and `source`. Stores the raw matched cycle
+      object under `.lang.<language>.native.endoflife`. Runs on the
+      `code` hook so data refreshes on every push without a separate
+      cron schedule. Adding coverage for a new language plugin requires
+      no code changes here — append the language and its endoflife.date
+      product slug to the `language_products` input.
     mainBash: runtime.sh
     hook:
       type: code
@@ -49,19 +51,26 @@ inputs:
       endoflife.date API base URL. Override only if you proxy/mirror the
       API internally.
     default: "https://endoflife.date/api"
-  java_product:
+  language_products:
     description: >
-      endoflife.date product slug used for Java. There is no generic `java`
-      product — pick the JDK distribution that matches your runtime.
-      Common values: `eclipse-temurin` (default), `amazon-corretto`,
+      Map from `.lang.<language>` key to endoflife.date product slug.
+      For each entry, the collector reads `.lang.<language>.version`
+      from the component's persisted JSON and queries
+      `<endoflife_base_url>/<product>.json`. Add an entry here to cover
+      a new language plugin without touching this collector's code.
+      Java has no generic `java` product on endoflife.date — choose a
+      JDK distribution slug (`eclipse-temurin`, `amazon-corretto`,
       `azul-zulu`, `microsoft-build-of-openjdk`, `redhat-build-of-openjdk`,
-      `oracle-jdk`, `sapmachine`, `bellsoft-liberica`, `ibm-semeru-runtime`.
-    default: "eclipse-temurin"
-  dotnet_product:
-    description: >
-      endoflife.date product slug used for .NET. Use `dotnet` for modern
-      .NET (.NET 5+, .NET Core) or `dotnetfx` for legacy .NET Framework.
-    default: "dotnet"
+      `oracle-jdk`, `sapmachine`, `bellsoft-liberica`, `ibm-semeru-runtime`).
+      `dotnet` covers .NET 5+; use `dotnetfx` for legacy .NET Framework.
+    default:
+      go: "go"
+      nodejs: "nodejs"
+      python: "python"
+      ruby: "ruby"
+      java: "eclipse-temurin"
+      dotnet: "dotnet"
+      php: "php"
 
 # No secrets — endoflife.date is a public API.
 
