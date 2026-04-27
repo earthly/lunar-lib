@@ -10,11 +10,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "End-of-Life Runtime Guardrails"
   long_description: |
-    Enforce that components are pinned to runtime versions that are still
-    receiving updates from upstream. Two checks: a runtime is not past
-    its end-of-life date, and a runtime is still in active support
-    (not just security-only maintenance). Works on the data written by
-    the `endoflife` collector under `.lang.<language>.eol`.
+    Enforce that runtime versions are still maintained upstream. Two
+    checks: not past end-of-life, and still in active support (not just
+    security-only maintenance). Reads the `endoflife` collector's
+    `.lang.<language>.eol` data.
   category: "security-and-compliance"
   icon: "assets/endoflife.svg"
   status: "beta"

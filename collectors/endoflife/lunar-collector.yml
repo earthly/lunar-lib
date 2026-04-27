@@ -10,16 +10,12 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "endoflife.date Collector"
   long_description: |
-    Detects the runtime/SDK version a component pins (Node.js, Python, Ruby,
-    Go, Java, .NET, PHP) by inspecting standard repo files (`.go-version`,
-    `go.mod`, `.python-version`, `pyproject.toml`, `.ruby-version`, `Gemfile`,
-    `.nvmrc`, `package.json`, `.java-version`, `pom.xml`, `build.gradle`,
-    `global.json`, `*.csproj`, `composer.json`). Resolves each detected
-    version against https://endoflife.date for the matching cycle and writes
-    normalized EOL/support data to `.lang.<language>.eol`. Catches
-    components pinned to runtimes that are past end-of-life or out of
-    active support — typical "neglected legacy service" smell.
-  categories: ["dependencies"]
+    Detects pinned runtime versions (Node.js, Python, Ruby, Go, Java, .NET,
+    PHP) from standard repo files and resolves each against
+    https://endoflife.date. Writes EOL/support data to
+    `.lang.<language>.eol` so policies can flag services running on EOL
+    or out-of-support runtimes.
+  categories: ["languages"]
   icon: "assets/endoflife.svg"
   status: "beta"
   related:
