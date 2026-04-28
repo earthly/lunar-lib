@@ -41,6 +41,16 @@ policies:
     mainPython: scala_version_pinned.py
     keywords: ["scalaVersion", "scala compiler", "version pinning"]
 
+  - name: min-scala-version
+    description: |
+      Ensures the declared Scala compiler version meets the configured
+      minimum (default: "2.12"). Reads `.lang.scala.version` (parsed from
+      `scalaVersion` / `<scala.version>` / Mill `def scalaVersion`). Skips
+      when the version is not detected — pair with `scala-version-pinned`
+      if you want presence to be enforced too.
+    mainPython: min_scala_version.py
+    keywords: ["scalaVersion", "scala compiler", "version floor", "compatibility"]
+
   - name: sbt-version-set
     description: |
       Ensures `project/build.properties` pins the sbt version (e.g.
@@ -48,6 +58,16 @@ policies:
       and Maven-only projects.
     mainPython: sbt_version_set.py
     keywords: ["sbt.version", "build.properties", "sbt"]
+
+  - name: min-sbt-version
+    description: |
+      Ensures the sbt version pinned in `project/build.properties` meets
+      the configured minimum (default: "1.9"). Reads `.lang.scala.sbt_version`.
+      Skips for Mill-only and Maven-only projects, and when the sbt version
+      is not detected — pair with `sbt-version-set` if you want presence to
+      be enforced too.
+    mainPython: min_sbt_version.py
+    keywords: ["sbt.version", "build.properties", "sbt", "version floor", "compatibility"]
 
   - name: dependencies-locked
     description: |
@@ -74,4 +94,15 @@ policies:
     mainPython: scalafmt_configured.py
     keywords: ["scalafmt", "formatting", "code style"]
 
-inputs: {}
+inputs:
+  min_scala_version:
+    description: |
+      Minimum required Scala compiler version (e.g., "2.12", "2.13", "3.3.1").
+      Compared with semantic-version semantics — "2.13" matches 2.13.x and 3.x,
+      but rejects 2.11.x.
+    default: "2.12"
+  min_sbt_version:
+    description: |
+      Minimum required sbt version (e.g., "1.9", "1.10.0"). Compared with
+      semantic-version semantics. Skipped when the project does not use sbt.
+    default: "1.9"

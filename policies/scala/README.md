@@ -14,7 +14,9 @@ This plugin provides the following policies (use `include` to select a subset):
 |--------|-------------|-----------------|
 | `build-tool-manifest-exists` | Validates `build.sbt`, `build.sc`, or `pom.xml` exists | Project lacks a recognised Scala build manifest |
 | `scala-version-pinned` | Validates Scala compiler version is declared | Missing `scalaVersion` declaration |
+| `min-scala-version` | Validates declared Scala version meets `min_scala_version` (default `2.12`) | Scala version below the configured minimum |
 | `sbt-version-set` | Validates `project/build.properties` pins sbt version | Missing or empty `sbt.version` (sbt projects only) |
+| `min-sbt-version` | Validates pinned sbt version meets `min_sbt_version` (default `1.9`) | sbt version below the configured minimum (sbt projects only) |
 | `dependencies-locked` | Validates lockfile is present (sbt-lock or equivalent) | No lockfile committed (informational) |
 | `test-module-exists` | Validates `src/test/scala` (or cross-version variant) exists | No test sources detected |
 | `scalafmt-configured` | Validates `.scalafmt.conf` is committed | scalafmt not configured (informational) |
@@ -92,7 +94,9 @@ policies:
 **Failure messages:**
 - `"No Scala build manifest found. Add build.sbt (sbt), build.sc (Mill), or pom.xml with scala-maven-plugin."`
 - `"Scala compiler version not declared. Add 'scalaVersion := \"2.13.12\"' to build.sbt or set <scala.version> in pom.xml."`
+- `"Scala version 2.11.12 is below minimum 2.12. Update scalaVersion in build.sbt."`
 - `"sbt version not pinned. Create project/build.properties with 'sbt.version=1.9.7'."`
+- `"sbt version 1.6.2 is below minimum 1.9. Update project/build.properties."`
 - `"No dependency lockfile found. Run 'sbt lock' (with sbt-lock) or commit build.sbt.lock for reproducible builds."`
 - `"No test sources found. Create src/test/scala/ and add ScalaTest, MUnit, or Specs2 tests."`
 - `"scalafmt not configured. Add .scalafmt.conf at the repo root for consistent formatting."`
@@ -109,10 +113,20 @@ policies:
 2. In `build.sc` (Mill): set `def scalaVersion = "2.13.12"` on your module
 3. In `pom.xml`: set `<scala.version>2.13.12</scala.version>` and use it in the scala-maven-plugin config
 
+### min-scala-version
+1. Update `scalaVersion` in `build.sbt` (or the equivalent in `build.sc` / `pom.xml`) to a version at or above `min_scala_version`
+2. Run `sbt clean test` (or your equivalent) to verify the project still builds and passes tests on the new version
+3. For cross-builds, ensure every entry in `crossScalaVersions` also meets the minimum
+
 ### sbt-version-set
 1. Create `project/build.properties`
 2. Add `sbt.version=1.9.7` (or the desired version)
 3. Commit the file
+
+### min-sbt-version
+1. Update `sbt.version` in `project/build.properties` to a version at or above `min_sbt_version`
+2. Run `sbt --version` locally to confirm the launcher resolves the new version
+3. Re-run CI to confirm reproducibility
 
 ### dependencies-locked
 1. Add the sbt-lock plugin to `project/plugins.sbt`:
