@@ -60,15 +60,34 @@ checks:
     run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
     message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
 
-  # ── Session-end checks (agent-session-end) ──
-  # Fire once at the end of a session if any changed file matches `on:`.
-  # Use for expensive validations whose cost doesn't scale with per-file granularity.
+  # The four checks below run the same Python validators that `earthly +lint`
+  # invokes in CI. Calling them directly (~120ms each, ~700ms for all four)
+  # avoids the ~30s buildkitd warmup the Earthly target needs and lets us
+  # catch lint failures at file-edit time instead of after-the-fact in CI.
 
-  - name: lint
-    hook: agent-session-end
-    on: "**/*.yml"
-    run: "earthly +lint 2>&1 | tail -10"
-    message: "Linter failed. Fix errors before pushing."
+  - name: readme-structure
+    hook: agent-after-file-edit
+    on: "**/README.md"
+    run: "python3 scripts/validate_readme_structure.py"
+    message: "Plugin README does not match the template structure. Each plugin type has required/disallowed sections — see ai-context/{collector,policy,cataloger}-README-template.md."
+
+  - name: landing-page-metadata
+    hook: agent-after-file-edit
+    on: "**/lunar-*.yml"
+    run: "python3 scripts/validate_landing_page_metadata.py"
+    message: "landing_page metadata in a plugin manifest is incomplete or invalid. Required fields, length limits, and category enums are documented in scripts/validate_landing_page_metadata.py."
+
+  - name: svg-grayscale
+    hook: agent-after-file-edit
+    on: "**/assets/*.svg"
+    run: "python3 scripts/validate_svg_grayscale.py"
+    message: "SVG asset uses non-grayscale colors. The website flattens rgb() fills to white — use white-with-opacity, black, none, or url(#gradient) referencing white stops."
+
+  - name: earthfile-wiring
+    hook: agent-after-file-edit
+    on: "**/Earthfile"
+    run: "python3 scripts/validate_earthfile_wiring.py"
+    message: "A plugin Earthfile defines an image: target that isn't wired into the root Earthfile's +all target. CI will not build or push this image until the BUILD --pass-args line is added."
 
   # ── Nudges (agent-after-file-edit-nudge) ──
   # Reminders shown alongside file edits. No `run:` — the `message:` is the
@@ -111,12 +130,16 @@ checks:
     hook: agent-after-file-edit-nudge
     on: "**/*screenshot*"
     message: >-
-      Reminder: Screenshots uploaded to PRs must be scrolled to show the
-      RELEVANT data, not the default top-of-page view. Dashboard screenshots
-      should show the specific collector/policy results being tested. Component
-      JSON screenshots should show the namespace/keys being verified. If the
-      data is too large for one screen, capture the section that serves as an
-      end-to-end smoke test.
+      Reminder: PR-evidence screenshots must go through `bender-screenshot`
+      (not raw Playwright `page.screenshot()`). The wrapper takes a JSON spec
+      with `must_be_visible` strings and refuses to save unless every one is
+      actually inside the final viewport — which catches the recurring failure
+      mode of posting top-of-page screenshots that hide the tested data
+      (PR #142). Use `scroll_to_text` to land on the relevant row/key; for
+      virtualized tables (Grafana checks panel) the wrapper scrolls the grid
+      container until the row materializes. The `screenshot-guard`
+      agent-before-command hook will block raw `playwright`/`chromium`
+      screenshot calls — route them through `bender-screenshot --spec` instead.
 
   # ── Agent session-start hooks ──
   # Fire once when an agent session begins (including `claude -p` headless
@@ -172,6 +195,19 @@ checks:
       `bender-linear-create-issue` to create tickets. Read-only
       `gh issue view|list|comment|close|reopen` and `gh label list` remain
       allowed.
+
+  - name: screenshot-guard
+    hook: agent-before-command
+    binary:
+      name_pattern: (python|python3|playwright|chromium|chrome|google-chrome|chromium-browser)
+    run: .lunar/hooks/screenshot-guard.sh
+    message: >-
+      Block raw Playwright `page.screenshot(...)` and `chromium --screenshot=`
+      calls; force PR-evidence screenshots through `bender-screenshot --spec`,
+      which validates every string in `must_be_visible` is actually in the
+      final viewport before saving. Allows non-screenshot uses of
+      python/playwright/chromium and any invocation of `bender-screenshot`
+      itself.
 
   - name: gh-comments-guard
     hook: agent-before-command
