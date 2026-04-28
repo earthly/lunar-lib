@@ -111,7 +111,6 @@ all:
     BUILD --pass-args ./collectors/shell+image
     BUILD --pass-args ./collectors/ruby+image
     BUILD --pass-args ./collectors/elixir+image
-    BUILD --pass-args ./collectors/scala+image
     BUILD --pass-args ./collectors/checkov+image
     BUILD --pass-args ./catalogers/github-org+image
     BUILD --pass-args ./policies/dependencies+image

@@ -4,7 +4,7 @@ name: scala
 description: Collect Scala project information, dependencies, CI/CD commands, and test coverage. Gates on the presence of `*.scala` source files — sbt-only-Java / Maven-only-Java repos receive no `.lang.scala` data.
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:scala-main
+default_image: earthly/lunar-lib:base-main
 default_image_ci_collectors: native
 
 landing_page:
