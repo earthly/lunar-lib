@@ -1,0 +1,94 @@
+version: 0
+
+name: endoflife
+description: Enforce that runtime/SDK versions are not end-of-life and are still in active support
+
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "End-of-Life Runtime Guardrails"
+  long_description: |
+    Enforce that runtime versions are still maintained upstream. Two
+    checks: not past end-of-life, and still in active support (not just
+    security-only maintenance). Reads the `endoflife` collector's
+    `.lang.<language>.eol` data.
+  category: "security-and-compliance"
+  icon: "assets/endoflife.svg"
+  status: "beta"
+  requires:
+    - slug: "endoflife"
+      type: "collector"
+      reason: "Provides EOL/support data per detected runtime under .lang.<language>.eol"
+  related: []
+  keywords: ["endoflife", "eol", "runtime", "lifecycle", "support", "security", "node", "python", "ruby", "go", "java", "dotnet", "php"]
+
+policies:
+  - name: runtime-not-eol
+    description: |
+      Fails if any detected runtime under `.lang.<language>.eol` is past
+      its end-of-life date (`is_eol == true`). Skips cleanly when no
+      runtime EOL data is present (e.g. component has no detectable
+      runtime pin, or the endoflife collector did not run). All detected
+      runtimes must be non-EOL — multi-runtime components fail if any one
+      is EOL.
+    mainPython: ./runtime_not_eol.py
+    keywords: ["endoflife", "eol", "runtime", "lifecycle", "supply chain"]
+
+  - name: runtime-supported
+    description: |
+      Fails if any detected runtime is outside the active support window
+      (`is_supported == false`). For products that distinguish active
+      support from security-only maintenance (e.g. Node.js, Python,
+      .NET), this catches services running on a runtime that's still
+      patched for security but no longer receiving non-security fixes.
+      For products without a separate active-support window (e.g. Go),
+      this check is equivalent to `runtime-not-eol`. Skips cleanly when
+      no EOL data is present.
+    mainPython: ./runtime_supported.py
+    keywords: ["endoflife", "support", "active support", "runtime", "lifecycle"]
+
+inputs: {}
+
+example_component_json: |
+  {
+    "lang": {
+      "go": {
+        "eol": {
+          "source": {
+            "tool": "endoflife.date",
+            "integration": "api",
+            "collected_at": "2026-04-27T12:00:00Z"
+          },
+          "product": "go",
+          "cycle": "1.21",
+          "detected_version": "1.21",
+          "is_eol": true,
+          "is_supported": false,
+          "eol_date": "2024-08-13",
+          "support_until": null,
+          "lts": false,
+          "latest_in_cycle": "1.21.13"
+        }
+      },
+      "nodejs": {
+        "eol": {
+          "source": {
+            "tool": "endoflife.date",
+            "integration": "api",
+            "collected_at": "2026-04-27T12:00:00Z"
+          },
+          "product": "nodejs",
+          "cycle": "20",
+          "detected_version": "20.11.1",
+          "is_eol": false,
+          "is_supported": false,
+          "eol_date": "2026-04-30",
+          "support_until": "2024-10-22",
+          "lts": true,
+          "latest_in_cycle": "20.19.0"
+        }
+      }
+    }
+  }
