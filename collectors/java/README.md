@@ -4,9 +4,9 @@ Collects Java project information, CI/CD commands, dependencies, and test covera
 
 ## Overview
 
-This collector gathers metadata about Java projects including build tool detection (Maven/Gradle), dependency graphs, CI/CD command tracking, test scope, and JaCoCo coverage metrics. It supports both Maven and Gradle build systems. Code hooks analyze project structure statically, while CI hooks observe build and test commands at runtime.
+This collector gathers metadata about Java projects including build tool detection (Maven/Gradle), dependency graphs, CI/CD command tracking, test scope, and JaCoCo coverage metrics. It supports Maven, Gradle, and sbt build systems (the sbt sub-collector covers Java-only sbt repos and sits alongside the scala collector for mixed Scala/Java). Code hooks analyze project structure statically, while CI hooks observe build and test commands at runtime.
 
-**Note:** The CI-hook collectors (`test-coverage`, `test-scope`, `cicd`, `maven-cicd`, `gradle-cicd`) don't run builds or tests—they observe and collect data from commands that your CI pipeline already runs.
+**Note:** The CI-hook collectors (`test-coverage`, `test-scope`, `cicd`, `maven-cicd`, `gradle-cicd`, `sbt-cicd`) don't run builds or tests—they observe and collect data from commands that your CI pipeline already runs.
 
 ## Collected Data
 
@@ -19,6 +19,7 @@ This collector writes to the following Component JSON paths:
 | `.lang.java.cicd` | object | Java runtime CI/CD command tracking with version |
 | `.lang.java.maven.cicd` | object | Maven CI/CD command tracking with version |
 | `.lang.java.gradle.cicd` | object | Gradle CI/CD command tracking with version |
+| `.lang.java.sbt.cicd` | object | sbt CI/CD command tracking with version |
 | `.lang.java.tests` | object | Test scope and JaCoCo coverage information |
 | `.testing.coverage` | object | Normalized cross-language coverage (dual-write from JaCoCo) |
 | `.testing.source` | object | Normalized testing indicator |
@@ -34,6 +35,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `cicd` | ci-before-command | Tracks java/javac commands in CI with version |
 | `maven-cicd` | ci-before-command | Tracks Maven commands in CI with version |
 | `gradle-cicd` | ci-before-command | Tracks Gradle commands in CI with version |
+| `sbt-cicd` | ci-before-command | Tracks sbt commands in CI with version |
 | `test-scope` | ci-before-command | Determines test scope (all vs module) |
 | `test-coverage` | ci-after-command | Extracts JaCoCo coverage from XML reports |
 
