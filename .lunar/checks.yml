@@ -60,6 +60,20 @@ checks:
     run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
     message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
 
+  - name: cronos-runner-required
+    hook: agent-after-file-edit
+    on: "**/.github/workflows/*.yml"
+    run: ".lunar/hooks/cronos-runner-check.sh {file}"
+    message: >-
+      Workflow file in a cronos-org repo (e.g. pantalasa-cronos/*) has no
+      job using `runs-on: cronos`. The lunar agent only traces CI commands
+      on the cronos self-hosted runner — without it, every CI-hook collector
+      registered for this component will silently never fire, and the
+      component will look "stuck" in the hub even though it is registered
+      correctly. ENG-543: a worker shipped scala-service with no workflow
+      at all and then invented a "per-component cycle hasn't reached the
+      repo" excuse. Set `runs-on: cronos` on the relevant job(s).
+
   # The four checks below run the same Python validators that `earthly +lint`
   # invokes in CI. Calling them directly (~120ms each, ~700ms for all four)
   # avoids the ~30s buildkitd warmup the Earthly target needs and lets us
