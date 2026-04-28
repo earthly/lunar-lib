@@ -60,15 +60,34 @@ checks:
     run: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
     message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
 
-  # ── Session-end checks (agent-session-end) ──
-  # Fire once at the end of a session if any changed file matches `on:`.
-  # Use for expensive validations whose cost doesn't scale with per-file granularity.
+  # The four checks below run the same Python validators that `earthly +lint`
+  # invokes in CI. Calling them directly (~120ms each, ~700ms for all four)
+  # avoids the ~30s buildkitd warmup the Earthly target needs and lets us
+  # catch lint failures at file-edit time instead of after-the-fact in CI.
 
-  - name: lint
-    hook: agent-session-end
-    on: "**/*.yml"
-    run: "earthly +lint 2>&1 | tail -10"
-    message: "Linter failed. Fix errors before pushing."
+  - name: readme-structure
+    hook: agent-after-file-edit
+    on: "**/README.md"
+    run: "python3 scripts/validate_readme_structure.py"
+    message: "Plugin README does not match the template structure. Each plugin type has required/disallowed sections — see ai-context/{collector,policy,cataloger}-README-template.md."
+
+  - name: landing-page-metadata
+    hook: agent-after-file-edit
+    on: "**/lunar-*.yml"
+    run: "python3 scripts/validate_landing_page_metadata.py"
+    message: "landing_page metadata in a plugin manifest is incomplete or invalid. Required fields, length limits, and category enums are documented in scripts/validate_landing_page_metadata.py."
+
+  - name: svg-grayscale
+    hook: agent-after-file-edit
+    on: "**/assets/*.svg"
+    run: "python3 scripts/validate_svg_grayscale.py"
+    message: "SVG asset uses non-grayscale colors. The website flattens rgb() fills to white — use white-with-opacity, black, none, or url(#gradient) referencing white stops."
+
+  - name: earthfile-wiring
+    hook: agent-after-file-edit
+    on: "**/Earthfile"
+    run: "python3 scripts/validate_earthfile_wiring.py"
+    message: "A plugin Earthfile defines an image: target that isn't wired into the root Earthfile's +all target. CI will not build or push this image until the BUILD --pass-args line is added."
 
   # ── Nudges (agent-after-file-edit-nudge) ──
   # Reminders shown alongside file edits. No `run:` — the `message:` is the
