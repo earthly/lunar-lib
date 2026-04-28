@@ -1,7 +1,7 @@
 version: 0
 
 name: scala
-description: Collect Scala project information, dependencies, CI/CD commands, and test coverage
+description: Collect Scala project information, dependencies, CI/CD commands, and test coverage. Gates on the presence of `*.scala` source files — sbt-only-Java / Maven-only-Java repos receive no `.lang.scala` data.
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:scala-main
@@ -34,7 +34,9 @@ collectors:
       and the test source directory. Parses Scala version (`scalaVersion`), sbt version,
       Mill version, project name/version, cross-build versions (`crossScalaVersions`),
       detected test frameworks, and framework flags (Spark, Akka, Cats).
-      Writes project metadata to .lang.scala.
+      Skips when no `*.scala` source files are present (Java-only sbt /
+      Maven repos belong under `.lang.java`). Writes project metadata to
+      `.lang.scala`.
     mainBash: project.sh
     hook:
       type: code

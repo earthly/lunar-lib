@@ -6,6 +6,8 @@ Collects Scala project information, dependencies, CI/CD commands, and test cover
 
 This collector gathers metadata about Scala projects including project name/version, Scala/sbt/Mill versions, test frameworks, cross-build configuration, dependencies, and framework flags (Spark, Akka, Cats). It runs on both code changes (for static analysis of `build.sbt`, `build.sc`, and `pom.xml`) and CI hooks (to capture runtime metrics like test coverage and sbt/mill command usage).
 
+**Source-gated:** All sub-collectors gate on the presence of `*.scala` source files in the repo. sbt and Maven are also used for Java-only projects — those land under `.lang.java` (which has its own sbt/maven sub-collectors), not `.lang.scala`. Mixed Scala+Java repos populate both namespaces.
+
 **Note:** The CI-hook collectors (`cicd`, `test-coverage`) don't run tests — they observe and collect data from `sbt test`, `mill test`, or `sbt coverageReport` commands that your CI pipeline already runs.
 
 ## Collected Data
