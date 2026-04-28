@@ -30,7 +30,7 @@ collectors:
   - name: project
     description: |
       Analyzes Scala project structure by detecting build.sbt, project/build.properties,
-      build.sc (Mill), pom.xml (with scala-maven-plugin), build.gradle(.kts), .scalafmt.conf,
+      build.sc (Mill), pom.xml (with scala-maven-plugin), .scalafmt.conf,
       and the test source directory. Parses Scala version (`scalaVersion`), sbt version,
       Mill version, project name/version, cross-build versions (`crossScalaVersions`),
       detected test frameworks, and framework flags (Spark, Akka, Cats).
@@ -75,7 +75,7 @@ collectors:
       binary:
         name_pattern: ^(sbt|mill)$
       args:
-        - value_pattern: ^(test|coverage|coverageReport|.+/test|.+/coverage)$
+        - value_pattern: ^(test|coverage|coverageReport|.+[/.](test|coverage|coverageReport))$
     keywords: ["scoverage", "scala test coverage", "sbt test", "mill test", "coverage metrics"]
 
 example_component_json: |
