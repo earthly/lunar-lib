@@ -104,7 +104,7 @@ The collector and policy are paired — the policy reads `.lang.<language>.eol` 
 
 **Failure message (`runtime-not-eol`):** `go cycle 1.21 (detected 1.21) reached end-of-life on 2024-08-13. Move to a supported cycle (current latest: see https://endoflife.date/go).`
 
-**Failure message (`runtime-supported`):** `nodejs cycle 18 (detected 18.19.1) is in security-only maintenance since 2023-10-18 and reaches end-of-life on 2025-04-30. Bump to a still-supported cycle (see https://endoflife.date/nodejs).`
+**Failure message (`runtime-supported`):** `go cycle 1.21 (detected 1.21) is out of active support and reached end-of-life on 2024-08-13 (Go has no separate active-support phase). Bump to a still-supported cycle (see https://endoflife.date/go).`
 
 ## Remediation
 
@@ -112,6 +112,6 @@ When this policy fails, you can resolve it by:
 
 1. **`runtime-not-eol`:** Bump the pinned runtime to a cycle whose `eol_date` is in the future. Update the relevant version file (`.go-version`, `.nvmrc`, `.python-version`, `package.json` engines, etc.) and rebuild. Reference the matching endoflife.date page (linked in the failure message) for the current latest cycle and any LTS recommendations.
 2. **`runtime-supported`:** Bump the pinned runtime to a cycle that's still in active support (i.e. before `support_until`). This is the recommended fix even when the runtime isn't yet EOL — security-only maintenance is a holding pattern, not a destination.
-3. **If the bump is blocked** (incompatible dependencies, planned re-platform, etc.) and you need to silence the check temporarily, configure the policy with `enforcement: report-pr` rather than `block-merge` until the upgrade lands. Don't suppress the data — leaving the EOL signal visible in the component JSON keeps the issue surfaced.
+3. **If the bump is blocked** (incompatible dependencies, planned re-platform, etc.) and you need to silence the check temporarily, configure the policy with `enforcement: report-pr` rather than `block-pr` until the upgrade lands. Don't suppress the data — leaving the EOL signal visible in the component JSON keeps the issue surfaced.
 
 The policy does not check whether the detected version is the latest patch in its cycle (use `.lang.<language>.eol.latest_in_cycle` vs `detected_version` for a custom patch-hygiene check) and does not enforce LTS-only usage (use `.lang.<language>.eol.lts` for a custom LTS check). Example Component JSON is defined in `lunar-policy.yml` under `example_component_json`.

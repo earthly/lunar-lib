@@ -33,7 +33,8 @@ collectors:
       normalized result to `.lang.<language>.eol` with `cycle`,
       `detected_version`, `is_eol`, `is_supported`, `eol_date`,
       `support_until`, `lts`, `latest_in_cycle`, and `source`. Stores the
-      raw matched cycle object under `.lang.<language>.native.endoflife`.
+      raw matched cycle object under `.lang.<language>.native.endoflife.cycle`
+      (alongside a `.product` string sibling).
       Runs on the `code` hook so the data refreshes on every push without
       depending on a separate cron schedule. If no runtime can be resolved
       for a given language, the language is silently skipped — only

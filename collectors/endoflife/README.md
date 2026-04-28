@@ -15,7 +15,7 @@ This collector writes to the following Component JSON paths, where `<language>` 
 | `.lang.<language>.eol.source` | object | Tool/integration metadata (`tool: "endoflife.date"`, `integration: "api"`, `collected_at`) |
 | `.lang.<language>.eol.product` | string | endoflife.date product slug (e.g. `go`, `nodejs`, `eclipse-temurin`) |
 | `.lang.<language>.eol.cycle` | string | Matched release cycle (e.g. `"1.21"` for Go, `"20"` for Node.js) |
-| `.lang.<language>.eol.detected_version` | string | The full version pinned in the repo (e.g. `"1.21.5"`, `"20.11.1"`) |
+| `.lang.<language>.eol.detected_version` | string | The version string as pinned in the repo. May be `major.minor` only (e.g. `"1.21"` from a bare `go 1.21` directive in `go.mod`) or a full semver (e.g. `"20.11.1"` from `.nvmrc`). |
 | `.lang.<language>.eol.is_eol` | boolean | `true` if `eol_date` is set and is on or before today |
 | `.lang.<language>.eol.is_supported` | boolean | `true` if the runtime is still in active (non-security-only) support |
 | `.lang.<language>.eol.eol_date` | string \| null | ISO date when the cycle reaches end-of-life; `null` if endoflife.date does not declare one |
