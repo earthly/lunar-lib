@@ -11,10 +11,10 @@ landing_page:
   display_name: "Scala Collector"
   long_description: |
     Analyze Scala projects to collect project metadata, dependencies, CI/CD
-    command tracking, and test coverage. Supports sbt (majority), Mill, and
-    Maven (via scala-maven-plugin). Detects cross-version builds, test
-    frameworks (ScalaTest, MUnit, Specs2), and data-engineering frameworks
-    (Spark, Akka, Cats).
+    command tracking, and test coverage. Supports sbt, Mill, and Maven (via
+    scala-maven-plugin). Detects cross-version builds, test frameworks
+    (ScalaTest, MUnit, Specs2), and data-engineering frameworks (Spark,
+    Akka, Cats).
   categories: ["languages", "build"]
   icon: "assets/scala.svg"
   status: "beta"
