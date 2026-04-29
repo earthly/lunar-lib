@@ -1,0 +1,94 @@
+version: 0
+
+name: opsgenie
+description: Collect on-call schedule and escalation data from OpsGenie
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "OpsGenie Collector"
+  long_description: |
+    Query the OpsGenie REST API to collect on-call schedule, escalation
+    policy, and team data. Normalizes results into the .oncall category
+    for tool-agnostic policy evaluation — the same `oncall` policy works
+    whether the data comes from OpsGenie, PagerDuty, or another provider.
+  categories: ["service-catalog"]
+  icon: "assets/opsgenie.svg"
+  status: "beta"
+  related:
+    - slug: "oncall"
+      type: "policy"
+      reason: "Enforces on-call schedule, escalation, and staffing standards"
+    - slug: "pagerduty"
+      type: "collector"
+      reason: "Alternative on-call data source — writes to the same .oncall paths"
+
+collectors:
+  - name: oncall
+    description: |
+      Queries the OpsGenie REST API for the component's team. Discovers the
+      team ID from the component's `opsgenie/team-id` meta annotation
+      (typically set by a company-specific cataloger via `lunar catalog
+      component --meta opsgenie/team-id <id>`), or falls back to the
+      explicit team_id input for static org-wide cases. Fetches team
+      details, the team's first on-call schedule (with rotation
+      participants), and its escalation policy. Writes normalized data to
+      .oncall.service, .oncall.schedule, .oncall.escalation, and
+      .oncall.summary. Stores raw API responses under
+      .oncall.native.opsgenie.
+    mainBash: oncall.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
+      clone-code: false
+    keywords: ["opsgenie", "oncall", "escalation", "incident management", "on-call schedule", "atlassian"]
+
+inputs:
+  team_id:
+    description: >
+      OpsGenie team ID (UUID) to query. Optional if the component has an
+      `opsgenie/team-id` meta annotation set by a cataloger.
+    default: ""
+  opsgenie_base_url:
+    description: >
+      OpsGenie API base URL. Use `https://api.eu.opsgenie.com` for the EU
+      instance.
+    default: "https://api.opsgenie.com"
+
+secrets:
+  OPSGENIE_API_KEY:
+    description: OpsGenie REST API key (read-only token with read access to teams, schedules, and escalations)
+
+example_component_json: |
+  {
+    "oncall": {
+      "source": {
+        "tool": "opsgenie",
+        "integration": "api"
+      },
+      "service": {
+        "id": "4513b7ea-3b91-438f-b7e4-e3e54af9147c",
+        "name": "Payments Team",
+        "status": "active"
+      },
+      "schedule": {
+        "exists": true,
+        "participants": 4,
+        "rotation": "weekly"
+      },
+      "escalation": {
+        "exists": true,
+        "levels": 3,
+        "policy_name": "Payments Escalation"
+      },
+      "summary": {
+        "has_oncall": true,
+        "has_escalation": true,
+        "min_participants": 4
+      },
+      "native": {
+        "opsgenie": { "...full OpsGenie API response..." }
+      }
+    }
+  }

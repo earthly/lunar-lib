@@ -20,8 +20,11 @@ landing_page:
     - slug: "pagerduty"
       type: "collector"
       reason: "Provides on-call and escalation data (PagerDuty implementation)"
+    - slug: "opsgenie"
+      type: "collector"
+      reason: "Provides on-call and escalation data (OpsGenie implementation)"
   related: []
-  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "operational readiness"]
+  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "opsgenie", "operational readiness"]
 
 policies:
   - name: schedule-configured
