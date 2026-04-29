@@ -1,0 +1,71 @@
+version: 0
+
+name: pre-commit
+description: Parse .pre-commit-config.yaml and collect configured hooks (id, repo, rev)
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Pre-commit Collector"
+  long_description: |
+    Parses .pre-commit-config.yaml to collect configured hooks, their source
+    repos, pinned revisions, and the optional pre-commit.ci ci.skip list.
+    Enables policies that enforce a healthy pre-commit baseline: config
+    presence, pinned refs, secret-scanning coverage, no silent ci.skip.
+  categories: ["code-analysis"]
+  icon: "assets/pre-commit.svg"
+  status: "beta"
+  related:
+    - slug: "pre-commit"
+      type: "policy"
+      reason: "Enforces pre-commit configuration baseline using collected hook data"
+
+collectors:
+  - name: config
+    description: |
+      Scans the repository for a pre-commit configuration file at
+      .pre-commit-config.yaml (or .yml variant). Parses the YAML to extract
+      the configured `repos[]` (each with `repo`, `rev`, `hooks[]`), a
+      flattened list of hook IDs, and the optional `ci.skip` list.
+      Writes structured data to `.code_quality.pre_commit`.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["pre-commit", "git hooks", "lint", "secret scan", "code quality", "developer tooling"]
+
+inputs:
+  paths:
+    description: Comma-separated list of pre-commit config file paths to check (first match wins)
+    default: ".pre-commit-config.yaml,.pre-commit-config.yml"
+
+example_component_json: |
+  {
+    "code_quality": {
+      "pre_commit": {
+        "valid": true,
+        "path": ".pre-commit-config.yaml",
+        "repos": [
+          {
+            "repo": "https://github.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.5.0",
+            "hooks": [
+              {"id": "trailing-whitespace"},
+              {"id": "end-of-file-fixer"}
+            ]
+          },
+          {
+            "repo": "https://github.com/gitleaks/gitleaks",
+            "rev": "v8.18.0",
+            "hooks": [
+              {"id": "gitleaks"}
+            ]
+          }
+        ],
+        "hook_ids": ["trailing-whitespace", "end-of-file-fixer", "gitleaks"],
+        "hook_count": 3,
+        "repo_count": 2,
+        "ci_skip": [],
+        "all_pinned": true
+      }
+    }
+  }

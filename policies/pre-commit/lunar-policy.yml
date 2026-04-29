@@ -1,0 +1,69 @@
+version: 0
+
+name: pre-commit
+description: Pre-commit framework guardrails — config presence, pinned refs, secret-scan coverage, and ci.skip hygiene
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Pre-commit Guardrails"
+  long_description: |
+    Enforce a healthy baseline for pre-commit usage: config exists, hooks
+    are pinned to immutable refs (not floating branches), at least one
+    secret-scanning hook is configured, and the pre-commit.ci ci.skip list
+    isn't being used to silently disable checks. Reads data from the
+    `pre-commit` collector.
+  category: "devex-build-and-ci"
+  icon: "assets/pre-commit.svg"
+  status: "beta"
+  requires:
+    - slug: "pre-commit"
+      type: "collector"
+      reason: "Provides parsed .pre-commit-config.yaml hook data"
+  related: []
+
+policies:
+  - name: config-exists
+    description: |
+      Universal check — fails when no `.pre-commit-config.yaml` is found in
+      the repository. Pre-commit is a low-friction way to enforce
+      lint/format/secret-scan hygiene; every component opted into this
+      policy should have a config file. Reads `.code_quality.pre_commit`.
+    mainPython: ./config-exists.py
+    keywords: ["pre-commit", "config exists", "developer tooling"]
+
+  - name: hooks-have-pinned-refs
+    description: |
+      Each repo entry in `.pre-commit-config.yaml` must have a `rev` pinned
+      to an immutable ref (tag or commit SHA), not a floating branch like
+      `main`, `master`, or `HEAD`. Floating refs let upstream hook changes
+      land in the developer machine without review. Skips when no
+      pre-commit config is present (paired with `config-exists`).
+    mainPython: ./hooks-have-pinned-refs.py
+    keywords: ["pre-commit", "pinned refs", "supply chain", "immutable"]
+
+  - name: has-secret-scan-hook
+    description: |
+      Recommends that the pre-commit config include at least one
+      secret-scanning hook (gitleaks, detect-secrets, trufflehog, or
+      similar). Pre-commit is the cheapest place to catch credentials
+      before they reach the remote. Skips when no pre-commit config is
+      present (paired with `config-exists`). The accepted hook ID list is
+      configurable via the `secret_scan_hook_ids` input.
+    mainPython: ./has-secret-scan-hook.py
+    keywords: ["pre-commit", "secret scanning", "gitleaks", "credentials"]
+
+  - name: ci-skip-empty
+    description: |
+      Flags non-empty `ci.skip` lists in `.pre-commit-config.yaml`. The
+      `ci.skip` setting is a pre-commit.ci escape hatch that disables
+      hooks in the hosted CI service while still showing them locally —
+      a common way to silently bypass enforcement. Skips when no
+      pre-commit config is present (paired with `config-exists`).
+    mainPython: ./ci-skip-empty.py
+    keywords: ["pre-commit", "ci.skip", "enforcement bypass"]
+
+inputs:
+  secret_scan_hook_ids:
+    description: Comma-separated list of pre-commit hook IDs that count as secret scanners
+    default: "gitleaks,detect-secrets,trufflehog,detect-aws-credentials,detect-private-key"
