@@ -165,11 +165,13 @@ checks:
     hook: agent-session-start
     run: .lunar/hooks/phase-guidance.sh
     message: >-
-      Before doing PR work, identify the phase (spec-review /
-      implementing / impl-review / merging) and read the matching
-      section of `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`.
-      CI green is not the finish line for implementation PRs —
-      cronos round-trip testing is required.
+      Before doing PR work, identify the phase (spec / implementation
+      & testing / impl-review / merge) and read the matching phase doc
+      under `.ai-implementation/phases/`. The overview lives at
+      `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`. CI green is
+      not the finish line for implementation PRs — cronos round-trip
+      testing (per `phases/implementation.md`) is required.
+
   - name: cronos-cheat-sheet
     hook: agent-session-start
     run: .lunar/hooks/cronos-cheat-sheet.sh
@@ -177,7 +179,6 @@ checks:
       Cronos hub DB schema, Grafana dashboard UIDs, component-variable
       gotchas, known traps. Use these instead of re-deriving the schema
       with `information_schema.columns` queries every ticket.
-
 
   # ── Agent before-command hooks ──
   # Fire before an agent (e.g. Claude Code) executes a shell command in its

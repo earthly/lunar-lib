@@ -128,9 +128,9 @@ For `agent-before-command`, non-zero stderr is propagated to the agent as the bl
 
 ### `phase-guidance.sh` — `agent-session-start`
 
-Fires once at the start of every agent session (fresh or resumed). Emits a markdown table that routes the agent to the right section of `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md` based on where the current PR/ticket sits in the spec → impl → merge lifecycle.
+Fires once at the start of every agent session (fresh or resumed). Emits a markdown table that routes the agent to the right phase doc under `.ai-implementation/phases/` based on where the current PR/ticket sits in the spec → impl → merge lifecycle. The overview at `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md` covers cross-cutting concerns (lifecycle, common mistakes, conventions); the phase docs are self-contained for their phase.
 
-Keeps the playbook as the single source of truth — the hook's job is just to prompt the agent to identify the phase and read the right section. Prevents the "spent hours in spec phase, blew right past the implementation checklist" failure mode observed on ENG-494.
+Keeps the agent's context fresh and focused on the work in front of them — they read the phase doc that applies, not all four. Prevents the "spent hours in spec phase, blew right past the implementation checklist" failure mode observed on ENG-494.
 
 ### `cronos-cheat-sheet.sh` — `agent-session-start`
 
