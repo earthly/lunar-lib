@@ -74,6 +74,20 @@ collectors:
         name_pattern: ^(gradle|gradlew)$
     keywords: ["gradle ci", "gradle version", "gradle wrapper", "build tracking"]
 
+  - name: sbt-cicd
+    description: |
+      Records sbt commands executed in CI pipelines along with the sbt version.
+      Detects version from `sbt --version` or `project/build.properties`.
+      Writes to .lang.java.sbt.cicd.cmds. Sister of the scala collector's cicd
+      sub-collector — both fire on the same sbt invocation, each writing into
+      its own language namespace for mixed Scala/Java sbt repos.
+    mainBash: sbt-cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(sbt|sbtn)$
+    keywords: ["sbt ci", "sbt version", "sbt build", "build tracking"]
+
   - name: test-scope
     description: |
       Determines whether Maven/Gradle test commands run all modules or a subset.
@@ -125,6 +139,13 @@ example_component_json: |
           "cicd": {
             "cmds": [
               { "cmd": "mvn clean install", "version": "3.9.6" }
+            ]
+          }
+        },
+        "sbt": {
+          "cicd": {
+            "cmds": [
+              { "cmd": "sbt test", "version": "1.9.7" }
             ]
           }
         },
