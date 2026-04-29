@@ -1,0 +1,108 @@
+version: 0
+
+name: scala
+description: Enforces Scala project structure, versioning, and dependency standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Scala Project Guardrails"
+  long_description: |
+    Enforce Scala-specific project standards including build manifest presence,
+    Scala version pinning, sbt version pinning, dependency lockfile commit,
+    test source layout, and scalafmt configuration. Supports sbt, Mill, and
+    Maven (via scala-maven-plugin).
+  category: "devex-build-and-ci"
+  icon: "assets/scala.svg"
+  status: "beta"
+  requires:
+    - slug: "scala"
+      type: "collector"
+      reason: "Provides Scala project metadata"
+  related: []
+
+policies:
+  - name: build-tool-manifest-exists
+    description: |
+      Ensures the project has a recognised Scala build manifest:
+      `build.sbt` (sbt), `build.sc` (Mill), or `pom.xml` with the
+      scala-maven-plugin. Required for any Scala project so that the
+      build is reproducible and tooling-discoverable.
+    mainPython: build_tool_manifest_exists.py
+    keywords: ["build.sbt", "build.sc", "pom.xml", "sbt", "mill", "manifest"]
+
+  - name: scala-version-pinned
+    description: |
+      Ensures the Scala compiler version is declared (`scalaVersion := "..."`
+      in build.sbt, the equivalent in build.sc, or `<scala.version>` /
+      `<scala.binary.version>` in pom.xml). Pinning the compiler version
+      prevents drift between developers and CI.
+    mainPython: scala_version_pinned.py
+    keywords: ["scalaVersion", "scala compiler", "version pinning"]
+
+  - name: min-scala-version
+    description: |
+      Ensures the declared Scala compiler version meets the configured
+      minimum (default: "2.12"). Reads `.lang.scala.version` (parsed from
+      `scalaVersion` / `<scala.version>` / Mill `def scalaVersion`). Skips
+      when the version is not detected — pair with `scala-version-pinned`
+      if you want presence to be enforced too.
+    mainPython: min_scala_version.py
+    keywords: ["scalaVersion", "scala compiler", "version floor", "compatibility"]
+
+  - name: sbt-version-set
+    description: |
+      Ensures `project/build.properties` pins the sbt version (e.g.
+      `sbt.version=1.9.7`) when sbt is the build tool. Skips for Mill-only
+      and Maven-only projects.
+    mainPython: sbt_version_set.py
+    keywords: ["sbt.version", "build.properties", "sbt"]
+
+  - name: min-sbt-version
+    description: |
+      Ensures the sbt version pinned in `project/build.properties` meets
+      the configured minimum (default: "1.9"). Reads `.lang.scala.sbt_version`.
+      Skips for Mill-only and Maven-only projects, and when the sbt version
+      is not detected — pair with `sbt-version-set` if you want presence to
+      be enforced too.
+    mainPython: min_sbt_version.py
+    keywords: ["sbt.version", "build.properties", "sbt", "version floor", "compatibility"]
+
+  - name: dependencies-locked
+    description: |
+      Ensures dependencies are locked for reproducible builds — either via
+      `build.sbt.lock` (sbt-lock plugin) or an equivalent Mill/Maven lock
+      mechanism. Informational by default — most Scala projects do not
+      lock dependencies, but doing so produces reproducible CI builds.
+    mainPython: dependencies_locked.py
+    keywords: ["build.sbt.lock", "lockfile", "reproducibility", "sbt-lock"]
+
+  - name: test-module-exists
+    description: |
+      Ensures a `src/test/scala` directory (or a cross-version variant
+      such as `src/test/scala-2.13` / `src/test/scala-3`) exists with
+      test sources. Skips on non-Scala projects.
+    mainPython: test_module_exists.py
+    keywords: ["src/test/scala", "scalatest", "munit", "testing", "test layout"]
+
+  - name: scalafmt-configured
+    description: |
+      Ensures `.scalafmt.conf` is committed at the repo root. scalafmt
+      enforces consistent code formatting and is the de facto standard
+      for Scala. Informational.
+    mainPython: scalafmt_configured.py
+    keywords: ["scalafmt", "formatting", "code style"]
+
+inputs:
+  min_scala_version:
+    description: |
+      Minimum required Scala compiler version (e.g., "2.12", "2.13", "3.3.1").
+      Compared with semantic-version semantics — "2.13" matches 2.13.x and 3.x,
+      but rejects 2.11.x.
+    default: "2.12"
+  min_sbt_version:
+    description: |
+      Minimum required sbt version (e.g., "1.9", "1.10.0"). Compared with
+      semantic-version semantics. Skipped when the project does not use sbt.
+    default: "1.9"
