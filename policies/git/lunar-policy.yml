@@ -66,9 +66,10 @@ policies:
   # --- gitattributes checks ---
   - name: gitattributes-exists
     description: |
-      Recommends that the repository have a `.gitattributes` file. Even a
-      minimal one (`* text=auto`) prevents the cross-platform line-ending
-      churn that bloats diffs and breaks CI. Reads `.git.attributes`.
+      Universal check — fails when no `.gitattributes` file is found in
+      the repository. Even a minimal one (`* text=auto`) prevents the
+      cross-platform line-ending churn that bloats diffs and breaks CI.
+      Reads `.git.attributes`.
     mainPython: ./gitattributes-exists.py
     keywords: ["gitattributes", "line endings", "repository hygiene"]
 
@@ -100,7 +101,9 @@ policies:
       configurable via `signed_commits_window`) to all carry a valid GPG
       or SSH signature. Catches teams that have GPG enforcement enabled
       in branch protection but have unsigned commits slipping in via
-      bypasses. Reads `.git.signing`.
+      bypasses. Universal — fails when `.git.signing` is absent (the
+      signed-commits sub-collector always runs unless `git log` fails on
+      a shallow or empty clone). Reads `.git.signing`.
     mainPython: ./signed-commits-recent.py
     keywords: ["signed commits", "gpg", "ssh signing", "supply chain"]
 

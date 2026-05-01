@@ -61,9 +61,9 @@ collectors:
       Inspects the last N commits on the default branch for GPG/SSH
       signature presence using `git log --pretty=format:'%G?'`. Each
       commit is classified as `good`, `bad`, `unknown`, `unsigned`,
-      `expired`, or `revoked`. Writes counts plus an `all_signed` summary
-      to `.git.signing`. The history-window size is configurable via
-      `signed_commits_window`.
+      `expired`, or `revoked`. Writes counts to
+      `.git.signing.signature_counts`. The history-window size is
+      configurable via `signed_commits_window`.
     mainBash: signed-commits.sh
     hook:
       type: code
