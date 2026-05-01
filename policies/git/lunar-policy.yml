@@ -1,7 +1,7 @@
 version: 0
 
 name: git
-description: Git-ecosystem guardrails — pre-commit baseline today, with room for commitlint, gitattributes, gitmodules, signed-commits
+description: Git-ecosystem guardrails — pre-commit baseline, commitlint, gitattributes, gitmodules, and signed-commits checks
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
@@ -9,17 +9,16 @@ landing_page:
   display_name: "Git Guardrails"
   long_description: |
     Enforce baselines for git-ecosystem tooling that lives in the
-    repository: pre-commit config presence, pinned hook refs, secret-scan
-    coverage, and clean ci.skip today, with room to grow into commitlint,
-    gitattributes, gitmodules, and signed-commits checks. Reads data from
-    the `git` collector.
+    repository: pre-commit config and hook hygiene, commitlint adoption,
+    gitattributes EOL normalization, submodule pinning, and recent
+    commit-signature coverage. Reads data from the `git` collector.
   category: "devex-build-and-ci"
   icon: "assets/git.svg"
   status: "beta"
   requires:
     - slug: "git"
       type: "collector"
-      reason: "Provides parsed pre-commit config data under .git.pre_commit"
+      reason: "Provides parsed config data under .git.* for all checks in this policy"
   related: []
 
 policies:
@@ -64,7 +63,72 @@ policies:
     mainPython: ./pre-commit-ci-skip-empty.py
     keywords: ["pre-commit", "ci.skip", "enforcement bypass"]
 
+  # --- commitlint checks ---
+  - name: commitlint-config-exists
+    description: |
+      Recommends that the repository have a commitlint configuration to
+      enforce commit-message structure (especially valuable when changelog
+      generation, semantic-release, or stakeholder-readable git history
+      matter). Reads `.git.commitlint`. Universal — fails when no config
+      is present.
+    mainPython: ./commitlint-config-exists.py
+    keywords: ["commitlint", "conventional commits", "commit messages"]
+
+  - name: commitlint-conventional
+    description: |
+      Requires the commitlint config to extend `@commitlint/config-conventional`
+      (or another conventional-commits ruleset). Conventional Commits
+      enables automated changelog generation and clear release-note
+      categorization. Skips when no commitlint config is present (paired
+      with `commitlint-config-exists`).
+    mainPython: ./commitlint-conventional.py
+    keywords: ["commitlint", "conventional commits", "changelog", "semantic-release"]
+
+  # --- gitattributes checks ---
+  - name: gitattributes-exists
+    description: |
+      Recommends that the repository have a `.gitattributes` file. Even a
+      minimal one (`* text=auto`) prevents the cross-platform line-ending
+      churn that bloats diffs and breaks CI. Reads `.git.attributes`.
+    mainPython: ./gitattributes-exists.py
+    keywords: ["gitattributes", "line endings", "repository hygiene"]
+
+  - name: gitattributes-eol-normalized
+    description: |
+      Requires `.gitattributes` to declare EOL normalization (e.g.
+      `* text=auto`, or `text` / `eol=` directives covering tracked text
+      files). Without this, Windows checkouts can produce CRLF diffs that
+      derail reviews. Skips when no `.gitattributes` is present (paired
+      with `gitattributes-exists`).
+    mainPython: ./gitattributes-eol-normalized.py
+    keywords: ["gitattributes", "eol", "line endings", "text=auto"]
+
+  # --- gitmodules checks ---
+  - name: submodules-no-floating-branches
+    description: |
+      Flags submodules that declare a `branch` field in `.gitmodules`,
+      since that signals the submodule is intended to track a floating
+      ref via `git submodule update --remote` (defeating the
+      always-pinned-by-SHA default). Skips when no `.gitmodules` is
+      present — submodule-free repos are not penalized.
+    mainPython: ./submodules-no-floating-branches.py
+    keywords: ["gitmodules", "submodules", "supply chain", "floating refs"]
+
+  # --- signed-commits checks ---
+  - name: signed-commits-recent
+    description: |
+      Requires the last N commits on the default branch (default 50,
+      configurable via `signed_commits_window`) to all carry a valid GPG
+      or SSH signature. Catches teams that have GPG enforcement enabled
+      in branch protection but have unsigned commits slipping in via
+      bypasses. Reads `.git.signing`.
+    mainPython: ./signed-commits-recent.py
+    keywords: ["signed commits", "gpg", "ssh signing", "supply chain"]
+
 inputs:
   secret_scan_hook_ids:
     description: Comma-separated list of pre-commit hook IDs that count as secret scanners
     default: "gitleaks,detect-secrets,trufflehog,detect-aws-credentials,detect-private-key"
+  signed_commits_window:
+    description: Number of recent commits on the default branch the signed-commits check applies to (must match collector input)
+    default: "50"
