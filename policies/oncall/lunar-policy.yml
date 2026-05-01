@@ -41,7 +41,7 @@ policies:
       checking .oncall.escalation.exists is true. Fails if no escalation
       data is present.
     mainPython: ./escalation_defined.py
-    keywords: ["escalation", "incident", "pagerduty", "response"]
+    keywords: ["escalation", "incident", "pagerduty", "opsgenie", "response"]
 
   - name: min-participants
     description: |
