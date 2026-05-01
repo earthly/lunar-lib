@@ -1,66 +1,67 @@
 version: 0
 
-name: pre-commit
-description: Pre-commit framework guardrails — config presence, pinned refs, secret-scan coverage, and ci.skip hygiene
+name: git
+description: Git-ecosystem guardrails — pre-commit baseline today, with room for commitlint, gitattributes, gitmodules, signed-commits
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Pre-commit Guardrails"
+  display_name: "Git Guardrails"
   long_description: |
-    Enforce a healthy baseline for pre-commit usage: config exists, hooks
-    are pinned to immutable refs (not floating branches), at least one
-    secret-scanning hook is configured, and the pre-commit.ci ci.skip list
-    isn't being used to silently disable checks. Reads data from the
-    `pre-commit` collector.
+    Enforce baselines for git-ecosystem tooling that lives in the
+    repository: pre-commit config presence, pinned hook refs, secret-scan
+    coverage, and clean ci.skip today, with room to grow into commitlint,
+    gitattributes, gitmodules, and signed-commits checks. Reads data from
+    the `git` collector.
   category: "devex-build-and-ci"
-  icon: "assets/pre-commit.svg"
+  icon: "assets/git.svg"
   status: "beta"
   requires:
-    - slug: "pre-commit"
+    - slug: "git"
       type: "collector"
-      reason: "Provides parsed .pre-commit-config.yaml hook data"
+      reason: "Provides parsed pre-commit config data under .git.pre_commit"
   related: []
 
 policies:
-  - name: config-exists
+  # --- pre-commit checks ---
+  - name: pre-commit-config-exists
     description: |
       Universal check — fails when no `.pre-commit-config.yaml` is found in
       the repository. Pre-commit is a low-friction way to enforce
       lint/format/secret-scan hygiene; every component opted into this
-      policy should have a config file. Reads `.code_quality.pre_commit`.
-    mainPython: ./config-exists.py
+      policy should have a config file. Reads `.git.pre_commit`.
+    mainPython: ./pre-commit-config-exists.py
     keywords: ["pre-commit", "config exists", "developer tooling"]
 
-  - name: hooks-have-pinned-refs
+  - name: pre-commit-pinned-refs
     description: |
       Each repo entry in `.pre-commit-config.yaml` must have a `rev` pinned
       to an immutable ref (tag or commit SHA), not a floating branch like
       `main`, `master`, or `HEAD`. Floating refs let upstream hook changes
       land in the developer machine without review. Skips when no
-      pre-commit config is present (paired with `config-exists`).
-    mainPython: ./hooks-have-pinned-refs.py
+      pre-commit config is present (paired with `pre-commit-config-exists`).
+    mainPython: ./pre-commit-pinned-refs.py
     keywords: ["pre-commit", "pinned refs", "supply chain", "immutable"]
 
-  - name: has-secret-scan-hook
+  - name: pre-commit-secret-scan-hook
     description: |
       Recommends that the pre-commit config include at least one
       secret-scanning hook (gitleaks, detect-secrets, trufflehog, or
       similar). Pre-commit is the cheapest place to catch credentials
       before they reach the remote. Skips when no pre-commit config is
-      present (paired with `config-exists`). The accepted hook ID list is
-      configurable via the `secret_scan_hook_ids` input.
-    mainPython: ./has-secret-scan-hook.py
+      present (paired with `pre-commit-config-exists`). The accepted hook
+      ID list is configurable via the `secret_scan_hook_ids` input.
+    mainPython: ./pre-commit-secret-scan-hook.py
     keywords: ["pre-commit", "secret scanning", "gitleaks", "credentials"]
 
-  - name: ci-skip-empty
+  - name: pre-commit-ci-skip-empty
     description: |
       Flags non-empty `ci.skip` lists in `.pre-commit-config.yaml`. The
       `ci.skip` setting is a pre-commit.ci escape hatch that disables
       hooks in the hosted CI service while still showing them locally —
       a common way to silently bypass enforcement. Skips when no
-      pre-commit config is present (paired with `config-exists`).
-    mainPython: ./ci-skip-empty.py
+      pre-commit config is present (paired with `pre-commit-config-exists`).
+    mainPython: ./pre-commit-ci-skip-empty.py
     keywords: ["pre-commit", "ci.skip", "enforcement bypass"]
 
 inputs:
