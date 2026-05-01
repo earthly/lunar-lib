@@ -1,7 +1,7 @@
 version: 0
 
 name: git
-description: Git-ecosystem guardrails — pre-commit baseline, commitlint, gitattributes, gitmodules, and signed-commits checks
+description: Git-ecosystem guardrails — pre-commit baseline, gitattributes, gitmodules, and signed-commits checks
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
@@ -9,9 +9,9 @@ landing_page:
   display_name: "Git Guardrails"
   long_description: |
     Enforce baselines for git-ecosystem tooling that lives in the
-    repository: pre-commit config and hook hygiene, commitlint adoption,
-    gitattributes EOL normalization, submodule pinning, and recent
-    commit-signature coverage. Reads data from the `git` collector.
+    repository: pre-commit config and hook hygiene, gitattributes EOL
+    normalization, submodule pinning, and recent commit-signature
+    coverage. Reads data from the `git` collector.
   category: "devex-build-and-ci"
   icon: "assets/git.svg"
   status: "beta"
@@ -62,27 +62,6 @@ policies:
       pre-commit config is present (paired with `pre-commit-config-exists`).
     mainPython: ./pre-commit-ci-skip-empty.py
     keywords: ["pre-commit", "ci.skip", "enforcement bypass"]
-
-  # --- commitlint checks ---
-  - name: commitlint-config-exists
-    description: |
-      Recommends that the repository have a commitlint configuration to
-      enforce commit-message structure (especially valuable when changelog
-      generation, semantic-release, or stakeholder-readable git history
-      matter). Reads `.git.commitlint`. Universal — fails when no config
-      is present.
-    mainPython: ./commitlint-config-exists.py
-    keywords: ["commitlint", "conventional commits", "commit messages"]
-
-  - name: commitlint-conventional
-    description: |
-      Requires the commitlint config to extend `@commitlint/config-conventional`
-      (or another conventional-commits ruleset). Conventional Commits
-      enables automated changelog generation and clear release-note
-      categorization. Skips when no commitlint config is present (paired
-      with `commitlint-config-exists`).
-    mainPython: ./commitlint-conventional.py
-    keywords: ["commitlint", "conventional commits", "changelog", "semantic-release"]
 
   # --- gitattributes checks ---
   - name: gitattributes-exists
