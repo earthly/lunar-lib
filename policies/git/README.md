@@ -79,9 +79,14 @@ A component with a pre-commit config (all repos pinned, secret scanner present, 
     "signing": {
       "default_branch": "main",
       "commits_examined": 50,
-      "signed_count": 50,
-      "unsigned_count": 0,
-      "all_signed": true
+      "signature_counts": {
+        "good": 50,
+        "bad": 0,
+        "unknown": 0,
+        "unsigned": 0,
+        "expired": 0,
+        "revoked": 0
+      }
     }
   }
 }
@@ -110,9 +115,14 @@ A repo with floating-pinned pre-commit hooks, missing `.gitattributes`, a submod
     "signing": {
       "default_branch": "main",
       "commits_examined": 50,
-      "signed_count": 35,
-      "unsigned_count": 15,
-      "all_signed": false
+      "signature_counts": {
+        "good": 35,
+        "bad": 0,
+        "unknown": 0,
+        "unsigned": 15,
+        "expired": 0,
+        "revoked": 0
+      }
     }
   }
 }

@@ -35,9 +35,6 @@ This collector writes to the following Component JSON paths (each rooted at `.gi
 | `.git.signing.default_branch` | string | Default branch the signature check ran against |
 | `.git.signing.commits_examined` | number | Number of commits inspected from the default branch |
 | `.git.signing.signature_counts` | object | Counts by `git log %G?` classification (`good`, `bad`, `unknown`, `unsigned`, `expired`, `revoked`) |
-| `.git.signing.signed_count` | number | Commits with a valid signature (`good`) |
-| `.git.signing.unsigned_count` | number | Commits without any signature |
-| `.git.signing.all_signed` | boolean | `true` when every examined commit was signed and valid |
 
 ## Collectors
 
