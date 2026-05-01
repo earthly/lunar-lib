@@ -13,7 +13,7 @@ landing_page:
     policy, and team data. Normalizes results into the .oncall category
     for tool-agnostic policy evaluation — the same `oncall` policy works
     whether the data comes from OpsGenie, PagerDuty, or another provider.
-  categories: ["service-catalog"]
+  categories: ["incident-management"]
   icon: "assets/opsgenie.svg"
   status: "beta"
   related:
