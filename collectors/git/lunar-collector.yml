@@ -1,0 +1,155 @@
+version: 0
+
+name: git
+description: Collect git-ecosystem configuration — pre-commit hooks, gitattributes, gitmodules, signed commits
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Git Collector"
+  long_description: |
+    Aggregates configuration data for git-ecosystem tooling that lives in
+    the repository: pre-commit hooks, gitattributes rules, submodule
+    definitions, and recent commit-signature history. Distinct from
+    `.vcs.*` (hosted-VCS data like branch protection, PRs).
+  categories: ["code-analysis"]
+  icon: "assets/git.svg"
+  status: "beta"
+  related:
+    - slug: "git"
+      type: "policy"
+      reason: "Enforces git-ecosystem configuration baselines using collected data"
+
+collectors:
+  - name: pre-commit
+    description: |
+      Scans the repository for a pre-commit configuration file at
+      .pre-commit-config.yaml (or .yml variant). Parses the YAML to extract
+      the configured `repos[]` (each with `repo`, `rev`, `hooks[]`), a
+      flattened list of hook IDs, and the optional `ci.skip` list. Writes
+      structured data to `.git.pre_commit`.
+    mainBash: pre-commit.sh
+    hook:
+      type: code
+    keywords: ["pre-commit", "git hooks", "lint", "secret scan", "code quality", "developer tooling"]
+
+  - name: gitattributes
+    description: |
+      Detects `.gitattributes` in the repository root. Parses each rule to
+      classify patterns by attribute (`text`/`eol` for EOL normalization,
+      `filter=lfs` for Git LFS, `binary` for binary patterns,
+      `export-ignore` for archive exclusion). Writes to `.git.attributes`.
+    mainBash: gitattributes.sh
+    hook:
+      type: code
+    keywords: ["gitattributes", "git lfs", "eol normalization", "line endings", "repository hygiene"]
+
+  - name: gitmodules
+    description: |
+      Detects `.gitmodules` in the repository root. Parses each
+      `[submodule "<name>"]` block to extract `path`, `url`, and the
+      optional `branch` field (set when a submodule tracks a floating
+      ref via `git submodule update --remote`). Writes to
+      `.git.submodules`.
+    mainBash: gitmodules.sh
+    hook:
+      type: code
+    keywords: ["gitmodules", "git submodules", "vendoring", "supply chain"]
+
+  - name: signed-commits
+    description: |
+      Inspects the last N commits on the default branch for GPG/SSH
+      signature presence using `git log --pretty=format:'%G?'`. Each
+      commit is classified as `good`, `bad`, `unknown`, `unsigned`,
+      `expired`, or `revoked`. Writes counts to
+      `.git.signing.signature_counts`. The history-window size is
+      configurable via `signed_commits_window`.
+    mainBash: signed-commits.sh
+    hook:
+      type: code
+    keywords: ["signed commits", "gpg", "ssh signing", "commit signing", "supply chain"]
+
+inputs:
+  pre_commit_paths:
+    description: Comma-separated list of pre-commit config file paths to check (first match wins)
+    default: ".pre-commit-config.yaml,.pre-commit-config.yml"
+  gitattributes_paths:
+    description: Comma-separated list of .gitattributes paths to check (first match wins)
+    default: ".gitattributes"
+  gitmodules_paths:
+    description: Comma-separated list of .gitmodules paths to check (first match wins)
+    default: ".gitmodules"
+  signed_commits_window:
+    description: Number of recent commits on the default branch to inspect for signature status
+    default: "50"
+
+example_component_json: |
+  {
+    "git": {
+      "pre_commit": {
+        "valid": true,
+        "path": ".pre-commit-config.yaml",
+        "repos": [
+          {
+            "repo": "https://github.com/pre-commit/pre-commit-hooks",
+            "rev": "v4.5.0",
+            "hooks": [
+              {"id": "trailing-whitespace"},
+              {"id": "end-of-file-fixer"}
+            ]
+          },
+          {
+            "repo": "https://github.com/gitleaks/gitleaks",
+            "rev": "v8.18.0",
+            "hooks": [
+              {"id": "gitleaks"}
+            ]
+          }
+        ],
+        "hook_ids": ["trailing-whitespace", "end-of-file-fixer", "gitleaks"],
+        "hook_count": 3,
+        "repo_count": 2,
+        "ci_skip": [],
+        "all_pinned": true
+      },
+      "attributes": {
+        "valid": true,
+        "path": ".gitattributes",
+        "rules_count": 8,
+        "lfs_patterns": ["*.psd", "*.zip"],
+        "binary_patterns": ["*.exe"],
+        "eol_normalized": true,
+        "export_ignore_patterns": [".github/", "tests/"]
+      },
+      "submodules": {
+        "valid": true,
+        "path": ".gitmodules",
+        "modules": [
+          {
+            "name": "vendor/foo",
+            "path": "vendor/foo",
+            "url": "https://github.com/example/foo.git",
+            "branch": null
+          },
+          {
+            "name": "vendor/bar",
+            "path": "vendor/bar",
+            "url": "https://github.com/example/bar.git",
+            "branch": "main"
+          }
+        ]
+      },
+      "signing": {
+        "default_branch": "main",
+        "commits_examined": 50,
+        "signature_counts": {
+          "good": 48,
+          "bad": 0,
+          "unknown": 0,
+          "unsigned": 2,
+          "expired": 0,
+          "revoked": 0
+        }
+      }
+    }
+  }
