@@ -12,7 +12,7 @@ landing_page:
     Query the PagerDuty API to collect on-call schedule, escalation policy,
     and current responder data. Normalizes results into the .oncall category
     for tool-agnostic policy evaluation.
-  categories: ["service-catalog"]
+  categories: ["incident-management"]
   icon: "assets/pagerduty.svg"
   status: "beta"
   related:

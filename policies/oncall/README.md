@@ -26,9 +26,9 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.oncall.schedule.exists` | boolean | `pagerduty` collector (or any oncall-category collector) |
-| `.oncall.schedule.participants` | number | `pagerduty` collector |
-| `.oncall.escalation.exists` | boolean | `pagerduty` collector |
+| `.oncall.schedule.exists` | boolean | `pagerduty` or `opsgenie` collector (or any oncall-category collector) |
+| `.oncall.schedule.participants` | number | `pagerduty` or `opsgenie` collector |
+| `.oncall.escalation.exists` | boolean | `pagerduty` or `opsgenie` collector |
 
 **Note:** Ensure a collector that writes to the `.oncall` category is configured before enabling this policy.
 
@@ -76,6 +76,6 @@ policies:
 
 When this policy fails, you can resolve it by:
 
-1. **schedule-configured:** Create an on-call schedule in PagerDuty for the service and assign team members
-2. **escalation-defined:** Create an escalation policy in PagerDuty with at least one level
+1. **schedule-configured:** Create an on-call schedule in your incident-management tool (PagerDuty, OpsGenie, etc.) for the service and assign team members
+2. **escalation-defined:** Create an escalation policy in your incident-management tool with at least one level
 3. **min-participants:** Add more team members to the on-call rotation (default minimum is 2)

@@ -66,6 +66,7 @@ VALID_INTEGRATION_CATEGORIES = {
     "languages",
     "documentation",
     "service-catalog",
+    "incident-management",
 }
 
 # Valid status values
