@@ -9,13 +9,14 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "OpsGenie Collector"
   long_description: |
-    Query the OpsGenie REST API to collect on-call schedule, escalation
-    policy, and team data. Normalizes results into the .oncall category
-    for tool-agnostic policy evaluation — the same `oncall` policy works
-    whether the data comes from OpsGenie, PagerDuty, or another provider.
+    Query the OpsGenie REST API for on-call, escalation, and team data.
+    Writes tool-agnostic .oncall.* fields. Experimental: Atlassian is
+    sunsetting OpsGenie into Jira Service Management; new accounts
+    cannot be created. Existing tenants still work; new users should
+    wait for the JSM collector.
   categories: ["incident-management"]
   icon: "assets/opsgenie.svg"
-  status: "beta"
+  status: "experimental"
   related:
     - slug: "oncall"
       type: "policy"

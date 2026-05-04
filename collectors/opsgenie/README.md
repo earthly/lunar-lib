@@ -2,6 +2,15 @@
 
 Collect on-call schedule and escalation data from the OpsGenie API.
 
+> ⚠️ **Experimental — OpsGenie is being sunset by Atlassian.**
+> [opsgenie.com](https://opsgenie.com) now redirects to atlassian.com,
+> and **new OpsGenie accounts can no longer be created**. Atlassian is
+> migrating OpsGenie functionality into Jira Service Management (JSM).
+> Existing OpsGenie tenants (orgs that signed up before the migration)
+> can continue to use this collector against the OpsGenie REST API.
+> Anyone setting up on-call from scratch should use Jira Service
+> Management; a JSM on-call collector is tracked separately.
+
 ## Overview
 
 This collector queries the OpsGenie REST API on a daily cron schedule to
