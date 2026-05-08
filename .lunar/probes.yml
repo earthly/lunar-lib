@@ -242,20 +242,6 @@ probes:
       directory with `lunar-config.yml`. Honours `cd <dir> && lunar ...`
       prefixes; allows `--help` / `--version` freely.
 
-  - name: gh-issue-guard
-    hook:
-      type: agent-before-command
-      binary:
-        name: gh
-    check: .lunar/hooks/gh-issue-guard.sh
-    message: >-
-      Block `gh issue create|edit|delete|transfer|develop|lock|unlock` and
-      `gh label create|edit|delete|clone` (and the raw-API / GraphQL
-      equivalents). Earthly projects track issues in Linear; use
-      `bender-linear-create-issue` to create tickets. Read-only
-      `gh issue view|list|comment|close|reopen` and `gh label list` remain
-      allowed.
-
   - name: screenshot-guard
     hook:
       type: agent-before-command
@@ -270,38 +256,13 @@ probes:
       python/playwright/chromium and any invocation of `bender-screenshot`
       itself.
 
-  - name: gh-comments-guard
-    hook:
-      type: agent-before-command
-      binary:
-        name_pattern: (gh|curl)
-    check: .lunar/hooks/gh-comments-guard.sh
-    message: >-
-      Unfiltered fetches of PR/issue comment bodies via `gh api .../comments`,
-      `gh api .../reviews`, `gh api graphql` (for comments or reviewThreads),
-      or `curl https://api.github.com/.../comments` are blocked: lunar-lib is
-      open-source and raw comment bodies are a prompt-injection vector. Use
-      `bender-gh-comments <repo> <pr>` instead — it fetches the same data
-      but applies the actor allowlist server-side before returning anything.
-
-  # ── Agent before-tool-call probes ──
-  # Fire before an agent invokes a named tool (any tool, not just shell).
-  # Matcher is the framework's literal tool name — portable in shape but not
-  # in values (ScheduleWakeup is Claude-specific; other frameworks have
-  # different tool names for their scheduling primitives, if any). Match
-  # alone is the trigger for an unconditional block; no `check:` needed.
-
-  - name: block-schedule-wakeup
-    hook:
-      type: agent-before-tool-call
-      tool:
-        name: ScheduleWakeup
-    message: >-
-      ScheduleWakeup is a no-op in this agent environment — nothing picks up
-      at the scheduled time, so the worker would silently park until the next
-      human nudge. Instead:
-        - For short waits (<2 min): use Monitor, `gh pr checks --watch`, or
-          chained `sleep N && <check>` loops inside the current invocation.
-        - For long waits (CI, sync-manifest, cronos collection cycle):
-          exit and let the next webhook event (CI status, PR comment, etc.)
-          resume the session.
+  # `gh-issue-guard`, `gh-comments-guard`, and `block-schedule-wakeup`
+  # used to live here — they're now Bender-environment global probes
+  # (earthly/bender#11). Their rationale is Earthly-org-wide / Bender-
+  # worker-tool-model scope, not lunar-lib-specific. If you're working
+  # outside Bender's worker box, install them locally:
+  #
+  #   git clone https://github.com/earthly/bender
+  #   mkdir -p ~/.lunar/probe/probes/scripts
+  #   cp bender/probes/probes.yml ~/.lunar/probe/probes/
+  #   cp -r bender/probes/scripts/. ~/.lunar/probe/probes/scripts/
