@@ -1,0 +1,268 @@
+# Agent guardrail probes for lunar-lib plugin authors.
+#
+# This is the lunar-probe-flavoured rewrite of the legacy `.lunar/checks.yml`.
+# Same probes, ported to the `.lunar/probes*.yml` schema documented at
+# https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md.
+#
+# Schema cheat sheet (see the doc for the full version):
+#   - Top-level: `version: 0` + `probes:` list.
+#   - Per-probe `hook:` is an object: `type:` + the matcher field(s) for that
+#     type, so event + match condition are grouped in one place.
+#   - `check:` and `hook.when:` are both optional bash gates with opposite
+#     polarity — `check:` fires on non-zero exit (negative polarity, the
+#     legacy `run:` field maps here); `hook.when:` fires on exit 0 (positive
+#     polarity, used for advisory gates and session-start dynamic content).
+#
+# Hook types follow the `<env>-<before|after>-<noun>` convention used by
+# Lunar collector CI hooks (e.g. `ci-before-command`), with the `agent-`
+# prefix for the agent-sandbox execution environment. Every probe has the
+# same shape (matcher + optional gates + `message:`); what firing *does*
+# depends on the hook type — only the four `before-*` hooks actually block,
+# everything else is a nudge.
+#
+#   hook.type:                    When it fires                        Matcher (under hook:)
+#   ----------------------------  -----------------------------------  ---------------------------
+#   agent-session-start           At every agent session begin         (none; optional `when:`
+#                                 (startup or resume). Surfaces         gate. Stdout/stderr captured
+#                                 `message:` as additionalContext.      as {when_stdout}/stderr/output
+#                                 `check:` is a lint error here.        for reference in message.)
+#   agent-before-file-edit        Before agent writes/edits a file.    `paths:` (string or list);
+#                                 Match → hard block.                  optional `when:` / `check:`
+#   agent-after-file-edit         After agent writes/edits a file.     `paths:` (string or list);
+#                                 With `check:` — louder nudge on      optional `when:` and/or `check:`
+#                                 non-zero exit. Without — always-on   gates ({file} substituted)
+#                                 advisory.
+#   agent-before-command          Before agent runs a shell cmd.       `binary:` (structured)
+#                                 Match → hard block. Use `when:` /
+#                                 `check:` to make the block conditional.
+#   agent-before-tool-call        Before agent invokes a named tool.   `tool:` (framework tool)
+#                                 Same hard-block contract.
+#   agent-session-end             When agent session ends. Use         `paths:` (any changed file
+#                                 `check_each:` for per-file checks or  matches a glob)
+#                                 `check_all:` for batched checks.
+#
+# Reserved for future use (parsed without error, silently skipped by MVP):
+#   agent-before-file-read        Before agent reads a file
+#   agent-after-command           After agent runs a shell command
+#   agent-after-tool-call         After agent invokes a named tool
+#   agent-before-prompt           Before agent processes a user prompt
+
+version: 0
+
+probes:
+  # ── Inline file-edit checks ──
+  # `check:` is the gate — non-zero exit fires the probe and surfaces `message:`
+  # to the agent. Edit already happened, so this is a louder nudge, not a true
+  # block; the agent should self-correct on its next turn.
+
+  - name: svg-black-fill
+    hook:
+      type: agent-after-file-edit
+      paths: "**/assets/*.svg"
+    check: "grep -qE 'fill=\"black\"' {file} && ! grep -iqE 'fill=\"(white|#fff|#ffffff)\"' {file}"
+    message: "SVG must use fill=\"black\". Website converts to white automatically."
+
+  - name: svg-no-title-tag
+    hook:
+      type: agent-after-file-edit
+      paths: "**/assets/*.svg"
+    check: "! grep -qE '<title>' {file}"
+    message: "Strip <title> tags from SVG icons. They add unnecessary metadata."
+
+  - name: earthfile-wired-into-all
+    hook:
+      type: agent-after-file-edit
+      paths: "collectors/*/Earthfile"
+    check: "PLUGIN_DIR=$(dirname {file} | sed \"s|$(git rev-parse --show-toplevel)/||\"); ROOT_EF=$(git rev-parse --show-toplevel)/Earthfile; grep -q \"$PLUGIN_DIR\" \"$ROOT_EF\""
+    message: "This plugin has an Earthfile but is not referenced in the root Earthfile's +all target. Add: BUILD --pass-args ./<plugin-path>+image"
+
+  - name: collector-gnu-grep
+    hook:
+      type: agent-after-file-edit
+      paths: "collectors/**/*.sh"
+    check: "! grep -nE 'grep\\s+-[a-zA-Z]*P|grep\\s+--include|grep\\s+--perl-regexp' {file}"
+    message: "GNU grep extension detected. This runs on Alpine/BusyBox where -P and --include are not available. Use sed, find, or BusyBox-compatible patterns."
+
+  - name: cronos-runner-required
+    hook:
+      type: agent-after-file-edit
+      paths: "**/.github/workflows/*.yml"
+    check: .lunar/hooks/cronos-runner-check.sh {file}
+    message: >-
+      Workflow file in a cronos-org repo (e.g. pantalasa-cronos/*) has no
+      job using `runs-on: cronos`. The lunar agent only traces CI commands
+      on the cronos self-hosted runner — without it, every CI-hook collector
+      registered for this component will silently never fire, and the
+      component will look "stuck" in the hub even though it is registered
+      correctly. ENG-543: a worker shipped scala-service with no workflow
+      at all and then invented a "per-component cycle hasn't reached the
+      repo" excuse. Set `runs-on: cronos` on the relevant job(s).
+
+  # The four probes below run the same Python validators that `earthly +lint`
+  # invokes in CI. Calling them directly (~120ms each, ~700ms for all four)
+  # avoids the ~30s buildkitd warmup the Earthly target needs and lets us
+  # catch lint failures at file-edit time instead of after-the-fact in CI.
+
+  - name: readme-structure
+    hook:
+      type: agent-after-file-edit
+      paths: "**/README.md"
+    check: "python3 scripts/validate_readme_structure.py"
+    message: "Plugin README does not match the template structure. Each plugin type has required/disallowed sections — see ai-context/{collector,policy,cataloger}-README-template.md."
+
+  - name: landing-page-metadata
+    hook:
+      type: agent-after-file-edit
+      paths: "**/lunar-*.yml"
+    check: "python3 scripts/validate_landing_page_metadata.py"
+    message: "landing_page metadata in a plugin manifest is incomplete or invalid. Required fields, length limits, and category enums are documented in scripts/validate_landing_page_metadata.py."
+
+  - name: svg-grayscale
+    hook:
+      type: agent-after-file-edit
+      paths: "**/assets/*.svg"
+    check: "python3 scripts/validate_svg_grayscale.py"
+    message: "SVG asset uses non-grayscale colors. The website flattens rgb() fills to white — use white-with-opacity, black, none, or url(#gradient) referencing white stops."
+
+  - name: earthfile-wiring
+    hook:
+      type: agent-after-file-edit
+      paths: "**/Earthfile"
+    check: "python3 scripts/validate_earthfile_wiring.py"
+    message: "A plugin Earthfile defines an image: target that isn't wired into the root Earthfile's +all target. CI will not build or push this image until the BUILD --pass-args line is added."
+
+  # ── Path-scoped advisories (agent-after-file-edit, no `check:`) ──
+  # Reminders shown alongside file edits. No `check:` — the `message:` is the
+  # whole probe. Optional `hook.when:` field gates the probe on a bash
+  # expression ({file} is substituted with the edited file path); the probe
+  # fires only when `when:` exits 0. These are the direct port of the legacy
+  # `agent-after-file-edit-nudge` hook type.
+
+  - name: svg-logo-sourcing
+    hook:
+      type: agent-after-file-edit
+      paths: "**/assets/*.svg"
+    message: "Reminder: Is this a tech-specific collector or policy? Check simple-icons (https://github.com/simple-icons/simple-icons) for an official logo before creating a custom one."
+
+  - name: ci-collector-testing-reminder
+    hook:
+      type: agent-after-file-edit
+      paths: "collectors/*/lunar-collector.yml"
+      when: "grep -q 'type: ci-' {file}"
+    message: "Reminder: This collector has CI hooks. Local 'lunar collector dev' is NOT sufficient -- you must test on cronos with a real CI run (push config, trigger component build, verify data on hub)."
+
+  - name: manifest-example-json-freshness
+    hook:
+      type: agent-after-file-edit
+      paths: "collectors/*/lunar-collector.yml"
+    message: "Reminder: Does example_component_json still match what the collector actually produces? Run 'lunar collector dev' and compare the output to the example in this manifest."
+
+  - name: policy-skip-vs-fail
+    hook:
+      type: agent-after-file-edit
+      paths: "policies/**/*.py"
+      when: "grep -qE '\\.skip\\s*\\(' {file}"
+    message: >-
+      This policy file contains a .skip() call — is skip appropriate here?
+      Rule of thumb: skip = category does not apply to this component
+      (e.g. Go policy on a Python repo, vendor-specific policy when the
+      vendor isn't in use). fail = category applies but condition not met
+      (e.g. oncall policy with no oncall data — the user opted in, so
+      absence IS the violation). Skipping when you should fail inflates
+      compliance scores. See ai-context/policy-reference.md — sections
+      "Universal vs Vendor-Specific Policies" and "skip(reason)" — for
+      the full decision tree.
+
+  - name: screenshot-quality-reminder
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*screenshot*"
+    message: >-
+      Reminder: PR-evidence screenshots must go through `bender-screenshot`
+      (not raw Playwright `page.screenshot()`). The wrapper takes a JSON spec
+      with `must_be_visible` strings and refuses to save unless every one is
+      actually inside the final viewport — which catches the recurring failure
+      mode of posting top-of-page screenshots that hide the tested data
+      (PR #142). Use `scroll_to_text` to land on the relevant row/key; for
+      virtualized tables (Grafana checks panel) the wrapper scrolls the grid
+      container until the row materializes. The `screenshot-guard`
+      agent-before-command probe will block raw `playwright`/`chromium`
+      screenshot calls — route them through `bender-screenshot --spec` instead.
+
+  # ── Agent session-start probes ──
+  # Fire once when an agent session begins (including `claude -p` headless
+  # resumes). `message:` is surfaced as additionalContext the agent sees before
+  # its first turn. We use `hook.when:` to point at a script (positive-polarity
+  # gate) and pull the script's stdout into `message:` via `{when_output}`,
+  # which preserves the legacy "stdout becomes additionalContext" behaviour.
+  # Use for orientation — what phase is this work in? which playbook section
+  # applies? — not for long-running checks. `check:` is a lint error here.
+
+  - name: phase-guidance
+    hook:
+      type: agent-session-start
+      when: .lunar/hooks/phase-guidance.sh
+    message: |
+      {when_output}
+
+      Before doing PR work, identify the phase (spec / implementation
+      & testing / impl-review / merge) and read the matching phase doc
+      under `.ai-implementation/phases/`. The overview lives at
+      `.ai-implementation/LUNAR-PLUGIN-PLAYBOOK-AI.md`. CI green is
+      not the finish line for implementation PRs — cronos round-trip
+      testing (per `phases/implementation.md`) is required.
+
+  - name: cronos-cheat-sheet
+    hook:
+      type: agent-session-start
+      when: .lunar/hooks/cronos-cheat-sheet.sh
+    message: |
+      {when_output}
+
+      Cronos hub DB schema, Grafana dashboard UIDs, component-variable
+      gotchas, known traps. Use these instead of re-deriving the schema
+      with `information_schema.columns` queries every ticket.
+
+  # ── Agent before-command probes ──
+  # Fire before an agent (e.g. Claude Code) executes a shell command in its
+  # sandbox. `check:` exit 0 → allow; non-zero → block with stderr shown to the
+  # agent. The runner pipes the PreToolUse JSON payload to `check:` on stdin.
+  # Matcher shape mirrors Lunar collector `ci-before-command` hooks.
+
+  - name: lunar-cli-guard
+    hook:
+      type: agent-before-command
+      binary:
+        name: lunar
+    check: .lunar/hooks/lunar-cli-guard.sh
+    message: >-
+      Block `lunar` CLI commands when context is wrong:
+      LUNAR_HUB_TOKEN must be set, and commands that talk to the hub
+      (collector|policy|component|catalog|sql|secret|hub) must run from a
+      directory with `lunar-config.yml`. Honours `cd <dir> && lunar ...`
+      prefixes; allows `--help` / `--version` freely.
+
+  - name: screenshot-guard
+    hook:
+      type: agent-before-command
+      binary:
+        name_pattern: (python|python3|playwright|chromium|chrome|google-chrome|chromium-browser)
+    check: .lunar/hooks/screenshot-guard.sh
+    message: >-
+      Block raw Playwright `page.screenshot(...)` and `chromium --screenshot=`
+      calls; force PR-evidence screenshots through `bender-screenshot --spec`,
+      which validates every string in `must_be_visible` is actually in the
+      final viewport before saving. Allows non-screenshot uses of
+      python/playwright/chromium and any invocation of `bender-screenshot`
+      itself.
+
+  # `gh-issue-guard`, `gh-comments-guard`, and `block-schedule-wakeup`
+  # used to live here — they're now Bender-environment global probes
+  # (earthly/bender#11). Their rationale is Earthly-org-wide / Bender-
+  # worker-tool-model scope, not lunar-lib-specific. If you're working
+  # outside Bender's worker box, install them locally:
+  #
+  #   git clone https://github.com/earthly/bender
+  #   mkdir -p ~/.lunar/probe/probes/scripts
+  #   cp bender/probes/probes.yml ~/.lunar/probe/probes/
+  #   cp -r bender/probes/scripts/. ~/.lunar/probe/probes/scripts/
