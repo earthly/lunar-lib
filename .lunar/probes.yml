@@ -87,7 +87,7 @@ probes:
     hook:
       type: agent-after-file-edit
       paths: "**/.github/workflows/*.yml"
-    check: .lunar/hooks/cronos-runner-check.sh
+    check: .lunar/hooks/cronos-runner-check.sh {file}
     message: >-
       Workflow file in a cronos-org repo (e.g. pantalasa-cronos/*) has no
       job using `runs-on: cronos`. The lunar agent only traces CI commands
