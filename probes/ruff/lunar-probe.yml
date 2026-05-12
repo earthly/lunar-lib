@@ -1,0 +1,49 @@
+version: 0
+
+name: ruff
+description: Lint and format-check Python with Ruff on every edit.
+author: earthly
+
+landing_page:
+  display_name: "Ruff"
+  long_description: |
+    Run Ruff against edited Python files on every agent file edit.
+    Ruff is an ultra-fast linter + formatter (Rust) — sub-50ms warm
+    per file — so single-file feedback fits comfortably inside the
+    agent loop. Probes are read-only (`ruff check --no-fix`,
+    `ruff format --check`); the agent owns all edits.
+  categories: ["languages", "code-analysis"]
+  icon: "assets/icon.svg"
+  status: "beta"
+
+inputs:
+  format_check:
+    description: If "true", also run `ruff format --check`. Set to "false" to skip the format probe (e.g. for repos that don't use Ruff's formatter).
+    default: "true"
+
+probes:
+  - name: lint
+    description: Run `ruff check` on each edited Python file.
+    keywords: ["python", "lint", "ruff"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.py"
+    check: 'command -v ruff >/dev/null 2>&1 && ruff check --quiet --no-fix {file}'
+    message: |
+      Ruff flagged `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the issues above, or run `ruff check --fix {file}` locally if you want Ruff to apply safe auto-fixes (then re-read the file before continuing).
+
+  - name: format
+    description: Verify formatter compliance with `ruff format --check` on each edited Python file.
+    keywords: ["python", "format", "ruff"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.py"
+      when: '[ "${{ inputs.format_check }}" = "true" ]'
+    check: 'command -v ruff >/dev/null 2>&1 && ruff format --check --quiet {file}'
+    message: "Ruff format-check failed for `{file}`. Run `ruff format {file}` locally before committing, then re-read the file."
