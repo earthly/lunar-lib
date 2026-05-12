@@ -1,0 +1,48 @@
+version: 0
+
+name: hadolint
+description: Lint Dockerfiles with Hadolint on every edit.
+author: earthly
+
+landing_page:
+  display_name: "Hadolint Probe"
+  long_description: |
+    Run Hadolint on Dockerfiles as the agent edits them. Catches `:latest`
+    base tags, missing `--no-install-recommends`, layer-cache busters, and
+    other Dockerfile anti-patterns before they land in CI. Read-only by
+    design — Hadolint has no `--fix` flag, so findings come back as
+    feedback for the agent to act on.
+  categories: ["containers", "code-analysis"]
+  icon: "assets/hadolint.svg"
+  status: "beta"
+  related:
+    - slug: "docker"
+      type: "collector"
+      reason: "Records the same Hadolint findings at CI time for dashboarding."
+    - slug: "container"
+      type: "policy"
+      reason: "CI guardrail that fails the build on Hadolint findings at or above the configured severity."
+
+probes:
+  - name: edit
+    description: Run Hadolint on edited Dockerfiles.
+    keywords: ["docker", "dockerfile", "lint", "hadolint", "container"]
+    hook:
+      type: agent-after-file-edit
+      paths:
+        - "**/Dockerfile"
+        - "**/Dockerfile.*"
+        - "**/*.Dockerfile"
+    check: '! command -v hadolint >/dev/null 2>&1 || hadolint {file}'
+    message: |-
+      Hadolint flagged `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the findings before committing — Dockerfile anti-patterns
+      (unpinned `:latest` tags, missing `--no-install-recommends`,
+      layer-cache busters, etc.) are real correctness and security
+      issues, and the `container` policy will fail CI on anything at
+      or above the configured severity threshold.
