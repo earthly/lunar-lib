@@ -1,0 +1,40 @@
+version: 0
+
+name: eslint
+description: Run ESLint at session end against all edited JS/TS files.
+author: earthly
+
+landing_page:
+  display_name: "ESLint Probe"
+  long_description: |
+    Run ESLint once at session end against every JS/TS file the agent
+    touched. Batched because ESLint's cold start dominates per-file cost.
+    Read-only by design — `--fix` is off, findings come back as feedback
+    for the agent to act on.
+  categories: ["languages", "build"]
+  icon: "assets/eslint.svg"
+  status: "beta"
+  related:
+    - slug: "nodejs"
+      type: "collector"
+      reason: "Records ESLint configuration presence (.eslintrc.*, eslint.config.*, package.json eslintConfig)."
+
+probes:
+  - name: session-end
+    description: Lint the touched JS/TS surface as a batch at session end.
+    keywords: ["javascript", "typescript", "eslint", "lint", "node", "tsx", "jsx"]
+    hook:
+      type: agent-session-end
+      paths: "**/*.{js,jsx,ts,tsx,mjs,cjs}"
+    check_all: '! command -v npx >/dev/null 2>&1 || ! npx --no-install eslint --version >/dev/null 2>&1 || npx --no-install eslint --quiet {files}'
+    message: |-
+      ESLint findings at session end:
+
+      ```
+      {check_output}
+      ```
+
+      Address the findings before committing. ESLint catches real
+      correctness bugs (unused imports, missing returns, `no-explicit-any`,
+      dead code, async-without-await) and most teams gate CI on a clean
+      ESLint pass.
