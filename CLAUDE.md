@@ -75,9 +75,10 @@ If someone asks you to do something code-related and you're not sure what they m
 - For lunar-lib: clone if not present, create feature branch, work, push, open draft PR
 - Commit messages should be descriptive (not "fix stuff")
 - **Always open PRs as draft:** `gh pr create --draft`
-- **Summon CodeRabbit review:** Post `@coderabbitai review` as a PR comment to kick off CodeRabbit's automated review. Once summoned, CodeRabbit re-reviews on every push automatically.
-  - **Normal PRs:** post the comment immediately after opening the PR.
-  - **Spec-only PRs** (title contains `[Spec Only]` or `[Spec]`): **hold off.** A spec PR has no implementation code yet. Only post `@coderabbitai review` once you transition from spec to implementation (i.e. when starting to write code after the secondary reviewer approves the spec — see `.ai-implementation/phases/implementation.md` Step 0).
+- **CodeRabbit summon is automatic — do not post it yourself.** The Bender server watches GitHub webhooks and posts `@coderabbitai review` on its own when a human marks the PR ready for review (the `pull_request.ready_for_review` action with a human in PEOPLE.json as the sender). CodeRabbit ignores summons posted while a PR is still in draft (PR #162 was the canary), which is why we moved this to the draft→ready transition.
+  - **Keep PRs in draft** while you implement, push, and post test evidence. CodeRabbit will not review yet, and that's intentional.
+  - **Do not run `gh pr ready` yourself.** Leave the flip to ready for a human — that's what triggers the summon.
+  - Once summoned, CodeRabbit re-reviews on every push automatically. You only address its feedback; you never re-summon.
 - **Reviewer assignment is a two-step process:**
   1. Add the person who requested the work as the default reviewer: `gh pr edit <PR> --add-reviewer <username>`
      - If triggered from Linear, add the ticket creator

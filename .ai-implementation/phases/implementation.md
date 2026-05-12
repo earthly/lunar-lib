@@ -65,17 +65,19 @@ Follow this checklist **in order**. Every step must be completed before moving t
 
 Reviewers expect to see your test evidence on the PR before their review is meaningful. A PR comment with Grafana screenshots + Component JSON output (Step 8) is what unblocks implementation review — not vice versa.
 
-### Step 0: Summon CodeRabbit
+### Step 0: CodeRabbit summon is automatic — leave the PR in draft until ready
 
-Post a single PR comment containing exactly `@coderabbitai review`. This kicks off CodeRabbit's automated review of the diff. From this point on, CodeRabbit re-reviews on every push automatically — you only need to summon it once at the start of the implementation phase.
+You do **not** post `@coderabbitai review` yourself. The Bender server watches GitHub webhooks and posts the summon automatically the moment a human (reviewer or PR author) marks the PR ready for review. That's the only transition CodeRabbit reliably acts on — comments posted while the PR is still in draft get ignored (we burned PR #162 confirming this).
 
-```bash
-gh pr comment <PR> --repo earthly/lunar-lib --body "@coderabbitai review"
-```
+What this means for you, the worker:
 
-Do this **after** pushing your initial implementation commit, so CodeRabbit's first review covers actual code rather than an empty/spec-only branch. Summoning before there's any implementation diff just burns a review cycle on nothing — you'd have to wait for the next push to get real signal anyway.
+- **Keep the PR in draft** while you're implementing, pushing, and posting test evidence. CodeRabbit will not review it yet, and that's intentional.
+- **Do not run `gh pr ready` yourself.** Leave the draft→ready flip to a human (the requester, typically). When they mark it ready, the server posts the summon.
+- **Do not paste `@coderabbitai review` manually.** The server is idempotent — even if you did, it would only post once per PR — but it's noise, and it's now somebody else's job.
 
-(Spec-only PRs deliberately skip this step. CodeRabbit is summoned exactly once per PR, at the spec→implementation transition.)
+If for some reason CodeRabbit really did not review after a human marked it ready (the post landed but no review came back within a few minutes), check the server logs for `[coderabbit-summon]`. If the summon never fired, the human-vs-bot gate likely dropped it; ping the reviewer to retoggle ready or post the comment manually as a fallback.
+
+(Spec-only PRs are already covered by this: a spec PR stays in draft the whole time, so no summon fires. The summon only happens when you flip to ready, which by convention only happens at implementation time.)
 
 ### Step 1: Write implementation code
 

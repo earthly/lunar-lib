@@ -29,7 +29,7 @@ see [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](../LUNAR-PLUGIN-PLAYBOOK-AI.md).
 
 ## What to do here
 
-CodeRabbit reviews the PR once you've posted `@coderabbitai review` (you should have done this at the start of the implementation phase — see [`phases/implementation.md`](implementation.md) Step 0). If you didn't, post it now. CodeRabbit then re-reviews on subsequent pushes automatically.
+CodeRabbit reviews the PR once the Bender server posts `@coderabbitai review` on your behalf — that's triggered automatically when a human flips the PR out of draft (see [`phases/implementation.md`](implementation.md) Step 0). If CodeRabbit hasn't reviewed by the time you're seeing this phase, it most likely means the PR is still in draft or the ready-for-review event came from a bot rather than a human; ask the requester to retoggle ready or check the server logs for `[coderabbit-summon]`. Once summoned, CodeRabbit re-reviews on subsequent pushes automatically.
 
 Address its feedback, but **use judgment** — CodeRabbit sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
 

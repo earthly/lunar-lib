@@ -16,7 +16,7 @@ see [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](../LUNAR-PLUGIN-PLAYBOOK-AI.md).
 ## Pre-merge checklist
 
 - [ ] CI is green
-- [ ] CodeRabbit review comments addressed (you posted `@coderabbitai review` at implementation kick-off and have replied to / resolved every thread)
+- [ ] CodeRabbit review comments addressed (the Bender server auto-summons CodeRabbit on the draft→ready transition; you only need to have replied to / resolved every thread it left)
 - [ ] **Both reviewers approved** the implementation
 - [ ] Test results with JSON output + screenshots posted on PR
 - [ ] No unresolved review threads
