@@ -65,6 +65,18 @@ Follow this checklist **in order**. Every step must be completed before moving t
 
 Reviewers expect to see your test evidence on the PR before their review is meaningful. A PR comment with Grafana screenshots + Component JSON output (Step 8) is what unblocks implementation review — not vice versa.
 
+### Step 0: Summon CodeRabbit
+
+Post a single PR comment containing exactly `@coderabbitai review`. This kicks off CodeRabbit's automated review of the diff. From this point on, CodeRabbit re-reviews on every push automatically — you only need to summon it once at the start of the implementation phase.
+
+```bash
+gh pr comment <PR> --repo earthly/lunar-lib --body "@coderabbitai review"
+```
+
+Do this **before** pushing implementation code so CodeRabbit's first review covers your initial implementation. If you forget and only remember after pushing, post the comment anyway — CodeRabbit will pick up from the current HEAD.
+
+(Spec-only PRs deliberately skip this step. CodeRabbit is summoned exactly once per PR, at the spec→implementation transition.)
+
 ### Step 1: Write implementation code
 
 Write the scripts referenced in the YAML manifest. Commit locally but do not push yet.

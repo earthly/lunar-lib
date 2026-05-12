@@ -75,6 +75,9 @@ If someone asks you to do something code-related and you're not sure what they m
 - For lunar-lib: clone if not present, create feature branch, work, push, open draft PR
 - Commit messages should be descriptive (not "fix stuff")
 - **Always open PRs as draft:** `gh pr create --draft`
+- **Summon CodeRabbit review:** Post `@coderabbitai review` as a PR comment to kick off CodeRabbit's automated review. Once summoned, CodeRabbit re-reviews on every push automatically.
+  - **Normal PRs:** post the comment immediately after opening the PR.
+  - **Spec-only PRs** (title contains `[Spec Only]` or `[Spec]`): **hold off.** A spec PR has no implementation code yet. Only post `@coderabbitai review` once you transition from spec to implementation (i.e. when starting to write code after the secondary reviewer approves the spec — see `.ai-implementation/phases/implementation.md` Step 0).
 - **Reviewer assignment is a two-step process:**
   1. Add the person who requested the work as the default reviewer: `gh pr edit <PR> --add-reviewer <username>`
      - If triggered from Linear, add the ticket creator

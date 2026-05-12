@@ -168,7 +168,8 @@ revisit it if a reviewer flags something you don't recognize.
 | Using `git add .` or `git add -A` | Stages unintended files (test configs, temp files, etc.). | Always `git add` specific directories: `git add collectors/<name>/` or `git add policies/<name>/`. |
 | Merging with only one approval | Both reviewers need to approve unless one explicitly waives. | Wait for both. |
 | Not posting test results on the PR | Reviewers need evidence, not trust. | Always post test results with JSON output, screenshots, and the test matrix template. See [`phases/implementation.md`](phases/implementation.md) Step 8. |
-| Ignoring Claude review feedback | Claude auto-reviews open PRs. Unresolved comments slow down human review. | Address or reply to every Claude review comment before requesting human review. |
+| Forgetting to post `@coderabbitai review` | CodeRabbit doesn't auto-review — it only runs when you summon it. Without the comment, the PR sits unreviewed. | After opening a normal PR, post `@coderabbitai review` as the first comment. For spec-only PRs, hold off until you transition to the implementation phase (see [`phases/implementation.md`](phases/implementation.md) Step 0). |
+| Ignoring CodeRabbit review feedback | Once summoned, CodeRabbit reviews on every push. Unresolved comments slow down human review. | Address or reply to every CodeRabbit review comment before requesting human review. Use judgment — CodeRabbit sometimes flags non-issues; reply explaining why and resolve the thread. |
 | Leaving branch refs in cronos config | The branch gets deleted on merge, breaking all manifest syncs. | Undeploy from cronos before merge (see [`phases/merge.md`](phases/merge.md) pre-merge checklist). |
 
 ### Docker images

@@ -29,7 +29,9 @@ see [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](../LUNAR-PLUGIN-PLAYBOOK-AI.md).
 
 ## What to do here
 
-Claude will automatically review the PR via the `claude-code-action` GitHub Action. Address its feedback, but **use judgment** — Claude sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
+CodeRabbit reviews the PR once you've posted `@coderabbitai review` (you should have done this at the start of the implementation phase — see [`phases/implementation.md`](implementation.md) Step 0). If you didn't, post it now. CodeRabbit then re-reviews on subsequent pushes automatically.
+
+Address its feedback, but **use judgment** — CodeRabbit sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
 
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale. See the testing steps in [`phases/implementation.md`](implementation.md) if you need a refresher.
 

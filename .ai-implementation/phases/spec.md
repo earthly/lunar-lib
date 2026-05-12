@@ -129,6 +129,8 @@ The PR description must include:
 
 Create a draft PR with the spec files only. Title should contain `[Spec Only]` or `[Spec]` so the phase-guidance hook can recognize the phase. Assign the **primary reviewer** (the person who requested the work, or who will iterate on the design with you).
 
+**Do NOT post `@coderabbitai review` yet.** CodeRabbit is an implementation-level reviewer — there is no implementation code in a spec PR, so summoning it now is noise. You'll post `@coderabbitai review` once at the start of the implementation phase (see [`phases/implementation.md`](implementation.md) Step 0); from that point on, CodeRabbit re-reviews on every push automatically.
+
 ---
 
 ## Then wait for go-ahead
