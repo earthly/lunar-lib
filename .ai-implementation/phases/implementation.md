@@ -73,7 +73,7 @@ Post a single PR comment containing exactly `@coderabbitai review`. This kicks o
 gh pr comment <PR> --repo earthly/lunar-lib --body "@coderabbitai review"
 ```
 
-Do this **before** pushing implementation code so CodeRabbit's first review covers your initial implementation. If you forget and only remember after pushing, post the comment anyway — CodeRabbit will pick up from the current HEAD.
+Do this **after** pushing your initial implementation commit, so CodeRabbit's first review covers actual code rather than an empty/spec-only branch. Summoning before there's any implementation diff just burns a review cycle on nothing — you'd have to wait for the next push to get real signal anyway.
 
 (Spec-only PRs deliberately skip this step. CodeRabbit is summoned exactly once per PR, at the spec→implementation transition.)
 
