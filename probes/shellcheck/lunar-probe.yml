@@ -1,0 +1,43 @@
+version: 0
+
+name: shellcheck
+description: Lint shell scripts with ShellCheck on every edit.
+author: earthly
+
+landing_page:
+  display_name: "ShellCheck Probe"
+  long_description: |
+    Run ShellCheck on shell scripts as the agent edits them. Catches
+    quoting bugs, deprecated syntax, and GNU-isms before they land in CI.
+    Read-only by design — ShellCheck has no --fix flag, so findings come
+    back as feedback for the agent to act on.
+  categories: ["languages", "build"]
+  icon: "assets/shellcheck.svg"
+  status: "beta"
+  related:
+    - slug: "shell"
+      type: "collector"
+      reason: "Records the same ShellCheck findings at CI time for dashboarding."
+    - slug: "shell"
+      type: "policy"
+      reason: "CI guardrail that fails the build when ShellCheck reports issues."
+
+probes:
+  - name: edit
+    description: Run ShellCheck on edited shell scripts.
+    keywords: ["shell", "shellcheck", "lint", "bash", "sh"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.sh"
+    check: '! command -v shellcheck >/dev/null 2>&1 || shellcheck -f tty {file}'
+    message: |-
+      ShellCheck flagged `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the findings before committing — many ShellCheck issues are
+      real correctness bugs (quoting, command substitution, deprecated
+      syntax) and the `shell` policy will fail CI on anything above the
+      configured severity threshold.
