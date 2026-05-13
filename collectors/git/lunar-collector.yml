@@ -1,7 +1,7 @@
 version: 0
 
 name: git
-description: Collect git-ecosystem configuration — pre-commit hooks, gitattributes, gitmodules, signed commits
+description: Collect git-ecosystem configuration — pre-commit hooks, gitattributes, gitmodules
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
@@ -9,9 +9,9 @@ landing_page:
   display_name: "Git Collector"
   long_description: |
     Aggregates configuration data for git-ecosystem tooling that lives in
-    the repository: pre-commit hooks, gitattributes rules, submodule
-    definitions, and recent commit-signature history. Distinct from
-    `.vcs.*` (hosted-VCS data like branch protection, PRs).
+    the repository: pre-commit hooks, gitattributes rules, and submodule
+    definitions. Distinct from `.vcs.*` (hosted-VCS data like branch
+    protection, PRs).
   categories: ["code-analysis"]
   icon: "assets/git.svg"
   status: "beta"
@@ -56,19 +56,6 @@ collectors:
       type: code
     keywords: ["gitmodules", "git submodules", "vendoring", "supply chain"]
 
-  - name: signed-commits
-    description: |
-      Inspects the last N commits on the default branch for GPG/SSH
-      signature presence using `git log --pretty=format:'%G?'`. Each
-      commit is classified as `good`, `bad`, `unknown`, `unsigned`,
-      `expired`, or `revoked`. Writes counts to
-      `.git.signing.signature_counts`. The history-window size is
-      configurable via `signed_commits_window`.
-    mainBash: signed-commits.sh
-    hook:
-      type: code
-    keywords: ["signed commits", "gpg", "ssh signing", "commit signing", "supply chain"]
-
 inputs:
   pre_commit_paths:
     description: Comma-separated list of pre-commit config file paths to check (first match wins)
@@ -79,9 +66,6 @@ inputs:
   gitmodules_paths:
     description: Comma-separated list of .gitmodules paths to check (first match wins)
     default: ".gitmodules"
-  signed_commits_window:
-    description: Number of recent commits on the default branch to inspect for signature status
-    default: "50"
 
 example_component_json: |
   {
@@ -138,18 +122,6 @@ example_component_json: |
             "branch": "main"
           }
         ]
-      },
-      "signing": {
-        "default_branch": "main",
-        "commits_examined": 50,
-        "signature_counts": {
-          "good": 48,
-          "bad": 0,
-          "unknown": 0,
-          "unsigned": 2,
-          "expired": 0,
-          "revoked": 0
-        }
       }
     }
   }

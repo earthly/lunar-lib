@@ -1,10 +1,10 @@
 # Git Guardrails
 
-Enforce baselines for git-ecosystem tooling — pre-commit, gitattributes, submodules, and recent commit signatures.
+Enforce baselines for git-ecosystem tooling — pre-commit, gitattributes, and submodules.
 
 ## Overview
 
-This policy enforces healthy practices for git-ecosystem tooling that lives in the repository. It covers [pre-commit](https://pre-commit.com) hook hygiene, `.gitattributes` EOL normalization, submodule pinning, and recent commit-signature coverage. Reads data from the `git` collector. Each "exists" check is universal and fails when the corresponding config is absent; dependent checks (e.g. `pre-commit-pinned-refs`) skip when no config is present so the existence check catches the absent case alone.
+This policy enforces healthy practices for git-ecosystem tooling that lives in the repository. It covers [pre-commit](https://pre-commit.com) hook hygiene, `.gitattributes` EOL normalization, and submodule pinning. Reads data from the `git` collector. Each "exists" check is universal and fails when the corresponding config is absent; dependent checks (e.g. `pre-commit-pinned-refs`) skip when no config is present so the existence check catches the absent case alone.
 
 ## Policies
 
@@ -19,7 +19,6 @@ This plugin provides the following policies (use `include` to select a subset):
 | `gitattributes-exists` | A `.gitattributes` file is present in the repository root |
 | `gitattributes-eol-normalized` | `.gitattributes` declares EOL normalization (e.g. `* text=auto`) |
 | `submodules-no-floating-branches` | No submodule declares a `branch` field that would make `git submodule update --remote` track a floating ref |
-| `signed-commits-recent` | The last N commits on the default branch (default 50) all carry a valid GPG/SSH signature |
 
 ## Required Data
 
@@ -30,7 +29,6 @@ This policy reads from the following Component JSON paths:
 | `.git.pre_commit` | object | `git` collector (`pre-commit` sub-collector) |
 | `.git.attributes` | object | `git` collector (`gitattributes` sub-collector) |
 | `.git.submodules` | object | `git` collector (`gitmodules` sub-collector) |
-| `.git.signing` | object | `git` collector (`signed-commits` sub-collector) |
 
 **Note:** Ensure the `git` collector is configured before enabling this policy. Each sub-collector writes nothing when its config file is absent — this policy's existence checks rely on object presence as the signal.
 
@@ -46,14 +44,13 @@ policies:
     # include: [pre-commit-config-exists, gitattributes-eol-normalized]
     # with:
     #   secret_scan_hook_ids: "gitleaks,detect-secrets,trufflehog"
-    #   signed_commits_window: "100"
 ```
 
 ## Examples
 
 ### Passing Example
 
-A component with a pre-commit config (all repos pinned, secret scanner present, empty `ci.skip`), a `.gitattributes` with EOL normalization, no submodules tracking a floating branch, and a clean signed-commit history:
+A component with a pre-commit config (all repos pinned, secret scanner present, empty `ci.skip`), a `.gitattributes` with EOL normalization, and no submodules tracking a floating branch:
 
 ```json
 {
@@ -75,18 +72,6 @@ A component with a pre-commit config (all repos pinned, secret scanner present, 
     "submodules": {
       "valid": true,
       "modules": [{"name": "vendor/foo", "path": "vendor/foo", "url": "https://github.com/example/foo.git", "branch": null}]
-    },
-    "signing": {
-      "default_branch": "main",
-      "commits_examined": 50,
-      "signature_counts": {
-        "good": 50,
-        "bad": 0,
-        "unknown": 0,
-        "unsigned": 0,
-        "expired": 0,
-        "revoked": 0
-      }
     }
   }
 }
@@ -94,7 +79,7 @@ A component with a pre-commit config (all repos pinned, secret scanner present, 
 
 ### Failing Example
 
-A repo with floating-pinned pre-commit hooks, missing `.gitattributes`, a submodule tracking `main`, and unsigned commits in the recent history:
+A repo with floating-pinned pre-commit hooks, missing `.gitattributes`, and a submodule tracking `main`:
 
 ```json
 {
@@ -111,18 +96,6 @@ A repo with floating-pinned pre-commit hooks, missing `.gitattributes`, a submod
     "submodules": {
       "valid": true,
       "modules": [{"name": "vendor/bar", "path": "vendor/bar", "url": "https://github.com/example/bar.git", "branch": "main"}]
-    },
-    "signing": {
-      "default_branch": "main",
-      "commits_examined": 50,
-      "signature_counts": {
-        "good": 35,
-        "bad": 0,
-        "unknown": 0,
-        "unsigned": 15,
-        "expired": 0,
-        "revoked": 0
-      }
     }
   }
 }
@@ -133,7 +106,6 @@ A repo with floating-pinned pre-commit hooks, missing `.gitattributes`, a submod
 - `pre-commit-ci-skip-empty`: `"ci.skip disables 1 hook(s) in pre-commit.ci: gitleaks"`
 - `gitattributes-exists`: `"No .gitattributes file found"`
 - `submodules-no-floating-branches`: `"Submodule 'vendor/bar' tracks branch 'main' — remove the branch directive to keep the submodule pinned by SHA"`
-- `signed-commits-recent`: `"15 of 50 recent commits on 'main' are unsigned"`
 
 ## Remediation
 
@@ -146,4 +118,3 @@ When these policies fail, you can resolve them by:
 5. **`gitattributes-exists`** — Add a `.gitattributes` file. A minimal one (`* text=auto`) prevents most cross-platform line-ending issues.
 6. **`gitattributes-eol-normalized`** — Add `* text=auto` (or equivalent `text` / `eol=` directives) to `.gitattributes`.
 7. **`submodules-no-floating-branches`** — Remove the `branch = …` line from the submodule's `.gitmodules` block. Submodules track by SHA by default; the `branch` field only matters for `git submodule update --remote`, which most repos shouldn't be using.
-8. **`signed-commits-recent`** — Configure GPG or SSH signing locally (`git config commit.gpgsign true` plus a key) and require it via branch protection. Then re-sign or rebase the unsigned commits in the recent window.
