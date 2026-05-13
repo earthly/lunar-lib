@@ -62,6 +62,19 @@ policies:
     mainPython: non_root.py
     keywords: ["security context", "non-root", "runAsNonRoot", "least privilege"]
 
+  - name: user-namespaces
+    description: |
+      Warns when workload PodSpecs do not set `hostUsers: false`.
+      User Namespaces (GA in Kubernetes v1.36) map container UIDs to
+      unprivileged host UIDs so that a container escape no longer hands
+      the attacker root on the node. Complements `non-root` — that check
+      drops privilege inside the container; this one isolates UIDs
+      across the kernel boundary. Severity is warning: cluster must be
+      on K8s >=1.36, and some workloads legitimately need host UIDs
+      (e.g. log shippers reading host paths).
+    mainPython: user_namespaces.py
+    keywords: ["user namespaces", "hostUsers", "container escape", "least privilege", "kernel boundary"]
+
   - name: min-kubectl-version
     description: |
       Ensures the kubectl version used in CI meets the minimum required version.

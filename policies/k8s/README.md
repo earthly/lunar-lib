@@ -18,6 +18,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `min-replicas` | Enforces minimum HPA replicas | HPA minReplicas below threshold |
 | `pdb` | Requires PodDisruptionBudgets | Deployment/StatefulSet missing PDB |
 | `non-root` | Requires non-root security context | Container may run as root |
+| `user-namespaces` | Warns when PodSpecs don't set `hostUsers: false` (K8s ≥1.36 user namespaces) | Container UIDs are not isolated from host UIDs — a container escape gives the attacker root on the node |
 | `min-kubectl-version` | Enforces minimum kubectl version in CI | kubectl client used in CI is below threshold |
 
 ## Required Data
@@ -72,6 +73,7 @@ A compliant component with proper resource specs, probes, and security context:
         "name": "payment-api",
         "namespace": "payments",
         "path": "deploy/deployment.yaml",
+        "host_users": false,
         "containers": [
           {
             "name": "api",
@@ -105,6 +107,7 @@ A component missing resources, probes, and security configuration:
         "name": "my-app",
         "namespace": "default",
         "path": "deploy/app.yaml",
+        "host_users": true,
         "containers": [
           {
             "name": "app",
@@ -127,6 +130,7 @@ A component missing resources, probes, and security configuration:
 - `deploy/app.yaml: Deployment default/my-app container 'app' missing resource requests`
 - `deploy/app.yaml: Deployment default/my-app container 'app' missing livenessProbe`
 - `deploy/app.yaml: Deployment default/my-app container 'app' should set securityContext.runAsNonRoot: true`
+- `deploy/app.yaml: Deployment default/my-app should set spec.hostUsers: false (Kubernetes user namespaces, GA in v1.36)`
 
 ## Remediation
 
@@ -138,5 +142,6 @@ When this policy fails, resolve it by:
 4. **For `min-replicas` failures:** Increase `spec.minReplicas` in your HPA to meet the threshold
 5. **For `pdb` failures:** Create a PodDisruptionBudget that selects your workload's pods
 6. **For `non-root` failures:** Add `securityContext.runAsNonRoot: true` to the container or pod spec
-7. **For `min-kubectl-version` failures:** Upgrade the kubectl client in your CI pipeline (e.g., pin `azure/setup-kubectl@v4` or `setup-kubectl` action to a newer version, or update the installed kubectl on self-hosted runners)
+7. **For `user-namespaces` warnings:** Add `spec.hostUsers: false` to the PodSpec (or `spec.template.spec.hostUsers: false` for Deployments/StatefulSets/DaemonSets/Jobs/CronJobs). Requires Kubernetes ≥1.36 in the target cluster. Privileged workloads that must share the host user namespace (e.g. log shippers reading host paths, kubelets, container-runtime sidecars) can use `include`/`exclude` in `lunar-config.yml` to opt out — or set `enforcement: report-pr` to keep the warning visible without blocking.
+8. **For `min-kubectl-version` failures:** Upgrade the kubectl client in your CI pipeline (e.g., pin `azure/setup-kubectl@v4` or `setup-kubectl` action to a newer version, or update the installed kubectl on self-hosted runners)
 
