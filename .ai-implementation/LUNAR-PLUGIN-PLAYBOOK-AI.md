@@ -1,12 +1,17 @@
 # Lunar Plugin PR Playbook
 
-End-to-end playbook for AI agents creating lunar-lib collector and
-policy PRs. This is a **bot-mode** workflow — the agent works
-autonomously through each phase, pausing only at explicit review gates.
+End-to-end playbook for AI agents creating lunar-lib **collector**,
+**policy**, and **probe** PRs. This is a **bot-mode** workflow — the
+agent works autonomously through each phase, pausing only at explicit
+review gates.
 
 This doc is the **overview**. The phase-by-phase deep content lives in
 phase-specific docs under [`phases/`](phases/) — read the one that
-matches your current phase, not all four at once.
+matches your current phase, not all four at once. Probe plugins have
+their own playbook at [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md)
+covering what's different about the probe shape (no Component JSON,
+no cronos test cycle, hook-based execution). Read it alongside this
+doc if you're authoring under `probes/<name>/`.
 
 ---
 
@@ -49,10 +54,11 @@ yourself from the table below.
 
 | Signal | Phase | Phase doc |
 |---|---|---|
-| PR title contains `[Spec Only]` / `[Spec]`; no scripts (`*.sh`) in `collectors/<name>/`, no `*.py` in `policies/<name>/` | **Spec** | [`phases/spec.md`](phases/spec.md) |
+| PR title contains `[Spec Only]` / `[Spec]`; no scripts (`*.sh`) in `collectors/<name>/`, no `*.py` in `policies/<name>/`, no `scripts/` under `probes/<name>/` | **Spec** | [`phases/spec.md`](phases/spec.md) |
 | Spec approved by secondary reviewer; implementation not yet written, or just being written; test evidence not yet on the PR | **Implementation & testing** | [`phases/implementation.md`](phases/implementation.md) |
-| Implementation present; cronos test evidence posted on the PR; awaiting both approvals | **Implementation review** | [`phases/impl-review.md`](phases/impl-review.md) |
+| Implementation present; test evidence posted on the PR (cronos for collectors/policies, local probe demo for probes); awaiting both approvals | **Implementation review** | [`phases/impl-review.md`](phases/impl-review.md) |
 | Both reviewers approved + CI green | **Merge** | [`phases/merge.md`](phases/merge.md) |
+| Plugin shape is a probe (`probes/<name>/`) | **Probe-specific deltas** | [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md) — read alongside the matching phase doc |
 
 You don't have to read this overview cover-to-cover up front, but you
 **must** read the matching phase doc above before starting work on
@@ -100,12 +106,17 @@ Then read these files in `ai-context/` (relative to lunar-lib root):
 | `core-concepts.md` | Architecture |
 | `collector-reference.md` | How collectors work (if building a collector) |
 | `policy-reference.md` | How policies work (if building a policy) |
-| `component-json/conventions.md` | **Schema design rules — critical.** Read the "Presence Detection" and "Anti-Pattern: Boolean Fields" sections carefully. |
-| `component-json/structure.md` | All existing Component JSON paths |
+| `component-json/conventions.md` | **Schema design rules — critical.** Read the "Presence Detection" and "Anti-Pattern: Boolean Fields" sections carefully. *(Collectors / policies only — probes don't write Component JSON.)* |
+| `component-json/structure.md` | All existing Component JSON paths *(collectors / policies only)* |
+
+For probe plugins, skip the Component JSON docs and read
+[`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md) plus
+[`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+instead.
 
 ### 4. Study the closest existing plugin
 
-Find the most similar existing collector or policy and read every file. Understand the pattern before writing anything. Examples:
+Find the most similar existing collector, policy, or probe and read every file. Understand the pattern before writing anything. Examples:
 
 | If building... | Study this |
 |----------------|-----------|
@@ -114,6 +125,7 @@ Find the most similar existing collector or policy and read every file. Understa
 | Language collector | `collectors/golang/` or `collectors/java/` |
 | Repo/file check policy | `policies/repo/` |
 | Security policy | `policies/sast/` or `policies/sca/` |
+| Probe plugin | `probes/commitlint/` *(first probe — see [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md))* |
 
 ---
 
