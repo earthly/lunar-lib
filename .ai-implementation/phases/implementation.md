@@ -111,11 +111,11 @@ Add your plugin to the cronos test environment config.
    - uses: github://earthly/lunar-lib/collectors/<name>@<branch>
    ```
 2. Commit and push to `pantalasa-cronos/lunar`.
-3. **Wait for the sync-manifest CI workflow to pass.** The hub only gets config updates when this workflow succeeds. Check with:
+3. **Wait for the hub-sync CI workflow to pass.** That workflow runs `lunar hub pull` to push the updated manifest to the hub — the hub only sees your branch reference after it succeeds. The workflow's name varies per repo (in `pantalasa-cronos/lunar` it's `Policy sync`); check the latest run:
    ```bash
    gh run list --repo pantalasa-cronos/lunar --limit 3
    ```
-   **Do NOT proceed until the sync build is green.**
+   **Do NOT proceed until that run is green.**
 
 ### Step 4: Prepare a test component
 
