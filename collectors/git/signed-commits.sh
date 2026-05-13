@@ -53,19 +53,27 @@ if [ -z "$DEFAULT_BRANCH" ]; then
   exit 0
 fi
 
-# Inspect the last N commits on the default branch. Prefer the remote
-# ref (origin/<branch>) so we describe the canonical history regardless
-# of local checkout state.
-if git rev-parse --verify "refs/remotes/origin/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-  RANGE="refs/remotes/origin/$DEFAULT_BRANCH"
-elif git rev-parse --verify "refs/heads/$DEFAULT_BRANCH" >/dev/null 2>&1; then
-  RANGE="refs/heads/$DEFAULT_BRANCH"
-else
-  RANGE="HEAD"
-fi
+# Inspect the last N commits on the default branch. Prefer the canonical
+# remote ref, but fall back through alternatives if it yields nothing —
+# in PR-checkout environments the remote-tracking ref can exist as a
+# pointer while the underlying objects aren't in the local clone, and
+# `git log` then silently returns empty.
+RANGE=""
+CODES=""
+for candidate in \
+  "refs/remotes/origin/$DEFAULT_BRANCH" \
+  "refs/heads/$DEFAULT_BRANCH" \
+  "HEAD"; do
+  if codes=$(git log -n "$WINDOW" --pretty=format:'%G?' "$candidate" 2>/dev/null) \
+    && [ -n "$codes" ]; then
+    RANGE="$candidate"
+    CODES="$codes"
+    break
+  fi
+done
 
-if ! CODES=$(git log -n "$WINDOW" --pretty=format:'%G?' "$RANGE" 2>/dev/null); then
-  echo "git: log failed for $RANGE" >&2
+if [ -z "$RANGE" ]; then
+  echo "git: no commits resolvable for '$DEFAULT_BRANCH'" >&2
   emit_signing "$DEFAULT_BRANCH" 0 0 0 0 0 0 0
   exit 0
 fi
