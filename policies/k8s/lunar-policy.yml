@@ -62,7 +62,7 @@ policies:
     mainPython: non_root.py
     keywords: ["security context", "non-root", "runAsNonRoot", "least privilege"]
 
-  - name: user-namespaces
+  - name: host-users
     description: |
       Requires workload PodSpecs to set `hostUsers: false`. User Namespaces
       (GA in Kubernetes v1.36) map container UIDs to unprivileged host UIDs
@@ -72,8 +72,40 @@ policies:
       cluster must be on K8s >=1.36; workloads that legitimately need host
       UIDs (e.g. log shippers reading host paths) can be opted out via
       `include`/`exclude` in `lunar-config.yml`.
-    mainPython: user_namespaces.py
+    mainPython: host_users.py
     keywords: ["user namespaces", "hostUsers", "container escape", "least privilege", "kernel boundary"]
+
+  - name: host-network
+    description: |
+      Fails when workload PodSpecs set `hostNetwork: true`. Sharing the host's
+      network namespace bypasses NetworkPolicy enforcement, exposes node-local
+      services to the pod, and gives a compromised container direct access to
+      the node's interfaces (and any cleartext traffic on them). Legitimate
+      hostNetwork users (CNI agents, node-local proxies, host-bound exporters)
+      can opt out via `include`/`exclude` in `lunar-config.yml`.
+    mainPython: host_network.py
+    keywords: ["hostNetwork", "network namespace", "NetworkPolicy bypass", "container escape", "least privilege"]
+
+  - name: host-pid
+    description: |
+      Fails when workload PodSpecs set `hostPID: true`. Sharing the host's
+      PID namespace lets the container see, signal, and (with the right
+      capabilities) attach to every process on the node, undermining process
+      isolation and aiding lateral movement after a container compromise.
+      Workloads that need it (e.g. node-level monitoring agents) can opt out
+      via `include`/`exclude` in `lunar-config.yml`.
+    mainPython: host_pid.py
+    keywords: ["hostPID", "PID namespace", "process isolation", "container escape", "least privilege"]
+
+  - name: host-ipc
+    description: |
+      Fails when workload PodSpecs set `hostIPC: true`. Sharing the host's
+      IPC namespace exposes node-wide System V IPC and POSIX shared memory
+      to the container, which can be abused to read or tamper with other
+      workloads' shared-memory state. Workloads that genuinely need host IPC
+      can opt out via `include`/`exclude` in `lunar-config.yml`.
+    mainPython: host_ipc.py
+    keywords: ["hostIPC", "IPC namespace", "shared memory", "container escape", "least privilege"]
 
   - name: min-kubectl-version
     description: |

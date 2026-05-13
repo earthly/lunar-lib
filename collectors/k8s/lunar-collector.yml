@@ -80,6 +80,9 @@ example_component_json: |
           "path": "deploy/deployment.yaml",
           "replicas": 3,
           "host_users": false,
+          "host_network": false,
+          "host_pid": false,
+          "host_ipc": false,
           "containers": [
             {
               "name": "api",
