@@ -64,14 +64,14 @@ policies:
 
   - name: user-namespaces
     description: |
-      Warns when workload PodSpecs do not set `hostUsers: false`.
-      User Namespaces (GA in Kubernetes v1.36) map container UIDs to
-      unprivileged host UIDs so that a container escape no longer hands
-      the attacker root on the node. Complements `non-root` — that check
-      drops privilege inside the container; this one isolates UIDs
-      across the kernel boundary. Severity is warning: cluster must be
-      on K8s >=1.36, and some workloads legitimately need host UIDs
-      (e.g. log shippers reading host paths).
+      Requires workload PodSpecs to set `hostUsers: false`. User Namespaces
+      (GA in Kubernetes v1.36) map container UIDs to unprivileged host UIDs
+      so that a container escape no longer hands the attacker root on the
+      node. Complements `non-root` — that check drops privilege inside the
+      container; this one isolates UIDs across the kernel boundary. Target
+      cluster must be on K8s >=1.36; workloads that legitimately need host
+      UIDs (e.g. log shippers reading host paths) can be opted out via
+      `include`/`exclude` in `lunar-config.yml`.
     mainPython: user_namespaces.py
     keywords: ["user namespaces", "hostUsers", "container escape", "least privilege", "kernel boundary"]
 
