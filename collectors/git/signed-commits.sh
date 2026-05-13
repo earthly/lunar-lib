@@ -3,15 +3,13 @@ set -e
 
 WINDOW="${LUNAR_VAR_SIGNED_COMMITS_WINDOW:-50}"
 
-# Resolve the default branch. Try `git remote show origin` first
-# (authoritative when the remote is reachable), then fall back to
-# refs/remotes/origin/HEAD, then HEAD itself.
-DEFAULT_BRANCH=""
-if remote_show=$(git remote show origin 2>/dev/null); then
-  DEFAULT_BRANCH=$(echo "$remote_show" | sed -n 's/^[[:space:]]*HEAD branch:[[:space:]]*//p' | head -1)
-fi
+# Resolve the default branch. Prefer the harness-supplied
+# LUNAR_COMPONENT_BASE_BRANCH (set on every collection — authoritative
+# and works in detached-HEAD PR checkouts). Fall back to local refs only
+# if the env var is missing.
+DEFAULT_BRANCH="${LUNAR_COMPONENT_BASE_BRANCH:-}"
 
-if [ -z "$DEFAULT_BRANCH" ] || [ "$DEFAULT_BRANCH" = "(unknown)" ]; then
+if [ -z "$DEFAULT_BRANCH" ]; then
   if head_ref=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null); then
     DEFAULT_BRANCH="${head_ref#refs/remotes/origin/}"
   fi
@@ -19,6 +17,9 @@ fi
 
 if [ -z "$DEFAULT_BRANCH" ]; then
   DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  # If we're in a detached HEAD (rev-parse returns literal "HEAD"),
+  # we can't infer the default branch — bail without writing.
+  [ "$DEFAULT_BRANCH" = "HEAD" ] && DEFAULT_BRANCH=""
 fi
 
 if [ -z "$DEFAULT_BRANCH" ]; then
