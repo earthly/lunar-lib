@@ -111,7 +111,7 @@ Add your plugin to the cronos test environment config.
    - uses: github://earthly/lunar-lib/collectors/<name>@<branch>
    ```
 2. Commit and push to `pantalasa-cronos/lunar`.
-3. **Wait for the hub-sync CI workflow to pass.** That workflow runs `lunar hub pull` to push the updated manifest to the hub — the hub only sees your branch reference after it succeeds. The workflow's name varies per repo (in `pantalasa-cronos/lunar` it's `Policy sync`); check the latest run:
+3. **Wait for the hub-sync CI workflow to pass.** That workflow runs `lunar hub pull` to push the updated manifest to the hub — the hub only sees your branch reference after it succeeds. The workflow's name varies per repo (in `pantalasa-cronos/lunar` it's `Sync Lunar Config`); check the latest run:
    ```bash
    gh run list --repo pantalasa-cronos/lunar --limit 3
    ```
@@ -381,7 +381,7 @@ All of these are **required** and must be attached to the PR:
    **D. Cross-check external signals**
    - If checks are still pending or stale, look for corroborating evidence of environment problems beyond the Grafana UI:
      - **Hanging GitHub Actions runs**: Check whether the component repo's CI runs on `cronos` have completed. A GitHub check that's still "in progress" or "queued" long after the workflow should have finished (e.g. >5 minutes for a simple build) indicates the cronos runner is stuck or the hub isn't processing. Check the run directly: `gh run view <run-id> --repo <owner>/<repo>`.
-     - **Policy sync failures**: Check if the cronos config repo's "Policy sync" workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
+     - **Hub-sync failures**: Check if the cronos config repo's `Sync Lunar Config` workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
    - These external signals help you distinguish "my code is broken" from "the environment is broken" — pending checks + a hanging CI run = environment issue, not a policy bug.
 
    **E. What to do if the UI is broken**
