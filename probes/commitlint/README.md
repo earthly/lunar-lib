@@ -22,9 +22,13 @@ probe never rewrites.
 
 | Name | Hook | Description |
 |------|------|-------------|
-| `commitlint.pre-commit` | `agent-before-command` (`binary: git`) | Intercept `git commit`, lint the message, block on rule violations. |
+| `pre-commit` | `agent-before-command` (`binary: git`) | Intercept `git commit`, lint the message, block on rule violations. |
 
-### Skip-safe behaviour
+Probes auto-namespace as `<plugin>.<probe>` at runtime, so this one
+shows up as `commitlint.pre-commit` in `lunar-probe logs`, PR check
+titles, and `lunar-probe lint` output.
+
+## Skip-safe behaviour
 
 The probe is a no-op (exit 0, command proceeds) when:
 
@@ -49,9 +53,6 @@ Pin to a tag once a `v*` release is cut:
 ```yaml
   - uses: github://earthly/lunar-lib/probes/commitlint@v1.0.0
 ```
-
-The probe is namespaced as `commitlint.pre-commit` in `lunar-probe logs`,
-PR check titles, and `lunar-probe lint` output.
 
 ## Requirements
 
@@ -128,8 +129,8 @@ authoring convention this PR introduces.
 
 ## See also
 
-- [`probes/shellcheck/`](../shellcheck/) — similar shape for shell scripts (`agent-after-file-edit`).
-- [`probes/eslint/`](../eslint/) — batched session-end lint for JS/TS.
-- [`probes/ruff/`](../ruff/) — per-edit lint for Python.
-- [`collectors/git/`](../../collectors/git/) — vanilla-git Component JSON collector.
-- [`collectors/pre-commit/`](../../collectors/pre-commit/) — pre-commit framework collector (PR #160).
+- [`collectors/git/`](../../collectors/git/) — vanilla-git Component JSON collector (gitattributes, gitmodules, signed-commits).
+- [`collectors/pre-commit/`](../../collectors/pre-commit/) — pre-commit framework collector (ENG-565).
+- [`.ai-implementation/PROBE-PLAYBOOK-AI.md`](../../.ai-implementation/PROBE-PLAYBOOK-AI.md) — convention for authoring probes (this is the canonical example).
+
+Future siblings (each tracked as a separate Linear ticket): `husky` (ENG-575), `lefthook` (ENG-576), `shellcheck` (ENG-633), `ruff` (ENG-634), `eslint` (ENG-636), `golangci-lint` (ENG-637).

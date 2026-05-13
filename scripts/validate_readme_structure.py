@@ -10,7 +10,7 @@ Usage:
 
 Options:
     --verbose   Show detailed information about each README
-    --type      Validate only specific type: collector, policy, cataloger (default: all)
+    --type      Validate only specific type: collector, policy, cataloger, probe (default: all)
 """
 
 import argparse
@@ -104,6 +104,44 @@ PLUGIN_CONFIGS = {
             "Related Policies",
             "Related Collectors",
             "Example Catalog JSON",
+        ],
+    },
+    "probe": {
+        "directory": "probes",
+        "yaml_file": "lunar-probe.yml",
+        "title_suffix": "Probe",
+        "uses_path": "github://earthly/lunar-lib/probes",
+        "item_list_name": "probes",
+        "item_section_name": "Probes",
+        "data_section_name": None,
+        "related_section_name": None,
+        "related_directory": None,
+        # Sections follow .ai-implementation/PROBE-PLAYBOOK-AI.md § "README".
+        # No Component JSON / Required Data — probes run agent-side and emit
+        # block reasons rather than writing structured output.
+        "sections": [
+            {"name": "Overview", "required": True},
+            {"name": "Probes", "required": True},
+            {"name": "Skip-safe behaviour", "required": True},
+            {"name": "Installation", "required": True},
+            {"name": "Requirements", "required": True},
+            {"name": "Configuration", "required": False},
+            {"name": "Implementation plan", "required": False},
+            {"name": "Why a probe, not a collector + policy?", "required": False},
+            {"name": "See also", "required": False},
+        ],
+        # Sections that belong to other plugin types and must not appear here.
+        "disallowed_sections": [
+            "Inputs",
+            "Secrets",
+            "Collected Data",
+            "Required Data",
+            "Synced Data",
+            "Example Component JSON",
+            "Hook Type",
+            "Source System",
+            "Related Collectors",
+            "Related Policies",
         ],
     },
 }
@@ -479,7 +517,7 @@ def validate_readme(
     if item_section:
         body = item_section.content
         # Map plural section names to singular column headers
-        singular_map = {"Collectors": "Collector", "Policies": "Policy", "Catalogers": "Cataloger"}
+        singular_map = {"Collectors": "Collector", "Policies": "Policy", "Catalogers": "Cataloger", "Probes": "Name"}
         singular_name = singular_map.get(item_section_name, item_section_name)
         
         has_table = re.search(rf"\|\s*{singular_name}\s*\|.*Description\s*\|", body, re.IGNORECASE)
@@ -695,7 +733,7 @@ def main():
     )
     parser.add_argument(
         "--type", "-t",
-        choices=["collector", "policy", "cataloger", "all"],
+        choices=["collector", "policy", "cataloger", "probe", "all"],
         default="all",
         help="Plugin type to validate (default: all)",
     )
@@ -710,7 +748,7 @@ def main():
     base_dir = args.base_dir.resolve()
     
     types_to_validate = (
-        ["collector", "policy", "cataloger"]
+        ["collector", "policy", "cataloger", "probe"]
         if args.type == "all"
         else [args.type]
     )

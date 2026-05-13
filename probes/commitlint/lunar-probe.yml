@@ -8,34 +8,16 @@ landing_page:
   display_name: "commitlint Probe"
   long_description: |
     Run [commitlint](https://commitlint.js.org/) on commit messages before
-    a `git commit` invocation completes. The probe intercepts `git commit`,
-    extracts the message from the standard surfaces (`-m`, `-F`, or the
-    editor flow via `.git/COMMIT_EDITMSG`), pipes it to a locally-installed
-    `commitlint`, and blocks the command on rule violations.
-
-    Read-only by design — the probe never edits the message or the repo's
-    commitlint config. Findings come back to the agent as the block reason
-    so it can fix the message and retry, instead of bouncing off a
-    `commit-msg` git-hook failure after-the-fact.
-
-    The probe skips cleanly when:
-
-    - `commitlint` is not on `PATH` (no-op, exit 0).
-    - The repo has no commitlint config file (no-op, exit 0).
-    - The command is a `git` invocation other than `commit` (no-op, exit 0).
-    - The commit message comes from a merge / amend / squash that doesn't
-      pass `-m` or `-F` (no-op, exit 0 — these flows are handled by the
-      editor + `commit-msg` git hook).
-  categories: ["git", "authoring"]
+    `git commit` lands. Intercepts the command, pipes the message to
+    commitlint, and blocks on rule violations. Read-only, local-only,
+    skip-safe when the tool or config is missing.
+  categories: ["authoring"]
   icon: "assets/commitlint.svg"
   status: "beta"
-  related:
-    - slug: "git"
-      type: "collector"
-      reason: "Vanilla-git plugin pair (gitattributes, gitmodules, signed commits) — commitlint is the message-format counterpart, kept separate by design (see ENG-565 / PR earthly/lunar-lib#160)."
-    - slug: "pre-commit"
-      type: "collector"
-      reason: "If the repo runs commitlint as a pre-commit framework hook, the same config + rules flow into this probe."
+  # related: populated once sibling collectors land on main.
+  # ENG-565 introduces collectors/git and collectors/pre-commit, both
+  # message-format-adjacent. Until those merge, the connection lives
+  # in README "See also" rather than the landing_page.related[] field.
 
 probes:
   - name: pre-commit
