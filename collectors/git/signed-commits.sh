@@ -100,24 +100,5 @@ while IFS= read -r code; do
   esac
 done <<< "$CODES"
 
-jq -n \
-  --arg default_branch "$DEFAULT_BRANCH" \
-  --argjson commits_examined "$EXAMINED" \
-  --argjson good "$GOOD" \
-  --argjson bad "$BAD" \
-  --argjson unknown "$UNKNOWN" \
-  --argjson unsigned "$UNSIGNED" \
-  --argjson expired "$EXPIRED" \
-  --argjson revoked "$REVOKED" \
-  '{
-    default_branch: $default_branch,
-    commits_examined: $commits_examined,
-    signature_counts: {
-      good: $good,
-      bad: $bad,
-      unknown: $unknown,
-      unsigned: $unsigned,
-      expired: $expired,
-      revoked: $revoked
-    }
-  }' | lunar collect -j ".git.signing" -
+emit_signing "$DEFAULT_BRANCH" "$EXAMINED" \
+  "$GOOD" "$BAD" "$UNKNOWN" "$UNSIGNED" "$EXPIRED" "$REVOKED"
