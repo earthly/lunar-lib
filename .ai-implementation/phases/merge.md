@@ -45,7 +45,7 @@ Squash-merge the PR and delete the branch.
 - uses: github://earthly/lunar-lib/collectors/<name>@main
 ```
 
-Commit, push, and **verify the hub-sync CI workflow passes** — it runs `lunar hub pull` to push the updated manifest to the hub, so the hub won't see your `@main` reference until it succeeds. In `pantalasa-cronos/lunar` the workflow is named `Policy sync`.
+Commit, push, and **verify the hub-sync CI workflow passes** — it runs `lunar hub pull` to push the updated manifest to the hub, so the hub won't see your `@main` reference until it succeeds. In `pantalasa-cronos/lunar` the workflow is named `Sync Lunar Config`.
 
 **For EXISTING plugins:** the config already points to `@main`, so nothing to do.
 
