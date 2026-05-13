@@ -17,7 +17,7 @@ Catalogers define the organizational structure of your software portfolio—what
 | **Purpose** | Define *what* components/domains exist | Gather *data about* components |
 | **Output** | Catalog JSON (domains, components, metadata) | Component JSON (SDLC data) |
 | **Scope** | Organization-wide catalog | Per-component data |
-| **Trigger** | Cron schedule, repo commits | Code changes, CI events |
+| **Trigger** | Cron, repo commits, per-component cron, per-component repo commits | Code changes, CI events |
 | **Command** | `lunar catalog` | `lunar collect` |
 
 ## Cataloger Definition
@@ -162,6 +162,25 @@ hook:
 
 **Note:** This hook cannot create new components—only augment existing ones.
 
+### Component-Cron Hook
+
+Runs on a schedule, once per existing component. Like `cron`, but the cataloger gets per-component context and is invoked once for each component currently in the catalog.
+
+```yaml
+hook:
+  type: component-cron
+  schedule: "0 3 * * *"
+```
+
+**Context:** Lunar Runner with the component's identity in `LUNAR_COMPONENT_ID`. No repository clone — read the component's already-collected data via `lunar component get-json "$LUNAR_COMPONENT_ID"`.
+
+**Use cases:**
+- Classifying components from signals in their Component JSON (e.g. tag `production` when `.k8s.deployments[].namespace == "prod"`)
+- Periodically refreshing tags or metadata that depend on collected data
+- Cross-referencing component data with external systems on a schedule
+
+**Note:** Like `component-repo`, this hook cannot create new components—only augment existing ones. A cataloger cannot mix global hooks (`cron`, `repo`) with per-component hooks (`component-repo`, `component-cron`).
+
 ## Environment Variables
 
 Catalogers have access to these environment variables:
@@ -191,9 +210,9 @@ Secrets are passed as `LUNAR_SECRET_<NAME>`:
 curl -H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN" ...
 ```
 
-### Component-Repo Hook Context
+### Per-Component Hook Context
 
-For `component-repo` hooks only:
+For `component-repo` and `component-cron` hooks:
 
 | Variable | Description |
 |----------|-------------|
@@ -495,6 +514,32 @@ curl -fsS "$OWNERSHIP_SHEET_CSV" | \
 curl -fsS "$INTERNAL_API/domains" | \
   jq '...' | lunar catalog --json '.domains' -
 ```
+
+### Pattern 7: Component-JSON Heuristics (component-cron hook)
+
+Classify components from signals in their existing Component JSON (data already collected by collectors). Uses a `component-cron` hook to re-evaluate each component on a schedule.
+
+```bash
+#!/bin/bash
+set -e
+
+# Hook: type: component-cron, schedule: "0 3 * * *"
+# LUNAR_COMPONENT_ID is set for each component
+
+COMPONENT_JSON="$(lunar component get-json "$LUNAR_COMPONENT_ID")"
+
+# Tag based on k8s deployment namespace
+if echo "$COMPONENT_JSON" | jq -e '.k8s.deployments[]? | select(.namespace == "prod")' >/dev/null; then
+  lunar catalog component --tag production
+fi
+
+# Tag based on dependency license
+if echo "$COMPONENT_JSON" | jq -e '.sca.dependencies[]? | select(.license == "AGPL-3.0")' >/dev/null; then
+  lunar catalog component --tag compliance-review
+fi
+```
+
+This pattern lets you treat the Component JSON itself as a classification signal — collectors fill it in, the cataloger reads it back to drive ownership / tags / domain assignment.
 
 ## Plugin Structure
 
