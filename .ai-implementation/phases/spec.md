@@ -129,7 +129,7 @@ The PR description must include:
 
 Create a draft PR with the spec files only. Title should contain `[Spec Only]` or `[Spec]` so the phase-guidance hook can recognize the phase. Assign the **primary reviewer** (the person who requested the work, or who will iterate on the design with you).
 
-**Do NOT post `@coderabbitai review` and do NOT flip the PR out of draft.** CodeRabbit is an implementation-level reviewer — there's no implementation code in a spec PR, so summoning is noise. You don't need to summon manually anyway: the Bender server auto-posts `@coderabbitai review` when a human marks the PR ready for review (see [`phases/implementation.md`](implementation.md) Step 0). Spec PRs stay in draft for the whole spec phase, so no summon fires — exactly the behavior we want.
+**Keep the PR in draft for the whole spec phase.** Don't flip it to ready until implementation is done — the draft→ready transition is the normal "implementation is ready for review" signal.
 
 ---
 

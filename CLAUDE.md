@@ -75,10 +75,7 @@ If someone asks you to do something code-related and you're not sure what they m
 - For lunar-lib: clone if not present, create feature branch, work, push, open draft PR
 - Commit messages should be descriptive (not "fix stuff")
 - **Always open PRs as draft:** `gh pr create --draft`
-- **CodeRabbit summon is automatic — do not post it yourself.** The Bender server watches GitHub webhooks and posts `@coderabbitai review` on its own when a human marks the PR ready for review (the `pull_request.ready_for_review` action with a human in PEOPLE.json as the sender). CodeRabbit ignores summons posted while a PR is still in draft (PR #162 was the canary), which is why we moved this to the draft→ready transition.
-  - **Keep PRs in draft** while you implement, push, and post test evidence. CodeRabbit will not review yet, and that's intentional.
-  - **Do not run `gh pr ready` yourself.** Leave the flip to ready for a human — that's what triggers the summon.
-  - Once summoned, CodeRabbit re-reviews on every push automatically. You only address its feedback; you never re-summon.
+- **Keep PRs in draft** while you implement, push, and post test evidence. Leave the draft→ready flip to a human (the requester, typically); a worker shouldn't run `gh pr ready` on its own.
 - **Reviewer assignment is a two-step process:**
   1. Add the person who requested the work as the default reviewer: `gh pr edit <PR> --add-reviewer <username>`
      - If triggered from Linear, add the ticket creator
