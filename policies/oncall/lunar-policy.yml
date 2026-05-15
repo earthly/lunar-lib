@@ -4,7 +4,7 @@ name: oncall
 description: Enforce on-call schedule, escalation, and staffing standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.2.0
 
 landing_page:
   display_name: "On-Call Guardrails"
