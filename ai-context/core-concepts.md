@@ -255,8 +255,8 @@ version: 0
 
 hub:
   host: lunar-hub.internal.example.com
-  grpc_port: 9000
-  http_port: 8080
+  grpcPort: 9000
+  httpPort: 8080
 
 domains:
   payments:

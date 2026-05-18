@@ -196,8 +196,6 @@ Catalogers have access to these environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `LUNAR_CATALOGER_NAME` | Name of the current cataloger |
-| `LUNAR_CATALOGER_OWNER` | Owner of the cataloger |
 | `LUNAR_BIN_DIR` | Directory for installed binaries |
 | `LUNAR_PLUGIN_ROOT` | Root directory of the plugin (for plugins) |
 
@@ -236,84 +234,13 @@ lunar catalog raw [--json] <json-path> <value>
 
 ```bash
 # Write components to the catalog
-lunar catalog --json '.components' '{"github.com/acme/api": {"owner": "jane@acme.com"}}'
+lunar catalog raw --json '.components' '{"github.com/acme/api": {"owner": "jane@acme.com"}}'
 
 # Pipe JSON from command output
-gh repo list my-org --json name,owner | jq '...' | lunar catalog --json '.components' -
+gh repo list my-org --json name,owner | jq '...' | lunar catalog raw --json '.components' -
 
 # Write domains
-lunar catalog --json '.domains' '{"platform": {"owner": "platform-team@acme.com"}}'
-```
-
-#### Component Form
-
-Write or update a single component with structured flags.
-
-```bash
-lunar catalog component [options] [<json-value>]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--name <n>` | Component name (required unless in component-repo hook) |
-| `--owner <owner>` | Component owner email |
-| `--branch <branch>` | Default branch name |
-| `--domain <domain>` | Domain path (e.g., `platform.api`) |
-| `--tag <tag>` | Add a tag (repeatable) |
-| `--ci-pipeline <name>` | Add a CI pipeline (repeatable) |
-| `--meta <key>=<value>` | Add metadata (string value, repeatable) |
-| `--meta-json <key>=<value>` | Add metadata (JSON value, repeatable) |
-
-**Examples:**
-
-```bash
-# Add component with flags
-lunar catalog component \
-  --name "github.com/acme/api" \
-  --owner "jane@acme.com" \
-  --domain "platform.backend" \
-  --tag "go" \
-  --tag "production"
-
-# Add tag to current component (in component-repo hook)
-lunar catalog component --tag production
-
-# Set metadata
-lunar catalog component \
-  --name "github.com/acme/api" \
-  --meta tier=1 \
-  --meta-json slos='{"latency_p99": 100}'
-```
-
-#### Domain Form
-
-Write or update a single domain.
-
-```bash
-lunar catalog domain [options] [<json-value>]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--name <n>` | Domain name (required) |
-| `--description <desc>` | Domain description |
-| `--owner <owner>` | Domain owner email |
-| `--meta <key>=<value>` | Add metadata (string value, repeatable) |
-| `--meta-json <key>=<value>` | Add metadata (JSON value, repeatable) |
-
-**Examples:**
-
-```bash
-# Create a domain
-lunar catalog domain \
-  --name "platform" \
-  --description "Platform services" \
-  --owner "platform-team@acme.com"
-
-# Create nested domain
-lunar catalog domain \
-  --name "platform.backend" \
-  --description "Backend platform services"
+lunar catalog raw --json '.domains' '{"platform": {"owner": "platform-team@acme.com"}}'
 ```
 
 ### Path Syntax
@@ -346,10 +273,7 @@ The Catalog JSON has a predefined structure:
   "domains": {
     "<domain-name>": {
       "description": "<description>",
-      "owner": "<owner>",
-      "meta": {
-        "<key>": "<value>"
-      }
+      "owner": "<owner>"
     }
   },
   "components": {
@@ -358,10 +282,7 @@ The Catalog JSON has a predefined structure:
       "domain": "<domain>",
       "branch": "<branch>",
       "tags": ["<tag1>", "<tag2>"],
-      "ciPipelines": ["<pipeline1>", "<pipeline2>"],
-      "meta": {
-        "<key>": "<value>"
-      }
+      "ciPipelines": ["<pipeline1>", "<pipeline2>"]
     }
   }
 }
@@ -396,7 +317,7 @@ version: 0
 
 name: my-cataloger                    # Required: Must match directory name
 description: What this cataloger does # Required: Brief description
-author: team@example.com              # Required
+author: team@example.com              # Optional
 
 # Recommended: specify container image
 default_image: earthly/lunar-scripts:1.0.0
@@ -618,23 +539,6 @@ echo "Found $(echo "$COMPONENTS" | jq 'length') components"
 
 One cataloger should sync from one source. Create separate catalogers for different systems.
 
-### 6. Test Locally
-
-Use `lunar cataloger dev` to test catalogers locally:
-
-```bash
-# Run catalogers and output the resulting Catalog JSON
-lunar cataloger dev --output-json
-```
-
-### 7. Document Your Sources
+### 6. Document Your Sources
 
 Document what external systems your cataloger syncs from and any required secrets.
-
-### 8. View Current Catalog
-
-Inspect the current catalog state:
-
-```bash
-lunar cataloger get-json
-```

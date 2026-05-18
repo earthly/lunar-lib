@@ -26,7 +26,7 @@ echo "$COMPONENTS" | jq '
       tags: .metadata.tags
     }
   }] | add
-' | lunar catalog --json '.components' -
+' | lunar catalog raw --json '.components' -
 ```
 
 ## Pattern 2: Database Sync (cron hook)
@@ -50,7 +50,7 @@ psql "$LUNAR_SECRET_DB_URL" -t -A -c "
   ))
   FROM services
   WHERE active = true
-" | lunar catalog --json '.components' -
+" | lunar catalog raw --json '.components' -
 ```
 
 ## Pattern 3: Central Repository Files (repo hook)
@@ -64,10 +64,10 @@ set -e
 # Hook: type: repo, repo: github.com/acme/software-catalog
 
 # Import domains from TOML file
-cat domains.toml | toml2json | jq '.domains' | lunar catalog --json '.domains' -
+cat domains.toml | toml2json | jq '.domains' | lunar catalog raw --json '.domains' -
 
 # Import components from YAML file
-cat services.yaml | yq -o=json '.components' | lunar catalog --json '.components' -
+cat services.yaml | yq -o=json '.components' | lunar catalog raw --json '.components' -
 ```
 
 ## Pattern 4: Component-Level Augmentation (component-repo hook)
@@ -80,18 +80,21 @@ set -e
 
 # Hook: type: component-repo
 
-# Add tag if repo has a specific CI workflow
+# Detect tags from repo signals
+TAGS='[]'
 if grep -q '^name: Production Deploy$' .github/workflows/*.yml 2>/dev/null; then
-  lunar catalog component --tag production
+  TAGS=$(echo "$TAGS" | jq '. + ["production"]')
+fi
+if [ -f go.mod ]; then
+  TAGS=$(echo "$TAGS" | jq '. + ["go"]')
+elif [ -f package.json ]; then
+  TAGS=$(echo "$TAGS" | jq '. + ["javascript"]')
+elif [ -f requirements.txt ] || [ -f pyproject.toml ]; then
+  TAGS=$(echo "$TAGS" | jq '. + ["python"]')
 fi
 
-# Add tag based on language detection
-if [ -f go.mod ]; then
-  lunar catalog component --tag go
-elif [ -f package.json ]; then
-  lunar catalog component --tag javascript
-elif [ -f requirements.txt ] || [ -f pyproject.toml ]; then
-  lunar catalog component --tag python
+if [ "$TAGS" != "[]" ]; then
+  lunar catalog raw --json ".components.\"$LUNAR_COMPONENT_ID\".tags" "$TAGS"
 fi
 ```
 
@@ -110,11 +113,10 @@ gh repo list my-org --json name,owner,description,url \
   --limit 1000 | jq '
   [.[] | {
     (.url | gsub("https://"; "")): {
-      owner: .owner.login,
-      meta: {description: .description}
+      owner: .owner.login
     }
   }] | add
-' | lunar catalog --json '.components' -
+' | lunar catalog raw --json '.components' -
 ```
 
 ## Pattern 6: Multi-Source Aggregation (cron hook)
@@ -129,15 +131,15 @@ set -e
 
 # Fetch from primary source (Backstage)
 curl -fsS "$BACKSTAGE_API/entities" | \
-  jq '...' | lunar catalog --json '.components' -
+  jq '...' | lunar catalog raw --json '.components' -
 
 # Augment with ownership data from a spreadsheet export
 curl -fsS "$OWNERSHIP_SHEET_CSV" | \
-  csvjson | jq '...' | lunar catalog --json '.components' -
+  csvjson | jq '...' | lunar catalog raw --json '.components' -
 
 # Add domain hierarchy from internal API
 curl -fsS "$INTERNAL_API/domains" | \
-  jq '...' | lunar catalog --json '.domains' -
+  jq '...' | lunar catalog raw --json '.domains' -
 ```
 
 ## Pattern 7: Component-JSON Heuristics (component-cron hook)
@@ -153,14 +155,17 @@ set -e
 
 COMPONENT_JSON="$(lunar component get-json "$LUNAR_COMPONENT_ID")"
 
-# Tag based on k8s deployment namespace
+# Detect tags from Component JSON signals
+TAGS='[]'
 if echo "$COMPONENT_JSON" | jq -e '.k8s.deployments[]? | select(.namespace == "prod")' >/dev/null; then
-  lunar catalog component --tag production
+  TAGS=$(echo "$TAGS" | jq '. + ["production"]')
+fi
+if echo "$COMPONENT_JSON" | jq -e '.sca.dependencies[]? | select(.license == "AGPL-3.0")' >/dev/null; then
+  TAGS=$(echo "$TAGS" | jq '. + ["compliance-review"]')
 fi
 
-# Tag based on dependency license
-if echo "$COMPONENT_JSON" | jq -e '.sca.dependencies[]? | select(.license == "AGPL-3.0")' >/dev/null; then
-  lunar catalog component --tag compliance-review
+if [ "$TAGS" != "[]" ]; then
+  lunar catalog raw --json ".components.\"$LUNAR_COMPONENT_ID\".tags" "$TAGS"
 fi
 ```
 

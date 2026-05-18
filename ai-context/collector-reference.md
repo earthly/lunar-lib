@@ -178,7 +178,6 @@ hook:
   binary:
     name_pattern: python[0-9]*    # Regex on binary name
     dir: /usr/local/bin            # Exact dir match (or dir_pattern for regex)
-    use_path_dirs: true            # Restrict to PATH directories
   args:
     - value: build                 # Positional arg (order matters)
     - flag: --tag                  # Flag (order-independent)
@@ -187,8 +186,6 @@ hook:
   envs:
     - name: DEBUG
       value: "1"
-  max_process_depth: 1             # Only top-level processes
-  include_children_depth: 1        # Also trigger on direct children
 ```
 
 **Matching rules:**
@@ -300,14 +297,12 @@ Collectors have access to these environment variables:
 | `LUNAR_COMPONENT_BASE_BRANCH` | Base branch of PR (target branch) | `main` |
 | `LUNAR_COMPONENT_GIT_SHA` | Git SHA being evaluated | `abc123...` |
 | `LUNAR_COMPONENT_TAGS` | Component tags (JSON array) | `["go","backend"]` |
-| `LUNAR_COMPONENT_META` | Component metadata (JSON) | `{"tier":"1"}` |
 
 ### Collector Context
 
 | Variable | Description |
 |----------|-------------|
 | `LUNAR_COLLECTOR_NAME` | Name of the current collector |
-| `LUNAR_COLLECTOR_CI_PIPELINE` | CI pipeline name (for CI hooks) |
 | `LUNAR_PLUGIN_ROOT` | Root directory of the plugin (for plugins) |
 | `LUNAR_BIN_DIR` | Directory for installed binaries |
 
@@ -392,7 +387,8 @@ lunar collect [options] <json-path> <value> [<json-path> <value> ...]
 | Option | Description |
 |--------|-------------|
 | `-j`, `--json` | Interpret value as JSON (not raw string) |
-| `--component <id>` | Specify component (default: from environment) |
+| `--array-append` | Append to existing array instead of replacing |
+| `--pretty`, `-p` | Pretty-print the resulting JSON |
 
 ### Examples
 
@@ -659,7 +655,7 @@ version: 0
 
 name: my-collector                    # Required: Unique name (must match directory name)
 description: What this collector does # Required: Brief description
-author: team@example.com              # Required
+author: team@example.com              # Optional
 
 # Recommended: specify container image
 # Use default_image alone when plugin has no CI collectors
