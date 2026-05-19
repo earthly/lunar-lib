@@ -74,11 +74,26 @@ No other Jira permissions are required. The collector only reads; it never write
 
 #### Caveat: assignee email visibility
 
-On Atlassian Cloud, `assignee.emailAddress` is governed by each user's email-visibility setting (Account → Profile → Contact). The field is only populated for users whose visibility is `Public` or `Anyone in your organization`; otherwise the API returns `null` and `.vcs.pr.ticket.assignee` is written as an empty string. This is an account-level Atlassian setting, **not** a token permission — granting additional scopes will not change the behavior.
+On Atlassian Cloud, `assignee.emailAddress` is governed by each user's email-visibility setting (Account → Profile → Contact). When `JIRA_TOKEN` is an API token or PAT — the auth shape the collector uses today — the field is only populated for users whose visibility is `Public` or `Anyone in your organization`; otherwise the API returns `null` and `.vcs.pr.ticket.assignee` is written as an empty string.
+
+The OAuth 2.0 granular scope `read:email-address:jira` is the only thing that overrides this — Atlassian documents it as "view email addresses of all users regardless of profile visibility settings." If you switch the collector to OAuth and grant that scope the email field becomes reliable; with API tokens the per-user setting always wins.
 
 #### Using OAuth 2.0 (3LO) instead of an API token
 
-If your org disallows long-lived user tokens and you plan to mint `JIRA_TOKEN` via an Atlassian OAuth 2.0 (3LO) app, the classic scope `read:jira-work` covers `GET /rest/api/3/issue/{issueIdOrKey}` end-to-end. The granular-scope equivalents (`read:issue-meta:jira`, `read:issue:jira`, `read:status:jira`, `read:issue-type:jira`, plus `read:user:jira` for assignee email) change over time — check Atlassian's [scope reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) for the current set before locking your app down.
+If your org disallows long-lived user tokens and you plan to mint `JIRA_TOKEN` via an Atlassian OAuth 2.0 (3LO) app, the classic scope `read:jira-work` covers `GET /rest/api/3/issue/{issueIdOrKey}` end-to-end. The minimum granular scopes for the fields this collector reads are:
+
+| Granular scope | Why it's needed |
+|----------------|-----------------|
+| `read:issue:jira` | View the issue itself |
+| `read:issue-meta:jira` | Issue summary and core metadata |
+| `read:issue-status:jira` | Status name |
+| `read:issue-type:jira` | Issue type name |
+| `read:user:jira` | Assignee user record |
+| `read:email-address:jira` | Assignee email (gated separately from `read:user:jira` — see the caveat above) |
+
+`read:project-role:jira` is **not** required. That scope governs reading project role memberships (Administrators, Developers, etc.), which this collector never touches.
+
+Atlassian's granular-scope names drift; if any of the above no longer match, check the [scope reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) and the per-endpoint scope list on the [`GET issue`](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-get) docs page.
 
 Note: the HTTP Basic auth shape the collector uses today works with API tokens and PATs; OAuth bearer tokens would require swapping the `curl` auth method, which the collector does not currently do.
 
