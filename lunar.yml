@@ -1,9 +1,3 @@
-# Earthly per-repo catalog file. Read by the lunar-yml cataloger in
-# earthly/lunar-internal-config to classify this repo and apply the
-# right collectors/policies via domain prefix matching.
-#
-# Schema: https://github.com/earthly/lunar-internal-config#per-repo-lunaryml
-
 domain: engineering.lunar.public
 codeowners:
   - me-bender
