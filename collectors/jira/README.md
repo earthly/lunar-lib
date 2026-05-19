@@ -21,7 +21,7 @@ This collector writes to the following Component JSON paths:
 | `.vcs.pr.ticket.status` | string | Ticket status name (e.g. `In Progress`) |
 | `.vcs.pr.ticket.type` | string | Issue type name (e.g. `Story`, `Bug`) |
 | `.vcs.pr.ticket.summary` | string | Ticket summary |
-| `.vcs.pr.ticket.assignee` | string | Assignee email (subject to Atlassian email visibility — see [Required scopes](#required-scopes)) |
+| `.vcs.pr.ticket.assignee` | string | Assignee email (subject to Atlassian email visibility) |
 | `.vcs.pr.ticket.reuse_count` | number | Count of other PRs referencing the same ticket |
 | `.vcs.pr.ticket.native.jira` | object | Full raw Jira API response |
 
@@ -47,64 +47,20 @@ collectors:
       jira_user: "user@acme.com"
 ```
 
-Required secrets:
-- `JIRA_TOKEN` — Jira API token used as the HTTP Basic password, paired with `jira_user` as the username. See [Required scopes](#required-scopes) for the permissions this token needs.
-- `GH_TOKEN` — GitHub token used to read PR titles via `GET /repos/{owner}/{repo}/pulls/{number}`. See [Required scopes](#required-scopes).
+### `JIRA_TOKEN`
 
-## Required scopes
+1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
+2. Click **Create API token** (classic token — leave scopes empty)
+3. The Jira user that owns the token needs the `Browse Projects` permission on the project(s) referenced in PR titles
 
-The collector makes exactly two outbound API calls. The table below maps each call to the sub-collector that issues it and the minimum permission the corresponding token needs.
+That's it for classic tokens. Scoped API tokens are not supported — they require Atlassian's `api.atlassian.com/ex/jira/{cloudId}/…` endpoint pattern, which this collector doesn't call.
 
-| Endpoint | Used by | Token | Minimum permission |
-|----------|---------|-------|--------------------|
-| `GET /rest/api/3/issue/{issueIdOrKey}` (Jira Cloud REST v3) | `ticket` | `JIRA_TOKEN` | `Browse Projects` on the Jira project(s) whose tickets appear in PR titles |
-| `GET /repos/{owner}/{repo}/pulls/{number}` (GitHub REST) | `ticket`, `ticket-history` | `GH_TOKEN` | Read access to the PR (see breakdown below) |
+Note: `assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact). If a user keeps their email private, this field is empty regardless of token permission.
 
-The `ticket-history` sub-collector additionally queries the Lunar SQL database via `lunar sql connection-string`. That uses the platform's own credentials — no Jira or GitHub permission is involved.
+### `GH_TOKEN`
 
-### Jira token (`JIRA_TOKEN`)
+Needs read access to the PR (`GET /repos/{owner}/{repo}/pulls/{number}`).
 
-The collector authenticates with HTTP Basic auth, sending `jira_user:JIRA_TOKEN` as the credential. This is the standard authentication shape for **Atlassian Cloud API tokens** (created at <https://id.atlassian.com/manage-profile/security/api-tokens>) and for **Jira Server / Data Center Personal Access Tokens (PATs)**.
-
-API tokens and PATs operate with the same permissions as the user who created them — there are no OAuth scopes attached. The user account that owns the token needs:
-
-- **`Browse Projects`** project permission on the Jira project(s) whose tickets are referenced in PR titles. This is the standard read-access permission and is sufficient to read `status`, `issuetype`, `summary`, and `assignee` from the issue endpoint.
-
-No other Jira permissions are required. The collector only reads; it never writes, transitions, or comments on tickets.
-
-#### Caveat: assignee email visibility
-
-On Atlassian Cloud, `assignee.emailAddress` is governed by each user's email-visibility setting (Account → Profile → Contact). When `JIRA_TOKEN` is an API token or PAT — the auth shape the collector uses today — the field is only populated for users whose visibility is `Public` or `Anyone in your organization`; otherwise the API returns `null` and `.vcs.pr.ticket.assignee` is written as an empty string.
-
-The OAuth 2.0 granular scope `read:email-address:jira` is the only thing that overrides this — Atlassian documents it as "view email addresses of all users regardless of profile visibility settings." If you switch the collector to OAuth and grant that scope the email field becomes reliable; with API tokens the per-user setting always wins.
-
-#### Using OAuth 2.0 (3LO) instead of an API token
-
-If your org disallows long-lived user tokens and you plan to mint `JIRA_TOKEN` via an Atlassian OAuth 2.0 (3LO) app, the classic scope `read:jira-work` covers `GET /rest/api/3/issue/{issueIdOrKey}` end-to-end. The minimum granular scopes for the fields this collector reads are:
-
-| Granular scope | Why it's needed |
-|----------------|-----------------|
-| `read:issue:jira` | View the issue itself |
-| `read:issue-meta:jira` | Issue summary and core metadata |
-| `read:issue-status:jira` | Status name |
-| `read:issue-type:jira` | Issue type name |
-| `read:user:jira` | Assignee user record |
-| `read:email-address:jira` | Assignee email (gated separately from `read:user:jira` — see the caveat above) |
-
-`read:project-role:jira` is **not** required. That scope governs reading project role memberships (Administrators, Developers, etc.), which this collector never touches.
-
-Atlassian's granular-scope names drift; if any of the above no longer match, check the [scope reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) and the per-endpoint scope list on the [`GET issue`](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-get) docs page.
-
-Note: the HTTP Basic auth shape the collector uses today works with API tokens and PATs; OAuth bearer tokens would require swapping the `curl` auth method, which the collector does not currently do.
-
-### GitHub token (`GH_TOKEN`)
-
-The collector calls `GET /repos/{owner}/{repo}/pulls/{number}` once per PR run to read the PR title. The minimum permission depends on token type and repository visibility:
-
-| Token type | Public repo | Private repo |
-|------------|-------------|--------------|
-| Classic personal access token (PAT) | No scope required | `repo` |
-| Fine-grained PAT | `Metadata: Read` + `Pull requests: Read` on the target repo | `Metadata: Read` + `Pull requests: Read` on the target repo |
-| GitHub App installation token | `metadata: read` + `pull_requests: read` | `metadata: read` + `pull_requests: read` |
-
-In CI, the default `GITHUB_TOKEN` issued by GitHub Actions already satisfies these requirements for the repo running the workflow.
+- Classic PAT: `repo` for private repos, no scope for public
+- Fine-grained PAT or GitHub App: `Metadata: Read` + `Pull requests: Read`
+- GitHub Actions `GITHUB_TOKEN`: works as-is
