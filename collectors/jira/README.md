@@ -47,6 +47,13 @@ collectors:
       jira_user: "user@acme.com"
 ```
 
+Required secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `JIRA_TOKEN` | Atlassian API token used with HTTP Basic auth to read the ticket via `GET /rest/api/3/issue/{key}` |
+| `GH_TOKEN` | GitHub token used to read the PR title via `GET /repos/{owner}/{repo}/pulls/{number}` |
+
 ### `JIRA_TOKEN`
 
 1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
