@@ -57,7 +57,14 @@ if [ -z "${LUNAR_SECRET_JIRA_TOKEN:-}" ]; then
 fi
 
 # Fetch ticket from Jira REST API.
-JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
+# Scoped (granular) API tokens authenticate against api.atlassian.com/ex/jira/{cloudId}/...
+# Classic API tokens authenticate against the site URL directly.
+JIRA_CLOUD_ID="${LUNAR_VAR_JIRA_CLOUD_ID:-}"
+if [ -n "$JIRA_CLOUD_ID" ]; then
+  JIRA_API_URL="https://api.atlassian.com/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/${TICKET_KEY}"
+else
+  JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
+fi
 
 set +e
 JIRA_RESPONSE="$(curl -fsS \

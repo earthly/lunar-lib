@@ -56,6 +56,9 @@ inputs:
     description: Jira instance base URL (e.g. https://acme.atlassian.net)
   jira_user:
     description: Jira user email for API authentication
+  jira_cloud_id:
+    description: Atlassian cloud ID (UUID from <site>/_edge/tenant_info). Required only when JIRA_TOKEN is a scoped API token; ignored for classic API tokens.
+    default: ""
 
 secrets:
   JIRA_TOKEN:
