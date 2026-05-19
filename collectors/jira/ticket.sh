@@ -75,7 +75,7 @@ CURL_STATUS=$?
 set -e
 
 if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
-  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_BASE_URL}." >&2
+  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_API_URL}." >&2
   exit 0
 fi
 
