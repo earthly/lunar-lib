@@ -45,6 +45,7 @@ collectors:
     with:
       jira_base_url: "https://acme.atlassian.net"
       jira_user: "user@acme.com"
+      # jira_cloud_id: "d9f4df71-…"   # required only if JIRA_TOKEN is a scoped API token
 ```
 
 Required secrets:
@@ -56,13 +57,24 @@ Required secrets:
 
 ### `JIRA_TOKEN`
 
+The collector supports both Atlassian API token shapes.
+
+**Classic API token** (default):
+
 1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
-2. Click **Create API token** (classic token — leave scopes empty)
-3. The Jira user that owns the token needs the `Browse Projects` permission on the project(s) referenced in PR titles
+2. Click **Create API token** (leave scopes empty)
+3. Owner needs the `Browse Projects` permission on the relevant project(s)
 
-That's it for classic tokens. Scoped API tokens are not supported — they require Atlassian's `api.atlassian.com/ex/jira/{cloudId}/…` endpoint pattern, which this collector doesn't call.
+**Scoped (fine-grained) API token**:
 
-Note: `assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact). If a user keeps their email private, this field is empty regardless of token permission.
+1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
+2. Click **Create API token with scopes**
+3. Grant `read:jira-work` (classic scope) — or the granular set: `read:issue:jira`, `read:issue-meta:jira`, `read:issue-status:jira`, `read:issue-type:jira`, `read:user:jira`, `read:email-address:jira`
+4. Set `jira_cloud_id` in `lunar-config.yml` (UUID from `https://<your-site>.atlassian.net/_edge/tenant_info`)
+
+When `jira_cloud_id` is set the collector calls `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/issue/{key}`; otherwise it calls `{jira_base_url}/rest/api/3/issue/{key}`.
+
+Note: `assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact). API tokens cannot override it; only OAuth apps with `read:email-address:jira` can.
 
 ### `GH_TOKEN`
 
