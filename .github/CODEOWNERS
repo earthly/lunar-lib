@@ -1,0 +1,7 @@
+# CODEOWNERS — review routing for earthly/lunar-lib
+#
+# GitHub picks the LAST matching rule for any given path, not all matches
+# combined. Add more-specific overrides below the wildcard if a path needs
+# a different reviewer set later.
+
+* @brandonSc @vladaionescu
