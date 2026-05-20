@@ -56,9 +56,8 @@ if [ -z "${LUNAR_SECRET_JIRA_TOKEN:-}" ]; then
   exit 0
 fi
 
-# Fetch ticket from Jira REST API.
+# Fetch ticket from Jira REST API using classic API token + HTTP Basic auth.
 JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
-
 set +e
 JIRA_RESPONSE="$(curl -fsS \
   -u "${JIRA_USER}:${LUNAR_SECRET_JIRA_TOKEN}" \
@@ -68,7 +67,7 @@ CURL_STATUS=$?
 set -e
 
 if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
-  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_BASE_URL}." >&2
+  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_API_URL}." >&2
   exit 0
 fi
 
