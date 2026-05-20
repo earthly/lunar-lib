@@ -45,7 +45,6 @@ collectors:
     with:
       jira_base_url: "https://acme.atlassian.net"
       jira_user: "user@acme.com"
-      # jira_cloud_id: "d9f4df71-…"   # required only if JIRA_TOKEN is a scoped API token
 ```
 
 Required secrets:
@@ -57,36 +56,20 @@ Required secrets:
 
 ### `JIRA_TOKEN`
 
-Pick one of the two token shapes below.
+Use a **classic Atlassian API token**. Steps:
 
-**Classic API token** (recommended):
+1. Sign in to Atlassian as the user whose account will own the token.
+2. Open <https://id.atlassian.com/manage-profile/security/api-tokens>.
+3. Click **Create API token** (the plain button — *not* "Create API token with scopes").
+4. Enter a label (e.g. `lunar-jira-collector`) and click **Create**.
+5. Click **Copy** to copy the token, then paste it into your secret store as `JIRA_TOKEN`.
+6. In Jira, make sure that same user has the **Browse Projects** permission on every project whose tickets appear in your PR titles.
 
-1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
-2. Click **Create API token** (leave scopes empty)
-3. Owner needs the `Browse Projects` permission on the relevant project(s)
+Set `jira_user` to that user's Atlassian email — the collector uses HTTP Basic auth (`email:token`) against `{jira_base_url}/rest/api/3/issue/{key}`.
 
-**Scoped (fine-grained) API token with granular scopes**:
+> **Note:** Granular ("fine-grained") Atlassian API tokens — the ones created via **Create API token with scopes** — are **not currently supported**. Atlassian's scoped tokens require a separate `api.atlassian.com/ex/jira/{cloudId}/...` gateway and Beta-state granular scopes that don't reliably grant project-level visibility in our testing. Stick with the classic token above.
 
-1. Open <https://id.atlassian.com/manage-profile/security/api-tokens>
-2. Click **Create API token with scopes**
-3. Grant **all** of the granular scopes that `GET /rest/api/3/issue/{key}` requires (per Atlassian's OpenAPI spec):
-   - `read:issue:jira`
-   - `read:issue-meta:jira`
-   - `read:issue-security-level:jira`
-   - `read:issue.vote:jira` (note: dot, not dash)
-   - `read:issue.changelog:jira` (note: dot, not dash)
-   - `read:avatar:jira`
-   - `read:status:jira`
-   - `read:user:jira`
-   - `read:field-configuration:jira`
-   - `read:email-address:jira` (optional; only needed if you want assignee email)
-4. Set `jira_cloud_id` in `lunar-config.yml` (UUID from `https://<your-site>.atlassian.net/_edge/tenant_info`)
-
-Shortcut: granting the single classic scope `read:jira-work` covers all of the above and avoids the long list.
-
-When `jira_cloud_id` is set the collector calls `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/issue/{key}` with `Authorization: Bearer <token>`; otherwise it calls `{jira_base_url}/rest/api/3/issue/{key}` with HTTP Basic (`email:token`).
-
-Note: `assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact). API tokens cannot override it; only OAuth apps with `read:email-address:jira` can.
+`assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact); API tokens cannot override it.
 
 ### `GH_TOKEN`
 

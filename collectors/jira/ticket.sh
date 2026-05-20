@@ -56,25 +56,13 @@ if [ -z "${LUNAR_SECRET_JIRA_TOKEN:-}" ]; then
   exit 0
 fi
 
-# Fetch ticket from Jira REST API.
-# Scoped (granular) API tokens authenticate via Bearer against
-# api.atlassian.com/ex/jira/{cloudId}/... Classic API tokens use HTTP Basic
-# (email:token) against the site URL.
-JIRA_CLOUD_ID="${LUNAR_VAR_JIRA_CLOUD_ID:-}"
+# Fetch ticket from Jira REST API using classic API token + HTTP Basic auth.
+JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
 set +e
-if [ -n "$JIRA_CLOUD_ID" ]; then
-  JIRA_API_URL="https://api.atlassian.com/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/${TICKET_KEY}"
-  JIRA_RESPONSE="$(curl -fsS \
-    -H "Authorization: Bearer ${LUNAR_SECRET_JIRA_TOKEN}" \
-    -H 'Accept: application/json' \
-    "$JIRA_API_URL")"
-else
-  JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
-  JIRA_RESPONSE="$(curl -fsS \
-    -u "${JIRA_USER}:${LUNAR_SECRET_JIRA_TOKEN}" \
-    -H 'Accept: application/json' \
-    "$JIRA_API_URL")"
-fi
+JIRA_RESPONSE="$(curl -fsS \
+  -u "${JIRA_USER}:${LUNAR_SECRET_JIRA_TOKEN}" \
+  -H 'Accept: application/json' \
+  "$JIRA_API_URL")"
 CURL_STATUS=$?
 set -e
 
