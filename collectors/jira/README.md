@@ -65,9 +65,9 @@ Use a **classic Atlassian API token**. Steps:
 5. Click **Copy** to copy the token, then paste it into your secret store as `JIRA_TOKEN`.
 6. In Jira, make sure that same user has the **Browse Projects** permission on every project whose tickets appear in your PR titles.
 
-Set `jira_user` to that user's Atlassian email — the collector uses HTTP Basic auth (`email:token`) against `{jira_base_url}/rest/api/3/issue/{key}`.
+Set `jira_user` to that user's Atlassian email — the collector uses HTTP Basic auth (`email:token`) against `{jira_base_url}/rest/api/3/issue/{key}`. This is the path Atlassian themselves recommend for our shape of integration: per [Basic auth for REST APIs](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/), *"We recommend using it for simple scripts and manual calls to the REST APIs."* This collector is exactly that — a small script doing one `GET /issue/{key}` per PR.
 
-> **Note:** Granular ("fine-grained") Atlassian API tokens — the ones created via **Create API token with scopes** — are **not currently supported**. Atlassian's scoped tokens require a separate `api.atlassian.com/ex/jira/{cloudId}/...` gateway and Beta-state granular scopes that don't reliably grant project-level visibility in our testing. Stick with the classic token above.
+> **Note:** Granular ("fine-grained") Atlassian API tokens — the ones created via **Create API token with scopes** — are **not currently supported**. Atlassian's scoped tokens require a separate `api.atlassian.com/ex/jira/{cloudId}/...` gateway, and even when all the right scopes are attached, Beta-state granular scopes don't reliably grant project-level visibility (verified empirically against `earthly.atlassian.net`). Atlassian's own [OAuth 2.0 scopes guidance](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/#classic-scopes) also says: *"When choosing your scopes, the recommendation is to use classic scopes"* — i.e. `read:jira-work` — rather than the granular ones. Stick with the classic API token above.
 
 `assignee.emailAddress` honors each Jira user's email-visibility setting (Account → Profile → Contact); API tokens cannot override it.
 
