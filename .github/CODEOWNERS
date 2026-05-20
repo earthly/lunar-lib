@@ -1,0 +1,12 @@
+# CODEOWNERS — review routing for earthly/lunar-lib
+#
+# GitHub picks the LAST matching rule for any given path, not all matches
+# combined. Add more-specific overrides below the wildcard if a path needs
+# a different reviewer set later.
+#
+# Note: GitHub Apps (e.g. me-bender[bot], lunar-internal[bot]) cannot be
+# listed as code owners — only user accounts and teams. Bender posts review
+# feedback as PR comments via its server-side webhooks instead of via
+# CODEOWNERS-triggered review requests.
+
+* @brandonSc @vladaionescu
