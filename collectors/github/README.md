@@ -27,7 +27,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector            | Description                                                                                                                                                      |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `repository`         | Collects basic repository settings including visibility, default branch, topics, and allowed merge strategies                                                    |
-| `branch-protection`  | Collects branch protection rules including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions |
+| `branch-protection`  | Collects branch protection rules from classic branch protection or rulesets (whichever is configured), including required approvals, status checks, force push restrictions, commit signing requirements, and push access restrictions. The `source` field on `.vcs.branch_protection` records which mechanism was detected (`"classic"`, `"ruleset"`, or `"none"`). |
 | `access-permissions` | Collects repository access permissions including direct collaborators and teams (does not expand team memberships)                                               |
 
 ## Installation
