@@ -119,28 +119,34 @@ else
   # names in the wire format differ from classic protection (e.g.
   # dismiss_stale_reviews_on_push vs dismiss_stale_reviews); the output schema
   # mirrors the classic-path names so consuming policies don't need to branch.
-  PR_RULE=$(echo "$RULES_DATA" | jq -c 'map(select(.type == "pull_request")) | first // null')
-  if [ "$PR_RULE" = "null" ]; then
+  #
+  # /rules/branches/{branch} returns one entry per rule per ruleset, so when an
+  # org-level and a repo-level ruleset both target this branch we get multiple
+  # entries of the same type. GitHub enforces the most restrictive across them,
+  # so we aggregate: max() for numeric counts, any-true for booleans, and
+  # union+dedup for context lists.
+  PR_RULES=$(echo "$RULES_DATA" | jq -c '[.[] | select(.type == "pull_request")]')
+  if [ "$(echo "$PR_RULES" | jq 'length')" = "0" ]; then
     REQUIRE_PR=false
     REQUIRED_APPROVALS=0
     REQUIRE_CODEOWNER_REVIEW=false
     DISMISS_STALE_REVIEWS=false
   else
     REQUIRE_PR=true
-    REQUIRED_APPROVALS=$(echo "$PR_RULE" | jq '.parameters.required_approving_review_count // 0')
-    REQUIRE_CODEOWNER_REVIEW=$(echo "$PR_RULE" | jq '.parameters.require_code_owner_review // false')
-    DISMISS_STALE_REVIEWS=$(echo "$PR_RULE" | jq '.parameters.dismiss_stale_reviews_on_push // false')
+    REQUIRED_APPROVALS=$(echo "$PR_RULES" | jq '[.[].parameters.required_approving_review_count // 0] | max')
+    REQUIRE_CODEOWNER_REVIEW=$(echo "$PR_RULES" | jq 'any(.[]; .parameters.require_code_owner_review // false)')
+    DISMISS_STALE_REVIEWS=$(echo "$PR_RULES" | jq 'any(.[]; .parameters.dismiss_stale_reviews_on_push // false)')
   fi
 
-  STATUS_CHECKS_RULE=$(echo "$RULES_DATA" | jq -c 'map(select(.type == "required_status_checks")) | first // null')
-  if [ "$STATUS_CHECKS_RULE" = "null" ]; then
+  STATUS_CHECKS_RULES=$(echo "$RULES_DATA" | jq -c '[.[] | select(.type == "required_status_checks")]')
+  if [ "$(echo "$STATUS_CHECKS_RULES" | jq 'length')" = "0" ]; then
     REQUIRE_STATUS_CHECKS=false
     REQUIRED_CHECKS='[]'
     REQUIRE_BRANCHES_UP_TO_DATE=false
   else
     REQUIRE_STATUS_CHECKS=true
-    REQUIRED_CHECKS=$(echo "$STATUS_CHECKS_RULE" | jq -c '[.parameters.required_status_checks[]?.context] // []')
-    REQUIRE_BRANCHES_UP_TO_DATE=$(echo "$STATUS_CHECKS_RULE" | jq '.parameters.strict_required_status_checks_policy // false')
+    REQUIRED_CHECKS=$(echo "$STATUS_CHECKS_RULES" | jq -c '[.[].parameters.required_status_checks[]?.context] | unique')
+    REQUIRE_BRANCHES_UP_TO_DATE=$(echo "$STATUS_CHECKS_RULES" | jq 'any(.[]; .parameters.strict_required_status_checks_policy // false)')
   fi
 
   # non_fast_forward rule blocks force-push; absent => allowed
