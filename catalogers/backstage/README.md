@@ -27,12 +27,12 @@ This cataloger writes to the following Catalog JSON paths:
 {
   "components": {
     "github.com/acme/payment-api": {
-      "owner": "team-payments@acme.com",
+      "owner": "group:default/team-payments",
       "domain": "platform.payments",
       "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
     },
     "github.com/acme/web-app": {
-      "owner": "team-web@acme.com",
+      "owner": "group:default/team-web",
       "domain": "platform.frontend",
       "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
     }
@@ -40,11 +40,11 @@ This cataloger writes to the following Catalog JSON paths:
   "domains": {
     "platform.payments": {
       "description": "Payment processing and billing",
-      "owner": "platform-leads@acme.com"
+      "owner": "group:default/platform-leads"
     },
     "platform.frontend": {
       "description": "Customer-facing web surfaces",
-      "owner": "platform-leads@acme.com"
+      "owner": "group:default/platform-leads"
     }
   }
 }
@@ -72,7 +72,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 catalogers:
-  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -93,11 +93,11 @@ For organisations that already run [`github-org`](../github-org) to enumerate re
 
 ```yaml
 catalogers:
-  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme"
 
-  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -110,7 +110,7 @@ Backstage components are matched to Lunar components by reading an annotation on
 
 ```yaml
 catalogers:
-  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
       component_id_annotation: "github.com/project-slug"  # value: "acme/payment-api"
@@ -149,26 +149,13 @@ with:
   filter: "metadata.annotations.team=platform"
 ```
 
-## Inputs
+### Owner Format
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `backstage_url` | Yes | — | Base URL of the Backstage instance |
-| `entity_kinds` | No | `Component,Domain` | Comma-separated kinds to sync |
-| `namespace` | No | `default` | Backstage namespace (`*` for all) |
-| `component_id_annotation` | No | `github.com/project-slug` | Annotation holding the repo slug |
-| `component_id_prefix` | No | `github.com/` | Prefix prepended to the annotation value |
-| `tag_prefix` | No | `bs-` | Prefix added to all emitted tags |
-| `include_derived_tags` | No | `true` | Emit `type-*` and `lifecycle-*` tags |
-| `default_owner` | No | _empty_ | Fallback owner for entities without `spec.owner` |
-| `domain_default_description` | No | _empty_ | Fallback description for domains |
-| `filter` | No | _empty_ | Extra raw Backstage filter |
+Backstage `spec.owner` is typically an entity reference like `group:default/team-payments` or `user:default/jane`, **not** an email. By default this cataloger passes the value through verbatim — matching what the existing [`policies/backstage/owner-set`](../../policies/backstage) policy already accepts (`team-payments`, `group:infra`, `user:alice` are all valid).
 
-## Secrets
+If you'd rather store bare names, set `owner_format: bare-name` to strip the `<kind>:<namespace>/` prefix. Resolving entity refs to emails by looking up the User/Group entity is intentionally out of scope for v1 — it adds API calls and only works when User/Group entities carry `spec.profile.email`.
 
-| Secret | Required | Description |
-|--------|----------|-------------|
-| `BACKSTAGE_TOKEN` | No | Bearer token for the Backstage API. Most internal deployments require this. |
+`default_owner` is also written verbatim, so you can use whatever convention you prefer (entity ref, email, plain string).
 
 ## Source System
 

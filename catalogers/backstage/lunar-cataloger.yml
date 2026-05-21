@@ -26,12 +26,12 @@ example_catalog_json: |
   {
     "components": {
       "github.com/acme/payment-api": {
-        "owner": "team-payments@acme.com",
+        "owner": "group:default/team-payments",
         "domain": "platform.payments",
         "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
       },
       "github.com/acme/web-app": {
-        "owner": "team-web@acme.com",
+        "owner": "group:default/team-web",
         "domain": "platform.frontend",
         "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
       }
@@ -39,11 +39,11 @@ example_catalog_json: |
     "domains": {
       "platform.payments": {
         "description": "Payment processing and billing",
-        "owner": "platform-leads@acme.com"
+        "owner": "group:default/platform-leads"
       },
       "platform.frontend": {
         "description": "Customer-facing web surfaces",
-        "owner": "platform-leads@acme.com"
+        "owner": "group:default/platform-leads"
       }
     }
   }
@@ -63,13 +63,7 @@ catalogers:
     hook:
       type: cron
       schedule: "0 2 * * *"
-    keywords:
-      - service catalog
-      - backstage
-      - components
-      - domains
-      - ownership
-      - sync
+    keywords: ["service catalog", "backstage", "components", "domains", "ownership", "sync"]
 
 inputs:
   backstage_url:
@@ -123,11 +117,28 @@ inputs:
       `bs-lifecycle-production`) in addition to `metadata.tags`.
     default: "true"
 
+  owner_format:
+    description: |
+      How to write `spec.owner` from Backstage into the Lunar `owner`
+      field. Backstage entity refs typically look like
+      `group:default/team-payments` or `user:default/jane`.
+      - `as-is`     — pass the Backstage value through verbatim.
+                      Matches what the existing `policies/backstage/*`
+                      checks accept (`team-payments`, `group:infra`,
+                      `user:alice` are all valid).
+      - `bare-name` — strip the `<kind>:<namespace>/` prefix and write
+                      only the trailing name (e.g. `team-payments`).
+                      Useful when downstream systems want plain names.
+      Email resolution via Backstage User/Group entities is out of
+      scope for v1.
+    default: "as-is"
+
   default_owner:
     description: |
-      Fallback owner email applied to components and domains that have
-      no `spec.owner` in Backstage. Leave empty to skip components
-      without an owner.
+      Fallback owner applied (verbatim) to components and domains that
+      have no `spec.owner` in Backstage. Format is whatever you want —
+      entity ref, email, plain string — Lunar stores it as-is. Leave
+      empty to skip entities without an owner.
     default: ""
 
   domain_default_description:
@@ -145,8 +156,7 @@ inputs:
     default: ""
 
 secrets:
-  - name: BACKSTAGE_TOKEN
+  BACKSTAGE_TOKEN:
     description: |
       Bearer token for the Backstage API. Required if the Backstage
       instance requires authentication; many internal deployments do.
-    required: false
