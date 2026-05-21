@@ -91,6 +91,18 @@ collectors:
       type: code
     keywords: ["editorconfig", "code style", "editor settings"]
 
+  - name: changelog
+    description: |
+      Detects a CHANGELOG file in the repository root. Checks common variants
+      (CHANGELOG.md, CHANGELOG, CHANGES.md, HISTORY.md, RELEASES.md) configurable
+      via the changelog_paths input. Extracts line count and section headings
+      (typically version entries in Keep-a-Changelog style). Writes to
+      `.repo.changelog`.
+    mainBash: changelog.sh
+    hook:
+      type: code
+    keywords: ["changelog", "release notes", "version history", "keep a changelog"]
+
 inputs:
   readme_paths:
     description: Comma-separated list of README paths to check (first match wins)
@@ -98,6 +110,9 @@ inputs:
   codeowners_paths:
     description: Comma-separated list of CODEOWNERS file paths to check (first match wins)
     default: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
+  changelog_paths:
+    description: Comma-separated list of CHANGELOG paths to check (first match wins)
+    default: "CHANGELOG.md,CHANGELOG,CHANGES.md,HISTORY.md,RELEASES.md"
 
 example_component_json: |
   {
@@ -150,6 +165,16 @@ example_component_json: |
         "exists": true,
         "path": ".editorconfig",
         "sections": 4
+      },
+      "changelog": {
+        "exists": true,
+        "path": "CHANGELOG.md",
+        "lines": 87,
+        "sections": [
+          "[1.2.0] - 2026-05-01",
+          "[1.1.0] - 2026-04-15",
+          "[1.0.0] - 2026-03-01"
+        ]
       }
     },
     "ownership": {
