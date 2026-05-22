@@ -1,0 +1,193 @@
+version: 0
+
+name: backstage-catalog-info
+description: Catalogs Backstage components by reading catalog-info.yaml files from GitHub repos
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage catalog-info.yaml Cataloger"
+  long_description: |
+    Walks repos in a GitHub org, fetches each repo's `catalog-info.yaml`,
+    and writes parsed Backstage entities into Lunar. Components →
+    `.components` (owner, domain, tags); Domains → `.domains`
+    (description, owner). Use when Backstage data lives in repo files,
+    not a running server.
+  categories: ["service-catalog", "vcs"]
+  icon: "assets/backstage-catalog-info.svg"
+  status: "experimental"
+  related:
+    - slug: "backstage"
+      type: "cataloger"
+      reason: "Same shape, sourced from a live Backstage API instead of repo files"
+    - slug: "backstage"
+      type: "collector"
+      reason: "Per-repo collector writing `.catalog.native.backstage` from the same files"
+    - slug: "github-org"
+      type: "cataloger"
+      reason: "Discovers the repos; this cataloger layers Backstage metadata on top"
+
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/payment-api": {
+        "owner": "group:default/team-payments",
+        "domain": "platform.payments",
+        "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+      },
+      "github.com/acme/web-app": {
+        "owner": "group:default/team-web",
+        "domain": "platform.frontend",
+        "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
+      }
+    },
+    "domains": {
+      "platform.payments": {
+        "description": "Payment processing and billing",
+        "owner": "group:default/platform-leads"
+      },
+      "platform.frontend": {
+        "description": "Customer-facing web surfaces",
+        "owner": "group:default/platform-leads"
+      }
+    }
+  }
+
+catalogers:
+  - name: sync
+    description: |
+      Enumerates every repo in `org_name`, fetches `catalog-info.yaml`
+      (configurable `paths`) from each repo's default branch via the
+      GitHub contents API, and writes the parsed entities to the Lunar
+      catalog. Components are keyed by
+      `component_id_prefix + <owner>/<repo>` so they align with
+      `github-org`. Multi-document YAML is supported — a single
+      catalog-info.yaml may declare many Components, Domains, or
+      Systems.
+    mainBash: main.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "domains", "ownership", "sync"]
+
+inputs:
+  org_name:
+    description: |
+      GitHub organisation to scan (e.g. `acme`). Required. The cataloger
+      lists every repo in the org via the GitHub REST API and then
+      fetches the configured `paths` from each.
+
+  paths:
+    description: |
+      Comma-separated list of repo-relative paths to try for the
+      catalog-info file. First match wins per repo. Repos with none of
+      these files are skipped silently.
+    default: "catalog-info.yaml,catalog-info.yml"
+
+  branch:
+    description: |
+      Branch to read `catalog-info.yaml` from. Empty means the repo's
+      default branch (resolved per repo via the GitHub API).
+    default: ""
+
+  entity_kinds:
+    description: |
+      Comma-separated list of Backstage entity kinds to sync. Each kind
+      is routed to the appropriate Catalog JSON path:
+      - Component, API, Resource → `.components`
+      - Domain, System            → `.domains`
+      Other kinds (User, Group, Location, …) are ignored.
+    default: "Component,Domain"
+
+  component_id_annotation:
+    description: |
+      Annotation key on a Backstage Component whose value identifies
+      the underlying repo. When present, its value (after prepending
+      `component_id_prefix`) becomes the Lunar component ID; when
+      absent, the cataloger falls back to the repo's `<owner>/<repo>`
+      derived from the GitHub path.
+    default: "github.com/project-slug"
+
+  component_id_prefix:
+    description: |
+      String prepended to the annotation value (or to the fallback
+      `<owner>/<repo>`) to form the Lunar component ID.
+    default: "github.com/"
+
+  tag_prefix:
+    description: |
+      Prefix added to Backstage `metadata.tags` when mapped to Lunar
+      tags. Also applied to derived tags like `type-<spec.type>` and
+      `lifecycle-<spec.lifecycle>`. Empty string disables the prefix.
+    default: "bs-"
+
+  include_derived_tags:
+    description: |
+      When `true`, emits derived tags from `spec.type` (e.g.
+      `bs-type-service`) and `spec.lifecycle` (e.g.
+      `bs-lifecycle-production`) in addition to `metadata.tags`.
+    default: "true"
+
+  owner_format:
+    description: |
+      How to write `spec.owner` from the catalog-info file into the
+      Lunar `owner` field. Backstage entity refs typically look like
+      `group:default/team-payments` or `user:default/jane`.
+      - `as-is`     — pass the value through verbatim. Matches what the
+                      existing `policies/backstage/*` checks accept
+                      (`team-payments`, `group:infra`, `user:alice` are
+                      all valid).
+      - `bare-name` — strip the `<kind>:<namespace>/` prefix and write
+                      only the trailing name (e.g. `team-payments`).
+    default: "as-is"
+
+  default_owner:
+    description: |
+      Fallback owner applied (verbatim) to components and domains that
+      have no `spec.owner` in their catalog-info file. Leave empty to
+      skip entities without an owner.
+    default: ""
+
+  domain_default_description:
+    description: |
+      Fallback description for domains that have no
+      `metadata.description` set in their catalog-info file.
+    default: ""
+
+  include_archived:
+    description: |
+      Include archived repositories when scanning the org.
+    default: "false"
+
+  include_public:
+    description: Include public repositories.
+    default: "true"
+
+  include_private:
+    description: Include private repositories.
+    default: "true"
+
+  include_internal:
+    description: Include internal repositories (GitHub Enterprise).
+    default: "true"
+
+  include_repos:
+    description: |
+      Comma-separated list of glob patterns of repo names to include
+      (matched against `<repo>`, not `<owner>/<repo>`). Empty means
+      include everything that passes the visibility filters.
+    default: ""
+
+  exclude_repos:
+    description: |
+      Comma-separated list of glob patterns of repo names to exclude.
+      Applied after `include_repos`.
+    default: ""
+
+secrets:
+  GITHUB_TOKEN:
+    description: |
+      GitHub Personal Access Token (or GitHub App installation token).
+      Needs `repo:read` for private repos and `read:org` to enumerate
+      the org's repository list. Public-only scans still need a token
+      to avoid the 60-req/hr unauthenticated rate limit.
