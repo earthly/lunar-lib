@@ -64,7 +64,9 @@ This integration provides the following catalogers:
 
 | Hook | Schedule | Description |
 |------|----------|-------------|
-| `cron` | `0 2 * * *` | Runs daily at 2am UTC |
+| `cron` | `0 2 * * *` | Runs daily at 02:00 UTC |
+
+Daily is the conservative default because a full `/api/catalog/entities` walk paginates through every entity in the Backstage instance — at thousands of components this is a non-trivial fetch against both the Backstage server and the Lunar Runner. Ownership, domain, and tag metadata also change on the order of hours-to-days, not minutes, so a nightly cycle covers the data velocity for almost every catalog. Smaller catalogs are free to tighten the cadence by overriding `hook.schedule` in their forked copy of `lunar-cataloger.yml` — promoting `schedule` to a `with:` input is a candidate v2 if anyone needs per-deployment tunability without a fork.
 
 ## Installation
 
