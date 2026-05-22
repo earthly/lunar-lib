@@ -62,7 +62,7 @@ catalogers:
     mainBash: main.sh
     hook:
       type: cron
-      schedule: "*/5 * * * *"  # TEMP — cronos live test on PR #178; revert to "0 2 * * *" before merge
+      schedule: "0 2 * * *"
     keywords: ["service catalog", "backstage", "components", "domains", "ownership", "sync"]
 
 inputs:
