@@ -126,8 +126,6 @@ PLUGIN_CONFIGS = {
             {"name": "Installation", "required": True},
             {"name": "Requirements", "required": True},
             {"name": "Configuration", "required": False},
-            {"name": "Implementation plan", "required": False},
-            {"name": "Why a probe, not a collector + policy?", "required": False},
             {"name": "See also", "required": False},
         ],
         # Sections that belong to other plugin types and must not appear here.

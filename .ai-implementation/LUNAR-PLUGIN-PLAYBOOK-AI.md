@@ -1,9 +1,9 @@
 # Lunar Plugin PR Playbook
 
 End-to-end playbook for AI agents creating lunar-lib **collector**,
-**policy**, and **probe** PRs. This is a **bot-mode** workflow — the
-agent works autonomously through each phase, pausing only at explicit
-review gates.
+**policy**, **cataloger**, and **probe** PRs. This is a **bot-mode**
+workflow — the agent works autonomously through each phase, pausing
+only at explicit review gates.
 
 This doc is the **overview**. The phase-by-phase deep content lives in
 phase-specific docs under [`phases/`](phases/) — read the one that
@@ -106,8 +106,8 @@ Then read these files in `ai-context/` (relative to lunar-lib root):
 | `core-concepts.md` | Architecture |
 | `collector-reference.md` | How collectors work (if building a collector) |
 | `policy-reference.md` | How policies work (if building a policy) |
-| `component-json/conventions.md` | **Schema design rules — critical.** Read the "Presence Detection" and "Anti-Pattern: Boolean Fields" sections carefully. *(Collectors / policies only — probes don't write Component JSON.)* |
-| `component-json/structure.md` | All existing Component JSON paths *(collectors / policies only)* |
+| `component-json/conventions.md` | **Schema design rules — critical.** Read the "Presence Detection" and "Anti-Pattern: Boolean Fields" sections carefully. *(Collectors / policies / catalogers only — probes don't write Component JSON.)* |
+| `component-json/structure.md` | All existing Component JSON paths *(collectors / policies / catalogers only)* |
 
 For probe plugins, skip the Component JSON docs and read
 [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md) plus

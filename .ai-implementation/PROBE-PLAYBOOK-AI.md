@@ -169,13 +169,12 @@ Required sections, in order:
 7. **Configuration** — `inputs:` table if present, plus a note on
    defaults. If no `inputs:` in the first release, say so and list
    planned ones as future work.
-8. **Implementation plan** *(spec PRs only)* — the script doesn't
-   exist yet, so describe what it will do step by step. Removed once
-   the script lands in the implementation phase.
-9. **Why a probe, not a collector + policy?** *(optional)* — when the
-   ticket originally framed the work as collector+policy, explain the
-   re-scope so reviewers see your reasoning.
-10. **See also** — sibling probes, related collectors/policies.
+8. **See also** — sibling probes, related collectors/policies.
+
+Spec-phase content (what the script will do, why a probe instead of a
+collector+policy, etc.) lives in the **PR description**, not the
+README. The published README should read as if the implementation
+already exists.
 
 ---
 
