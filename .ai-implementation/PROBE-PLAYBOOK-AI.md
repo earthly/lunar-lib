@@ -250,7 +250,36 @@ Once the secondary reviewer approves the spec, you write the
    probes:
      - uses: ../lunar-lib/probes/<name>
    ```
-3. Run `lunar-probe install` to register hooks.
+3. Run `lunar-probe install` to register hooks. For Claude Code this
+   materialises a native [Claude
+   plugin](https://docs.claude.com/en/docs/claude-code/plugins) bundle
+   at `~/.lunar/probe/plugins/claude/marketplace/lunar-probe/` and
+   registers it via `claude plugins marketplace add` + `claude plugins
+   install lunar-probe@lunar-probe` (the legacy strip-and-rewrite of
+   `~/.claude/settings.json` was removed in
+   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8)).
+   Cursor / Codex / Gemini still write to their per-framework hook
+   config — see the install matrix in
+   [`lunar-probe`'s README](https://github.com/earthly/lunar-probe#first-run).
+
+   Verify with `claude plugins list` (look for
+   `lunar-probe@lunar-probe → ✔ enabled`); for the other frameworks,
+   inspect their hook config or re-run `install` and watch for an
+   `unchanged` report.
+
+   Useful flags while iterating:
+   - `--dry-run` — preview what install would write without touching
+     disk. Run on a fresh box first to sanity-check the bundle and
+     hook paths.
+   - `--agent claude` (repeatable) — restrict the run to one
+     framework. Handy when only the Claude Code bundle needs
+     rewiring.
+   - `--update` — same effect as `install`; refreshes skills and
+     rewrites hook paths against the current binary.
+   - `--uninstall` (or the `lunar-probe uninstall` alias) — remove
+     everything install added. Pair with `--agent` to target one
+     framework. Use between tests to confirm the probe fires from a
+     clean install.
 4. Trigger the probe's hook event (edit a matching file, run the
    matching command, …) and capture:
    - The full `check:` stdout/stderr.
