@@ -266,7 +266,7 @@ Once the secondary reviewer approves the spec, you write the
    `settings.json` directly to the framework's user-config dir and
    drops `SKILL.md` trees under each framework's `skills/` location.
 3. In a scratch repo that exercises the probe's trigger (e.g. for
-   commitlint, a repo with a commitlint config), drop a
+   shellcheck, a repo with at least one `.sh` file), drop a
    `.lunar/probes.yml` pointing at the local plugin path:
    ```yaml
    version: 0
