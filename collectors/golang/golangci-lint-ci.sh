@@ -64,8 +64,12 @@ for arg in $CMD_STR; do
             JSON_FILE="$arg"
         fi
     # Legacy v1 syntax: --out-format=json:<path>
+    # Multi-format form: --out-format=json:<path>,line-number — only the part
+    # before the first comma belongs to the json format, the rest pairs other
+    # formats with their own outputs.
     elif [[ "$arg" == --out-format=json:* ]]; then
         candidate="${arg#--out-format=json:}"
+        candidate="${candidate%%,*}"
         if [ -n "$candidate" ] && [ "$candidate" != "stdout" ]; then
             JSON_FILE="$candidate"
         fi
