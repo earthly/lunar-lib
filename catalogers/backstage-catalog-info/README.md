@@ -156,12 +156,9 @@ If you'd rather store bare names, set `owner_format: bare-name` to strip the `<k
 
 ## Source System
 
-This cataloger calls the [GitHub REST API](https://docs.github.com/en/rest):
+This cataloger reads from GitHub. It requires:
 
-1. `GET /orgs/{org}/repos` (paginated) to enumerate the org's repositories — applies visibility / archived / include / exclude filters.
-2. `GET /repos/{owner}/{repo}` to resolve `default_branch` when `branch` is empty.
-3. `GET /repos/{owner}/{repo}/contents/{path}?ref={branch}` for each candidate in `paths`, first match wins.
-
-A bearer token (`LUNAR_SECRET_GITHUB_TOKEN`) is required to handle authenticated rate limits and to read private repos.
+1. **A GitHub token** (`LUNAR_SECRET_GITHUB_TOKEN`) with `repo` scope for private/internal repos and `read:org` to enumerate the org's repository list. Public-only scans still need a token to clear the unauthenticated rate limit.
+2. **Read access** to the files listed in `paths` (default `catalog-info.yaml,catalog-info.yml`) at the configured `branch` — the repo's default branch when `branch` is empty.
 
 Backstage parses YAML inputs against its own entity schema, but this cataloger does not invoke the Backstage validator — invalid entities are skipped silently with a log line. Use the per-repo [`backstage` collector](../../collectors/backstage) (which **does** invoke validation) when authoritative lint findings are required.
