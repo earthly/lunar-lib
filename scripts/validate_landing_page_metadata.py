@@ -74,13 +74,18 @@ VALID_INTEGRATION_CATEGORIES = {
     "incident-management",
 }
 
-# Valid categories for probes (agent-time guardrails — what does the probe nudge?)
-# Starts small; grows as new probe plugins land. Categorise by *what* the probe
-# enforces, not *how*. Linter probes (eslint, ruff, shellcheck, gofmt) → code-quality;
-# commit-message / file-naming / convention probes (commitlint) → authoring.
+# Valid categories for probes (agent-time guardrails — what does the probe nudge?).
+# Pre-populated so the website surface for probe landing pages can be built out
+# upfront and doesn't need a new release cycle each time a probe ships in a
+# different category. Categorise by *what* the probe enforces, not *how*.
 VALID_PROBE_CATEGORIES = {
-    "code-quality",
-    "authoring",
+    "code-quality",   # linters: eslint, ruff, shellcheck, golangci-lint, hadolint, etc.
+    "formatting",     # read-only format checks: prettier --check, gofmt -l, black --check
+    "authoring",      # commit messages, file naming, conventions: commitlint, husky, lefthook
+    "security",       # edit-time secret detection / vuln warnings
+    "testing",        # edit-time test triggers, coverage thresholds
+    "dependencies",   # outdated / vulnerable / license-incompatible deps at edit time
+    "documentation",  # docstring presence, README structure checks
 }
 
 # Valid status values

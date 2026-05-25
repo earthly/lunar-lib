@@ -1,10 +1,10 @@
 # Lunar Probe Plugin Playbook
 
 End-to-end playbook for AI agents authoring **probe plugins** in
-`lunar-lib/probes/<name>/`. Probes are the third plugin shape in
-lunar-lib, alongside collectors (`collectors/`) and policies
-(`policies/`). The PR lifecycle and review gates are the same as
-collectors/policies — see
+`lunar-lib/probes/<name>/`. Probes are the fourth plugin shape in
+lunar-lib, alongside collectors (`collectors/`), policies
+(`policies/`), and catalogers (`catalogers/`). The PR lifecycle and
+review gates are the same as collectors/policies/catalogers — see
 [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](LUNAR-PLUGIN-PLAYBOOK-AI.md) for the
 overarching Spec → Review → Implement → Approve → Merge flow.
 
@@ -60,10 +60,13 @@ shape. The differences are the manifest filename and the absence of
 `requirements.txt` / `mainBash` / `mainPython` — probes use the
 hook-based execution model from `lunar-probe` instead.
 
-For the full plugin grammar (the manifest schema, `uses:` import
-forms, `inputs:` / `with:`, namespacing, cache, lint rules), the
-authoritative reference is
-[`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md).
+For the full plugin grammar, read both:
+
+- [`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md)
+  — the plugin convention (manifest schema, `uses:` import forms,
+  `inputs:` / `with:`, namespacing, cache, lint rules).
+- [`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+  — the `probes.yml` / `lunar-probe.yml` syntax and hook-event grammar.
 
 ---
 

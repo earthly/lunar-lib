@@ -48,36 +48,21 @@ Code registers a native plugin via `claude plugins marketplace add` +
 `claude plugins install`. Re-running `lunar-probe install` after a
 lunar-probe upgrade is the supported refresh path.
 
-Then add this probe to your `.lunar/probes.yml`:
+Then add this probe to your `.lunar/probes.yml` (pin to the latest
+released tag):
 
 ```yaml
 version: 0
 
 probes:
-  - uses: github://earthly/lunar-lib/probes/commitlint@main
-```
-
-Pin to a tag once a `v*` release is cut:
-
-```yaml
   - uses: github://earthly/lunar-lib/probes/commitlint@v1.0.0
 ```
 
 ## Requirements
 
 - `commitlint` available on the agent's `PATH` (typically installed via `npm install -g @commitlint/cli @commitlint/config-conventional` or as a devDependency invoked via `npx`).
-- A commitlint config in the repo. The probe does not ship a config — it deferrs to whatever the repo already defines.
+- A commitlint config in the repo. The probe does not ship a config — it defers to whatever the repo already defines.
 - `jq` on `PATH` for parsing the PreToolUse payload.
-
-## Configuration
-
-This probe has no `inputs:` in its first release. Future iterations may
-add:
-
-- `commitlint_args: "--config /path/to/override.config.js --color"` — pass through to commitlint
-- `enforce_when: "config-present"` — control whether absence of a config triggers a warning vs. a no-op
-
-Open an issue or PR if you need either before they ship.
 
 ## Implementation plan
 
@@ -103,14 +88,10 @@ will be added in the implementation phase of this PR. The script:
 
 Edge cases the script must handle:
 
-- Multi-line messages passed as `-m "subject" -m "body"` (commitlint joins them).
-- `-F -` / heredoc stdin (`<<EOF`) — capture, pipe, lint.
-- Quoting / escaping in the agent's emitted command string. The PreToolUse
-  payload preserves the raw command; parsing with a fragile regex would
-  miss e.g. nested quotes. The implementation will use a small POSIX `sh`
-  argv-tokeniser (not bash arrays — agent CI runs Alpine BusyBox).
-- Repo at a path other than `$(pwd)` — `git rev-parse --show-toplevel` to
-  locate the commitlint config search root.
+- Multi-line messages passed as `-m "subject" -m "body"`.
+- `-F -` / heredoc stdin (`<<EOF`).
+- Quoting / escaping in the agent's emitted command string (nested quotes, escaped chars).
+- Repo at a path other than `$(pwd)` — locate the commitlint config from the repo root.
 
 ## Why a probe, not a collector + policy?
 
@@ -133,13 +114,7 @@ The structure-proposal step on this PR re-scoped commitlint as a
   loop. Tracked as a "Why not also..." note rather than blocking this
   spec.
 
-See `.ai-implementation/PROBE-PLAYBOOK-AI.md` for the broader probe
-authoring convention this PR introduces.
-
 ## See also
 
 - [`collectors/git/`](../../collectors/git/) — vanilla-git Component JSON collector (gitattributes, gitmodules, signed-commits).
 - [`collectors/pre-commit/`](../../collectors/pre-commit/) — pre-commit framework collector (ENG-565).
-- [`.ai-implementation/PROBE-PLAYBOOK-AI.md`](../../.ai-implementation/PROBE-PLAYBOOK-AI.md) — convention for authoring probes (this is the canonical example).
-
-Future siblings (each tracked as a separate Linear ticket): `husky` (ENG-575), `lefthook` (ENG-576), `shellcheck` (ENG-633), `ruff` (ENG-634), `eslint` (ENG-636), `golangci-lint` (ENG-637).
