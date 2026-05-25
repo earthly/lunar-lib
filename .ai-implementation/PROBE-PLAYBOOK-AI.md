@@ -242,7 +242,28 @@ Once the secondary reviewer approves the spec, you write the
 
 1. Install `lunar-probe` from `earthly/lunar-probe` if not already on
    `PATH`. Check `lunar-probe --version` works.
-2. In a scratch repo that exercises the probe's trigger (e.g. for
+2. Wire `lunar-probe` into the agent framework you're testing against
+   (Claude Code is the default for lunar-lib probe development):
+   ```bash
+   lunar-probe install                       # auto-detects every framework on the box
+   lunar-probe install --agent claude        # restrict to one framework while iterating
+   lunar-probe install --dry-run             # preview without writing
+   ```
+   For **Claude Code**, install shells out to the `claude` CLI and
+   registers `earthly/lunar-probe` as a native plugin:
+   ```
+   claude plugins marketplace add earthly/lunar-probe --sparse .claude-plugin plugins skills
+   claude plugins install lunar-probe@lunar-probe
+   ```
+   Verify it landed with `claude plugins list` — you should see
+   `lunar-probe@lunar-probe`. The plugin owns its own hooks, so
+   `~/.claude/settings.json` is never touched. If the `claude` CLI
+   isn't on `PATH`, install prints the two commands above and exits
+   cleanly so you can run them manually after installing `claude`.
+   For Cursor / Codex / Gemini, install writes `hooks.json` /
+   `settings.json` directly to the framework's user-config dir and
+   drops `SKILL.md` trees under each framework's `skills/` location.
+3. In a scratch repo that exercises the probe's trigger (e.g. for
    commitlint, a repo with a commitlint config), drop a
    `.lunar/probes.yml` pointing at the local plugin path:
    ```yaml
@@ -250,7 +271,10 @@ Once the secondary reviewer approves the spec, you write the
    probes:
      - uses: ../lunar-lib/probes/<name>
    ```
-3. Run `lunar-probe install` to register hooks.
+   Local relative paths and the published
+   `github://earthly/lunar-lib/probes/<name>@<ref>` form share the
+   same `uses:` grammar — local during iteration, github once the
+   plugin lands.
 4. Trigger the probe's hook event (edit a matching file, run the
    matching command, …) and capture:
    - The full `check:` stdout/stderr.
@@ -262,6 +286,10 @@ Once the secondary reviewer approves the spec, you write the
 5. Post the captured evidence on the PR. Screenshots are fine for
    the Claude Code transcript view; text is fine for `lunar-probe
    logs` output.
+6. Clean up your test box when you're done — `lunar-probe uninstall`
+   (or `lunar-probe install --uninstall`) removes every entry install
+   wrote, including the Claude plugin registration. User-authored
+   hook entries in cursor/codex/gemini config files are preserved.
 
 **No cronos deploy. No Component JSON screenshot. No
 `bender-track-pr` for cronos sync.** Probes run client-side.

@@ -39,7 +39,16 @@ The probe is a no-op (exit 0, command proceeds) when:
 
 ## Installation
 
-Add to your `.lunar/probes.yml`:
+Prereq: `lunar-probe` itself must be installed on your box and wired
+into your agent framework. See
+[`earthly/lunar-probe` § Install](https://github.com/earthly/lunar-probe#install)
+for the one-line installer; the short version is `lunar-probe install`
+(auto-detects Claude Code, Cursor, Codex, Gemini), which for Claude
+Code registers a native plugin via `claude plugins marketplace add` +
+`claude plugins install`. Re-running `lunar-probe install` after a
+lunar-probe upgrade is the supported refresh path.
+
+Then add this probe to your `.lunar/probes.yml`:
 
 ```yaml
 version: 0
