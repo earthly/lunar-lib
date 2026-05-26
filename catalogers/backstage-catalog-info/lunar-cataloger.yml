@@ -10,8 +10,8 @@ landing_page:
   long_description: |
     Augments existing Lunar components with owner, domain, and tag
     metadata from `.catalog.native.backstage` — populated by the
-    per-repo `backstage` collector during CI runs. Runs per-component
-    via `component-cron`. Use when Backstage data lives in repo files,
+    per-repo `backstage` collector. Runs per-component via
+    `component-cron`. Use when Backstage data lives in repo files,
     not a running server.
   categories: ["service-catalog", "vcs"]
   icon: "assets/backstage-catalog-info.svg"
@@ -47,13 +47,13 @@ catalogers:
   - name: augment
     description: |
       For each existing Lunar component, reads `.catalog.native.backstage`
-      from the component's Catalog JSON, verifies the entity is a
+      from the component's Component JSON, verifies the entity is a
       Backstage `Component` whose annotation matches the current Lunar
-      component, and writes its owner, domain, and tags back to
-      `.components["$LUNAR_COMPONENT_ID"]`. Components whose JSON has
-      no `.catalog.native.backstage` (the per-repo `backstage` collector
-      didn't run, or the repo has no `catalog-info.yaml`) are skipped
-      silently.
+      component, and writes its owner, domain, and tags to
+      `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON.
+      Components whose Component JSON has no `.catalog.native.backstage`
+      (the per-repo `backstage` collector didn't run, or the repo has
+      no `catalog-info.yaml`) are skipped silently.
     mainBash: main.sh
     hook:
       type: component-cron

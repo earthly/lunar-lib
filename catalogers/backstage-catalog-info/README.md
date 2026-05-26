@@ -4,9 +4,9 @@ Augments existing Lunar components with metadata read from each repo's `catalog-
 
 ## Overview
 
-Augments existing Lunar components with owner, domain, and tag metadata from each repo's `catalog-info.yaml`. Runs per component via the [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) hook — reads the parsed YAML from `.catalog.native.backstage` (populated by the per-repo [`backstage` collector](../../collectors/backstage) during CI Lunar runs), then writes owner/domain/tags back to that component's catalog entry.
+Augments existing Lunar components with owner, domain, and tag metadata from each repo's `catalog-info.yaml`. Runs per component via the [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) hook, reading the Backstage entity that the per-repo [`backstage` collector](../../collectors/backstage) has already written to `.catalog.native.backstage`, then writing owner / domain / tags to that component's catalog entry.
 
-This cataloger does no GitHub API calls and needs no auth — it transforms already-collected data. Because `component-cron` cannot create new components, pair with one that does — typically [`github-org`](../github-org) for org-wide discovery, or the live-API [`backstage`](../backstage) cataloger.
+Makes no GitHub API calls and needs no auth — it transforms already-collected data. Because `component-cron` cannot create new components, pair it with a component-defining cataloger — typically [`github-org`](../github-org), or the live-API [`backstage`](../backstage) cataloger.
 
 ## Synced Data
 
@@ -46,7 +46,7 @@ This cataloger does **not** define new components and does **not** write to `.do
 
 | Cataloger | Description |
 |-----------|-------------|
-| `augment` | Reads `.catalog.native.backstage` from the current component's Catalog JSON, verifies it matches the current component, and writes its owner / domain / tags back to `.components["$LUNAR_COMPONENT_ID"]` |
+| `augment` | Reads the Backstage entity at `.catalog.native.backstage` from the current component's Component JSON, verifies it corresponds to this component, and writes its owner / domain / tags to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON |
 
 ## Hook Type
 
@@ -54,9 +54,9 @@ This cataloger does **not** define new components and does **not** write to `.do
 |------|----------|-------------|
 | `component-cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per existing component |
 
-`component-cron` means the cataloger is invoked separately for each Lunar component currently in the catalog, with the component identifier exposed as `$LUNAR_COMPONENT_ID` and no repository clone — the script reads the component's existing Catalog JSON (including `.catalog.native.backstage`) via `lunar component get-json`. See the [cataloger-hooks reference](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) for the full contract.
+`component-cron` invokes the cataloger separately for each Lunar component currently in the catalog, exposing the component identifier as `$LUNAR_COMPONENT_ID`. No repository clone — the cataloger reads from the component's already-collected data. See the [cataloger-hooks reference](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) for the full contract.
 
-Daily at 03:00 is a conservative default — `catalog-info.yaml` changes typically land on the order of hours-to-days (PRs adding new components, team handovers), and the schedule is offset by an hour from the standard `0 2 * * *` to let component-defining catalogers and the per-repo `backstage` collector's CI runs land first. Tighten the cadence by overriding `hook.schedule` in a fork.
+Daily at 03:00 is a conservative default — `catalog-info.yaml` changes typically land on the order of hours-to-days (PRs adding new components, team handovers), and the schedule is offset by an hour from the standard `0 2 * * *` to let component-defining catalogers and the per-repo `backstage` collector's output land first. Tighten the cadence by overriding `hook.schedule` in a fork.
 
 ## Installation
 
@@ -67,9 +67,9 @@ catalogers:
   - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
-Because `component-cron` only augments existing components, a component-defining cataloger must run first (see the [Layering](#layering-with-a-component-defining-cataloger) section below). Each component's repo must also have the per-repo [`backstage` collector](../../collectors/backstage) wired into its CI Lunar runs so that `.catalog.native.backstage` is populated — components missing this data are skipped silently.
+Because `component-cron` only augments existing components, a component-defining cataloger must run first (see the [Layering](#layering-with-a-component-defining-cataloger) section below). Each component's repo must also have the per-repo [`backstage` collector](../../collectors/backstage) installed so that `.catalog.native.backstage` is populated on the component — components missing this data are skipped silently.
 
-No secrets to configure. The cataloger reads from the component's existing Catalog JSON and makes no external API calls.
+No secrets to configure. The cataloger reads pre-collected data and makes no external API calls.
 
 ### Layering with a Component-Defining Cataloger
 
@@ -91,7 +91,7 @@ The data source is the same Backstage metadata; the difference is where you read
 | Use this cataloger (`backstage-catalog-info`) when… | Use the live-API [`backstage`](../backstage) cataloger when… |
 |------------------------------------------------------|--------------------------------------------------------------|
 | You don't run a Backstage server — `catalog-info.yaml` files in repos are the source of truth | You run a Backstage instance and want its server-side processing (group hierarchy resolution, namespace defaults, relations) |
-| You already run per-repo Lunar CI (so the `backstage` collector lights up automatically per repo) | You want a single global pull at fixed cadence, regardless of per-repo CI |
+| You can install the per-repo [`backstage` collector](../../collectors/backstage) on each component repo (it parses `catalog-info.yaml` automatically) | You want a single global pull at fixed cadence with no per-repo collector dependency |
 
 Running both would write to the same `.components` keys with the same data via different paths — wasteful and the last-declared cataloger silently wins. Don't layer them; pick the one that matches your Backstage setup.
 
@@ -123,9 +123,9 @@ If you'd rather store bare names, set `owner_format: bare-name` to strip the `<k
 
 ## Source System
 
-This cataloger has no direct source system — it reads from the component's existing Catalog JSON (`lunar component get-json $LUNAR_COMPONENT_ID`) and makes no external API calls. The data flow is two-stage:
+This cataloger has no direct source system — it reads pre-collected data and makes no external API calls. The data flow is two-stage:
 
-1. **Per-repo, during CI Lunar runs:** the [`backstage` collector](../../collectors/backstage) reads `catalog-info.yaml` from the repo and writes the parsed entity to `.catalog.native.backstage` (including `valid` / `errors[]` flags from its lint pass).
-2. **Per-component, on this cataloger's schedule:** this cataloger reads `.catalog.native.backstage` and projects owner / domain / tags into `.components[$LUNAR_COMPONENT_ID]`.
+1. **Per-repo, by the [`backstage` collector](../../collectors/backstage):** parses `catalog-info.yaml` from the repo and writes the parsed entity to `.catalog.native.backstage` on the component (with `valid` / `errors[]` flags from its lint pass).
+2. **Per-component, on this cataloger's schedule:** reads `.catalog.native.backstage` from the component and projects owner / domain / tags into `.components[$LUNAR_COMPONENT_ID]` in the Catalog JSON.
 
 The collector handles validation and path discovery once; this cataloger trusts its output. If a component has no `.catalog.native.backstage` (collector not configured, repo has no `catalog-info.yaml`, or CI hasn't run yet), the component is skipped silently. The cataloger does **not** read invalid entities (`.catalog.native.backstage.valid == false`) — the collector's lint findings are authoritative.
