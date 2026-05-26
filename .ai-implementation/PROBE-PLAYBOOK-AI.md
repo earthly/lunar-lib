@@ -251,20 +251,31 @@ Once the secondary reviewer approves the spec, you write the
      - uses: ../lunar-lib/probes/<name>
    ```
 3. Run `lunar-probe install` to register hooks. For Claude Code this
-   materialises a native [Claude
-   plugin](https://docs.claude.com/en/docs/claude-code/plugins) bundle
-   at `~/.lunar/probe/plugins/claude/marketplace/lunar-probe/` and
-   registers it via `claude plugins marketplace add` + `claude plugins
-   install lunar-probe@lunar-probe` (the legacy strip-and-rewrite of
-   `~/.claude/settings.json` was removed in
-   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8)).
-   Cursor / Codex / Gemini still write to their per-framework hook
-   config — see the install matrix in
+   registers `earthly/lunar-probe` as a native [Claude
+   plugin](https://docs.claude.com/en/docs/claude-code/plugins) by
+   shelling out to the `claude` CLI:
+   ```
+   claude plugins marketplace add earthly/lunar-probe --sparse .claude-plugin plugins skills
+   claude plugins install lunar-probe@lunar-probe
+   ```
+   The plugin bundle is a static artefact checked into
+   `earthly/lunar-probe` (under `plugins/claude/` + the marketplace
+   manifest at `.claude-plugin/marketplace.json`); the `claude` CLI
+   clones the sparse subset into its own
+   `~/.claude/plugins/marketplaces/...` location. `lunar-probe install`
+   itself doesn't write anything under `~/.lunar/probe/plugins/` —
+   the only `~/.lunar/probe/` content it produces is the generic
+   skill copy at `~/.lunar/probe/skills/<name>/`. The legacy
+   strip-and-rewrite of `~/.claude/settings.json` was removed in
+   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8);
+   that file is no longer touched. Cursor / Codex / Gemini still
+   write to their per-framework hook config — see the install matrix
+   in
    [`lunar-probe`'s README](https://github.com/earthly/lunar-probe#first-run).
 
    Verify with `claude plugins list` (look for
-   `lunar-probe@lunar-probe → ✔ enabled`); for the other frameworks,
-   inspect their hook config or re-run `install` and watch for an
+   `lunar-probe@lunar-probe`); for the other frameworks, inspect
+   their hook config or re-run `install` and watch for an
    `unchanged` report.
 
    Useful flags while iterating:
