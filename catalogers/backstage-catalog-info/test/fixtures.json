@@ -1,0 +1,197 @@
+{
+  "annotation_match": {
+    "_comment": "Standard case: Backstage Component with the github.com/project-slug annotation matching $LUNAR_COMPONENT_ID via prefix",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "apiVersion": "backstage.io/v1alpha1",
+          "kind": "Component",
+          "metadata": {
+            "name": "payment-api",
+            "namespace": "default",
+            "annotations": {
+              "github.com/project-slug": "acme/payment-api"
+            },
+            "tags": ["payments", "tier1"]
+          },
+          "spec": {
+            "type": "service",
+            "lifecycle": "production",
+            "owner": "group:default/team-payments",
+            "domain": "platform.payments"
+          }
+        }
+      }
+    }
+  },
+  "id_fallback": {
+    "_comment": "No annotation set on entity — match via $LUNAR_COMPONENT_ID starting with component_id_prefix. Also exercises spec.system fallback for domain.",
+    "_component_id": "github.com/acme/web-app",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "apiVersion": "backstage.io/v1alpha1",
+          "kind": "Component",
+          "metadata": {
+            "name": "web-app",
+            "namespace": "default",
+            "tags": ["frontend"]
+          },
+          "spec": {
+            "type": "website",
+            "lifecycle": "production",
+            "owner": "group:default/team-web",
+            "system": "system:default/storefront"
+          }
+        }
+      }
+    }
+  },
+  "owner_format_bare": {
+    "_comment": "Same as annotation_match but exercised with owner_format=bare-name — the group:default/ prefix should be stripped",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Component",
+          "metadata": {
+            "annotations": {
+              "github.com/project-slug": "acme/payment-api"
+            },
+            "tags": ["payments"]
+          },
+          "spec": {
+            "type": "service",
+            "lifecycle": "production",
+            "owner": "group:default/team-payments",
+            "domain": "platform.payments"
+          }
+        }
+      }
+    }
+  },
+  "default_owner_fallback": {
+    "_comment": "Entity has no spec.owner — default_owner is applied verbatim",
+    "_component_id": "github.com/acme/orphan",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Component",
+          "metadata": {
+            "annotations": {
+              "github.com/project-slug": "acme/orphan"
+            }
+          },
+          "spec": {
+            "type": "service",
+            "lifecycle": "experimental"
+          }
+        }
+      }
+    }
+  },
+  "no_derived_tags": {
+    "_comment": "Same as annotation_match but with include_derived_tags=false — no bs-type-*/bs-lifecycle-* tags",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Component",
+          "metadata": {
+            "annotations": {"github.com/project-slug": "acme/payment-api"},
+            "tags": ["payments"]
+          },
+          "spec": {
+            "type": "service",
+            "lifecycle": "production",
+            "owner": "group:default/team-payments"
+          }
+        }
+      }
+    }
+  },
+  "skip_missing_data": {
+    "_comment": "Component JSON has no .catalog.native.backstage at all — silent skip with exit 0",
+    "_component_id": "github.com/acme/no-collector-yet",
+    "catalog": {}
+  },
+  "skip_invalid": {
+    "_comment": "Collector flagged the entity as invalid — silent skip",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": false,
+          "errors": ["missing spec.type"],
+          "kind": "Component",
+          "metadata": {
+            "annotations": {"github.com/project-slug": "acme/payment-api"}
+          }
+        }
+      }
+    }
+  },
+  "skip_wrong_kind": {
+    "_comment": "Entity at .catalog.native.backstage is a Domain (not a Component) — silent skip",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Domain",
+          "metadata": {
+            "name": "platform.payments"
+          },
+          "spec": {
+            "owner": "group:default/platform-leads"
+          }
+        }
+      }
+    }
+  },
+  "skip_annotation_mismatch": {
+    "_comment": "Annotation present but resolved value doesn't match $LUNAR_COMPONENT_ID — silent skip (stale collector data)",
+    "_component_id": "github.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Component",
+          "metadata": {
+            "annotations": {
+              "github.com/project-slug": "acme/some-other-repo"
+            },
+            "tags": ["payments"]
+          },
+          "spec": {
+            "owner": "group:default/team-payments"
+          }
+        }
+      }
+    }
+  },
+  "skip_no_annotation_and_prefix_mismatch": {
+    "_comment": "No annotation AND $LUNAR_COMPONENT_ID doesn't start with component_id_prefix — silent skip",
+    "_component_id": "gitlab.com/acme/payment-api",
+    "catalog": {
+      "native": {
+        "backstage": {
+          "valid": true,
+          "kind": "Component",
+          "metadata": {
+            "tags": ["payments"]
+          },
+          "spec": {
+            "owner": "group:default/team-payments"
+          }
+        }
+      }
+    }
+  }
+}

@@ -15,7 +15,7 @@ landing_page:
     not a running server.
   categories: ["service-catalog", "vcs"]
   icon: "assets/backstage-catalog-info.svg"
-  status: "experimental"
+  status: "beta"
   related:
     - slug: "backstage"
       type: "collector"
