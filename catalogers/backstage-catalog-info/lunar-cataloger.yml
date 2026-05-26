@@ -57,7 +57,7 @@ catalogers:
     mainBash: main.sh
     hook:
       type: component-cron
-      schedule: "*/10 * * * *"
+      schedule: "0 3 * * *"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment"]
 
 inputs:
