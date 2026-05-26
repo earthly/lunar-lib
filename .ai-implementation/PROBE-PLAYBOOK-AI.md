@@ -252,19 +252,32 @@ Once the secondary reviewer approves the spec, you write the
    lunar-probe install --dry-run             # preview without writing
    ```
    For **Claude Code**, install shells out to the `claude` CLI and
-   registers `earthly/lunar-probe` as a native plugin:
+   registers `earthly/lunar-probe` as a native [Claude
+   plugin](https://docs.claude.com/en/docs/claude-code/plugins):
    ```
    claude plugins marketplace add earthly/lunar-probe --sparse .claude-plugin plugins skills
    claude plugins install lunar-probe@lunar-probe
    ```
+   The plugin bundle is a static artefact checked into
+   `earthly/lunar-probe` (under `plugins/claude/` + the marketplace
+   manifest at `.claude-plugin/marketplace.json`); the `claude` CLI
+   clones the sparse subset into `~/.claude/plugins/marketplaces/...`.
+   `lunar-probe install` itself doesn't write anything under
+   `~/.lunar/probe/plugins/` — the only `~/.lunar/probe/` content it
+   produces is the generic skill copy at
+   `~/.lunar/probe/skills/<name>/`.
+
    Verify it landed with `claude plugins list` — you should see
    `lunar-probe@lunar-probe`. The plugin owns its own hooks, so
-   `~/.claude/settings.json` is never touched. If the `claude` CLI
-   isn't on `PATH`, install prints the two commands above and exits
-   cleanly so you can run them manually after installing `claude`.
-   For Cursor / Codex / Gemini, install writes `hooks.json` /
-   `settings.json` directly to the framework's user-config dir and
-   drops `SKILL.md` trees under each framework's `skills/` location.
+   `~/.claude/settings.json` is never touched (the legacy
+   strip-and-rewrite was removed in
+   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8)).
+   If the `claude` CLI isn't on `PATH`, install prints the two
+   commands above and exits cleanly so you can run them manually
+   after installing `claude`. For Cursor / Codex / Gemini, install
+   writes `hooks.json` / `settings.json` directly to the framework's
+   user-config dir and drops `SKILL.md` trees under each framework's
+   `skills/` location.
 3. In a scratch repo that exercises the probe's trigger (e.g. for
    shellcheck, a repo with at least one `.sh` file), drop a
    `.lunar/probes.yml` pointing at the local plugin path:
