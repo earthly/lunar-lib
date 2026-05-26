@@ -1,7 +1,7 @@
 version: 0
 
 name: backstage-catalog-info
-description: Augments existing Lunar components with metadata read from each repo's catalog-info.yaml
+description: Augments existing Lunar components with metadata from `.catalog.native.backstage` (populated by the per-repo `backstage` collector)
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
@@ -9,19 +9,20 @@ landing_page:
   display_name: "Backstage catalog-info.yaml Cataloger"
   long_description: |
     Augments existing Lunar components with owner, domain, and tag
-    metadata pulled from each repo's `catalog-info.yaml`. Runs once per
-    component (component-cron). Use when Backstage data lives in repo
-    files, not a running server.
+    metadata from `.catalog.native.backstage` — populated by the
+    per-repo `backstage` collector during CI runs. Runs per-component
+    via `component-cron`. Use when Backstage data lives in repo files,
+    not a running server.
   categories: ["service-catalog", "vcs"]
   icon: "assets/backstage-catalog-info.svg"
   status: "experimental"
   related:
     - slug: "backstage"
+      type: "collector"
+      reason: "Required — provides `.catalog.native.backstage` that this cataloger reads"
+    - slug: "backstage"
       type: "cataloger"
       reason: "Same Backstage metadata, sourced from a live Backstage API instead of repo files"
-    - slug: "backstage"
-      type: "collector"
-      reason: "Per-repo collector that writes `.catalog.native.backstage` during CI Lunar runs"
     - slug: "github-org"
       type: "cataloger"
       reason: "Defines the components this cataloger augments"
@@ -45,12 +46,14 @@ example_catalog_json: |
 catalogers:
   - name: augment
     description: |
-      For each existing Lunar component, fetches `catalog-info.yaml`
-      (configurable `paths`) from the component's repo via the GitHub
-      contents API, finds the Backstage `Component` entity that matches
-      the current component, and writes its owner, domain, and tags
-      back to `.components["$LUNAR_COMPONENT_ID"]`. Components without
-      a matching entity are skipped silently.
+      For each existing Lunar component, reads `.catalog.native.backstage`
+      from the component's Catalog JSON, verifies the entity is a
+      Backstage `Component` whose annotation matches the current Lunar
+      component, and writes its owner, domain, and tags back to
+      `.components["$LUNAR_COMPONENT_ID"]`. Components whose JSON has
+      no `.catalog.native.backstage` (the per-repo `backstage` collector
+      didn't run, or the repo has no `catalog-info.yaml`) are skipped
+      silently.
     mainBash: main.sh
     hook:
       type: component-cron
@@ -58,19 +61,6 @@ catalogers:
     keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment"]
 
 inputs:
-  paths:
-    description: |
-      Comma-separated list of repo-relative paths to try for the
-      catalog-info file. First match wins. Components whose repo has
-      none of these files are skipped silently.
-    default: "catalog-info.yaml,catalog-info.yml"
-
-  branch:
-    description: |
-      Branch to read `catalog-info.yaml` from. Empty means the repo's
-      default branch (resolved via the GitHub API).
-    default: ""
-
   component_id_annotation:
     description: |
       Annotation key on a Backstage Component used to match it against
@@ -119,10 +109,3 @@ inputs:
       Fallback owner applied (verbatim) to components whose matched
       Backstage entity has no `spec.owner`. Leave empty to skip.
     default: ""
-
-secrets:
-  GITHUB_TOKEN:
-    description: |
-      GitHub Personal Access Token (or GitHub App installation token)
-      with read access to the component repos. Public-only setups
-      still need a token to clear the unauthenticated rate limit.
