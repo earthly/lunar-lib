@@ -1,10 +1,10 @@
 # Lunar Probe Plugin Playbook
 
 End-to-end playbook for AI agents authoring **probe plugins** in
-`lunar-lib/probes/<name>/`. Probes are the third plugin shape in
-lunar-lib, alongside collectors (`collectors/`) and policies
-(`policies/`). The PR lifecycle and review gates are the same as
-collectors/policies — see
+`lunar-lib/probes/<name>/`. Probes are the fourth plugin shape in
+lunar-lib, alongside collectors (`collectors/`), policies
+(`policies/`), and catalogers (`catalogers/`). The PR lifecycle and
+review gates are the same as collectors/policies/catalogers — see
 [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](LUNAR-PLUGIN-PLAYBOOK-AI.md) for the
 overarching Spec → Review → Implement → Approve → Merge flow.
 
@@ -60,10 +60,13 @@ shape. The differences are the manifest filename and the absence of
 `requirements.txt` / `mainBash` / `mainPython` — probes use the
 hook-based execution model from `lunar-probe` instead.
 
-For the full plugin grammar (the manifest schema, `uses:` import
-forms, `inputs:` / `with:`, namespacing, cache, lint rules), the
-authoritative reference is
-[`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md).
+For the full plugin grammar, read both:
+
+- [`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md)
+  — the plugin convention (manifest schema, `uses:` import forms,
+  `inputs:` / `with:`, namespacing, cache, lint rules).
+- [`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+  — the `probes.yml` / `lunar-probe.yml` syntax and hook-event grammar.
 
 ---
 
@@ -166,13 +169,12 @@ Required sections, in order:
 7. **Configuration** — `inputs:` table if present, plus a note on
    defaults. If no `inputs:` in the first release, say so and list
    planned ones as future work.
-8. **Implementation plan** *(spec PRs only)* — the script doesn't
-   exist yet, so describe what it will do step by step. Removed once
-   the script lands in the implementation phase.
-9. **Why a probe, not a collector + policy?** *(optional)* — when the
-   ticket originally framed the work as collector+policy, explain the
-   re-scope so reviewers see your reasoning.
-10. **See also** — sibling probes, related collectors/policies.
+8. **See also** — sibling probes, related collectors/policies.
+
+Spec-phase content (what the script will do, why a probe instead of a
+collector+policy, etc.) lives in the **PR description**, not the
+README. The published README should read as if the implementation
+already exists.
 
 ---
 
@@ -242,18 +244,16 @@ Once the secondary reviewer approves the spec, you write the
 
 1. Install `lunar-probe` from `earthly/lunar-probe` if not already on
    `PATH`. Check `lunar-probe --version` works.
-2. In a scratch repo that exercises the probe's trigger (e.g. for
-   commitlint, a repo with a commitlint config), drop a
-   `.lunar/probes.yml` pointing at the local plugin path:
-   ```yaml
-   version: 0
-   probes:
-     - uses: ../lunar-lib/probes/<name>
+2. Wire `lunar-probe` into the agent framework you're testing against
+   (Claude Code is the default for lunar-lib probe development):
+   ```bash
+   lunar-probe install                       # auto-detects every framework on the box
+   lunar-probe install --agent claude        # restrict to one framework while iterating
+   lunar-probe install --dry-run             # preview without writing
    ```
-3. Run `lunar-probe install` to register hooks. For Claude Code this
+   For **Claude Code**, install shells out to the `claude` CLI and
    registers `earthly/lunar-probe` as a native [Claude
-   plugin](https://docs.claude.com/en/docs/claude-code/plugins) by
-   shelling out to the `claude` CLI:
+   plugin](https://docs.claude.com/en/docs/claude-code/plugins):
    ```
    claude plugins marketplace add earthly/lunar-probe --sparse .claude-plugin plugins skills
    claude plugins install lunar-probe@lunar-probe
@@ -261,36 +261,35 @@ Once the secondary reviewer approves the spec, you write the
    The plugin bundle is a static artefact checked into
    `earthly/lunar-probe` (under `plugins/claude/` + the marketplace
    manifest at `.claude-plugin/marketplace.json`); the `claude` CLI
-   clones the sparse subset into its own
-   `~/.claude/plugins/marketplaces/...` location. `lunar-probe install`
-   itself doesn't write anything under `~/.lunar/probe/plugins/` —
-   the only `~/.lunar/probe/` content it produces is the generic
-   skill copy at `~/.lunar/probe/skills/<name>/`. The legacy
-   strip-and-rewrite of `~/.claude/settings.json` was removed in
-   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8);
-   that file is no longer touched. Cursor / Codex / Gemini still
-   write to their per-framework hook config — see the install matrix
-   in
-   [`lunar-probe`'s README](https://github.com/earthly/lunar-probe#first-run).
+   clones the sparse subset into `~/.claude/plugins/marketplaces/...`.
+   `lunar-probe install` itself doesn't write anything under
+   `~/.lunar/probe/plugins/` — the only `~/.lunar/probe/` content it
+   produces is the generic skill copy at
+   `~/.lunar/probe/skills/<name>/`.
 
-   Verify with `claude plugins list` (look for
-   `lunar-probe@lunar-probe`); for the other frameworks, inspect
-   their hook config or re-run `install` and watch for an
-   `unchanged` report.
-
-   Useful flags while iterating:
-   - `--dry-run` — preview what install would write without touching
-     disk. Run on a fresh box first to sanity-check the bundle and
-     hook paths.
-   - `--agent claude` (repeatable) — restrict the run to one
-     framework. Handy when only the Claude Code bundle needs
-     rewiring.
-   - `--update` — same effect as `install`; refreshes skills and
-     rewrites hook paths against the current binary.
-   - `--uninstall` (or the `lunar-probe uninstall` alias) — remove
-     everything install added. Pair with `--agent` to target one
-     framework. Use between tests to confirm the probe fires from a
-     clean install.
+   Verify it landed with `claude plugins list` — you should see
+   `lunar-probe@lunar-probe`. The plugin owns its own hooks, so
+   `~/.claude/settings.json` is never touched (the legacy
+   strip-and-rewrite was removed in
+   [lunar-probe#8](https://github.com/earthly/lunar-probe/pull/8)).
+   If the `claude` CLI isn't on `PATH`, install prints the two
+   commands above and exits cleanly so you can run them manually
+   after installing `claude`. For Cursor / Codex / Gemini, install
+   writes `hooks.json` / `settings.json` directly to the framework's
+   user-config dir and drops `SKILL.md` trees under each framework's
+   `skills/` location.
+3. In a scratch repo that exercises the probe's trigger (e.g. for
+   shellcheck, a repo with at least one `.sh` file), drop a
+   `.lunar/probes.yml` pointing at the local plugin path:
+   ```yaml
+   version: 0
+   probes:
+     - uses: ../lunar-lib/probes/<name>
+   ```
+   Local relative paths and the published
+   `github://earthly/lunar-lib/probes/<name>@<ref>` form share the
+   same `uses:` grammar — local during iteration, github once the
+   plugin lands.
 4. Trigger the probe's hook event (edit a matching file, run the
    matching command, …) and capture:
    - The full `check:` stdout/stderr.
@@ -302,6 +301,10 @@ Once the secondary reviewer approves the spec, you write the
 5. Post the captured evidence on the PR. Screenshots are fine for
    the Claude Code transcript view; text is fine for `lunar-probe
    logs` output.
+6. Clean up your test box when you're done — `lunar-probe uninstall`
+   (or `lunar-probe install --uninstall`) removes every entry install
+   wrote, including the Claude plugin registration. User-authored
+   hook entries in cursor/codex/gemini config files are preserved.
 
 **No cronos deploy. No Component JSON screenshot. No
 `bender-track-pr` for cronos sync.** Probes run client-side.
