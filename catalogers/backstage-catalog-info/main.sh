@@ -46,10 +46,23 @@ echo "Owner format: $OWNER_FORMAT"
 # collector (collectors/backstage). If it's absent, the collector hasn't run
 # on this component's repo yet, the repo has no `catalog-info.yaml`, or
 # `.catalog.native` exists but doesn't include a `backstage` block.
+#
+# `lunar component get-json` reads the merged collection blob from the hub.
+# Treat a failed lookup (network, hub error, transient unavailability) the
+# same as missing data — skip silently rather than exiting non-zero, so a
+# transient hub blip doesn't surface as a cataloger error per-component.
 
-COMPONENT_JSON=$(lunar component get-json "$COMPONENT_ID")
+ERR_FILE=$(mktemp)
+trap 'rm -f "$ERR_FILE"' EXIT
+if ! COMPONENT_JSON=$(lunar component get-json "$COMPONENT_ID" 2>"$ERR_FILE"); then
+    echo "lunar component get-json failed for $COMPONENT_ID — skipping (stderr: $(head -c 300 "$ERR_FILE"))"
+    exit 0
+fi
 
-ENTITY=$(echo "$COMPONENT_JSON" | jq '.catalog.native.backstage // null')
+if ! ENTITY=$(echo "$COMPONENT_JSON" | jq '.catalog.native.backstage // null' 2>"$ERR_FILE"); then
+    echo "jq parse failed on Component JSON for $COMPONENT_ID — skipping (stderr: $(head -c 200 "$ERR_FILE"))"
+    exit 0
+fi
 
 if [ "$ENTITY" = "null" ]; then
     echo "No .catalog.native.backstage on $COMPONENT_ID — skipping (collector not configured, or no catalog-info.yaml)"
