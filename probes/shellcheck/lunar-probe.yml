@@ -38,6 +38,5 @@ probes:
       {check_stdout}
       ```
 
-      Fix the findings and re-save the file. The probe runs locally (no
-      network) and skips if `shellcheck` isn't on `PATH`. ShellCheck has
-      no `--fix` flag — the agent owns all edits.
+      Fix the finding and re-save the file. The probe will run again
+      automatically to re-evaluate `shellcheck`.
