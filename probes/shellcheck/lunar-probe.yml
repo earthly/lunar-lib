@@ -7,11 +7,11 @@ author: earthly
 landing_page:
   display_name: "shellcheck Probe"
   long_description: |
-    Run [ShellCheck](https://www.shellcheck.net/) on every `.sh` file the
-    agent edits. Catches unquoted variables, missing `--` separators,
-    GNU-isms on Alpine, useless `cat`s, and the rest of the agent's hot
-    garbage shell at authoring time. Read-only, local-only, skip-safe
-    when the tool isn't installed.
+    Run [ShellCheck](https://www.shellcheck.net/) on every `.sh` file
+    the agent edits — full rule set, surfaced before the change lands.
+    Examples of what it catches: unquoted variables, missing `--`,
+    GNU-isms, useless `cat`s. Read-only, local-only, skip-safe when
+    shellcheck isn't installed.
   categories: ["code-quality"]
   icon: "assets/shellcheck.svg"
   status: "beta"

@@ -1,9 +1,11 @@
 # shellcheck Probe
 
-Lint shell scripts with [ShellCheck](https://www.shellcheck.net/) after the
-agent edits a `.sh` file. Catches unquoted variables, missing `--`
-separators, GNU-isms on Alpine, useless `cat`s, and the rest of the
-authoring-time shell mistakes before they hit CI.
+Lint shell scripts with [ShellCheck](https://www.shellcheck.net/) after
+the agent edits a `.sh` file. Runs the full ShellCheck rule set against
+the edited file before the change is staged — examples of what it
+catches include unquoted variables, missing `--` separators, GNU-isms
+on portable shells, and useless `cat`s, but the probe surfaces every
+finding ShellCheck reports.
 
 ## Overview
 
