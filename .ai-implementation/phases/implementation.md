@@ -186,8 +186,8 @@ For a single-component deep dive (did the right JSON land?), the **Collector Det
 
 Catalogers have their own truth table and their own set of Grafana dashboards. Don't reuse the collector queries — `collection_records` is empty for catalogers.
 
-- **`hub.snippet_runs`** — same as for collectors. One row per (cataloger, component) invocation. `status` is updated AFTER the river job finalizes, so it can lag — for the real run state, join `hub.snippet_runs.river_job_id` against `queue.river_job.id` and read `river_job.state` (`available`, `running`, `completed`, `discarded`). The job queue for catalogers is `queue='cataloger_run'` and is concurrency-capped (~5 concurrent across the whole hub), so backlog is common when many catalogers fire at once.
-- **`hub.catalog_json_items`** — what each cataloger actually wrote. Schema: `cataloger_name`, `component_name` (NULL for global `cron`/`repo` hooks, set for per-component `component-cron`/`component-repo`), `catalog_data` (JSONB delta array — each element has optional `domains` and `components` maps), `created_at`, `snippet_run_id`, `source` (`'cataloger'`). The catalogers UI takes the latest row per `(cataloger_name, component_name)` as the current delta — see the Grafana "Catalogers listing" panel query for the exact `DISTINCT ON` shape.
+- **`hub.snippet_runs`** — one row per (cataloger, component) invocation that **actually wrote something OR crashed**. A successful silent-skip (script `exit 0` with no `lunar catalog raw` write) leaves NO row here. For per-component hooks (`component-cron`/`component-repo`), `component_name` is populated on the rows that exist. `status` is updated AFTER the river job finalizes, so it can lag — for the real run state, join `hub.snippet_runs.river_job_id` against `queue.river_job.id` and read `river_job.state` (`available`, `running`, `completed`, `discarded`). The job queue for catalogers is `queue='cataloger_run'` and is concurrency-capped (~5 concurrent across the whole hub), so backlog is common when many catalogers fire at once.
+- **`hub.catalog_json_items`** — what each cataloger actually wrote. Schema: `cataloger_name`, `component_name` (**empirically NULL on this hub across all observed cataloger rows including `component-cron`** — read `snippet_runs.component_name` for per-component scope, not `catalog_json_items.component_name`), `catalog_data` (JSONB delta array — each element has optional `domains` and `components` maps), `created_at`, `snippet_run_id`, `source` (`'cataloger'`). A `catalog_data = []` row with a `discarded` river_job is a crash that didn't write — useful as a failure marker, not as a write record. The catalogers UI takes the latest row per `(cataloger_name, component_name)` as the current delta — see the Grafana "Catalogers listing" panel query for the exact `DISTINCT ON` shape.
 
 ```sql
 -- "Did my cataloger ever fire, and when?"
@@ -197,11 +197,15 @@ LEFT JOIN hub.snippet_runs r ON r.snippet_id = s.id
 WHERE s.name = 'YOUR_CATALOGER.SUB' GROUP BY s.name;
 
 -- "Real run state right now (status column lags; river_job is live)."
-SELECT r.id, r.status AS snippet_status, j.state AS job_state, r.component_name
-FROM hub.snippet_runs r
-JOIN hub.snippets s ON r.snippet_id = s.id
-JOIN queue.river_job j ON j.id = r.river_job_id
-WHERE s.name = 'YOUR_CATALOGER.SUB' ORDER BY r.queued_at DESC LIMIT 10;
+-- For silent-skip catalogers, snippet_runs rows ONLY exist for runs that
+-- wrote or crashed — so this is a partial view. The complete picture for
+-- "how many fires across all components" lives in queue.river_job alone.
+SELECT j.state, COUNT(*)
+FROM queue.river_job j
+WHERE j.queue = 'cataloger_run'
+  AND j.args->>'cataloger_id' IN (SELECT id::text FROM hub.snippets WHERE name = 'YOUR_CATALOGER.SUB')
+  AND j.created_at > NOW() - INTERVAL '1 hour'
+GROUP BY j.state;
 
 -- "What did it write?"
 SELECT cji.created_at, cji.component_name, jsonb_pretty(cji.catalog_data)
@@ -221,9 +225,9 @@ There are four cataloger-specific dashboards. Which one you use depends on your 
 3. **Per-run / per-component drill-down** — from the listing above, click a row to land on `/d/q22qnoc11btoga/cataloger-details?var-name=...&var-component=...&var-id=...` with the specific component+run scoped in. This is where you see the actual JSONB delta and the diff against the previous run.
 4. **Runs listing** (same dashboard as collectors, different filter) — `/d/den5tflglaolcd/runs-listing?var-snippet_name=YOUR_CATALOGER.SUB&var-snippet_type=cataloger`. Note the `var-snippet_type=cataloger` filter — without it the dashboard defaults to `collector` and your cataloger won't appear.
 
-For silent-skip evidence (a `component-cron` cataloger correctly NOT writing for components that don't match), check `catalog_json_items` directly: count `DISTINCT component_name` rows for your `cataloger_name` and compare against the total number of registered components on cronos. The difference is the silent-skip count. Catalogers should not emit error logs or `exit 1` for "not applicable" components — they exit 0 with nothing written.
+For silent-skip evidence (a `component-cron` cataloger correctly NOT writing for components that don't match), count `queue.river_job` rows with `state='completed'` for your cataloger_id and subtract `hub.snippet_runs` rows for the same snippet — the difference is the silent-skip count, because silent-skip leaves NO `snippet_runs` row. Concretely: `(river_job completed for cataloger_id) - (snippet_runs for snippet_id) = silent-skips`. Catalogers should not emit error logs or `exit 1` for "not applicable" components — they exit 0 with nothing written.
 
-**Order of operations: verify the cataloger ran AND wrote AT LEAST ONE catalog_json_items row, THEN undeploy.** Same reasoning as cron-collectors — the moment you remove the cataloger from the cronos manifest, `manifest_id`-scoped UI queries (including the catalogers listing) hide its rows even though `catalog_json_items` still has the writes. The latest-manifest filter is in the dashboard SQL itself, not optional. So capture screenshots BEFORE cleanup.
+**Order of operations: verify the cataloger ran AND (if you expect writes) wrote AT LEAST ONE catalog_json_items row, THEN undeploy.** Same reasoning as cron-collectors — the moment you remove the cataloger from the cronos manifest, `manifest_id`-scoped UI queries (including the catalogers listing) hide its rows even though `catalog_json_items` still has the writes. The latest-manifest filter is in the dashboard SQL itself, not optional. So capture screenshots BEFORE cleanup. If your cataloger is correctly silent-skipping on all cronos components (e.g. the input shape it expects isn't present), validate via `river_job.state='completed'` count instead — there will be no `catalog_json_items` writes by design.
 
 ### Step 6: Run local dev tests
 
