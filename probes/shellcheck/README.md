@@ -15,9 +15,6 @@ agent edits a file matching `**/*.sh`. The probe runs `shellcheck` against
 the edited file; if ShellCheck exits non-zero, the edit is reported back to
 the agent as a block reason with the findings inlined.
 
-ShellCheck is **read-only by design** — there is no `--fix` flag. The
-probe never rewrites the file; the agent decides how to respond.
-
 ## Probes
 
 | Name | Hook | Description |
