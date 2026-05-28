@@ -8,13 +8,15 @@ context after the fact.
 ## Overview
 
 This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin.
-It ships two alternative probes — `block` and `warn` — that intercept
-`gh pr create` and check the title for a ticket reference (`[A-Z]+-\d+`,
-matching Linear, Jira, and most other trackers). Pick one in your
-`.lunar/probes.yml`, not both. Both share a single check script
+It ships two probes — `block` and `warn` — that intercept `gh pr create`
+and check the title for a ticket reference (`[A-Z]+-\d+`, matching
+Linear, Jira, and most other trackers). Both share one check script
 (`scripts/check-pr-title.sh`, landing in the implementation phase on
 this same PR) that parses the command line, applies the skip rules
 below, and exits non-zero when the title is missing a reference.
+
+Consumers pick the severity by selecting a probe with `include:` /
+`exclude:` on the `uses:` entry (see [Installation](#installation)).
 
 ## Probes
 
@@ -62,8 +64,8 @@ block message includes that branch as a hint.
 Prereq: [`lunar-probe`](https://github.com/earthly/lunar-probe) installed
 and wired into your agent framework.
 
-Then add this probe to your `.lunar/probes.yml` (pin to the latest
-released tag, and pick **either** `block` **or** `warn`, not both):
+Add this probe to your `.lunar/probes.yml` (pin to the latest released
+tag) and select **block** or **warn** with `include:`:
 
 ```yaml
 version: 0
@@ -71,14 +73,18 @@ version: 0
 probes:
   # Hard block at gh pr create time
   - uses: github://earthly/lunar-lib/probes/pr-title-ticket-ref@v1.0.0
-    with:
-      mode: block   # reserved — see "Configuration" below
+    include: ["block"]
 
   # OR: post-creation nudge instead
   # - uses: github://earthly/lunar-lib/probes/pr-title-ticket-ref@v1.0.0
-  #   with:
-  #     mode: warn
+  #   include: ["warn"]
 ```
+
+`include:` / `exclude:` are documented in [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
+(mutually exclusive; `include:` defaults to all probes in the manifest
+if omitted). Omitting both pulls in `block` *and* `warn` — fine once
+`agent-after-command` ships, but means a no-op `warn` namespaced entry
+in your logs until then.
 
 ## Requirements
 
@@ -92,18 +98,11 @@ probes:
 
 ## Configuration
 
-The `mode` input above is **reserved for forward-compatibility** — it
-maps cleanly onto a future `inputs.severity` lever that would collapse
-`block` and `warn` into a single probe. Until lunar-probe ships
-input-driven severity, picking the probe name (`block` vs `warn`) in
-your `.lunar/probes.yml` is what actually selects the behaviour. See
-[`earthly/lunar-probe` § Inputs (reserved, forward-compat)](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#inputs-reserved-forward-compat).
-
-The ticket-reference pattern itself is hard-coded to `[A-Z]+-\d+` in
-the initial release — it intentionally matches Linear (`ENG-123`),
-Jira (`ABC-42`), and any other `<PROJECT>-<NUMBER>` tracker. Making
-the regex configurable is tracked as a follow-up; the most common
-ask would be a project-prefix allowlist (e.g. only `ENG-` or `OPS-`).
+The ticket-reference pattern is hard-coded to `[A-Z]+-\d+` in the
+initial release — it intentionally matches Linear (`ENG-123`), Jira
+(`ABC-42`), and any other `<PROJECT>-<NUMBER>` tracker. Making the
+regex configurable is tracked as a follow-up; the most common ask
+would be a project-prefix allowlist (e.g. only `ENG-` or `OPS-`).
 
 ## See also
 
