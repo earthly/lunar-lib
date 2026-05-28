@@ -80,11 +80,9 @@ probes:
   #   include: ["warn"]
 ```
 
-`include:` / `exclude:` are documented in [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
-(mutually exclusive; `include:` defaults to all probes in the manifest
-if omitted). Omitting both pulls in `block` *and* `warn` — fine once
-`agent-after-command` ships, but means a no-op `warn` namespaced entry
-in your logs until then.
+Use `include` to select only one of the warn/block level checks (never
+both at the same time). See [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
+for the full syntax.
 
 ## Requirements
 
