@@ -1,0 +1,86 @@
+version: 0
+
+name: python-deps-cve
+description: Block Python dep pins that match known critical CVEs (default ships the Starlette BadHost / CVE-2026-48710 pair). Skip-safe when the dep / pattern isn't present.
+author: earthly
+
+landing_page:
+  display_name: "Python Deps CVE Probe"
+  long_description: |
+    Catch Python dependencies pinned to known-vulnerable versions
+    before the edit lands. Block tier scans requirements/lock files;
+    nudge tier flags `request.url.path` use inside Starlette
+    middleware (the BadHost auth-bypass surface). Plugin is shaped
+    to grow per future Python-dep CVE.
+  categories: ["security"]
+  icon: "assets/python-deps-cve.svg"
+  status: "beta"
+  related:
+    - slug: "python"
+      type: "policy"
+      reason: "CI-time backstop on Python dep versions; probe is the agent-time complement."
+
+probes:
+  - name: starlette-badhost-pin
+    description: Block dep-file edits that pin Starlette to a BadHost-vulnerable version (default range covers CVE-2026-48710 — `[0.8.3, 1.0.1)`).
+    keywords: ["python", "starlette", "fastapi", "cve", "badhost", "vulnerability", "deps", "lockfile"]
+    hook:
+      type: agent-before-file-edit
+      paths:
+        - "**/requirements*.txt"
+        - "**/pyproject.toml"
+        - "**/Pipfile*"
+        - "**/poetry.lock"
+        - "**/uv.lock"
+    inputs:
+      package:
+        description: |
+          PyPI package name to inspect in the proposed write. Default
+          is `starlette`. Override to extend the probe to a different
+          package (e.g. for a future CVE in the same family).
+        default: "starlette"
+      vulnerable_range:
+        description: |
+          Vulnerable version range as a comma-separated `min,max`
+          pair. `min` is inclusive, `max` is exclusive. Default is
+          the Starlette BadHost range (`0.8.3,1.0.1`).
+        default: "0.8.3,1.0.1"
+    check: scripts/check-starlette-version.sh
+    message: |-
+      `{file}` pins a Starlette version vulnerable to CVE-2026-48710
+      (BadHost).
+
+      Found:      `{check_stdout}`
+      Vulnerable: `starlette ∈ [0.8.3, 1.0.1)`
+      Fix:        pin `starlette>=1.0.1` and re-resolve the lockfile.
+
+      BadHost lets a remote attacker forge `request.url.path` via a
+      crafted `Host` header, bypassing auth/routing middleware that
+      branches on that path. Cascades into FastAPI, vLLM, LiteLLM,
+      MCP servers — Starlette 1.0.1 (2026-05-21) is the fix.
+
+      Full writeup: https://badhost.org/
+
+  - name: url-path-auth-pattern
+    description: Nudge on `.py` edits that reference `request.url.path` inside Starlette middleware — the surface exploited by CVE-2026-48710 (BadHost).
+    keywords: ["python", "starlette", "middleware", "cve", "badhost", "url-path", "auth-bypass", "soft-warn"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.py"
+    check: scripts/check-url-path-in-middleware.sh
+    message: |-
+      Heads up: `{file}` references `request.url.path` inside Starlette
+      middleware.
+
+      `request.url` is built from the inbound `Host` header, so
+      `request.url.path` is attacker-controlled (CVE-2026-48710 —
+      BadHost). For auth or routing decisions, prefer
+      `scope["path"]`, which the ASGI server parses from the wire
+      and isn't header-derived.
+
+      Found in `{file}`:
+      ```
+      {check_stdout}
+      ```
+
+      Full writeup: https://badhost.org/
