@@ -11,9 +11,9 @@ This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin.
 It ships two probes — `block` and `warn` — that intercept `gh pr create`
 and check the title for a ticket reference (`[A-Z]+-\d+`, matching
 Linear, Jira, and most other trackers). Both share one check script
-(`scripts/check-pr-title.sh`, landing in the implementation phase on
-this same PR) that parses the command line, applies the skip rules
-below, and exits non-zero when the title is missing a reference.
+(`scripts/check-pr-title.sh`) that parses the command line, applies
+the skip rules below, and exits non-zero when the title is missing
+a reference.
 
 Consumers pick the severity by selecting a probe with `include:` /
 `exclude:` on the `uses:` entry (see [Installation](#installation)).
@@ -56,9 +56,10 @@ The probe is a no-op (exit 0, the `gh` command proceeds) when:
 
 When the title *is* present and none of the above apply, the probe
 checks the title against the configured `pattern` (default
-`[A-Z]+-\d+` — see [Configuration](#configuration) to override). If
-the branch name encodes a ticket (e.g. `feat/abc-123-...`) but the
-title doesn't, the block message includes that branch as a hint.
+`[A-Z]+-\d+` — see [Configuration](#configuration) to override). The
+block message also nudges the agent to reuse the current branch's
+ticket prefix — branches named after the ticket (`feat/abc-123-...`)
+are typically the easiest source.
 
 ## Installation
 
