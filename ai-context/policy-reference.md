@@ -273,7 +273,7 @@ c.assert_true(coverage >= 80, f"Coverage {coverage}% is below 80%")
 > turns into an **Error** state if the path is missing after workflows
 > finished (raw `ValueError` from `get_value` bubbles through). Use the
 > `get_node()` form shown below under
-> [Boolean Existence Fields](#boolean-existence-fields) instead.
+> [Pattern 1: Boolean Value vs Data Existence](#pattern-1-boolean-value-vs-data-existence) instead.
 
 #### assert_false(value, failure_message)
 
