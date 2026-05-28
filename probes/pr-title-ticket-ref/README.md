@@ -59,14 +59,8 @@ block message includes that branch as a hint.
 
 ## Installation
 
-Prereq: `lunar-probe` itself must be installed on your box and wired
-into your agent framework. See
-[`earthly/lunar-probe` § Install](https://github.com/earthly/lunar-probe#install)
-for the one-line installer; the short version is `lunar-probe install`
-(auto-detects Claude Code, Cursor, Codex, Gemini), which for Claude
-Code registers a native plugin via `claude plugins marketplace add` +
-`claude plugins install`. Re-running `lunar-probe install` after a
-lunar-probe upgrade is the supported refresh path.
+Prereq: [`lunar-probe`](https://github.com/earthly/lunar-probe) installed
+and wired into your agent framework.
 
 Then add this probe to your `.lunar/probes.yml` (pin to the latest
 released tag, and pick **either** `block` **or** `warn`, not both):
