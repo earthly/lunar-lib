@@ -1,7 +1,7 @@
 version: 0
 
 name: pr-title-ticket-ref
-description: Block `gh pr create` when the PR title lacks a ticket reference (e.g. ENG-123).
+description: Block `gh pr create` when the PR title lacks a ticket reference (default pattern matches Linear/Jira/etc. tracker tokens).
 author: earthly
 
 landing_page:
@@ -21,23 +21,33 @@ landing_page:
 
 probes:
   - name: block
-    description: Block `gh pr create` when the title lacks a ticket reference (e.g. `ENG-123`).
+    description: Block `gh pr create` when the title lacks a ticket reference (default pattern matches Linear/Jira-style tracker tokens).
     keywords: ["pr", "github", "ticket", "linear", "title", "traceability", "gh"]
     hook:
       type: agent-before-command
       binary:
         name: gh
+    inputs:
+      pattern:
+        description: |
+          Regex the PR title must match anywhere. Default covers
+          Linear/Jira-style `<PROJECT>-<NUMBER>` tokens. Override
+          to constrain to specific projects (e.g.
+          `\[(ENG|OPS)-\d+\]` to require leading `[ENG-...]` or
+          `[OPS-...]` brackets only).
+        default: '[A-Z]+-\d+'
     check: scripts/check-pr-title.sh
     message: |-
       `gh pr create` rejected: PR title is missing a ticket reference.
 
       Title:    `{check_stdout}`
-      Expected: `[ENG-123] <summary>` (any `[A-Z]+-\d+` token works).
+      Expected: a ticket token (e.g. `[ABC-123]`) somewhere in the
+      title — see the `pattern` input for the exact regex.
 
       If the current branch already encodes the ticket (e.g.
-      `bender/eng-800-...`), reuse it in the title:
+      `feat/abc-123-...`), reuse it in the title:
 
-        gh pr create --title "[ENG-800] <summary>" ...
+        gh pr create --title "[ABC-123] <summary>" ...
 
       Exempt by design (probe will let these through):
         - Drafts (`--draft` / `-d`)
@@ -53,6 +63,15 @@ probes:
       type: agent-after-command
       binary:
         name: gh
+    inputs:
+      pattern:
+        description: |
+          Regex the PR title must match anywhere. Default covers
+          Linear/Jira-style `<PROJECT>-<NUMBER>` tokens. Override
+          to constrain to specific projects (e.g.
+          `\[(ENG|OPS)-\d+\]` to require leading `[ENG-...]` or
+          `[OPS-...]` brackets only).
+        default: '[A-Z]+-\d+'
     check: scripts/check-pr-title.sh
     message: |-
       Heads up: the PR you just opened with `gh pr create` is missing
@@ -62,7 +81,7 @@ probes:
 
       Consider editing the PR to add a ticket prefix for traceability:
 
-        gh pr edit <num> --title "[ENG-XXX] <original title>"
+        gh pr edit <num> --title "[XXXXXX] <original title>"
 
       Pick `block` instead of `warn` in your `.lunar/probes.yml` if you
       want this to be a hard rejection at `gh pr create` time.

@@ -55,9 +55,10 @@ The probe is a no-op (exit 0, the `gh` command proceeds) when:
   `gh`'s own error handling rather than guessing.
 
 When the title *is* present and none of the above apply, the probe
-checks for `[A-Z]+-\d+` anywhere in the title. If the branch name
-encodes a ticket (e.g. `bender/eng-800-...`) but the title doesn't, the
-block message includes that branch as a hint.
+checks the title against the configured `pattern` (default
+`[A-Z]+-\d+` — see [Configuration](#configuration) to override). If
+the branch name encodes a ticket (e.g. `feat/abc-123-...`) but the
+title doesn't, the block message includes that branch as a hint.
 
 ## Installation
 
@@ -96,11 +97,29 @@ for the full syntax.
 
 ## Configuration
 
-The ticket-reference pattern is hard-coded to `[A-Z]+-\d+` in the
-initial release — it intentionally matches Linear (`ENG-123`), Jira
-(`ABC-42`), and any other `<PROJECT>-<NUMBER>` tracker. Making the
-regex configurable is tracked as a follow-up; the most common ask
-would be a project-prefix allowlist (e.g. only `ENG-` or `OPS-`).
+The ticket-reference pattern defaults to `[A-Z]+-\d+`, intentionally
+covering Linear (`ENG-123`), Jira (`ABC-42`), and any other
+`<PROJECT>-<NUMBER>` tracker. Override the `pattern` input on the
+`uses:` entry to narrow or broaden the regex:
+
+```yaml
+probes:
+  - uses: github://earthly/lunar-lib/probes/pr-title-ticket-ref@v1.0.0
+    include: ["block"]
+    with:
+      # Require leading [ENG-...] or [OPS-...] brackets specifically.
+      pattern: '^\[(ENG|OPS)-\d+\]'
+```
+
+Both `block` and `warn` declare the same `pattern` input, so a
+single `with:` block applies to whichever probe you `include:`.
+
+> `inputs:` / `with:` are currently parsed-but-reserved in
+> lunar-probe — the runner accepts them without error but doesn't
+> yet dispatch consumer overrides to checks (see [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)).
+> Until input dispatch ships, the check script runs against the
+> declared default; consumer overrides will activate automatically
+> once the runner supports them, without a probe-side change.
 
 ## See also
 
