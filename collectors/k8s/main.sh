@@ -106,6 +106,10 @@ process_file() {
             namespace: .namespace,
             path: .path,
             replicas: .replicas,
+            host_users: (if $w.pod_spec.hostUsers == null then true else $w.pod_spec.hostUsers end),
+            host_network: (if $w.pod_spec.hostNetwork == null then false else $w.pod_spec.hostNetwork end),
+            host_pid: (if $w.pod_spec.hostPID == null then false else $w.pod_spec.hostPID end),
+            host_ipc: (if $w.pod_spec.hostIPC == null then false else $w.pod_spec.hostIPC end),
             containers: [
                 (.pod_spec.containers // [])[] |
                 {

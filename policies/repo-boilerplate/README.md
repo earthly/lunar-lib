@@ -40,6 +40,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `security-exists` | Verifies SECURITY.md file exists |
 | `contributing-exists` | Verifies CONTRIBUTING.md file exists |
 | `editorconfig-exists` | Verifies .editorconfig file exists (use `exclude` if not wanted) |
+| `changelog-exists` | Verifies a CHANGELOG file exists. Apply only to release-surface repos via `on:` targeting |
 
 ## Required Data
 
@@ -53,6 +54,7 @@ This policy reads from the following Component JSON paths:
 | `.repo.security` | object | `repo-boilerplate` collector (security subcollector) |
 | `.repo.contributing` | object | `repo-boilerplate` collector (contributing subcollector) |
 | `.repo.editorconfig` | object | `repo-boilerplate` collector (editorconfig subcollector) |
+| `.repo.changelog` | object | `repo-boilerplate` collector (changelog subcollector) |
 | `.ownership.codeowners` | object | `repo-boilerplate` collector (codeowners subcollector) |
 
 **Note:** Ensure the `repo-boilerplate` collector is configured before enabling this policy.
@@ -66,13 +68,21 @@ policies:
   - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    exclude: [editorconfig-exists]
+    exclude: [editorconfig-exists, changelog-exists]
     # include: [readme-exists, codeowners-exists, gitignore-exists, license-exists]
     # with:
     #   min_lines: "25"
     #   required_sections: "Installation,Usage"
     #   min_owners_per_rule: "2"
     #   max_owners_per_rule: "10"
+
+  # Apply changelog-exists only to repos that publish versioned releases
+  # (e.g. public OSS repos, Helm charts, libraries). Adjust the selector to
+  # whatever signal your environment uses to identify release-surface repos.
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
+    on: ["visibility:public"]
+    enforcement: report-pr
+    include: [changelog-exists]
 ```
 
 ## Examples
@@ -92,7 +102,8 @@ policies:
     "license": { "exists": true, "path": "LICENSE", "spdx_id": "MIT" },
     "security": { "exists": true, "path": "SECURITY.md", "lines": 28, "sections": ["Reporting a Vulnerability"] },
     "contributing": { "exists": true, "path": "CONTRIBUTING.md", "lines": 55, "sections": ["Getting Started", "Pull Requests"] },
-    "editorconfig": { "exists": true, "path": ".editorconfig", "sections": 4 }
+    "editorconfig": { "exists": true, "path": ".editorconfig", "sections": 4 },
+    "changelog": { "exists": true, "path": "CHANGELOG.md", "lines": 87, "sections": ["[1.2.0] - 2026-05-01", "[1.1.0] - 2026-04-15"] }
   },
   "ownership": {
     "codeowners": {
@@ -118,7 +129,8 @@ policies:
     "license": { "exists": false },
     "security": { "exists": false },
     "contributing": { "exists": false },
-    "editorconfig": { "exists": false }
+    "editorconfig": { "exists": false },
+    "changelog": { "exists": false }
   },
   "ownership": {
     "codeowners": { "exists": false }
@@ -131,6 +143,7 @@ policies:
 - `"No CODEOWNERS file found"`
 - `".gitignore file not found"`
 - `"LICENSE file not found"`
+- `"No CHANGELOG file found"`
 
 ## Remediation
 
@@ -142,3 +155,4 @@ When this policy fails, resolve it by adding the missing files:
 4. **LICENSE** - Add a `LICENSE` file with your project's license
 5. **SECURITY.md** - Add a `SECURITY.md` with vulnerability disclosure instructions
 6. **CONTRIBUTING.md** - Add a `CONTRIBUTING.md` with contribution guidelines
+7. **CHANGELOG** - Add a `CHANGELOG.md` recording notable changes per release ([Keep a Changelog](https://keepachangelog.com/) is a common convention)

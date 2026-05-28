@@ -1,0 +1,162 @@
+version: 0
+
+name: backstage
+description: Syncs components and domains from a Backstage catalog into Lunar
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage Cataloger"
+  long_description: |
+    Sync components and domains from a Backstage software catalog into Lunar.
+    Maps Backstage entities to Lunar catalog with owner, domain, and tags,
+    using the Backstage REST API.
+  categories: ["service-catalog"]
+  icon: "assets/backstage.svg"
+  status: "experimental"
+  related:
+    - slug: "backstage"
+      type: "collector"
+      reason: "Parses per-repo catalog-info.yaml for the same components this cataloger syncs"
+    - slug: "github-org"
+      type: "cataloger"
+      reason: "Discovers repos from GitHub; Backstage layers owner/domain/tags on top"
+
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/payment-api": {
+        "owner": "group:default/team-payments",
+        "domain": "platform.payments",
+        "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+      },
+      "github.com/acme/web-app": {
+        "owner": "group:default/team-web",
+        "domain": "platform.frontend",
+        "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
+      }
+    },
+    "domains": {
+      "platform.payments": {
+        "description": "Payment processing and billing",
+        "owner": "group:default/platform-leads"
+      },
+      "platform.frontend": {
+        "description": "Customer-facing web surfaces",
+        "owner": "group:default/platform-leads"
+      }
+    }
+  }
+
+catalogers:
+  - name: sync
+    description: |
+      Fetches entities from the Backstage catalog REST API and writes
+      them to the Lunar catalog. Component entities populate
+      `.components` with owner, domain, and tags; Domain entities
+      populate `.domains` with description and owner. Components are
+      keyed by a configurable annotation (defaults to
+      `github.com/project-slug`) so they line up with components
+      discovered by the `github-org` cataloger or by repo-based
+      collectors.
+    mainBash: main.sh
+    hook:
+      type: cron
+      schedule: "0 2 * * *"
+    keywords: ["service catalog", "backstage", "components", "domains", "ownership", "sync"]
+
+inputs:
+  backstage_url:
+    description: |
+      Base URL of the Backstage instance (e.g. https://backstage.example.com).
+      The cataloger appends `/api/catalog/entities` to this URL. Required.
+
+  entity_kinds:
+    description: |
+      Comma-separated list of Backstage entity kinds to sync. Each kind
+      is routed to the appropriate Catalog JSON path:
+      - Component, API, Resource → `.components`
+      - Domain, System            → `.domains`
+      Other kinds (User, Group, Location) are ignored.
+    default: "Component,Domain"
+
+  namespace:
+    description: |
+      Backstage namespace to query. Use `*` to query all namespaces.
+    default: "default"
+
+  component_id_annotation:
+    description: |
+      Annotation key on a Backstage Component whose value identifies
+      the underlying repo. The cataloger reads this annotation and
+      prepends `component_id_prefix` to build the Lunar component ID.
+      Typical Backstage convention: `github.com/project-slug` (value
+      `owner/repo`) or `backstage.io/source-location` (value
+      `url:https://github.com/owner/repo`).
+    default: "github.com/project-slug"
+
+  component_id_prefix:
+    description: |
+      String prepended to the value of `component_id_annotation` to
+      form the Lunar component ID. For the default annotation
+      `github.com/project-slug` the value is already `owner/repo`, so
+      the prefix is `github.com/` to produce `github.com/owner/repo`.
+    default: "github.com/"
+
+  tag_prefix:
+    description: |
+      Prefix added to Backstage `metadata.tags` when mapped to Lunar
+      tags. Also applied to derived tags like `type-<spec.type>` and
+      `lifecycle-<spec.lifecycle>`. Empty string disables the prefix.
+    default: "bs-"
+
+  include_derived_tags:
+    description: |
+      When `true`, emits derived tags from `spec.type` (e.g.
+      `bs-type-service`) and `spec.lifecycle` (e.g.
+      `bs-lifecycle-production`) in addition to `metadata.tags`.
+    default: "true"
+
+  owner_format:
+    description: |
+      How to write `spec.owner` from Backstage into the Lunar `owner`
+      field. Backstage entity refs typically look like
+      `group:default/team-payments` or `user:default/jane`.
+      - `as-is`     — pass the Backstage value through verbatim.
+                      Matches what the existing `policies/backstage/*`
+                      checks accept (`team-payments`, `group:infra`,
+                      `user:alice` are all valid).
+      - `bare-name` — strip the `<kind>:<namespace>/` prefix and write
+                      only the trailing name (e.g. `team-payments`).
+                      Useful when downstream systems want plain names.
+      Email resolution via Backstage User/Group entities is out of
+      scope for v1.
+    default: "as-is"
+
+  default_owner:
+    description: |
+      Fallback owner applied (verbatim) to components and domains that
+      have no `spec.owner` in Backstage. Format is whatever you want —
+      entity ref, email, plain string — Lunar stores it as-is. Leave
+      empty to skip entities without an owner.
+    default: ""
+
+  domain_default_description:
+    description: |
+      Fallback description for domains that have no `metadata.description`
+      set in Backstage.
+    default: ""
+
+  filter:
+    description: |
+      Additional raw Backstage filter expression (passed through to the
+      `?filter=` query parameter). Use to restrict the sync to a subset
+      of entities (e.g. `metadata.annotations.team=platform`). Empty
+      means no extra filter.
+    default: ""
+
+secrets:
+  BACKSTAGE_TOKEN:
+    description: |
+      Bearer token for the Backstage API. Required if the Backstage
+      instance requires authentication; many internal deployments do.

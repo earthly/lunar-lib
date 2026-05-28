@@ -594,14 +594,8 @@ Policies have access to these environment variables:
 | Variable | Description |
 |----------|-------------|
 | `LUNAR_COMPONENT_ID` | Component identifier (e.g., `github.com/acme/api`) |
-| `LUNAR_COMPONENT_DOMAIN` | Component's domain |
-| `LUNAR_COMPONENT_OWNER` | Component owner email |
-| `LUNAR_COMPONENT_PR` | PR number (if applicable) |
 | `LUNAR_COMPONENT_GIT_SHA` | Git SHA being evaluated |
-| `LUNAR_COMPONENT_TAGS` | Component tags (JSON array) |
-| `LUNAR_COMPONENT_META` | Component metadata (JSON) |
-| `LUNAR_POLICY_NAME` | Name of the current policy |
-| `LUNAR_INITIATIVE_NAME` | Initiative the policy belongs to |
+| `LUNAR_COMPONENT_PR` | PR number (if applicable) |
 | `LUNAR_SECRET_<NAME>` | Secrets (avoid using in policies—prefer collectors) |
 
 ## Policy Inputs
@@ -1027,7 +1021,7 @@ version: 0
 
 name: my-policy                       # Required: Must match directory name
 description: What this policy checks  # Required: Brief description
-author: team@example.com              # Required
+author: team@example.com              # Optional
 
 default_image: earthly/lunar-scripts:1.0.0  # Recommended: specify base or custom image
 

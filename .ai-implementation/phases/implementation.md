@@ -65,20 +65,6 @@ Follow this checklist **in order**. Every step must be completed before moving t
 
 Reviewers expect to see your test evidence on the PR before their review is meaningful. A PR comment with Grafana screenshots + Component JSON output (Step 8) is what unblocks implementation review — not vice versa.
 
-### Step 0: CodeRabbit summon is automatic — leave the PR in draft until ready
-
-You do **not** post `@coderabbitai review` yourself. The Bender server watches GitHub webhooks and posts the summon automatically the moment a human (reviewer or PR author) marks the PR ready for review. That's the only transition CodeRabbit reliably acts on — comments posted while the PR is still in draft get ignored (we burned PR #162 confirming this).
-
-What this means for you, the worker:
-
-- **Keep the PR in draft** while you're implementing, pushing, and posting test evidence. CodeRabbit will not review it yet, and that's intentional.
-- **Do not run `gh pr ready` yourself.** Leave the draft→ready flip to a human (the requester, typically). When they mark it ready, the server posts the summon.
-- **Do not paste `@coderabbitai review` manually.** The server is idempotent — even if you did, it would only post once per PR — but it's noise, and it's now somebody else's job.
-
-If for some reason CodeRabbit really did not review after a human marked it ready (the post landed but no review came back within a few minutes), check the server logs for `[coderabbit-summon]`. If the summon never fired, the human-vs-bot gate likely dropped it; ping the reviewer to retoggle ready or post the comment manually as a fallback.
-
-(Spec-only PRs are already covered by this: a spec PR stays in draft the whole time, so no summon fires. The summon only happens when you flip to ready, which by convention only happens at implementation time.)
-
 ### Step 1: Write implementation code
 
 Write the scripts referenced in the YAML manifest. Commit locally but do not push yet.
@@ -111,11 +97,11 @@ Add your plugin to the cronos test environment config.
    - uses: github://earthly/lunar-lib/collectors/<name>@<branch>
    ```
 2. Commit and push to `pantalasa-cronos/lunar`.
-3. **Wait for the sync-manifest CI workflow to pass.** The hub only gets config updates when this workflow succeeds. Check with:
+3. **Wait for the hub-sync CI workflow to pass.** That workflow runs `lunar hub pull` to push the updated manifest to the hub — the hub only sees your branch reference after it succeeds. The workflow's name varies per repo (in `pantalasa-cronos/lunar` it's `Sync Lunar Config`); check the latest run:
    ```bash
    gh run list --repo pantalasa-cronos/lunar --limit 3
    ```
-   **Do NOT proceed until the sync build is green.**
+   **Do NOT proceed until that run is green.**
 
 ### Step 4: Prepare a test component
 
@@ -381,7 +367,7 @@ All of these are **required** and must be attached to the PR:
    **D. Cross-check external signals**
    - If checks are still pending or stale, look for corroborating evidence of environment problems beyond the Grafana UI:
      - **Hanging GitHub Actions runs**: Check whether the component repo's CI runs on `cronos` have completed. A GitHub check that's still "in progress" or "queued" long after the workflow should have finished (e.g. >5 minutes for a simple build) indicates the cronos runner is stuck or the hub isn't processing. Check the run directly: `gh run view <run-id> --repo <owner>/<repo>`.
-     - **Policy sync failures**: Check if the cronos config repo's "Policy sync" workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
+     - **Hub-sync failures**: Check if the cronos config repo's `Sync Lunar Config` workflow passed after your config change. If it failed, the hub doesn't know about your collector/policy.
    - These external signals help you distinguish "my code is broken" from "the environment is broken" — pending checks + a hanging CI run = environment issue, not a policy bug.
 
    **E. What to do if the UI is broken**

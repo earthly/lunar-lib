@@ -76,11 +76,11 @@ Guardrails are your engineering standards expressed as code. They verify that ap
 - CODEOWNERS files must be valid
 - SBOMs must be generated for compliance
 
-Lunar includes 100+ pre-built guardrails across categories like testing, security, compliance, operational readiness, and infrastructure. You can also create custom guardrails for your unique standards.
+Lunar includes 200+ pre-built guardrails across categories like testing, security, compliance, operational readiness, and infrastructure. You can also create custom guardrails for your unique standards.
 
 ### Gradual Enforcement
 
-Not every standard needs to block deployments immediately. Lunar supports five enforcement levels:
+Not every standard needs to block deployments immediately. Lunar supports six enforcement levels:
 
 1. `draft`: Visible only to the platform team for testing
 2. `score`: Affects application health scores in dashboards

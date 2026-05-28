@@ -9,6 +9,7 @@ Version control settings (GitHub, GitLab, Bitbucket, etc.).
     "default_branch": "main",
     "branch_protection": {
       "enabled": true,
+      "source": "ruleset",
       "branch": "main",
       "require_pr": true,
       "required_approvals": 2,
@@ -43,6 +44,7 @@ Version control settings (GitHub, GitLab, Bitbucket, etc.).
 
 - `.vcs.default_branch` — Default branch name
 - `.vcs.branch_protection.enabled` — Protection active
+- `.vcs.branch_protection.source` — How protection was detected: `"classic"` (legacy branch protection), `"ruleset"` (GitHub rulesets), or `"none"` (neither configured)
 - `.vcs.branch_protection.required_approvals` — Min approvals
 - `.vcs.branch_protection.require_codeowner_review` — CODEOWNER approval
 - `.vcs.pr.ticket.id` — Extracted ticket reference (only in PR context)

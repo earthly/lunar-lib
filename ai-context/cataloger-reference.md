@@ -17,7 +17,7 @@ Catalogers define the organizational structure of your software portfolio—what
 | **Purpose** | Define *what* components/domains exist | Gather *data about* components |
 | **Output** | Catalog JSON (domains, components, metadata) | Component JSON (SDLC data) |
 | **Scope** | Organization-wide catalog | Per-component data |
-| **Trigger** | Cron schedule, repo commits | Code changes, CI events |
+| **Trigger** | Cron, repo commits, per-component cron, per-component repo commits | Code changes, CI events |
 | **Command** | `lunar catalog` | `lunar collect` |
 
 ## Cataloger Definition
@@ -162,6 +162,25 @@ hook:
 
 **Note:** This hook cannot create new components—only augment existing ones.
 
+### Component-Cron Hook
+
+Runs on a schedule, once per existing component. Like `cron`, but the cataloger gets per-component context and is invoked once for each component currently in the catalog.
+
+```yaml
+hook:
+  type: component-cron
+  schedule: "0 3 * * *"
+```
+
+**Context:** Lunar Runner with the component's identity in `LUNAR_COMPONENT_ID`. No repository clone — read the component's already-collected data via `lunar component get-json "$LUNAR_COMPONENT_ID"`.
+
+**Use cases:**
+- Classifying components from signals in their Component JSON (e.g. tag `production` when `.k8s.deployments[].namespace == "prod"`)
+- Periodically refreshing tags or metadata that depend on collected data
+- Cross-referencing component data with external systems on a schedule
+
+**Note:** Like `component-repo`, this hook cannot create new components—only augment existing ones. A cataloger cannot mix global hooks (`cron`, `repo`) with per-component hooks (`component-repo`, `component-cron`).
+
 ## Environment Variables
 
 Catalogers have access to these environment variables:
@@ -177,8 +196,6 @@ Catalogers have access to these environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `LUNAR_CATALOGER_NAME` | Name of the current cataloger |
-| `LUNAR_CATALOGER_OWNER` | Owner of the cataloger |
 | `LUNAR_BIN_DIR` | Directory for installed binaries |
 | `LUNAR_PLUGIN_ROOT` | Root directory of the plugin (for plugins) |
 
@@ -191,9 +208,9 @@ Secrets are passed as `LUNAR_SECRET_<NAME>`:
 curl -H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN" ...
 ```
 
-### Component-Repo Hook Context
+### Per-Component Hook Context
 
-For `component-repo` hooks only:
+For `component-repo` and `component-cron` hooks:
 
 | Variable | Description |
 |----------|-------------|
@@ -217,84 +234,13 @@ lunar catalog raw [--json] <json-path> <value>
 
 ```bash
 # Write components to the catalog
-lunar catalog --json '.components' '{"github.com/acme/api": {"owner": "jane@acme.com"}}'
+lunar catalog raw --json '.components' '{"github.com/acme/api": {"owner": "jane@acme.com"}}'
 
 # Pipe JSON from command output
-gh repo list my-org --json name,owner | jq '...' | lunar catalog --json '.components' -
+gh repo list my-org --json name,owner | jq '...' | lunar catalog raw --json '.components' -
 
 # Write domains
-lunar catalog --json '.domains' '{"platform": {"owner": "platform-team@acme.com"}}'
-```
-
-#### Component Form
-
-Write or update a single component with structured flags.
-
-```bash
-lunar catalog component [options] [<json-value>]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--name <n>` | Component name (required unless in component-repo hook) |
-| `--owner <owner>` | Component owner email |
-| `--branch <branch>` | Default branch name |
-| `--domain <domain>` | Domain path (e.g., `platform.api`) |
-| `--tag <tag>` | Add a tag (repeatable) |
-| `--ci-pipeline <name>` | Add a CI pipeline (repeatable) |
-| `--meta <key>=<value>` | Add metadata (string value, repeatable) |
-| `--meta-json <key>=<value>` | Add metadata (JSON value, repeatable) |
-
-**Examples:**
-
-```bash
-# Add component with flags
-lunar catalog component \
-  --name "github.com/acme/api" \
-  --owner "jane@acme.com" \
-  --domain "platform.backend" \
-  --tag "go" \
-  --tag "production"
-
-# Add tag to current component (in component-repo hook)
-lunar catalog component --tag production
-
-# Set metadata
-lunar catalog component \
-  --name "github.com/acme/api" \
-  --meta tier=1 \
-  --meta-json slos='{"latency_p99": 100}'
-```
-
-#### Domain Form
-
-Write or update a single domain.
-
-```bash
-lunar catalog domain [options] [<json-value>]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--name <n>` | Domain name (required) |
-| `--description <desc>` | Domain description |
-| `--owner <owner>` | Domain owner email |
-| `--meta <key>=<value>` | Add metadata (string value, repeatable) |
-| `--meta-json <key>=<value>` | Add metadata (JSON value, repeatable) |
-
-**Examples:**
-
-```bash
-# Create a domain
-lunar catalog domain \
-  --name "platform" \
-  --description "Platform services" \
-  --owner "platform-team@acme.com"
-
-# Create nested domain
-lunar catalog domain \
-  --name "platform.backend" \
-  --description "Backend platform services"
+lunar catalog raw --json '.domains' '{"platform": {"owner": "platform-team@acme.com"}}'
 ```
 
 ### Path Syntax
@@ -327,10 +273,7 @@ The Catalog JSON has a predefined structure:
   "domains": {
     "<domain-name>": {
       "description": "<description>",
-      "owner": "<owner>",
-      "meta": {
-        "<key>": "<value>"
-      }
+      "owner": "<owner>"
     }
   },
   "components": {
@@ -339,10 +282,7 @@ The Catalog JSON has a predefined structure:
       "domain": "<domain>",
       "branch": "<branch>",
       "tags": ["<tag1>", "<tag2>"],
-      "ciPipelines": ["<pipeline1>", "<pipeline2>"],
-      "meta": {
-        "<key>": "<value>"
-      }
+      "ciPipelines": ["<pipeline1>", "<pipeline2>"]
     }
   }
 }
@@ -358,143 +298,7 @@ Catalog information is merged from multiple sources. Later sources override earl
 
 ## Common Patterns
 
-### Pattern 1: External API Sync (cron hook)
-
-Fetch component data from an external service catalog. Uses a `cron` hook to sync periodically.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: cron, schedule: "0 2 * * *"
-
-# Query Backstage API for all components
-COMPONENTS=$(curl -fsS \
-  -H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN" \
-  "https://backstage.example.com/api/catalog/entities?filter=kind=component")
-
-# Transform and write to catalog
-echo "$COMPONENTS" | jq '
-  [.[] | {
-    (.metadata.annotations["github.com/repo"]): {
-      owner: .spec.owner,
-      domain: .spec.domain,
-      tags: .metadata.tags
-    }
-  }] | add
-' | lunar catalog --json '.components' -
-```
-
-### Pattern 2: Database Sync (cron hook)
-
-Sync catalog from a database. Uses a `cron` hook to sync periodically.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: cron, schedule: "0 2 * * *"
-
-# Export services from database
-psql "$LUNAR_SECRET_DB_URL" -t -A -c "
-  SELECT json_agg(json_build_object(
-    repo_url, json_build_object(
-      'owner', owner_email,
-      'domain', domain_path,
-      'tags', ARRAY[tier, team]
-    )
-  ))
-  FROM services
-  WHERE active = true
-" | lunar catalog --json '.components' -
-```
-
-### Pattern 3: Central Repository Files (repo hook)
-
-Read catalog definitions from files in a central repo. Uses a `repo` hook to run when the catalog repo is updated.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: repo, repo: github.com/acme/software-catalog
-
-# Import domains from TOML file
-cat domains.toml | toml2json | jq '.domains' | lunar catalog --json '.domains' -
-
-# Import components from YAML file
-cat services.yaml | yq -o=json '.components' | lunar catalog --json '.components' -
-```
-
-### Pattern 4: Component-Level Augmentation (component-repo hook)
-
-Augment components from their own repos. Uses a `component-repo` hook to run on commits to any component repository.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: component-repo
-
-# Add tag if repo has a specific CI workflow
-if grep -q '^name: Production Deploy$' .github/workflows/*.yml 2>/dev/null; then
-  lunar catalog component --tag production
-fi
-
-# Add tag based on language detection
-if [ -f go.mod ]; then
-  lunar catalog component --tag go
-elif [ -f package.json ]; then
-  lunar catalog component --tag javascript
-elif [ -f requirements.txt ] || [ -f pyproject.toml ]; then
-  lunar catalog component --tag python
-fi
-```
-
-### Pattern 5: GitHub Organization Sync (cron hook)
-
-Sync all repos from a GitHub organization. Uses a `cron` hook to sync periodically.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: cron, schedule: "0 2 * * *"
-
-# List all repos and transform to catalog format
-gh repo list my-org --json name,owner,description,url \
-  --limit 1000 | jq '
-  [.[] | {
-    (.url | gsub("https://"; "")): {
-      owner: .owner.login,
-      meta: {description: .description}
-    }
-  }] | add
-' | lunar catalog --json '.components' -
-```
-
-### Pattern 6: Multi-Source Aggregation (cron hook)
-
-Combine data from multiple sources. Uses a `cron` hook to sync periodically.
-
-```bash
-#!/bin/bash
-set -e
-
-# Hook: type: cron, schedule: "0 2 * * *"
-
-# Fetch from primary source (Backstage)
-curl -fsS "$BACKSTAGE_API/entities" | \
-  jq '...' | lunar catalog --json '.components' -
-
-# Augment with ownership data from a spreadsheet export
-curl -fsS "$OWNERSHIP_SHEET_CSV" | \
-  csvjson | jq '...' | lunar catalog --json '.components' -
-
-# Add domain hierarchy from internal API
-curl -fsS "$INTERNAL_API/domains" | \
-  jq '...' | lunar catalog --json '.domains' -
-```
+See [cataloger-patterns.md](cataloger-patterns.md) for worked examples covering external API sync, database sync, central catalog repo, component-level augmentation, GitHub org sync, multi-source aggregation, and Component-JSON heuristics.
 
 ## Plugin Structure
 
@@ -513,7 +317,7 @@ version: 0
 
 name: my-cataloger                    # Required: Must match directory name
 description: What this cataloger does # Required: Brief description
-author: team@example.com              # Required
+author: team@example.com              # Optional
 
 # Recommended: specify container image
 default_image: earthly/lunar-scripts:1.0.0
@@ -735,23 +539,6 @@ echo "Found $(echo "$COMPONENTS" | jq 'length') components"
 
 One cataloger should sync from one source. Create separate catalogers for different systems.
 
-### 6. Test Locally
-
-Use `lunar cataloger dev` to test catalogers locally:
-
-```bash
-# Run catalogers and output the resulting Catalog JSON
-lunar cataloger dev --output-json
-```
-
-### 7. Document Your Sources
+### 6. Document Your Sources
 
 Document what external systems your cataloger syncs from and any required secrets.
-
-### 8. View Current Catalog
-
-Inspect the current catalog state:
-
-```bash
-lunar cataloger get-json
-```

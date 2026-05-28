@@ -57,26 +57,26 @@ def make_branch_protection_data(
     require_signed_commits=True,
     require_status_checks=True,
     required_approvals=2,
+    source=None,
 ):
     """Helper to create branch protection test data."""
-    return {
-        "vcs": {
-            "branch_protection": {
-                "enabled": enabled,
-                "branch": branch,
-                "allow_deletions": allow_deletions,
-                "allow_force_push": allow_force_push,
-                "dismiss_stale_reviews": dismiss_stale_reviews,
-                "require_branches_up_to_date": require_branches_up_to_date,
-                "require_codeowner_review": require_codeowner_review,
-                "require_linear_history": require_linear_history,
-                "require_pr": require_pr,
-                "require_signed_commits": require_signed_commits,
-                "require_status_checks": require_status_checks,
-                "required_approvals": required_approvals,
-            }
-        }
+    bp = {
+        "enabled": enabled,
+        "branch": branch,
+        "allow_deletions": allow_deletions,
+        "allow_force_push": allow_force_push,
+        "dismiss_stale_reviews": dismiss_stale_reviews,
+        "require_branches_up_to_date": require_branches_up_to_date,
+        "require_codeowner_review": require_codeowner_review,
+        "require_linear_history": require_linear_history,
+        "require_pr": require_pr,
+        "require_signed_commits": require_signed_commits,
+        "require_status_checks": require_status_checks,
+        "required_approvals": required_approvals,
     }
+    if source is not None:
+        bp["source"] = source
+    return {"vcs": {"branch_protection": bp}}
 
 
 def make_disabled_protection_data(branch="main"):
@@ -537,6 +537,110 @@ class TestAllowedMergeStrategies(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             check_allowed_merge_strategies(node, allowed_strategies_override="")
         self.assertIn("must be configured", str(context.exception))
+
+
+class TestRulesetsDerivedData(unittest.TestCase):
+    """Tests for branch protection data derived from GitHub rulesets.
+
+    The collector queries the classic branch-protection endpoint first and falls
+    back to /repos/{owner}/{repo}/rules/branches/{branch} when the classic
+    endpoint 404s. Either path produces the same .vcs.branch_protection schema,
+    distinguished only by the .source field ("classic" | "ruleset" | "none").
+
+    These tests verify policies evaluate correctly against the ruleset-derived
+    shape — a repo with a ruleset enforcing PR + non_fast_forward + deletion
+    should pass branch-protection-enabled, disallow-force-push, and
+    disallow-branch-deletion even though it 404s on the classic endpoint.
+    """
+
+    def test_ruleset_protected_passes_enabled_check(self):
+        """Ruleset-only protection should pass branch-protection-enabled."""
+        data = make_branch_protection_data(enabled=True, source="ruleset")
+        node = Node.from_component_json(data)
+        check = check_branch_protection_enabled(node)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_ruleset_with_non_fast_forward_disallows_force_push(self):
+        """Ruleset with non_fast_forward rule => allow_force_push=false => passes."""
+        data = make_branch_protection_data(
+            allow_force_push=False, source="ruleset"
+        )
+        node = Node.from_component_json(data)
+        check = check_disallow_force_push(node)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_ruleset_with_deletion_rule_disallows_deletion(self):
+        """Ruleset with deletion rule => allow_deletions=false => passes."""
+        data = make_branch_protection_data(
+            allow_deletions=False, source="ruleset"
+        )
+        node = Node.from_component_json(data)
+        check = check_disallow_branch_deletion(node)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_ruleset_with_pr_rule_satisfies_minimum_approvals(self):
+        """Ruleset with pull_request rule should populate required_approvals."""
+        data = make_branch_protection_data(
+            required_approvals=2, require_pr=True, source="ruleset"
+        )
+        node = Node.from_component_json(data)
+        check = check_minimum_approvals(node, min_approvals_override=2)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_source_none_unprotected_fails(self):
+        """Repo with neither classic nor ruleset protection => fails."""
+        data = {
+            "vcs": {
+                "branch_protection": {
+                    "enabled": False,
+                    "branch": "main",
+                    "source": "none",
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        check = check_branch_protection_enabled(node)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_charts_repro_shape_passes(self):
+        """Charts-shaped data (the repro case from ENG-741) should pass."""
+        # Mirrors the field values the collector derives from the
+        # earthly/charts ruleset: pull_request rule with 1 approval, non_fast_
+        # forward + deletion present, no status checks, no signed commits.
+        data = {
+            "vcs": {
+                "branch_protection": {
+                    "enabled": True,
+                    "source": "ruleset",
+                    "branch": "main",
+                    "require_pr": True,
+                    "required_approvals": 1,
+                    "require_codeowner_review": False,
+                    "dismiss_stale_reviews": False,
+                    "require_status_checks": False,
+                    "require_branches_up_to_date": False,
+                    "allow_force_push": False,
+                    "allow_deletions": False,
+                    "require_linear_history": False,
+                    "require_signed_commits": False,
+                    "required_checks": [],
+                    "restrictions": {"users": [], "teams": [], "apps": []},
+                }
+            }
+        }
+        node = Node.from_component_json(data)
+        self.assertEqual(
+            check_branch_protection_enabled(node).status, CheckStatus.PASS
+        )
+        self.assertEqual(
+            check_disallow_force_push(node).status, CheckStatus.PASS
+        )
+        self.assertEqual(
+            check_disallow_branch_deletion(node).status, CheckStatus.PASS
+        )
+        self.assertEqual(
+            check_require_pull_request(node).status, CheckStatus.PASS
+        )
 
 
 if __name__ == "__main__":

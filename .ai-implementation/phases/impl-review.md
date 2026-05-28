@@ -29,10 +29,6 @@ see [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](../LUNAR-PLUGIN-PLAYBOOK-AI.md).
 
 ## What to do here
 
-CodeRabbit reviews the PR once the Bender server posts `@coderabbitai review` on your behalf — that's triggered automatically when a human flips the PR out of draft (see [`phases/implementation.md`](implementation.md) Step 0). If CodeRabbit hasn't reviewed by the time you're seeing this phase, it most likely means the PR is still in draft or the ready-for-review event came from a bot rather than a human; ask the requester to retoggle ready or check the server logs for `[coderabbit-summon]`. Once summoned, CodeRabbit re-reviews on subsequent pushes automatically.
-
-Address its feedback, but **use judgment** — CodeRabbit sometimes flags things that aren't real issues. If a comment is wrong or irrelevant, reply explaining why and resolve the thread. When you've addressed a valid comment (pushed a fix), resolve that thread too. Don't leave conversations hanging.
-
 **Implementation review may trigger spec changes.** Reviewers may ask you to adjust the YAML manifest, README, or Component JSON paths even after implementation is added. This is normal — make the changes. **Re-test after significant changes** (logic changes, new assertions, changed Component JSON paths). A quick `lunar collector dev` or `lunar policy dev` run is enough — post updated results on the PR if the previous results are now stale. See the testing steps in [`phases/implementation.md`](implementation.md) if you need a refresher.
 
 Wait for **both reviewers** to approve the PR via GitHub review.

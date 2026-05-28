@@ -180,9 +180,7 @@ revisit it if a reviewer flags something you don't recognize.
 | Using `git add .` or `git add -A` | Stages unintended files (test configs, temp files, etc.). | Always `git add` specific directories: `git add collectors/<name>/` or `git add policies/<name>/`. |
 | Merging with only one approval | Both reviewers need to approve unless one explicitly waives. | Wait for both. |
 | Not posting test results on the PR | Reviewers need evidence, not trust. | Always post test results with JSON output, screenshots, and the test matrix template. See [`phases/implementation.md`](phases/implementation.md) Step 8. |
-| Posting `@coderabbitai review` manually | The Bender server posts the summon automatically on the draft→ready webhook. Doing it yourself in draft state is the failure mode that prompted this automation (PR #162) — CodeRabbit ignored the in-draft summon and never reviewed. | Don't post it. Leave the PR in draft until a human marks it ready; the server handles the summon. See [`phases/implementation.md`](phases/implementation.md) Step 0. |
-| Running `gh pr ready` from the worker | The summon trigger is human-driven specifically so bot-marked-ready events don't fire it. A worker flipping the PR ready means the summon won't fire. | Leave the draft→ready flip to a human (the requester). |
-| Ignoring CodeRabbit review feedback | Once CodeRabbit reviews (on ready or on subsequent pushes), unresolved comments slow down human review. | Address or reply to every CodeRabbit review comment before requesting human review. Use judgment — CodeRabbit sometimes flags non-issues; reply explaining why and resolve the thread. |
+| Running `gh pr ready` from the worker | The draft→ready flip is a human-driven signal that implementation is ready for review. A worker flipping it short-circuits that handoff. | Leave the draft→ready flip to a human (the requester). |
 | Leaving branch refs in cronos config | The branch gets deleted on merge, breaking all manifest syncs. | Undeploy from cronos before merge (see [`phases/merge.md`](phases/merge.md) pre-merge checklist). |
 
 ### Docker images

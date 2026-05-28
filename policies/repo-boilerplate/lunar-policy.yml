@@ -147,6 +147,17 @@ policies:
     mainPython: ./editorconfig-exists.py
     keywords: ["editorconfig", "code style", "repository hygiene"]
 
+  # --- Changelog checks ---
+  - name: changelog-exists
+    description: |
+      Verifies that a CHANGELOG file exists in the repository root. Detects
+      common variants (CHANGELOG.md, CHANGELOG, CHANGES.md, HISTORY.md,
+      RELEASES.md). Intended for repos that ship versioned releases — apply
+      via lunar-config `on:` targeting (e.g. public-only) rather than blanketly.
+      Reads from `.repo.changelog`.
+    mainPython: ./changelog-exists.py
+    keywords: ["changelog", "release notes", "version history", "repository hygiene"]
+
 inputs:
   min_lines:
     description: Minimum number of lines required in README file

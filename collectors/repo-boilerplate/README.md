@@ -18,6 +18,7 @@ This collector writes to the following Component JSON paths:
 | `.repo.security` | object | SECURITY.md metadata (exists, path, lines, sections) |
 | `.repo.contributing` | object | CONTRIBUTING.md metadata (exists, path, lines, sections) |
 | `.repo.editorconfig` | object | .editorconfig metadata (exists, path, sections) |
+| `.repo.changelog` | object | CHANGELOG metadata (exists, path, lines, sections) |
 | `.ownership.codeowners` | object | Parsed CODEOWNERS data (exists, valid, owners, rules) |
 
 ## Collectors
@@ -33,6 +34,7 @@ This integration provides the following collectors (use `include` to select a su
 | `security` | Detects SECURITY.md, extracts line count and sections |
 | `contributing` | Detects CONTRIBUTING.md, extracts line count and sections |
 | `editorconfig` | Detects .editorconfig, counts section blocks |
+| `changelog` | Detects CHANGELOG (variants configurable), extracts line count and version sections |
 
 ## Installation
 
@@ -45,4 +47,5 @@ collectors:
     # with:
     #   readme_paths: "README.md,README,README.txt,README.rst"
     #   codeowners_paths: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
+    #   changelog_paths: "CHANGELOG.md,CHANGELOG,CHANGES.md,HISTORY.md,RELEASES.md"
 ```

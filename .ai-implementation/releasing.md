@@ -218,7 +218,7 @@ After a successful release, update the cronos staging environment to reference t
    git push
    ```
 
-4. **Verify the "Sync Lunar Config" CI workflow passes** — if it fails, the hub won't pick up the new configuration.
+4. **Verify the `Sync Lunar Config` workflow passes** in `pantalasa-cronos/lunar` — it runs `lunar hub pull` to push the updated manifest to the hub. If it fails, the hub won't pick up the new configuration.
 
 **Note:** Only update `@v<old>` → `@vX.Y.Z`. Do not change `@main` references — those are either development plugins being tested or plugins that intentionally track latest.
 
