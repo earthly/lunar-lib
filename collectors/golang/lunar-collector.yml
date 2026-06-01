@@ -83,6 +83,20 @@ collectors:
       type: code
     keywords: ["golangci-lint", "go linting", "static analysis", "code quality"]
 
+  - name: golangci-lint-ci
+    description: |
+      Detects user-invoked `golangci-lint run` invocations in CI pipelines.
+      Parses JSON-formatted output (--output.json.path=<file> or legacy
+      --out-format=json:<file>, or stdout captured via the runtime) into
+      normalized warnings at .lang.go.lint, matching the schema of the
+      code-hook `golangci-lint` sub-collector. Records the version used.
+    mainBash: golangci-lint-ci.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: golangci-lint
+    keywords: ["golangci-lint", "go linting", "ci linting", "user-invoked"]
+
   - name: dependencies
     description: |
       Extracts direct and transitive dependencies from go.mod using go list -m -json all.
@@ -142,6 +156,13 @@ example_component_json: |
           ],
           "linters": ["golangci-lint"],
           "source": { "tool": "golangci-lint", "integration": "code" }
+        },
+        "native": {
+          "golangci_lint": {
+            "cicd": {
+              "cmds": [{ "cmd": "golangci-lint run --output.json.path=lint.json", "version": "1.62.0" }]
+            }
+          }
         }
       }
     }
