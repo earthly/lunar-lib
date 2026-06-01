@@ -60,7 +60,9 @@ catalogers:
     # (`component-cron`). Discussed on PR earthly/lunar-lib#181.
     hook:
       type: component-cron
-      schedule: "0 3 * * *"
+      # TEMP: */5 for cronos integration verification. Revert to "0 3 * * *"
+      # before this PR moves out of draft. See PR earthly/lunar-lib#181.
+      schedule: "*/5 * * * *"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment"]
 
 inputs:
