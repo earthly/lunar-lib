@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: foo
+  annotations:
+    github.com/project-slug: acme/foo
+spec:
+  type: service
+  owner: group:default/team-foo
+  lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bar
+  annotations:
+    github.com/project-slug: acme/bar
+spec:
+  type: service
+  owner: group:default/team-bar
+  lifecycle: production

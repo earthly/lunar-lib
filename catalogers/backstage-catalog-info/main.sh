@@ -1,32 +1,42 @@
 #!/bin/bash
 #
 # Backstage catalog-info Cataloger — augments the current Lunar component
-# with owner / domain / tags read from the Backstage entity that the per-repo
-# `backstage` collector parsed out of `catalog-info.yaml`.
+# with owner / domain / tags read from `catalog-info.yaml` in the component's
+# GitHub repo.
 #
-# Runs once per existing component via the `component-cron` hook. Reads
-# `.catalog.native.backstage` from the component's Component JSON (the
-# collector's output), confirms the entity is a `Component` whose annotation
-# (or ID fallback) matches `$LUNAR_COMPONENT_ID`, and writes a single
-# `.components["$LUNAR_COMPONENT_ID"]` entry back into the Catalog JSON.
+# Runs once per existing component via `component-cron`. Fetches
+# `catalog-info.yaml` (or `.yml`) via the GitHub Contents API, parses the
+# YAML (supports multi-document files), picks the matching `Component`
+# entity, and writes a single `.components["$LUNAR_COMPONENT_ID"]` entry
+# back into the Catalog JSON.
 #
-# Silent skips (exit 0 with a log line, no write) for: missing Component JSON
-# data, `valid == false`, `kind != Component`, or no matching identifier.
+# Silent skips (exit 0 with a log line, no write):
+#   - Component ID is not a github.com/<owner>/<repo>
+#   - No catalog-info.yaml at any of the configured paths (404 from GH)
+#   - YAML parse error
+#   - No `Component` entity in the file
+#   - Multiple Components in the file, none match `$LUNAR_COMPONENT_ID`
+#   - Multiple Components in the file, none annotated, can't disambiguate
 #
 # Inputs (LUNAR_VAR_*):
-#   component_id_annotation   (default github.com/project-slug)
-#   component_id_prefix       (default github.com/)
-#   tag_prefix                (default bs-)
-#   include_derived_tags      (default true)
-#   owner_format              (default as-is) as-is | bare-name
-#   default_owner             (default empty)
+#   paths                    (default catalog-info.yaml,catalog-info.yml)
+#   branch                   (default empty → repo's default branch)
+#   component_id_annotation  (default github.com/project-slug)
+#   component_id_prefix      (default github.com/)
+#   tag_prefix               (default bs-)
+#   include_derived_tags     (default true)
+#   owner_format             (default as-is) as-is | bare-name
+#   default_owner            (default empty)
 #
-# No secrets, no network — the collector handles fetching + validation.
+# Secrets:
+#   GH_TOKEN — required, fetched as LUNAR_SECRET_GH_TOKEN
 
 set -euo pipefail
 
 COMPONENT_ID="${LUNAR_COMPONENT_ID:?LUNAR_COMPONENT_ID must be set by the component-cron runner}"
 
+PATHS="${LUNAR_VAR_PATHS:-catalog-info.yaml,catalog-info.yml}"
+BRANCH="${LUNAR_VAR_BRANCH:-}"
 COMPONENT_ID_ANNOTATION="${LUNAR_VAR_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
@@ -34,82 +44,119 @@ INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 
+if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
+    export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
+elif [ -z "${GH_TOKEN:-}" ]; then
+    echo "GH_TOKEN or LUNAR_SECRET_GH_TOKEN must be set" >&2
+    exit 1
+fi
+
 echo "Component: $COMPONENT_ID"
+echo "Paths: $PATHS"
+[ -n "$BRANCH" ] && echo "Branch: $BRANCH"
 echo "Annotation key: $COMPONENT_ID_ANNOTATION"
 echo "Component id prefix: $COMPONENT_ID_PREFIX"
 echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 
-# --- Read collector output -------------------------------------------------
-# `.catalog.native.backstage` is written by the per-repo `backstage`
-# collector (collectors/backstage). If it's absent, the collector hasn't run
-# on this component's repo yet, the repo has no `catalog-info.yaml`, or
-# `.catalog.native` exists but doesn't include a `backstage` block.
-#
-# `lunar component get-json` reads the merged collection blob from the hub.
-# Treat a failed lookup (network, hub error, transient unavailability) the
-# same as missing data — skip silently rather than exiting non-zero, so a
-# transient hub blip doesn't surface as a cataloger error per-component.
+# --- Parse component ID into owner/repo -----------------------------------
+# Only github.com/<owner>/<repo> IDs are supported. Anything else (gitlab,
+# bitbucket, custom schemes) silently skips — this cataloger is GH-specific.
 
+if [[ "$COMPONENT_ID" != "${COMPONENT_ID_PREFIX}"* ]]; then
+    echo "Component id '$COMPONENT_ID' does not start with prefix '$COMPONENT_ID_PREFIX' — skipping"
+    exit 0
+fi
+SLUG="${COMPONENT_ID#$COMPONENT_ID_PREFIX}"
+if [[ "$SLUG" != */* ]]; then
+    echo "Component id '$COMPONENT_ID' is not in '$COMPONENT_ID_PREFIX<owner>/<repo>' form — skipping"
+    exit 0
+fi
+
+# --- Fetch catalog-info.yaml ----------------------------------------------
+# Try each configured path in order. First success wins. GitHub Contents API
+# returns the raw file body when called with `Accept: application/vnd.github.raw`.
+# 404 → silently try the next path. Any other GH error → silent skip.
+
+YAML=""
+FOUND_PATH=""
 ERR_FILE=$(mktemp)
 trap 'rm -f "$ERR_FILE"' EXIT
-if ! COMPONENT_JSON=$(lunar component get-json "$COMPONENT_ID" 2>"$ERR_FILE"); then
-    echo "lunar component get-json failed for $COMPONENT_ID — skipping (stderr: $(head -c 300 "$ERR_FILE"))"
-    exit 0
-fi
 
-if ! ENTITY=$(echo "$COMPONENT_JSON" | jq '.catalog.native.backstage // null' 2>"$ERR_FILE"); then
-    echo "jq parse failed on Component JSON for $COMPONENT_ID — skipping (stderr: $(head -c 200 "$ERR_FILE"))"
-    exit 0
-fi
-
-if [ "$ENTITY" = "null" ]; then
-    echo "No .catalog.native.backstage on $COMPONENT_ID — skipping (collector not configured, or no catalog-info.yaml)"
-    exit 0
-fi
-
-# Respect the collector's lint pass. `valid: false` means the YAML parsed but
-# the entity is malformed (missing kind, bad schema). Don't write augmented
-# data from a known-bad source. (Note: `.valid // true` would mishandle a
-# literal `false` because jq's `//` treats false as a fallback trigger.)
-IS_INVALID=$(echo "$ENTITY" | jq -r '.valid == false')
-if [ "$IS_INVALID" = "true" ]; then
-    echo "Backstage entity for $COMPONENT_ID is marked invalid by the collector — skipping"
-    exit 0
-fi
-
-KIND=$(echo "$ENTITY" | jq -r '.kind // ""')
-if [ "$KIND" != "Component" ]; then
-    echo "Backstage entity kind is '$KIND' (not Component) — skipping"
-    exit 0
-fi
-
-# --- Identifier match ------------------------------------------------------
-# Step 1: try the configured annotation. Step 2: fall back to checking that
-# $LUNAR_COMPONENT_ID itself starts with $COMPONENT_ID_PREFIX (covers the
-# common single-Component catalog-info.yaml with no project-slug annotation).
-
-ANNOTATION_VALUE=$(echo "$ENTITY" | jq -r --arg key "$COMPONENT_ID_ANNOTATION" '(.metadata.annotations // {})[$key] // ""')
-
-if [ -n "$ANNOTATION_VALUE" ]; then
-    EXPECTED="${COMPONENT_ID_PREFIX}${ANNOTATION_VALUE}"
-    if [ "$EXPECTED" != "$COMPONENT_ID" ]; then
-        echo "Annotation '$COMPONENT_ID_ANNOTATION'='$ANNOTATION_VALUE' (→ '$EXPECTED') does not match component id '$COMPONENT_ID' — skipping"
-        exit 0
+IFS=',' read -ra PATH_ARRAY <<< "$PATHS"
+for raw_path in "${PATH_ARRAY[@]}"; do
+    path="$(echo "$raw_path" | xargs)"
+    [ -z "$path" ] && continue
+    URL="repos/$SLUG/contents/$path"
+    if [ -n "$BRANCH" ]; then
+        URL="${URL}?ref=${BRANCH}"
     fi
-    echo "Matched via annotation '$COMPONENT_ID_ANNOTATION'='$ANNOTATION_VALUE'"
-else
-    if [ -z "$COMPONENT_ID_PREFIX" ] || [[ "$COMPONENT_ID" != "$COMPONENT_ID_PREFIX"* ]]; then
-        echo "No '$COMPONENT_ID_ANNOTATION' annotation and component id '$COMPONENT_ID' does not start with prefix '$COMPONENT_ID_PREFIX' — skipping"
-        exit 0
+    if YAML=$(gh api -H "Accept: application/vnd.github.raw" "$URL" 2>"$ERR_FILE"); then
+        FOUND_PATH="$path"
+        break
     fi
-    echo "Matched via ID prefix '$COMPONENT_ID_PREFIX' (no annotation set on entity)"
+    # Distinguish "missing file" (404) from real errors. `gh api` exits 1 on
+    # any non-2xx — surface the stderr in logs so an auth/network problem is
+    # debuggable, but don't propagate failure (silent skip per design).
+    YAML=""
+done
+
+if [ -z "$YAML" ]; then
+    echo "No catalog-info.yaml at any of '$PATHS' in '$SLUG' — skipping (last stderr: $(head -c 200 "$ERR_FILE"))"
+    exit 0
+fi
+echo "Fetched $FOUND_PATH from $SLUG ($(echo "$YAML" | wc -c) bytes)"
+
+# --- Parse YAML (multi-document) ------------------------------------------
+# `yq ea '[.]' -o=json` collects all documents in a multi-doc file into a
+# single JSON array. Single-doc files yield a one-element array.
+
+if ! ENTITIES=$(echo "$YAML" | yq ea '[.]' -o=json 2>"$ERR_FILE"); then
+    echo "yq parse failed on $FOUND_PATH for $SLUG — skipping (stderr: $(head -c 200 "$ERR_FILE"))"
+    exit 0
+fi
+
+# --- Pick the matching Component entity -----------------------------------
+# Strategy:
+#   1. Filter to kind:Component.
+#   2. If ANY entity has the configured annotation, only annotated entries
+#      participate in matching: pick the one whose
+#      `<prefix><annotation_value>` equals `$LUNAR_COMPONENT_ID`. If none
+#      matches, skip — refuses to guess for a repo that uses annotations.
+#   3. If NO entity has the annotation and exactly one Component exists,
+#      use it (single-Component-per-repo case).
+#   4. If NO entity has the annotation and multiple Components exist,
+#      skip — ambiguous, the YAML needs annotations to disambiguate.
+
+ENTITY=$(echo "$ENTITIES" | jq \
+    --arg ann "$COMPONENT_ID_ANNOTATION" \
+    --arg prefix "$COMPONENT_ID_PREFIX" \
+    --arg comp "$COMPONENT_ID" \
+    '
+    [.[] | select((.kind // "") == "Component")] as $components
+    | ($components | map(select((.metadata.annotations // {})[$ann] // "" | tostring | length > 0))) as $annotated
+    | if ($annotated | length) > 0 then
+        (
+          [$annotated[] | select(($prefix + ((.metadata.annotations // {})[$ann] | tostring)) == $comp)]
+          | first
+        ) // null
+      elif ($components | length) == 1 then
+        $components[0]
+      else
+        null
+      end
+    ')
+
+if [ "$ENTITY" = "null" ] || [ -z "$ENTITY" ]; then
+    COMPONENT_COUNT=$(echo "$ENTITIES" | jq '[.[] | select((.kind // "") == "Component")] | length')
+    echo "No matching Component entity in $FOUND_PATH for $COMPONENT_ID (Component count: $COMPONENT_COUNT) — skipping"
+    exit 0
 fi
 
 # --- Transform -------------------------------------------------------------
 # Project owner / domain / tags from the entity into the shape that goes
-# under .components["$COMPONENT_ID"]. Owner / domain are omitted from the
+# under `.components["$COMPONENT_ID"]`. Owner / domain are omitted from the
 # output when empty so we don't blow away upstream values with "".
 
 ENTRY=$(echo "$ENTITY" | jq \
