@@ -2,7 +2,7 @@
 """
 Validate landing page metadata in plugin YAML files.
 
-This script validates that all plugin YAML files (collectors, policies, catalogers)
+This script validates that all plugin YAML files (collectors, policies, catalogers, probes)
 have complete and valid landing page metadata for the website guardrails pages.
 
 Usage:
@@ -10,7 +10,7 @@ Usage:
 
 Options:
     --verbose   Show detailed information about each plugin
-    --type      Validate only specific type: collector, policy, cataloger (default: all)
+    --type      Validate only specific type: collector, policy, cataloger, probe (default: all)
 """
 
 import argparse
@@ -41,6 +41,11 @@ PLUGIN_CONFIGS = {
         "yaml_file": "lunar-cataloger.yml",
         "item_key": "catalogers",
     },
+    "probe": {
+        "directory": "probes",
+        "yaml_file": "lunar-probe.yml",
+        "item_key": "probes",
+    },
 }
 
 # Valid categories for policies (verification use-case aligned)
@@ -69,11 +74,25 @@ VALID_INTEGRATION_CATEGORIES = {
     "incident-management",
 }
 
+# Valid categories for probes (agent-time guardrails — what does the probe nudge?).
+# Pre-populated so the website surface for probe landing pages can be built out
+# upfront and doesn't need a new release cycle each time a probe ships in a
+# different category. Categorise by *what* the probe enforces, not *how*.
+VALID_PROBE_CATEGORIES = {
+    "code-quality",   # linters: eslint, ruff, shellcheck, golangci-lint, hadolint, etc.
+    "formatting",     # read-only format checks: prettier --check, gofmt -l, black --check
+    "authoring",      # commit messages, file naming, conventions: commitlint, husky, lefthook
+    "security",       # edit-time secret detection / vuln warnings
+    "testing",        # edit-time test triggers, coverage thresholds
+    "dependencies",   # outdated / vulnerable / license-incompatible deps at edit time
+    "documentation",  # docstring presence, README structure checks
+}
+
 # Valid status values
 VALID_STATUSES = {"stable", "beta", "experimental", "deprecated"}
 
 # Valid related types
-VALID_RELATED_TYPES = {"collector", "policy", "cataloger"}
+VALID_RELATED_TYPES = {"collector", "policy", "cataloger", "probe"}
 
 # Character limits
 DISPLAY_NAME_MAX_LENGTH = 50
@@ -412,6 +431,7 @@ def parse_yaml_with_regex(content: str) -> dict[str, Any]:
     result["collectors"] = extract_items_array("collectors")
     result["policies"] = extract_items_array("policies")
     result["catalogers"] = extract_items_array("catalogers")
+    result["probes"] = extract_items_array("probes")
     
     # Extract top-level name
     name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
@@ -555,6 +575,7 @@ def validate_plugin(
     policies_dir = base_dir / "policies"
     collectors_dir = base_dir / "collectors"
     catalogers_dir = base_dir / "catalogers"
+    probes_dir = base_dir / "probes"
     
     # Check YAML exists
     if not yaml_path.exists():
@@ -582,6 +603,7 @@ def validate_plugin(
         "collector": "Collector",
         "policy": "Guardrails",
         "cataloger": "Cataloger",
+        "probe": "Probe",
     }.get(plugin_type, "")
     
     if not display_name:
@@ -625,6 +647,9 @@ def validate_plugin(
         if plugin_type == "policy":
             valid_cats = VALID_POLICY_CATEGORIES
             cat_type = "policy"
+        elif plugin_type == "probe":
+            valid_cats = VALID_PROBE_CATEGORIES
+            cat_type = "probe"
         else:
             valid_cats = VALID_INTEGRATION_CATEGORIES
             cat_type = "integration"
@@ -703,6 +728,8 @@ def validate_plugin(
                     target_dir = collectors_dir / slug
                 elif rel_type == "cataloger":
                     target_dir = catalogers_dir / slug
+                elif rel_type == "probe":
+                    target_dir = probes_dir / slug
                 else:
                     target_dir = None
                 
@@ -838,7 +865,7 @@ def main():
     )
     parser.add_argument(
         "--type", "-t",
-        choices=["collector", "policy", "cataloger", "all"],
+        choices=["collector", "policy", "cataloger", "probe", "all"],
         default="all",
         help="Plugin type to validate (default: all)",
     )
@@ -846,14 +873,14 @@ def main():
         "--base-dir",
         type=Path,
         default=Path(__file__).parent.parent,
-        help="Base directory containing collectors/policies/catalogers",
+        help="Base directory containing collectors/policies/catalogers/probes",
     )
     args = parser.parse_args()
     
     base_dir = args.base_dir.resolve()
     
     types_to_validate = (
-        ["collector", "policy", "cataloger"]
+        ["collector", "policy", "cataloger", "probe"]
         if args.type == "all"
         else [args.type]
     )
@@ -894,10 +921,12 @@ def main():
         print(f"    - Collectors: must end with 'Collector'")
         print(f"    - Catalogers: must end with 'Cataloger'")
         print(f"    - Policies: must end with 'Guardrails'")
+        print(f"    - Probes: must end with 'Probe'")
         print(f"  long_description: max {LONG_DESCRIPTION_MAX_LENGTH} chars")
         print(f"  category:")
         print(f"    - Policies: one of {sorted(VALID_POLICY_CATEGORIES)}")
         print(f"    - Collectors/Catalogers: array of {sorted(VALID_INTEGRATION_CATEGORIES)}")
+        print(f"    - Probes: array of {sorted(VALID_PROBE_CATEGORIES)}")
         print(f"  icon: path to SVG file (must exist)")
         print(f"  status: one of {sorted(VALID_STATUSES)}")
         print(f"\nRequired for policies:")

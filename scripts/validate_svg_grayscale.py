@@ -66,6 +66,7 @@ def main():
         glob.glob("collectors/*/assets/*.svg")
         + glob.glob("policies/*/assets/*.svg")
         + glob.glob("catalogers/*/assets/*.svg")
+        + glob.glob("probes/*/assets/*.svg")
     )
 
     if not svg_files:
