@@ -78,6 +78,9 @@ fi
 # Try each configured path in order. First success wins. GitHub Contents API
 # returns the raw file body when called with `Accept: application/vnd.github.raw`.
 # 404 → silently try the next path. Any other GH error → silent skip.
+#
+# curl over `gh api` because the lunar-lib base image is `alpine + lunar-scripts`
+# (no GitHub CLI). curl is always present; `gh` would require a custom image.
 
 YAML=""
 FOUND_PATH=""
@@ -88,22 +91,33 @@ IFS=',' read -ra PATH_ARRAY <<< "$PATHS"
 for raw_path in "${PATH_ARRAY[@]}"; do
     path="$(echo "$raw_path" | xargs)"
     [ -z "$path" ] && continue
-    URL="repos/$SLUG/contents/$path"
+    URL="https://api.github.com/repos/$SLUG/contents/$path"
     if [ -n "$BRANCH" ]; then
         URL="${URL}?ref=${BRANCH}"
     fi
-    if YAML=$(gh api -H "Accept: application/vnd.github.raw" "$URL" 2>"$ERR_FILE"); then
+    HTTP_CODE=$(curl -sS -o "$ERR_FILE.body" -w '%{http_code}' \
+        -H "Authorization: Bearer $GH_TOKEN" \
+        -H "Accept: application/vnd.github.raw" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$URL" 2>"$ERR_FILE" || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
+        YAML=$(cat "$ERR_FILE.body")
         FOUND_PATH="$path"
+        rm -f "$ERR_FILE.body"
         break
     fi
-    # Distinguish "missing file" (404) from real errors. `gh api` exits 1 on
-    # any non-2xx — surface the stderr in logs so an auth/network problem is
-    # debuggable, but don't propagate failure (silent skip per design).
+    # 404 → file absent at this path, try next. Other non-2xx (auth, rate-limit)
+    # → surface the response body in logs so the failure is debuggable, but
+    # still silently skip overall (per design).
+    if [ "$HTTP_CODE" != "404" ]; then
+        echo "GH Contents API returned $HTTP_CODE for $URL: $(head -c 200 "$ERR_FILE.body" 2>/dev/null)" >&2
+    fi
+    rm -f "$ERR_FILE.body"
     YAML=""
 done
 
 if [ -z "$YAML" ]; then
-    echo "No catalog-info.yaml at any of '$PATHS' in '$SLUG' — skipping (last stderr: $(head -c 200 "$ERR_FILE"))"
+    echo "No catalog-info.yaml at any of '$PATHS' in '$SLUG' — skipping"
     exit 0
 fi
 echo "Fetched $FOUND_PATH from $SLUG ($(echo "$YAML" | wc -c) bytes)"

@@ -2,11 +2,11 @@
 #
 # Local offline test for the backstage-catalog-info cataloger.
 #
-# Mocks `gh api -H "Accept: application/vnd.github.raw" repos/.../contents/...`
-# to return per-scenario fixtures from test/fixtures/<name>.yaml (absence
-# simulates a 404), and mocks `lunar catalog raw --json '.components' -` to
-# capture writes to a file. Then asserts the captured output matches the
-# expected Catalog JSON entry for that scenario.
+# Mocks `curl ... https://api.github.com/repos/.../contents/...` to return
+# per-scenario fixtures from test/fixtures/<name>.yaml (absence simulates a
+# 404), and mocks `lunar catalog raw --json '.components' -` to capture
+# writes to a file. Then asserts the captured output matches the expected
+# Catalog JSON entry for that scenario.
 #
 # All scenarios run; any failure is logged with a diff and the script
 # exits non-zero at the end.
@@ -23,32 +23,47 @@ echo "Test directory: $TEST_DIR"
 echo "Fixtures dir:   $FIXTURES_DIR"
 echo ""
 
-# --- Mock gh --------------------------------------------------------------
-# Only handles `gh api ... repos/<slug>/contents/<path>` style calls. Reads
-# $TEST_DIR/fetched.yaml. If the file is absent, exits 1 (simulating 404).
-cat > "$TEST_DIR/gh" << 'EOF'
+# --- Mock curl ------------------------------------------------------------
+# Implements just enough of `curl -sS -o <body> -w '%{http_code}' ... <URL>` to
+# stand in for `main.sh`'s fetch. Looks for $TEST_DIR/fetched.yaml: if present,
+# writes its content to the -o file and prints "200"; if absent, writes a
+# Not-Found JSON body and prints "404".
+cat > "$TEST_DIR/curl" << 'EOF'
 #!/bin/bash
 set -euo pipefail
-TEST_DIR_ENV="${MOCK_GH_TEST_DIR:?MOCK_GH_TEST_DIR must be set}"
-seen_api=0
-for arg in "$@"; do
-    if [ "$arg" = "api" ]; then
-        seen_api=1
-        break
-    fi
+TEST_DIR_ENV="${MOCK_CURL_TEST_DIR:?MOCK_CURL_TEST_DIR must be set}"
+OUT_PATH=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o)
+            OUT_PATH="$2"
+            shift 2
+            ;;
+        -H|-w)
+            shift 2
+            ;;
+        -sS|-sSL|-s|-S|-L)
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
 done
-if [ "$seen_api" -eq 0 ]; then
-    echo "Mock gh: only 'gh api ...' is supported, got: $*" >&2
+if [ -z "$OUT_PATH" ]; then
+    echo "Mock curl: -o <path> is required" >&2
     exit 1
 fi
 if [ -f "$TEST_DIR_ENV/fetched.yaml" ]; then
-    cat "$TEST_DIR_ENV/fetched.yaml"
+    cp "$TEST_DIR_ENV/fetched.yaml" "$OUT_PATH"
+    printf '200'
     exit 0
 fi
-echo '{"message":"Not Found"}' >&2
-exit 1
+printf '{"message":"Not Found"}' > "$OUT_PATH"
+printf '404'
+exit 0
 EOF
-chmod +x "$TEST_DIR/gh"
+chmod +x "$TEST_DIR/curl"
 
 # --- Mock lunar -----------------------------------------------------------
 # Only `lunar catalog raw --json '.components' -` is needed: it appends stdin
@@ -68,7 +83,7 @@ EOF
 chmod +x "$TEST_DIR/lunar"
 
 export PATH="$TEST_DIR:$PATH"
-export MOCK_GH_TEST_DIR="$TEST_DIR"
+export MOCK_CURL_TEST_DIR="$TEST_DIR"
 export MOCK_LUNAR_TEST_DIR="$TEST_DIR"
 
 # --- Test runner ----------------------------------------------------------
