@@ -66,16 +66,26 @@ EOF
 chmod +x "$TEST_DIR/curl"
 
 # --- Mock lunar -----------------------------------------------------------
-# Only `lunar catalog raw --json '.components' -` is needed: it appends stdin
-# to $TEST_DIR/components.out.
+# Handles `lunar catalog raw --json '<path>' -` for `.components` and
+# `.domains`. Each write is appended to a per-path .out file so a single
+# scenario can be asserted against both maps independently.
 cat > "$TEST_DIR/lunar" << 'EOF'
 #!/bin/bash
 set -euo pipefail
 TEST_DIR_ENV="${MOCK_LUNAR_TEST_DIR:?MOCK_LUNAR_TEST_DIR must be set}"
-if [ "${1:-}" = "catalog" ] && [ "${2:-}" = "raw" ] && [ "${3:-}" = "--json" ] && [ "${4:-}" = ".components" ]; then
-    cat >> "$TEST_DIR_ENV/components.out"
-    echo "" >> "$TEST_DIR_ENV/components.out"
-    exit 0
+if [ "${1:-}" = "catalog" ] && [ "${2:-}" = "raw" ] && [ "${3:-}" = "--json" ]; then
+    case "${4:-}" in
+        .components)
+            cat >> "$TEST_DIR_ENV/components.out"
+            echo "" >> "$TEST_DIR_ENV/components.out"
+            exit 0
+            ;;
+        .domains)
+            cat >> "$TEST_DIR_ENV/domains.out"
+            echo "" >> "$TEST_DIR_ENV/domains.out"
+            exit 0
+            ;;
+    esac
 fi
 echo "Mock lunar: unhandled command: $*" >&2
 exit 1
@@ -91,6 +101,12 @@ export MOCK_LUNAR_TEST_DIR="$TEST_DIR"
 # fixture-or-NONE: basename under test/fixtures/, or NONE to simulate 404
 # expected-jq: jq filter on merged components.out; "true" means pass.
 #              "" means expect no write (skipped scenario)
+#
+# Optional env overrides may include `EXPECTED_DOMAINS_JQ=<filter>` (the
+# only special-cased KEY=VALUE that the runner intercepts before calling
+# main.sh) — when set, the runner additionally asserts the filter against
+# the merged domains.out and fails if it doesn't evaluate to "true". An
+# empty filter (or omitted) means "expect no domain write".
 FAILED=0
 PASSED=0
 
@@ -105,6 +121,7 @@ run_scenario() {
 
     # Fresh state per scenario
     : > "$TEST_DIR/components.out"
+    : > "$TEST_DIR/domains.out"
     rm -f "$TEST_DIR/fetched.yaml"
 
     if [ "$fixture" != "NONE" ]; then
@@ -117,8 +134,14 @@ run_scenario() {
     unset LUNAR_VAR_OWNER_FORMAT LUNAR_VAR_DEFAULT_OWNER
     unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH
 
+    local expected_domains_jq=""
+    local kv
     for kv in "$@"; do
-        export "$kv"
+        if [[ "$kv" == EXPECTED_DOMAINS_JQ=* ]]; then
+            expected_domains_jq="${kv#EXPECTED_DOMAINS_JQ=}"
+        else
+            export "$kv"
+        fi
     done
 
     export LUNAR_COMPONENT_ID="$component_id"
@@ -138,50 +161,96 @@ run_scenario() {
     else
         merged='{}'
     fi
-
-    if [ -z "$expected_jq" ]; then
-        if [ "$merged" = "{}" ]; then
-            echo "  OK (correctly skipped — no write)"
-            PASSED=$((PASSED + 1))
-        else
-            echo "  FAIL (expected no write, got):"
-            echo "$merged" | jq . | sed 's/^/    /'
-            FAILED=$((FAILED + 1))
-        fi
-        return
+    local merged_domains
+    if [ -s "$TEST_DIR/domains.out" ]; then
+        merged_domains=$(jq -s 'add // {}' "$TEST_DIR/domains.out" 2>/dev/null || echo '{}')
+    else
+        merged_domains='{}'
     fi
 
-    local check
-    check=$(echo "$merged" | jq -r "$expected_jq" 2>&1 || echo "JQ_ERROR")
-    if [ "$check" = "true" ]; then
-        echo "  OK"
-        echo "$merged" | jq . | sed 's/^/    /'
+    local component_check_ok=1
+    if [ -z "$expected_jq" ]; then
+        if [ "$merged" = "{}" ]; then
+            component_check_ok=1
+        else
+            echo "  FAIL (expected no component write, got):"
+            echo "$merged" | jq . | sed 's/^/    /'
+            component_check_ok=0
+        fi
+    else
+        local check
+        check=$(echo "$merged" | jq -r "$expected_jq" 2>&1 || echo "JQ_ERROR")
+        if [ "$check" = "true" ]; then
+            component_check_ok=1
+        else
+            echo "  FAIL — component assertion did not pass (got: $check)"
+            echo "  merged components:"
+            echo "$merged" | jq . | sed 's/^/    /'
+            echo "  jq filter: $expected_jq"
+            component_check_ok=0
+        fi
+    fi
+
+    local domain_check_ok=1
+    if [ -z "$expected_domains_jq" ]; then
+        if [ "$merged_domains" != "{}" ]; then
+            echo "  FAIL (expected no domain write, got):"
+            echo "$merged_domains" | jq . | sed 's/^/    /'
+            domain_check_ok=0
+        fi
+    else
+        local dcheck
+        dcheck=$(echo "$merged_domains" | jq -r "$expected_domains_jq" 2>&1 || echo "JQ_ERROR")
+        if [ "$dcheck" != "true" ]; then
+            echo "  FAIL — domain assertion did not pass (got: $dcheck)"
+            echo "  merged domains:"
+            echo "$merged_domains" | jq . | sed 's/^/    /'
+            echo "  jq filter: $expected_domains_jq"
+            domain_check_ok=0
+        fi
+    fi
+
+    if [ "$component_check_ok" = "1" ] && [ "$domain_check_ok" = "1" ]; then
+        if [ -z "$expected_jq" ]; then
+            echo "  OK (correctly skipped — no write)"
+        else
+            echo "  OK"
+            echo "  components:"
+            echo "$merged" | jq . | sed 's/^/    /'
+            if [ "$merged_domains" != "{}" ]; then
+                echo "  domains:"
+                echo "$merged_domains" | jq . | sed 's/^/    /'
+            fi
+        fi
         PASSED=$((PASSED + 1))
     else
-        echo "  FAIL — assertion did not pass (got: $check)"
-        echo "  merged output:"
-        echo "$merged" | jq . | sed 's/^/    /'
-        echo "  jq filter: $expected_jq"
         FAILED=$((FAILED + 1))
     fi
 }
 
 # ── Scenario: annotation match, defaults ──────────────────────────────────
+# Component refs domain "platform.payments"; no Domain entity in the file
+# with that metadata.name → empty domain stub keeps validateDomainRefs happy.
 run_scenario "annotation_match" "annotation_match" "github.com/acme/payment-api" \
-    '.["github.com/acme/payment-api"] | (.owner == "group:default/team-payments" and .domain == "platform.payments" and (.tags | sort) == (["bs-payments","bs-tier1","bs-type-service","bs-lifecycle-production"] | sort))'
+    '.["github.com/acme/payment-api"] | (.owner == "group:default/team-payments" and .domain == "platform.payments" and (.tags | sort) == (["bs-payments","bs-tier1","bs-type-service","bs-lifecycle-production"] | sort))' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
 # ── Scenario: single-Component-no-annotation fallback ─────────────────────
 # Component has no project-slug annotation, but it's the only Component in
-# the file → matcher falls back to it.
+# the file → matcher falls back to it. Domain is derived from spec.system
+# ("storefront") since spec.domain is absent — bare name, empty stub.
 run_scenario "single_component_no_annotation" "single_component_no_annotation" "github.com/acme/web-app" \
-    '.["github.com/acme/web-app"] | (.owner == "group:default/team-web" and .domain == "storefront" and (.tags | sort) == (["bs-frontend","bs-type-website","bs-lifecycle-production"] | sort))'
+    '.["github.com/acme/web-app"] | (.owner == "group:default/team-web" and .domain == "storefront" and (.tags | sort) == (["bs-frontend","bs-type-website","bs-lifecycle-production"] | sort))' \
+    'EXPECTED_DOMAINS_JQ=.["storefront"] == {}'
 
 # ── Scenario: owner_format=bare-name ──────────────────────────────────────
 run_scenario "owner_format_bare" "annotation_match" "github.com/acme/payment-api" \
     '.["github.com/acme/payment-api"].owner == "team-payments"' \
-    LUNAR_VAR_OWNER_FORMAT=bare-name
+    LUNAR_VAR_OWNER_FORMAT=bare-name \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
 # ── Scenario: default_owner fallback ──────────────────────────────────────
+# no_owner fixture has no spec.domain / spec.system → no domain emission.
 run_scenario "default_owner_fallback" "no_owner" "github.com/acme/orphan" \
     '.["github.com/acme/orphan"].owner == "fallback-team"' \
     LUNAR_VAR_DEFAULT_OWNER=fallback-team
@@ -189,11 +258,22 @@ run_scenario "default_owner_fallback" "no_owner" "github.com/acme/orphan" \
 # ── Scenario: include_derived_tags=false drops type-*/lifecycle-* ─────────
 run_scenario "no_derived_tags" "annotation_match" "github.com/acme/payment-api" \
     '.["github.com/acme/payment-api"].tags == ["bs-payments","bs-tier1"]' \
-    LUNAR_VAR_INCLUDE_DERIVED_TAGS=false
+    LUNAR_VAR_INCLUDE_DERIVED_TAGS=false \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
 # ── Scenario: multi-Component file, one entity matches our ID ─────────────
+# System "payments-platform" in the file doesn't match the domain name
+# "platform.payments", so the stub stays empty.
 run_scenario "multi_component_one_matches" "multi_component_one_matches" "github.com/acme/payment-api" \
-    '.["github.com/acme/payment-api"] | (.owner == "group:default/team-payments" and .domain == "platform.payments" and (.tags | index("bs-payments") != null) and (.tags | index("bs-tier1") != null))'
+    '.["github.com/acme/payment-api"] | (.owner == "group:default/team-payments" and .domain == "platform.payments" and (.tags | index("bs-payments") != null) and (.tags | index("bs-tier1") != null))' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: Domain entity in the same YAML → pull description + owner ──
+# A kind:Domain entity with metadata.name matching the component's
+# spec.domain populates the .domains entry instead of leaving it empty.
+run_scenario "domain_entity_in_yaml" "domain_entity_in_yaml" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].domain == "platform.payments"' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] | (.description == "Payments platform — billing, ledger, settlement" and .owner == "group:default/team-payments")'
 
 # ── Skip scenarios (expect no write) ──────────────────────────────────────
 # No file at any configured path (404 from GitHub Contents API)

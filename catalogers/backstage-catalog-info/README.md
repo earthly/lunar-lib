@@ -10,15 +10,16 @@ Because `component-cron` cannot create new components, pair this with a componen
 
 ## Synced Data
 
-This cataloger writes to the following Catalog JSON paths (on the **current** component only):
+This cataloger writes to the following Catalog JSON paths on each run:
 
 | Path | Type | Description |
 |------|------|-------------|
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
 | `.components["$LUNAR_COMPONENT_ID"].domain` | string | `spec.domain` of the matched Component (falls back to `spec.system` when `domain` is absent) |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
+| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
 
-This cataloger does **not** define new components and does **not** write to `.domains`. Both are out of scope for `component-cron` — use a global cataloger for those.
+This cataloger does **not** define new components — that's out of scope for `component-cron`. Pair with a component-defining cataloger (see [Layering](#layering-with-a-component-defining-cataloger)). Domain entries are written as stubs only; for a richer global domain catalog, layer with the [`backstage`](../backstage) cataloger.
 
 <details>
 <summary>Example Catalog JSON output (across multiple component runs)</summary>
@@ -36,6 +37,13 @@ This cataloger does **not** define new components and does **not** write to `.do
       "domain": "platform.frontend",
       "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
     }
+  },
+  "domains": {
+    "platform.payments": {
+      "description": "Payments platform — billing, ledger, settlement",
+      "owner": "group:default/team-payments"
+    },
+    "platform.frontend": {}
   }
 }
 ```

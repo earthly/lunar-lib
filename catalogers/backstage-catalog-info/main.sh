@@ -215,6 +215,54 @@ echo "Augmenting $COMPONENT_ID with:"
 echo "$ENTRY" | jq .
 
 # --- Write to Catalog JSON -------------------------------------------------
+# Hub `validateDomainRefs` rejects (and silently drops) the entire catalog
+# merge save if a component references a domain that isn't present under
+# `.domains`. Per-component runs accumulate via merge, so writing
+# `.domains["<name>"] = {…}` here dedupes naturally across runs.
+# If the same YAML carries a `kind: Domain` / `kind: System` entity with a
+# matching `metadata.name`, propagate its description + owner so the domain
+# row is informative rather than an empty stub.
+
+DOMAIN_NAME=$(echo "$ENTRY" | jq -r '.domain // ""')
+if [ -n "$DOMAIN_NAME" ]; then
+    DOMAIN_VALUE=$(echo "$ENTITIES" | jq \
+        --arg name "$DOMAIN_NAME" \
+        --arg owner_format "$OWNER_FORMAT" \
+        --arg default_owner "$DEFAULT_OWNER" \
+        '
+        def bare(s):
+            if (s | type) != "string" or s == "" then s
+            elif (s | contains("/")) then (s | split("/") | last)
+            else s
+            end;
+
+        def format_owner(o):
+            if $owner_format == "bare-name" then bare(o) else o end;
+
+        ([.[]
+          | select((.kind // "") == "Domain" or (.kind // "") == "System")
+          | select(((.metadata.name // "") | tostring) == $name)]
+         | first) as $d
+        | if $d == null then {}
+          else
+            (($d.spec.owner // "" | tostring) as $raw_owner
+             | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
+             | ($d.metadata.description // "" | tostring) as $desc
+             | ({}
+                + (if $desc != "" then {description: $desc} else {} end)
+                + (if $owner != "" then {owner: $owner} else {} end)))
+          end
+        ')
+    echo "Writing domain '$DOMAIN_NAME':"
+    echo "$DOMAIN_VALUE" | jq .
+    if echo "$DOMAIN_VALUE" | jq --arg name "$DOMAIN_NAME" '{($name): .}' | lunar catalog raw --json '.domains' -; then
+        echo "Wrote domain '$DOMAIN_NAME'"
+    else
+        echo "Failed to write domain '$DOMAIN_NAME'" >&2
+        exit 1
+    fi
+fi
+
 # Single keyed object under .components — the path takes a map, not a list.
 
 if echo "$ENTRY" | jq --arg id "$COMPONENT_ID" '{($id): .}' | lunar catalog raw --json '.components' -; then
