@@ -45,6 +45,9 @@ The probe is a no-op (exit 0, the `gh` command proceeds) when:
   title check happens.
 - The invocation includes `--draft` or `-d`. Drafts are work-in-progress
   by design — humans flip the PR to ready when the title is final.
+  Flip `enforce_drafts: true` (see [Configuration](#configuration)) if
+  your team treats drafts as real tracked work and wants the ticket
+  reference from creation.
 - The current branch matches a bot-author pattern: `dependabot/*` or
   `renovate/*`. These open PRs without ticket context on purpose.
 - The title is prefixed with `NO-TICKET:` (case-insensitive). Use this
@@ -98,10 +101,14 @@ for the full syntax.
 
 ## Configuration
 
-The ticket-reference pattern defaults to `[A-Z]+-\d+`, intentionally
-covering Linear (`ENG-123`), Jira (`ABC-42`), and any other
-`<PROJECT>-<NUMBER>` tracker. Override the `pattern` input on the
-`uses:` entry to narrow or broaden the regex:
+Both probes declare two inputs on the `uses:` entry; defaults are
+chosen to be most-permissive so the probe stays out of the way until
+you opt in to stricter behaviour.
+
+| Input | Default | Effect |
+|-------|---------|--------|
+| `pattern` | `[A-Z]+-\d+` | Regex the title must match anywhere. Default covers Linear (`ENG-123`), Jira (`ABC-42`), and any other `<PROJECT>-<NUMBER>` tracker. Narrow to constrain to specific projects. |
+| `enforce_drafts` | `false` | When `false`, `--draft` / `-d` invocations skip the title check (drafts are WIP, title settles before flip-to-ready). Set `true` to require the ticket reference on drafts too. |
 
 ```yaml
 probes:
@@ -110,16 +117,15 @@ probes:
     with:
       # Require leading [ENG-...] or [OPS-...] brackets specifically.
       pattern: '^\[(ENG|OPS)-\d+\]'
+      # Drafts must carry the ticket too — we track them as real work.
+      enforce_drafts: true
 ```
-
-Both `block` and `warn` declare the same `pattern` input, so a
-single `with:` block applies to whichever probe you `include:`.
 
 > `inputs:` / `with:` are currently parsed-but-reserved in
 > lunar-probe — the runner accepts them without error but doesn't
 > yet dispatch consumer overrides to checks (see [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)).
 > Until input dispatch ships, the check script runs against the
-> declared default; consumer overrides will activate automatically
+> declared defaults; consumer overrides will activate automatically
 > once the runner supports them, without a probe-side change.
 
 ## See also

@@ -36,6 +36,15 @@ probes:
           `\[(ENG|OPS)-\d+\]` to require leading `[ENG-...]` or
           `[OPS-...]` brackets only).
         default: '[A-Z]+-\d+'
+      enforce_drafts:
+        description: |
+          When `false` (default), `--draft` / `-d` invocations skip
+          the title check — drafts are work-in-progress and the
+          title is expected to settle before flip-to-ready. Set
+          `true` to require the ticket reference on draft PRs too
+          (useful when drafts are still tracked as real work and
+          should carry a ticket from creation).
+        default: 'false'
     check: scripts/check-pr-title.sh
     message: |-
       `gh pr create` rejected: PR title is missing a ticket reference.
@@ -50,7 +59,7 @@ probes:
         gh pr create --title "[ABC-123] <summary>" ...
 
       Exempt by design (probe will let these through):
-        - Drafts (`--draft` / `-d`)
+        - Drafts (`--draft` / `-d`) — unless `enforce_drafts: true`
         - Bot branches: `dependabot/*`, `renovate/*`
         - Titles prefixed with `NO-TICKET:` (use for genuinely
           ticket-less PRs — chore commits cut by humans, one-line
@@ -72,6 +81,15 @@ probes:
           `\[(ENG|OPS)-\d+\]` to require leading `[ENG-...]` or
           `[OPS-...]` brackets only).
         default: '[A-Z]+-\d+'
+      enforce_drafts:
+        description: |
+          When `false` (default), `--draft` / `-d` invocations skip
+          the title check — drafts are work-in-progress and the
+          title is expected to settle before flip-to-ready. Set
+          `true` to nudge on draft PRs too (useful when drafts are
+          still tracked as real work and should carry a ticket
+          from creation).
+        default: 'false'
     check: scripts/check-pr-title.sh
     message: |-
       Heads up: the PR you just opened with `gh pr create` is missing

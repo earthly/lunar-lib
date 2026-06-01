@@ -18,9 +18,11 @@ run_check() {
     # $1 = branch name
     # $2 = JSON payload (stdin)
     # $3 = LUNAR_VAR_PATTERN override (empty = unset)
+    # $4 = LUNAR_VAR_ENFORCE_DRAFTS override (empty = unset)
     branch="$1"
     payload="$2"
     pattern_env="$3"
+    enforce_drafts_env="${4:-}"
 
     tmp="$(mktemp -d)"
     (
@@ -32,11 +34,11 @@ run_check() {
         git checkout -q -b "$branch" 2>/dev/null
     ) >/dev/null 2>&1
 
-    if [ -n "$pattern_env" ]; then
-        RESULT_STDOUT="$(cd "$tmp" && printf '%s' "$payload" | LUNAR_VAR_PATTERN="$pattern_env" sh "$SCRIPT" 2>/dev/null)"
-    else
-        RESULT_STDOUT="$(cd "$tmp" && printf '%s' "$payload" | sh "$SCRIPT" 2>/dev/null)"
-    fi
+    set --
+    [ -n "$pattern_env" ]        && set -- "$@" "LUNAR_VAR_PATTERN=$pattern_env"
+    [ -n "$enforce_drafts_env" ] && set -- "$@" "LUNAR_VAR_ENFORCE_DRAFTS=$enforce_drafts_env"
+
+    RESULT_STDOUT="$(cd "$tmp" && printf '%s' "$payload" | env "$@" sh "$SCRIPT" 2>/dev/null)"
     RESULT_EXIT=$?
 
     rm -rf "$tmp"
@@ -199,6 +201,37 @@ assert "custom ^[(ENG|OPS)-N] + BLA-100 → block" 1 "[BLA-100] foo"
 
 run_check "main" '{"tool_input":{"command":"gh pr create --title \"ENG-7\""}}' '[A-Z]+-\d+'
 assert "custom pattern w/ PCRE \\d → allow (translated to [0-9])" 0 ""
+
+# ============================================================
+# Configurable enforce_drafts (forward-compat, when input dispatch ships)
+# ============================================================
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"Add probe\""}}' "" "true"
+assert "enforce_drafts=true + --draft + no ticket → block" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"gh pr create -d --title \"Add probe\""}}' "" "true"
+assert "enforce_drafts=true + -d + no ticket → block" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"[ENG-800] Add probe\""}}' "" "true"
+assert "enforce_drafts=true + --draft + ticket present → allow" 0 ""
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"Add probe\""}}' "" "1"
+assert "enforce_drafts=1 (truthy) + --draft + no ticket → block" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"Add probe\""}}' "" "TRUE"
+assert "enforce_drafts=TRUE (case-insensitive) + --draft + no ticket → block" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"Add probe\""}}' "" "false"
+assert "enforce_drafts=false (explicit) + --draft + no ticket → allow" 0 ""
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"Add probe\""}}' "" "no"
+assert "enforce_drafts=no (other falsy) + --draft + no ticket → allow" 0 ""
+
+run_check "main" '{"tool_input":{"command":"gh pr create --draft --title \"NO-TICKET: fix typo\""}}' "" "true"
+assert "enforce_drafts=true + --draft + NO-TICKET prefix → allow (allowlist wins)" 0 ""
+
+run_check "dependabot/npm/foo" '{"tool_input":{"command":"gh pr create --draft --title \"Bump foo\""}}' "" "true"
+assert "enforce_drafts=true + --draft + dependabot/* branch → allow (bot skip wins)" 0 ""
 
 # ============================================================
 # Report

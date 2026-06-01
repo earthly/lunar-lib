@@ -57,7 +57,14 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ "$draft" -eq 1 ] && exit 0
+# Drafts are skipped by default; consumer can flip `enforce_drafts: true`
+# to require the ticket reference on `--draft` / `-d` invocations too.
+if [ "$draft" -eq 1 ]; then
+    case "$(printf '%s' "${LUNAR_VAR_ENFORCE_DRAFTS:-false}" | tr '[:upper:]' '[:lower:]')" in
+        true|1) ;;       # fall through to ticket check
+        *)      exit 0 ;;
+    esac
+fi
 
 branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')"
 case "$branch" in
