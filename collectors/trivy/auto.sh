@@ -56,6 +56,10 @@ if [ "$SCAN_OK" != "true" ]; then
   exit 0
 fi
 
+# Preserve the raw Trivy JSON so policies can read fields we don't normalize
+# (CVSS scores, References, Description, CweIDs, DataSource, etc.).
+lunar collect -j ".sca.native.trivy.results" - < "$RESULTS_FILE"
+
 # Build source metadata JSON
 SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" '{
   tool: "trivy",
