@@ -96,6 +96,17 @@ inputs:
       `$LUNAR_COMPONENT_ID`.
     default: "github.com/"
 
+  domain_annotation:
+    description: |
+      Annotation key on a Backstage Component used to source the
+      domain when `spec.domain` is absent. Useful for orgs that
+      model domains via a custom annotation rather than the
+      canonical Backstage `spec.domain` field. When set and the
+      matched Component carries this annotation, its value wins
+      over `spec.domain` / `spec.system`. Leave empty to use the
+      canonical Backstage fields only.
+    default: ""
+
   tag_prefix:
     description: |
       Prefix added to Backstage `metadata.tags` when mapped to Lunar

@@ -15,7 +15,7 @@ This cataloger writes to the following Catalog JSON paths on each run:
 | Path | Type | Description |
 |------|------|-------------|
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
-| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `spec.domain` of the matched Component (falls back to `spec.system` when `domain` is absent) |
+| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system` when neither is set |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
 | `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
 
@@ -130,6 +130,19 @@ If the file has multiple `Component` entities and none are annotated, the catalo
 ### Restricting Synced Kinds
 
 This cataloger only processes `kind: Component` entities. `Domain`, `System`, `API`, `Resource`, `User`, `Group`, `Location`, etc. are ignored — they're either container-level concepts (handled by a global cataloger like [`backstage`](../backstage)) or not Lunar catalog concerns.
+
+### Sourcing the Domain from a Custom Annotation
+
+Some orgs model component domains via a custom annotation rather than the canonical Backstage `spec.domain` field — for example, to express a hierarchical name like `engineering.tooling.observability` that Backstage's flat `spec.domain` doesn't model well. Set `domain_annotation` to that key and the cataloger reads it from `metadata.annotations[<key>]`:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    with:
+      domain_annotation: "yourorg.example.com/domain"
+```
+
+When set and the matched Component has that annotation, its value wins over `spec.domain` / `spec.system`. When the annotation is absent on a given entity, the cataloger falls back to `spec.domain` then `spec.system` as usual. Leave `domain_annotation` empty (the default) to use only the canonical Backstage fields.
 
 ### Owner Format
 

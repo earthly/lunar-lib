@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
   components with owner / domain / tag metadata read from each repo's
   `catalog-info.yaml`, fetched via the GitHub Contents API on a
-  `component-cron` schedule (#181).
+  `component-cron` schedule (#181). Supports a `domain_annotation` input
+  for orgs that store a component's domain in a custom annotation rather
+  than the canonical Backstage `spec.domain` field.
 - This file. Going forward, every PR should add an entry under `[Unreleased]`
   for any user-visible change (new collector / policy / cataloger / probe,
   manifest schema change, breaking rename, new starter-pack, etc.). Internal

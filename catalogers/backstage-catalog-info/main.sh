@@ -23,6 +23,7 @@
 #   branch                   (default empty → repo's default branch)
 #   component_id_annotation  (default github.com/project-slug)
 #   component_id_prefix      (default github.com/)
+#   domain_annotation        (default empty → use spec.domain / spec.system)
 #   tag_prefix               (default bs-)
 #   include_derived_tags     (default true)
 #   owner_format             (default as-is) as-is | bare-name
@@ -39,6 +40,7 @@ PATHS="${LUNAR_VAR_PATHS:-catalog-info.yaml,catalog-info.yml}"
 BRANCH="${LUNAR_VAR_BRANCH:-}"
 COMPONENT_ID_ANNOTATION="${LUNAR_VAR_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
+DOMAIN_ANNOTATION="${LUNAR_VAR_DOMAIN_ANNOTATION:-}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
@@ -56,6 +58,7 @@ echo "Paths: $PATHS"
 [ -n "$BRANCH" ] && echo "Branch: $BRANCH"
 echo "Annotation key: $COMPONENT_ID_ANNOTATION"
 echo "Component id prefix: $COMPONENT_ID_PREFIX"
+[ -n "$DOMAIN_ANNOTATION" ] && echo "Domain annotation: $DOMAIN_ANNOTATION"
 echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
@@ -178,6 +181,7 @@ ENTRY=$(echo "$ENTITY" | jq \
     --arg include_derived "$INCLUDE_DERIVED_TAGS" \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
+    --arg domain_annotation "$DOMAIN_ANNOTATION" \
     '
     def bare(s):
         if (s | type) != "string" or s == "" then s
@@ -191,9 +195,13 @@ ENTRY=$(echo "$ENTITY" | jq \
     . as $e
     | (.spec.owner // "" | tostring) as $raw_owner
     | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
+    | (if ($domain_annotation | length) > 0
+        then ((.metadata.annotations // {})[$domain_annotation] // "" | tostring)
+        else "" end) as $annotated_domain
     | (.spec.domain // "" | tostring) as $raw_domain
     | (.spec.system // "" | tostring) as $raw_system
-    | (if ($raw_domain | length) > 0 then $raw_domain
+    | (if ($annotated_domain | length) > 0 then $annotated_domain
+        elif ($raw_domain | length) > 0 then $raw_domain
         elif ($raw_system | length) > 0 then bare($raw_system)
         else "" end) as $domain
     | (.metadata.tags // []) as $base_tags

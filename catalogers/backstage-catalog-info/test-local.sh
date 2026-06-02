@@ -275,6 +275,24 @@ run_scenario "domain_entity_in_yaml" "domain_entity_in_yaml" "github.com/acme/pa
     '.["github.com/acme/payment-api"].domain == "platform.payments"' \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] | (.description == "Payments platform — billing, ledger, settlement" and .owner == "group:default/team-payments")'
 
+# ── Scenario: domain_annotation sources domain from a custom annotation ───
+# Component has no spec.domain / spec.system but carries a custom
+# pantalasa.org/domain annotation. Setting domain_annotation makes the
+# cataloger pick up that annotation instead.
+run_scenario "domain_from_annotation" "domain_from_annotation" "github.com/acme/observability-gateway-dashboard" \
+    '.["github.com/acme/observability-gateway-dashboard"].domain == "engineering.tooling.observability"' \
+    LUNAR_VAR_DOMAIN_ANNOTATION=pantalasa.org/domain \
+    'EXPECTED_DOMAINS_JQ=.["engineering.tooling.observability"] == {}'
+
+# ── Scenario: domain_annotation falls back to spec.domain when absent ────
+# annotation_match has spec.domain=platform.payments and no custom domain
+# annotation. Setting domain_annotation to a key the entity doesn't carry
+# falls back to spec.domain.
+run_scenario "domain_annotation_fallback" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].domain == "platform.payments"' \
+    LUNAR_VAR_DOMAIN_ANNOTATION=pantalasa.org/domain \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
 # ── Skip scenarios (expect no write) ──────────────────────────────────────
 # No file at any configured path (404 from GitHub Contents API)
 run_scenario "skip_no_file" "NONE" "github.com/acme/payment-api" ""
