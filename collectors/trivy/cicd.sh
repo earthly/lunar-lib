@@ -33,3 +33,36 @@ lunar collect ".sca.source.integration" "ci"
 if [ -n "$TRIVY_VERSION" ] && [ "$TRIVY_VERSION" != "unknown" ]; then
     lunar collect ".sca.source.version" "$TRIVY_VERSION"
 fi
+
+# Capture raw scan output if Trivy wrote to a file we can find.
+# Trivy supports: -f|--format <fmt> -o|--output <file>, or shell redirect.
+OUTPUT_FORMAT=""
+OUTPUT_FILE=""
+
+# 1) -f json / --format json (also sarif)
+if echo "$CMD_STR" | grep -qE '(-f|--format)[[:space:]]+(json|sarif)([[:space:]]|$)'; then
+    OUTPUT_FORMAT=$(echo "$CMD_STR" | grep -oE '(-f|--format)[[:space:]]+(json|sarif)' | head -1 | awk '{print $2}')
+fi
+
+# 2) -o <file> / --output <file>
+if echo "$CMD_STR" | grep -qE '(-o|--output)[[:space:]]+[^[:space:]]+'; then
+    OUTPUT_FILE=$(echo "$CMD_STR" | grep -oE '(-o|--output)[[:space:]]+[^[:space:]]+' | head -1 | awk '{print $2}')
+fi
+
+# 3) Shell redirect: trivy ... > file.json
+if [ -z "$OUTPUT_FILE" ] && echo "$CMD_STR" | grep -qE '>[[:space:]]*[^[:space:]]+\.(json|sarif)'; then
+    OUTPUT_FILE=$(echo "$CMD_STR" | grep -oE '>[[:space:]]*[^[:space:]]+\.(json|sarif)' | head -1 | sed 's/>[[:space:]]*//')
+    [ -z "$OUTPUT_FORMAT" ] && OUTPUT_FORMAT="${OUTPUT_FILE##*.}"
+fi
+
+RAW_PATH=""
+case "$OUTPUT_FORMAT" in
+    json)  RAW_PATH=".sca.native.trivy.cicd.raw" ;;
+    sarif) RAW_PATH=".sca.native.trivy.cicd.sarif" ;;
+esac
+
+if [ -n "$RAW_PATH" ] && [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
+    echo "Collecting raw Trivy output from $OUTPUT_FILE (format: $OUTPUT_FORMAT)" >&2
+    lunar collect -j "$RAW_PATH" - < "$OUTPUT_FILE" || \
+        echo "Warning: Failed to collect raw Trivy output from $OUTPUT_FILE" >&2
+fi
