@@ -1,0 +1,42 @@
+version: 0
+
+name: ruff
+description: Lint Python files with Ruff after the agent edits a `.py` file.
+author: earthly
+
+landing_page:
+  display_name: "ruff Probe"
+  long_description: |
+    Run [Ruff](https://docs.astral.sh/ruff/) on every `.py` file the
+    agent edits — full default rule set, surfaced before the change
+    lands. Examples: unused imports, undefined names, pycodestyle
+    violations, formatting drift. Read-only, local-only, skip-safe
+    when `ruff` isn't installed.
+  categories: ["code-quality"]
+  icon: "assets/ruff.svg"
+  status: "beta"
+  related:
+    - slug: "python"
+      type: "collector"
+      reason: "CI-time Python linter detection. Probe is the agent-time complement."
+    - slug: "python"
+      type: "policy"
+      reason: "Gates on CI-collected Python lint findings. Probe catches it earlier."
+
+probes:
+  - name: lint
+    description: Run `ruff check` and `ruff format --check` on the edited Python file and block on findings.
+    keywords: ["python", "py", "ruff", "lint", "format", "static-analysis", "pyflakes", "pycodestyle"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.py"
+    check: scripts/lint-python-file.sh
+    message: |-
+      Ruff flagged issues in `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the finding and re-save the file. The probe will run again
+      automatically to re-evaluate `ruff check` and `ruff format --check`.
