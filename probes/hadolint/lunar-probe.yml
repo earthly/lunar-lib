@@ -1,0 +1,42 @@
+version: 0
+
+name: hadolint
+description: Lint Dockerfiles with hadolint after the agent edits a `Dockerfile*`.
+author: earthly
+
+landing_page:
+  display_name: "hadolint Probe"
+  long_description: |
+    Run [hadolint](https://github.com/hadolint/hadolint) on every
+    `Dockerfile*` the agent edits — full rule set plus embedded
+    ShellCheck for `RUN` blocks. Examples of what it catches:
+    `latest` tags, unpinned versions, layer bloat. Read-only,
+    local-only, skip-safe when `hadolint` isn't installed.
+  categories: ["code-quality"]
+  icon: "assets/hadolint.svg"
+  status: "beta"
+  related:
+    - slug: "docker"
+      type: "collector"
+      reason: "CI-time hadolint + Dockerfile detection. Probe is the agent-time complement."
+    - slug: "container"
+      type: "policy"
+      reason: "Gates on CI-collected hadolint findings. Probe catches it earlier."
+
+probes:
+  - name: lint
+    description: Run `hadolint` on the edited Dockerfile and block on findings.
+    keywords: ["docker", "dockerfile", "hadolint", "lint", "static-analysis", "container"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/Dockerfile*"
+    check: scripts/lint-dockerfile.sh
+    message: |-
+      hadolint flagged issues in `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the finding and re-save the file. The probe will run again
+      automatically to re-evaluate `hadolint`.
