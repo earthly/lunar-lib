@@ -35,18 +35,19 @@ if [ -n "$TRIVY_VERSION" ] && [ "$TRIVY_VERSION" != "unknown" ]; then
 fi
 
 # Capture raw scan output if Trivy wrote to a file we can find.
-# Trivy supports: -f|--format <fmt> -o|--output <file>, or shell redirect.
+# Trivy supports: -f|--format <fmt> -o|--output <file> (space or = form),
+# or shell redirect.
 OUTPUT_FORMAT=""
 OUTPUT_FILE=""
 
-# 1) -f json / --format json (also sarif)
-if echo "$CMD_STR" | grep -qE '(-f|--format)[[:space:]]+(json|sarif)([[:space:]]|$)'; then
-    OUTPUT_FORMAT=$(echo "$CMD_STR" | grep -oE '(-f|--format)[[:space:]]+(json|sarif)' | head -1 | awk '{print $2}')
+# 1) -f json / --format json / --format=json (also sarif)
+if echo "$CMD_STR" | grep -qE '(-f|--format)[[:space:]=]+(json|sarif)([[:space:]]|$)'; then
+    OUTPUT_FORMAT=$(echo "$CMD_STR" | grep -oE '(-f|--format)[[:space:]=]+(json|sarif)' | head -1 | sed -E 's/(-f|--format)[[:space:]=]+//')
 fi
 
-# 2) -o <file> / --output <file>
-if echo "$CMD_STR" | grep -qE '(-o|--output)[[:space:]]+[^[:space:]]+'; then
-    OUTPUT_FILE=$(echo "$CMD_STR" | grep -oE '(-o|--output)[[:space:]]+[^[:space:]]+' | head -1 | awk '{print $2}')
+# 2) -o <file> / --output <file> / --output=<file>
+if echo "$CMD_STR" | grep -qE '(-o|--output)[[:space:]=]+[^[:space:]=]+'; then
+    OUTPUT_FILE=$(echo "$CMD_STR" | grep -oE '(-o|--output)[[:space:]=]+[^[:space:]=]+' | head -1 | sed -E 's/(-o|--output)[[:space:]=]+//')
 fi
 
 # 3) Shell redirect: trivy ... > file.json
