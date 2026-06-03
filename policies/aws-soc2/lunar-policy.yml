@@ -1,0 +1,152 @@
+version: 0
+
+name: aws-soc2
+description: AWS SOC 2 infrastructure controls enforced against Terraform IaC
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "AWS SOC 2 Guardrails"
+  long_description: |
+    Enforce SOC 2 AWS infrastructure controls on your Terraform: encryption at
+    rest for EBS volumes and snapshots, CloudTrail, GuardDuty, VPC flow logs, S3
+    public-access blocking and access logging, security-group ingress limits,
+    EKS/RDS/ELB logging, HTTPS-only load balancers, and WAF on public ALBs.
+  category: "security-and-compliance"
+  icon: "assets/aws-soc2.svg"
+  status: "beta"
+  requires:
+    - slug: "terraform"
+      type: "collector"
+      reason: "Provides parsed Terraform HCL for AWS resources"
+
+  related:
+    - slug: "iac"
+      type: "policy"
+      reason: "Generic IaC guardrails (validity, WAF, destroy protection)"
+    - slug: "terraform"
+      type: "policy"
+      reason: "Terraform-specific guardrails (providers, modules, backend)"
+
+policies:
+  - name: alb-waf-enabled
+    description: |
+      Requires every internet-facing Application Load Balancer to have an AWS WAF
+      web ACL associated. Unprotected public ALBs are exposed to common web
+      exploits such as SQL injection and cross-site scripting.
+    mainPython: alb_waf_enabled.py
+    keywords: ["aws waf", "alb", "application load balancer", "web acl", "soc2", "owasp"]
+
+  - name: cloudtrail-multi-region
+    description: |
+      Requires a multi-region CloudTrail trail that delivers events to CloudWatch
+      Logs, so API activity is captured across every region and available for
+      monitoring and alerting.
+    mainPython: cloudtrail_multi_region.py
+    keywords: ["cloudtrail", "multi-region", "cloudwatch", "audit log", "aws api", "soc2"]
+
+  - name: security-group-no-public-postgres
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to the PostgreSQL port. Databases must never be reachable directly
+      from the public internet.
+    mainPython: security_group_no_public_postgres.py
+    keywords: ["security group", "postgresql", "5432", "ingress", "public access", "soc2"]
+
+  - name: security-group-no-public-ssh
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to the SSH port. SSH must be reached through a bastion or VPN, never
+      open to the entire internet.
+    mainPython: security_group_no_public_ssh.py
+    keywords: ["security group", "ssh", "port 22", "ingress", "public access", "soc2"]
+
+  - name: eks-control-plane-logging
+    description: |
+      Requires EKS clusters to enable control-plane logging to CloudWatch for the
+      required log types (api, audit, authenticator, controllerManager,
+      scheduler), giving auditable visibility into cluster activity.
+    mainPython: eks_control_plane_logging.py
+    keywords: ["eks", "kubernetes", "control plane logging", "cloudwatch", "audit", "soc2"]
+
+  - name: elb-access-logging
+    description: |
+      Requires Elastic Load Balancers to have access logging enabled so request
+      traffic is recorded to S3 for audit, troubleshooting, and security
+      investigations.
+    mainPython: elb_access_logging.py
+    keywords: ["elb", "load balancer", "access logging", "s3 logs", "audit", "soc2"]
+
+  - name: ebs-snapshot-encryption
+    description: |
+      Requires EBS snapshots to be encrypted at rest. Snapshots inherit data from
+      their source volumes and must not leave that data unencrypted when copied
+      or shared.
+    mainPython: ebs_snapshot_encryption.py
+    keywords: ["ebs snapshot", "encryption at rest", "kms", "data protection", "aws", "soc2"]
+
+  - name: ebs-volume-encryption
+    description: |
+      Requires EBS volumes (standalone and instance block devices) to be
+      encrypted at rest, protecting data on disk with KMS-managed keys.
+    mainPython: ebs_volume_encryption.py
+    keywords: ["ebs volume", "encryption at rest", "kms", "ec2 disk", "data protection", "soc2"]
+
+  - name: elb-https-only
+    description: |
+      Requires load balancers to enforce encrypted transport. HTTP listeners must
+      redirect to HTTPS, and listeners must use HTTPS/TLS so traffic in transit is
+      never sent in cleartext.
+    mainPython: elb_https_only.py
+    keywords: ["elb", "https", "tls", "encryption in transit", "load balancer listener", "soc2"]
+
+  - name: guardduty-enabled
+    description: |
+      Requires Amazon GuardDuty to be enabled so the account has continuous
+      threat detection across CloudTrail, VPC flow, and DNS telemetry.
+    mainPython: guardduty_enabled.py
+    keywords: ["guardduty", "threat detection", "aws security", "monitoring", "detector", "soc2"]
+
+  - name: rds-cloudwatch-logging
+    description: |
+      Requires RDS instances and clusters to export database logs to CloudWatch,
+      so engine, audit, and error logs are retained off-host for monitoring.
+    mainPython: rds_cloudwatch_logging.py
+    keywords: ["rds", "cloudwatch logs", "database logging", "log exports", "audit", "soc2"]
+
+  - name: s3-block-public-access
+    description: |
+      Requires every S3 bucket to have public access fully blocked through a
+      public access block configuration, preventing accidental public exposure of
+      stored objects.
+    mainPython: s3_block_public_access.py
+    keywords: ["s3", "public access block", "bucket security", "data exposure", "aws", "soc2"]
+
+  - name: s3-access-logging
+    description: |
+      Requires S3 buckets to have server access logging enabled, recording every
+      request to a logging bucket for audit and forensic purposes.
+    mainPython: s3_access_logging.py
+    keywords: ["s3", "server access logging", "audit log", "bucket logging", "aws", "soc2"]
+
+  - name: vpc-flow-logs
+    description: |
+      Requires every VPC to have flow logs enabled, capturing accepted and
+      rejected network traffic for security monitoring and incident response.
+    mainPython: vpc_flow_logs.py
+    keywords: ["vpc", "flow logs", "network monitoring", "cloudwatch", "traffic audit", "soc2"]
+
+inputs:
+  ssh_port:
+    description: TCP port treated as SSH for the public-ingress check
+    default: "22"
+  postgres_port:
+    description: TCP port treated as PostgreSQL for the public-ingress check
+    default: "5432"
+  eks_required_log_types:
+    description: Comma-separated EKS control-plane log types that must be enabled
+    default: "api,audit,authenticator,controllerManager,scheduler"
+  require_cloudtrail_cloudwatch:
+    description: Whether CloudTrail must also deliver logs to CloudWatch Logs (true/false)
+    default: "true"
