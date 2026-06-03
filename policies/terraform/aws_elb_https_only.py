@@ -8,7 +8,7 @@ _SECURE = ("https", "tls", "ssl")
 
 
 def main(node=None):
-    c = Check("elb-https-only", "Load balancers enforce HTTPS/TLS", node=node)
+    c = Check("aws-elb-https-only", "Load balancers enforce HTTPS/TLS", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

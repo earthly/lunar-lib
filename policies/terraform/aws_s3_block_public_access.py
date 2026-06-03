@@ -8,7 +8,7 @@ _FLAGS = ("block_public_acls", "block_public_policy", "ignore_public_acls", "res
 
 
 def main(node=None):
-    c = Check("s3-block-public-access", "S3 buckets block public access", node=node)
+    c = Check("aws-s3-block-public-access", "S3 buckets block public access", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

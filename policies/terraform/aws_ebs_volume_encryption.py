@@ -5,7 +5,7 @@ from helpers import iter_resources, block, truthy
 
 
 def main(node=None):
-    c = Check("ebs-volume-encryption", "EBS volumes are encrypted at rest", node=node)
+    c = Check("aws-ebs-volume-encryption", "EBS volumes are encrypted at rest", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

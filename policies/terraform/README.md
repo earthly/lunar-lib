@@ -21,20 +21,20 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
-| `cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
-| `security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
-| `security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
-| `eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
-| `elb-access-logging` | Load balancers log access requests | `aws_lb` / `aws_elb` without access logging enabled |
-| `ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
-| `ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
-| `elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect |
-| `guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
-| `rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
-| `s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
-| `s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
-| `vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
+| `aws-alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
+| `aws-cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
+| `aws-security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
+| `aws-security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
+| `aws-eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
+| `aws-elb-access-logging` | Load balancers log access requests | `aws_lb` / `aws_elb` without access logging enabled |
+| `aws-ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
+| `aws-ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
+| `aws-elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect |
+| `aws-guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
+| `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
+| `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
+| `aws-s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
+| `aws-vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
 
 ## Required Data
 

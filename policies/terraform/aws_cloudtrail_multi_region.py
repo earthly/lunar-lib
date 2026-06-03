@@ -5,7 +5,7 @@ from helpers import iter_resources, truthy
 
 
 def main(node=None):
-    c = Check("cloudtrail-multi-region", "CloudTrail is multi-region and ships to CloudWatch", node=node)
+    c = Check("aws-cloudtrail-multi-region", "CloudTrail is multi-region and ships to CloudWatch", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

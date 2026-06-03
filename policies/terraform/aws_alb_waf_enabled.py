@@ -5,7 +5,7 @@ from helpers import iter_resources, references, truthy
 
 
 def main(node=None):
-    c = Check("alb-waf-enabled", "Public ALBs have a WAF web ACL associated", node=node)
+    c = Check("aws-alb-waf-enabled", "Public ALBs have a WAF web ACL associated", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

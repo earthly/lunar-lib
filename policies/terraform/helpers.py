@@ -154,6 +154,33 @@ def has_resource(native_files_node, *rtypes):
     return False
 
 
+def iter_module_calls(native_files_node, *source_substrings):
+    """Yield ``(name, config)`` for ``module`` blocks whose ``source`` matches.
+
+    With no substrings, yields every module call. Used so checks can evaluate
+    module-provisioned infrastructure (e.g. ``terraform-aws-modules/eks``) by
+    reading the module's input arguments, rather than skipping because the
+    underlying ``aws_*`` resource lives inside the module and isn't in the HCL.
+    """
+    if not native_files_node.exists():
+        return
+    for f in native_files_node:
+        hcl = f.get_node(".hcl")
+        if not hcl.exists():
+            continue
+        raw = hcl.get_value()
+        if not isinstance(raw, dict):
+            continue
+        modules = raw.get("module")
+        if not isinstance(modules, dict):
+            continue
+        for mname, configs in modules.items():
+            for cfg in as_blocks(configs):
+                src = str(cfg.get("source", ""))
+                if not source_substrings or any(s in src for s in source_substrings):
+                    yield mname, cfg
+
+
 def block(cfg, key):
     """Return nested block(s) under ``key`` as a list of dicts."""
     return as_blocks(cfg.get(key))
@@ -164,11 +191,23 @@ def references(value, rtype, name=None):
 
     Handles interpolation strings (``"${aws_s3_bucket.logs.id}"``) and lists of
     them. With ``name`` omitted, matches any reference to the type.
+
+    Matches on whole address segments so ``aws_lb.web`` does NOT match
+    ``${aws_lb.web2.arn}`` — a resource reference always carries a trailing
+    attribute/index, or is the bare address itself.
     """
-    needle = "{}.{}".format(rtype, name) if name else rtype
     if isinstance(value, list):
         return any(references(v, rtype, name) for v in value)
-    return isinstance(value, str) and needle in value
+    if not isinstance(value, str):
+        return False
+    if name is None:
+        return "{}.".format(rtype) in value or "{}[".format(rtype) in value
+    target = "{}.{}".format(rtype, name)
+    return (
+        (target + ".") in value      # ${aws_lb.web.arn}
+        or (target + "[") in value   # ${aws_lb.web[0].arn}
+        or value.strip("${} \t") == target  # bare ${aws_lb.web}
+    )
 
 
 def as_int(value):

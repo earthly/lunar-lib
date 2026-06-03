@@ -5,7 +5,7 @@ from helpers import iter_resources, references, block
 
 
 def main(node=None):
-    c = Check("s3-access-logging", "S3 buckets have server access logging", node=node)
+    c = Check("aws-s3-access-logging", "S3 buckets have server access logging", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():

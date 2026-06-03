@@ -5,7 +5,7 @@ from helpers import iter_resources, truthy
 
 
 def main(node=None):
-    c = Check("guardduty-enabled", "GuardDuty detector is enabled", node=node)
+    c = Check("aws-guardduty-enabled", "GuardDuty detector is enabled", node=node)
     with c:
         native = c.get_node(".iac.native.terraform.files")
         if not native.exists():
