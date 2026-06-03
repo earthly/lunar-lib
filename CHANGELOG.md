@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SSH/PostgreSQL, EKS/RDS/ELB logging, HTTPS-only load balancers, and WAF on
   public ALBs. Reads `.iac.native.terraform.files` from the `terraform`
   collector. Spec-only PR (manifest + README + icon); implementation follows
-  spec approval.
+  spec approval (#192).
 - New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
   components with owner / domain / tag metadata read from each repo's
   `catalog-info.yaml`, fetched via the GitHub Contents API on a
