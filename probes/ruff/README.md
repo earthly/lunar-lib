@@ -54,12 +54,6 @@ This is `lunar-probe`'s first-class `requires:` mechanism (engine
 support landed in `earthly/lunar-probe` ENG-761), not a bespoke guard —
 it keeps every probe's missing-dependency reporting uniform.
 
-The probe is a genuine silent no-op (edit proceeds, nothing recorded)
-only when:
-
-- The edited file does not match `**/*.py`.
-- The file no longer exists on disk by the time `check:` runs (mid-edit race — rare, but the script bails cleanly).
-
 ## Installation
 
 Prereq: `lunar-probe` itself must be installed on your box and wired
