@@ -67,7 +67,34 @@ example_component_json: |
       "source": {
         "tool": "snyk",
         "version": "1.1200.0",
-        "integration": "github_app"
+        "integration": "ci"
+      },
+      "vulnerabilities": {
+        "critical": 1,
+        "high": 1,
+        "medium": 1,
+        "low": 0,
+        "total": 3
+      },
+      "findings": [
+        {
+          "severity": "critical",
+          "package": "minimist",
+          "version": "1.2.0",
+          "ecosystem": "npm",
+          "cve": "CVE-2021-44906",
+          "snyk_id": "SNYK-JS-MINIMIST-2",
+          "title": "Prototype Pollution",
+          "fix_version": "1.2.6",
+          "fixable": true
+        }
+      ],
+      "summary": {
+        "has_critical": true,
+        "has_high": true,
+        "has_medium": true,
+        "has_low": false,
+        "all_fixable": false
       },
       "native": {
         "snyk": {
@@ -78,8 +105,12 @@ example_component_json: |
           },
           "cicd": {
             "cmds": [
-              {"cmd": "snyk test --all-projects", "version": "1.1200.0"}
-            ]
+              {"cmd": "snyk test --all-projects --json-file-output=snyk-sca.json", "version": "1.1200.0"}
+            ],
+            "raw": {
+              "vulnerabilities": ["...full Snyk JSON output..."],
+              "ok": false
+            }
           }
         }
       }
