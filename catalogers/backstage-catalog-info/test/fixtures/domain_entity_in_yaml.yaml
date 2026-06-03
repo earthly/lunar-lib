@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: platform.payments
+  description: Payments platform — billing, ledger, settlement
+spec:
+  owner: group:default/team-payments
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  annotations:
+    github.com/project-slug: acme/payment-api
+  tags:
+    - payments
+spec:
+  type: service
+  owner: group:default/team-payments
+  lifecycle: production
+  domain: platform.payments
