@@ -28,9 +28,35 @@ shows up as `ruff.lint` in `lunar-probe logs`, PR check titles, and
 
 ## Skip-safe behaviour
 
-The probe is a no-op (exit 0, edit proceeds) when:
+The probe never breaks the agent session when Ruff is absent — but it
+does **not** disappear silently either. The manifest declares its
+dependency:
 
-- `ruff` is not on `PATH` — repos without Ruff installed never see this probe fire.
+```yaml
+requires:
+  - tool: ruff
+    install_hint: "pip install ruff  (or: uv tool install ruff / brew install ruff)"
+```
+
+When `ruff` isn't on `PATH`, `lunar-probe` short-circuits the check
+(the edit still proceeds) and records a breadcrumb. At session-end it
+surfaces a single consolidated reminder to the agent, install hint
+included, so a missing linter is visible rather than a silent gap in
+coverage:
+
+```
+⚠ Skipped probes (missing dependencies):
+- ruff.lint: missing `ruff` on PATH
+  install: pip install ruff  (or: uv tool install ruff / brew install ruff)
+```
+
+This is `lunar-probe`'s first-class `requires:` mechanism (engine
+support landed in `earthly/lunar-probe` ENG-761), not a bespoke guard —
+it keeps every probe's missing-dependency reporting uniform.
+
+The probe is a genuine silent no-op (edit proceeds, nothing recorded)
+only when:
+
 - The edited file does not match `**/*.py`.
 - The file no longer exists on disk by the time `check:` runs (mid-edit race — rare, but the script bails cleanly).
 

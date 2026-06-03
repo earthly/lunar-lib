@@ -30,6 +30,9 @@ probes:
     hook:
       type: agent-after-file-edit
       paths: "**/*.py"
+    requires:
+      - tool: ruff
+        install_hint: "pip install ruff  (or: uv tool install ruff / brew install ruff)"
     check: scripts/lint-python-file.sh
     message: |-
       Ruff flagged issues in `{file}`:
