@@ -17,24 +17,24 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `remote-backend` | Remote backend configured | No `terraform { backend {} }` block found |
 | `min-provider-versions` | Providers meet minimum version requirements | Provider version constraint below required minimum |
 
-The checks below are AWS resource security guardrails. Each maps to a SOC 2 / Secureframe control and is individually includable — a future SOC 2 starter-pack can bundle them all:
+The checks below are AWS resource security guardrails relevant to SOC 2 (tagged with the `soc2` keyword). Each is individually includable — a future SOC 2 starter-pack can bundle them all:
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `alb-waf-enabled` | Public ALBs have a WAF web ACL associated (SOC 2) | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
-| `cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch (SOC 2) | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
-| `security-group-no-public-postgres` | No public ingress to PostgreSQL (SOC 2) | A security group allows `0.0.0.0/0` to port 5432 |
-| `security-group-no-public-ssh` | No public ingress to SSH (SOC 2) | A security group allows `0.0.0.0/0` to port 22 |
-| `eks-control-plane-logging` | EKS control-plane logging enabled (SOC 2) | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
-| `elb-access-logging` | Load balancers log access requests (SOC 2) | `aws_lb` / `aws_elb` without access logging enabled |
-| `ebs-snapshot-encryption` | EBS snapshots encrypted at rest (SOC 2) | `aws_ebs_snapshot` without `encrypted = true` |
-| `ebs-volume-encryption` | EBS volumes encrypted at rest (SOC 2) | `aws_ebs_volume` or block device without `encrypted = true` |
-| `elb-https-only` | Load balancers enforce HTTPS/TLS (SOC 2) | Plaintext HTTP listener without an HTTPS redirect |
-| `guardduty-enabled` | GuardDuty detector enabled (SOC 2) | No `aws_guardduty_detector` with `enable = true` |
-| `rds-cloudwatch-logging` | RDS exports logs to CloudWatch (SOC 2) | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
-| `s3-block-public-access` | S3 buckets block public access (SOC 2) | Bucket without a full `aws_s3_bucket_public_access_block` |
-| `s3-access-logging` | S3 buckets log access requests (SOC 2) | Bucket without server access logging configured |
-| `vpc-flow-logs` | VPCs have flow logs enabled (SOC 2) | `aws_vpc` without a matching `aws_flow_log` |
+| `alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
+| `cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
+| `security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
+| `security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
+| `eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
+| `elb-access-logging` | Load balancers log access requests | `aws_lb` / `aws_elb` without access logging enabled |
+| `ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
+| `ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
+| `elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect |
+| `guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
+| `rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
+| `s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
+| `s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
+| `vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
 
 ## Required Data
 
