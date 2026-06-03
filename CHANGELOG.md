@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New probe (beta): `vscode-trust` — gates the on-disk artifacts behind the
+  github.dev 1-click GitHub token-steal (workspace-local VSCode extensions and
+  active-content Jupyter notebooks), both in the agent loop and as a PR gate
+  (#193).
 - New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
   components with owner / domain / tag metadata read from each repo's
   `catalog-info.yaml`, fetched via the GitHub Contents API on a
