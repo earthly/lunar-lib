@@ -25,7 +25,11 @@ policies:
     runPython: |
       from lunar_policy import Check
       with Check("readme-exists", "README.md should exist") as c:
-          c.assert_true(c.get_value(".repo.readme_exists"), "README.md not found")
+          node = c.get_node(".repo.readme.exists")
+          c.assert_true(
+              node.exists() and bool(node.get_value()),
+              "README.md not found",
+          )
     on: ["domain:payments"]
     enforcement: block-pr
 
@@ -261,9 +265,15 @@ All assertions record their result and continue execution (they don't raise exce
 #### assert_true(value, failure_message)
 
 ```python
-c.assert_true(c.get_value(".repo.readme_exists"), "README.md not found")
 c.assert_true(coverage >= 80, f"Coverage {coverage}% is below 80%")
 ```
+
+> **Heads-up about `.exists` bool fields:** passing the raw result of
+> `c.get_value(".some.path.exists")` to `assert_true` looks ergonomic but
+> turns into an **Error** state if the path is missing after workflows
+> finished (raw `ValueError` from `get_value` bubbles through). Use the
+> `get_node()` form shown below under
+> [Pattern 1: Boolean Value vs Data Existence](#pattern-1-boolean-value-vs-data-existence) instead.
 
 #### assert_false(value, failure_message)
 
@@ -729,17 +739,28 @@ for label in required:
 
 **Case A: Collector writes explicit true/false values**
 
-When a collector explicitly writes both success and failure cases (e.g., `lunar collect -j ".repo.readme_exists" false`), use `assert_true` on the value:
+When a collector explicitly writes both success and failure cases (e.g., `lunar collect -j ".repo.readme.exists" false`), reach for `get_node()` and combine `.exists()` with `.get_value()`:
 
 ```python
 from lunar_policy import Check
 
-# Works because the readme collector writes: 
+# Works because the readme collector writes:
 #   - true if README exists
 #   - false if README is missing
 with Check("readme-exists", "Repository should have a README") as c:
-    c.assert_true(c.get_value(".repo.readme_exists"), "README.md not found")
+    node = c.get_node(".repo.readme.exists")
+    c.assert_true(
+        node.exists() and bool(node.get_value()),
+        "README.md not found",
+    )
 ```
+
+> **Why not `assert_true(c.get_value(".repo.readme.exists"))`?** If the path
+> is missing after workflows have finished, `get_value()` raises a raw
+> `ValueError` that the `Check` context manager turns into an **Error** state
+> instead of a clean `FAIL`. Going through `get_node()` lets `.exists()`
+> swallow the `ValueError` and lets us produce a plain `FAIL` (or `PENDING`
+> while workflows are still running) instead of an opaque error.
 
 **Case B: Collector only writes on success (absence = failure)**
 
@@ -756,8 +777,9 @@ with Check("sca-scanner-ran", "SCA scanner should run in CI") as c:
 ```
 
 **Rule of thumb:**
-- Use `assert_true(get_value(...))` when the collector writes both `true` and `false`
-- Use `assert_exists(...)` when data absence indicates failure
+- Use the `get_node(...).exists() and bool(get_node(...).get_value())` pair (see Case A) when the collector writes both `true` and `false` — keeps a missing path as `PENDING`/`FAIL` instead of `Error`.
+- Use `assert_exists(...)` when data absence indicates failure.
+- **Do not** pass `c.get_value(".some.path.exists")` straight into `assert_true` — a missing path turns into an `Error`, not a clean failure.
 
 **Avoid `get_value_or_default` for existence checks.** It's tempting to write:
 
@@ -822,7 +844,11 @@ from lunar_policy import Check
 def main(node=None):
     c = Check("readme-exists", "README should exist", node=node)
     with c:
-        c.assert_true(c.get_value(".repo.readme_exists"), "README.md not found")
+        readme_exists = c.get_node(".repo.readme.exists")
+        c.assert_true(
+            readme_exists.exists() and bool(readme_exists.get_value()),
+            "README.md not found",
+        )
     return c
 
 if __name__ == "__main__":
@@ -946,18 +972,22 @@ def check_readme(node=None):
     """The policy function - accepts optional node for testing."""
     c = Check("readme-exists", node=node)
     with c:
-        c.assert_true(c.get_value(".repo.readme_exists"), "README not found")
+        readme_exists = c.get_node(".repo.readme.exists")
+        c.assert_true(
+            readme_exists.exists() and bool(readme_exists.get_value()),
+            "README not found",
+        )
     return c
 
 class TestReadmePolicy(unittest.TestCase):
     def test_readme_exists_passes(self):
-        data = {"repo": {"readme_exists": True}}
+        data = {"repo": {"readme": {"exists": True}}}
         node = Node.from_component_json(data)
         check = check_readme(node)
         self.assertEqual(check.status, CheckStatus.PASS)
 
     def test_readme_missing_fails(self):
-        data = {"repo": {"readme_exists": False}}
+        data = {"repo": {"readme": {"exists": False}}}
         node = Node.from_component_json(data)
         check = check_readme(node)
         self.assertEqual(check.status, CheckStatus.FAIL)

@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: observability-gateway-dashboard
+  annotations:
+    github.com/project-slug: acme/observability-gateway-dashboard
+    pantalasa.org/domain: engineering.tooling.observability
+spec:
+  type: service
+  owner: matthew.allen@pantalasa.org
+  lifecycle: production

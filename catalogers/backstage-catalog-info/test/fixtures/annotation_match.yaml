@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  description: Payment processing API
+  annotations:
+    github.com/project-slug: acme/payment-api
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - payments
+    - tier1
+spec:
+  type: service
+  owner: group:default/team-payments
+  lifecycle: production
+  domain: platform.payments
+  system: payments-platform

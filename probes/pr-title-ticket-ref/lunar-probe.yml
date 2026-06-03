@@ -1,0 +1,88 @@
+version: 0
+
+name: pr-title-ticket-ref
+description: Block `gh pr create` when the PR title lacks a ticket reference (default pattern matches Linear/Jira/etc. tracker tokens).
+author: earthly
+
+landing_page:
+  display_name: "PR Title Ticket Ref Probe"
+  long_description: |
+    Intercept `gh pr create` and block (or warn) when the PR title is
+    missing a ticket reference like `ENG-123`. Skip-safe on drafts, bot
+    branches (`dependabot/*`, `renovate/*`), and an `NO-TICKET:`
+    allowlist prefix. Catches untraceable PRs before they exist.
+  categories: ["authoring"]
+  icon: "assets/pr-title-ticket-ref.svg"
+  status: "beta"
+  related:
+    - slug: "ticket"
+      type: "policy"
+      reason: "CI-time gate on ticket presence; probe is the agent-time complement."
+
+inputs:
+  pattern:
+    description: |
+      Regex the PR title must match anywhere. Default covers
+      Linear/Jira-style `<PROJECT>-<NUMBER>` tokens. Override
+      to constrain to specific projects (e.g.
+      `\[(ENG|OPS)-\d+\]` to require leading `[ENG-...]` or
+      `[OPS-...]` brackets only).
+    default: '[A-Z]+-\d+'
+  enforce_drafts:
+    description: |
+      When `false` (default), `--draft` / `-d` invocations skip
+      the title check — drafts are work-in-progress and the
+      title is expected to settle before flip-to-ready. Set
+      `true` to require the ticket reference on draft PRs too
+      (useful when drafts are still tracked as real work and
+      should carry a ticket from creation).
+    default: 'false'
+
+probes:
+  - name: block
+    description: Block `gh pr create` when the title lacks a ticket reference (default pattern matches Linear/Jira-style tracker tokens).
+    keywords: ["pr", "github", "ticket", "linear", "title", "traceability", "gh"]
+    hook:
+      type: agent-before-command
+      binary:
+        name: gh
+    check: scripts/check-pr-title.sh
+    message: |-
+      `gh pr create` rejected: PR title is missing a ticket reference.
+
+      Title:    `{check_stdout}`
+      Expected: a ticket token (e.g. `[ABC-123]`) somewhere in the
+      title — see the `pattern` input for the exact regex.
+
+      If the current branch already encodes the ticket (e.g.
+      `feat/abc-123-...`), reuse it in the title:
+
+        gh pr create --title "[ABC-123] <summary>" ...
+
+      Exempt by design (probe will let these through):
+        - Drafts (`--draft` / `-d`) — unless `enforce_drafts: true`
+        - Bot branches: `dependabot/*`, `renovate/*`
+        - Titles prefixed with `NO-TICKET:` (use for genuinely
+          ticket-less PRs — chore commits cut by humans, one-line
+          README fixes, etc.)
+
+  - name: warn
+    description: Soft-nudge alternative to `block` — warns after `gh pr create` when the title lacks a ticket reference.
+    keywords: ["pr", "github", "ticket", "linear", "title", "traceability", "gh", "soft-warn"]
+    hook:
+      type: agent-after-command
+      binary:
+        name: gh
+    check: scripts/check-pr-title.sh
+    message: |-
+      Heads up: the PR you just opened with `gh pr create` is missing
+      a ticket reference in the title.
+
+      Title: `{check_stdout}`
+
+      Consider editing the PR to add a ticket prefix for traceability:
+
+        gh pr edit <num> --title "[XXXXXX] <original title>"
+
+      Pick `block` instead of `warn` in your `.lunar/probes.yml` if you
+      want this to be a hard rejection at `gh pr create` time.

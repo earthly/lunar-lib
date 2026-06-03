@@ -1,0 +1,37 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: payments-platform
+spec:
+  owner: group:default/team-payments
+  domain: platform.payments
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  annotations:
+    github.com/project-slug: acme/payment-api
+  tags:
+    - payments
+    - tier1
+spec:
+  type: service
+  owner: group:default/team-payments
+  lifecycle: production
+  domain: platform.payments
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-worker
+  annotations:
+    github.com/project-slug: acme/payment-worker
+  tags:
+    - payments
+    - background
+spec:
+  type: service
+  owner: group:default/team-payments
+  lifecycle: production
+  domain: platform.payments

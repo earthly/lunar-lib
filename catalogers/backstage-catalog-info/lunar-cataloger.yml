@@ -1,0 +1,150 @@
+version: 0
+
+name: backstage-catalog-info
+description: Augments existing Lunar components with metadata read from each repo's catalog-info.yaml, fetched directly via the GitHub Contents API
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Backstage catalog-info.yaml Cataloger"
+  long_description: |
+    Augments existing Lunar components with owner, domain, and tag
+    metadata read from each repo's `catalog-info.yaml`. Fetches files
+    via the GitHub Contents API on a schedule. Runs per component. Use
+    when Backstage data lives in repo files, not in a Backstage server.
+  categories: ["service-catalog", "vcs"]
+  icon: "assets/backstage-catalog-info.svg"
+  status: "beta"
+  related:
+    - slug: "backstage"
+      type: "cataloger"
+      reason: "Same Backstage metadata, sourced from a live Backstage API instead of repo files"
+    - slug: "backstage"
+      type: "collector"
+      reason: "Per-repo collector that parses catalog-info.yaml into the Component JSON"
+    - slug: "github-org"
+      type: "cataloger"
+      reason: "Defines the components this cataloger augments"
+
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/payment-api": {
+        "owner": "group:default/team-payments",
+        "domain": "platform.payments",
+        "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+      },
+      "github.com/acme/web-app": {
+        "owner": "group:default/team-web",
+        "domain": "platform.frontend",
+        "tags": ["bs-frontend", "bs-type-website", "bs-lifecycle-production"]
+      }
+    }
+  }
+
+catalogers:
+  - name: augment
+    description: |
+      For each existing Lunar component, fetches `catalog-info.yaml`
+      from the component's GitHub repo via the Contents API, parses
+      it (supports multi-document YAML), picks the matching
+      `Component` entity, and writes its owner, domain, and tags to
+      `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON.
+      Repos with no `catalog-info.yaml`, an unparseable file, or no
+      matching `Component` are skipped silently.
+    mainBash: main.sh
+    # TODO(post-merge): also ship a `cron`-hooked variant that walks
+    # an org and creates components from catalog-info.yaml. Trade-off
+    # is full-day-1 catalog coverage (`cron`) vs near-real-time updates
+    # when an individual repo's catalog-info.yaml changes
+    # (`component-cron`). Discussed on PR earthly/lunar-lib#181.
+    hook:
+      type: component-cron
+      schedule: "0 3 * * *"
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment"]
+
+inputs:
+  paths:
+    description: |
+      Comma-separated list of file paths to try in the component's
+      repo. First match wins. Defaults match the conventional
+      Backstage locations.
+    default: "catalog-info.yaml,catalog-info.yml"
+
+  branch:
+    description: |
+      Git ref to read `catalog-info.yaml` from. Empty means the
+      repo's default branch.
+    default: ""
+
+  component_id_annotation:
+    description: |
+      Annotation key on a Backstage Component used to match it
+      against the current Lunar component. The cataloger picks the
+      entity whose `metadata.annotations[<key>]` value, prefixed
+      with `component_id_prefix`, equals `$LUNAR_COMPONENT_ID`. If
+      the file has exactly one Component entity and no annotation,
+      that single entity is used (the single-Component-per-repo
+      case).
+    default: "github.com/project-slug"
+
+  component_id_prefix:
+    description: |
+      String prepended to the annotation value when matching against
+      `$LUNAR_COMPONENT_ID`.
+    default: "github.com/"
+
+  domain_annotation:
+    description: |
+      Annotation key on a Backstage Component used to source the
+      domain when `spec.domain` is absent. Useful for orgs that
+      model domains via a custom annotation rather than the
+      canonical Backstage `spec.domain` field. When set and the
+      matched Component carries this annotation, its value wins
+      over `spec.domain` / `spec.system`. Leave empty to use the
+      canonical Backstage fields only.
+    default: ""
+
+  tag_prefix:
+    description: |
+      Prefix added to Backstage `metadata.tags` when mapped to Lunar
+      tags. Also applied to derived tags like `type-<spec.type>` and
+      `lifecycle-<spec.lifecycle>`. Empty string disables the
+      prefix.
+    default: "bs-"
+
+  include_derived_tags:
+    description: |
+      When `true`, emits derived tags from `spec.type` (e.g.
+      `bs-type-service`) and `spec.lifecycle` (e.g.
+      `bs-lifecycle-production`) in addition to `metadata.tags`.
+    default: "true"
+
+  owner_format:
+    description: |
+      How to write `spec.owner` from the catalog-info file into the
+      Lunar `owner` field. Backstage entity refs typically look like
+      `group:default/team-payments` or `user:default/jane`.
+      - `as-is`     — pass the value through verbatim. Matches what
+                      the existing `policies/backstage/*` checks
+                      accept (`team-payments`, `group:infra`,
+                      `user:alice` are all valid).
+      - `bare-name` — strip the `<kind>:<namespace>/` prefix and
+                      write only the trailing name (e.g.
+                      `team-payments`).
+    default: "as-is"
+
+  default_owner:
+    description: |
+      Fallback owner applied (verbatim) to components whose matched
+      Backstage entity has no `spec.owner`. Leave empty to skip.
+    default: ""
+
+secrets:
+  GH_TOKEN:
+    description: |
+      GitHub token used to fetch `catalog-info.yaml` from component
+      repos via the Contents API. Needs `Contents: Read` on the
+      target repos (`repo` scope on a classic PAT, or
+      `contents: read` on a fine-grained PAT / GitHub App
+      installation token).

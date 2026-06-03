@@ -126,10 +126,21 @@ When a collector **always runs** (e.g., code collector that checks file existenc
 }
 ```
 
-**Policy pattern:** Use `assert_true(get_value(...))`:
+**Policy pattern:** Use `get_node(...)` and combine `.exists()` with `.get_value()`:
 ```python
-c.assert_true(c.get_value(".repo.readme.exists"), "README.md not found")
+node = c.get_node(".repo.readme.exists")
+c.assert_true(
+    node.exists() and bool(node.get_value()),
+    "README.md not found",
+)
 ```
+
+> **Why not `assert_true(get_value(".repo.readme.exists"))`?** When the path is
+> missing after workflows finish, `get_value()` raises `ValueError`, which the
+> `Check` context manager turns into an **Error** state — not a clean
+> pass/fail. Going through `get_node().exists()` lets the missing-data case
+> fall through to a normal failure (or a `Pending` state while workflows are
+> still running) instead of an opaque collector error.
 
 ### Anti-Pattern: Boolean Fields Without a Failure Writer
 
@@ -180,7 +191,7 @@ c.assert_true(c.get_value(".repo.readme.exists"), "README.md not found")
 | Scenario | Collector Behavior | Policy Assertion |
 |----------|-------------------|------------------|
 | Conditional execution (CI hook, scanner) | Object exists when ran, missing when didn't | `assert_exists(".sca")` |
-| Always-checked property | Writes explicit `true` or `false` | `assert_true(get_value(".repo.readme.exists"))` |
+| Always-checked property | Writes explicit `true` or `false` | `node = get_node(".repo.readme.exists"); assert_true(node.exists() and bool(node.get_value()))` |
 
 ### Optional Fields in Nested Data
 
