@@ -1,0 +1,55 @@
+version: 0
+
+name: vscode-trust
+description: Block the on-disk artifacts behind the github.dev 1-click GitHub token-steal — workspace-local VSCode extensions and active-content notebooks.
+author: earthly
+
+landing_page:
+  display_name: "VSCode Trust Probe"
+  long_description: |
+    Guard against the github.dev 1-click GitHub token-steal. Hard-blocks
+    workspace-local VSCode extensions (`.vscode/extensions/*/package.json`) that
+    skip publisher-trust, and flags notebooks embedding active HTML/JS in cells —
+    in the agent loop and as a PR gate.
+  categories: ["security"]
+  icon: "assets/vscode-trust.svg"
+  status: "beta"
+  related: []
+
+probes:
+  - name: no-workspace-local-extension
+    description: Hard-block writing a workspace-local VSCode extension manifest — it skips the marketplace publisher-trust check and enables the auto-install vector.
+    keywords: ["vscode", "supply-chain", "extension", "publisher-trust", "github-token", "security"]
+    hook:
+      type: agent-before-file-edit
+      paths:
+        - "**/.vscode/extensions/**/package.json"
+    check: scripts/detect-vscode-extension.sh
+    message: |-
+      Blocked: `{file}` is a workspace-local VSCode extension manifest.
+
+      Extensions shipped inside `.vscode/extensions/` install without the
+      marketplace publisher-trust check and can be auto-installed via spoofed
+      keystrokes — the vector behind the github.dev 1-click GitHub token-steal
+      (https://blog.ammaraskar.com/github-token-stealing/).
+
+      Recommend extensions through `.vscode/extensions.json` instead; never ship
+      extension source in-repo.
+
+  - name: notebook-active-content
+    description: Flag Jupyter notebooks that embed active HTML/JS (onerror=, <script>, synthetic KeyboardEvent) in cells — the keystroke-injection payload shape.
+    keywords: ["notebook", "ipynb", "jupyter", "xss", "keystroke-injection", "supply-chain", "security"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.ipynb"
+    check: scripts/scan-notebook.sh
+    message: |-
+      `{file}` embeds active HTML/JS in a notebook cell:
+
+      ```
+      {check_stdout}
+      ```
+
+      Notebook cells that render `onerror=`, `<script>`, or synthetic
+      `KeyboardEvent`/`dispatchEvent` are the payload shape used by the github.dev
+      token-steal. Remove the active content before committing.
