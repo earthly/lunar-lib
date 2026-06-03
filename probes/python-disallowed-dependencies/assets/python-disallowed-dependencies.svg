@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="black">
-  <path d="M50 6 L14 20 L14 52 C14 72 28 86 50 94 C72 86 86 72 86 52 L86 20 Z" fill="none" stroke="black" stroke-width="5" stroke-linejoin="round"/>
-  <text x="50" y="60" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22" font-weight="bold" fill="black">CVE</text>
-</svg>

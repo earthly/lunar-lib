@@ -1,20 +1,23 @@
-# Python Disallowed Dependencies Probe
+# Python Probe
 
-Block agent-time edits that pin a Python dependency to a version with
-a known critical CVE. Ships seeded defaults covering widely-deployed
-Python CVEs (Starlette BadHost / CVE-2026-48710, urllib3, Jinja2,
-PyYAML, requests, Werkzeug, aiohttp, Pillow, cryptography, setuptools);
-consumers extend or replace the list per-probe via inputs.
+A growing toolkit of agent-time guardrails for Python projects. Each
+capability is a separate probe; consumers select the ones they want with
+`include:` / `exclude:` on the `uses:` entry.
+
+Today the plugin ships one probe — **`disallowed-deps`** — that blocks
+edits pinning a Python dependency to a known-vulnerable version. More
+Python probes (a linter, a CVE code-pattern nudge) land under this same
+plugin as separate follow-ups.
 
 ## Overview
 
 This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin.
-It ships one probe, `disallowed-pin`, that hard-blocks dep-file edits
-(`requirements*.txt`, `pyproject.toml`, `Pipfile*`, `poetry.lock`,
-`uv.lock`) when the proposed write pins a Python package to a version
-inside a known-vulnerable range.
+It groups Python-specific agent-time checks under a single `uses:` entry,
+mirroring how [`policies/python/`](../../policies/python/) groups
+Python-specific CI-time policies. Consumers opt into individual probes
+with `include:` (see [Installation](#installation)).
 
-This is the agent-time analogue of
+The shipped `disallowed-deps` probe is the agent-time analogue of
 [`policies/sbom/disallowed-packages`](../../policies/sbom/) — same mental
 model (a curated disallowed list, consumers extend), applied at edit-time
 on the dep files themselves rather than at PR-time on a normalized SBOM.
@@ -23,30 +26,35 @@ The shape diverges in two places (see [Notes](#notes)):
 - **Per-package version ranges**, not regex-on-name — vulnerabilities are
   version-specific; regex-on-name would over-block the fix release.
 - **One plugin per language** — agent-time has no normalized SBOM layer
-  to abstract language, so each plugin's parser is scoped to one
-  ecosystem's dep-file syntax. Sibling plugins per other language family
-  (Node, Java, Go, …) will follow under the same shape.
+  to abstract language, so each language's dep-file parser lives in its
+  own plugin (`python`, then `node`, `java`, … under the same shape).
 
-## Probe
+## Probes
 
 | Name | Hook | Description |
 |------|------|-------------|
-| `disallowed-pin` | `agent-before-file-edit` (dep / lock files) | Hard block — proposed write pins a Python package to a version inside a disallowed range. |
+| `disallowed-deps` | `agent-before-file-edit` (dep / lock files) | Hard block — proposed write pins a Python package to a version inside a disallowed range. |
 
-Auto-namespaces as `python-disallowed-dependencies.disallowed-pin` at
-runtime (visible in `lunar-probe logs` and PR check titles).
+Probes auto-namespace as `<plugin>.<probe>` at runtime, so this shows up
+as `python.disallowed-deps` in `lunar-probe logs` and PR check titles.
 
-## Shipped defaults
+> **Roadmap (separate follow-up tickets):** a `linter` probe (run
+> `ruff` / `flake8` on Python edits) and a `cve-patterns` probe (nudge
+> on known-vulnerable code patterns, e.g. the BadHost `request.url`
+> exploitation surface). They'll be added here as additional rows;
+> consumers already on `include:` won't pick them up unless they opt in.
+
+## `disallowed-deps` — shipped defaults
 
 The probe ships with a curated list of widely-deployed Python CVEs as
-`data/disallowed-dependencies.json`. Each entry is
+`data/disallowed-deps.json`. Each entry is
 `{name, vulnerable_range, cve, severity, fix, why}`.
 
 > The table below is the **candidate seed list** for spec review. CVE
 > IDs, exact ranges, and fix versions will be re-verified against the
 > published advisories at implementation time before they land in
-> `data/disallowed-dependencies.json` — these are illustrative for
-> shape review, not final.
+> `data/disallowed-deps.json` — these are illustrative for shape review,
+> not final.
 
 | Package | Vulnerable range | CVE | Severity | Fixed in | Issue |
 |---|---|---|---|---|---|
@@ -66,7 +74,7 @@ new entry as new Python CVEs are published.
 
 ## Skip-safe behaviour
 
-The probe is a no-op (exit `0`, the edit proceeds) when:
+`disallowed-deps` is a no-op (exit `0`, the edit proceeds) when:
 
 - The proposed write doesn't mention any disallowed package.
 - The pinned version parses as outside the disallowed range for that
@@ -84,12 +92,13 @@ fires: the edit is rejected with the offending pin on `{check_stdout}`.
 
 ## Configuration
 
-The probe accepts two inputs that let consumers extend or replace the
-shipped list without forking the plugin:
+`disallowed-deps` accepts two inputs that let consumers extend or replace
+the shipped list without forking the plugin:
 
 ```yaml
 probes:
-  - uses: github://earthly/lunar-lib/probes/python-disallowed-dependencies@v1.0.0
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    include: ["disallowed-deps"]
     with:
       extra_disallowed: |
         [
@@ -106,7 +115,7 @@ probes:
 
 | Input | Default | Notes |
 |---|---|---|
-| `extra_disallowed` | `[]` | JSON array, same shape as `data/disallowed-dependencies.json`. Appended to defaults. |
+| `extra_disallowed` | `[]` | JSON array, same shape as `data/disallowed-deps.json`. Appended to defaults. |
 | `replace_defaults` | `"false"` | When `"true"`, `extra_disallowed` *replaces* shipped defaults instead of extending. |
 
 > `inputs:` / `with:` are currently parsed-but-reserved in
@@ -122,16 +131,20 @@ probes:
 Prereq: [`lunar-probe`](https://github.com/earthly/lunar-probe)
 installed and wired into your agent framework.
 
-Add to your `.lunar/probes.yml` (pin to a released tag):
+Add to your `.lunar/probes.yml` (pin to a released tag) and select the
+probes you want with `include:`:
 
 ```yaml
 version: 0
 
 probes:
-  - uses: github://earthly/lunar-lib/probes/python-disallowed-dependencies@v1.0.0
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    include: ["disallowed-deps"]
 ```
 
-See [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
+Omit `include:` to opt into every probe the plugin ships, or use
+`exclude:` to take all-but-one. See
+[`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
 for the full syntax.
 
 ## Requirements
@@ -140,7 +153,7 @@ for the full syntax.
   Alpine BusyBox. No bashisms.
 - `jq` on `PATH` for parsing the PreToolUse JSON payload that
   lunar-probe pipes to `check:` on stdin and for reading the
-  `data/disallowed-dependencies.json` data file.
+  `data/disallowed-deps.json` data file.
 - `grep`, `sed` — BusyBox-compatible flags only (no `-P`, no
   `--include`).
 - No Python runtime, no `pip` — the check parses what it needs with
@@ -149,15 +162,21 @@ for the full syntax.
 
 ## Notes
 
-- **Why one plugin per language, not per CVE.** The plugin equivalent
-  at PR-time
+- **Why group probes under one `python` plugin.** Mirrors
+  [`policies/python/`](../../policies/python/): one plugin per language,
+  multiple capabilities inside it, opt-in per capability with
+  `include:`. A consumer adds one `uses:` line for "Python guardrails"
+  and picks what they want, rather than wiring up a separate plugin per
+  check.
+- **Why one plugin per language, not one overall.** The plugin
+  equivalent at PR-time
   ([`policies/sbom/disallowed-packages`](../../policies/sbom/)) is one
   regex list applied to a normalized SBOM, which abstracts language. At
   agent-time there's no equivalent normalized layer — the probe has to
   know which dep-file syntax to parse, which is language-specific.
   Splitting by language keeps each plugin's parser scoped; future
-  `node-disallowed-dependencies`, `java-disallowed-dependencies`, etc.
-  follow the same shape.
+  `node`, `java`, `go`, … plugins follow the same shape, each with its
+  own `disallowed-deps` probe.
 - **Why per-package version ranges, not regex-on-name.** Vulnerabilities
   are version-specific; regex-on-name would over-block the fix release
   and miss the case where a known-bad range straddles a fix. The shape
@@ -165,14 +184,14 @@ for the full syntax.
 
 ## See also
 
-- [`policies/python/`](../../policies/python/) — *(planned)* CI-time
-  backstop policy that reads `.lang.python.dependencies[]` from the
-  Python collector and flags vulnerable pins at PR-check time. This
-  probe is the agent-time complement: it intercepts the edit before
-  the bad pin lands; the policy catches the case where the pin slipped
-  in some other way.
+- [`policies/python/`](../../policies/python/) — CI-time Python policies
+  (the plugin this mirrors at PR-time). A *planned* backstop policy will
+  read `.lang.python.dependencies[]` from the Python collector and flag
+  vulnerable pins at PR-check time; `disallowed-deps` is the agent-time
+  complement — it intercepts the edit before the bad pin lands.
 - [`policies/sbom/disallowed-packages`](../../policies/sbom/) — the
-  PR-time SBOM-based equivalent that inspired this probe's shape.
+  PR-time SBOM-based equivalent that inspired the `disallowed-deps`
+  probe's shape.
 - [BadHost writeup](https://badhost.org/) — CVE-2026-48710 details
   and proof-of-concept.
 - [Starlette 1.0.1 release](https://github.com/encode/starlette/releases)
