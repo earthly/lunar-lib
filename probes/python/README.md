@@ -1,36 +1,43 @@
-# ruff Probe
+# Python Probe
 
-Lint Python files with [Ruff](https://docs.astral.sh/ruff/) after the
-agent edits a `.py` file. Runs the full default Ruff rule set against
-the edited file before the change is staged — examples of what it
-catches include unused imports, undefined names, pyflakes errors,
-pycodestyle violations, import-order drift, and formatting drift, but
-the probe surfaces every finding Ruff reports.
+Agent-time Python guardrails, bundled per language. Runs
+[Ruff](https://docs.astral.sh/ruff/) on every `.py` file the agent
+edits — `ruff check` for lint findings (unused imports, undefined
+names, pyflakes errors, pycodestyle violations, import-order and
+formatting drift, and the rest of the default rule set) and
+`ruff format --check` for Black-compatible formatting. Each is a
+separately toggleable sub-probe.
 
 ## Overview
 
-This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin.
-It wires up a single `agent-after-file-edit` hook that fires whenever the
-agent edits a file matching `**/*.py`. The probe runs `ruff check` and
-`ruff format --check` against the edited file; if either exits non-zero,
-the edit is reported back to the agent as a block reason with the findings
-inlined.
+This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin —
+a per-language **bundle** that groups Python guardrails the same way
+[`collectors/python/`](../../collectors/python/) and
+[`policies/python/`](../../policies/python/) group their Python logic.
+Both sub-probes hook `agent-after-file-edit` on `**/*.py`; when the agent
+edits a Python file they run their Ruff command against it and, on a
+non-zero exit, report the findings back to the agent as a block reason.
+
+Consumers take the whole bundle or a subset — see
+[Configuration](#configuration).
 
 ## Probes
 
 | Name | Hook | Description |
 |------|------|-------------|
-| `lint` | `agent-after-file-edit` (`paths: **/*.py`) | Run `ruff check` and `ruff format --check` on the edited file, block on findings. |
+| `ruff-lint` | `agent-after-file-edit` (`paths: **/*.py`) | Run `ruff check` on the edited file, block on lint findings. |
+| `ruff-format` | `agent-after-file-edit` (`paths: **/*.py`) | Run `ruff format --check` on the edited file, block on formatting drift. |
 
-Probes auto-namespace as `<plugin>.<probe>` at runtime, so this one
-shows up as `ruff.lint` in `lunar-probe logs`, PR check titles, and
-`lunar-probe lint` output.
+Probes auto-namespace as `<plugin>.<probe>`, so these surface as
+`python.ruff-lint` and `python.ruff-format` in `lunar-probe logs`, PR
+check titles, and `lunar-probe lint` output. More Python sub-probes
+(e.g. a type check, a disallowed-dependency guard) can join this bundle
+over time without changing how consumers reference it.
 
 ## Skip-safe behaviour
 
-The probe never breaks the agent session when Ruff is absent — but it
-does **not** disappear silently either. The manifest declares its
-dependency:
+Neither sub-probe breaks the agent session when Ruff is absent — but
+they don't disappear silently either. Each declares its dependency:
 
 ```yaml
 requires:
@@ -40,13 +47,12 @@ requires:
 
 When `ruff` isn't on `PATH`, `lunar-probe` short-circuits the check
 (the edit still proceeds) and records a breadcrumb. At session-end it
-surfaces a single consolidated reminder to the agent, install hint
-included, so a missing linter is visible rather than a silent gap in
-coverage:
+surfaces a single consolidated reminder, install hint included, so a
+missing linter is visible rather than a silent gap in coverage:
 
 ```
 ⚠ Skipped probes (missing dependencies):
-- ruff.lint: missing `ruff` on PATH
+- python.ruff-lint: missing `ruff` on PATH
   install: pip install ruff  (or: uv tool install ruff / brew install ruff)
 ```
 
@@ -65,14 +71,14 @@ Code registers a native plugin via `claude plugins marketplace add` +
 `claude plugins install`. Re-running `lunar-probe install` after a
 lunar-probe upgrade is the supported refresh path.
 
-Then add this probe to your `.lunar/probes.yml` (pin to the latest
+Then add this bundle to your `.lunar/probes.yml` (pin to the latest
 released tag):
 
 ```yaml
 version: 0
 
 probes:
-  - uses: github://earthly/lunar-lib/probes/ruff@v1.0.0
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
 ```
 
 ## Requirements
@@ -81,19 +87,28 @@ probes:
   manager or `pip`: `pip install ruff`, `brew install ruff`,
   `uv tool install ruff`, or grab a static binary from
   [astral-sh/ruff releases](https://github.com/astral-sh/ruff/releases).
-- `jq` on `PATH` for parsing the PostToolUse payload.
+- `jq` on `PATH` for parsing the agent's file-edit payload.
 
 ## Configuration
 
-This probe does not currently expose any `inputs:`. Ruff picks up its
-configuration from the repo's `pyproject.toml` / `ruff.toml` /
-`.ruff.toml` automatically; per-repo rule selection, ignored files,
-and line length all live there. Surfacing knobs for severity gating
-or for opting out of the format check is tracked as future work.
+Ruff reads its own configuration from the repo's `pyproject.toml` /
+`ruff.toml` / `.ruff.toml` automatically — rule selection, ignores, and
+line length all live there.
+
+To take only part of the bundle, use `include:` / `exclude:` (probe
+names, mutually exclusive) on the `uses:` entry:
+
+```yaml
+probes:
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    exclude: [ruff-format]      # lint only — skip the format check
+```
+
+The bundle does not currently expose any `inputs:`. Surfacing knobs
+for severity gating is tracked as future work.
 
 ## See also
 
-- [`collectors/python/`](../../collectors/python/) — CI-time Python linter detection + project metadata. This probe is the agent-time complement.
+- [`collectors/python/`](../../collectors/python/) — CI-time Python linter detection + project metadata. This bundle is the agent-time complement.
 - [`policies/python/`](../../policies/python/) — policy gating on CI-collected Python linter configuration.
-- [`probes/shellcheck/`](../shellcheck/) — sibling Phase 1 probe for shell scripts.
-- [`probes/hadolint/`](../hadolint/) — sibling Phase 1 probe for Dockerfiles.
+- [`probes/shellcheck/`](../shellcheck/) — sibling probe for shell scripts (migrating to a `probes/shell/` per-language bundle, same shape as this one).
