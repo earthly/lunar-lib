@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to a known-vulnerable version, seeded with widely-deployed Python CVEs (incl.
   Starlette BadHost / CVE-2026-48710); consumers extend or replace the list.
   Spec-only; implementation follows spec approval (#187).
+- `terraform` policy: 14 AWS infrastructure security checks relevant to SOC 2,
+  added as individually-includable sub-policies — EBS volume/snapshot
+  encryption, CloudTrail multi-region + CloudWatch, GuardDuty, VPC flow logs, S3
+  public-access blocking and access logging, security-group ingress limits on
+  SSH/PostgreSQL, EKS/RDS/ELB logging, HTTPS-only load balancers, and WAF on
+  public ALBs. Each reads `.iac.native.terraform.files` from the `terraform`
+  collector. Spec-only (manifest + README); implementation follows spec
+  approval (#192).
 - New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
   components with owner / domain / tag metadata read from each repo's
   `catalog-info.yaml`, fetched via the GitHub Contents API on a
