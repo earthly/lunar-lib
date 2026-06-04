@@ -40,25 +40,105 @@ Two consequences that fall out of "runs in the agent loop":
 
 ---
 
-## Layout
+## Granularity: one bundle per language
 
-A probe plugin is a directory containing a single `lunar-probe.yml`
-plus the assets it references:
+Probes are packaged as **per-language (or per-ecosystem) bundles** —
+`probes/python/`, `probes/shell/`, `probes/docker/` — each exposing one
+or more **sub-probes**. This mirrors how `collectors/<language>/` and
+`policies/<language>/` group their per-language logic: the directory is
+the language/ecosystem, and the individual checks live inside it.
 
-```text
-probes/<name>/
-├── lunar-probe.yml        # required — plugin manifest
-├── README.md              # required — human docs
-├── scripts/               # optional — referenced from check: / check_each: / check_all:
-│   └── <name>.sh
-└── assets/                # optional — icons / images referenced by landing_page
-    └── <name>.svg
+**Do not author one plugin per tool.** A `ruff` check and a future
+`mypy` check are both Python guardrails, so they belong in the same
+`probes/python/` bundle as two sub-probes — not in `probes/ruff/` and
+`probes/mypy/`. One bundle per language keeps the integrations-page
+entry, the `uses:` line a consumer writes, and the cross-reference to
+the matching `collectors/<language>/` + `policies/<language>/` all
+aligned on the language axis.
+
+| Concept | What it is |
+|---|---|
+| **Bundle** — `probes/python/` | One directory, one `lunar-probe.yml`, one `name:` slug = the language/ecosystem. |
+| **Sub-probe** — `ruff-lint`, `ruff-format` | One entry in the manifest's `probes:` list = one individual check. |
+
+At runtime each sub-probe is namespaced `<plugin>.<probe>`, so the two
+Python sub-probes surface as `python.ruff-lint` and `python.ruff-format`
+in `lunar-probe logs`, PR check titles, and `lunar-probe lint` output. A
+bundle can grow new sub-probes over time without changing how consumers
+reference it.
+
+> **Why the first probes diverged.** This convention was undefined when
+> the shellcheck probe shipped, so it was authored per-tool
+> (`probes/shellcheck/`, with a bare `lint` sub-probe). New probes follow
+> the per-language convention from the start, and `probes/shellcheck/` is
+> expected to fold into a `probes/shell/` bundle.
+
+### Sub-probe naming
+
+**Lead the sub-probe name with the tool — never a bare function name.**
+
+| Shape | Use when | Example |
+|---|---|---|
+| `<tool>-<function>` | one tool exposes several distinct checks | `ruff-lint`, `ruff-format` |
+| `<tool>` | the tool maps to a single check | `hadolint` |
+
+Bare `lint` / `format` / `check` are **not** allowed. The moment a
+second tool joins the bundle — a `mypy` check in `probes/python/`, a
+second Dockerfile linter in `probes/docker/` — bare names collide.
+Tool-scoped names (`ruff-lint` + `mypy-check`, not `lint` + `lint`) stay
+unique as the bundle grows. The reference bundle `probes/python/`
+(PR #188) uses this form; `probes/shellcheck/`'s bare `lint` predates the
+convention.
+
+### Consumers select sub-probes with `include:` / `exclude:`
+
+A consumer takes the whole bundle by default, or a subset via `include:`
+/ `exclude:` on the `uses:` entry. The values are bare sub-probe names,
+and the two keys are **mutually exclusive** (setting both is a
+`lunar-probe lint` error):
+
+```yaml
+version: 0
+
+probes:
+  # Whole bundle:
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+
+  # Subset — lint only, drop the format-check sub-probe:
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    exclude: [ruff-format]
+
+  # Equivalent subset, expressed as an opt-in:
+  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    include: [ruff-lint]
 ```
 
-This mirrors the existing `collectors/<name>/` and `policies/<name>/`
-shape. The differences are the manifest filename and the absence of
-`requirements.txt` / `mainBash` / `mainPython` — probes use the
-hook-based execution model from `lunar-probe` instead.
+**Reference implementation:** `probes/python/` (PR #188) — its
+`lunar-probe.yml` defines the `ruff-lint` + `ruff-format` sub-probes and
+its `README.md` documents the `include:` / `exclude:` selection.
+
+---
+
+## Layout
+
+A probe plugin is a directory — one per language/ecosystem (see
+[Granularity](#granularity-one-bundle-per-language)) — containing a
+single `lunar-probe.yml` plus the assets it references:
+
+```text
+probes/<language>/
+├── lunar-probe.yml        # required — plugin manifest (declares 1+ sub-probes)
+├── README.md              # required — human docs
+├── scripts/               # optional — referenced from check: / check_each: / check_all:
+│   └── <sub-probe>.sh     # typically one script per sub-probe
+└── assets/                # optional — icons / images referenced by landing_page
+    └── <language>.svg
+```
+
+This mirrors the existing `collectors/<language>/` and
+`policies/<language>/` shape. The differences are the manifest filename
+and the absence of `requirements.txt` / `mainBash` / `mainPython` —
+probes use the hook-based execution model from `lunar-probe` instead.
 
 For the full plugin grammar, read both:
 
@@ -103,13 +183,16 @@ inputs:                      # optional — consumer-configurable knobs
     default: "false"
 
 probes:
-  - name: <probe-name>       # required — namespaced as <plugin-name>.<probe-name> at runtime
+  - name: <tool>-<function>  # required — tool-prefixed (see Sub-probe naming); runtime id is <plugin>.<name>
     description: <one-line>
     keywords: ["..."]
     hook:
       type: agent-after-file-edit   # or agent-before-command, agent-session-end, ...
       paths: "**/*.<ext>"
-    check: scripts/<name>.sh        # or inline shell
+    requires:                       # optional — skip + session-end summary if unmet (see "Declaring dependencies")
+      - tool: <bin>
+        install_hint: "<how to install <bin>>"
+    check: scripts/<sub-probe>.sh   # or inline shell
     message: |-
       Human-readable findings. `{check_stdout}` / `{check_stderr}` /
       `{file}` / `{files}` / `{cwd}` substitutions are available.
@@ -135,16 +218,101 @@ PreToolUse JSON shape piped to `check:` on stdin.
   `go mod tidy`, no `prettier --write`. Probes are passive sensors;
   the agent decides how to fix what's reported. Hard reviewer rule —
   enforced on Vlad's PR feedback.
-- **Default to skip-safe.** If the underlying tool isn't on `PATH` or
-  the repo isn't configured for it, the probe should `exit 0` (the
-  command/edit proceeds). Repos that don't use the tool should never
-  see the probe fire.
+- **Declare dependencies with `requires:`, not a silent `exit 0`.** If
+  the probe wraps a tool — or needs a repo config file — list it under
+  `requires:` (see [Declaring dependencies](#declaring-dependencies-requires)).
+  `lunar-probe` then skips the check when the dependency is missing *and*
+  surfaces a consolidated session-end reminder, which is strictly better
+  than an in-script `command -v <tool> || exit 0` that hides the gap.
+  Reserve a bare `exit 0` in the script for genuinely-inapplicable inputs
+  (e.g. a matched file that no longer exists by the time `check:` runs).
 - **Local-only by design.** No network calls in `check:`. If a tool
   needs network (e.g. semgrep ruleset fetch), the probe is the wrong
   shape — author it as a CI collector instead.
 - **Namespacing is automatic.** Probes ship as
   `<plugin-name>.<probe-name>` in logs and PR check titles. Pick a
   plugin-level `name:` slug carefully — it's the import-time prefix.
+
+---
+
+## Declaring dependencies: `requires:`
+
+A probe almost always wraps an external tool (`ruff`, `hadolint`,
+`shellcheck`), and sometimes a repo config file. Declare those
+dependencies with `requires:` instead of guarding for them by hand
+inside the `check:` script:
+
+```yaml
+probes:
+  - name: ruff-lint
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.py"
+    requires:
+      - tool: ruff
+        install_hint: "pip install ruff  (or: uv tool install ruff / brew install ruff)"
+    check: scripts/ruff-lint.sh
+    message: "Ruff found lint issues in `{file}`: `{check_stdout}`"
+```
+
+When a declared dependency is missing, `lunar-probe` **skips that
+probe's check** — the edit or command still proceeds, and the skip
+doesn't count toward the PR exit code — then records a breadcrumb.
+
+Two requirement kinds; set **exactly one** per entry (both, or neither,
+is a `lunar-probe lint` error):
+
+| Kind | Met when | Example |
+|---|---|---|
+| `tool: <bin>` | `<bin>` is on `PATH` | `tool: ruff` |
+| `config: <glob>` (or a list) | at least one glob matches a file under the repo root (a list is any-of) | `config: ["commitlint.config.*", ".commitlintrc*"]` |
+
+`install_hint: "<string>"` is optional on either kind and is surfaced
+**verbatim** in the session-end summary, so the agent sees the canonical
+fix.
+
+### The session-end summary
+
+At `agent-session-end`, `lunar-probe` drains every breadcrumb into a
+single block surfaced to the agent:
+
+```
+⚠ Skipped probes (missing dependencies):
+- python.ruff-lint: missing `ruff` on PATH
+  install: pip install ruff  (or: uv tool install ruff / brew install ruff)
+```
+
+This is **the sanctioned replacement for the old in-script
+`command -v <tool> >/dev/null 2>&1 || exit 0` guard.** That guard made a
+missing tool indistinguishable from a clean pass — coverage silently
+vanished and the user never knew. `requires:` keeps the no-op behaviour
+(a missing tool never breaks the session) while making the gap visible
+exactly once, with the fix in hand.
+
+### `requires:` vs `hook.when:`
+
+Both can stop a probe from firing, but they answer different questions,
+and `hook.when:` is evaluated **first**:
+
+| Mechanism | Use when the probe… | Behaviour |
+|---|---|---|
+| `hook.when:` | …doesn't apply to this repo at all (e.g. a JS probe on a Go repo) | **Silent** skip — no nag |
+| `requires:` | …*should* apply here, but its tool/config is missing | **Loud-on-summary** skip — session-end reminder + install hint |
+
+If `hook.when:` gates the probe off, `requires:` isn't evaluated at all —
+so a globally-installed bundle stays quiet on repos it doesn't apply to,
+and only nags about a missing dependency on repos where it genuinely
+should have run.
+
+### Side-effect-free, always
+
+`requires:` surfaces an `install_hint` string — it **never installs
+anything**. This is the same rule as the read-only `check:` constraint:
+probes report, the agent (or the human) acts. Don't bootstrap a tool
+from inside a probe.
+
+Reference bundles `probes/python/` (PR #188) and `probes/docker/`
+(PR #189) both declare their tool with `requires:` + `install_hint:`.
 
 ---
 
@@ -158,9 +326,12 @@ Required sections, in order:
    what it blocks vs. warns on.
 3. **Probes table** — `| Name | Hook | Description |` row per probe in
    the manifest.
-4. **Skip-safe behaviour** — bullet list of every case where the
-   probe is a no-op. This is the reader's reassurance that adding the
-   probe is low-risk.
+4. **Skip-safe behaviour** — every case where the probe is a no-op.
+   Express missing-tool / missing-config cases as `requires:` and show
+   the `⚠ Skipped probes` session-end summary (see
+   [Declaring dependencies](#declaring-dependencies-requires)); list any
+   other no-op cases (file gone mid-edit, path mismatch) as bullets.
+   This is the reader's reassurance that adding the probe is low-risk.
 5. **Installation** — the `uses:` one-liner for `.lunar/probes.yml`,
    pointing at `github://earthly/lunar-lib/probes/<name>@main` (and
    the tag-pinned form once a `v*` release is cut).
@@ -202,11 +373,11 @@ The Spec PR contains **only** the manifest, README, and icon. No
 scripts in `scripts/`, no `requirements.txt`, no test artefacts:
 
 ```text
-probes/<name>/
-├── lunar-probe.yml
+probes/<language>/
+├── lunar-probe.yml          # declares the bundle's sub-probe(s)
 ├── README.md
 └── assets/
-    └── <name>.svg
+    └── <language>.svg
 ```
 
 Plus, if the convention itself is being extended (e.g. the first
@@ -296,8 +467,10 @@ Once the secondary reviewer approves the spec, you write the
    - The `lunar-probe logs` output for that session.
    - A pass case (probe is a no-op or exits 0).
    - A fail case (probe blocks / surfaces a finding).
-   - A skip-safe case (tool not on `PATH`, no config — probe should
-     no-op).
+   - A skip-safe case: with the tool removed from `PATH`, the edit
+     proceeds and the `⚠ Skipped probes (missing dependencies)` summary
+     appears at session end (the `requires:` behaviour — see
+     [Declaring dependencies](#declaring-dependencies-requires)).
 5. Post the captured evidence on the PR. Screenshots are fine for
    the Claude Code transcript view; text is fine for `lunar-probe
    logs` output.
@@ -314,11 +487,11 @@ Once the secondary reviewer approves the spec, you write the
 | Mistake | Why it's wrong | Fix |
 |---|---|---|
 | `check:` script writes to the working tree (`gofmt -w`, `prettier --write`, `go mod tidy`) | Vlad's architectural rule: `check:` is read-only. Probes are passive sensors; agent is the sole edit author. | Replace `-w` / `--write` with `-l` / `--list-different` / `--check`. Surface findings in `message:`, let the agent fix. |
-| Probe fires for repos that don't use the tool | Pollutes every consumer's session with irrelevant blocks. | Add an explicit skip clause: `command -v <tool> >/dev/null 2>&1 || exit 0`. |
+| Probe fires for repos that don't use the tool | Pollutes every consumer's session with irrelevant blocks. | Declare the tool under `requires:` (see [Declaring dependencies](#declaring-dependencies-requires)) — `lunar-probe` skips the check and surfaces a session-end summary. Don't fall back to a silent in-script `command -v <tool> || exit 0`. |
 | Probe writes shell that depends on bash arrays / `[[ ]]` / `set -o pipefail` semantics | Many agent shells run under POSIX `sh` (Alpine BusyBox in agent CI). | Stick to POSIX `sh` constructs. Test against `dash` or `busybox sh`. |
 | Probe's `message:` lacks `{check_stdout}` / context | Agent sees a generic "probe blocked" with no recourse. | Always include the tool's output via `{check_stdout}` so the agent can act on the actual diagnostic. |
 | `agent-before-command` matcher missing `binary.name` | Probe fires for every shell command, paying the parse cost for nothing. | Set `hook.binary.name: <bin>` so the probe only fires for the targeted binary. |
-| Probe assumes `jq` / `yq` / GNU coreutils | Not always available. | Either check with `command -v` and skip, or document the requirement in README "Requirements". |
+| Probe assumes `jq` / `yq` / GNU coreutils | Not always available. | Declare the ones the check can't run without under `requires: - tool: <bin>` so a missing one surfaces at session-end instead of crashing the check into a false positive; document all external helpers in README "Requirements" too. |
 
 ---
 
@@ -338,11 +511,18 @@ Same as collectors/policies:
 
 - Manifest filename: `lunar-probe.yml` (singular, matches
   `lunar-collector.yml`).
-- Plugin slug `name:` must match the containing directory.
-- Probe names are auto-namespaced as `<plugin>.<probe>` — pick the
-  plugin slug carefully.
+- One bundle per language/ecosystem (`probes/python/`), not one plugin
+  per tool. Plugin slug `name:` = the language and must match the
+  containing directory.
+- Sub-probes are the entries in `probes:`; name them tool-first
+  (`ruff-lint`, `ruff-format`, `hadolint`), never bare `lint` / `format`.
+- Sub-probe names are auto-namespaced as `<plugin>.<probe>`
+  (`python.ruff-lint`). Consumers pick a subset with `include:` /
+  `exclude:` on the `uses:` entry.
 - `check:` is read-only. Always.
-- `exit 0` when the tool isn't installed or the repo isn't configured.
+- Declare tool/config deps with `requires:` (skips the check + surfaces
+  a session-end summary) — not a silent `exit 0`. Reserve a bare
+  `exit 0` for genuinely-inapplicable inputs.
 - Local test only — no cronos.
 - Implementation goes on the same PR as the spec after secondary
   approval.
