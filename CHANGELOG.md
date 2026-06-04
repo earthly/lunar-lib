@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New probe (experimental): `prompt-injection` — scans files for
+  prompt-injection markers (instruction overrides, role/persona switches,
+  system-prompt exfiltration lures, secret-exfiltration requests, model
+  control tokens, and invisible Unicode Tags-block characters) in the
+  agent loop. Ships two variants sharing one detection script:
+  `block-read` (hard-blocks a poisoned file before the agent reads it, on
+  `agent-before-file-read`) and `warn-edit` (non-blocking warning after
+  the agent writes untrusted content, on `agent-after-file-edit`).
+  Read-only, local-only, skip-safe (allow marker, binaries, oversized
+  files, and clean files all pass through). Concept draft for review.
 - `terraform` policy: 14 AWS infrastructure security checks relevant to SOC 2,
   added as individually-includable sub-policies — EBS volume/snapshot
   encryption, CloudTrail multi-region + CloudWatch, GuardDuty, VPC flow logs, S3
