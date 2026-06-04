@@ -1,0 +1,82 @@
+[
+  {
+    "name": "starlette",
+    "vulnerable_range": "[0.8.3, 1.0.1)",
+    "cve": "CVE-2026-48710",
+    "severity": "high",
+    "fix": "1.0.1",
+    "why": "BadHost — request.url is built from the inbound Host header; bypasses URL-path auth checks"
+  },
+  {
+    "name": "urllib3",
+    "vulnerable_range": "[2.0.0, 2.2.2)",
+    "cve": "CVE-2024-37891",
+    "severity": "high",
+    "fix": "2.2.2",
+    "why": "Proxy-Authorization header leaked to the origin on cross-origin redirect"
+  },
+  {
+    "name": "Jinja2",
+    "vulnerable_range": "[0.0.0, 3.1.4)",
+    "cve": "CVE-2024-34064",
+    "severity": "medium",
+    "fix": "3.1.4",
+    "why": "XSS via the xmlattr filter accepting keys with spaces/quotes"
+  },
+  {
+    "name": "PyYAML",
+    "vulnerable_range": "[0.0.0, 5.4)",
+    "cve": "CVE-2020-14343",
+    "severity": "critical",
+    "fix": "5.4",
+    "why": "Arbitrary code execution via the FullLoader constructor"
+  },
+  {
+    "name": "requests",
+    "vulnerable_range": "[2.3.0, 2.32.0)",
+    "cve": "CVE-2024-35195",
+    "severity": "medium",
+    "fix": "2.32.0",
+    "why": "Certificate verification bypass persisting across a Session after first verify=False"
+  },
+  {
+    "name": "Werkzeug",
+    "vulnerable_range": "[0.0.0, 3.0.3)",
+    "cve": "CVE-2024-34069",
+    "severity": "medium",
+    "fix": "3.0.3",
+    "why": "Debugger PIN bypass / RCE when the interactive debugger is exposed"
+  },
+  {
+    "name": "aiohttp",
+    "vulnerable_range": "[0.0.0, 3.9.2)",
+    "cve": "CVE-2024-23334",
+    "severity": "high",
+    "fix": "3.9.2",
+    "why": "Directory traversal in static file serving when follow_symlinks=True"
+  },
+  {
+    "name": "Pillow",
+    "vulnerable_range": "[0.0.0, 10.3.0)",
+    "cve": "CVE-2024-28219",
+    "severity": "high",
+    "fix": "10.3.0",
+    "why": "Buffer overflow in _imagingcms.c via strcpy"
+  },
+  {
+    "name": "cryptography",
+    "vulnerable_range": "[0.0.0, 42.0.0)",
+    "cve": "CVE-2023-50782",
+    "severity": "medium",
+    "fix": "42.0.0",
+    "why": "Bleichenbacher timing oracle in RSA PKCS#1 v1.5 decryption"
+  },
+  {
+    "name": "setuptools",
+    "vulnerable_range": "[0.0.0, 70.0.0)",
+    "cve": "CVE-2024-6345",
+    "severity": "high",
+    "fix": "70.0.0",
+    "why": "Remote code execution via the package_index download/install path"
+  }
+]
