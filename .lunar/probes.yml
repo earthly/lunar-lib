@@ -2,7 +2,7 @@
 #
 # This is the lunar-probe-flavoured rewrite of the legacy `.lunar/checks.yml`.
 # Same probes, ported to the `.lunar/probes*.yml` schema documented at
-# https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md.
+# https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml.
 #
 # Schema cheat sheet (see the doc for the full version):
 #   - Top-level: `version: 0` + `probes:` list.
