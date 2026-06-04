@@ -117,4 +117,4 @@ work.
 - [`collectors/docker/`](../../collectors/docker/) — CI-time hadolint execution + Dockerfile detection. This probe is the agent-time complement.
 - [`policies/container/`](../../policies/container/) — policy gating on CI-collected hadolint findings.
 - [`probes/shellcheck/`](../shellcheck/) — sibling probe for shell scripts.
-- [`probes/ruff/`](../ruff/) — sibling probe for Python files.
+- [`probes/python/`](../python/) — sibling probe for Python files.
