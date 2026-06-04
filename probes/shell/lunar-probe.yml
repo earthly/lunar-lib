@@ -1,0 +1,43 @@
+version: 0
+
+name: shell
+description: Shell guardrails that run as the agent edits `.sh` files — ShellCheck lint, with room for more.
+author: earthly
+
+landing_page:
+  display_name: "Shell Probe"
+  long_description: |
+    Agent-time shell guardrails, bundled per language. Runs ShellCheck
+    on each `.sh` file the agent edits — the full rule set, surfaced
+    before the change lands. Read-only and skip-safe when `shellcheck`
+    isn't installed.
+  categories: ["code-quality"]
+  icon: "assets/shell.svg"
+  status: "beta"
+  related:
+    - slug: "shell"
+      type: "collector"
+      reason: "CI-time ShellCheck + shell detection. This bundle is the agent-time complement."
+    - slug: "shell"
+      type: "policy"
+      reason: "Gates on CI-collected ShellCheck findings. These probes catch them earlier."
+
+probes:
+  - name: shellcheck
+    description: Run `shellcheck` on the edited shell script and block on findings.
+    keywords: ["shell", "bash", "sh", "shellcheck", "lint", "static-analysis"]
+    hook:
+      type: agent-after-file-edit
+      paths: "**/*.sh"
+    requires:
+      - tool: shellcheck
+        install_hint: "brew install shellcheck  (or: apt-get install shellcheck / dnf install ShellCheck)"
+    check: scripts/shellcheck.sh
+    message: |-
+      ShellCheck flagged issues in `{file}`:
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the findings and re-save the file — the probe re-runs `shellcheck` automatically.

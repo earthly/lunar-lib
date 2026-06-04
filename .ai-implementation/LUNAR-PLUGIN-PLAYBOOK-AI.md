@@ -125,7 +125,7 @@ Find the most similar existing collector, policy, or probe and read every file. 
 | Language collector | `collectors/golang/` or `collectors/java/` |
 | Repo/file check policy | `policies/repo/` |
 | Security policy | `policies/sast/` or `policies/sca/` |
-| Probe plugin | `probes/shellcheck/` *(first probe — see [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md))* |
+| Probe plugin | `probes/shell/` *(per-language probe bundle — see [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md))* |
 
 ---
 
