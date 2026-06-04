@@ -1,19 +1,19 @@
 version: 0
 
-name: hadolint
-description: Lint Dockerfiles with hadolint after the agent edits a `Dockerfile*`.
+name: docker
+description: Agent-time Docker guardrails — lint Dockerfiles with hadolint as the agent edits them.
 author: earthly
 
 landing_page:
-  display_name: "hadolint Probe"
+  display_name: "docker Probe"
   long_description: |
-    Run [hadolint](https://github.com/hadolint/hadolint) on every
-    `Dockerfile*` the agent edits — full rule set plus embedded
-    ShellCheck for `RUN` blocks. Examples of what it catches:
-    `latest` tags, unpinned versions, layer bloat. Read-only,
-    local-only, skip-safe when `hadolint` isn't installed.
+    Agent-time Docker guardrails, bundled as one probe. The hadolint
+    sub-probe runs [hadolint](https://github.com/hadolint/hadolint) on
+    every Dockerfile the agent edits — full rule set plus embedded
+    ShellCheck for RUN blocks. Read-only, local-only, skip-safe when
+    the tool isn't installed.
   categories: ["code-quality"]
-  icon: "assets/hadolint.svg"
+  icon: "assets/docker.svg"
   status: "beta"
   related:
     - slug: "docker"
@@ -24,12 +24,15 @@ landing_page:
       reason: "Gates on CI-collected hadolint findings. Probe catches it earlier."
 
 probes:
-  - name: lint
+  - name: hadolint
     description: Run `hadolint` on the edited Dockerfile and block on findings.
     keywords: ["docker", "dockerfile", "hadolint", "lint", "static-analysis", "container"]
     hook:
       type: agent-after-file-edit
       paths: "**/Dockerfile*"
+    requires:
+      - tool: hadolint
+        install_hint: "brew install hadolint  (or grab a static binary from github.com/hadolint/hadolint/releases)"
     check: scripts/lint-dockerfile.sh
     message: |-
       hadolint flagged issues in `{file}`:
