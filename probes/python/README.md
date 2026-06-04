@@ -18,16 +18,8 @@ Python-specific CI-time policies. Consumers opt into individual probes
 with `include:` (see [Installation](#installation)).
 
 The shipped `disallowed-deps` probe is the agent-time analogue of
-[`policies/sbom/disallowed-packages`](../../policies/sbom/) — same mental
-model (a curated disallowed list, consumers extend), applied at edit-time
-on the dep files themselves rather than at PR-time on a normalized SBOM.
-The shape diverges in two places (see [Notes](#notes)):
-
-- **Per-package version ranges**, not regex-on-name — vulnerabilities are
-  version-specific; regex-on-name would over-block the fix release.
-- **One plugin per language** — agent-time has no normalized SBOM layer
-  to abstract language, so each language's dep-file parser lives in its
-  own plugin (`python`, then `node`, `java`, … under the same shape).
+[`policies/sbom/disallowed-packages`](../../policies/sbom/) — a curated
+disallowed list, enforced on dep-file edits rather than on a PR-time SBOM.
 
 ## Probes
 
@@ -159,28 +151,6 @@ for the full syntax.
 - No Python runtime, no `pip` — the check parses what it needs with
   text tooling alone, keeping the probe fast and dependency-light at
   agent-time.
-
-## Notes
-
-- **Why group probes under one `python` plugin.** Mirrors
-  [`policies/python/`](../../policies/python/): one plugin per language,
-  multiple capabilities inside it, opt-in per capability with
-  `include:`. A consumer adds one `uses:` line for "Python guardrails"
-  and picks what they want, rather than wiring up a separate plugin per
-  check.
-- **Why one plugin per language, not one overall.** The plugin
-  equivalent at PR-time
-  ([`policies/sbom/disallowed-packages`](../../policies/sbom/)) is one
-  regex list applied to a normalized SBOM, which abstracts language. At
-  agent-time there's no equivalent normalized layer — the probe has to
-  know which dep-file syntax to parse, which is language-specific.
-  Splitting by language keeps each plugin's parser scoped; future
-  `node`, `java`, `go`, … plugins follow the same shape, each with its
-  own `disallowed-deps` probe.
-- **Why per-package version ranges, not regex-on-name.** Vulnerabilities
-  are version-specific; regex-on-name would over-block the fix release
-  and miss the case where a known-bad range straddles a fix. The shape
-  diverges from `disallowed-packages` accordingly.
 
 ## See also
 
