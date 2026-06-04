@@ -35,6 +35,21 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
 | `aws-s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
 | `aws-vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
+| `aws-security-group-no-public-admin-ports` | No public ingress to sensitive admin/database ports | A security group allows `0.0.0.0/0` to a port like RDP, MySQL, MSSQL, or Telnet |
+| `aws-rds-encryption-at-rest` | RDS storage is encrypted at rest | `aws_db_instance` / `aws_rds_cluster` without `storage_encrypted = true` |
+| `aws-rds-not-publicly-accessible` | RDS is not publicly accessible | An RDS instance sets `publicly_accessible = true` |
+| `aws-rds-snapshot-encryption` | RDS snapshots encrypted at rest | Snapshot whose source DB is not `storage_encrypted` |
+| `aws-s3-encryption-at-rest` | S3 buckets declare encryption at rest | Bucket without a server-side encryption configuration |
+| `aws-s3-no-static-website` | S3 buckets do not host static websites | Bucket with a website configuration (public hosting) |
+| `aws-s3-no-public-acl` | S3 buckets do not grant public ACL access | Bucket with a `public-read`/`public-read-write` ACL or AllUsers grant |
+| `aws-iam-password-min-length` | IAM password policy enforces a minimum length | No `aws_iam_account_password_policy`, or length below the minimum |
+| `aws-iam-no-direct-user-policies` | No IAM policies attached directly to users | Inline/managed policy attached to a user instead of a group or role |
+| `aws-acm-cert-dns-validation` | ACM certificates use DNS validation | `aws_acm_certificate` using EMAIL (or unset) validation |
+| `aws-eks-private-endpoint` | EKS clusters enable private endpoint access | Cluster without `endpoint_private_access` / `cluster_endpoint_private_access` |
+| `aws-dynamodb-encryption` | DynamoDB tables declare encryption at rest | Table without a `server_side_encryption { enabled = true }` block |
+| `aws-lambda-not-public` | Lambda functions are not publicly invokable | `principal = "*"` permission without source scope, or function URL with `authorization_type = NONE` |
+| `aws-cloudtrail-log-file-validation` | CloudTrail validates log-file integrity | Trail without `enable_log_file_validation = true` |
+| `aws-cloudtrail-kms-encryption` | CloudTrail logs encrypted with KMS | Trail without `kms_key_id` |
 
 ## Required Data
 

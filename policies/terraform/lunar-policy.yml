@@ -165,6 +165,122 @@ policies:
     mainPython: aws_vpc_flow_logs.py
     keywords: ["vpc", "flow logs", "network monitoring", "cloudwatch", "traffic audit", "soc2"]
 
+  - name: aws-security-group-no-public-admin-ports
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to sensitive admin or database ports (RDP, MSSQL, Oracle, MySQL,
+      Telnet, SMB, Elasticsearch, and more). SSH and PostgreSQL have their own
+      dedicated checks.
+    mainPython: aws_security_group_no_public_admin_ports.py
+    keywords: ["security group", "ingress", "rdp", "mysql", "mssql", "public access", "soc2"]
+
+  - name: aws-rds-encryption-at-rest
+    description: |
+      Requires RDS instances and clusters to set storage_encrypted = true so
+      database storage is encrypted at rest with KMS. Replicas and
+      snapshot/PITR restores that inherit encryption are not flagged.
+    mainPython: aws_rds_encryption_at_rest.py
+    keywords: ["rds", "encryption at rest", "storage_encrypted", "kms", "database", "soc2"]
+
+  - name: aws-rds-not-publicly-accessible
+    description: |
+      Requires RDS instances to keep publicly_accessible = false so databases
+      are not reachable directly from the public internet.
+    mainPython: aws_rds_not_publicly_accessible.py
+    keywords: ["rds", "publicly accessible", "database", "public access", "network", "soc2"]
+
+  - name: aws-rds-snapshot-encryption
+    description: |
+      Requires RDS snapshots to be encrypted at rest. Snapshots inherit
+      encryption from their source DB, so this verifies the referenced instance
+      or cluster sets storage_encrypted = true.
+    mainPython: aws_rds_snapshot_encryption.py
+    keywords: ["rds snapshot", "encryption at rest", "storage_encrypted", "kms", "backup", "soc2"]
+
+  - name: aws-s3-encryption-at-rest
+    description: |
+      Requires every S3 bucket to declare a server-side encryption
+      configuration, making encryption at rest an explicit and auditable
+      choice rather than relying on the implicit default.
+    mainPython: aws_s3_encryption_at_rest.py
+    keywords: ["s3", "encryption at rest", "sse", "kms", "bucket", "soc2"]
+
+  - name: aws-s3-no-static-website
+    description: |
+      Forbids S3 buckets from hosting a public static website, which would serve
+      bucket contents directly to the internet.
+    mainPython: aws_s3_no_static_website.py
+    keywords: ["s3", "static website", "public", "bucket", "data exposure", "soc2"]
+
+  - name: aws-s3-no-public-acl
+    description: |
+      Forbids S3 buckets from granting public access through canned ACLs
+      (public-read/public-read-write) or grants to the AllUsers/AuthenticatedUsers
+      groups.
+    mainPython: aws_s3_no_public_acl.py
+    keywords: ["s3", "acl", "public access", "bucket", "data exposure", "soc2"]
+
+  - name: aws-iam-password-min-length
+    description: |
+      Requires an IAM account password policy that enforces a minimum password
+      length (default 14). The account password policy is a global baseline, so
+      its absence is treated as a violation.
+    mainPython: aws_iam_password_min_length.py
+    keywords: ["iam", "password policy", "minimum length", "account baseline", "credentials", "soc2"]
+
+  - name: aws-iam-no-direct-user-policies
+    description: |
+      Forbids attaching IAM policies (inline or managed) directly to users.
+      Policies should be attached to groups or roles so access is granted
+      through reviewable, reusable boundaries.
+    mainPython: aws_iam_no_direct_user_policies.py
+    keywords: ["iam", "least privilege", "user policy", "groups", "roles", "soc2"]
+
+  - name: aws-acm-cert-dns-validation
+    description: |
+      Requires ACM certificates to use DNS validation so issuance and renewal
+      are automatic and auditable. Imported certificates are not flagged.
+    mainPython: aws_acm_cert_dns_validation.py
+    keywords: ["acm", "certificate", "dns validation", "tls", "renewal", "soc2"]
+
+  - name: aws-eks-private-endpoint
+    description: |
+      Requires EKS clusters to enable private API-server endpoint access, so the
+      control plane is reachable from within the VPC rather than only over the
+      public internet.
+    mainPython: aws_eks_private_endpoint.py
+    keywords: ["eks", "kubernetes", "private endpoint", "api server", "network", "soc2"]
+
+  - name: aws-dynamodb-encryption
+    description: |
+      Requires DynamoDB tables to declare server-side encryption explicitly.
+      DynamoDB is encrypted by default with an AWS-owned key; this makes
+      encryption (optionally customer-managed) a deliberate, auditable choice.
+    mainPython: aws_dynamodb_encryption.py
+    keywords: ["dynamodb", "encryption at rest", "sse", "kms", "table", "soc2"]
+
+  - name: aws-lambda-not-public
+    description: |
+      Forbids Lambda functions from being publicly invokable through a
+      principal "*" permission without a source scope, or a function URL with
+      authorization_type = NONE.
+    mainPython: aws_lambda_not_public.py
+    keywords: ["lambda", "public access", "function url", "permission", "principal", "soc2"]
+
+  - name: aws-cloudtrail-log-file-validation
+    description: |
+      Requires CloudTrail trails to enable log-file integrity validation so
+      tampering with delivered logs can be detected.
+    mainPython: aws_cloudtrail_log_file_validation.py
+    keywords: ["cloudtrail", "log file validation", "integrity", "audit log", "tamper", "soc2"]
+
+  - name: aws-cloudtrail-kms-encryption
+    description: |
+      Requires CloudTrail trails to encrypt delivered logs with a KMS
+      customer-managed key.
+    mainPython: aws_cloudtrail_kms_encryption.py
+    keywords: ["cloudtrail", "kms", "encryption at rest", "audit log", "sse-kms", "soc2"]
+
 inputs:
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
@@ -184,3 +300,9 @@ inputs:
   require_cloudtrail_cloudwatch:
     description: Whether CloudTrail must also deliver logs to CloudWatch Logs (true/false)
     default: "true"
+  extra_admin_ports:
+    description: Additional comma-separated TCP ports to treat as sensitive for the public admin-ports check
+    default: ""
+  min_password_length:
+    description: Minimum IAM account password length required by aws-iam-password-min-length
+    default: "14"

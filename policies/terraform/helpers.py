@@ -287,6 +287,39 @@ def public_ingress_offenders(native_files_node, port):
     return offenders
 
 
+def public_ingress_offenders_for_ports(native_files_node, ports):
+    """Map each of ``ports`` to the SG labels that expose it to the whole internet.
+
+    Single traversal over all three security-group shapes (inline
+    ``aws_security_group`` ingress blocks, standalone ``aws_security_group_rule``
+    ingress, and ``aws_vpc_security_group_ingress_rule``). Returns
+    ``{port: [labels]}`` containing only ports with at least one offender.
+    A protocol "-1"/"all" world-open rule matches every port (it genuinely
+    exposes all of them).
+    """
+    result = {p: [] for p in ports}
+
+    def scan(label, rule):
+        if not _open_to_world(rule):
+            return
+        for p in ports:
+            if _covers_port(rule, p) and label not in result[p]:
+                result[p].append(label)
+
+    for _, name, cfg in iter_resources(native_files_node, "aws_security_group"):
+        for ing in block(cfg, "ingress"):
+            scan("aws_security_group.{}".format(name), ing)
+
+    for _, name, cfg in iter_resources(native_files_node, "aws_security_group_rule"):
+        if str(cfg.get("type", "")).lower() == "ingress":
+            scan("aws_security_group_rule.{}".format(name), cfg)
+
+    for _, name, cfg in iter_resources(native_files_node, "aws_vpc_security_group_ingress_rule"):
+        scan("aws_vpc_security_group_ingress_rule.{}".format(name), cfg)
+
+    return {p: labels for p, labels in result.items() if labels}
+
+
 def has_any_security_group(native_files_node):
     """True if the config declares any security group or ingress-rule resource."""
     return has_resource(
