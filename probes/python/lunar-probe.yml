@@ -5,30 +5,22 @@ description: Agent-time guardrails for Python projects, shipped as individually-
 author: earthly
 
 landing_page:
-  display_name: "Python"
+  display_name: "Python Probe"
   long_description: |
-    A growing toolkit of agent-time guardrails for Python projects.
-    Each capability is a separate probe; consumers pick the ones they
-    want with `include:` / `exclude:` on the `uses:` entry.
-
-    Ships today:
-      - `disallowed-deps` — hard-block dep / lock file edits that pin a
-        package to a version inside a known-vulnerable range. Seeded with
-        widely-deployed Python CVEs (incl. Starlette BadHost /
-        CVE-2026-48710); consumers extend or replace the list.
-
-    Planned (separate follow-ups): a linter probe and a CVE
-    code-pattern nudge probe, added under this same plugin.
-  categories: ["security"]
+    A toolkit of agent-time guardrails for Python projects, shipped as
+    one lunar-probe plugin. Each capability is a separate probe, selected
+    with `include:` / `exclude:`. Ships `disallowed-deps` today; a linter
+    and a CVE code-pattern nudge follow under the same plugin.
+  categories: ["security", "dependencies"]
   icon: "assets/python.svg"
   status: "beta"
   related:
     - slug: "python"
       type: "policy"
-      reason: "CI-time backstop on Python dep versions; this probe is the agent-time complement."
+      reason: "CI-time Python policies; the agent-time probes are the edit-time complement."
     - slug: "sbom"
       type: "policy"
-      reason: "PR-time SBOM-based equivalent (`disallowed-packages`) that inspired the disallowed-deps probe's shape."
+      reason: "PR-time SBOM disallowed-list; shape inspiration for the disallowed-deps probe."
 
 probes:
   - name: disallowed-deps
@@ -69,5 +61,5 @@ probes:
       Fix the pin in this file, re-resolve the lockfile, then retry.
       Extend or replace the disallowed list via the `extra_disallowed` and
       `replace_defaults` inputs — see
-      [`probes/python/README.md`](../README.md) for the shipped defaults
-      and the override shape.
+      [`probes/python/docs/disallowed-deps.md`](../docs/disallowed-deps.md)
+      for the shipped defaults and the override shape.
