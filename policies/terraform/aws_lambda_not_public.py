@@ -19,11 +19,14 @@ def main(node=None):
 
         for _, name, cfg in permissions:
             principal = str(cfg.get("principal", ""))
-            # "*" grants invoke to everyone unless scoped by source_account/source_arn.
-            if principal == "*" and not (cfg.get("source_account") or cfg.get("source_arn")):
+            # "*" grants invoke to everyone unless scoped by source_account,
+            # source_arn, or principal_org_id (org-internal — not public).
+            scoped = cfg.get("source_account") or cfg.get("source_arn") or cfg.get("principal_org_id")
+            if principal == "*" and not scoped:
                 c.fail(
-                    "aws_lambda_permission.{} grants invoke to principal \"*\" with "
-                    "no source_account/source_arn scope (publicly invokable).".format(name)
+                    "aws_lambda_permission.{} grants invoke to principal \"*\" with no "
+                    "source_account/source_arn/principal_org_id scope (publicly "
+                    "invokable).".format(name)
                 )
 
         for _, name, cfg in urls:

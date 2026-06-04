@@ -596,6 +596,11 @@ class TestLambdaNotPublic(unittest.TestCase):
         n = node({"aws_lambda_permission": {"p": [{"principal": "*", "source_account": "123456789012"}]}})
         self.assertEqual(status(aws_lambda_not_public, n), CheckStatus.PASS)
 
+    def test_pass_star_with_org_id(self):
+        # principal "*" scoped to an AWS Organization is org-internal, not public.
+        n = node({"aws_lambda_permission": {"p": [{"principal": "*", "principal_org_id": "o-abc123"}]}})
+        self.assertEqual(status(aws_lambda_not_public, n), CheckStatus.PASS)
+
     def test_fail_star(self):
         n = node({"aws_lambda_permission": {"p": [{"principal": "*"}]}})
         self.assertEqual(status(aws_lambda_not_public, n), CheckStatus.FAIL)
