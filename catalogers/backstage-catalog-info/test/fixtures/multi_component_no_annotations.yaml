@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: foo
+spec:
+  type: service
+  owner: group:default/team-foo
+  lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bar
+spec:
+  type: service
+  owner: group:default/team-bar
+  lifecycle: production

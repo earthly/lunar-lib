@@ -1,54 +1,44 @@
 # Python Probe
 
-Agent-time Python guardrails, bundled per language. Runs
-[Ruff](https://docs.astral.sh/ruff/) on every `.py` file the agent
-edits — `ruff check` for lint findings (unused imports, undefined
-names, pyflakes errors, pycodestyle violations, import-order and
-formatting drift, and the rest of the default rule set) and
-`ruff format --check` for Black-compatible formatting. Each is a
-separately toggleable sub-probe.
+Agent-time guardrails for Python projects, shipped as a single
+[`lunar-probe`](https://github.com/earthly/lunar-probe) plugin. Each
+capability is a separate probe; select the ones you want with `include:` /
+`exclude:` on the `uses:` entry.
 
 ## Overview
 
-This is a [`lunar-probe`](https://github.com/earthly/lunar-probe) plugin —
-a per-language **bundle** that groups Python guardrails the same way
-[`collectors/python/`](../../collectors/python/) and
-[`policies/python/`](../../policies/python/) group their Python logic.
-Both sub-probes hook `agent-after-file-edit` on `**/*.py`; when the agent
-edits a Python file they run their Ruff command against it and, on a
-non-zero exit, report the findings back to the agent as a block reason.
-
-Consumers take the whole bundle or a subset — see
-[Configuration](#configuration).
+A growing toolkit of Python agent-time guardrails grouped under one
+plugin — mirroring how [`policies/python/`](../../policies/python/) groups
+Python CI-time policies. Consumers add one `uses:` entry and opt into
+individual probes with `include:` (see [Installation](#installation)).
+Each probe's behaviour, defaults, and configuration live on its own page
+under [`docs/`](docs/).
 
 ## Probes
 
 | Name | Hook | Description |
 |------|------|-------------|
-| `ruff-lint` | `agent-after-file-edit` (`paths: **/*.py`) | Run `ruff check` on the edited file, block on lint findings. |
-| `ruff-format` | `agent-after-file-edit` (`paths: **/*.py`) | Run `ruff format --check` on the edited file, block on formatting drift. |
+| `ruff-lint` | `agent-after-file-edit` | Run `ruff check` on the edited `.py` file, block on lint findings. [Details →](docs/ruff-lint.md) |
+| `ruff-format` | `agent-after-file-edit` | Run `ruff format --check` on the edited `.py` file, block on formatting drift. [Details →](docs/ruff-format.md) |
+| `disallowed-deps` | `agent-before-file-edit` | Block dep / lock edits that pin a package to a known-vulnerable version. [Details →](docs/disallowed-deps.md) |
 
-Probes auto-namespace as `<plugin>.<probe>`, so these surface as
-`python.ruff-lint` and `python.ruff-format` in `lunar-probe logs`, PR
-check titles, and `lunar-probe lint` output. More Python sub-probes
-(e.g. a type check, a disallowed-dependency guard) can join this bundle
-over time without changing how consumers reference it.
+Probes auto-namespace as `python.<probe>` at runtime (e.g.
+`python.ruff-lint`, `python.disallowed-deps`) — visible in `lunar-probe
+logs` and PR check titles. More Python probes land under this plugin via
+separate PRs; each adds a row here and its own page under
+[`docs/`](docs/).
 
 ## Skip-safe behaviour
 
-Neither sub-probe breaks the agent session when Ruff is absent — but
-they don't disappear silently either. Each declares its dependency:
+Every probe in this plugin is skip-safe: it's a no-op (exit `0`, the
+action proceeds) whenever its trigger isn't present or the tooling it
+needs is unavailable — none of them block on uncertainty.
 
-```yaml
-requires:
-  - tool: ruff
-    install_hint: "pip install ruff  (or: uv tool install ruff / brew install ruff)"
-```
-
-When `ruff` isn't on `PATH`, `lunar-probe` short-circuits the check
-(the edit still proceeds) and records a breadcrumb. At session-end it
-surfaces a single consolidated reminder, install hint included, so a
-missing linter is visible rather than a silent gap in coverage:
+The `ruff-*` probes additionally declare `requires: tool: ruff`. When
+`ruff` isn't on `PATH`, `lunar-probe` short-circuits the check (the edit
+proceeds) and surfaces a single consolidated reminder at session-end —
+with an install hint — so a missing linter is visible rather than a
+silent gap:
 
 ```
 ⚠ Skipped probes (missing dependencies):
@@ -56,59 +46,50 @@ missing linter is visible rather than a silent gap in coverage:
   install: pip install ruff  (or: uv tool install ruff / brew install ruff)
 ```
 
-This is `lunar-probe`'s first-class `requires:` mechanism (engine
-support landed in `earthly/lunar-probe` ENG-761), not a bespoke guard —
-it keeps every probe's missing-dependency reporting uniform.
+The exact per-probe skip conditions are documented on each probe's page —
+see [`ruff-lint`](docs/ruff-lint.md#skip-safe-behaviour),
+[`ruff-format`](docs/ruff-format.md#skip-safe-behaviour), and
+[`disallowed-deps`](docs/disallowed-deps.md#skip-safe-behaviour).
 
 ## Installation
 
-Prereq: `lunar-probe` itself must be installed on your box and wired
-into your agent framework. See
-[`earthly/lunar-probe` § Install](https://github.com/earthly/lunar-probe#install)
-for the one-line installer; the short version is `lunar-probe install`
-(auto-detects Claude Code, Cursor, Codex, Gemini), which for Claude
-Code registers a native plugin via `claude plugins marketplace add` +
-`claude plugins install`. Re-running `lunar-probe install` after a
-lunar-probe upgrade is the supported refresh path.
+Prereq: [`lunar-probe`](https://github.com/earthly/lunar-probe) installed
+and wired into your agent framework.
 
-Then add this bundle to your `.lunar/probes.yml` (pin to the latest
-released tag):
+Add to your `.lunar/probes.yml` (pin to a released tag) and select the
+probes you want with `include:`:
 
 ```yaml
 version: 0
 
 probes:
   - uses: github://earthly/lunar-lib/probes/python@v1.0.0
+    include: ["ruff-lint", "ruff-format"]
 ```
+
+Omit `include:` to opt into every probe the plugin ships, or use
+`exclude:` to take all-but-one. See
+[`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
+for the full syntax.
 
 ## Requirements
 
-- `ruff` available on the agent's `PATH`. Install via your package
-  manager or `pip`: `pip install ruff`, `brew install ruff`,
-  `uv tool install ruff`, or grab a static binary from
-  [astral-sh/ruff releases](https://github.com/astral-sh/ruff/releases).
-- `jq` on `PATH` for parsing the agent's file-edit payload.
+- POSIX `sh` — every check script is portable across Bash, dash, and
+  Alpine BusyBox. No bashisms.
+- `jq` on `PATH` for parsing the framework payload piped to each check on
+  stdin.
+- `ruff` on `PATH` for the `ruff-lint` / `ruff-format` probes
+  (`pip install ruff`, `uv tool install ruff`, or `brew install ruff`).
+  Declared via `requires:` — when absent, those probes skip and surface a
+  session-end reminder rather than blocking.
+- Standard text tools (`grep`, `sed`) for `disallowed-deps` —
+  BusyBox-compatible flags only. No Python runtime is needed at
+  agent-time.
 
-## Configuration
-
-Ruff reads its own configuration from the repo's `pyproject.toml` /
-`ruff.toml` / `.ruff.toml` automatically — rule selection, ignores, and
-line length all live there.
-
-To take only part of the bundle, use `include:` / `exclude:` (probe
-names, mutually exclusive) on the `uses:` entry:
-
-```yaml
-probes:
-  - uses: github://earthly/lunar-lib/probes/python@v1.0.0
-    exclude: [ruff-format]      # lint only — skip the format check
-```
-
-The bundle does not currently expose any `inputs:`. Surfacing knobs
-for severity gating is tracked as future work.
+Individual probes list their exact tooling on their [`docs/`](docs/) page.
 
 ## See also
 
-- [`collectors/python/`](../../collectors/python/) — CI-time Python linter detection + project metadata. This bundle is the agent-time complement.
-- [`policies/python/`](../../policies/python/) — policy gating on CI-collected Python linter configuration.
-- [`probes/shellcheck/`](../shellcheck/) — sibling probe for shell scripts (migrating to a `probes/shell/` per-language bundle, same shape as this one).
+- [`policies/python/`](../../policies/python/) — CI-time Python policies.
+  The agent-time probes here are the edit-time complement: they intercept
+  a problem before/at the edit, the policies catch it at PR-check time.

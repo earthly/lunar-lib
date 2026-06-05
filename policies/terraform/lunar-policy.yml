@@ -9,8 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Terraform Guardrails"
   long_description: |
-    Enforce Terraform-specific best practices including provider version pinning, minimum provider versions,
-    module version pinning, and remote backend configuration.
+    Enforce Terraform best practices such as provider/module version pinning and
+    remote backend configuration, plus AWS resource security checks relevant to
+    SOC 2: encryption at rest, logging, public-access blocking, network ingress
+    limits, WAF, GuardDuty, and VPC flow logs.
   category: "deployment-and-infrastructure"
   icon: "assets/terraform.svg"
   status: "beta"
@@ -53,6 +55,232 @@ policies:
     mainPython: min_provider_versions.py
     keywords: ["terraform", "providers", "minimum version", "security", "semver"]
 
+  # --- AWS infrastructure security checks (SOC 2-relevant; tagged via the soc2 keyword) ---
+  # Each reads the same parsed Terraform HCL as the checks above and is
+  # individually includable. A future SOC 2 starter-pack can bundle them.
+  - name: aws-alb-waf-enabled
+    description: |
+      Requires every internet-facing Application Load Balancer to have an AWS WAF
+      web ACL associated. Unprotected public ALBs are exposed to common web
+      exploits such as SQL injection and cross-site scripting.
+    mainPython: aws_alb_waf_enabled.py
+    keywords: ["aws waf", "alb", "application load balancer", "web acl", "soc2", "owasp"]
+
+  - name: aws-cloudtrail-multi-region
+    description: |
+      Requires a multi-region CloudTrail trail that delivers events to CloudWatch
+      Logs, so API activity is captured across every region and available for
+      monitoring and alerting.
+    mainPython: aws_cloudtrail_multi_region.py
+    keywords: ["cloudtrail", "multi-region", "cloudwatch", "audit log", "aws api", "soc2"]
+
+  - name: aws-security-group-no-public-postgres
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to the PostgreSQL port. Databases must never be reachable directly
+      from the public internet.
+    mainPython: aws_security_group_no_public_postgres.py
+    keywords: ["security group", "postgresql", "5432", "ingress", "public access", "soc2"]
+
+  - name: aws-security-group-no-public-ssh
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to the SSH port. SSH must be reached through a bastion or VPN, never
+      open to the entire internet.
+    mainPython: aws_security_group_no_public_ssh.py
+    keywords: ["security group", "ssh", "port 22", "ingress", "public access", "soc2"]
+
+  - name: aws-eks-control-plane-logging
+    description: |
+      Requires EKS clusters to enable control-plane logging to CloudWatch for the
+      required log types (api, audit, authenticator, controllerManager,
+      scheduler), giving auditable visibility into cluster activity.
+    mainPython: aws_eks_control_plane_logging.py
+    keywords: ["eks", "kubernetes", "control plane logging", "cloudwatch", "audit", "soc2"]
+
+  - name: aws-elb-access-logging
+    description: |
+      Requires Elastic Load Balancers to have access logging enabled so request
+      traffic is recorded to S3 for audit, troubleshooting, and security
+      investigations.
+    mainPython: aws_elb_access_logging.py
+    keywords: ["elb", "load balancer", "access logging", "s3 logs", "audit", "soc2"]
+
+  - name: aws-ebs-snapshot-encryption
+    description: |
+      Requires EBS snapshots to be encrypted at rest. Snapshots inherit data from
+      their source volumes and must not leave that data unencrypted when copied
+      or shared.
+    mainPython: aws_ebs_snapshot_encryption.py
+    keywords: ["ebs snapshot", "encryption at rest", "kms", "data protection", "aws", "soc2"]
+
+  - name: aws-ebs-volume-encryption
+    description: |
+      Requires EBS volumes (standalone and instance block devices) to be
+      encrypted at rest, protecting data on disk with KMS-managed keys.
+    mainPython: aws_ebs_volume_encryption.py
+    keywords: ["ebs volume", "encryption at rest", "kms", "ec2 disk", "data protection", "soc2"]
+
+  - name: aws-elb-https-only
+    description: |
+      Requires load balancers to enforce encrypted transport. HTTP listeners must
+      redirect to HTTPS, and listeners must use HTTPS/TLS so traffic in transit is
+      never sent in cleartext.
+    mainPython: aws_elb_https_only.py
+    keywords: ["elb", "https", "tls", "encryption in transit", "load balancer listener", "soc2"]
+
+  - name: aws-guardduty-enabled
+    description: |
+      Requires Amazon GuardDuty to be enabled so the account has continuous
+      threat detection across CloudTrail, VPC flow, and DNS telemetry.
+    mainPython: aws_guardduty_enabled.py
+    keywords: ["guardduty", "threat detection", "aws security", "monitoring", "detector", "soc2"]
+
+  - name: aws-rds-cloudwatch-logging
+    description: |
+      Requires RDS instances and clusters to export database logs to CloudWatch,
+      so engine, audit, and error logs are retained off-host for monitoring.
+    mainPython: aws_rds_cloudwatch_logging.py
+    keywords: ["rds", "cloudwatch logs", "database logging", "log exports", "audit", "soc2"]
+
+  - name: aws-s3-block-public-access
+    description: |
+      Requires every S3 bucket to have public access fully blocked through a
+      public access block configuration, preventing accidental public exposure of
+      stored objects.
+    mainPython: aws_s3_block_public_access.py
+    keywords: ["s3", "public access block", "bucket security", "data exposure", "aws", "soc2"]
+
+  - name: aws-s3-access-logging
+    description: |
+      Requires S3 buckets to have server access logging enabled, recording every
+      request to a logging bucket for audit and forensic purposes.
+    mainPython: aws_s3_access_logging.py
+    keywords: ["s3", "server access logging", "audit log", "bucket logging", "aws", "soc2"]
+
+  - name: aws-vpc-flow-logs
+    description: |
+      Requires every VPC to have flow logs enabled, capturing accepted and
+      rejected network traffic for security monitoring and incident response.
+    mainPython: aws_vpc_flow_logs.py
+    keywords: ["vpc", "flow logs", "network monitoring", "cloudwatch", "traffic audit", "soc2"]
+
+  - name: aws-security-group-no-public-admin-ports
+    description: |
+      Requires that no security group allows unrestricted ingress (0.0.0.0/0 or
+      ::/0) to sensitive admin or database ports (RDP, MSSQL, Oracle, MySQL,
+      Telnet, SMB, Elasticsearch, and more). SSH and PostgreSQL have their own
+      dedicated checks.
+    mainPython: aws_security_group_no_public_admin_ports.py
+    keywords: ["security group", "ingress", "rdp", "mysql", "mssql", "public access", "soc2"]
+
+  - name: aws-rds-encryption-at-rest
+    description: |
+      Requires RDS instances and clusters to set storage_encrypted = true so
+      database storage is encrypted at rest with KMS. Replicas and
+      snapshot/PITR restores that inherit encryption are not flagged.
+    mainPython: aws_rds_encryption_at_rest.py
+    keywords: ["rds", "encryption at rest", "storage_encrypted", "kms", "database", "soc2"]
+
+  - name: aws-rds-not-publicly-accessible
+    description: |
+      Requires RDS instances to keep publicly_accessible = false so databases
+      are not reachable directly from the public internet.
+    mainPython: aws_rds_not_publicly_accessible.py
+    keywords: ["rds", "publicly accessible", "database", "public access", "network", "soc2"]
+
+  - name: aws-rds-snapshot-encryption
+    description: |
+      Requires RDS snapshots to be encrypted at rest. Snapshots inherit
+      encryption from their source DB, so this verifies the referenced instance
+      or cluster sets storage_encrypted = true.
+    mainPython: aws_rds_snapshot_encryption.py
+    keywords: ["rds snapshot", "encryption at rest", "storage_encrypted", "kms", "backup", "soc2"]
+
+  - name: aws-s3-encryption-at-rest
+    description: |
+      Requires every S3 bucket to declare a server-side encryption
+      configuration, making encryption at rest an explicit and auditable
+      choice rather than relying on the implicit default.
+    mainPython: aws_s3_encryption_at_rest.py
+    keywords: ["s3", "encryption at rest", "sse", "kms", "bucket", "soc2"]
+
+  - name: aws-s3-no-static-website
+    description: |
+      Forbids S3 buckets from hosting a public static website, which would serve
+      bucket contents directly to the internet.
+    mainPython: aws_s3_no_static_website.py
+    keywords: ["s3", "static website", "public", "bucket", "data exposure", "soc2"]
+
+  - name: aws-s3-no-public-acl
+    description: |
+      Forbids S3 buckets from granting public access through canned ACLs
+      (public-read/public-read-write) or grants to the AllUsers/AuthenticatedUsers
+      groups.
+    mainPython: aws_s3_no_public_acl.py
+    keywords: ["s3", "acl", "public access", "bucket", "data exposure", "soc2"]
+
+  - name: aws-iam-password-min-length
+    description: |
+      Requires an IAM account password policy that enforces a minimum password
+      length (default 14). The account password policy is a global baseline, so
+      its absence is treated as a violation.
+    mainPython: aws_iam_password_min_length.py
+    keywords: ["iam", "password policy", "minimum length", "account baseline", "credentials", "soc2"]
+
+  - name: aws-iam-no-direct-user-policies
+    description: |
+      Forbids attaching IAM policies (inline or managed) directly to users.
+      Policies should be attached to groups or roles so access is granted
+      through reviewable, reusable boundaries.
+    mainPython: aws_iam_no_direct_user_policies.py
+    keywords: ["iam", "least privilege", "user policy", "groups", "roles", "soc2"]
+
+  - name: aws-acm-cert-dns-validation
+    description: |
+      Requires ACM certificates to use DNS validation so issuance and renewal
+      are automatic and auditable. Imported certificates are not flagged.
+    mainPython: aws_acm_cert_dns_validation.py
+    keywords: ["acm", "certificate", "dns validation", "tls", "renewal", "soc2"]
+
+  - name: aws-eks-private-endpoint
+    description: |
+      Requires EKS clusters to enable private API-server endpoint access, so the
+      control plane is reachable from within the VPC rather than only over the
+      public internet.
+    mainPython: aws_eks_private_endpoint.py
+    keywords: ["eks", "kubernetes", "private endpoint", "api server", "network", "soc2"]
+
+  - name: aws-dynamodb-encryption
+    description: |
+      Requires DynamoDB tables to declare server-side encryption explicitly.
+      DynamoDB is encrypted by default with an AWS-owned key; this makes
+      encryption (optionally customer-managed) a deliberate, auditable choice.
+    mainPython: aws_dynamodb_encryption.py
+    keywords: ["dynamodb", "encryption at rest", "sse", "kms", "table", "soc2"]
+
+  - name: aws-lambda-not-public
+    description: |
+      Forbids Lambda functions from being publicly invokable through a
+      principal "*" permission without a source scope, or a function URL with
+      authorization_type = NONE.
+    mainPython: aws_lambda_not_public.py
+    keywords: ["lambda", "public access", "function url", "permission", "principal", "soc2"]
+
+  - name: aws-cloudtrail-log-file-validation
+    description: |
+      Requires CloudTrail trails to enable log-file integrity validation so
+      tampering with delivered logs can be detected.
+    mainPython: aws_cloudtrail_log_file_validation.py
+    keywords: ["cloudtrail", "log file validation", "integrity", "audit log", "tamper", "soc2"]
+
+  - name: aws-cloudtrail-kms-encryption
+    description: |
+      Requires CloudTrail trails to encrypt delivered logs with a KMS
+      customer-managed key.
+    mainPython: aws_cloudtrail_kms_encryption.py
+    keywords: ["cloudtrail", "kms", "encryption at rest", "audit log", "sse-kms", "soc2"]
+
 inputs:
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
@@ -60,3 +288,21 @@ inputs:
   min_provider_versions:
     description: 'JSON object mapping provider names to minimum versions (e.g., {"aws": "5.0", "random": "3.0"})'
     default: "{}"
+  ssh_port:
+    description: TCP port treated as SSH for the public-ingress check
+    default: "22"
+  postgres_port:
+    description: TCP port treated as PostgreSQL for the public-ingress check
+    default: "5432"
+  eks_required_log_types:
+    description: Comma-separated EKS control-plane log types that must be enabled
+    default: "api,audit,authenticator,controllerManager,scheduler"
+  require_cloudtrail_cloudwatch:
+    description: Whether CloudTrail must also deliver logs to CloudWatch Logs (true/false)
+    default: "true"
+  extra_admin_ports:
+    description: Additional comma-separated TCP ports to treat as sensitive for the public admin-ports check
+    default: ""
+  min_password_length:
+    description: Minimum IAM account password length required by aws-iam-password-min-length
+    default: "14"

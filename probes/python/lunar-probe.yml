@@ -1,27 +1,30 @@
 version: 0
 
 name: python
-description: Python guardrails that run as the agent edits `.py` files — Ruff lint + format-check, with room for more.
+description: Agent-time guardrails for Python projects, shipped as individually-includable probes. Ships Ruff lint + format-check on edited `.py` files and `disallowed-deps` (block dep-file pins to known-vulnerable versions). Select probes with `include:` / `exclude:`.
 author: earthly
 
 landing_page:
   display_name: "Python Probe"
   long_description: |
-    Agent-time Python guardrails, bundled per language. Runs Ruff on
-    each edited `.py` file — `ruff check` for lint findings and
-    `ruff format --check` for formatting drift, each a separately
-    toggleable sub-probe. Read-only and skip-safe when `ruff` isn't
-    installed.
-  categories: ["code-quality"]
+    Agent-time Python guardrails in one lunar-probe plugin. `ruff-lint`
+    and `ruff-format` lint and format-check edited `.py` files;
+    `disallowed-deps` blocks dep-file pins to known-vulnerable versions.
+    Each is a separately includable sub-probe, skip-safe when its tool
+    isn't installed.
+  categories: ["code-quality", "security", "dependencies"]
   icon: "assets/python.svg"
   status: "beta"
   related:
     - slug: "python"
       type: "collector"
-      reason: "CI-time Python linter detection. This bundle is the agent-time complement."
+      reason: "CI-time Python linter detection. The probes are the agent-time complement."
     - slug: "python"
       type: "policy"
-      reason: "Gates on CI-collected Python lint findings. These probes catch them earlier."
+      reason: "Gates on CI-collected Python findings. These probes catch them earlier."
+    - slug: "sbom"
+      type: "policy"
+      reason: "PR-time SBOM disallowed-list; shape inspiration for disallowed-deps."
 
 probes:
   - name: ruff-lint
@@ -61,3 +64,44 @@ probes:
       ```
 
       Run `ruff format {file}` to fix the formatting, then re-save.
+
+  - name: disallowed-deps
+    description: Block dep-file edits that pin a Python package to a version inside a known-vulnerable range. Defaults seeded with widely-deployed Python CVEs; extend via inputs.
+    keywords: ["python", "cve", "vulnerability", "deps", "dependencies", "lockfile", "disallowed-dependencies", "supply-chain", "starlette", "badhost"]
+    hook:
+      type: agent-before-file-edit
+      paths:
+        - "**/requirements*.txt"
+        - "**/pyproject.toml"
+        - "**/Pipfile*"
+        - "**/poetry.lock"
+        - "**/uv.lock"
+    inputs:
+      extra_disallowed:
+        description: |
+          Additional disallowed pins to enforce on top of the shipped
+          defaults. JSON array of
+          `{name, vulnerable_range, cve, severity, fix, why}` objects —
+          same shape as `data/disallowed-deps.json` shipped with the
+          probe. Empty by default; the seeded defaults alone are usually
+          enough.
+        default: "[]"
+      replace_defaults:
+        description: |
+          When `"true"`, `extra_disallowed` *replaces* the shipped defaults
+          instead of extending them. Use this when the consumer wants full
+          control of the disallowed list. Defaults to `"false"`.
+        default: "false"
+    check: scripts/check-disallowed-deps.sh
+    message: |-
+      `{file}` pins a Python dependency to a known-vulnerable version.
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the pin in this file, re-resolve the lockfile, then retry.
+      Extend or replace the disallowed list via the `extra_disallowed` and
+      `replace_defaults` inputs — see
+      [`probes/python/docs/disallowed-deps.md`](../docs/disallowed-deps.md)
+      for the shipped defaults and the override shape.

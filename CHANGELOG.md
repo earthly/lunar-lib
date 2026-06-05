@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New probe (beta): `python` — agent-time guardrails for Python projects,
+  shipped as individually-includable probes selected with `include:`. First
+  probe `disallowed-deps` hard-blocks dep / lock file edits that pin a package
+  to a known-vulnerable version, seeded with widely-deployed Python CVEs (incl.
+  Starlette BadHost / CVE-2026-48710); consumers extend or replace the list.
+  Spec-only; implementation follows spec approval (#187).
+- `terraform` policy: 14 AWS infrastructure security checks relevant to SOC 2,
+  added as individually-includable sub-policies — EBS volume/snapshot
+  encryption, CloudTrail multi-region + CloudWatch, GuardDuty, VPC flow logs, S3
+  public-access blocking and access logging, security-group ingress limits on
+  SSH/PostgreSQL, EKS/RDS/ELB logging, HTTPS-only load balancers, and WAF on
+  public ALBs. Each reads `.iac.native.terraform.files` from the `terraform`
+  collector. Spec-only (manifest + README); implementation follows spec
+  approval (#192).
+- New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
+  components with owner / domain / tag metadata read from each repo's
+  `catalog-info.yaml`, fetched via the GitHub Contents API on a
+  `component-cron` schedule (#181). Supports a `domain_annotation` input
+  for orgs that store a component's domain in a custom annotation rather
+  than the canonical Backstage `spec.domain` field.
 - This file. Going forward, every PR should add an entry under `[Unreleased]`
   for any user-visible change (new collector / policy / cataloger / probe,
   manifest schema change, breaking rename, new starter-pack, etc.). Internal

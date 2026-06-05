@@ -4,7 +4,7 @@ Enforces Terraform-specific configuration best practices.
 
 ## Overview
 
-This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It reads from `.iac.native.terraform.files[]` and analyzes the parsed HCL to extract `required_providers`, `module`, and `backend` blocks. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
+This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It also bundles a set of AWS resource security checks relevant to SOC 2 — such as encryption at rest, logging, public-access blocking, and network ingress limits — each individually includable. All checks read from `.iac.native.terraform.files[]` and analyze the parsed HCL. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
 
 ## Policies
 
@@ -16,6 +16,40 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `module-versions-pinned` | Modules use pinned versions | Module missing `version` or `?ref=` in source |
 | `remote-backend` | Remote backend configured | No `terraform { backend {} }` block found |
 | `min-provider-versions` | Providers meet minimum version requirements | Provider version constraint below required minimum |
+
+The checks below are AWS resource security guardrails relevant to SOC 2 (tagged with the `soc2` keyword). Each is individually includable — a future SOC 2 starter-pack can bundle them all:
+
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
+| `aws-alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
+| `aws-cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
+| `aws-security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
+| `aws-security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
+| `aws-eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
+| `aws-elb-access-logging` | Load balancers log access requests | `aws_lb` / `aws_elb` without access logging enabled |
+| `aws-ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
+| `aws-ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
+| `aws-elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect |
+| `aws-guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
+| `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
+| `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
+| `aws-s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
+| `aws-vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
+| `aws-security-group-no-public-admin-ports` | No public ingress to sensitive admin/database ports | A security group allows `0.0.0.0/0` to a port like RDP, MySQL, MSSQL, or Telnet |
+| `aws-rds-encryption-at-rest` | RDS storage is encrypted at rest | `aws_db_instance` / `aws_rds_cluster` without `storage_encrypted = true` |
+| `aws-rds-not-publicly-accessible` | RDS is not publicly accessible | An RDS instance sets `publicly_accessible = true` |
+| `aws-rds-snapshot-encryption` | RDS snapshots encrypted at rest | Snapshot whose source DB is not `storage_encrypted` |
+| `aws-s3-encryption-at-rest` | S3 buckets declare encryption at rest | Bucket without a server-side encryption configuration |
+| `aws-s3-no-static-website` | S3 buckets do not host static websites | Bucket with a website configuration (public hosting) |
+| `aws-s3-no-public-acl` | S3 buckets do not grant public ACL access | Bucket with a `public-read`/`public-read-write` ACL or AllUsers grant |
+| `aws-iam-password-min-length` | IAM password policy enforces a minimum length | No `aws_iam_account_password_policy`, or length below the minimum |
+| `aws-iam-no-direct-user-policies` | No IAM policies attached directly to users | Inline/managed policy attached to a user instead of a group or role |
+| `aws-acm-cert-dns-validation` | ACM certificates use DNS validation | `aws_acm_certificate` using EMAIL (or unset) validation |
+| `aws-eks-private-endpoint` | EKS clusters enable private endpoint access | Cluster without `endpoint_private_access` / `cluster_endpoint_private_access` |
+| `aws-dynamodb-encryption` | DynamoDB tables declare encryption at rest | Table without a `server_side_encryption { enabled = true }` block |
+| `aws-lambda-not-public` | Lambda functions are not publicly invokable | `principal = "*"` permission without source scope, or function URL with `authorization_type = NONE` |
+| `aws-cloudtrail-log-file-validation` | CloudTrail validates log-file integrity | Trail without `enable_log_file_validation = true` |
+| `aws-cloudtrail-kms-encryption` | CloudTrail logs encrypted with KMS | Trail without `kms_key_id` |
 
 ## Required Data
 
