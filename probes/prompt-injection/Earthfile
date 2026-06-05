@@ -1,0 +1,9 @@
+VERSION 0.8
+
+test:
+    FROM alpine:3.21
+    WORKDIR /work
+    RUN apk add --no-cache jq grep sed coreutils findutils
+    COPY --dir scripts test .
+    RUN chmod +x scripts/scan-for-injection.sh test/run_tests.sh
+    RUN ./test/run_tests.sh

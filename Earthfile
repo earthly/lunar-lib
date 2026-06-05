@@ -70,6 +70,7 @@ test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD ./probes/pr-title-ticket-ref+test
+    BUILD ./probes/prompt-injection+test
 
 lint:
     FROM python:3.12-alpine
