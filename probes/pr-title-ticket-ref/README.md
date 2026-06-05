@@ -31,7 +31,7 @@ up as `pr-title-ticket-ref.block` and `pr-title-ticket-ref.warn` in
 
 > `agent-after-command` is currently a reserved hook type in
 > lunar-probe — the runner parses it without error but doesn't fire it
-> yet (see [`lunar-probe` § hook types](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)).
+> yet (see [Lunar Probe docs § hook types](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml#hook-types)).
 > Once the runner ships support, `warn` activates automatically without
 > a probe-side change. Until then, `block` is the only probe that fires.
 
@@ -86,7 +86,7 @@ probes:
 ```
 
 Use `include` to select only one of the warn/block level checks (never
-both at the same time). See [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)
+both at the same time). See [Lunar Probe docs § Uses-import](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml#uses-import)
 for the full syntax.
 
 ## Requirements
@@ -123,7 +123,7 @@ probes:
 
 > `inputs:` / `with:` are currently parsed-but-reserved in
 > lunar-probe — the runner accepts them without error but doesn't
-> yet dispatch consumer overrides to checks (see [`lunar-probe` § Uses-import](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md#uses-import)).
+> yet dispatch consumer overrides to checks (see [Lunar Probe docs § Uses-import](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml#uses-import)).
 > Until input dispatch ships, the check script runs against the
 > declared defaults; consumer overrides will activate automatically
 > once the runner supports them, without a probe-side change.

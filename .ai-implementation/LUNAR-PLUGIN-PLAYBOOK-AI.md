@@ -111,7 +111,7 @@ Then read these files in `ai-context/` (relative to lunar-lib root):
 
 For probe plugins, skip the Component JSON docs and read
 [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md) plus
-[`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+[Lunar Probe docs — `.lunar/probes.yml` syntax](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml)
 instead.
 
 ### 4. Study the closest existing plugin
