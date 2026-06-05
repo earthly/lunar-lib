@@ -1,0 +1,9 @@
+VERSION 0.8
+
+test:
+    FROM alpine:3.21
+    WORKDIR /work
+    RUN apk add --no-cache jq grep sed coreutils
+    COPY --dir scripts test data .
+    RUN chmod +x scripts/check-disallowed-deps.sh test/run_tests.sh
+    RUN ./test/run_tests.sh

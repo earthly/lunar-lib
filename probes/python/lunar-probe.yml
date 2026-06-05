@@ -1,0 +1,65 @@
+version: 0
+
+name: python
+description: Agent-time guardrails for Python projects, shipped as individually-includable probes. Today ships `disallowed-deps` — block dep-file edits that pin a package to a known-vulnerable version (seeded with widely-deployed Python CVEs, incl. Starlette BadHost / CVE-2026-48710). Select probes with `include:` / `exclude:`.
+author: earthly
+
+landing_page:
+  display_name: "Python Probe"
+  long_description: |
+    A toolkit of agent-time guardrails for Python projects, shipped as
+    one lunar-probe plugin. Each capability is a separate probe, selected
+    with `include:` / `exclude:`. Ships `disallowed-deps` today; a linter
+    and a CVE code-pattern nudge follow under the same plugin.
+  categories: ["security", "dependencies"]
+  icon: "assets/python.svg"
+  status: "beta"
+  related:
+    - slug: "python"
+      type: "policy"
+      reason: "CI-time Python policies; the agent-time probes are the edit-time complement."
+    - slug: "sbom"
+      type: "policy"
+      reason: "PR-time SBOM disallowed-list; shape inspiration for the disallowed-deps probe."
+
+probes:
+  - name: disallowed-deps
+    description: Block dep-file edits that pin a Python package to a version inside a known-vulnerable range. Defaults seeded with widely-deployed Python CVEs; extend via inputs.
+    keywords: ["python", "cve", "vulnerability", "deps", "dependencies", "lockfile", "disallowed-dependencies", "supply-chain", "starlette", "badhost"]
+    hook:
+      type: agent-before-file-edit
+      paths:
+        - "**/requirements*.txt"
+        - "**/pyproject.toml"
+        - "**/Pipfile*"
+        - "**/poetry.lock"
+        - "**/uv.lock"
+    inputs:
+      extra_disallowed:
+        description: |
+          Additional disallowed pins to enforce on top of the shipped
+          defaults. JSON array of
+          `{name, vulnerable_range, cve, severity, fix, why}` objects —
+          same shape as `data/disallowed-deps.json` shipped with the
+          probe. Empty by default; the seeded defaults alone are usually
+          enough.
+        default: "[]"
+      replace_defaults:
+        description: |
+          When `"true"`, `extra_disallowed` *replaces* the shipped defaults
+          instead of extending them. Use this when the consumer wants full
+          control of the disallowed list. Defaults to `"false"`.
+        default: "false"
+    check: scripts/check-disallowed-deps.sh
+    message: |-
+      `{file}` pins a Python dependency to a known-vulnerable version.
+
+      ```
+      {check_stdout}
+      ```
+
+      Fix the pin in this file, re-resolve the lockfile, then retry.
+      Extend or replace the disallowed list via the `extra_disallowed` and
+      `replace_defaults` inputs — see
+      [`probes/python/docs/disallowed-deps.md`](../docs/disallowed-deps.md)
+      for the shipped defaults and the override shape.

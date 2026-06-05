@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New probe (beta): `python` — agent-time guardrails for Python projects,
+  shipped as individually-includable probes selected with `include:`. First
+  probe `disallowed-deps` hard-blocks dep / lock file edits that pin a package
+  to a known-vulnerable version, seeded with widely-deployed Python CVEs (incl.
+  Starlette BadHost / CVE-2026-48710); consumers extend or replace the list.
+  Spec-only; implementation follows spec approval (#187).
 - `terraform` policy: 14 AWS infrastructure security checks relevant to SOC 2,
   added as individually-includable sub-policies — EBS volume/snapshot
   encryption, CloudTrail multi-region + CloudWatch, GuardDuty, VPC flow logs, S3
