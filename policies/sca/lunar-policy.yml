@@ -25,6 +25,10 @@ landing_page:
     - slug: "trivy"
       type: "collector"
       reason: "Provides SCA scan results via Trivy vulnerability scanning"
+
+    - slug: "grype"
+      type: "collector"
+      reason: "Provides SCA scan results via Grype vulnerability scanning"
   related: []
 
 policies:
