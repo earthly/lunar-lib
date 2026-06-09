@@ -7,16 +7,16 @@ echo "Running Grype vulnerability scan" >&2
 # known CVEs. `dir:.` catalogs packages across all supported ecosystems in one
 # pass.
 #
-# Use the vulnerability DB pre-baked into the image (see Earthfile), and do NOT
-# download/import it at scan time: Grype's DB is ~1.7GB, and downloading +
-# decompressing it inside the memory-limited collector container OOM-kills it
-# (exit 137). The DB is therefore as fresh as the image build (the -main image
-# is rebuilt regularly); VALIDATE_AGE is disabled so an image a few days old
-# isn't rejected. GRYPE_DB_CACHE_DIR points at the baked DB (also set in the
-# image, repeated here for clarity and for local `lunar collector dev`).
-export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
-export GRYPE_DB_AUTO_UPDATE=false
-export GRYPE_DB_VALIDATE_AGE=false
+# Point Grype's DB cache at a disk-backed path. Grype's default cache location
+# is memory-backed in the collector container, and the vulnerability DB
+# decompresses to ~1.7GB — writing that to a memory-backed dir OOM-kills the
+# memory-limited container (exit 137). On disk, memory stays low: the DB is a
+# SQLite file queried on-disk, not loaded into RAM. The compressed download is
+# only ~121MB and is fetched at scan time (Grype's default), so CVE data is
+# always current rather than frozen at image-build time. Grype has no delta/
+# incremental update — the DB ships as a full snapshot — so this full fetch is
+# the way to stay fresh.
+export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
 # Keep Go's heap tight during package cataloging + matching.
 export GOGC=40
 
