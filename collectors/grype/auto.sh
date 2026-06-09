@@ -4,9 +4,22 @@ set -eo pipefail
 echo "Running Grype vulnerability scan" >&2
 
 # Grype scans the repository filesystem (dependency manifests + lockfiles) for
-# known CVEs. The vulnerability DB is downloaded at scan time (Grype's default)
-# so CVE data is always current. `dir:.` catalogs packages across all supported
-# ecosystems in one pass.
+# known CVEs. `dir:.` catalogs packages across all supported ecosystems in one
+# pass.
+#
+# Use the vulnerability DB pre-baked into the image (see Earthfile), and do NOT
+# download/import it at scan time: Grype's DB is ~1.7GB, and downloading +
+# decompressing it inside the memory-limited collector container OOM-kills it
+# (exit 137). The DB is therefore as fresh as the image build (the -main image
+# is rebuilt regularly); VALIDATE_AGE is disabled so an image a few days old
+# isn't rejected. GRYPE_DB_CACHE_DIR points at the baked DB (also set in the
+# image, repeated here for clarity and for local `lunar collector dev`).
+export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+export GRYPE_DB_AUTO_UPDATE=false
+export GRYPE_DB_VALIDATE_AGE=false
+# Keep Go's heap tight during package cataloging + matching.
+export GOGC=40
+
 RESULTS_FILE="/tmp/grype-results.json"
 
 if ! grype "dir:." -o json > "$RESULTS_FILE" 2>/tmp/grype-stderr.log; then

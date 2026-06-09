@@ -11,5 +11,15 @@ image:
 
     RUN grype version
 
+    # Pre-bake the vulnerability DB into the image. Grype's DB is ~1.7GB;
+    # downloading + decompressing it at scan time OOM-kills the memory-limited
+    # collector container on the hub (exit 137 — see auto.sh). Baking it in means
+    # scans query the DB read-only from disk (low memory) and skip the per-run
+    # download. DB freshness is tied to image rebuild cadence (-main is rebuilt
+    # regularly); auto.sh sets GRYPE_DB_VALIDATE_AGE=false so an older image's DB
+    # is not rejected.
+    ENV GRYPE_DB_CACHE_DIR=/opt/grype/db
+    RUN grype db update && grype db status && chmod -R a+rX /opt/grype
+
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:grype-$VERSION

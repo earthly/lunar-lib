@@ -4,7 +4,7 @@ Scans source code dependencies for known vulnerabilities using Grype.
 
 ## Overview
 
-This collector runs [Grype](https://github.com/anchore/grype) — Anchore's open-source vulnerability scanner — against the repository to detect known CVEs in dependencies. It supports the ecosystems Grype covers (Go, Node.js, Python, Java, Rust, Ruby, PHP, .NET, and more) and writes normalized vulnerability data to `.sca` in the Component JSON, making results immediately consumable by the existing SCA policy. No secrets or vendor accounts are required — Grype's vulnerability database is downloaded at scan time to ensure the latest CVE data.
+This collector runs [Grype](https://github.com/anchore/grype) — Anchore's open-source vulnerability scanner — against the repository to detect known CVEs in dependencies. It supports the ecosystems Grype covers (Go, Node.js, Python, Java, Rust, Ruby, PHP, .NET, and more) and writes normalized vulnerability data to `.sca` in the Component JSON, making results immediately consumable by the existing SCA policy. No secrets or vendor accounts are required. Grype's vulnerability database is pre-baked into the collector image (it is ~1.7GB, too large to download at scan time inside the memory-limited collector container), so CVE data is as current as the most recent image build.
 
 ## Collected Data
 
