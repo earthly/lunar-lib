@@ -1,0 +1,15 @@
+VERSION 0.8
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # Install Grype
+    ARG GRYPE_VERSION=0.114.0
+    ARG TARGETARCH
+    RUN curl -sSfL "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin grype && \
+        chmod +x /usr/local/bin/grype
+
+    RUN grype version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:grype-$VERSION
