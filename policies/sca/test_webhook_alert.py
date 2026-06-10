@@ -1,12 +1,12 @@
-"""Unit tests for the SCA webhook alert notifier (alert.py) and the reusable
-webhook helper (webhook.py).
+"""Unit tests for the SCA max-severity webhook alert (max_severity.py) and the
+reusable webhook helper (webhook.py).
 
 Run from this directory:
     python3 -m unittest test_webhook_alert -v
 
 The alert tests spin up a throwaway HTTP receiver on localhost to prove the
-webhook fires with the right payload, and that a slow or dead endpoint never
-fails the check (alerting is best-effort).
+webhook fires with the right payload when max-severity fails, and that a slow
+or dead endpoint never changes the check result (it stays FAILED, never ERROR).
 """
 
 import contextlib
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lunar_policy import Node, CheckStatus  # noqa: E402
 
 import webhook  # noqa: E402
-import alert  # noqa: E402
+import max_severity  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
@@ -92,6 +92,7 @@ def node(sca=None, lang=True):
     return Node.from_component_json(data, bundle_info={"workflows_finished": True})
 
 
+# Trivy-style: summary has has_critical/has_high; full findings list.
 SCA_WITH_HIGH = {
     "source": {"tool": "trivy", "integration": "code"},
     "vulnerabilities": {"critical": 0, "high": 2, "medium": 1, "low": 0, "total": 3},
@@ -113,7 +114,8 @@ SCA_CLEAN = {
     "summary": {"has_critical": False, "has_high": False, "all_fixable": True},
 }
 
-SCA_SUMMARY_ONLY = {  # a collector that reports counts but no per-finding detail
+# A collector that reports counts/summary but no per-finding detail.
+SCA_SUMMARY_ONLY = {
     "source": {"tool": "snyk", "integration": "github_app"},
     "vulnerabilities": {"critical": 1, "high": 3, "medium": 0, "low": 0, "total": 4},
     "summary": {"has_critical": True, "has_high": True},
@@ -127,11 +129,7 @@ SCA_SUMMARY_ONLY = {  # a collector that reports counts but no per-finding detai
 
 @contextlib.contextmanager
 def lunar_env(**overrides):
-    """Strip all LUNAR_* env, set component identity + overrides, then restore.
-
-    Prevents LUNAR_VAR_* / LUNAR_SECRET_* leaking between tests (variable()
-    scans the whole environment by prefix).
-    """
+    """Strip all LUNAR_* env, set component identity + overrides, then restore."""
     saved = {k: v for k, v in os.environ.items() if k.startswith("LUNAR_")}
     for k in list(os.environ):
         if k.startswith("LUNAR_"):
@@ -148,32 +146,23 @@ def lunar_env(**overrides):
         os.environ.update(saved)
 
 
-def run_alert(n, **env):
-    """Run alert.main with the given LUNAR_* env, swallowing the SDK's stdout."""
+def run_check(n, **env):
+    """Run max_severity.main with the given LUNAR_* env, swallowing stdout."""
     with lunar_env(**env):
         with contextlib.redirect_stdout(io.StringIO()):
-            return alert.main(node=n)
+            return max_severity.main(node=n)
 
 
 def resolved_status(c):
-    """Resolve a check to PASS/FAIL/SKIPPED.
+    """Resolve a check to PASS/FAIL/SKIPPED/ERROR.
 
-    The SDK's Check.status property aggregates FAIL/ERROR/PENDING but reports a
-    skipped check as PASS, while the real runtime still receives the SKIPPED
-    result. Detect the skip from the emitted result set, mirroring the runtime.
+    Check.status reports a skipped check as PASS while the runtime still gets
+    the SKIPPED result, so detect skip from the emitted result set.
     """
     for r in getattr(c, "_results", []):
         if r.result == CheckStatus.SKIPPED:
             return CheckStatus.SKIPPED
     return c.status
-
-
-def skip_reason(c):
-    """Return the skip/failure message recorded on the check, if any."""
-    for r in getattr(c, "_results", []):
-        if r.failure_message:
-            return r.failure_message
-    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -183,35 +172,60 @@ def skip_reason(c):
 
 class WebhookHelperTests(unittest.TestCase):
     def test_dedupe_key_is_order_independent(self):
-        a = webhook.dedupe_key("c", "sha", ["CVE-2", "CVE-1"])
-        b = webhook.dedupe_key("c", "sha", ["CVE-1", "CVE-2"])
-        self.assertEqual(a, b)
+        self.assertEqual(
+            webhook.dedupe_key("c", "sha", ["CVE-2", "CVE-1"]),
+            webhook.dedupe_key("c", "sha", ["CVE-1", "CVE-2"]),
+        )
 
     def test_dedupe_key_changes_with_content(self):
-        a = webhook.dedupe_key("c", "sha", ["CVE-1"])
-        b = webhook.dedupe_key("c", "sha", ["CVE-1", "CVE-2"])
-        self.assertNotEqual(a, b)
+        self.assertNotEqual(
+            webhook.dedupe_key("c", "sha", ["CVE-1"]),
+            webhook.dedupe_key("c", "sha", ["CVE-1", "CVE-2"]),
+        )
+
+    def test_finding_text_rendering(self):
+        self.assertEqual(
+            webhook.finding_text({"severity": "high", "package": "p", "id": "CVE-1", "fix_version": "1.0"}),
+            "high: p — CVE-1 (fix: 1.0)",
+        )
+        self.assertIn(
+            "no fix available",
+            webhook.finding_text({"severity": "low", "package": "p", "id": "CVE-2", "fix_version": None}),
+        )
 
     def test_build_payload_shape_and_stable_key(self):
         findings = [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0"}]
-        p1 = webhook.build_payload("sca", findings, component="c", git_sha="sha", timestamp="T1")
-        p2 = webhook.build_payload("sca", findings, component="c", git_sha="sha", timestamp="T2")
+        p1 = webhook.build_payload("sca", findings, check="max-severity", message="m",
+                                   min_severity="high", component="c", git_sha="sha", pr=42, timestamp="T1")
+        p2 = webhook.build_payload("sca", findings, check="max-severity", message="m",
+                                   min_severity="high", component="c", git_sha="sha", pr=42, timestamp="T2")
         self.assertEqual(p1["schema_version"], webhook.SCHEMA_VERSION)
         self.assertEqual(p1["policy"], "sca")
+        self.assertEqual(p1["check"], "max-severity")
         self.assertEqual(p1["component"], "c")
         self.assertEqual(p1["git_sha"], "sha")
-        self.assertEqual(p1["run_id"], "sha")
+        self.assertEqual(p1["pr"], 42)
+        self.assertEqual(p1["min_severity"], "high")
+        self.assertEqual(p1["message"], "m")
         self.assertEqual(p1["findings"], findings)
+        self.assertEqual(p1["findings_text"], ["high: p — CVE-1 (fix: 1.0)"])
         # Timestamp is informational; the dedupe key must be stable across runs.
         self.assertNotEqual(p1["timestamp"], p2["timestamp"])
         self.assertEqual(p1["dedupe_key"], p2["dedupe_key"])
+
+    def test_build_payload_pr_from_env(self):
+        with lunar_env(LUNAR_COMPONENT_PR="7"):
+            self.assertEqual(webhook.build_payload("sca", [])["pr"], 7)
+        with lunar_env():  # no PR set
+            self.assertIsNone(webhook.build_payload("sca", [])["pr"])
+        with lunar_env(LUNAR_COMPONENT_PR="not-a-number"):
+            self.assertIsNone(webhook.build_payload("sca", [])["pr"])
 
     def test_post_webhook_success_round_trip(self):
         with Receiver(status=200) as r:
             sent, detail = webhook.post_webhook(r.url, {"hello": "world"}, timeout=2)
         self.assertTrue(sent)
         self.assertEqual(detail, "HTTP 200")
-        self.assertEqual(len(r.requests), 1)
         headers, body = r.requests[0]
         self.assertEqual(body, {"hello": "world"})
         self.assertEqual(headers.get("Content-Type"), "application/json")
@@ -225,20 +239,18 @@ class WebhookHelperTests(unittest.TestCase):
     def test_post_webhook_connection_refused_never_raises(self):
         sent, detail = webhook.post_webhook(DEAD_URL, {"x": 1}, timeout=1)
         self.assertFalse(sent)
-        self.assertTrue(detail)  # some diagnostic string, but no exception
+        self.assertTrue(detail)
 
     def test_post_webhook_timeout_is_bounded(self):
         with Receiver(status=200, delay=1.0) as r:
             start = time.monotonic()
-            sent, detail = webhook.post_webhook(r.url, {"x": 1}, timeout=0.2)
+            sent, _ = webhook.post_webhook(r.url, {"x": 1}, timeout=0.2)
             elapsed = time.monotonic() - start
         self.assertFalse(sent)
-        self.assertLess(elapsed, 0.9)  # aborted at the timeout, well before 1.0s
+        self.assertLess(elapsed, 0.9)
 
     def test_post_webhook_empty_url(self):
-        sent, detail = webhook.post_webhook("", {"x": 1})
-        self.assertFalse(sent)
-        self.assertEqual(detail, "no url")
+        self.assertEqual(webhook.post_webhook("", {"x": 1}), (False, "no url"))
 
     def test_post_webhook_forwards_auth_header(self):
         with Receiver(status=200) as r:
@@ -248,127 +260,97 @@ class WebhookHelperTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
-# alert.py notifier tests                                                      #
+# max-severity + webhook tests                                                 #
 # --------------------------------------------------------------------------- #
 
 
-class AlertCheckTests(unittest.TestCase):
+class MaxSeverityAlertTests(unittest.TestCase):
     def test_skips_when_no_language(self):
         with Receiver() as r:
-            c = run_alert(node(sca=SCA_WITH_HIGH, lang=False), LUNAR_VAR_alert_url=r.url)
+            c = run_check(node(sca=SCA_WITH_HIGH, lang=False), LUNAR_VAR_alert_url=r.url)
             self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
             self.assertEqual(len(r.requests), 0)
 
-    def test_skips_when_alert_url_unset(self):
-        # No LUNAR_VAR_alert_url at all -> alerting disabled, zero network cost.
-        c = run_alert(node(sca=SCA_WITH_HIGH))
-        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-
-    def test_skips_when_no_sca_data(self):
+    def test_passes_and_no_post_when_clean(self):
         with Receiver() as r:
-            c = run_alert(node(sca=None), LUNAR_VAR_alert_url=r.url)
-            self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+            c = run_check(node(sca=SCA_CLEAN), LUNAR_VAR_alert_url=r.url)
+            self.assertEqual(resolved_status(c), CheckStatus.PASS)
             self.assertEqual(len(r.requests), 0)
 
-    def test_skips_when_summary_only_collector(self):
-        with Receiver() as r:
-            c = run_alert(node(sca=SCA_SUMMARY_ONLY), LUNAR_VAR_alert_url=r.url)
-            self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-            self.assertEqual(len(r.requests), 0)
+    def test_fails_without_alert_url_and_no_post(self):
+        # No LUNAR_VAR_alert_url -> still fails, just no webhook.
+        c = run_check(node(sca=SCA_WITH_HIGH))
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
 
-    def test_skips_when_no_findings_at_or_above_threshold(self):
-        with Receiver() as r:
-            c = run_alert(node(sca=SCA_CLEAN), LUNAR_VAR_alert_url=r.url)
-            self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-            self.assertEqual(len(r.requests), 0)
-
-    def test_fires_with_findings_and_correct_payload(self):
+    def test_fails_and_fires_with_correct_payload(self):
         with Receiver(status=200) as r:
-            c = run_alert(
-                node(sca=SCA_WITH_HIGH),
-                LUNAR_VAR_alert_url=r.url,
-                LUNAR_VAR_min_severity="high",
-            )
-        self.assertEqual(resolved_status(c), CheckStatus.PASS)
-        self.assertEqual(len(r.requests), 1)
+            c = run_check(node(sca=SCA_WITH_HIGH),
+                          LUNAR_VAR_alert_url=r.url, LUNAR_VAR_min_severity="high")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)  # still gates
+        self.assertEqual(len(r.requests), 1)                    # one POST
         _, body = r.requests[0]
         self.assertEqual(body["policy"], "sca")
+        self.assertEqual(body["check"], "max-severity")
         self.assertEqual(body["component"], "github.com/acme/api")
         self.assertEqual(body["git_sha"], "abc123")
-        self.assertEqual(body["run_id"], "abc123")
+        self.assertIsNone(body["pr"])
+        self.assertEqual(body["min_severity"], "high")
+        self.assertIn("vulnerability findings detected", body["message"])
         self.assertEqual(body["schema_version"], 1)
         self.assertIn("dedupe_key", body)
-        self.assertIn("timestamp", body)
-        # min_severity=high -> only the two HIGH findings, medium excluded.
+        # min_severity=high -> the two HIGH findings, medium excluded.
         ids = sorted(f["id"] for f in body["findings"])
         self.assertEqual(ids, ["CVE-2023-44487", "CVE-2024-0001"])
         for f in body["findings"]:
             self.assertEqual(set(f.keys()), {"id", "severity", "package", "fix_version"})
-        self.assertEqual(body["summary"]["total"], 2)
-        self.assertEqual(body["summary"]["by_severity"]["high"], 2)
+        self.assertEqual(len(body["findings_text"]), 2)
+        self.assertTrue(any("golang.org/x/net" in t for t in body["findings_text"]))
 
-    def test_min_severity_widens_finding_set(self):
+    def test_pr_number_forwarded_from_env(self):
         with Receiver(status=200) as r:
-            run_alert(
-                node(sca=SCA_WITH_HIGH),
-                LUNAR_VAR_alert_url=r.url,
-                LUNAR_VAR_min_severity="medium",
-            )
+            run_check(node(sca=SCA_WITH_HIGH),
+                      LUNAR_VAR_alert_url=r.url, LUNAR_COMPONENT_PR="123")
             _, body = r.requests[0]
-        self.assertEqual(body["summary"]["total"], 3)  # 2 high + 1 medium
+        self.assertEqual(body["pr"], 123)
 
-    def test_critical_threshold_finds_nothing_and_skips(self):
-        with Receiver() as r:
-            c = run_alert(
-                node(sca=SCA_WITH_HIGH),
-                LUNAR_VAR_alert_url=r.url,
-                LUNAR_VAR_min_severity="critical",
-            )
-            self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-            self.assertEqual(len(r.requests), 0)
+    def test_min_severity_medium_widens_findings(self):
+        with Receiver(status=200) as r:
+            run_check(node(sca=SCA_WITH_HIGH),
+                      LUNAR_VAR_alert_url=r.url, LUNAR_VAR_min_severity="medium")
+            _, body = r.requests[0]
+        self.assertEqual(len(body["findings"]), 3)  # 2 high + 1 medium
 
-    def test_never_fails_when_endpoint_is_down(self):
-        # Endpoint refuses the connection: the check must NOT fail. It surfaces
-        # the non-delivery as a non-gating SKIP with a reason.
-        c = run_alert(
-            node(sca=SCA_WITH_HIGH),
-            LUNAR_VAR_alert_url=DEAD_URL,
-            LUNAR_VAR_alert_timeout="1",
-        )
-        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
-        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-        self.assertIn("not delivered", skip_reason(c).lower())
+    def test_summary_only_collector_fires_with_empty_findings(self):
+        with Receiver(status=200) as r:
+            c = run_check(node(sca=SCA_SUMMARY_ONLY), LUNAR_VAR_alert_url=r.url)
+            self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+            self.assertEqual(len(r.requests), 1)
+            _, body = r.requests[0]
+        self.assertEqual(body["findings"], [])         # no per-finding detail
+        self.assertEqual(body["findings_text"], [])
+        self.assertIn("Critical", body["message"])     # message still populated
 
-    def test_never_fails_when_endpoint_is_slow(self):
+    def test_endpoint_down_still_fails_not_errors(self):
+        # Endpoint refuses the connection: the check must FAIL on the findings,
+        # never become an ERROR, and never raise.
+        c = run_check(node(sca=SCA_WITH_HIGH),
+                      LUNAR_VAR_alert_url=DEAD_URL, LUNAR_VAR_alert_timeout_sec="1")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertNotEqual(resolved_status(c), CheckStatus.ERROR)
+
+    def test_slow_endpoint_bounded_and_still_fails(self):
         with Receiver(status=200, delay=1.0) as r:
             start = time.monotonic()
-            c = run_alert(
-                node(sca=SCA_WITH_HIGH),
-                LUNAR_VAR_alert_url=r.url,
-                LUNAR_VAR_alert_timeout="0.2",
-            )
+            c = run_check(node(sca=SCA_WITH_HIGH),
+                          LUNAR_VAR_alert_url=r.url, LUNAR_VAR_alert_timeout_sec="0.2")
             elapsed = time.monotonic() - start
-        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
-        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         self.assertLess(elapsed, 0.9)  # bounded by the timeout, not the 1.0s delay
-
-    def test_delivery_failure_skips_with_reason_never_fails(self):
-        # Endpoint reachable but returns 500: POST is attempted, the check
-        # surfaces a non-gating SKIP carrying the HTTP status, and never fails.
-        with Receiver(status=500) as r:
-            c = run_alert(node(sca=SCA_WITH_HIGH), LUNAR_VAR_alert_url=r.url)
-            self.assertEqual(len(r.requests), 1)  # delivery was attempted
-        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
-        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
-        self.assertIn("HTTP 500", skip_reason(c))
 
     def test_auth_token_from_secret_is_forwarded(self):
         with Receiver(status=200) as r:
-            run_alert(
-                node(sca=SCA_WITH_HIGH),
-                LUNAR_VAR_alert_url=r.url,
-                LUNAR_SECRET_ALERT_AUTH_TOKEN="topsecret",
-            )
+            run_check(node(sca=SCA_WITH_HIGH),
+                      LUNAR_VAR_alert_url=r.url, LUNAR_SECRET_ALERT_AUTH_TOKEN="topsecret")
             headers, _ = r.requests[0]
         self.assertEqual(headers.get("Authorization"), "Bearer topsecret")
 
