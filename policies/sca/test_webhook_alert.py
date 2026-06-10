@@ -168,6 +168,14 @@ def resolved_status(c):
     return c.status
 
 
+def skip_reason(c):
+    """Return the skip/failure message recorded on the check, if any."""
+    for r in getattr(c, "_results", []):
+        if r.failure_message:
+            return r.failure_message
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # webhook.py helper tests                                                      #
 # --------------------------------------------------------------------------- #
@@ -320,13 +328,16 @@ class AlertCheckTests(unittest.TestCase):
             self.assertEqual(len(r.requests), 0)
 
     def test_never_fails_when_endpoint_is_down(self):
-        # Endpoint refuses the connection: the check must still PASS, not fail.
+        # Endpoint refuses the connection: the check must NOT fail. It surfaces
+        # the non-delivery as a non-gating SKIP with a reason.
         c = run_alert(
             node(sca=SCA_WITH_HIGH),
             LUNAR_VAR_alert_url=DEAD_URL,
             LUNAR_VAR_alert_timeout="1",
         )
-        self.assertEqual(resolved_status(c), CheckStatus.PASS)
+        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+        self.assertIn("not delivered", skip_reason(c).lower())
 
     def test_never_fails_when_endpoint_is_slow(self):
         with Receiver(status=200, delay=1.0) as r:
@@ -337,8 +348,19 @@ class AlertCheckTests(unittest.TestCase):
                 LUNAR_VAR_alert_timeout="0.2",
             )
             elapsed = time.monotonic() - start
-        self.assertEqual(resolved_status(c), CheckStatus.PASS)
+        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
         self.assertLess(elapsed, 0.9)  # bounded by the timeout, not the 1.0s delay
+
+    def test_delivery_failure_skips_with_reason_never_fails(self):
+        # Endpoint reachable but returns 500: POST is attempted, the check
+        # surfaces a non-gating SKIP carrying the HTTP status, and never fails.
+        with Receiver(status=500) as r:
+            c = run_alert(node(sca=SCA_WITH_HIGH), LUNAR_VAR_alert_url=r.url)
+            self.assertEqual(len(r.requests), 1)  # delivery was attempted
+        self.assertNotEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+        self.assertIn("HTTP 500", skip_reason(c))
 
     def test_auth_token_from_secret_is_forwarded(self):
         with Receiver(status=200) as r:

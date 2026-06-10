@@ -96,11 +96,12 @@ policies can reuse it.
 
 **Behaviour and guarantees:**
 
-- **Never gates the component.** The `alert` check only ever reports PASS (an
-  alert fired) or SKIPPED (alerting disabled, no scan data, or nothing at or
-  above the threshold). It has no failure path, so a misconfigured, slow, or
-  unreachable endpoint can never block a PR or release. Delivery outcome is
-  logged to the policy run's stderr.
+- **Never gates the component.** The `alert` check has no failure path. It
+  reports PASS when the webhook is delivered, and SKIPPED (with a reason) when
+  alerting is disabled, there is nothing at or above the threshold, or delivery
+  fails. A misconfigured, slow, or unreachable endpoint surfaces as a
+  non-gating skip (`Alert not delivered (...)`) — visible in the platform, but
+  never blocking a PR or release. The outcome is also logged to stderr.
 - **Bounded latency.** The POST is synchronous with a short timeout
   (`alert_timeout`, default 2s). Cost is incurred only when there is actually
   something to send — a clean component, a sub-threshold component, or a policy

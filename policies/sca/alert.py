@@ -108,14 +108,26 @@ def main(node=None):
             alert_url, payload, timeout=timeout, auth_token=auth_token
         )
 
-        # Best-effort: the check always passes. The delivery outcome is logged
-        # to stderr for operator visibility rather than gating the component.
-        status = "sent" if sent else "NOT sent"
         print(
-            f"[alert] webhook {status} ({detail}); "
+            f"[alert] webhook {'sent' if sent else 'NOT sent'} ({detail}); "
             f"findings={len(findings)} dedupe_key={payload['dedupe_key']}",
             file=sys.stderr,
         )
+
+        # Surface the delivery outcome without ever gating the component:
+        #   delivered     -> PASS
+        #   not delivered -> SKIPPED with the reason (visible in the platform,
+        #                    non-gating)
+        # A slow, unreachable, or erroring endpoint can never fail the policy —
+        # there is deliberately no fail path here.
+        if sent:
+            c.assert_true(True, "alert delivered")
+        else:
+            c.skip(
+                f"Alert not delivered ({detail}); {len(findings)} finding(s) "
+                f"at or above '{min_severity}'. Delivery is best-effort and "
+                f"does not fail the policy."
+            )
     return c
 
 
