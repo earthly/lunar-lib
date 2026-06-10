@@ -48,9 +48,25 @@ policies:
     mainPython: max_total.py
     keywords: ["sca", "threshold", "vulnerabilities", "dependencies"]
 
+  - name: alert
+    description: |
+      Best-effort webhook notifier. When alert_url is set and SCA findings
+      exist at or above min_severity, POSTs a standard JSON payload listing
+      those findings. This check is a notifier, not a gate: it only ever
+      passes (alert fired) or skips (alerting disabled / nothing to alert),
+      and never blocks the component — even if the endpoint is slow or down.
+    mainPython: alert.py
+    keywords: ["sca", "webhook", "alert", "notification", "vulnerabilities"]
+
 inputs:
   min_severity:
     description: "Minimum severity to fail on (critical, high, medium, low)"
     default: "high"
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"
+  alert_url:
+    description: "Optional webhook URL. When set, the 'alert' check POSTs a JSON payload listing findings at or above min_severity. Leave empty to disable alerting (default)."
+    default: ""
+  alert_timeout:
+    description: "Webhook POST timeout in seconds. Best-effort — a slow or dead endpoint is never allowed to fail the policy."
+    default: "2"
