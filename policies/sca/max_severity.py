@@ -1,8 +1,81 @@
-"""Ensure no findings at or above the configured severity threshold."""
+"""Ensure no findings at or above the configured severity threshold.
+
+When findings cross the threshold the check fails as usual. Additionally, if an
+`alert_url` input is configured, a best-effort webhook is POSTed describing the
+findings (payload schema in webhook.py). Delivery is fire-and-forget with a
+short timeout: a slow or unreachable endpoint never changes the check result —
+a failing check stays FAILED, it does not become an ERROR. Leave `alert_url`
+unset (the default) to disable alerting.
+"""
+
+import os
+import sys
 
 from lunar_policy import Check, variable_or_default
 
+import webhook
+
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
+
+
+def _severities_in_scope(min_severity):
+    return SEVERITY_ORDER[: SEVERITY_ORDER.index(min_severity) + 1]
+
+
+def _collect_findings(sca_node, in_scope):
+    """Return findings at/above threshold from .sca.findings[], normalized.
+
+    Returns [] when the collector did not emit per-finding detail (e.g. a
+    summary-only SCA collector) — the alert still carries the failure message.
+    """
+    findings_node = sca_node.get_node(".findings")
+    if not findings_node.exists():
+        return []
+    out = []
+    for finding in findings_node:
+        severity = (finding.get_value_or_default(".severity", "") or "").lower()
+        if severity not in in_scope:
+            continue
+        out.append(
+            {
+                "id": finding.get_value_or_default(".cve", None),
+                "severity": severity,
+                "package": finding.get_value_or_default(".package", None),
+                "fix_version": finding.get_value_or_default(".fix_version", None),
+            }
+        )
+    return out
+
+
+def _fire_alert(sca_node, min_severity, message):
+    """Best-effort webhook on failure. Never raises; never changes the result.
+
+    No-op when `alert_url` is unset (alerting disabled).
+    """
+    alert_url = variable_or_default("alert_url", "").strip()
+    if not alert_url:
+        return
+    try:
+        findings = _collect_findings(sca_node, set(_severities_in_scope(min_severity)))
+        payload = webhook.build_payload(
+            "sca",
+            findings,
+            check="max-severity",
+            message=message,
+            min_severity=min_severity,
+        )
+        timeout = webhook.positive_float(variable_or_default("alert_timeout_sec", "2"), 2.0)
+        auth_token = os.environ.get("LUNAR_SECRET_ALERT_AUTH_TOKEN") or None
+        sent, detail = webhook.post_webhook(
+            alert_url, payload, timeout=timeout, auth_token=auth_token
+        )
+        print(
+            f"[alert] webhook {'sent' if sent else 'NOT sent'} ({detail}); "
+            f"findings={len(findings)} dedupe_key={payload['dedupe_key']}",
+            file=sys.stderr,
+        )
+    except Exception as e:  # noqa: BLE001 - alerting must never break the check
+        print(f"[alert] skipped due to error: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 def main(node=None):
@@ -12,7 +85,7 @@ def main(node=None):
             c.skip("No programming language detected in this component")
 
         min_severity = variable_or_default("min_severity", "high").lower()
-        
+
         if min_severity not in SEVERITY_ORDER:
             raise ValueError(
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
@@ -23,32 +96,36 @@ def main(node=None):
             c.fail("No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured.")
             return c
 
-        # Get the index of min_severity to know which severities to check
-        severity_index = SEVERITY_ORDER.index(min_severity)
-        severities_to_check = SEVERITY_ORDER[:severity_index + 1]
+        in_scope = _severities_in_scope(min_severity)
 
-        # Check summary booleans first (preferred)
-        for severity in severities_to_check:
-            summary_key = f".summary.has_{severity}"
-            summary = sca_node.get_node(summary_key)
+        # Determine the failing severity: summary booleans first (preferred),
+        # then counts. Build the same human-readable message we fail with.
+        fail_message = None
+        for severity in in_scope:
+            summary = sca_node.get_node(f".summary.has_{severity}")
             if summary.exists() and summary.get_value():
-                c.fail(f"{severity.capitalize()} vulnerability findings detected")
-                return c
+                fail_message = f"{severity.capitalize()} vulnerability findings detected"
+                break
+        if fail_message is None:
+            for severity in in_scope:
+                count_node = sca_node.get_node(f".vulnerabilities.{severity}")
+                if count_node.exists() and count_node.get_value() > 0:
+                    fail_message = (
+                        f"{severity.capitalize()} vulnerability findings detected "
+                        f"({count_node.get_value()} found)"
+                    )
+                    break
 
-        # Fall back to counting
-        for severity in severities_to_check:
-            count_key = f".vulnerabilities.{severity}"
-            count_node = sca_node.get_node(count_key)
-            if count_node.exists():
-                count = count_node.get_value()
-                if count > 0:
-                    c.fail(f"{severity.capitalize()} vulnerability findings detected ({count} found)")
-                    return c
+        if fail_message is not None:
+            # Fire the webhook (best-effort) alongside the failure.
+            _fire_alert(sca_node, min_severity, fail_message)
+            c.fail(fail_message)
+            return c
 
-        # If scan data exists but has no findings/summary, that's a collector
-        # bug — raise ValueError deliberately so it surfaces as a crash.
+        # Scan data exists but reports no findings/summary — that's a collector
+        # bug; raise ValueError deliberately so it surfaces.
         has_any_data = False
-        for severity in severities_to_check:
+        for severity in in_scope:
             if sca_node.get_node(f".summary.has_{severity}").exists():
                 has_any_data = True
                 break

@@ -39,8 +39,10 @@ policies:
     description: |
       Ensures no findings at or above the configured severity threshold.
       Configure min_severity to set the threshold (critical, high, medium, low).
+      When this check fails and alert_url is set, it also POSTs a best-effort
+      webhook describing the findings (see the README for the JSON schema).
     mainPython: max_severity.py
-    keywords: ["sca", "critical", "high", "vulnerabilities", "security", "dependencies"]
+    keywords: ["sca", "critical", "high", "vulnerabilities", "security", "dependencies", "webhook", "alert"]
 
   - name: max-total
     description: |
@@ -54,3 +56,9 @@ inputs:
     default: "high"
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"
+  alert_url:
+    description: "Optional webhook URL. When set, a failing max-severity check also POSTs a JSON payload describing the findings at or above min_severity. Leave empty to disable alerting (default)."
+    default: ""
+  alert_timeout_sec:
+    description: "Webhook POST timeout in seconds. Best-effort — a slow or dead endpoint never changes the check result."
+    default: "2"
