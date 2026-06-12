@@ -1,0 +1,107 @@
+version: 0
+
+name: grype
+description: |
+  Scan source code dependencies for known vulnerabilities using Grype.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:grype-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Grype Vulnerability Scanner Collector"
+  long_description: |
+    Scans repository dependencies for known CVEs using Grype, Anchore's
+    open-source vulnerability scanner. Writes normalized findings to .sca
+    for use with the SCA policy. No secrets or vendor accounts required.
+  categories: ["security"]
+  icon: "assets/grype.svg"
+  status: "beta"
+  related:
+    - slug: "sca"
+      type: "policy"
+      reason: "Enforces SCA vulnerability thresholds"
+
+collectors:
+  - name: auto
+    description: |
+      Auto-scans the repository filesystem for dependency vulnerabilities
+      using Grype. Writes normalized findings to .sca with severity counts,
+      CVE IDs, affected packages, and fix versions.
+    mainBash: auto.sh
+    hook:
+      type: code
+    keywords: ["grype", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
+
+  - name: cicd
+    description: |
+      Detects Grype executions in CI pipelines. Captures the command,
+      version, and input arguments for audit and compliance tracking.
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: grype
+    keywords: ["grype", "ci", "cicd", "command detection", "audit"]
+
+example_component_json: |
+  {
+    "sca": {
+      "source": {
+        "tool": "grype",
+        "version": "0.74.0",
+        "integration": "code"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 2,
+        "medium": 5,
+        "low": 3,
+        "total": 10
+      },
+      "findings": [
+        {
+          "severity": "high",
+          "package": "golang.org/x/net",
+          "version": "0.7.0",
+          "ecosystem": "go-module",
+          "cve": "CVE-2023-44487",
+          "title": "HTTP/2 Rapid Reset Attack",
+          "fix_version": "0.17.0",
+          "fixable": true
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true,
+        "all_fixable": true
+      },
+      "native": {
+        "grype": {
+          "cicd": {
+            "cmds": [
+              {"cmd": "grype dir:. -o json", "version": "0.74.0"}
+            ]
+          },
+          "matches": [
+            {
+              "vulnerability": {
+                "id": "CVE-2023-44487",
+                "severity": "High",
+                "fix": {"versions": ["0.17.0"], "state": "fixed"},
+                "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2023-44487",
+                "cvss": [{"metrics": {"baseScore": 7.5}}]
+              },
+              "artifact": {
+                "name": "golang.org/x/net",
+                "version": "0.7.0",
+                "type": "go-module",
+                "language": "go",
+                "purl": "pkg:golang/golang.org/x/net@0.7.0"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New collector (beta): `grype` — scans repository dependencies for known CVEs
+  using [Grype](https://github.com/anchore/grype), Anchore's open-source
+  vulnerability scanner. Two sub-collectors mirror `trivy`: `auto` (code hook)
+  scans the filesystem and normalizes findings into `.sca`; `cicd`
+  (ci-after-command) records Grype invocations under `.sca.native.grype`. No
+  secrets required, and it reuses the existing `sca` policy (added to its
+  `requires:`). Spec-only; implementation follows spec approval (#201).
 - New probe (beta): `python` — agent-time guardrails for Python projects,
   shipped as individually-includable probes selected with `include:`. First
   probe `disallowed-deps` hard-blocks dep / lock file edits that pin a package
