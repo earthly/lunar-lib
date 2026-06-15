@@ -5,7 +5,7 @@ description: Enforce that runtime/SDK versions are not end-of-life and are still
 
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.4.0
 
 landing_page:
   display_name: "End-of-Life Runtime Guardrails"
