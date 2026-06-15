@@ -44,6 +44,14 @@ collectors:
         name: grype
     keywords: ["grype", "ci", "cicd", "command detection", "audit"]
 
+inputs:
+  db_auto_update:
+    description: |
+      EXPERIMENTAL. Download the latest Grype vulnerability database at scan time
+      instead of using the one baked into the image. May cause OOM issues on some
+      deployments if memory limits per collector container are not configured.
+    default: "false"
+
 example_component_json: |
   {
     "sca": {

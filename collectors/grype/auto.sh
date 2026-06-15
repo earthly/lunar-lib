@@ -7,17 +7,24 @@ echo "Running Grype vulnerability scan" >&2
 # known CVEs. `dir:.` catalogs packages across all supported ecosystems in one
 # pass.
 #
-# Use the vulnerability DB pre-baked into the image (see Earthfile); do NOT
-# download/decompress it at scan time. Grype's DB decompresses to ~1.7GB, and
-# materializing it at runtime OOM-kills the memory-limited collector container
-# (exit 137) — confirmed on the hub with BOTH the default cache and a
-# disk-backed cache, so it's the runtime DB materialization itself, not the
-# cache location. The baked DB sits in a read-only image layer and is queried
-# on-disk via SQLite (low memory). Freshness is tied to image rebuild cadence;
-# VALIDATE_AGE is disabled so a slightly-older image's DB isn't rejected.
-export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
-export GRYPE_DB_AUTO_UPDATE=false
-export GRYPE_DB_VALIDATE_AGE=false
+# DB source is controlled by the `db_auto_update` input (default false):
+#   - false (default): scan against the DB pre-baked into the image (see
+#     Earthfile), queried on-disk via SQLite. Fits the default Lunar collector
+#     resource limits. VALIDATE_AGE is off so a slightly-older image's DB isn't
+#     rejected; freshness is tied to image rebuild cadence.
+#   - true (EXPERIMENTAL): download the current DB at scan time for always-fresh
+#     CVEs. Grype's DB decompresses to ~1.7GB; materializing it at runtime needs
+#     more memory/ephemeral storage than the Lunar default and may OOM-kill the
+#     collector (exit 137) on deployments without raised per-collector limits.
+if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-false}" = "true" ]; then
+  echo "WARNING: grype db_auto_update=true is experimental — downloading the vulnerability DB at scan time may cause OOM issues if per-collector memory limits aren't configured on this deployment." >&2
+  export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
+  # GRYPE_DB_AUTO_UPDATE defaults true → fresh DB each scan
+else
+  export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+  export GRYPE_DB_AUTO_UPDATE=false
+  export GRYPE_DB_VALIDATE_AGE=false
+fi
 # Keep Go's heap tight during package cataloging + matching.
 export GOGC=40
 
