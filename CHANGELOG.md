@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-06-15
+
 ### Added
 
 - New collector (beta): `grype` — scans repository dependencies for known CVEs
@@ -15,31 +17,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scans the filesystem and normalizes findings into `.sca`; `cicd`
   (ci-after-command) records Grype invocations under `.sca.native.grype`. No
   secrets required, and it reuses the existing `sca` policy (added to its
-  `requires:`). Spec-only; implementation follows spec approval (#201).
-- New probe (beta): `python` — agent-time guardrails for Python projects,
-  shipped as individually-includable probes selected with `include:`. First
-  probe `disallowed-deps` hard-blocks dep / lock file edits that pin a package
-  to a known-vulnerable version, seeded with widely-deployed Python CVEs (incl.
-  Starlette BadHost / CVE-2026-48710); consumers extend or replace the list.
-  Spec-only; implementation follows spec approval (#187).
-- `terraform` policy: 14 AWS infrastructure security checks relevant to SOC 2,
-  added as individually-includable sub-policies — EBS volume/snapshot
-  encryption, CloudTrail multi-region + CloudWatch, GuardDuty, VPC flow logs, S3
-  public-access blocking and access logging, security-group ingress limits on
-  SSH/PostgreSQL, EKS/RDS/ELB logging, HTTPS-only load balancers, and WAF on
-  public ALBs. Each reads `.iac.native.terraform.files` from the `terraform`
-  collector. Spec-only (manifest + README); implementation follows spec
-  approval (#192).
-- New cataloger (beta): `backstage-catalog-info` — augments existing Lunar
-  components with owner / domain / tag metadata read from each repo's
-  `catalog-info.yaml`, fetched via the GitHub Contents API on a
-  `component-cron` schedule (#181). Supports a `domain_annotation` input
-  for orgs that store a component's domain in a custom annotation rather
-  than the canonical Backstage `spec.domain` field.
-- This file. Going forward, every PR should add an entry under `[Unreleased]`
-  for any user-visible change (new collector / policy / cataloger / probe,
-  manifest schema change, breaking rename, new starter-pack, etc.). Internal
-  refactors and docs-only changes don't need an entry.
+  `requires:`) (#201).
+- New probe bundle (beta): `python` — agent-time guardrails for Python
+  projects, shipped as individually-includable sub-probes selected with
+  `include:`. `disallowed-deps` hard-blocks dep / lock file edits that pin a
+  package to a known-vulnerable version (seeded with widely-deployed Python
+  CVEs incl. Starlette BadHost / CVE-2026-48710; consumers extend or replace
+  the list); `ruff-lint` and `ruff-format` run Ruff over changed Python files
+  (#187, #188).
+- New probe bundle (beta): `docker` — `hadolint` sub-probe lints Dockerfiles
+  during agent sessions and on PRs (#189).
+- New probe bundle (beta): `shell` — `shellcheck` sub-probe, migrated from the
+  standalone `shellcheck` probe into a per-language bundle (#198, #199).
+- `terraform` policy: 29 AWS infrastructure security checks relevant to SOC 2,
+  added across two batches as individually-includable sub-policies — EBS
+  volume/snapshot encryption, CloudTrail multi-region + CloudWatch, GuardDuty,
+  VPC flow logs, S3 public-access blocking and access logging, security-group
+  ingress limits, EKS/RDS/ELB logging, HTTPS-only load balancers, WAF on public
+  ALBs, and an account-level IAM password policy. Each reads
+  `.iac.native.terraform.files` from the `terraform` collector (#192, #197).
+
+### Changed
+
+- `sca` policy: optional `alert_url` input — on a max-severity failure the
+  policy additionally POSTs a best-effort CVE-findings webhook. Non-gating: the
+  webhook outcome never changes the check result (#202).
+- `snyk/cli` collector: normalize SCA results from `--json-file-output` into the
+  shared `.sca` shape, matching `trivy` and `grype` (#194).
+
+## [1.3.0] — 2026-06-03
+
+### Added
+
+- New catalogers (beta): `backstage` — syncs components and domains from a
+  Backstage software catalog into Lunar, mapping entities with owner / domain /
+  tags (#178); `backstage-catalog-info` — augments existing Lunar components
+  with owner / domain / tag metadata read from each repo's `catalog-info.yaml`,
+  fetched via the GitHub Contents API on a `component-cron` schedule, with a
+  `domain_annotation` input for orgs that store the domain in a custom
+  annotation rather than the canonical Backstage `spec.domain` field (#181).
+- New probes (beta): `shellcheck` — the first lunar-lib probe (#167);
+  `pr-title-ticket-ref` — flags PRs whose title doesn't reference a ticket
+  (#184).
+- `golang/golangci-lint-ci` sub-collector — detects user-invoked `golangci-lint`
+  runs in CI (#183).
+- `repo-boilerplate`: `changelog-exists` check (#180).
+- This CHANGELOG file (#185). Going forward, every PR should add an entry under
+  `[Unreleased]` for any user-visible change (new collector / policy / cataloger
+  / probe, manifest schema change, breaking rename, new starter-pack, etc.).
+  Internal refactors and docs-only changes don't need an entry.
+
+### Changed
+
+- `github` collector: detect ruleset-based branch protection in addition to the
+  classic branch-protection API (#179).
+- `trivy` collector: preserve the raw Trivy JSON under
+  `.sca.native.trivy.results` (#190).
+- `policies/ticket`: drop Jira-specific wording from `ticket-present` (#177).
+
+### Fixed
+
+- `repo-boilerplate`: fix the `assert_true(.exists)` anti-pattern (#186).
 
 ## [1.2.0] — 2026-05-15
 
@@ -167,7 +205,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/earthly/lunar-lib/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/earthly/lunar-lib/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/earthly/lunar-lib/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/earthly/lunar-lib/compare/v1.0.5...v1.1.0
 [1.0.5]: https://github.com/earthly/lunar-lib/compare/v1.0.4...v1.0.5
