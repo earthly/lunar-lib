@@ -61,7 +61,7 @@ collectors:
     runs_on: [default-branch]
     hook:
       type: cron
-      schedule: "*/10 * * * *"  # TEMP for cronos verification — REVERT to "0 2 * * *" before merge
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC (>= 10-min collector floor)
       clone-code: true
     keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
 
