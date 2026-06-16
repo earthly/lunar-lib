@@ -53,3 +53,5 @@ collectors:
 ```
 
 > **Note:** The `grype` collector writes to the same `.sca` paths as the `snyk` and `trivy` collectors. Use one SCA scanner per component, not several, or they will overwrite each other's `.sca` data.
+
+> **Re-scan freshness:** With the default `db_auto_update: false`, a re-scan is less likely to surface newly-published CVEs, since it uses the vulnerability DB baked into the collector image. Bumping the pinned `grype` collector version (a newer image ships a newer DB) means the next cron tick picks up the new CVE data.
