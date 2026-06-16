@@ -33,26 +33,25 @@ collectors:
       type: code
     keywords: ["grype", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
 
-  - name: cron-rescan
+  - name: rescan
     description: |
-      Cron-scheduled SCA re-scan. Re-runs the same Grype filesystem scan as the
-      `auto` collector (shares auto.sh) against the cloned repository on a
-      schedule and overwrites .sca, so the SCA policy re-evaluates a branch
-      against CVEs published after its last commit was scanned — closing the gap
-      where a stable branch silently picks up a new CVE. Grype and its
-      vulnerability database come from this collector's own image, so there is
-      no runtime download of lunar-lib or the scanner. Defaults to the default
-      branch only; per-PR fan-out (re-scanning open PR heads) is opt-in by
-      widening runs_on to [prs, default-branch] on this sub-collector. Cron
-      runs stamp .sca.source.integration="cron" and .sca.source.scanned_at so
-      re-scan data is distinguishable from a code-push scan.
+      Re-runs the dependency (SCA) scan on a schedule and overwrites .sca so
+      the SCA policy re-evaluates against CVEs published since the commit was
+      first scanned — closing the gap where a branch passes at scan time but a
+      dependency picks up a new CVE later. Runs the same scan as the `auto`
+      collector (the sibling auto.sh) in the Grype collector image.
     mainBash: auto.sh
+    # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
+    # self-default ([default-branch]) blocks runs_on inheritance from a
+    # consumer's `uses:` line, so the import line cannot toggle this — the value
+    # must live in the manifest. Default-branch only (cheap: one re-scan per
+    # component per tick); per-PR fan-out is opt-in (see README).
     runs_on: [default-branch]
     hook:
       type: cron
-      schedule: "0 3 * * *"  # Human-readable: daily at 03:00 UTC
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC (>= 10-min collector floor)
       clone-code: true
-    keywords: ["grype", "sca", "cve", "cron", "rescan", "nightly", "vulnerability", "dependency scanning"]
+    keywords: ["sca", "cve", "grype", "dependency scanning", "cron rescan", "vulnerability"]
 
   - name: cicd
     description: |
