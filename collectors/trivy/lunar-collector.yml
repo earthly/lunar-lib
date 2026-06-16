@@ -50,9 +50,8 @@ collectors:
       Re-runs the dependency (SCA) scan on a schedule and overwrites .sca so
       the SCA policy re-evaluates against CVEs published since the commit was
       first scanned — closing the gap where a branch passes at scan time but a
-      dependency picks up a new CVE later. Reuses the exact same scan as the
-      `auto` collector (the sibling auto.sh) running in the same Trivy image,
-      so there is no extra container and no network fetch of scan code.
+      dependency picks up a new CVE later. Runs the same scan as the `auto`
+      collector (the sibling auto.sh) in the Trivy collector image.
     mainBash: auto.sh
     # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
     # self-default ([default-branch]) blocks runs_on inheritance from a
