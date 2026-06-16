@@ -39,7 +39,9 @@ collectors:
       the SCA policy re-evaluates against CVEs published since the commit was
       first scanned — closing the gap where a branch passes at scan time but a
       dependency picks up a new CVE later. Runs the same scan as the `auto`
-      collector (the sibling auto.sh) in the Grype collector image.
+      collector (the sibling auto.sh) in the Grype collector image, and stamps
+      .sca.source.integration="cron" (vs "code" for the on-push scan) so it's
+      clear the data came from a scheduled re-scan.
     mainBash: auto.sh
     # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
     # self-default ([default-branch]) blocks runs_on inheritance from a
