@@ -45,6 +45,27 @@ collectors:
         name: trivy
     keywords: ["trivy", "ci", "cicd", "command detection", "audit"]
 
+  - name: rescan
+    description: |
+      Re-runs the dependency (SCA) scan on a schedule and overwrites .sca so
+      the SCA policy re-evaluates against CVEs published since the commit was
+      first scanned — closing the gap where a branch passes at scan time but a
+      dependency picks up a new CVE later. Reuses the exact same scan as the
+      `auto` collector (the sibling auto.sh) running in the same Trivy image,
+      so there is no extra container and no network fetch of scan code.
+    mainBash: auto.sh
+    # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
+    # self-default ([default-branch]) blocks runs_on inheritance from a
+    # consumer's `uses:` line, so the import line cannot toggle this — the value
+    # must live in the manifest. Default-branch only (cheap: one re-scan per
+    # component per tick); per-PR fan-out is opt-in (see README).
+    runs_on: [default-branch]
+    hook:
+      type: cron
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC (>= 10-min collector floor)
+      clone-code: true
+    keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
+
 example_component_json: |
   {
     "sca": {
