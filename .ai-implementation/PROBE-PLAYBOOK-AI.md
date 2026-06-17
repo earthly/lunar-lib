@@ -22,7 +22,7 @@ in your head.
 | Output | Component JSON | Compliance findings | **Block reason returned to the agent** (or pass) |
 | When it fires | Collection cycle / CI hook | Policy eval after collection | **Hook event** (`agent-after-file-edit`, `agent-before-command`, `agent-session-end`, …) |
 | Plugin manifest | `lunar-collector.yml` | `lunar-policy.yml` | **`lunar-probe.yml`** |
-| Schema home | `component-json/conventions.md` | `component-json/structure.md` | `lunar-probe`'s [`probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md) |
+| Schema home | `component-json/conventions.md` | `component-json/structure.md` | `lunar-probe`'s [`.lunar/probes.yml` syntax docs](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml) |
 | Network | Often (vendor APIs, registries) | Pure-function on JSON | **Local-only** by default — no network in `check:` |
 | Test cycle | Deploy to cronos, watch Component JSON | Deploy to cronos, watch policy results | **Local demo** — run the probe against a real edit / commit on the agent's box |
 | Approval gate | Spec → secondary approval → implement → review → approve | Same | Same |
@@ -62,10 +62,10 @@ hook-based execution model from `lunar-probe` instead.
 
 For the full plugin grammar, read both:
 
-- [`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md)
+- [Lunar Probe docs — probe plugins](https://docs-lunar.earthly.dev/lunar-probe/probes/probe-plugins)
   — the plugin convention (manifest schema, `uses:` import forms,
   `inputs:` / `with:`, namespacing, cache, lint rules).
-- [`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+- [Lunar Probe docs — `.lunar/probes.yml` syntax](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml)
   — the `probes.yml` / `lunar-probe.yml` syntax and hook-event grammar.
 
 ---
@@ -125,7 +125,7 @@ probes:
 | `agent-before-tool-call` | Before any agent tool call | Tool-specific guards |
 | `agent-session-end` | Once at session end | Batched / repo-wide linters (eslint, mypy) |
 
-See [`probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+See [the Lunar Probe syntax docs](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml)
 for the full event payload of each hook, exit-code semantics, and the
 PreToolUse JSON shape piped to `check:` on stdin.
 
@@ -354,7 +354,7 @@ Same as collectors/policies:
 - [`LUNAR-PLUGIN-PLAYBOOK-AI.md`](LUNAR-PLUGIN-PLAYBOOK-AI.md) — the
   overarching collector/policy/probe PR lifecycle and cross-cutting
   common mistakes.
-- [`earthly/lunar-probe/docs/probes-yml-syntax.md`](https://github.com/earthly/lunar-probe/blob/main/docs/probes-yml-syntax.md)
+- [Lunar Probe docs — `.lunar/probes.yml` syntax](https://docs-lunar.earthly.dev/lunar-probe/probes/probes-yml)
   — authoritative `lunar-probe.yml` syntax reference.
-- [`earthly/lunar-probe/.agents/plans/probe-plugins.md`](https://github.com/earthly/lunar-probe/blob/main/.agents/plans/probe-plugins.md)
+- [Lunar Probe docs — probe plugins](https://docs-lunar.earthly.dev/lunar-probe/probes/probe-plugins)
   — formal plugin convention (cache, namespacing, `uses:`, lint rules).
