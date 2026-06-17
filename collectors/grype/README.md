@@ -26,6 +26,7 @@ This integration provides the following collectors (use `include` to select a su
 |-----------|-----------|-------------|
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities |
 | `cicd` | ci-after-command | Detects Grype executions in CI and captures command metadata |
+| `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs |
 
 ## Installation
 
@@ -39,4 +40,18 @@ collectors:
 
 Zero configuration required. Works with any language Grype supports.
 
+By default this also enables the `rescan` cron sub-collector, which re-runs the
+scan daily on each component's default branch and overwrites `.sca`. To keep the
+on-push (`auto`) and CI-detection (`cicd`) scans but turn the scheduled re-scan
+off, exclude it:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/grype@main
+    on: ["domain:your-domain"]
+    exclude: [rescan]
+```
+
 > **Note:** The `grype` collector writes to the same `.sca` paths as the `snyk` and `trivy` collectors. Use one SCA scanner per component, not several, or they will overwrite each other's `.sca` data.
+
+> **Re-scan freshness:** With the default `db_auto_update: false`, a re-scan is less likely to surface newly-published CVEs, since it uses the vulnerability DB baked into the collector image. Bumping the pinned `grype` collector version (a newer image ships a newer DB) means the next cron tick picks up the new CVE data.

@@ -33,6 +33,28 @@ collectors:
       type: code
     keywords: ["grype", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
 
+  - name: rescan
+    description: |
+      Re-runs the dependency (SCA) scan on a schedule and overwrites .sca so
+      the SCA policy re-evaluates against CVEs published since the commit was
+      first scanned — closing the gap where a branch passes at scan time but a
+      dependency picks up a new CVE later. Runs the same scan as the `auto`
+      collector (the sibling auto.sh) in the Grype collector image, and stamps
+      .sca.source.integration="cron" (vs "code" for the on-push scan) so it's
+      clear the data came from a scheduled re-scan.
+    mainBash: auto.sh
+    # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
+    # self-default ([default-branch]) blocks runs_on inheritance from a
+    # consumer's `uses:` line, so the import line cannot toggle this — the value
+    # must live in the manifest. Default-branch only (cheap: one re-scan per
+    # component per tick); per-PR fan-out is opt-in (see README).
+    runs_on: [default-branch]
+    hook:
+      type: cron
+      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC (>= 10-min collector floor)
+      clone-code: true
+    keywords: ["sca", "cve", "grype", "dependency scanning", "cron rescan", "vulnerability"]
+
   - name: cicd
     description: |
       Detects Grype executions in CI pipelines. Captures the command,

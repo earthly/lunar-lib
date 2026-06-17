@@ -43,10 +43,19 @@ GRYPE_VERSION=$(jq -r '.descriptor.version // empty' "$RESULTS_FILE")
 # (CVSS scores, dataSource, relatedVulnerabilities, full fix state, etc.).
 jq -c '.matches // []' "$RESULTS_FILE" | lunar collect -j ".sca.native.grype.matches" -
 
+# This script is shared by the `auto` (code hook) and `rescan` (cron hook)
+# sub-collectors. Stamp .sca.source.integration so it's obvious whether the
+# data came from an on-push scan ("code") or a scheduled re-scan ("cron").
+# The cron sub-collector's name ends in "rescan" (e.g. "grype.rescan").
+case "${LUNAR_COLLECTOR_NAME:-}" in
+  *rescan) INTEGRATION="cron" ;;
+  *)       INTEGRATION="code" ;;
+esac
+
 # Build source metadata JSON
-SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" '{
+SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" --arg integration "$INTEGRATION" '{
   tool: "grype",
-  integration: "code"
+  integration: $integration
 } + (if $version != "" then {version: $version} else {} end)')
 
 # Check if any vulnerabilities found
