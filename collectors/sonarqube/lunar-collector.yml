@@ -4,7 +4,7 @@ name: sonarqube
 description: Collect SonarQube/SonarCloud data via Web API read, auto-run scanner, in-repo config, CI scanner runs, and GitHub App checks
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.0
 default_image_ci_collectors: native
 
 landing_page:
