@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-06-17
+
+### Added
+
+- `trivy` collector: new `rescan` cron sub-collector — re-runs the dependency
+  (SCA) scan daily on each component's default branch and overwrites `.sca`, so
+  the `sca` policy re-evaluates a previously-clean commit against CVEs published
+  after it was first scanned. Reuses the existing `auto` scan (same `auto.sh`,
+  same image) and stamps `.sca.source.integration` as `cron` (vs `code` for the
+  on-push scan). Enabled by default; opt out with `exclude: [rescan]` (#205).
+- `grype` collector: new `rescan` cron sub-collector — the same scheduled
+  default-branch re-scan and `.sca` overwrite as `trivy`, symmetric behavior
+  (#204).
+
 ## [1.4.0] — 2026-06-15
 
 ### Added
@@ -205,7 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/earthly/lunar-lib/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/earthly/lunar-lib/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/earthly/lunar-lib/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/earthly/lunar-lib/compare/v1.1.0...v1.2.0
