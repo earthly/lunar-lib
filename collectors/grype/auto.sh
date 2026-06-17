@@ -24,6 +24,15 @@ else
   export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
   export GRYPE_DB_AUTO_UPDATE=false
   export GRYPE_DB_VALIDATE_AGE=false
+  # Band-aid until per-collector sizing lands (ENG-981 / ENG-984): soft-cap the
+  # Go runtime ~12% under the 512Mi default collector pod limit (Lunar's
+  # DefaultSnippetContainer / "medium" size) so the GC reclaims hard before the
+  # kernel OOM-kills us (exit 137) on a large dependency tree. GOMEMLIMIT is a
+  # soft limit, so leave headroom for the grype binary + SQLite off-heap +
+  # overshoot. Only the baked-DB path is sized to fit 512Mi; the experimental
+  # db_auto_update path above needs the bigger pod ENG-984 assigns (size: large)
+  # — leave it uncapped there so that fix isn't throttled back down to 512Mi.
+  export GOMEMLIMIT=450MiB
 fi
 # Keep Go's heap tight during package cataloging + matching.
 export GOGC=40
