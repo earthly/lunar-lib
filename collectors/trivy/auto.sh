@@ -60,10 +60,19 @@ fi
 # (CVSS scores, References, Description, CweIDs, DataSource, etc.).
 lunar collect -j ".sca.native.trivy.results" - < "$RESULTS_FILE"
 
+# This script is shared by the `auto` (code hook) and `rescan` (cron hook)
+# sub-collectors. Stamp .sca.source.integration so it's obvious whether the
+# data came from an on-push scan ("code") or a scheduled re-scan ("cron").
+# The cron sub-collector's name ends in "rescan" (e.g. "trivy.rescan").
+case "${LUNAR_COLLECTOR_NAME:-}" in
+  *rescan) INTEGRATION="cron" ;;
+  *)       INTEGRATION="code" ;;
+esac
+
 # Build source metadata JSON
-SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" '{
+SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATION" '{
   tool: "trivy",
-  integration: "code"
+  integration: $integration
 } + (if $version != "" then {version: $version} else {} end)')
 
 # Check if any vulnerabilities found
