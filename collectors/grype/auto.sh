@@ -7,17 +7,17 @@ echo "Running Grype vulnerability scan" >&2
 # known CVEs. `dir:.` catalogs packages across all supported ecosystems in one
 # pass.
 #
-# DB source is controlled by the `db_auto_update` input (default false):
-#   - false (default): scan against the DB pre-baked into the image (see
-#     Earthfile), queried on-disk via SQLite. Fits the default Lunar collector
-#     resource limits. VALIDATE_AGE is off so a slightly-older image's DB isn't
-#     rejected; freshness is tied to image rebuild cadence.
-#   - true (EXPERIMENTAL): download the current DB at scan time for always-fresh
-#     CVEs. Grype's DB decompresses to ~1.7GB; materializing it at runtime needs
-#     more memory/ephemeral storage than the Lunar default and may OOM-kill the
-#     collector (exit 137) on deployments without raised per-collector limits.
-if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-false}" = "true" ]; then
-  echo "WARNING: grype db_auto_update=true is experimental — downloading the vulnerability DB at scan time may cause OOM issues if per-collector memory limits aren't configured on this deployment." >&2
+# DB source is controlled by the `db_auto_update` input (default true):
+#   - true (default): download the current DB at scan time so the scan sees CVEs
+#     published since the image was built. Grype's DB decompresses to ~1.7GB, so
+#     the auto/rescan collectors declare `size: large` to give the container the
+#     memory + ephemeral storage the runtime DB needs. Without that headroom the
+#     download OOM-kills the collector (exit 137), which is why this requires a
+#     Hub that honors collector size (ENG-983).
+#   - false: scan against the DB pre-baked into the image (see Earthfile),
+#     queried on-disk via SQLite — lighter, but only as fresh as the image
+#     build. VALIDATE_AGE is off so a slightly-older image's DB isn't rejected.
+if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-true}" = "true" ]; then
   export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
   # GRYPE_DB_AUTO_UPDATE defaults true → fresh DB each scan
 else
