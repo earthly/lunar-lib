@@ -71,6 +71,7 @@ test:
     BUILD ./collectors/backstage+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
+    BUILD ./policies/nodejs+test
 
 lint:
     FROM python:3.12-alpine

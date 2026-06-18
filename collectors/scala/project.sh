@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_scala_project; then
@@ -139,6 +140,7 @@ jq -n \
     --argjson test_frameworks "$test_frameworks_json" \
     --argjson frameworks "$frameworks_json" \
     '{
+        project_exists: true,
         build_systems: $build_systems,
         build_sbt_exists: $build_sbt_exists,
         build_properties_exists: $build_properties_exists,

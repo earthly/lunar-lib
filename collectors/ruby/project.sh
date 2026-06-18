@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_ruby_project; then
@@ -56,8 +57,17 @@ if [[ -z "$ruby_version" && -f "Gemfile.lock" ]]; then
     ruby_version=$(sed -n '/^RUBY VERSION$/,/^$/{s/^[[:space:]]*ruby \([0-9][0-9.]*\).*/\1/p;}' Gemfile.lock | head -1)
 fi
 
+# A real Ruby project (vs a component that merely ran Ruby/Bundler tooling in
+# CI) is signalled by a manifest. Mirror is_ruby_project so policies can gate on
+# .project_exists and skip CI-only components.
+project_exists=false
+if [[ "$gemfile_exists" == "true" || "$rakefile_exists" == "true" || "$ruby_version_file_exists" == "true" || "$gemspec_json" != "[]" ]]; then
+    project_exists=true
+fi
+
 # Build JSON and collect
 jq -n \
+    --argjson project_exists "$project_exists" \
     --argjson gemfile_exists "$gemfile_exists" \
     --argjson gemfile_lock_exists "$gemfile_lock_exists" \
     --argjson ruby_version_file_exists "$ruby_version_file_exists" \
@@ -66,6 +76,7 @@ jq -n \
     --argjson build_systems "$build_systems" \
     --arg version "$ruby_version" \
     '{
+        project_exists: $project_exists,
         gemfile_exists: $gemfile_exists,
         gemfile_lock_exists: $gemfile_lock_exists,
         ruby_version_file_exists: $ruby_version_file_exists,

@@ -15,6 +15,9 @@ def check_min_scala_version(min_version=None, node=None):
         scala = c.get_node(".lang.scala")
         if not scala.exists():
             c.skip("Not a Scala project")
+        project_exists_node = scala.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Scala project detected in this component")
 
         version_node = scala.get_node(".version")
         if not version_node.exists():

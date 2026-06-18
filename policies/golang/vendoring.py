@@ -11,6 +11,9 @@ def check_vendoring(mode=None, node=None):
         go = c.get_node(".lang.go")
         if not go.exists():
             c.skip("Not a Go project")
+        project_exists_node = go.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Go project detected in this component")
 
         if mode == "none":
             c.skip("Vendoring check disabled (vendoring_mode=none)")

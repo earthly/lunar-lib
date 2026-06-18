@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_cpp_project; then
@@ -99,6 +100,7 @@ jq -n \
     --argjson cpp_count "$cpp_count" \
     --argjson header_count "$header_count" \
     '{
+        project_exists: true,
         build_systems: $build_systems,
         cmake_exists: $cmake_exists,
         makefile_exists: $makefile_exists,

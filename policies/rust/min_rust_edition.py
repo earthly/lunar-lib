@@ -11,6 +11,9 @@ def check_min_rust_edition(min_edition=None, node=None):
         rust = c.get_node(".lang.rust")
         if not rust.exists():
             c.skip("Not a Rust project")
+        project_exists_node = rust.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Rust project detected in this component")
 
         edition_node = rust.get_node(".edition")
         if not edition_node.exists():

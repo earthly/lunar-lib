@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_elixir_project; then
@@ -107,6 +108,7 @@ jq -n \
     --argjson umbrella "$umbrella_json" \
     --argjson frameworks "$frameworks_json" \
     '{
+        project_exists: $mix_exs_exists,
         build_systems: ["mix"],
         mix_exs_exists: $mix_exs_exists,
         mix_lock_exists: $mix_lock_exists,

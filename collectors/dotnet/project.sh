@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 # Check if this is a .NET project
@@ -131,6 +132,7 @@ jq -n \
     --argjson test_projects "$(printf '%s\n' "${test_projects[@]}" | jq -s '.' 2>/dev/null || echo '[]')" \
     --argjson target_frameworks "$(printf '%s\n' "${target_frameworks[@]}" | jq -R . | jq -s '.' 2>/dev/null || echo '[]')" \
     '{
+        project_exists: true,
         global_json_exists: $global_json_exists,
         directory_build_props_exists: $directory_build_props_exists,
         packages_lock_exists: $packages_lock_exists,

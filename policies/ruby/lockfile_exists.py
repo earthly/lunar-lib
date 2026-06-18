@@ -8,6 +8,9 @@ def check_lockfile_exists(node=None):
         ruby = c.get_node(".lang.ruby")
         if not ruby.exists():
             c.skip("Not a Ruby project")
+        project_exists_node = ruby.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Ruby project detected in this component")
 
         gemfile = ruby.get_node(".gemfile_exists")
         if not gemfile.exists() or not gemfile.get_value():

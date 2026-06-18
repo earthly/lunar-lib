@@ -12,6 +12,9 @@ def check_test_module_exists(node=None):
         scala = c.get_node(".lang.scala")
         if not scala.exists():
             c.skip("Not a Scala project")
+        project_exists_node = scala.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Scala project detected in this component")
 
         test_node = scala.get_node(".test_directory_exists")
         has_tests = test_node.get_value() if test_node.exists() else False

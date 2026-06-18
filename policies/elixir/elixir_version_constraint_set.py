@@ -12,6 +12,9 @@ def check_elixir_version_constraint_set(node=None):
         elixir = c.get_node(".lang.elixir")
         if not elixir.exists():
             c.skip("Not an Elixir project")
+        project_exists_node = elixir.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Elixir project detected in this component")
 
         req_node = elixir.get_node(".elixir_requirement")
         req = req_node.get_value() if req_node.exists() else ""

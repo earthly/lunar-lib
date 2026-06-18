@@ -13,6 +13,9 @@ def htmlhint_clean(max_warnings=None, node=None):
         html = c.get_node(".lang.html")
         if not html.exists():
             c.skip("Not an HTML project")
+        project_exists_node = html.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No HTML project detected in this component")
 
         lint_node = html.get_node(".lint")
         if not lint_node.exists():

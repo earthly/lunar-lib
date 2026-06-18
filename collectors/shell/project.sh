@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_shell_project; then
@@ -55,6 +56,7 @@ jq -n \
     --argjson scripts "$scripts_json" \
     --argjson shells "$shells_json" \
     '{
+        project_exists: true,
         script_count: $script_count,
         scripts: $scripts,
         shells: $shells,
