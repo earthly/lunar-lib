@@ -86,6 +86,8 @@ lint:
     RUN python scripts/validate_svg_grayscale.py
     # Validate all plugin Earthfiles with image targets are wired into +all
     RUN python scripts/validate_earthfile_wiring.py
+    # Validate earthly/lunar-lib image tags are canonical (-main / -vX.Y.Z), not dev/personal builds
+    RUN python scripts/validate_image_tags.py
 
 ai-context:
     COPY --dir ai-context .
