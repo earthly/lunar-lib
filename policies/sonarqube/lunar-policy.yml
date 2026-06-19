@@ -4,7 +4,7 @@ name: sonarqube
 description: Enforce SonarQube/SonarCloud-specific code-quality standards — quality gate and letter-rating thresholds
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.1
 
 landing_page:
   display_name: "SonarQube Guardrails"

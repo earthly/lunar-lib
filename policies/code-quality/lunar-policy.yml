@@ -4,7 +4,7 @@ name: code-quality
 description: Enforce code-quality standards via the tool-agnostic `.code_quality` path (populated by code quality collectors like `sonarqube`)
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.1
 
 landing_page:
   display_name: "Code Quality Guardrails"

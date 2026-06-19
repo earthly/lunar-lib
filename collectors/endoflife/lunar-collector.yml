@@ -5,7 +5,7 @@ description: Detect runtime versions and check end-of-life status via the endofl
 
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.1
 
 landing_page:
   display_name: "endoflife.date Collector"
