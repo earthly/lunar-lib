@@ -423,8 +423,8 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
-        self.assertIn("and 5 more", msg)
-        # MAX_LISTED_FINDINGS enumerated findings + one "and N more" tail segment.
+        self.assertIn("+5 more (see component JSON for full list)", msg)
+        # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." tail segment.
         self.assertEqual(len(msg.split("; ")), max_severity.MAX_LISTED_FINDINGS + 1)
 
 

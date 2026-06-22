@@ -18,10 +18,10 @@ import webhook
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 
-# Cap on how many individual findings to enumerate in the failure message, so a
-# component with hundreds of vulns yields a readable result instead of a
-# multi-screen wall of text. Any webhook alert still carries the full set.
-MAX_LISTED_FINDINGS = 20
+# Cap on how many individual findings to enumerate in the failure message: a
+# GitHub check / PR comment listing more than this is a wall of text, and the
+# full set is always in the component JSON (and any webhook alert's findings).
+MAX_LISTED_FINDINGS = 10
 
 
 def _severities_in_scope(min_severity):
@@ -60,7 +60,8 @@ def _with_findings(headline, findings):
     the in-scope findings (most severe first) so the failure names the actual
     packages/CVEs — not just that the threshold was crossed. Summary-only
     collectors (no `.findings`) return the headline unchanged. The list is
-    capped at MAX_LISTED_FINDINGS; the rest are summarized as "and N more".
+    capped at MAX_LISTED_FINDINGS; any remainder is summarized as a
+    "+N more (see component JSON for full list)" tail.
     """
     if not findings:
         return headline
@@ -77,7 +78,7 @@ def _with_findings(headline, findings):
     lines = [webhook.finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
     hidden = len(ordered) - len(lines)
     if hidden > 0:
-        lines.append(f"and {hidden} more")
+        lines.append(f"+{hidden} more (see component JSON for full list)")
     return f"{headline}: " + "; ".join(lines)
 
 

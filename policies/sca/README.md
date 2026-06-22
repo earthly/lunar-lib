@@ -164,7 +164,7 @@ the findings as normal and the delivery failure is logged to stderr.
 - `max-severity`: "Critical vulnerability findings detected: critical: lodash — CVE-2021-23337 (fix: 4.17.21); high: axios — CVE-2023-45857 (no fix available)"
 - `max-total`: "Total vulnerability findings (25) exceeds threshold (10)"
 
-When the threshold is crossed, `max-severity` names the offending packages/CVEs (most severe first) so the failure is actionable on its own. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`).
+When the threshold is crossed, `max-severity` names the offending packages/CVEs (most severe first) so the failure is actionable on its own — up to the first 10, with a `+N more (see component JSON for full list)` tail when there are more (the full set is always in the component JSON). If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`).
 
 ## Remediation
 
