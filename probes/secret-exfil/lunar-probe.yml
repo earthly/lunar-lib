@@ -1,0 +1,121 @@
+version: 0
+
+name: secret-exfil
+description: Catch credential-exfiltration payloads in the agent loop — source that reads secrets and ships them over the network, and npm install hooks that fetch-and-execute remote code.
+author: earthly
+
+landing_page:
+  display_name: "Secret Exfiltration Probe"
+  long_description: |
+    Agent-time guardrail against supply-chain credential theft. Flags
+    source files that both read secret material (API-key env vars,
+    ~/.ssh, .npmrc, .env) and phone home, plus npm install hooks that
+    fetch-and-execute remote code. Read-only, local-only, skip-safe.
+  categories: ["security", "dependencies"]
+  icon: "assets/secret-exfil.svg"
+  status: "experimental"
+  related:
+    - slug: "secrets"
+      type: "policy"
+      reason: "Hub-side gate on committed secrets; this catches code that exfiltrates them."
+    - slug: "sca"
+      type: "policy"
+      reason: "Supply-chain dependency scanning; this catches the install-time exfil payload."
+
+inputs:
+  allow_marker:
+    description: |
+      A sentinel string that exempts a file from scanning when it
+      appears anywhere in the file. Use it on code that legitimately
+      pairs a secret with a network call (e.g. a client that sends an
+      auth token to its own API), on security advisories or threat
+      models that quote these patterns, and on this probe's own test
+      fixtures. Set to an empty string to disable the escape hatch
+      entirely.
+    default: "lunar-probe-allow: secret-exfil"
+  extra_secret_patterns:
+    description: |
+      Additional newline-separated POSIX ERE patterns to treat as
+      secret-material access, on top of the built-in rule set (custom
+      token env-var names, internal credential file paths, etc.).
+      Matched case-insensitively.
+    default: ""
+  extra_egress_patterns:
+    description: |
+      Additional newline-separated POSIX ERE patterns to treat as an
+      outbound network sink, on top of the built-in rule set (internal
+      HTTP client wrappers, custom exfil channels, etc.). Matched
+      case-insensitively.
+    default: ""
+  max_bytes:
+    description: |
+      Files larger than this many bytes are skipped (the edit proceeds
+      unscanned) to bound scan cost. Default 2 MiB. A non-numeric
+      override falls back to the default.
+    default: "2097152"
+
+probes:
+  - name: network-egress
+    description: After the agent writes a source file, flag it when it both reads secret material (API-key env vars, ~/.ssh, ~/.aws, .npmrc, .env) and contains an outbound network sink — the credential-exfiltration shape.
+    keywords: ["supply-chain", "secret", "credential", "exfiltration", "egress", "security", "ai", "agent", "token-theft"]
+    hook:
+      type: agent-after-file-edit
+      paths:
+        - "**/*.js"
+        - "**/*.mjs"
+        - "**/*.cjs"
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.jsx"
+        - "**/*.py"
+        - "**/*.sh"
+        - "**/*.bash"
+        - "**/*.rb"
+        - "**/*.go"
+        - "**/*.php"
+        - "**/*.ps1"
+    check: scripts/scan-egress.sh
+    message: |-
+      Heads up: `{file}` (which the agent just wrote) both reads secret
+      material and ships data over the network:
+
+      {check_stdout}
+
+      That pairing — credential access plus an outbound sink in one
+      file — is the shape of supply-chain credential-exfiltration
+      malware (the vector behind the recent compromised-OSS-tooling
+      credential thefts). If this code came from an untrusted source —
+      a dependency, a fetched snippet, pasted tool output — treat it as
+      hostile: do not run it, and remove or quarantine the file before
+      continuing.
+
+      If this is legitimate (e.g. a client that intentionally sends an
+      auth token to its own API), add the allow marker
+      `lunar-probe-allow: secret-exfil` to the file, or narrow the
+      probe's `paths`. See the probe README.
+
+  - name: install-hook
+    description: After the agent writes a package.json, flag npm lifecycle install hooks (preinstall/install/postinstall/prepare) whose body fetch-and-executes remote code or is obfuscated — the npm supply-chain RCE vector.
+    keywords: ["supply-chain", "npm", "postinstall", "lifecycle", "package-json", "rce", "security", "malware"]
+    hook:
+      type: agent-after-file-edit
+      paths:
+        - "**/package.json"
+    check: scripts/scan-install-hook.sh
+    message: |-
+      `{file}` declares an npm lifecycle install hook that runs a
+      fetch-and-execute or obfuscated payload:
+
+      {check_stdout}
+
+      `preinstall` / `install` / `postinstall` / `prepare` scripts run
+      automatically on `npm install`, with no prompt — they are the
+      primary remote-code-execution vector for compromised npm
+      packages. A hook that pipes `curl`/`wget` into a shell, runs
+      `node -e` / `eval`, decodes base64 to a shell, or writes to
+      `~/.ssh` is almost never legitimate.
+
+      Remove the hook, or — if it is genuinely needed — point it at a
+      committed, reviewed script in-repo rather than a one-liner that
+      pulls and runs remote code. Add `lunar-probe-allow: secret-exfil`
+      to exempt a file you have verified.
