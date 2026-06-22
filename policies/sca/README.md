@@ -90,7 +90,7 @@ only) so other policies can reuse it:
   "git_sha": "1a2b3c4",
   "pr": 42,
   "min_severity": "high",
-  "message": "High vulnerability findings detected (5 found)",
+  "message": "High vulnerability findings detected: high: golang.org/x/net — CVE-2023-44487 (fix: 0.17.0)",
   "findings": [
     { "id": "CVE-2023-44487", "severity": "high",
       "package": "golang.org/x/net", "fix_version": "0.17.0" }
@@ -147,7 +147,13 @@ the findings as normal and the delivery failure is logged to stderr.
 {
   "sca": {
     "source": { "tool": "snyk", "integration": "github_app" },
-    "vulnerabilities": { "critical": 2, "high": 5, "medium": 10, "total": 25 },
+    "vulnerabilities": { "critical": 1, "high": 1, "medium": 10, "total": 25 },
+    "findings": [
+      { "severity": "critical", "package": "lodash", "version": "4.17.19",
+        "cve": "CVE-2021-23337", "fix_version": "4.17.21" },
+      { "severity": "high", "package": "axios", "version": "1.3.0",
+        "cve": "CVE-2023-45857", "fix_version": null }
+    ],
     "summary": { "has_critical": true, "has_high": true }
   }
 }
@@ -155,8 +161,10 @@ the findings as normal and the delivery failure is logged to stderr.
 
 **Failure messages:**
 - `executed`: "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured."
-- `max-severity`: "Critical vulnerability findings detected (2 found)"
+- `max-severity`: "Critical vulnerability findings detected: critical: lodash — CVE-2021-23337 (fix: 4.17.21); high: axios — CVE-2023-45857 (no fix available)"
 - `max-total`: "Total vulnerability findings (25) exceeds threshold (10)"
+
+When the threshold is crossed, `max-severity` names the offending packages/CVEs (most severe first) so the failure is actionable on its own. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`).
 
 ## Remediation
 
