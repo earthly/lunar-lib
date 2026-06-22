@@ -4,6 +4,11 @@
 # Each test boots a throwaway git repo on a controllable branch, pipes
 # a PreToolUse JSON payload through the check, then asserts on exit
 # code + stdout.
+#
+# shellcheck disable=SC2016
+# The payload strings are single-quoted on purpose: the `$(...)` and
+# backtick sequences inside them are literal test data (we assert the
+# check *defers* on command substitution), not expansions.
 
 set -u
 
@@ -26,7 +31,7 @@ run_check() {
 
     tmp="$(mktemp -d)"
     (
-        cd "$tmp"
+        cd "$tmp" || exit
         git init -q
         git config user.email t@t.t
         git config user.name t
@@ -232,6 +237,55 @@ assert "enforce_drafts=true + --draft + NO-TICKET prefix → allow (allowlist wi
 
 run_check "dependabot/npm/foo" '{"tool_input":{"command":"gh pr create --draft --title \"Bump foo\""}}' "" "true"
 assert "enforce_drafts=true + --draft + dependabot/* branch → allow (bot skip wins)" 0 ""
+
+# ============================================================
+# Wrapper entrypoint: `*-pr-create` (a script that forwards the same
+# --title flags to `gh pr create`). The agent invokes the wrapper, so
+# the hook never sees the inner `gh` — the check must match on the
+# wrapper name and parse its argv as gh-pr-create-style flags.
+# ============================================================
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --title \"[ENG-800] Add probe\""}}' ""
+assert "wrapper: ticket present → allow" 0 ""
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --title \"Add probe\""}}' ""
+assert "wrapper: no ticket → block (title echoed)" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --title=\"Refactor stuff\""}}' ""
+assert "wrapper: --title=value, no ticket → block" 1 "Refactor stuff"
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create -t \"[ABC-1] tiny\""}}' ""
+assert "wrapper: -t with ticket → allow" 0 ""
+
+# A wrapper's own long flags must fall through harmlessly to the title parse.
+run_check "main" '{"tool_input":{"command":"acme-pr-create --wrapper-only-flag --title \"missing ticket\""}}' ""
+assert "wrapper: own flag + bad title → block" 1 "missing ticket"
+
+# Invoked via absolute path — the check basenames the entrypoint token.
+run_check "main" '{"tool_input":{"command":"/usr/local/bin/acme-pr-create --title \"missing ticket\""}}' ""
+assert "wrapper: absolute path + bad title → block" 1 "missing ticket"
+
+# Skip rules apply identically to wrappers.
+run_check "main" '{"tool_input":{"command":"acme-pr-create --draft --title \"Add probe\""}}' ""
+assert "wrapper: --draft + no ticket → allow (draft skip default)" 0 ""
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --draft --title \"Add probe\""}}' "" "true"
+assert "wrapper: enforce_drafts=true + --draft + no ticket → block" 1 "Add probe"
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --title \"NO-TICKET: chore\""}}' ""
+assert "wrapper: NO-TICKET: prefix → allow" 0 ""
+
+run_check "renovate/all" '{"tool_input":{"command":"acme-pr-create --title \"Update deps\""}}' ""
+assert "wrapper: renovate/* branch → allow (bot skip)" 0 ""
+
+run_check "main" '{"tool_input":{"command":"acme-pr-create --title \"[ENG-$(num)] foo\""}}' ""
+assert "wrapper: command substitution → allow (safe defer)" 0 ""
+
+# A command that is neither `gh` nor a `*-pr-create` wrapper must be left
+# alone even if the check is somehow invoked directly (the hook matcher is
+# the first gate, this is the script's own belt-and-suspenders).
+run_check "main" '{"tool_input":{"command":"create-pr --title \"missing ticket\""}}' ""
+assert "non-gh non-wrapper command → allow (defer)" 0 ""
 
 # ============================================================
 # Report

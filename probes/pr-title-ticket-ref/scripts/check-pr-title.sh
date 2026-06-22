@@ -14,6 +14,7 @@ cmd="$(jq -r '.tool_input.command // ""' 2>/dev/null || printf '')"
 # Defer to gh when the title is built via shell substitution — we
 # can't see the post-expansion value, so blocking risks false
 # positives (e.g. `--title "[ENG-$(num)] foo"`).
+# shellcheck disable=SC2016  # the single-quoted `$(` is a literal glob, not an expansion
 case "$cmd" in
     *'`'*|*'$('*) exit 0 ;;
 esac
@@ -30,19 +31,48 @@ IFS='
 set -- $tokens
 IFS="$OLD_IFS"
 
-# Must be `gh ... pr create` (allow leading flags before the subcommand).
-[ "${1:-}" = "gh" ] || exit 0
-shift
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --*=*|--*|-*) shift ;;
-        *) break ;;
-    esac
-done
-[ "${1:-}" = "pr" ] || exit 0
-shift
-[ "${1:-}" = "create" ] || exit 0
-shift
+# Recognize the PR-creation entrypoint. Two command shapes reach this
+# check (the hook's binary matcher gates out everything else):
+#
+#   1. gh ... pr create [flags]    — the GitHub CLI directly.
+#   2. <name>-pr-create [flags]    — a thin wrapper that forwards the
+#                                    same --title/-t flags on to
+#                                    `gh pr create` (e.g. a CI/bot script
+#                                    that wraps `gh pr create` to also
+#                                    register or label the new PR). The
+#                                    agent invokes the wrapper, so the
+#                                    inner `gh` call is never seen by the
+#                                    hook — we have to match the wrapper.
+#
+# Both carry the title in identical `--title` / `-t` / `--title=` flags,
+# so once the entrypoint-specific preamble is stripped the extraction
+# loop below is shared. A wrapper's own long flags (`--foo`) just fall
+# through that loop harmlessly.
+entry="${1:-}"
+case "${entry##*/}" in          # basename — tolerate an absolute path
+    gh)
+        shift
+        # Allow global flags before the `pr` subcommand.
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --*=*|--*|-*) shift ;;
+                *) break ;;
+            esac
+        done
+        [ "${1:-}" = "pr" ] || exit 0
+        shift
+        [ "${1:-}" = "create" ] || exit 0
+        shift
+        ;;
+    *-pr-create)
+        # Wrapper: argv is already gh-pr-create-style — nothing to strip
+        # beyond the wrapper name itself.
+        shift
+        ;;
+    *)
+        exit 0
+        ;;
+esac
 
 title=""
 draft=0

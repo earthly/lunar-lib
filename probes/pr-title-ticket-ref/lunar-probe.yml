@@ -1,16 +1,17 @@
 version: 0
 
 name: pr-title-ticket-ref
-description: Block `gh pr create` when the PR title lacks a ticket reference (default pattern matches Linear/Jira/etc. tracker tokens).
+description: Block `gh pr create` (and `*-pr-create` wrapper scripts) when the PR title lacks a ticket reference (default pattern matches Linear/Jira/etc. tracker tokens).
 author: earthly
 
 landing_page:
   display_name: "PR Title Ticket Ref Probe"
   long_description: |
-    Intercept `gh pr create` and block (or warn) when the PR title is
-    missing a ticket reference like `ENG-123`. Skip-safe on drafts, bot
-    branches (`dependabot/*`, `renovate/*`), and an `NO-TICKET:`
-    allowlist prefix. Catches untraceable PRs before they exist.
+    Intercept `gh pr create` (and `*-pr-create` wrapper scripts) and
+    block (or warn) when the PR title is missing a ticket reference like
+    `ENG-123`. Skip-safe on drafts, bot branches (`dependabot/*`,
+    `renovate/*`), and an `NO-TICKET:` allowlist prefix. Catches
+    untraceable PRs before they exist.
   categories: ["authoring"]
   icon: "assets/pr-title-ticket-ref.svg"
   status: "beta"
@@ -40,15 +41,19 @@ inputs:
 
 probes:
   - name: block
-    description: Block `gh pr create` when the title lacks a ticket reference (default pattern matches Linear/Jira-style tracker tokens).
+    description: Block `gh pr create` (and `*-pr-create` wrappers) when the title lacks a ticket reference (default pattern matches Linear/Jira-style tracker tokens).
     keywords: ["pr", "github", "ticket", "linear", "title", "traceability", "gh"]
     hook:
       type: agent-before-command
       binary:
-        name: gh
+        # Fire on `gh` itself and on any `*-pr-create` wrapper — a thin
+        # script that forwards the same flags to `gh pr create`. The
+        # agent invokes the wrapper, so the hook never sees the inner
+        # `gh`; matching the wrapper name is the only way to catch it.
+        name_pattern: '^(gh|.*-pr-create)$'
     check: scripts/check-pr-title.sh
     message: |-
-      `gh pr create` rejected: PR title is missing a ticket reference.
+      PR creation blocked: the title is missing a ticket reference.
 
       Title:    `{check_stdout}`
       Expected: a ticket token (e.g. `[ABC-123]`) somewhere in the
@@ -67,16 +72,20 @@ probes:
           README fixes, etc.)
 
   - name: warn
-    description: Soft-nudge alternative to `block` — warns after `gh pr create` when the title lacks a ticket reference.
+    description: Soft-nudge alternative to `block` — warns after `gh pr create` (or a `*-pr-create` wrapper) when the title lacks a ticket reference.
     keywords: ["pr", "github", "ticket", "linear", "title", "traceability", "gh", "soft-warn"]
     hook:
       type: agent-after-command
       binary:
-        name: gh
+        # Fire on `gh` itself and on any `*-pr-create` wrapper — a thin
+        # script that forwards the same flags to `gh pr create`. The
+        # agent invokes the wrapper, so the hook never sees the inner
+        # `gh`; matching the wrapper name is the only way to catch it.
+        name_pattern: '^(gh|.*-pr-create)$'
     check: scripts/check-pr-title.sh
     message: |-
-      Heads up: the PR you just opened with `gh pr create` is missing
-      a ticket reference in the title.
+      Heads up: the PR you just opened is missing a ticket reference in
+      the title.
 
       Title: `{check_stdout}`
 
@@ -85,4 +94,4 @@ probes:
         gh pr edit <num> --title "[XXXXXX] <original title>"
 
       Pick `block` instead of `warn` in your `.lunar/probes.yml` if you
-      want this to be a hard rejection at `gh pr create` time.
+      want this to be a hard rejection at PR-creation time.
