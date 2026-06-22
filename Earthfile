@@ -69,6 +69,7 @@ plugin-source:
 test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
+    BUILD ./collectors/github+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
 

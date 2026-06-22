@@ -29,28 +29,89 @@ REPO_FULL_NAME="${OWNER}/${REPO}"
 # GitHub API base URL
 API_BASE="https://api.github.com"
 
-# Helper function to call GitHub API
+# Helper function to call the GitHub API.
+#
+# Captures the HTTP status code so callers can distinguish a genuine "absent"
+# (e.g. a 404 "Branch not protected") from a transient API error (a 401 from a
+# rotated token, a 403/429 rate limit, a 5xx, or a network failure). Sets two
+# globals and always returns 0 — callers MUST inspect GH_HTTP_CODE:
+#   GH_HTTP_CODE  HTTP status, or "000" if curl itself failed
+#   GH_BODY       response body
+#
+# Retries a few times on transient failures (network error, 429, 5xx) with a
+# short backoff. Auth errors (401/403) are not retried — within a single run
+# the token is fixed — but are still surfaced via a non-200 GH_HTTP_CODE for the
+# caller to treat as an error.
 gh_api() {
   local endpoint="$1"
   local url="${API_BASE}${endpoint}"
+  local attempt=1
+  local max_attempts=3
+  local response
 
-  curl -sSL -H "Authorization: token ${LUNAR_SECRET_GH_TOKEN}" \
-       -H "Accept: application/vnd.github+json" \
-       -H "X-GitHub-Api-Version: 2022-11-28" \
-       "$url"
+  while :; do
+    # -w appends "<newline><status>" after the body so we can split the two.
+    # curl returns non-zero only on a transport-level failure (DNS, connection,
+    # timeout); HTTP error statuses still exit 0 with the status in -w.
+    response=$(curl -sSL -w $'\n%{http_code}' \
+         -H "Authorization: token ${LUNAR_SECRET_GH_TOKEN}" \
+         -H "Accept: application/vnd.github+json" \
+         -H "X-GitHub-Api-Version: 2022-11-28" \
+         "$url" 2>/dev/null) || response=$'\n000'
+
+    GH_HTTP_CODE=$(printf '%s\n' "$response" | tail -n1)
+    GH_BODY=$(printf '%s\n' "$response" | sed '$d')
+
+    # Retry only on clearly-transient failures.
+    case "$GH_HTTP_CODE" in
+      000 | 429 | 5[0-9][0-9])
+        if [ "$attempt" -lt "$max_attempts" ]; then
+          sleep "$attempt"
+          attempt=$((attempt + 1))
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
+
+  return 0
 }
 
-# Get the default branch from the repository
-REPO_DATA=$(gh_api "/repos/${OWNER}/${REPO}")
-DEFAULT_BRANCH=$(echo "$REPO_DATA" | jq -r '.default_branch')
+# Get the default branch from the repository. If this call fails we can't
+# reliably determine which branch to inspect, so abort (non-zero) rather than
+# guess — a non-zero exit marks the run errored and preserves any previously
+# collected .vcs data instead of overwriting it with a wrong value.
+gh_api "/repos/${OWNER}/${REPO}"
+if [ "$GH_HTTP_CODE" != "200" ]; then
+  echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} for /repos/${REPO_FULL_NAME}. Aborting so the last-known-good branch protection data is retained." >&2
+  exit 1
+fi
+DEFAULT_BRANCH=$(echo "$GH_BODY" | jq -r '.default_branch // empty')
+if [ -z "$DEFAULT_BRANCH" ]; then
+  echo "Error: could not determine the default branch for ${REPO_FULL_NAME}. Aborting." >&2
+  exit 1
+fi
 
 # Fetch classic branch protection settings.
-# Returns the protection object on success, or {"message": "Branch not protected", ...} on 404.
-PROTECTION_DATA=$(gh_api "/repos/${OWNER}/${REPO}/branches/${DEFAULT_BRANCH}/protection" 2>/dev/null || echo '{}')
+#   200 => classic protection is configured; parse it below.
+#   404 => "Branch not protected" — the ONLY legitimate signal to fall through
+#          to the rulesets path. The repo and default branch exist (we just
+#          confirmed them above), so a 404 here genuinely means no classic
+#          protection, not a missing resource.
+#   anything else (401/403/429/5xx/000) => an API error. Do NOT treat it as
+#          "unprotected": abort (non-zero) so the run is marked errored and the
+#          last-known-good .vcs data is retained.
+gh_api "/repos/${OWNER}/${REPO}/branches/${DEFAULT_BRANCH}/protection"
+PROTECTION_DATA="$GH_BODY"
 
-CLASSIC_PROTECTED=true
-if echo "$PROTECTION_DATA" | jq -e 'has("message") and .message != null' > /dev/null 2>&1; then
+if [ "$GH_HTTP_CODE" = "200" ]; then
+  CLASSIC_PROTECTED=true
+elif [ "$GH_HTTP_CODE" = "404" ]; then
   CLASSIC_PROTECTED=false
+else
+  echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} for classic branch protection on ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting so the last-known-good branch protection data is retained." >&2
+  exit 1
 fi
 
 if [ "$CLASSIC_PROTECTED" = "true" ]; then
@@ -97,14 +158,25 @@ if [ "$CLASSIC_PROTECTED" = "true" ]; then
 else
   # ---- Rulesets fallback ----
   # GitHub now recommends rulesets over classic branch protection. A repo can be
-  # fully protected via a ruleset and still 404 on the classic endpoint above.
-  # Query the effective-rules endpoint to detect ruleset-based protection.
-  RULES_DATA=$(gh_api "/repos/${OWNER}/${REPO}/rules/branches/${DEFAULT_BRANCH}" 2>/dev/null || echo '[]')
+  # fully protected via a ruleset and still 404 on the classic endpoint above, so
+  # query the effective-rules endpoint to detect ruleset-based protection.
+  #
+  # On 200 this returns a JSON array (possibly empty). A non-200 is an API error —
+  # abort rather than coerce it to "no rules", which would falsely report the repo
+  # as unprotected. An empty array on 200 is the genuine "no rulesets" signal,
+  # handled below.
+  gh_api "/repos/${OWNER}/${REPO}/rules/branches/${DEFAULT_BRANCH}"
+  if [ "$GH_HTTP_CODE" != "200" ]; then
+    echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} for rulesets on ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting so the last-known-good branch protection data is retained." >&2
+    exit 1
+  fi
+  RULES_DATA="$GH_BODY"
 
-  # Error responses come back as objects ({"message": "..."}) — coerce anything
-  # that isn't an array to empty.
+  # A 200 response is always a JSON array. If it somehow isn't, treat it as an
+  # error rather than silently coercing to "unprotected".
   if ! echo "$RULES_DATA" | jq -e 'type == "array"' > /dev/null 2>&1; then
-    RULES_DATA='[]'
+    echo "Error: unexpected non-array response from the rulesets endpoint for ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting." >&2
+    exit 1
   fi
 
   if [ "$(echo "$RULES_DATA" | jq 'length')" = "0" ]; then

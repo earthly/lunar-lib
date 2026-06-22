@@ -1,0 +1,11 @@
+VERSION 0.8
+
+test:
+    FROM python:3.12-alpine
+    # branch_protection.sh is bash and shells out to jq; the test stubs curl,
+    # lunar, and sleep on PATH and drives the real script as a subprocess.
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY branch_protection.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest test_branch_protection -v
