@@ -317,8 +317,10 @@ class MaxSeverityAlertTests(unittest.TestCase):
         self.assertIsNone(body["pr"])
         self.assertEqual(body["min_severity"], "high")
         self.assertIn("vulnerability findings detected", body["message"])
-        # The webhook message mirrors the enriched check text: it names findings.
+        # Webhook message: compact single-line summary that names findings, no
+        # Markdown (the multi-line sub-list form is for the GitHub check only).
         self.assertIn("golang.org/x/net", body["message"])
+        self.assertNotIn("\n", body["message"])
         self.assertEqual(body["schema_version"], 1)
         self.assertIn("dedupe_key", body)
         # min_severity=high -> the two HIGH findings, medium excluded.
@@ -392,6 +394,9 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
         self.assertIn("High vulnerability findings detected", msg)
+        # Rendered as a Markdown sub-list: headline, then one indented bullet
+        # per finding (nests under the hub's failure bullet in the PR comment).
+        self.assertIn("High vulnerability findings detected:\n    * ", msg)
         # Both HIGH findings named, with package + CVE + fix status.
         self.assertIn("golang.org/x/net", msg)
         self.assertIn("CVE-2023-44487", msg)
@@ -424,8 +429,10 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
         self.assertIn("+5 more (see component JSON for full list)", msg)
-        # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." tail segment.
-        self.assertEqual(len(msg.split("; ")), max_severity.MAX_LISTED_FINDINGS + 1)
+        # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
+        # a 4-space-indented Markdown sub-bullet under the headline.
+        bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]
+        self.assertEqual(len(bullets), max_severity.MAX_LISTED_FINDINGS + 1)
 
 
 if __name__ == "__main__":

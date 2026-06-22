@@ -53,7 +53,7 @@ def _collect_findings(sca_node, in_scope):
     return out
 
 
-def _with_findings(headline, findings):
+def _with_findings(headline, findings, multiline=False):
     """Return the failure headline with the offending findings enumerated.
 
     When the collector emitted per-finding detail, append an explicit list of
@@ -62,6 +62,13 @@ def _with_findings(headline, findings):
     collectors (no `.findings`) return the headline unchanged. The list is
     capped at MAX_LISTED_FINDINGS; any remainder is summarized as a
     "+N more (see component JSON for full list)" tail.
+
+    `multiline=True` renders the findings as a Markdown sub-list — one per line,
+    indented 4 spaces so they nest under the failure bullet the hub emits
+    (`  * <message>`) and show as a tidy nested list in the GitHub PR comment.
+    The default single-line (`; `-joined) form is used for the webhook payload's
+    `message`, which is consumed as plain text and also ships structured
+    findings separately.
     """
     if not findings:
         return headline
@@ -79,6 +86,8 @@ def _with_findings(headline, findings):
     hidden = len(ordered) - len(lines)
     if hidden > 0:
         lines.append(f"+{hidden} more (see component JSON for full list)")
+    if multiline:
+        return f"{headline}:\n" + "\n".join(f"    * {line}" for line in lines)
     return f"{headline}: " + "; ".join(lines)
 
 
@@ -153,14 +162,13 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            # Name the offending packages/CVEs in the failure message — not just
-            # that the threshold was crossed. The same enriched message backs
-            # the check result and the (optional) webhook so they never diverge;
-            # the webhook additionally carries the structured findings.
+            # Name the offending packages/CVEs, not just that the threshold was
+            # crossed. The check failure text renders them as a Markdown sub-list
+            # (nests tidily in the GitHub PR comment); the webhook gets the
+            # compact single-line form plus the structured findings array.
             findings = _collect_findings(sca_node, set(in_scope))
-            fail_message = _with_findings(fail_message, findings)
-            _fire_alert(min_severity, fail_message, findings)
-            c.fail(fail_message)
+            _fire_alert(min_severity, _with_findings(fail_message, findings), findings)
+            c.fail(_with_findings(fail_message, findings, multiline=True))
             return c
 
         # Scan data exists but reports no findings/summary — that's a collector
