@@ -9,9 +9,10 @@ landing_page:
   display_name: "Backstage catalog-info.yaml Cataloger"
   long_description: |
     Augments existing Lunar components with owner, domain, and tag
-    metadata read from each repo's `catalog-info.yaml`. Fetches files
-    via the GitHub Contents API on a schedule. Runs per component. Use
-    when Backstage data lives in repo files, not in a Backstage server.
+    metadata read from each repo's `catalog-info.yaml` — on a schedule
+    via the GitHub API, or the moment a repo is committed to. Runs per
+    component. Use when Backstage data lives in repo files, not a
+    Backstage server.
   categories: ["service-catalog", "vcs"]
   icon: "assets/backstage-catalog-info.svg"
   status: "beta"
@@ -45,16 +46,16 @@ example_catalog_json: |
 catalogers:
   - name: augment
     description: |
-      Scheduled variant. For each existing Lunar component, fetches
-      `catalog-info.yaml` from the component's GitHub repo via the
-      Contents API, parses it (supports multi-document YAML), picks
-      the matching `Component` entity, and writes its owner, domain,
-      and tags to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog
-      JSON. Repos with no `catalog-info.yaml`, an unparseable file, or
-      no matching `Component` are skipped silently. Runs on a fixed
-      cadence regardless of repo activity — pair with
-      `augment-on-commit` (below) when you want updates the moment a
-      repo's `catalog-info.yaml` changes instead of at the next cron.
+      For each existing Lunar component, fetches `catalog-info.yaml`
+      from the component's GitHub repo via the Contents API, parses it
+      (supports multi-document YAML), picks the matching `Component`
+      entity, and writes its owner, domain, and tags to
+      `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON. Repos
+      with no `catalog-info.yaml`, an unparseable file, or no matching
+      `Component` are skipped silently. Runs on a fixed cadence
+      regardless of repo activity — pair with `augment-on-commit`
+      (below) for updates the moment a repo's `catalog-info.yaml`
+      changes instead of at the next cron.
     mainBash: main.sh
     hook:
       type: component-cron
