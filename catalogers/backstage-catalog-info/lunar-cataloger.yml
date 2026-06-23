@@ -64,25 +64,29 @@ catalogers:
 
   - name: augment-on-commit
     description: |
-      Commit-triggered companion to `augment`. Runs the very same
-      script (`main.sh`) and produces the identical augmentation, but
-      via the `component-repo` hook so it refreshes a component the
-      moment its repo receives a commit instead of waiting for the
-      daily cron. Catalogers run without a repo checkout, so — exactly
-      like `augment` — it fetches `catalog-info.yaml` from the
-      component's GitHub repo via the Contents API and needs the same
-      `GH_TOKEN`. Same matching rules, same inputs, same silent-skip
-      behavior. Augments existing components only (a component-defining
-      cataloger such as `github-org` must run first); cannot create
-      new components.
-    mainBash: main.sh
-    # TODO(post-merge): a third variant floated on PR earthly/lunar-lib#181
+      Commit-triggered companion to `augment`: identical owner /
+      domain / tag augmentation, but fired the moment a component's
+      repo receives a commit instead of waiting for the daily cron.
+      Runs via the `component-repo` hook, which checks out the
+      component's repo, so it reads `catalog-info.yaml` straight from
+      the working tree — no GitHub Contents API call and no `GH_TOKEN`
+      required. Same matching rules, same inputs (except `branch`,
+      which only applies to the API-fetch `augment` variant), and the
+      same silent-skip behavior. Like `augment`, it augments existing
+      components only — a component-defining cataloger such as
+      `github-org` must run first — and cannot create new ones.
+    mainBash: main-on-commit.sh
+    # TODO(post-merge): the third variant floated on PR earthly/lunar-lib#181
     # is a `cron`-hooked org-walker that CREATES components from
     # catalog-info.yaml for full day-1 coverage (vs the two augment-only
     # variants here, which only enrich components that already exist).
     # Different shape — defer it to its own PR.
     hook:
       type: component-repo
+      # Request a checkout of the component's repo so main-on-commit.sh can
+      # read catalog-info.yaml from the working tree (vs. fetching over the
+      # GitHub API like the scheduled `augment` variant).
+      clone-code: true
     keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment", "commit-triggered", "real-time"]
 
 inputs:
@@ -96,7 +100,10 @@ inputs:
   branch:
     description: |
       Git ref to read `catalog-info.yaml` from. Empty means the
-      repo's default branch. Applies to both variants.
+      repo's default branch. Applies to the `augment` (Contents API)
+      variant only — `augment-on-commit` reads whatever ref the
+      `component-repo` hook checked out, so this input is ignored
+      there.
     default: ""
 
   component_id_annotation:
@@ -165,8 +172,10 @@ inputs:
 secrets:
   GH_TOKEN:
     description: |
-      GitHub token used by both variants to fetch `catalog-info.yaml`
-      from component repos via the Contents API. Needs `Contents: Read`
-      on the target repos (`repo` scope on a classic PAT, or
-      `contents: read` on a fine-grained PAT / GitHub App installation
-      token).
+      GitHub token used by the `augment` variant to fetch
+      `catalog-info.yaml` from component repos via the Contents API.
+      Needs `Contents: Read` on the target repos (`repo` scope on a
+      classic PAT, or `contents: read` on a fine-grained PAT / GitHub
+      App installation token). Not required by `augment-on-commit`,
+      which reads the file from the `component-repo` checkout; if you
+      run only that variant you can leave `GH_TOKEN` unset.

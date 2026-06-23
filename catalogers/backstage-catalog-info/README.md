@@ -4,7 +4,7 @@ Augments existing Lunar components with metadata read from each repo's `catalog-
 
 ## Overview
 
-Augments existing Lunar components with owner, domain, and tag metadata read from each repo's `catalog-info.yaml` — it picks the matching `Component` entity and writes owner / domain / tags to that component's catalog entry. The same logic runs in two trigger variants from one script: `augment` refreshes the catalog on a daily schedule, while `augment-on-commit` does the same the moment a repo is committed to. Both fetch the file via the GitHub Contents API (catalogers run without a repo checkout), so both need a `GH_TOKEN`, and both only enrich components that already exist — pair this with a component-defining cataloger such as [`github-org`](../github-org).
+Augments existing Lunar components with owner, domain, and tag metadata read from each repo's `catalog-info.yaml` — it picks the matching `Component` entity and writes owner / domain / tags to that component's catalog entry. The same augmentation runs in two trigger variants: `augment` refreshes the catalog on a daily schedule (fetching the file via the GitHub Contents API), while `augment-on-commit` updates a component the moment its repo is committed to (reading the file from the checkout, no token). Both only enrich components that already exist, so pair this with a component-defining cataloger such as [`github-org`](../github-org).
 
 ## Synced Data
 
@@ -53,7 +53,7 @@ This cataloger does **not** define new components — both the `component-cron` 
 | Cataloger | Description |
 |-----------|-------------|
 | `augment` | **Scheduled.** Fetches `catalog-info.yaml` from the current component's GitHub repo via the Contents API, parses the YAML (multi-document files supported), picks the matching `Component` entity, and writes its owner / domain / tags to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON. Runs on a `component-cron` schedule. Requires `GH_TOKEN`. |
-| `augment-on-commit` | **Commit-triggered.** Runs the identical script (`main.sh`) and produces the same output as `augment`, but on the `component-repo` hook — it fires when the component's repo receives a commit. Catalogers run without a repo checkout, so it fetches `catalog-info.yaml` over the Contents API just like `augment` and needs the same `GH_TOKEN`. Use it for near-real-time updates; see [Choosing a variant](#choosing-a-variant). |
+| `augment-on-commit` | **Commit-triggered.** Same parsing, matching, and output as `augment`, but runs on the `component-repo` hook — it fires when the component's repo receives a commit and reads `catalog-info.yaml` from the checkout instead of the Contents API. No `GH_TOKEN` required. Use it for near-real-time updates; see [Choosing a variant](#choosing-a-variant). |
 
 ## Hook Type
 
@@ -62,17 +62,18 @@ This cataloger does **not** define new components — both the `component-cron` 
 | `augment` | `component-cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per existing component |
 | `augment-on-commit` | `component-repo` | on commit to a component's repo | Runs whenever a component's repo receives a commit, once per affected component |
 
-Both hooks invoke the cataloger separately for each Lunar component, exposing the component identifier as `$LUNAR_COMPONENT_ID`. Neither gives the cataloger a repo checkout, so both variants fetch `catalog-info.yaml` over the Contents API (and need `GH_TOKEN`) — the only difference is *when* they run: `component-cron` on a schedule, `component-repo` the moment the component's repo receives a commit. See the cataloger-hooks reference for the full contract on [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) and [`component-repo`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-repo).
+Both hooks invoke the cataloger separately for each Lunar component, exposing the component identifier as `$LUNAR_COMPONENT_ID`. The difference is *when* and *with what*: `component-cron` fires on a schedule with no repo checkout (so `augment` fetches the file over the API), while `component-repo` fires on a commit with the component's repo checked out (so `augment-on-commit` reads the file locally). See the cataloger-hooks reference for the full contract on [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) and [`component-repo`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-repo).
 
 Daily at 03:00 is a conservative default for `augment` — it's offset by an hour from the standard `0 2 * * *` so it lands after component-defining catalogers populate the catalog. Tighten the cadence by overriding `hook.schedule` in a fork.
 
 ### Choosing a variant
 
-The two sub-catalogers run the same script and produce identical catalog entries from the same `catalog-info.yaml` — both fetch over the Contents API and need `GH_TOKEN`. Pick by how fresh you need the data:
+The two sub-catalogers produce identical catalog entries from the same `catalog-info.yaml`; pick by how fresh you need the data and whether a checkout is available:
 
 | | `augment` (`component-cron`) | `augment-on-commit` (`component-repo`) |
 |--|------------------------------|----------------------------------------|
 | **Freshness** | Up to a day stale (next cron) | Near-real-time — updates on the triggering commit |
+| **GitHub token** | Required (`GH_TOKEN`, Contents API) | Not required (reads the checkout) |
 | **Catches drift independent of commits** | Yes — re-reads every component each cron | No — only fires when a repo is committed to |
 | **Covers components whose repo is quiet** | Yes | No, until the next commit |
 
@@ -91,25 +92,25 @@ Pick a single variant with `include` (see [Choosing a variant](#choosing-a-varia
 
 ```yaml
 catalogers:
-  # Commit-triggered only — near-real-time updates on each commit
+  # Commit-triggered only — near-real-time, no GitHub token needed
   - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment-on-commit]
 ```
 
 ```yaml
 catalogers:
-  # Scheduled only — daily backfill
+  # Scheduled only — daily backfill via the GitHub Contents API
   - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment]
 ```
 
-Both variants fetch `catalog-info.yaml` over the GitHub Contents API, so set the token used to read it from each repo:
+If you run the `augment` variant (scheduled / Contents API), set the GitHub token used to fetch `catalog-info.yaml` from each repo:
 
 ```sh
 lunar secret set GH_TOKEN <your-github-token>
 ```
 
-The token needs `Contents: Read` on every repo this cataloger will read (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or any of the GitHub-API collectors, this cataloger picks it up automatically.
+The token needs `Contents: Read` on every repo this cataloger will read (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or any of the GitHub-API collectors, this cataloger picks it up automatically. The `augment-on-commit` variant reads the file from the `component-repo` checkout, so it needs no token — if you run only that variant you can skip this step.
 
 Because both variants only augment existing components, a component-defining cataloger must run first (see the [Layering](#layering-with-a-component-defining-cataloger) section below).
 
