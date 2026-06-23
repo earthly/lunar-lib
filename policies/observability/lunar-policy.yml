@@ -4,7 +4,7 @@ name: observability
 description: Enforce dashboard, alerting, and SLO configuration standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.2
 
 landing_page:
   display_name: "Observability Guardrails"
