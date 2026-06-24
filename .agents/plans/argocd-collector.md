@@ -1,9 +1,9 @@
-# ArgoCD Validation Collector + Policies — Plan
+# ArgoCD Validation Collector + GitOps Policies — Plan
 
-A reusable ArgoCD guardrail set: parse ArgoCD config, validate it, and (the hard
-part) correlate ArgoCD config back to the source component when the two live in
-**separate repos**. This document describes the options implemented in the
-**first pass** and is explicit about what's deferred and why.
+A reusable GitOps guardrail set: parse and validate ArgoCD config, and (the hard
+part) correlate it back to the source component when the two live in **separate
+repos**. This document describes the options implemented in the **first pass**
+and is explicit about what's deferred and why.
 
 Tracking: ENG-1014.
 
@@ -25,7 +25,7 @@ ArgoCD is the dominant GitOps CD tool. Two realities shape this work:
    catalog, or a proprietary platform tool) — never a standard machine-readable
    field. See "Correlation" below.
 
-So the collector is easy; **correlating ArgoCD config to the right component is the
+So the collector is easy; **correlating GitOps config to the right component is the
 real design problem**, and we solve it with a small set of configurable strategies
 plus a fork escape hatch.
 
@@ -35,52 +35,68 @@ plus a fork escape hatch.
 
 | Phase | What | Confidence |
 | -- | -- | -- |
-| **1 (build now)** | `argocd` collector (local parse) + `argocd` policy set + correlation via **annotation** (default) and **repoURL-normalize** fallback | High — no platform dependencies |
-| **2 (opt-in, same tier)** | `argocd-link` cataloger adding **image-match** and **catalog/tag** correlation strategies | Medium — depends on other collectors/catalog |
+| **1 (build now)** | `argocd` collector (parse + validate) + `gitops` policy set + correlation via **annotation** (default) and **repoURL-normalize** fallback | High — no platform dependencies |
+| **2 (opt-in, same tier)** | `gitops-link` cataloger adding **image-match** and **catalog/tag** correlation strategies | Medium — depends on other collectors/catalog |
 | **Deferred (verify first)** | rich cross-component data **push**, `ApplicationSet` generator resolution, **API/fork** source adapter | Blocked / needs verification |
 
 ---
 
-## Schema: `.cd.argocd`
+## Schema: `.cd.gitops` (normalized) + `.cd.gitops.native.argocd` (raw)
 
 A new tool-agnostic top-level category `.cd` (continuous delivery), sibling to the
-existing `.ci` (continuous integration). ArgoCD-specific data lives under
-`.cd.argocd`, mirroring the `.lang.<language>` and `.iac.native.terraform` pattern:
-CD tools have tool-specific concepts (`Application`, `AppProject`, sync policy) that
-do not normalize cleanly across Flux/Spinnaker yet. As more CD tools are added,
-genuinely tool-agnostic fields can be promoted up to `.cd`.
+existing `.ci` (continuous integration). Under it, a **methodology** level:
+`.cd.gitops` holds the GitOps-specific *normalized* view — concepts that translate
+across GitOps tools (a deployment unit, its sync policy, its source, its
+destination, the project that scopes it). The *raw, tool-specific* shape goes under
+`.cd.gitops.native.argocd`, per the established `.native.<tool>` convention.
 
-> **Open question (resolve at spec review):** `.cd` vs `.deployment`. The older
-> `ai-context/guardrail-specs/deployment-and-infrastructure.md` brainstorm used
-> `.deployment.argocd.*`; neither exists in `component-json/structure.md` yet.
-> `.cd` is preferred here because it pairs symmetrically with the existing `.ci`.
+This separates the **WHAT** (GitOps continuous delivery) from the **HOW** (ArgoCD).
+A future `flux` collector populates the same `.cd.gitops.applications[]` /
+`.projects[]` and writes its raw shape under `.cd.gitops.native.flux` — so the
+`gitops` policy set works unchanged across tools. This mirrors the
+`snyk`/`trivy`/`grype` collectors → normalized `.sca` → one `sca` policy pattern.
+(Genuinely push-based CD — Spinnaker, Harness — has a different shape and would get
+its own `.cd.<methodology>` sibling, not `.cd.gitops`.)
+
+> Resolves the earlier `.cd` vs `.deployment` open question in favor of `.cd`
+> (pairs symmetrically with `.ci`), per reviewer input, and pushes the tool name
+> (`argocd`) down to `.native`. Neither namespace exists in
+> `component-json/structure.md` yet — it will be added there once the shape is
+> locked.
 
 ```jsonc
 {
   "cd": {
-    "argocd": {
+    "gitops": {
       "source": { "tool": "argocd", "integration": "code" },
-      "applications": [
+      "applications": [           // normalized: "a GitOps-managed deployment unit"
         {
           "name": "payment-api",
           "path": "apps/payment-api.yaml",
-          "kind": "Application",              // or ApplicationSet
+          "valid": true,                     // conforms to the argoproj CRD schema
+          "kind": "Application",             // Application | ApplicationSet (Flux: Kustomization | HelmRelease)
           "project": "platform",
-          "template_label": "standard-v2",    // configurable golden-path label, if present
           "component_annotation": "github.com/org/payment-api", // lunar.earthly.dev/component, if present
           "sync_policy": { "automated": true, "prune": true, "self_heal": true },
           "destination": { "server": "...", "namespace": "payments" },
           "source_ref": { "repoURL": "https://github.com/org/gitops.git",
                           "path": "payment-api", "targetRevision": "HEAD" },
           "images": ["myregistry.io/payment-api"],   // if statically resolvable (see Correlation)
-          "canary": { "rollout": true }              // Argo Rollouts referenced
+          "canary": { "rollout": true }              // Argo Rollouts referenced (data only — see Optional checks)
         }
       ],
       "projects": [
-        { "name": "platform", "is_default": false,
+        { "name": "platform", "path": "projects/platform.yaml", "valid": true,
+          "is_default": false,
           "source_repos": ["https://github.com/org/gitops.git"],
           "destinations": [{ "namespace": "payments", "server": "..." }] }
-      ]
+      ],
+      "native": {
+        "argocd": {                          // raw, ArgoCD-specific parsed resources
+          "applications": [ { "path": "apps/payment-api.yaml", "resource": { /* full parsed CRD */ } } ],
+          "projects":     [ { "path": "projects/platform.yaml", "resource": { /* full parsed CRD */ } } ]
+        }
+      }
     }
   }
 }
@@ -88,54 +104,91 @@ genuinely tool-agnostic fields can be promoted up to `.cd`.
 
 Notes:
 
-* Tool-agnostic category (`.cd`) so policies don't care whether data came from
-  files (now) or an API (later); `.cd.argocd` holds the ArgoCD-specific shape.
+* Policies read the normalized `.cd.gitops.*` and don't care whether data came from
+  ArgoCD files (now), Flux files, or an API (later).
 * `images` is best-effort: only populated when the referenced workload manifests
   are plain YAML in the same repo/path. Helm/templated/generated manifests will
   often leave it empty — that's expected (see Correlation caveats).
 
 ---
 
-## Component 1 — `argocd` collector (local parse)
+## Validation (the "is there an ArgoCD linter?" answer)
+
+There is **no single official `argocd lint` CLI** for offline manifest validation.
+The standard offline approach — and the one this collector uses — is
+**`kubeconform` with the argoproj CRD schemas** (from the `datreeio/CRDs-catalog`,
+which publishes `argoproj.io/Application_v1alpha1.json`,
+`AppProject_v1alpha1.json`, `ApplicationSet_v1alpha1.json`). This is exactly how
+the existing `k8s` collector validates core resources, so it's a known, in-repo
+pattern.
+
+Each parsed resource gets a `valid` boolean (and an `error` string on failure),
+and the `gitops` `valid` policy asserts every resource is schema-valid. Because
+validation needs the `kubeconform` binary plus the baked CRD schemas, the collector
+ships a **custom image** (`earthly/lunar-lib:argocd-main`, Earthfile added at
+implementation, wired into `+all`) rather than running on `base-main`.
+
+---
+
+## Component 1 — `argocd` collector (parse + validate)
 
 A `code`-hook collector that scans the cloned repo for ArgoCD CRDs
-(`apiVersion: argoproj.io/*`) and writes the normalized view above to its **own**
-Component JSON. Works in both modes with no special handling:
+(`apiVersion: argoproj.io/*`), validates each against the argoproj schemas, and
+writes the normalized `.cd.gitops` view above (plus raw `.cd.gitops.native.argocd`)
+to its **own** Component JSON. Works in both modes with no special handling:
 
 * a dedicated GitOps/ArgoCD repo (finds many `Application`s), and
 * a component repo that ships its own ArgoCD files (finds its own).
 
-Generalizes the demo collectors (raw inventory + the single-template check) into
-one normalized schema. Composes with the existing `k8s` and `docker` collectors
-(it does not re-parse workloads — it references them). Runs on `earthly/lunar-lib:base-main`
-(yq/jq are sufficient; no custom image needed).
+Composes with the existing `k8s` and `docker` collectors (it does not re-parse
+workloads — it references them).
 
 ---
 
-## Component 2 — `argocd` policy set
+## Component 2 — `gitops` policy set
 
-Checks that run on whichever component holds the ArgoCD files (one check per file,
-`include`/`exclude`-able). All resolve to **skip** when `.cd.argocd` is absent
-(vendor not in use), per the skip-vs-fail convention.
+Tool-agnostic checks over `.cd.gitops` (one check per file, `include`/`exclude`-able).
+All resolve to **skip** when `.cd.gitops` is absent (no GitOps config in this
+component), per the skip-vs-fail convention. The default set is intentionally lean
+and **general — it applies to essentially any team running ArgoCD**, with nothing
+tied to a specific customer's platform conventions:
 
-* `golden-path-template` — `Application` carries the configured golden-path label/template (skip when no Application has one — feature not configured).
+* `valid` — every Application/AppProject conforms to the argoproj CRD schema.
 * `sync-policy` — `syncPolicy.automated` with `prune` + `selfHeal` true.
-* `non-default-project` — `spec.project` is not `default` and is within an allow-list (allow-list optional; empty = only enforce non-default).
+* `non-default-project` — `spec.project` is not `default` (and, optionally, within an allow-list).
 * `source-repo-allowlist` — `source.repoURL` within configured allowed repos (allow-list: errors if enabled but unconfigured).
 * `destination-allowlist` — destination namespace/cluster within allow-list (allow-list: errors if enabled but unconfigured).
-* `canary-for-critical` — Argo Rollouts present for components tagged critical-tier (criticality-tiered enforcement via `critical_tags`).
+
+### Optional checks (niche — NOT in the default set)
+
+These two came out of the originating design session's specific platform use-case.
+They're real, but they are **not general** to most ArgoCD users, so they're kept
+out of the shipped default set and offered as opt-in additions (or a later phase)
+only if there's demand. The underlying *data* is still collected where it's
+generally useful.
+
+* `golden-path-template` — asserts each Application carries an org-specific
+  "golden-path" template label. This is a **platform-engineering pattern** (a
+  golden-path manifest generator stamps the label), not something most ArgoCD users
+  do. Opt-in: the collector can extract a configured label, and a future policy can
+  enforce it, but it's off by default.
+* `canary-for-critical` — asserts critical-tier components deploy via canary. Note
+  **Argo Rollouts is a *separate* argoproj project** (its own `Rollout` CRD), not
+  part of core ArgoCD — and mandating progressive delivery is a strong stance. The
+  collector still records `.canary.rollout` (whether an Application references a
+  Rollout) as general adoption-visibility data; the *mandate* is deferred/opt-in.
 
 ---
 
-## Component 3 — Cross-component correlation (`argocd-link` cataloger) — Phase 2
+## Component 3 — Cross-component correlation (`gitops-link` cataloger) — Phase 2
 
-When the ArgoCD files and the source component are different repos, we need to
+When the GitOps files and the source component are different repos, we need to
 attach the deployment posture (or at least a link) to the **source component**.
 
 Mechanism: a **cataloger** (catalogers can write tags/`meta` to *other*
-components, and aren't sha-keyed). It reads the GitOps repo's `.cd.argocd`,
+components, and aren't sha-keyed). It reads the GitOps repo's `.cd.gitops`,
 resolves each `Application` to a component, and stamps the target component with a
-tag (`argocd-managed`) and `meta` (e.g. `argo_app`, `argo_project`, sync-policy
+tag (`gitops-managed`) and `meta` (e.g. `gitops_app`, `gitops_project`, sync-policy
 booleans). Policies on the source component then read those.
 
 ### Correlation strategies (configurable, first-match-wins)
@@ -150,8 +203,8 @@ booleans). Policies on the source component then read those.
 
 Precedence: **annotation → image → catalog/tag → repoURL**. All toggleable.
 
-Phase 1 ships the annotation extraction (`.cd.argocd.applications[].component_annotation`)
-and the repoURL data (`.cd.argocd.applications[].source_ref.repoURL`) inside the
+Phase 1 ships the annotation extraction (`.cd.gitops.applications[].component_annotation`)
+and the repoURL data (`.cd.gitops.applications[].source_ref.repoURL`) inside the
 collector so the cataloger has both ends to work with when it lands.
 
 ---
@@ -161,18 +214,17 @@ collector so the cataloger has both ends to work with when it lands.
 Collector:
 
 * `find_command` — how to locate candidate YAML (default: repo-wide `*.yaml`/`*.yml`).
-* `golden_path_label` — label/annotation marking the standard template (no default; skip template extraction if unset).
 
-Cataloger (`argocd-link`, Phase 2):
+Cataloger (`gitops-link`, Phase 2):
 
 * `correlate_by` — ordered list, e.g. `["annotation","repoURL"]` (default); add `"image"` / `"tag"` to enable those.
 * `component_annotation` — annotation key for strategy 1 (default `lunar.earthly.dev/component`).
 * `image_registry_aliases` — normalization map for strategy 2.
 * `tag_key` — component meta/tag field for strategy 3.
 
-Policies:
+Policies (`gitops`):
 
-* `allowed_projects`, `allowed_source_repos`, `allowed_destinations`, `critical_tags`.
+* `allowed_projects`, `allowed_source_repos`, `allowed_destinations`.
 
 ---
 
@@ -189,7 +241,7 @@ Policies:
 
 ## Verify first (platform dependencies — deferred)
 
-* **Rich cross-component data push** (writing `.cd.argocd` *into* another component
+* **Rich cross-component data push** (writing `.cd.gitops` *into* another component
   rather than tags/`meta`) depends on `lunar collect --component <id> --sha <sha>`.
   Before building on it, confirm: exact flag + semantics, whether it works from a
   `code`-hook collector runtime, the auth/permission model, and — critically —
@@ -197,7 +249,7 @@ Policies:
   component's HEAD sha; `targetRevision` is often a branch, not a sha). Until
   verified, the cataloger writes tags/`meta` only (sha-free).
 * **API adapter** for orgs whose source of truth is a deploy service rather than
-  Git — design as a separate `cron` collector that emits the same `.cd.argocd`
+  Git — design as a separate `cron` collector that emits the same `.cd.gitops`
   schema; implement once a concrete target exists (fork-friendly).
 
 ## Out of scope (first pass)
@@ -213,16 +265,16 @@ Policies:
 
 ```
 collectors/argocd/
-  lunar-collector.yml      # code-hook parse sub-collector
-  main.sh                  # parse argoproj.io/* CRDs -> .cd.argocd
-policies/argocd/
-  golden_path_template.py
+  lunar-collector.yml      # code-hook parse + validate sub-collector
+  main.sh                  # parse + kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
+  Earthfile                # custom image: kubeconform + argoproj CRD schemas
+policies/gitops/
+  valid.py
   sync_policy.py
   non_default_project.py
   source_repo_allowlist.py
   destination_allowlist.py
-  canary_for_critical.py
-catalogers/argocd-link/    # phase 2
+catalogers/gitops-link/    # phase 2
   lunar-cataloger.yml      # cron / component-cron
   main.sh                  # resolver: annotation -> image -> tag -> repoURL
 ```

@@ -1,34 +1,34 @@
 version: 0
 
-name: argocd
-description: ArgoCD GitOps configuration and deployment policies
+name: gitops
+description: GitOps continuous-delivery configuration and deployment policies
 author: earthly
 
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "ArgoCD Guardrails"
+  display_name: "GitOps Guardrails"
   long_description: |
-    Enforce ArgoCD GitOps best practices: automated sync with prune and
-    self-heal, non-default projects, source-repo and destination allow-lists,
-    golden-path templates, and canary rollouts for critical services. Skips
-    when a component has no ArgoCD config.
+    Enforce GitOps continuous-delivery best practices on the data parsed by the
+    argocd collector: valid manifests, automated sync with prune and self-heal,
+    non-default projects, and source-repo and destination allow-lists. Tool-
+    agnostic (reads .cd.gitops); skips when a component has no GitOps config.
   category: "deployment-and-infrastructure"
   icon: "assets/argocd.svg"
   status: "beta"
   requires:
     - slug: "argocd"
       type: "collector"
-      reason: "Provides parsed ArgoCD configuration that these policies evaluate"
+      reason: "Provides parsed, normalized GitOps configuration these policies evaluate"
 
 policies:
-  - name: golden-path-template
+  - name: valid
     description: |
-      Requires each ArgoCD Application to carry the organization's golden-path
-      template label. Standardizing on a golden-path template keeps deployment
-      configuration consistent and reviewable across services.
-    mainPython: golden_path_template.py
-    keywords: ["argocd", "golden path", "template", "gitops standard", "platform engineering"]
+      Validates that all GitOps manifests (ArgoCD Applications, ApplicationSets,
+      and AppProjects) conform to the argoproj CRD schemas. Invalid manifests can
+      silently fail to sync or behave unexpectedly once applied to the cluster.
+    mainPython: valid.py
+    keywords: ["argocd", "gitops", "manifest validation", "argoproj", "schema"]
 
   - name: sync-policy
     description: |
@@ -62,14 +62,6 @@ policies:
     mainPython: destination_allowlist.py
     keywords: ["argocd", "destination", "namespace", "cluster", "allowlist"]
 
-  - name: canary-for-critical
-    description: |
-      Requires components tagged as critical-tier to deploy via Argo Rollouts
-      (canary or blue-green) rather than a plain Application. Progressive
-      delivery limits blast radius for the most important services.
-    mainPython: canary_for_critical.py
-    keywords: ["argocd", "argo rollouts", "canary", "progressive delivery", "critical tier"]
-
 inputs:
   allowed_projects:
     description: Comma-separated allow-list of AppProject names for non-default-project. Empty means only enforce that the project is not `default`.
@@ -80,6 +72,3 @@ inputs:
   allowed_destinations:
     description: Comma-separated allow-list of permitted destination namespaces (or `cluster/namespace`) for destination-allowlist. Required when that check is enabled (errors if empty).
     default: ""
-  critical_tags:
-    description: Comma-separated component tags that mark a component as critical-tier for canary-for-critical.
-    default: "critical,tier1"
