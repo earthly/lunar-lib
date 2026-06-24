@@ -160,7 +160,7 @@ Requires significant configuration, custom rules, or is for very specific use ca
 | A6 | 🆕 `owasp-zap` collector | Collector | Needs target URLs, web app specific |
 | A7 | 🆕 `cosign` collector + `signing` policy | Both | Needs signing keys, supply chain specific |
 | A8 | 🆕 `code-complexity` collector + policy | Both | Needs threshold tuning per codebase |
-| A9 | 🆕 `argocd-flux` collector + `gitops` policy | Both | GitOps-specific deployment pattern |
+| A9 | 🆕 `argocd` collector + `argocd` policy (+ `argocd-link` cataloger) | Both | GitOps validation + cross-repo correlation (annotation/image/catalog/repoURL strategies). **Spec: [.agents/plans/argocd-collector.md](../.agents/plans/argocd-collector.md)** |
 | A10 | 🆕 `cloudformation` collector | Collector | AWS-specific IaC |
 | A11 | 🆕 `pulumi` collector | Collector | Pulumi-specific IaC |
 | A12 | 🆕 `pre-commit` collector + policy | Both | Pre-commit hook specific |
@@ -345,3 +345,4 @@ These items are blocked on platform-level features (e.g., GitLab App support, Bi
 | **GitLab collector** (VCS + CI security) | Collector | GitLab App support | Mirrors `github` collector: branch protection, merge request settings, repo config. Also parses `.gitlab-ci.yml` for CI security. |
 | **GitLab CI agent integration** | Collector | GitLab App support | CI hook collectors for GitLab pipelines (equivalent to GHA CI agent). |
 | **BitBucket collector** (VCS settings) | Collector | BitBucket App support | Branch permissions, PR settings, repo config. |
+| **ArgoCD rich cross-component push** | Collector | `lunar collect --component/--sha` semantics verified | Phase-2 upgrade for `argocd-link` (see [.agents/plans/argocd-collector.md](../.agents/plans/argocd-collector.md)): push full `.cd.argocd` into the source component instead of tags/meta. Needs target-sha story resolved. |
