@@ -1,0 +1,32 @@
+# Example platform-controlled component tags file.
+#
+# Check a file like this into your Lunar config repo (the repo that holds
+# lunar-config.yml) and point the component-tags cataloger at it via the
+# `tags_file` input (default: component-tags.yml at the repo root).
+#
+# Schema: a single `components` map of component ID -> { tags: [...] }.
+# The listed tags are MERGED additively into each component's catalog tags —
+# they add to whatever other catalogers contribute, never replace them.
+#
+# Because this file lives in the config repo, the tags are platform-controlled:
+# only someone who can merge to the config repo can change them. That's the
+# whole point — exemption/allowlist tags must not be developer-settable.
+
+components:
+  # Policy exception: exempt these components from a release-blocking gate by
+  # tagging them `release-bypass`, then scope the gate with `not_on:
+  # [release-bypass]`. The exemption is auditable in this file's git history.
+  github.com/acme/payment-api:
+    tags: [release-bypass, tier1]
+
+  github.com/acme/legacy-billing:
+    tags: [release-bypass]
+
+  # Arbitrary platform-owned tags — not limited to bypass logic. Use this for
+  # any tag set you want platform (not repo authors) to control: tiering,
+  # compliance scope, ownership-program membership, etc.
+  github.com/acme/web-app:
+    tags: [frontend, pci-out-of-scope]
+
+  github.com/acme/checkout-service:
+    tags: [tier1, pci-in-scope]

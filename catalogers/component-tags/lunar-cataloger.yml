@@ -1,0 +1,82 @@
+version: 0
+
+name: component-tags
+description: Applies platform-controlled tags to components from a YAML file in your Lunar config repo
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Component Tags Cataloger"
+  long_description: |
+    Apply platform-controlled tags to components from a YAML file in
+    your Lunar config repo. Centrally manage policy exceptions,
+    allowlists, and overrides — governed by config-repo review, not
+    developer-set repo metadata.
+  categories: ["service-catalog"]
+  icon: "assets/component-tags.svg"
+  status: "beta"
+  related:
+    - slug: "github-org"
+      type: "cataloger"
+      reason: "Defines the components this cataloger tags"
+    - slug: "backstage-catalog-info"
+      type: "cataloger"
+      reason: "Also writes component tags, sourced from per-repo catalog-info.yaml"
+
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/payment-api": {
+        "tags": ["release-bypass", "tier1"]
+      },
+      "github.com/acme/legacy-billing": {
+        "tags": ["release-bypass"]
+      },
+      "github.com/acme/web-app": {
+        "tags": ["frontend"]
+      }
+    }
+  }
+
+catalogers:
+  - name: sync
+    description: |
+      Reads a platform-controlled YAML file (default
+      `component-tags.yml`) from your Lunar config repo and applies its
+      tags to the named components. Runs via the `repo` hook with
+      `clone-code: true`: the config repo is checked out and the file is
+      read straight from the working tree — no token, no API call. Each
+      component's tags are written to `.components["<id>"].tags`. Tags
+      are MERGED into the catalog: they add to whatever other catalogers
+      contribute for the same component, never replace them. Because the
+      hook fires on every commit to the config repo, tag changes take
+      effect the moment they merge rather than at a fixed cadence. Pair
+      with a component-defining cataloger such as `github-org` so the
+      component IDs in the file line up with cataloged components.
+    mainBash: main.sh
+    hook:
+      type: repo
+      # The org's Lunar config repo — the same repo that holds
+      # lunar-config.yml. Templated from the `config_repo` input so each
+      # consumer points it at their own config repo.
+      repo: "${{ inputs.config_repo }}"
+      # Check the config repo out so main.sh reads the tags file from the
+      # working tree (no GitHub token / Contents API needed).
+      clone-code: true
+    keywords: ["service catalog", "tags", "platform-controlled", "governance", "policy exceptions", "allowlist", "release bypass", "overrides"]
+
+inputs:
+  config_repo:
+    description: |
+      The Lunar config repo to read the tags file from — the same repo
+      that holds your `lunar-config.yml`. Use the GitHub URL form your
+      other catalogers use (e.g. `github://acme/lunar`). Required. The
+      cataloger re-runs on every commit to this repo, so tag changes
+      take effect the moment they merge.
+    # No default = required input
+
+  tags_file:
+    description: |
+      Path, relative to the config repo root, of the YAML file that maps
+      component IDs to the tags to apply. See the README for the schema.
+    default: "component-tags.yml"
