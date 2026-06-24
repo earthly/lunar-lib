@@ -1,0 +1,85 @@
+version: 0
+
+name: argocd
+description: ArgoCD GitOps configuration and deployment policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "ArgoCD Guardrails"
+  long_description: |
+    Enforce ArgoCD GitOps best practices: automated sync with prune and
+    self-heal, non-default projects, source-repo and destination allow-lists,
+    golden-path templates, and canary rollouts for critical services. Skips
+    when a component has no ArgoCD config.
+  category: "deployment-and-infrastructure"
+  icon: "assets/argocd.svg"
+  status: "beta"
+  requires:
+    - slug: "argocd"
+      type: "collector"
+      reason: "Provides parsed ArgoCD configuration that these policies evaluate"
+
+policies:
+  - name: golden-path-template
+    description: |
+      Requires each ArgoCD Application to carry the organization's golden-path
+      template label. Standardizing on a golden-path template keeps deployment
+      configuration consistent and reviewable across services.
+    mainPython: golden_path_template.py
+    keywords: ["argocd", "golden path", "template", "gitops standard", "platform engineering"]
+
+  - name: sync-policy
+    description: |
+      Requires Applications to use an automated sync policy with prune and
+      self-heal enabled. Drift between Git and the cluster is corrected
+      automatically instead of accumulating silently.
+    mainPython: sync_policy.py
+    keywords: ["argocd", "sync policy", "automated sync", "prune", "self-heal", "drift"]
+
+  - name: non-default-project
+    description: |
+      Requires Applications to belong to a named AppProject rather than the
+      permissive built-in `default` project, and (optionally) to a project on
+      an allow-list. Scoped projects bound what an Application may deploy.
+    mainPython: non_default_project.py
+    keywords: ["argocd", "appproject", "default project", "least privilege", "gitops"]
+
+  - name: source-repo-allowlist
+    description: |
+      Requires each Application's manifest source repository to be within a
+      configured allow-list of trusted repositories. Prevents deployments from
+      unreviewed or untrusted Git sources.
+    mainPython: source_repo_allowlist.py
+    keywords: ["argocd", "source repo", "allowlist", "supply chain", "trusted source"]
+
+  - name: destination-allowlist
+    description: |
+      Requires each Application's destination namespace and cluster to be
+      within a configured allow-list. Stops Applications from targeting
+      clusters or namespaces they should not deploy to.
+    mainPython: destination_allowlist.py
+    keywords: ["argocd", "destination", "namespace", "cluster", "allowlist"]
+
+  - name: canary-for-critical
+    description: |
+      Requires components tagged as critical-tier to deploy via Argo Rollouts
+      (canary or blue-green) rather than a plain Application. Progressive
+      delivery limits blast radius for the most important services.
+    mainPython: canary_for_critical.py
+    keywords: ["argocd", "argo rollouts", "canary", "progressive delivery", "critical tier"]
+
+inputs:
+  allowed_projects:
+    description: Comma-separated allow-list of AppProject names for non-default-project. Empty means only enforce that the project is not `default`.
+    default: ""
+  allowed_source_repos:
+    description: Comma-separated allow-list of permitted Application source repoURLs for source-repo-allowlist. Required when that check is enabled (errors if empty).
+    default: ""
+  allowed_destinations:
+    description: Comma-separated allow-list of permitted destination namespaces (or `cluster/namespace`) for destination-allowlist. Required when that check is enabled (errors if empty).
+    default: ""
+  critical_tags:
+    description: Comma-separated component tags that mark a component as critical-tier for canary-for-critical.
+    default: "critical,tier1"
