@@ -10,9 +10,9 @@ landing_page:
   display_name: "ArgoCD Collector"
   long_description: |
     Parses and validates ArgoCD Application, ApplicationSet, and AppProject
-    manifests (argoproj.io CRDs) into a normalized, tool-agnostic .cd.gitops
-    view: sync policy, destinations, source repos, and projects. Validates each
-    resource against the argoproj CRD schemas. No ArgoCD API or secrets.
+    manifests into a normalized .cd.gitops view, and pushes each app's
+    deployment posture onto its source component (out-of-band) so GitOps
+    guardrails work even when ArgoCD config lives in a separate repo.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "beta"
@@ -42,10 +42,41 @@ collectors:
       type: code
     keywords: ["argocd", "gitops", "argo", "application", "appproject", "sync policy", "validation", "continuous delivery"]
 
+  - name: link-push
+    description: |
+      Correlates each ArgoCD Application back to the source-code component it
+      deploys (annotation → image → catalog/tag → repoURL, first match wins),
+      then writes that application's deployment posture onto the source
+      component's Component JSON using the out-of-band collect syntax
+      (lunar collect --component <id> --sha <sha>). This makes the GitOps
+      guardrails evaluate on the service repo even when the ArgoCD config lives
+      in a separate GitOps repo. Applications that can't be resolved are skipped
+      with a logged reason — no bogus cross-component writes.
+    mainBash: link_push.sh
+    hook:
+      type: code
+    keywords: ["argocd", "gitops", "cross-component", "out-of-band collect", "deployment posture", "correlation", "continuous delivery"]
+
 inputs:
   find_command:
-    description: Command to find candidate YAML files (must output one file path per line)
+    description: Command to find candidate YAML files (must output one file path per line). Used by the parse sub-collector.
     default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+  correlate_by:
+    description: Ordered, comma-separated correlation strategies for link-push (first match wins). Options annotation, image, tag, repoURL.
+    default: "annotation,repoURL"
+  component_annotation:
+    description: Application annotation key that carries the source component id, for the annotation correlation strategy.
+    default: "lunar.earthly.dev/component"
+  image_registry_aliases:
+    description: Comma-separated old=new registry-host aliases used to normalize image references for the image correlation strategy. Empty disables normalization.
+    default: ""
+  tag_key:
+    description: Component meta/tag field that maps a component to its ArgoCD app name, for the tag correlation strategy.
+    default: ""
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token used by link-push to resolve each source repo's default-branch HEAD sha (the out-of-band write target).
 
 example_component_json: |
   {

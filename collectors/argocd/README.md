@@ -4,7 +4,7 @@ Parses and validates ArgoCD `Application`, `ApplicationSet`, and `AppProject` ma
 
 ## Overview
 
-This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas, and records a normalized, tool-agnostic view of the GitOps deployment configuration under `.cd.gitops`. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope what may be deployed where, and preserves the raw ArgoCD resource shapes under `.cd.gitops.native.argocd`. It runs on a code hook with no ArgoCD API or secrets — pure file parsing and offline schema validation. The normalized data feeds the tool-agnostic `gitops` policy set.
+This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas, and records a normalized, tool-agnostic view of the GitOps deployment configuration under `.cd.gitops`. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope deployments, and preserves the raw ArgoCD resource shapes under `.cd.gitops.native.argocd`. It then correlates each Application back to its source-code component and pushes the deployment posture onto that component out-of-band, so GitOps guardrails work even when ArgoCD config lives in a separate repo. The normalized data feeds the tool-agnostic `gitops` policy set.
 
 ## Collected Data
 
@@ -20,6 +20,7 @@ This collector writes to the following Component JSON paths:
 | `.cd.gitops.applications[].source_ref` | object | Manifest source (`repoURL`, `path`, `targetRevision`) |
 | `.cd.gitops.applications[].component_annotation` | string | Source-component link from the `lunar.earthly.dev/component` annotation, when present |
 | `.cd.gitops.projects[]` | array | AppProjects (`name`, `valid`, `is_default`, `source_repos`, `destinations`) |
+| `.cd.gitops.linked_from` | string | On a source component: the GitOps repo the pushed posture was resolved from (written by `link-push`) |
 | `.cd.gitops.native.argocd` | object | Raw, ArgoCD-specific parsed resources for advanced guardrail use |
 
 ## Collectors
@@ -29,6 +30,7 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |--------|-------------|
 | `parse` | Parses and validates `argoproj.io/*` custom resources into `.cd.gitops` |
+| `link-push` | Correlates each Application to its source component and pushes the deployment posture there out-of-band (`lunar collect --component/--sha`) |
 
 ## Installation
 

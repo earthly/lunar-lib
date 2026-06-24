@@ -1,9 +1,9 @@
 # ArgoCD Validation Collector + GitOps Policies — Plan
 
-A reusable GitOps guardrail set: parse and validate ArgoCD config, and (the hard
-part) correlate it back to the source component when the two live in **separate
-repos**. This document describes the options implemented in the **first pass**
-and is explicit about what's deferred and why.
+A reusable GitOps guardrail set: parse and validate ArgoCD config, enforce GitOps
+best practices, and — the hard part — **push the deployment posture back onto the
+source component** when the ArgoCD config and the application source live in
+**separate repos**. Everything below ships in **one PR** (ENG-1014 / #218).
 
 Tracking: ENG-1014.
 
@@ -25,19 +25,24 @@ ArgoCD is the dominant GitOps CD tool. Two realities shape this work:
    catalog, or a proprietary platform tool) — never a standard machine-readable
    field. See "Correlation" below.
 
-So the collector is easy; **correlating GitOps config to the right component is the
-real design problem**, and we solve it with a small set of configurable strategies
-plus a fork escape hatch.
+So the collector is easy; **correlating GitOps config to the right component, and
+attaching its deployment posture there, is the real design problem.** We solve it
+with a small set of configurable correlation strategies plus the out-of-band
+collect syntax to write the result onto the source component.
 
 ---
 
-## First-pass scope
+## Scope — all in this PR
 
-| Phase | What | Confidence |
+| Piece | What | Confidence |
 | -- | -- | -- |
-| **1 (build now)** | `argocd` collector (parse + validate) + `gitops` policy set + correlation via **annotation** (default) and **repoURL-normalize** fallback | High — no platform dependencies |
-| **2 (opt-in, same tier)** | `gitops-link` cataloger adding **image-match** and **catalog/tag** correlation strategies | Medium — depends on other collectors/catalog |
-| **Deferred (verify first)** | rich cross-component data **push**, `ApplicationSet` generator resolution, **API/fork** source adapter | Blocked / needs verification |
+| `argocd` collector — `parse` sub-collector | parse + kubeconform-validate argoproj CRDs → normalized `.cd.gitops` + raw `.cd.gitops.native.argocd` on the GitOps repo's own component | High — no platform deps |
+| `gitops` policy set | 5 tool-agnostic checks over `.cd.gitops` | High — no platform deps |
+| `argocd` collector — `link-push` sub-collector | resolve each Application → source component (annotation → image → tag → repoURL), then **out-of-band `lunar collect --component <source-id> --sha <sha>`** to write the deployment posture onto the **source** component | Medium — depends on ENG-859 out-of-band collect (shipped on `earthly/lunar` main); a few things to confirm at impl (below) |
+
+Genuinely out of scope (not asked for, real gaps): `ApplicationSet` runtime
+generator expansion, and a live ArgoCD/deploy-service **API adapter** (a future
+`cron` collector emitting the same `.cd.gitops` schema — fork-friendly).
 
 ---
 
@@ -102,10 +107,28 @@ its own `.cd.<methodology>` sibling, not `.cd.gitops`.)
 }
 ```
 
+When `link-push` writes onto a **source** component, it writes the single matched
+application plus a link marker so policies/dashboards can tell it came in
+out-of-band:
+
+```jsonc
+{
+  "cd": {
+    "gitops": {
+      "source": { "tool": "argocd", "integration": "external" },   // pushed, not parsed locally
+      "linked_from": "github.com/org/gitops",                       // the GitOps repo it was resolved from
+      "applications": [ { "name": "payment-api", "project": "platform",
+                          "sync_policy": { "automated": true, "prune": true, "self_heal": true },
+                          "destination": { "namespace": "payments" }, "...": "..." } ]
+    }
+  }
+}
+```
+
 Notes:
 
-* Policies read the normalized `.cd.gitops.*` and don't care whether data came from
-  ArgoCD files (now), Flux files, or an API (later).
+* Policies read the normalized `.cd.gitops.*` and don't care whether the data was
+  parsed locally (GitOps repo) or pushed in out-of-band (source repo).
 * `images` is best-effort: only populated when the referenced workload manifests
   are plain YAML in the same repo/path. Helm/templated/generated manifests will
   often leave it empty — that's expected (see Correlation caveats).
@@ -130,9 +153,9 @@ implementation, wired into `+all`) rather than running on `base-main`.
 
 ---
 
-## Component 1 — `argocd` collector (parse + validate)
+## Component 1 — `argocd` collector, `parse` sub-collector (parse + validate)
 
-A `code`-hook collector that scans the cloned repo for ArgoCD CRDs
+A `code`-hook sub-collector that scans the cloned repo for ArgoCD CRDs
 (`apiVersion: argoproj.io/*`), validates each against the argoproj schemas, and
 writes the normalized `.cd.gitops` view above (plus raw `.cd.gitops.native.argocd`)
 to its **own** Component JSON. Works in both modes with no special handling:
@@ -159,6 +182,10 @@ tied to a specific customer's platform conventions:
 * `source-repo-allowlist` — `source.repoURL` within configured allowed repos (allow-list: errors if enabled but unconfigured).
 * `destination-allowlist` — destination namespace/cluster within allow-list (allow-list: errors if enabled but unconfigured).
 
+Because `link-push` (Component 3) writes `.cd.gitops` onto the **source** component
+too, these policies light up on the service repo — not just the GitOps repo — even
+when ArgoCD config lives elsewhere.
+
 ### Optional checks (niche — NOT in the default set)
 
 These two came out of the originating design session's specific platform use-case.
@@ -168,28 +195,40 @@ only if there's demand. The underlying *data* is still collected where it's
 generally useful.
 
 * `golden-path-template` — asserts each Application carries an org-specific
-  "golden-path" template label. This is a **platform-engineering pattern** (a
-  golden-path manifest generator stamps the label), not something most ArgoCD users
-  do. Opt-in: the collector can extract a configured label, and a future policy can
-  enforce it, but it's off by default.
+  "golden-path" template label. A **platform-engineering pattern** (a golden-path
+  manifest generator stamps the label), not something most ArgoCD users do.
 * `canary-for-critical` — asserts critical-tier components deploy via canary. Note
   **Argo Rollouts is a *separate* argoproj project** (its own `Rollout` CRD), not
   part of core ArgoCD — and mandating progressive delivery is a strong stance. The
-  collector still records `.canary.rollout` (whether an Application references a
-  Rollout) as general adoption-visibility data; the *mandate* is deferred/opt-in.
+  collector still records `.canary.rollout` as adoption-visibility data; the
+  *mandate* is deferred/opt-in.
 
 ---
 
-## Component 3 — Cross-component correlation (`gitops-link` cataloger) — Phase 2
+## Component 3 — `argocd` collector, `link-push` sub-collector (cross-component out-of-band push)
 
-When the GitOps files and the source component are different repos, we need to
-attach the deployment posture (or at least a link) to the **source component**.
+This is the piece that makes GitOps guardrails work in the **separate-repo** world:
+attach each Application's deployment posture to the **source component** it deploys,
+even though the ArgoCD config lives in a different repo.
 
-Mechanism: a **cataloger** (catalogers can write tags/`meta` to *other*
-components, and aren't sha-keyed). It reads the GitOps repo's `.cd.gitops`,
-resolves each `Application` to a component, and stamps the target component with a
-tag (`gitops-managed`) and `meta` (e.g. `gitops_app`, `gitops_project`, sync-policy
-booleans). Policies on the source component then read those.
+Mechanism — a `code`-hook sub-collector that runs on the **GitOps** repo:
+
+1. Reads the parsed `.cd.gitops.applications[]` (from the `parse` step).
+2. **Resolves each Application → source component id** via the strategy chain below
+   (first match wins): `annotation → image → catalog/tag → repoURL`.
+3. **Resolves the source component's target SHA** — the default-branch HEAD sha of
+   the source repo (see "to confirm" below; this must be a commit the Hub has
+   already VCS-ingested).
+4. **Writes out-of-band** with the ENG-859 syntax:
+   ```bash
+   lunar collect --component "$SOURCE_ID" --sha "$SOURCE_SHA" -j \
+     ".cd.gitops.applications" "[ { ...matched application... } ]" \
+     ".cd.gitops.source"      '{"tool":"argocd","integration":"external"}' \
+     ".cd.gitops.linked_from" "\"$GITOPS_COMPONENT_ID\""
+   ```
+   The Hub stores this as an `external` collection keyed by `(source component, sha)`
+   and **re-evaluates that SHA's policies** — so the source component's `gitops`
+   checks (and dashboards) reflect its ArgoCD posture immediately.
 
 ### Correlation strategies (configurable, first-match-wins)
 
@@ -201,26 +240,48 @@ booleans). Policies on the source component then read those.
 | 4 | **repoURL normalize** | natural key: normalize `source.repoURL` → component id | ✅ fallback | nothing | Only correct when manifests are co-located with source or the GitOps repo *is* the target. Weak in the separate-repo case. |
 | — | **Fork** | custom | n/a | code change | Escape hatch for bespoke resolution (e.g. query an internal deploy service/CMDB API). |
 
-Precedence: **annotation → image → catalog/tag → repoURL**. All toggleable.
+Precedence: **annotation → image → catalog/tag → repoURL**. All toggleable. The
+sub-collector logs which strategy resolved each link, and skips (with a logged
+reason) any Application it can't resolve — no bogus writes.
 
-Phase 1 ships the annotation extraction (`.cd.gitops.applications[].component_annotation`)
-and the repoURL data (`.cd.gitops.applications[].source_ref.repoURL`) inside the
-collector so the cataloger has both ends to work with when it lands.
+### To confirm at implementation (the load-bearing details)
+
+The out-of-band collect syntax is **shipped on `earthly/lunar` main** (ENG-859):
+`lunar collect --component <id> --sha <sha> …` submits an `external` collection via
+the `CollectExternal` RPC and triggers a re-eval for that SHA. Three things to nail
+down during implementation/cronos e2e:
+
+1. **Target SHA must be Hub-ingested.** Out-of-band collect lands at `(component,
+   sha)` and the Hub silently skips a SHA it hasn't VCS-ingested. ArgoCD
+   `targetRevision` is usually a branch (`HEAD`) or tag, not a sha — so `link-push`
+   resolves the **source repo's default-branch HEAD sha** (GitHub API) as the
+   target, which is the commit the Hub most likely has. Confirm on cronos that the
+   write lands and re-eval fires; if the Hub exposes a "latest ingested sha for
+   component X" lookup, prefer that over the GitHub API.
+2. **CLI version.** `--component/--sha` must be present in the `lunar` baked into
+   the collector image. It's on `earthly/lunar` main; confirm the image's CLI has
+   it before cronos e2e.
+3. **Permission model.** Confirm the collector's Hub token is allowed to write a
+   collection to a **different** component (cross-component `CollectExternal`).
+
+Until #1–#3 are confirmed green on cronos, `parse` + `gitops` policies ship
+standalone (they have no such dependency); `link-push` is the same PR's second
+unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
 ## Configuration inputs
 
-Collector:
+Collector (`argocd`):
 
-* `find_command` — how to locate candidate YAML (default: repo-wide `*.yaml`/`*.yml`).
+* `find_command` — how to locate candidate YAML (default: repo-wide `*.yaml`/`*.yml`). *(parse)*
+* `correlate_by` — ordered strategy list, e.g. `["annotation","repoURL"]` (default); add `"image"` / `"tag"` to enable those. *(link-push)*
+* `component_annotation` — annotation key for strategy 1 (default `lunar.earthly.dev/component`). *(link-push)*
+* `image_registry_aliases` — registry normalization map for strategy 2. *(link-push)*
+* `tag_key` — component meta/tag field for strategy 3. *(link-push)*
 
-Cataloger (`gitops-link`, Phase 2):
-
-* `correlate_by` — ordered list, e.g. `["annotation","repoURL"]` (default); add `"image"` / `"tag"` to enable those.
-* `component_annotation` — annotation key for strategy 1 (default `lunar.earthly.dev/component`).
-* `image_registry_aliases` — normalization map for strategy 2.
-* `tag_key` — component meta/tag field for strategy 3.
+Secret (`link-push`): a GitHub token to resolve each source repo's default-branch
+HEAD sha (target for the out-of-band write).
 
 Policies (`gitops`):
 
@@ -230,34 +291,25 @@ Policies (`gitops`):
 
 ## Honest feasibility & risks
 
-* **Components 1 & 2 are straightforward** and carry no platform dependencies — build them first; they deliver value standalone (validate any repo that contains ArgoCD files).
+* **`parse` + `gitops` policies are straightforward** and carry no platform
+  dependencies — they deliver value standalone (validate any repo with ArgoCD files).
+* **`link-push` is the dependent piece.** The out-of-band write itself is shipped
+  (ENG-859); the open work is target-SHA selection, image CLI version, and the
+  cross-component permission model (see "To confirm" above). All three are
+  cronos-verifiable in this PR.
 * **Correlation is best-effort, layered, not magic.** Annotation is the only fully
   reliable generic path and ideally is injected by a golden-path generator rather
   than hand-added per repo. Image-match is the best automatic booster but its
   coverage depends on how images are built and whether they're statically
   resolvable. repoURL is a weak floor in the separate-repo world.
 * `ApplicationSet` generates `Application`s at runtime; static file parsing
-  won't see them all. Out of scope for first pass; note the gap.
+  won't see them all — noted gap, out of scope.
 
-## Verify first (platform dependencies — deferred)
-
-* **Rich cross-component data push** (writing `.cd.gitops` *into* another component
-  rather than tags/`meta`) depends on `lunar collect --component <id> --sha <sha>`.
-  Before building on it, confirm: exact flag + semantics, whether it works from a
-  `code`-hook collector runtime, the auth/permission model, and — critically —
-  **how to choose the target** `--sha` (the GitOps side rarely has the source
-  component's HEAD sha; `targetRevision` is often a branch, not a sha). Until
-  verified, the cataloger writes tags/`meta` only (sha-free).
-* **API adapter** for orgs whose source of truth is a deploy service rather than
-  Git — design as a separate `cron` collector that emits the same `.cd.gitops`
-  schema; implement once a concrete target exists (fork-friendly).
-
-## Out of scope (first pass)
+## Out of scope (this PR)
 
 * Argo Rollouts deep analysis beyond "present?".
 * `ApplicationSet` generator expansion.
-* Querying a live ArgoCD/deploy API.
-* Rich cross-component JSON push.
+* Querying a live ArgoCD/deploy API (future `cron` collector emitting `.cd.gitops`).
 
 ---
 
@@ -265,8 +317,9 @@ Policies (`gitops`):
 
 ```
 collectors/argocd/
-  lunar-collector.yml      # code-hook parse + validate sub-collector
+  lunar-collector.yml      # parse (code) + link-push (code) sub-collectors
   main.sh                  # parse + kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
+  link_push.sh             # resolve Application -> source component, out-of-band lunar collect --component/--sha
   Earthfile                # custom image: kubeconform + argoproj CRD schemas
 policies/gitops/
   valid.py
@@ -274,7 +327,4 @@ policies/gitops/
   non_default_project.py
   source_repo_allowlist.py
   destination_allowlist.py
-catalogers/gitops-link/    # phase 2
-  lunar-cataloger.yml      # cron / component-cron
-  main.sh                  # resolver: annotation -> image -> tag -> repoURL
 ```
