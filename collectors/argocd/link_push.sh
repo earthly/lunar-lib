@@ -56,7 +56,7 @@ lookup_component_sha() {
     psql "$CONN_STRING" -t -A -F $'\t' -c \
       "SELECT component_id, git_sha FROM components_latest
        WHERE component_id = '$id' AND pr IS NULL
-       ORDER BY timestamp DESC LIMIT 1;" 2>/dev/null || true
+       LIMIT 1;" 2>/dev/null || true
 }
 
 # Echo "component_id<TAB>git_sha" for the component that builds the given image.
@@ -70,7 +70,7 @@ lookup_component_by_image() {
            SELECT 1 FROM jsonb_array_elements(coalesce(component_json->'containers'->'builds','[]'::jsonb)) b
            WHERE regexp_replace(b->>'image', '(@sha256:.*)|(:[^/]+\$)', '') = '$img'
          )
-       ORDER BY timestamp DESC LIMIT 1;" 2>/dev/null || true
+       LIMIT 1;" 2>/dev/null || true
 }
 
 # Echo "component_id<TAB>git_sha" for a component whose tag_key meta maps to an
@@ -84,7 +84,7 @@ lookup_component_by_tag() {
       "SELECT component_id, git_sha FROM components_latest
        WHERE pr IS NULL AND component_id <> '$self'
          AND component_json #>> '{meta,$key}' = '$val'
-       ORDER BY timestamp DESC LIMIT 1;" 2>/dev/null || true
+       LIMIT 1;" 2>/dev/null || true
 }
 
 # Resolve one app (JSON on stdin var $1) to "component_id<TAB>git_sha<TAB>strategy".
@@ -133,12 +133,22 @@ if [ "$APP_COUNT" -eq 0 ]; then
     exit 0
 fi
 
+# Debug breadcrumb: written to THIS component's own JSON so the runtime
+# resolution is observable (snippet stderr isn't queryable from the hub DB).
+DBG_TOTAL=$(psql "$CONN_STRING" -t -A -c "SELECT count(*) FROM components_latest;" 2>&1 | head -c 200)
+DBG_BUILDS=$(psql "$CONN_STRING" -t -A -c "SELECT count(*) FROM components_latest WHERE component_json->'containers'->'builds' IS NOT NULL;" 2>&1 | head -c 200)
+DBG_FIRST_IMG=$(echo "$APPS" | jq -r '.[0].images[0]? // ""')
+DBG_IMGMATCH=$(lookup_component_by_image "$DBG_FIRST_IMG" 2>&1 | tr '\t' '|' | head -c 200)
+DBG_APPS=$(mktemp)
+
 # Resolve every app, collecting {target_id, target_sha, record} lines.
 RESOLVED=$(mktemp)
 for ((i=0; i<APP_COUNT; i++)); do
     APP=$(echo "$APPS" | jq -c ".[$i]")
     NAME=$(echo "$APP" | jq -r '.name')
     LINE=$(resolve_app "$APP")
+    jq -n --arg n "$NAME" --arg imgs "$(echo "$APP" | jq -c '.images')" --arg line "$(printf '%s' "$LINE" | tr '\t' '|')" \
+        '{app:$n, images:$imgs, resolved:$line}' >> "$DBG_APPS"
     if [ -z "$LINE" ]; then
         echo "link-push: could not resolve a source component for app '$NAME' — skipping." >&2
         continue
@@ -157,6 +167,14 @@ for ((i=0; i<APP_COUNT; i++)); do
     jq -n --arg id "$TARGET_ID" --arg sha "$TARGET_SHA" --argjson rec "$APP" \
         '{target_id: $id, target_sha: $sha, record: $rec}' >> "$RESOLVED"
 done
+
+# Write the debug breadcrumb onto this component (best-effort, local collect).
+jq -n --arg total "$DBG_TOTAL" --arg builds "$DBG_BUILDS" --arg self "$LUNAR_COMPONENT_ID" \
+    --arg first_img "$DBG_FIRST_IMG" --arg imgmatch "$DBG_IMGMATCH" --arg cb "$CORRELATE_BY" \
+    --argjson apps "$(jq -s '.' "$DBG_APPS")" \
+    '{self:$self, correlate_by:$cb, components_visible:$total, components_with_builds:$builds, first_image:$first_img, image_lookup_raw:$imgmatch, apps:$apps}' \
+    | lunar collect -j ".cd.gitops._link_debug" - 2>/dev/null || true
+rm -f "$DBG_APPS"
 
 # Group resolved apps by target component and push once per component.
 PUSH_GROUPS=$(jq -s 'group_by(.target_id)' "$RESOLVED")
