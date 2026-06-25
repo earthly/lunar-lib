@@ -9,10 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "GitOps Guardrails"
   long_description: |
-    Enforce GitOps continuous-delivery best practices on the data parsed by the
-    argocd collector: valid manifests, automated sync with prune and self-heal,
-    non-default projects, and source-repo and destination allow-lists. Tool-
-    agnostic (reads .cd.gitops); skips when a component has no GitOps config.
+    Enforce GitOps best practices on data from the argocd collector: valid
+    manifests, automated sync (prune + self-heal), non-default projects,
+    source/destination allow-lists, and adoption coverage to flag components
+    that should be on ArgoCD but aren't. Tool-agnostic; reads .cd.gitops.
   category: "deployment-and-infrastructure"
   icon: "assets/argocd.svg"
   status: "beta"
@@ -62,6 +62,17 @@ policies:
     mainPython: destination_allowlist.py
     keywords: ["argocd", "destination", "namespace", "cluster", "allowlist"]
 
+  - name: gitops-managed
+    description: |
+      Coverage check: requires every component this policy targets (optionally
+      narrowed to a tag) to actually be deployed by an ArgoCD Application — i.e.
+      to have resolved .cd.gitops data, whether parsed locally or link-pushed
+      from a separate GitOps repo. Surfaces components that should be on GitOps
+      but haven't been migrated. Unlike the other checks, absence of GitOps data
+      is a failure here, not a skip — that's the whole point.
+    mainPython: gitops_managed.py
+    keywords: ["argocd", "gitops adoption", "coverage", "migration", "deployment visibility"]
+
 inputs:
   allowed_projects:
     description: Comma-separated allow-list of AppProject names for non-default-project. Empty means only enforce that the project is not `default`.
@@ -71,4 +82,7 @@ inputs:
     default: ""
   allowed_destinations:
     description: Comma-separated allow-list of permitted destination namespaces (or `cluster/namespace`) for destination-allowlist. Required when that check is enabled (errors if empty).
+    default: ""
+  expected_tag:
+    description: For gitops-managed — only enforce coverage on components carrying this Lunar tag. Empty enforces on every component the policy targets (via on:).
     default: ""

@@ -181,6 +181,7 @@ tied to a specific customer's platform conventions:
 * `non-default-project` — `spec.project` is not `default` (and, optionally, within an allow-list).
 * `source-repo-allowlist` — `source.repoURL` within configured allowed repos (allow-list: errors if enabled but unconfigured).
 * `destination-allowlist` — destination namespace/cluster within allow-list (allow-list: errors if enabled but unconfigured).
+* `gitops-managed` — **coverage** check (see Component 4): fails a component that *should* be on GitOps but has no resolved `.cd.gitops`.
 
 Because `link-push` (Component 3) writes `.cd.gitops` onto the **source** component
 too, these policies light up on the service repo — not just the GitOps repo — even
@@ -270,6 +271,54 @@ unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
+## Component 4 — GitOps adoption coverage (`gitops-managed`)
+
+Three connected questions a link-pushed component should be able to answer:
+
+**1. Do the policies run *gracefully* on a link-pushed component?** Yes — that's the
+whole point of `link-push`. The pushed record carries the *full* normalized
+application shape (`valid`, `sync_policy`, `project`, `destination`, `source_ref`),
+so the five config checks evaluate on the source component exactly as they would on
+the GitOps repo. The component needs no local ArgoCD files. One edge case: if the
+source component *also* ships its own ArgoCD files, its local `.cd.gitops` and the
+pushed `.cd.gitops` merge (Hub array-concat) — `link-push` dedupes by application
+name so the same app doesn't appear twice.
+
+**2. Positive signal — "is this component on ArgoCD?"** Presence of `.cd.gitops` on
+the component *is* the signal (object-presence convention — no redundant
+`managed: true` boolean). `.cd.gitops.source.integration` distinguishes how it got
+there: `code` (the component ships its own ArgoCD files) vs `external` (link-pushed
+from a separate GitOps repo). So "which components are on ArgoCD" is a simple
+presence query across the fleet — exactly the visibility orgs lack mid-migration.
+
+**3. The hard inverse — "which components *should* be on ArgoCD but aren't?"** This
+is the migration-coverage gap, and it can't come from the GitOps config alone (the
+un-migrated components are, by definition, absent from it). It has to come from the
+**expected-deployment signal on the component side** — i.e. component tags /
+cataloging. The `gitops-managed` check encodes it:
+
+* Applied to the components you expect on GitOps (via lunar-config `on:` targeting —
+  "applying the policy to the correct deployment", as you put it — and/or an
+  optional `expected_tag` filter), it asserts `.cd.gitops` **exists**.
+* Absent → **FAIL** ("expected to be GitOps-managed but no ArgoCD Application
+  deploys it"). This is the inverse skip-vs-fail of the config checks: there,
+  absence = skip (vendor not in use); here, absence = the violation. The user
+  opted in by tagging/targeting, so absence is a real finding.
+* A component *not* in the expected set (lacks the tag / outside the `on:` scope)
+  → **skip**.
+
+The expected-on-GitOps set is the org's own input (a tag like `should-be-gitops`,
+set by hand or by a cataloger such as `backstage`). Lunar doesn't invent it — it
+just enforces coverage against it.
+
+**Convergence note:** `gitops-managed` reads `.cd.gitops` presence, which for a
+separate-repo component arrives via `link-push`'s out-of-band write (and the write
+triggers a re-eval for that SHA). So a freshly-onboarded org may see transient
+failures that resolve as the `argocd` collector processes the GitOps repo and the
+links land — eventual consistency, not a false negative.
+
+---
+
 ## Configuration inputs
 
 Collector (`argocd`):
@@ -285,7 +334,8 @@ HEAD sha (target for the out-of-band write).
 
 Policies (`gitops`):
 
-* `allowed_projects`, `allowed_source_repos`, `allowed_destinations`.
+* `allowed_projects`, `allowed_source_repos`, `allowed_destinations` *(config checks)*.
+* `expected_tag` — for `gitops-managed`: only enforce coverage on components carrying this tag (empty = every targeted component).
 
 ---
 
@@ -327,4 +377,5 @@ policies/gitops/
   non_default_project.py
   source_repo_allowlist.py
   destination_allowlist.py
+  gitops_managed.py        # coverage: fails components expected on GitOps but absent
 ```
