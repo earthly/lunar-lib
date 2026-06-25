@@ -12,8 +12,11 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
-# Ordered correlation strategies (first match wins).
-CORRELATE_BY="${LUNAR_VAR_CORRELATE_BY:-annotation,repoURL}"
+# Ordered correlation strategies (first match wins). Default precedence
+# annotation -> image -> repoURL: image-match links an app to the component that
+# builds its image (the useful path when the GitOps repo is separate from the
+# source), with repoURL as the weak co-located fallback.
+CORRELATE_BY="${LUNAR_VAR_CORRELATE_BY:-annotation,image,repoURL}"
 TAG_KEY="${LUNAR_VAR_TAG_KEY:-}"
 
 # Hub DB connection (same pattern as snyk/semgrep/codeql collectors). Without it
