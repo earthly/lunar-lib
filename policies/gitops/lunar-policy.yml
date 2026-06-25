@@ -70,5 +70,5 @@ inputs:
     description: Comma-separated allow-list of permitted destination namespaces (or `cluster/namespace`) for destination-allowlist. Required when that check is enabled (errors if empty).
     default: ""
   expected_tag:
-    description: For gitops-managed — only enforce coverage on components carrying this Lunar tag. Empty enforces on every component the policy targets (via on:).
+    description: For gitops-managed — only enforce coverage on components whose catalog tags (.catalog.entity.tags, e.g. from a Backstage catalog-info.yaml) include this value. Empty enforces on every component the policy targets (via on:).
     default: ""

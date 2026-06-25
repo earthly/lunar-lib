@@ -28,8 +28,9 @@ This policy reads from the following Component JSON paths:
 | `.cd.gitops.applications[].sync_policy` | object | `argocd` collector |
 | `.cd.gitops.applications[].destination` | object | `argocd` collector |
 | `.cd.gitops.applications[].source_ref` | object | `argocd` collector |
+| `.catalog.entity.tags[]` | array | catalog collector (only when `gitops-managed` uses `expected_tag`) |
 
-**Note:** Ensure the `argocd` collector is configured before enabling this policy. The `gitops-managed` check also reads the component's Lunar tags (to decide which components are expected on GitOps); the expected-on-GitOps signal can be set manually or by a cataloger.
+**Note:** Ensure the `argocd` collector is configured before enabling this policy. The `gitops-managed` check decides which components are "expected on GitOps" two ways: deploy it `on:` the tag/domain that must be GitOps-managed (e.g. `on: [production]`) and leave `expected_tag` empty, or set `expected_tag` to a catalog tag and the check only enforces on components whose `.catalog.entity.tags` carry it (populated by a catalog cataloger, e.g. from a Backstage `catalog-info.yaml`).
 
 ## Installation
 
