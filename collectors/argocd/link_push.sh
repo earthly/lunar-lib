@@ -188,6 +188,30 @@ for ((g=0; g<GROUP_COUNT; g++)); do
     TID=$(echo "$GROUP" | jq -r '.[0].target_id')
     TSHA=$(echo "$GROUP" | jq -r '.[0].target_sha')
     RECORDS=$(echo "$GROUP" | jq -c '[.[].record]')
+
+    # Idempotency guard. The hub periodically re-runs code collectors, and an
+    # out-of-band CollectExternal write APPENDS a new collection record each time
+    # (there is no supersede for external writes yet). Without this guard, the
+    # target's merged .cd.gitops.applications array gains a duplicate entry on
+    # every re-run. Skip when the target already carries exactly this GitOps
+    # repo's app set — nothing changed, so re-pushing would only duplicate.
+    # (The complete fix, which also handles an app set that genuinely changed,
+    # is CollectExternal superseding prior records for the same
+    # component+sha+collector — tracked as a platform follow-up.)
+    WANT_NAMES=$(printf '%s' "$RECORDS" | jq -cS '[.[].name] | unique' 2>/dev/null)
+    HAVE_JSON=$(psql "$CONN_STRING" -t -A -c \
+        "SELECT component_json->'cd'->'gitops'->'applications'
+         FROM components_latest
+         WHERE component_id = '$(sql_escape "$TID")' AND pr IS NULL
+           AND component_json->'cd'->'gitops'->>'linked_from' = '$(sql_escape "$LUNAR_COMPONENT_ID")'
+         LIMIT 1" 2>/dev/null)
+    HAVE_NAMES=$(printf '%s' "$HAVE_JSON" | jq -cS '[.[]?.name] | unique' 2>/dev/null)
+    if [ -n "$HAVE_NAMES" ] && [ "$HAVE_NAMES" = "$WANT_NAMES" ]; then
+        echo "link-push: $TID already linked from $LUNAR_COMPONENT_ID with the same app set — skipping (idempotent)." >&2
+        jq -n --arg t "$TID" '{target:$t, ok:true, skipped:true}' >> "$DBG_PUSH"
+        continue
+    fi
+
     # The collector runtime forces stdout-capture mode (LUNAR_COLLECT_STDOUT /
     # LUNAR_LOG_PREFIX) so `lunar collect` prints instead of submitting — which
     # ignores --component. Unset both so this becomes a real CollectExternal
