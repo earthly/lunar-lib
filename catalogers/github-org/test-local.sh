@@ -14,14 +14,26 @@ echo "Output file: $OUTPUT_FILE"
 # Create mock 'lunar' command
 cat > "$TEST_DIR/lunar" << 'EOF'
 #!/bin/bash
-# Mock lunar command - captures catalog output to file
+# Mock lunar command - captures catalog output to per-path files
 
-if [[ "$1" == "catalog" && "$2" == "--json" && "$3" == ".components" ]]; then
-    # Read from stdin (the - argument) and append to output file
-    cat >> "${LUNAR_TEST_OUTPUT_FILE}"
-    echo ""  # Add newline between batches
+# Real invocation shape: `lunar catalog raw --json <path> -`
+if [[ "$1" == "catalog" && "$2" == "raw" && "$3" == "--json" ]]; then
+    case "$4" in
+        .components)
+            cat >> "${LUNAR_TEST_OUTPUT_FILE}"
+            echo ""  # Add newline between batches
+            ;;
+        .domains)
+            cat >> "${LUNAR_TEST_DOMAINS_FILE}"
+            echo ""
+            ;;
+        *)
+            echo "Mock lunar: unhandled json path: $4" >&2
+            exit 1
+            ;;
+    esac
 else
-    echo "Mock lunar: unhandled command: $@" >&2
+    echo "Mock lunar: unhandled command: $*" >&2
     exit 1
 fi
 EOF
@@ -30,17 +42,21 @@ chmod +x "$TEST_DIR/lunar"
 # Add mock to PATH
 export PATH="$TEST_DIR:$PATH"
 export LUNAR_TEST_OUTPUT_FILE="$OUTPUT_FILE"
+DOMAINS_FILE="$TEST_DIR/domains-output.json"
+export LUNAR_TEST_DOMAINS_FILE="$DOMAINS_FILE"
 
 # Set GH_TOKEN from gh CLI auth if not already set
 if [ -z "${GH_TOKEN:-}" ] && [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
-    export GH_TOKEN=$(gh auth token 2>/dev/null || echo "")
+    GH_TOKEN=$(gh auth token 2>/dev/null || echo "")
+    export GH_TOKEN
     if [ -z "$GH_TOKEN" ]; then
         echo "Warning: No GH_TOKEN set and 'gh auth token' failed. Run 'gh auth login' first."
     fi
 fi
 
-# Initialize output file
+# Initialize output files
 echo "" > "$OUTPUT_FILE"
+echo "" > "$DOMAINS_FILE"
 
 # Set cataloger inputs - use a small public org for testing
 export LUNAR_VAR_ORG_NAME="${TEST_ORG:-earthly}"
@@ -52,6 +68,8 @@ export LUNAR_VAR_INCLUDE_REPOS="${TEST_INCLUDE_REPOS:-}"
 export LUNAR_VAR_EXCLUDE_REPOS="${TEST_EXCLUDE_REPOS:-}"
 export LUNAR_VAR_TAG_PREFIX="${TEST_TAG_PREFIX:-gh-}"
 export LUNAR_VAR_DEFAULT_OWNER="${TEST_DEFAULT_OWNER:-}"
+export LUNAR_VAR_DEFAULT_DOMAIN="${TEST_DEFAULT_DOMAIN:-}"
+export LUNAR_VAR_GITHUB_HOST="${TEST_GITHUB_HOST:-github.com}"
 
 echo ""
 echo "=== Running cataloger with settings ==="
@@ -64,6 +82,8 @@ echo "Include repos: $LUNAR_VAR_INCLUDE_REPOS"
 echo "Exclude repos: $LUNAR_VAR_EXCLUDE_REPOS"
 echo "Tag prefix: $LUNAR_VAR_TAG_PREFIX"
 echo "Default owner: $LUNAR_VAR_DEFAULT_OWNER"
+echo "Default domain: $LUNAR_VAR_DEFAULT_DOMAIN"
+echo "GitHub host: $LUNAR_VAR_GITHUB_HOST"
 echo ""
 echo "=== Cataloger output ==="
 
@@ -78,6 +98,10 @@ jq -s 'add' "$OUTPUT_FILE" 2>/dev/null || cat "$OUTPUT_FILE"
 echo ""
 echo "=== Component count ==="
 jq -s 'add | keys | length' "$OUTPUT_FILE" 2>/dev/null || echo "Could not count"
+
+echo ""
+echo "=== Captured domains JSON ==="
+jq -s 'add' "$DOMAINS_FILE" 2>/dev/null || cat "$DOMAINS_FILE"
 
 # Cleanup
 rm -rf "$TEST_DIR"

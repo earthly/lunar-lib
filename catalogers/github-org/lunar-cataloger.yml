@@ -61,6 +61,16 @@ inputs:
     description: GitHub organization name to sync (required)
     # No default = required input
 
+  github_host:
+    description: |
+      GitHub hostname to catalog from. Use "github.com" (default) for
+      GitHub.com, or a GitHub Enterprise Server hostname (e.g.
+      "github.acme.com") to catalog from a self-hosted GHE instance.
+      A full URL such as "https://github.acme.com" is also accepted —
+      the scheme and any trailing path are stripped automatically.
+      The same LUNAR_SECRET_GH_TOKEN is used regardless of host.
+    default: "github.com"
+
   include_public:
     description: Include public repositories
     default: "true"
@@ -96,4 +106,13 @@ inputs:
   default_owner:
     description: |
       Default owner email for all components. Leave empty to not set owner.
+    default: ""
+
+  default_domain:
+    description: |
+      Default domain for all components. Leave empty to not set a domain.
+      When set, the domain is stamped on every component's `.domain` field
+      and also registered under `.domains` so the catalog passes the hub's
+      domain-reference validation. A higher-precedence domain definition in
+      lunar-config.yml still wins on merge.
     default: ""

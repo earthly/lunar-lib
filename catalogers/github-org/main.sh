@@ -4,12 +4,28 @@ set -e
 # GitHub Organization Cataloger
 # Syncs all repositories from a GitHub organization as Lunar components
 
-# Set up GitHub CLI authentication from Lunar secret
-if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
-    export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
-elif [ -z "${GH_TOKEN:-}" ]; then
+# GitHub host: "github.com" (default) or a GitHub Enterprise Server hostname.
+# Accept a full URL too and normalize down to the bare host (strip scheme + any
+# trailing path), so "github.acme.com", "https://github.acme.com" and
+# "https://github.acme.com/" all resolve to the same hostname.
+GITHUB_HOST_RAW="${LUNAR_VAR_GITHUB_HOST:-github.com}"
+GITHUB_HOST=$(echo "$GITHUB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#/.*$##')
+GITHUB_HOST="${GITHUB_HOST:-github.com}"
+export GH_HOST="$GITHUB_HOST"
+
+# Authenticate the gh CLI from the Lunar secret (falling back to a token already
+# in the environment). github.com reads GH_TOKEN; GitHub Enterprise Server hosts
+# read GH_ENTERPRISE_TOKEN — gh picks the right one by host, so route the token
+# to the matching variable.
+GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
+if [ -z "$GH_AUTH_TOKEN" ]; then
     echo "Error: GH_TOKEN or LUNAR_SECRET_GH_TOKEN must be set" >&2
     exit 1
+fi
+if [ "$GITHUB_HOST" = "github.com" ]; then
+    export GH_TOKEN="$GH_AUTH_TOKEN"
+else
+    export GH_ENTERPRISE_TOKEN="$GH_AUTH_TOKEN"
 fi
 
 # Required input
@@ -24,6 +40,7 @@ INCLUDE_REPOS="${LUNAR_VAR_INCLUDE_REPOS:-}"
 EXCLUDE_REPOS="${LUNAR_VAR_EXCLUDE_REPOS:-}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
 # Rate limit / retry settings
 MAX_RETRIES=5
@@ -47,18 +64,21 @@ if [ ${#VISIBILITIES[@]} -eq 0 ]; then
 fi
 
 echo "Cataloging repos from GitHub org: $ORG_NAME"
+echo "GitHub host: $GITHUB_HOST"
 echo "Visibilities: ${VISIBILITIES[*]}"
 echo "Include archived: $INCLUDE_ARCHIVED"
 [ -n "$INCLUDE_REPOS" ] && echo "Include patterns: $INCLUDE_REPOS"
 [ -n "$EXCLUDE_REPOS" ] && echo "Exclude patterns: $EXCLUDE_REPOS"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
+[ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
 
 # Convert glob pattern to regex
 # Escapes regex special chars, converts * to .* and ? to .
 glob_to_regex() {
     local glob="$1"
     # Escape regex special chars (except * and ?)
-    local escaped=$(echo "$glob" | sed -E 's/([.+^${}()|\\])/\\\1/g')
+    local escaped
+    escaped=$(echo "$glob" | sed -E 's/([.+^${}()|\\])/\\\1/g')
     # Convert glob wildcards to regex
     escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/\?/./g')
     echo "^${escaped}$"
@@ -149,7 +169,7 @@ EXCLUDE_REGEX=$(patterns_to_regex "$EXCLUDE_REPOS")
 
 # Use temp file for large dataset handling
 TEMP_FILE=$(mktemp)
-trap "rm -f $TEMP_FILE ${TEMP_FILE}.chunk ${TEMP_FILE}.new" EXIT
+trap 'rm -f "$TEMP_FILE" "${TEMP_FILE}.chunk" "${TEMP_FILE}.new"' EXIT
 
 # Initialize with empty array
 echo "[]" > "$TEMP_FILE"
@@ -158,8 +178,7 @@ echo "[]" > "$TEMP_FILE"
 for visibility in "${VISIBILITIES[@]}"; do
     echo "Fetching $visibility repos..."
     
-    REPOS=$(fetch_repos_with_retry "$visibility")
-    if [ $? -ne 0 ]; then
+    if ! REPOS=$(fetch_repos_with_retry "$visibility"); then
         echo "Failed to fetch $visibility repos, aborting"
         exit 1
     fi
@@ -185,6 +204,7 @@ BATCH_SIZE=1000
 CATALOG_ENTRIES=$(jq \
     --arg prefix "$TAG_PREFIX" \
     --arg owner "$DEFAULT_OWNER" \
+    --arg domain "$DEFAULT_DOMAIN" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     '
@@ -214,6 +234,7 @@ CATALOG_ENTRIES=$(jq \
                     archived: (if .isArchived then "true" else "false" end),
                 }
             } + (if $owner != "" then {owner: $owner} else {} end)
+              + (if $domain != "" then {domain: $domain} else {} end)
         )
     }]
     ' "$TEMP_FILE")
@@ -225,6 +246,24 @@ echo "Components after filtering: $TOTAL_ENTRIES"
 if [ "$TOTAL_ENTRIES" -eq 0 ]; then
     echo "No components to catalog"
     exit 0
+fi
+
+# Register the default domain BEFORE writing components. Every component above
+# carries `domain: $DEFAULT_DOMAIN`, and the hub's validateDomainRefs drops the
+# entire catalog merge if a component references a domain absent from .domains.
+# Writing it first keeps every intermediate merge-save valid. A higher-precedence
+# definition in lunar-config.yml (or a later cataloger) still wins on merge, so
+# this is just the safety net that keeps the reference valid.
+if [ -n "$DEFAULT_DOMAIN" ]; then
+    echo "Registering domain '$DEFAULT_DOMAIN' under .domains"
+    if jq -n --arg d "$DEFAULT_DOMAIN" \
+        '{($d): {description: "Created by the github-org cataloger"}}' \
+        | lunar catalog raw --json '.domains' -; then
+        echo "Registered domain '$DEFAULT_DOMAIN'"
+    else
+        echo "Failed to register domain '$DEFAULT_DOMAIN'" >&2
+        exit 1
+    fi
 fi
 
 # Process in batches
