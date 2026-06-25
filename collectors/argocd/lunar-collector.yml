@@ -19,7 +19,10 @@ landing_page:
   related:
     - slug: "gitops"
       type: "policy"
-      reason: "Enforces GitOps best practices using this collector's data"
+      reason: "Tool-agnostic GitOps checks over this collector's normalized data"
+    - slug: "argocd"
+      type: "policy"
+      reason: "ArgoCD-specific checks: argoproj CRD validation and AppProject hygiene"
     - slug: "k8s"
       type: "collector"
       reason: "Parses the workload manifests ArgoCD Applications deploy"

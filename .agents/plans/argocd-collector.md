@@ -37,7 +37,7 @@ collect syntax to write the result onto the source component.
 | Piece | What | Confidence |
 | -- | -- | -- |
 | `argocd` collector — `parse` sub-collector | parse + kubeconform-validate argoproj CRDs → normalized `.cd.gitops` + raw `.cd.gitops.native.argocd` on the GitOps repo's own component | High — no platform deps |
-| `gitops` policy set | 5 tool-agnostic checks over `.cd.gitops` | High — no platform deps |
+| `gitops` policy set (general) + `argocd` policy set (specific) | tool-agnostic checks over `.cd.gitops` + ArgoCD-specific checks (argoproj CRD validation, AppProject) | High — no platform deps |
 | `argocd` collector — `link-push` sub-collector | resolve each Application → source component (annotation → image → tag → repoURL), then **out-of-band `lunar collect --component <source-id> --sha <sha>`** to write the deployment posture onto the **source** component | Medium — depends on ENG-859 out-of-band collect (shipped on `earthly/lunar` main); a few things to confirm at impl (below) |
 
 Genuinely out of scope (not asked for, real gaps): `ApplicationSet` runtime
@@ -168,32 +168,43 @@ workloads — it references them).
 
 ---
 
-## Component 2 — `gitops` policy set
+## Component 2 — Two policy plugins: `gitops` (general) + `argocd` (specific)
 
-Tool-agnostic checks over `.cd.gitops` (one check per file, `include`/`exclude`-able).
-All resolve to **skip** when `.cd.gitops` is absent (no GitOps config in this
-component), per the skip-vs-fail convention. The default set is intentionally lean
-and **general — it applies to essentially any team running ArgoCD**, with nothing
-tied to a specific customer's platform conventions:
+The checks split cleanly by *what they depend on*, so they ship as **two policy
+plugins** — same pattern as the repo's existing `policies/iac` (general) +
+`policies/terraform` (tool-specific), both fed by one `terraform` collector. Here,
+one `argocd` collector feeds both `policies/gitops` and `policies/argocd`; a future
+`flux` collector would also feed `policies/gitops`.
 
-* `valid` — every Application/AppProject conforms to the argoproj CRD schema.
-* `sync-policy` — `syncPolicy.automated` with `prune` + `selfHeal` true.
-* `non-default-project` — `spec.project` is not `default` (and, optionally, within an allow-list).
-* `source-repo-allowlist` — `source.repoURL` within configured allowed repos (allow-list: errors if enabled but unconfigured).
-* `destination-allowlist` — destination namespace/cluster within allow-list (allow-list: errors if enabled but unconfigured).
-* `gitops-managed` — **coverage** check (see Component 4): fails a component that *should* be on GitOps but has no resolved `.cd.gitops`.
+**Dividing line:** a check is **general** iff it reads only normalized, tool-
+agnostic `.cd.gitops` fields any GitOps collector populates. It's **ArgoCD-specific**
+iff it depends on an ArgoCD concept (AppProject) or argo-schema validation.
+
+### `policies/gitops` — tool-agnostic (works for ArgoCD, Flux, …)
+
+Reads only normalized `.cd.gitops`. All resolve to **skip** when `.cd.gitops` is
+absent — except `gitops-managed`, which inverts that (see Component 4).
+
+* `sync-policy` — `sync_policy.automated` with `prune` + `self_heal` true (normalized; a Flux collector maps its reconcile/prune fields to the same shape).
+* `source-repo-allowlist` — `source_ref.repoURL` within configured allowed repos (allow-list: errors if enabled but unconfigured).
+* `destination-allowlist` — `destination` namespace/cluster within allow-list (allow-list: errors if enabled but unconfigured).
+* `gitops-managed` — **coverage** check (Component 4): fails a component that *should* be on GitOps but has no resolved `.cd.gitops`.
+
+### `policies/argocd` — ArgoCD-specific (argoproj CRDs / AppProject)
+
+* `valid` — every Application/ApplicationSet/AppProject conforms to the **argoproj CRD schema** (Flux has different CRDs → a `flux` policy would have its own `valid`).
+* `non-default-project` — `spec.project` is not `default` (and, optionally, within an allow-list). **AppProject is an ArgoCD concept** — Flux has no equivalent.
 
 Because `link-push` (Component 3) writes `.cd.gitops` onto the **source** component
-too, these policies light up on the service repo — not just the GitOps repo — even
-when ArgoCD config lives elsewhere.
+too, both policy sets light up on the service repo — not just the GitOps repo —
+even when ArgoCD config lives elsewhere.
 
-### Optional checks (niche — NOT in the default set)
+### Optional checks (niche — NOT shipped, would live under `policies/argocd`)
 
 These two came out of the originating design session's specific platform use-case.
-They're real, but they are **not general** to most ArgoCD users, so they're kept
-out of the shipped default set and offered as opt-in additions (or a later phase)
-only if there's demand. The underlying *data* is still collected where it's
-generally useful.
+They're real but **not general**, so they're kept out of the shipped set and
+offered as opt-in additions only if there's demand. The underlying *data* is still
+collected where it's generally useful.
 
 * `golden-path-template` — asserts each Application carries an org-specific
   "golden-path" template label. A **platform-engineering pattern** (a golden-path
@@ -332,10 +343,14 @@ Collector (`argocd`):
 Secret (`link-push`): a GitHub token to resolve each source repo's default-branch
 HEAD sha (target for the out-of-band write).
 
-Policies (`gitops`):
+Policies (`gitops`, general):
 
-* `allowed_projects`, `allowed_source_repos`, `allowed_destinations` *(config checks)*.
+* `allowed_source_repos`, `allowed_destinations` *(allow-list config checks)*.
 * `expected_tag` — for `gitops-managed`: only enforce coverage on components carrying this tag (empty = every targeted component).
+
+Policies (`argocd`, specific):
+
+* `allowed_projects` — for `non-default-project`: optional AppProject allow-list.
 
 ---
 
@@ -371,11 +386,12 @@ collectors/argocd/
   main.sh                  # parse + kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
   link_push.sh             # resolve Application -> source component, out-of-band lunar collect --component/--sha
   Earthfile                # custom image: kubeconform + argoproj CRD schemas
-policies/gitops/
-  valid.py
+policies/gitops/           # tool-agnostic (any GitOps tool); reads normalized .cd.gitops
   sync_policy.py
-  non_default_project.py
   source_repo_allowlist.py
   destination_allowlist.py
   gitops_managed.py        # coverage: fails components expected on GitOps but absent
+policies/argocd/           # ArgoCD-specific (argoproj CRDs / AppProject)
+  valid.py                 # argoproj CRD schema validation
+  non_default_project.py   # AppProject hygiene
 ```
