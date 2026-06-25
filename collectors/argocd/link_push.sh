@@ -182,19 +182,33 @@ rm -f "$RESOLVED"
 GROUP_COUNT=$(echo "$PUSH_GROUPS" | jq 'length')
 
 PUSHED=0
+DBG_PUSH=$(mktemp)
 for ((g=0; g<GROUP_COUNT; g++)); do
     GROUP=$(echo "$PUSH_GROUPS" | jq -c ".[$g]")
     TID=$(echo "$GROUP" | jq -r '.[0].target_id')
     TSHA=$(echo "$GROUP" | jq -r '.[0].target_sha')
     RECORDS=$(echo "$GROUP" | jq -c '[.[].record]')
-    if lunar collect --component "$TID" --sha "$TSHA" -j \
+    # The collector runtime forces stdout-capture mode (LUNAR_COLLECT_STDOUT /
+    # LUNAR_LOG_PREFIX) so `lunar collect` prints instead of submitting — which
+    # ignores --component. Unset both so this becomes a real CollectExternal
+    # cross-component submit to the source component.
+    if env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX lunar collect \
+        --component "$TID" --sha "$TSHA" -j \
         ".cd.gitops.applications" "$RECORDS" \
         ".cd.gitops.source" '{"tool":"argocd","integration":"external"}' \
         ".cd.gitops.linked_from" "\"$LUNAR_COMPONENT_ID\"" 2>/tmp/oob-err; then
         PUSHED=$((PUSHED+1))
+        jq -n --arg t "$TID" '{target:$t, ok:true}' >> "$DBG_PUSH"
     else
         echo "link-push: out-of-band push to $TID failed: $(cat /tmp/oob-err 2>/dev/null)" >&2
+        jq -n --arg t "$TID" --arg e "$(head -c 300 /tmp/oob-err 2>/dev/null)" '{target:$t, ok:false, err:$e}' >> "$DBG_PUSH"
     fi
 done
+
+# Debug breadcrumb of the push results (best-effort, local collect onto self).
+jq -n --argjson pushes "$(jq -s '.' "$DBG_PUSH")" --arg pushed "$PUSHED" \
+    '{pushed_count:$pushed, pushes:$pushes}' \
+    | lunar collect -j ".cd.gitops._push_debug" - 2>/dev/null || true
+rm -f "$DBG_PUSH"
 
 echo "link-push: pushed deployment posture to $PUSHED source component(s)." >&2
