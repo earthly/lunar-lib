@@ -1,6 +1,3 @@
-import json
-import os
-
 from lunar_policy import Check, variable_or_default
 
 
@@ -11,14 +8,22 @@ def main(node=None):
         node=node,
     )
     with c:
-        # The "expected on GitOps" set is the org's own input. If expected_tag is
-        # configured, only enforce on components carrying it; otherwise enforce on
-        # every component the policy targets (via `on:`).
+        # The "expected on GitOps" set is the org's own choice, scoped two ways:
+        #   1. Deploy this policy `on:` the tag/domain that must be GitOps-managed
+        #      (e.g. on:[production]) and leave expected_tag empty — every targeted
+        #      component is then expected to have GitOps data.
+        #   2. Set expected_tag to a catalog tag; the check only enforces on
+        #      components whose .catalog.entity.tags carry it, skipping the rest.
+        # Tags live in the Component JSON (.catalog.entity.tags, populated by a
+        # catalog cataloger) — manifest `on:` tags are not visible to policy code.
         expected = variable_or_default("expected_tag", "").strip()
         if expected:
-            tags = json.loads(os.environ.get("LUNAR_COMPONENT_TAGS", "[]"))
+            tags = c.get_node(".catalog.entity.tags").get_value_or_default(".", []) or []
             if expected not in tags:
-                c.skip(f"Component is not tagged '{expected}' — not expected on GitOps")
+                c.skip(
+                    f"Component is not tagged '{expected}' in the catalog — "
+                    f"not expected on GitOps"
+                )
 
         # Inverse skip-vs-fail: absence of GitOps data is the violation here.
         # `.cd.gitops` is present when the component ships ArgoCD files OR when

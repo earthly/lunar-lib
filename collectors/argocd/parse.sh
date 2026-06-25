@@ -6,8 +6,15 @@
 # Annotation key that carries the source component id (configurable input).
 ANNOTATION_KEY="${LUNAR_VAR_COMPONENT_ANNOTATION:-lunar.earthly.dev/component}"
 
-# argoproj CRD schemas baked into the image (see Earthfile).
-ARGO_SCHEMA_LOCATION="${LUNAR_ARGO_SCHEMAS:-/opt/argo-schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json}"
+# argoproj CRD schemas baked into the image (see Earthfile). The location is a
+# kubeconform Go template; its `}}` must NOT sit inside a ${VAR:-default}
+# expansion — bash brace-matching eats one `}` there ({{.Group}} -> {{.Group}),
+# which breaks kubeconform's registry init ("bad character U+007D"). Keep the
+# default a single-quoted literal and apply it with an explicit test.
+ARGO_SCHEMA_LOCATION="$LUNAR_ARGO_SCHEMAS"
+if [ -z "$ARGO_SCHEMA_LOCATION" ]; then
+    ARGO_SCHEMA_LOCATION='/opt/argo-schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+fi
 
 # Directories to ignore while scanning for YAML.
 _ARGO_IGNORE_DIRS=( ".git" ".github" "node_modules" "vendor" )
@@ -48,10 +55,16 @@ _process_argo_file() {
         return 0
     fi
 
-    # Validate the whole file against the argoproj CRD schemas (best-effort).
+    # Validate the whole file against the argoproj CRD schemas baked into the
+    # image (best-effort). We deliberately do NOT pass `-schema-location default`:
+    # that location is a remote URL (raw.githubusercontent.com), so in a
+    # network-restricted collector runtime kubeconform fails the download and
+    # marks every resource invalid. We only validate argoproj.io resources (the
+    # caller filters first) and their schemas are local, so offline validation is
+    # both sufficient and deterministic. Non-argoproj docs in a multi-doc file
+    # have no local schema and are skipped via -ignore-missing-schemas.
     local valid
     if kubeconform -strict -ignore-missing-schemas \
-        -schema-location default \
         -schema-location "$ARGO_SCHEMA_LOCATION" "$f" >/dev/null 2>&1; then
         valid=true
     else
