@@ -12,11 +12,11 @@ image:
         mv kubeconform /usr/local/bin/ && \
         chmod +x /usr/local/bin/kubeconform
 
-    # argoproj CRD JSON schemas (datreeio/CRDs-catalog) for offline validation,
-    # baked under the {{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
-    # layout kubeconform's -schema-location template expects.
+    # argoproj CRD JSON schemas (datreeio/CRDs-catalog) for offline validation.
+    # datreeio filenames are lowercase, which matches what kubeconform's
+    # -schema-location template ({{.ResourceKind}} is lowercased) resolves to.
     RUN mkdir -p /opt/argo-schemas/argoproj.io && \
-        for r in Application_v1alpha1 ApplicationSet_v1alpha1 AppProject_v1alpha1; do \
+        for r in application_v1alpha1 applicationset_v1alpha1 appproject_v1alpha1; do \
           curl -sSL --fail -o "/opt/argo-schemas/argoproj.io/${r}.json" \
             "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/argoproj.io/${r}.json"; \
         done
