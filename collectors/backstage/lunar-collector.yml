@@ -3,7 +3,7 @@ version: 0
 name: backstage
 description: Parse catalog-info.yaml for Backstage service catalog metadata
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.3
 
 landing_page:
   display_name: "Backstage Collector"

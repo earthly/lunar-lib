@@ -4,7 +4,7 @@ name: elixir
 description: Enforces Elixir project structure, tooling, and dependency standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.5.3
 
 landing_page:
   display_name: "Elixir Project Guardrails"
