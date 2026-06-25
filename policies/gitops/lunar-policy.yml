@@ -14,7 +14,7 @@ landing_page:
     coverage to flag components that should be on GitOps but aren't. Works for
     any GitOps collector (argocd today, flux later).
   category: "deployment-and-infrastructure"
-  icon: "assets/argocd.svg"
+  icon: "assets/gitops.svg"
   status: "beta"
   requires:
     - slug: "argocd"
