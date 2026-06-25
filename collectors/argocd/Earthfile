@@ -1,0 +1,29 @@
+VERSION 0.8
+# Build the argocd collector image: base-image (jq, yq, psql) + kubeconform and
+# the argoproj CRD schemas for offline Application/AppProject validation.
+image:
+    FROM --pass-args ../../+base-image
+
+    # kubeconform for manifest validation
+    ARG TARGETARCH
+    ARG KUBECONFORM_VERSION=0.6.7
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+        curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-${ARCH}.tar.gz" | tar xz && \
+        mv kubeconform /usr/local/bin/ && \
+        chmod +x /usr/local/bin/kubeconform
+
+    # argoproj CRD JSON schemas (datreeio/CRDs-catalog) for offline validation,
+    # baked under the {{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+    # layout kubeconform's -schema-location template expects.
+    RUN mkdir -p /opt/argo-schemas/argoproj.io && \
+        for r in Application_v1alpha1 ApplicationSet_v1alpha1 AppProject_v1alpha1; do \
+          curl -sSL --fail -o "/opt/argo-schemas/argoproj.io/${r}.json" \
+            "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/argoproj.io/${r}.json"; \
+        done
+
+    # GNU parallel for faster file processing
+    RUN apk add --no-cache parallel && \
+        mkdir -p ~/.parallel && touch ~/.parallel/will-cite
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:argocd-$VERSION
