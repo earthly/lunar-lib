@@ -27,9 +27,13 @@ def main(node=None):
 
         # Inverse skip-vs-fail: absence of GitOps data is the violation here.
         # `.cd.gitops` is present when the component ships ArgoCD files OR when
-        # link-push stamped its deployment posture out-of-band.
-        c.assert_exists(
-            ".cd.gitops",
+        # link-push stamped its deployment posture out-of-band. Assert it as an
+        # explicit boolean (not assert_exists, whose missing-path result reports
+        # as no-data/pending) so a component that should be on GitOps but isn't
+        # surfaces as a clear failure.
+        has_gitops = c.get_node(".cd.gitops").get_value_or_default(".", None) is not None
+        c.assert_true(
+            has_gitops,
             "Component is expected to be GitOps-managed but no Application deploys "
             "it (.cd.gitops not found). Migrate it to GitOps or exclude it from "
             "this policy's scope.",
