@@ -199,13 +199,14 @@ for ((g=0; g<GROUP_COUNT; g++)); do
     # is CollectExternal superseding prior records for the same
     # component+sha+collector — tracked as a platform follow-up.)
     WANT_NAMES=$(printf '%s' "$RECORDS" | jq -cS '[.[].name] | unique' 2>/dev/null)
-    HAVE_JSON=$(psql "$CONN_STRING" -t -A -c \
-        "SELECT component_json->'cd'->'gitops'->'applications'
-         FROM components_latest
-         WHERE component_id = '$(sql_escape "$TID")' AND pr IS NULL
-           AND component_json->'cd'->'gitops'->>'linked_from' = '$(sql_escape "$LUNAR_COMPONENT_ID")'
-         LIMIT 1" 2>/dev/null)
-    HAVE_NAMES=$(printf '%s' "$HAVE_JSON" | jq -cS '[.[]?.name] | unique' 2>/dev/null)
+    # Read the target's LIVE merged JSON via get-json (a direct hub read), not
+    # the SQL-API components_latest view: that view is materialized and lags by
+    # minutes, so a guard reading it never sees the prior push and keeps
+    # duplicating. get-json reflects a just-submitted external record at once.
+    HAVE_NAMES=$(env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX \
+        lunar component get-json "$TID" 2>/dev/null \
+        | jq -cS --arg lf "$LUNAR_COMPONENT_ID" \
+            'if (.cd.gitops.linked_from == $lf) then ([.cd.gitops.applications[]?.name] | unique) else empty end' 2>/dev/null)
     if [ -n "$HAVE_NAMES" ] && [ "$HAVE_NAMES" = "$WANT_NAMES" ]; then
         echo "link-push: $TID already linked from $LUNAR_COMPONENT_ID with the same app set — skipping (idempotent)." >&2
         jq -n --arg t "$TID" '{target:$t, ok:true, skipped:true}' >> "$DBG_PUSH"
