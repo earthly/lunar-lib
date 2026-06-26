@@ -282,6 +282,63 @@ unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
+## Push vs Pull — the cross-component correlation choice
+
+Component 3 (`link-push`) is the **push**: a collector on the GitOps repo writes
+`.cd.gitops.*` *onto* the source component. There's a second shape — **pull** — where
+the data stays on the GitOps component (the `parse` step already produces it locally)
+and the **consumer reads it on demand**. Same correlation problem, inverted timing.
+Vlad raised this for the PR-enforcement use-case; both are worth speccing because they
+fail in opposite directions.
+
+### Why push can't gate a PR
+
+`link-push` writes at `(source component, **default-branch HEAD sha**)` — it must,
+because the Hub drops a SHA it hasn't ingested (Component 3, gotcha #2). So pushed
+posture only ever attaches to **post-merge main**. A PR check evaluates at the PR's
+*head* SHA, where the pushed `.cd.gitops` doesn't exist → the gate sees nothing. Push
+is for *main-branch dashboards / scoring*, not PR gating.
+
+### Pull — two flavors
+
+| Flavor | Where the read happens | Lands on the PR SHA? | Works with today's policy SDK? | Freshness |
+| -- | -- | -- | -- | -- |
+| **A. `get-json` materialize** (collector) — the `link-pull` counterpart | a `code` sub-collector on the **consumer** (service) repo calls `lunar component get-json <gitops-id>`, extracts its `Application`, and writes `.cd.gitops` onto **its own** component (normal in-band write) | ✅ it runs in the consumer's collection context, so it stamps the SHA being collected — **including a PR head SHA** | ✅ the existing `gitops`/`argocd` policies read `.cd.gitops` unchanged | **Immediate** — `get-json` is the authoritative live read (field guide); refreshed each consumer collection |
+| **B. Strategy-3 SQL** (policy) | the policy queries the Lunar SQL API for the GitOps component's posture at eval time — no materialization, no write | ✅ evaluated live at the PR SHA's policy run | ⚠️ **needs confirm** — shipped `lunar_policy` exposes node-reads only (no SQL primitive). Feasible via policy outbound HTTP to the SQL API, but it's a DIY raw query, not an SDK call | **Lags** — `components_latest` is materialized, minutes behind (field guide) |
+
+Both kill the push pain wholesale: no `CollectExternal`, no SHA-targeting, no append/dup
+guard, no manifest-id shadow, no cross-component **write** permission. The GitOps
+component owns its own `.cd.gitops`; the consumer reads it.
+
+### Recommendation
+
+- **PR enforcement, today → Flavor A (`get-json` materialize).** It lands on the PR
+  head SHA (it runs in the consumer's collection), the existing policies gate it with
+  zero changes, and `get-json` reads the GitOps posture live. Same correlation chain as
+  push (annotation → image → catalog → repoURL), resolved from the consumer side, but a
+  self-write instead of an out-of-band write — so none of Component 3's five gotchas
+  apply.
+- **Clean endgame → Flavor B (Strategy-3 SQL).** Zero materialization, the policy
+  asserts directly against the GitOps component. Gated on confirming in-policy SQL
+  access (an SDK helper or sanctioned egress) and on tolerating the SQL view's lag.
+- **Push (`link-push`) stays** for the non-PR case: making a service component's
+  *stored* JSON reflect its live GitOps posture for dashboards / main-branch scoring.
+
+### To confirm at implementation (pull)
+
+1. **`get-json` perms/cost in a collector runtime** — confirm a consumer-side collector
+   may `get-json` a *different* component (read perm) and that it's cheap enough to run
+   each collection. Read is lower-privilege than the cross-component *write* push needs.
+2. **Consumer-side correlation** — push resolves app→service on the GitOps repo; pull
+   must resolve service→its GitOps `Application` from the *service* side. The annotation
+   lives on the `Application` (GitOps repo), so Flavor A still needs a discovery step
+   ("which GitOps component carries an `Application` that resolves to me") — a `lunar
+   sql` lookup over `.cd.gitops.native.argocd`, or a configured `gitops_component` input.
+3. **Strategy-3 in-policy SQL** — confirm the policy runtime can reach the SQL API
+   (egress + auth + endpoint) before committing to Flavor B; otherwise it's A.
+
+---
+
 ## Component 4 — GitOps adoption coverage (`gitops-managed`)
 
 Three connected questions a link-pushed component should be able to answer:
