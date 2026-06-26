@@ -282,65 +282,67 @@ unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
-## Push vs Pull — the cross-component correlation choice
+## Two collectors: deployment correlation (central repo) + deployment readiness (app repos)
 
-Component 3 (`link-push`) is the **push**: a collector on the GitOps repo writes
-`.cd.gitops.*` *onto* the source component. There's a second shape — **pull** — where
-the data stays on the GitOps component (the `parse` step already produces it locally)
-and the **consumer reads it on demand**. Same correlation problem, inverted timing.
-Vlad raised this for the PR-enforcement use-case; both are worth speccing because they
-fail in opposite directions.
+**Per review (Vlad):** push and pull serve very different use-cases, so they are **two
+separate collectors on two different repos** — not two sub-collectors of one plugin —
+and named for the user *outcome*, not the "push/pull" implementation mental model.
 
-### Why push can't gate a PR
+The distinction (Vlad's framing — past vs future):
 
-`link-push` writes at `(source component, **default-branch HEAD sha**)` — it must,
-because the Hub drops a SHA it hasn't ingested (Component 3, gotcha #2). So pushed
-posture only ever attaches to **post-merge main**. A PR check evaluates at the PR's
-*head* SHA, where the pushed `.cd.gitops` doesn't exist → the gate sees nothing. Push
-is for *main-branch dashboards / scoring*, not PR gating.
+- **Currently deployed (the "push").** A collector on the **central GitOps repo**
+  validates the ArgoCD config and correlates each `Application` to the **service it
+  deploys**, recording that deployed posture onto the service. It writes at the
+  service's *default-branch HEAD* (it must — the Hub drops a SHA it hasn't ingested,
+  Component 3 gotcha #2), so it only ever describes **post-merge main**. It **cannot**
+  gate a PR; it answers "what is deployed, and which source repo does it come from."
+- **Going to be deployed (the "pull").** A collector on each **app/service repo** reads
+  *its own* ArgoCD deployment posture from the GitOps component and materializes it onto
+  the service at the SHA being collected — **including a PR head SHA** — so the
+  `gitops`/`argocd` policies enforce "does this change fit the deployment requirements"
+  **at PR time**.
 
-### Pull — two flavors
+### The two collectors
 
-| Flavor | Where the read happens | Lands on the PR SHA? | Works with today's policy SDK? | Freshness |
-| -- | -- | -- | -- | -- |
-| **A. `get-json` materialize** (collector) — the `link-pull` counterpart | a `code` sub-collector on the **consumer** (service) repo calls `lunar component get-json <gitops-id>`, extracts its `Application`, and writes `.cd.gitops` onto **its own** component (normal in-band write) | ✅ it runs in the consumer's collection context, so it stamps the SHA being collected — **including a PR head SHA** | ✅ the existing `gitops`/`argocd` policies read `.cd.gitops` unchanged | **Immediate** — `get-json` is the authoritative live read (field guide); refreshed each consumer collection |
-| **B. Strategy-3 SQL** (policy) | the policy queries the Lunar SQL API for the GitOps component's posture at eval time — no materialization, no write | ✅ evaluated live at the PR SHA's policy run | ⚠️ **needs confirm** — shipped `lunar_policy` exposes node-reads only (no SQL primitive). Feasible via policy outbound HTTP to the SQL API, but it's a DIY raw query, not an SDK call | **Lags** — `components_latest` is materialized, minutes behind (field guide) |
+| Collector | Runs on | Job | Today's code |
+| -- | -- | -- | -- |
+| **`argocd`** | the central **GitOps repo** | parse + kubeconform-validate the argoproj CRDs, correlate each `Application` to the service it deploys (image-match), record the deployed posture onto those services | `parse.sh` + `link_push.sh` |
+| **`argocd-deployment`** *(name pending review)* | each **app / service repo** | `get-json` this service's `Application` from the GitOps component and materialize `.cd.gitops` onto the service, so PR checks validate the upcoming deployment | `link_pull.sh` |
 
-Both kill the push pain wholesale: no `CollectExternal`, no SHA-targeting, no append/dup
-guard, no manifest-id shadow, no cross-component **write** permission. The GitOps
-component owns its own `.cd.gitops`; the consumer reads it.
+Both feed the **same** normalized `.cd.gitops` and the **same** `gitops`/`argocd`
+policies — the split is two correlation front-ends on two repo classes, not duplicated
+policy surface.
 
-### Recommendation
+> **Names — proposed, pending Vlad/Brandon.** Lib collectors are named for the source
+> they read (`snyk`, `jira`), so the central one stays **`argocd`**. The app-side one is
+> proposed as **`argocd-deployment`**; purer-outcome alternatives if preferred:
+> `deployment-readiness` or `gitops-deployment` (tool-agnostic — it just reads
+> `.cd.gitops`). I'll do the file restructure once the name is blessed; renaming a
+> user-facing collector is a churn-once decision.
 
-- **PR enforcement, today → Flavor A (`get-json` materialize).** It lands on the PR
-  head SHA (it runs in the consumer's collection), the existing policies gate it with
-  zero changes, and `get-json` reads the GitOps posture live. Self-write instead of an
-  out-of-band write — so none of Component 3's five gotchas apply. **Implemented as the
-  `link-pull` sub-collector** (`collectors/argocd/link_pull.sh`): rather than the
-  docker-image auto-correlation (which would need the build to have run — i.e. the
-  collector-dependency feature we don't have yet), it reads the app→Application mapping
-  **predeclared in `catalog-info.yaml`** (`lunar.earthly.dev/gitops-component` +
-  `lunar.earthly.dev/argocd-application` annotations), `get-json`s that GitOps
-  component, and materializes the matching app(s) onto the service. Reading catalog-info
-  straight from the checkout keeps it dependency-free (no cataloger-ordering needed).
-- **Clean endgame → Flavor B (Strategy-3 SQL).** Zero materialization, the policy
-  asserts directly against the GitOps component. Gated on confirming in-policy SQL
-  access (an SDK helper or sanctioned egress) and on tolerating the SQL view's lag.
-- **Push (`link-push`) stays** for the non-PR case: making a service component's
-  *stored* JSON reflect its live GitOps posture for dashboards / main-branch scoring.
+### Pull is a collector read, NOT an in-policy SQL query
+
+An earlier sketch had a "Strategy-3" variant where the **policy** queried the Lunar SQL
+API directly at eval time. **Dropped (per Vlad):** the platform assumes policies are
+fast and self-contained, and there's no supported in-policy SQL pattern yet. The pull
+collector does a normal `get-json` self-write; the policies read `.cd.gitops` unchanged
+and stay node-only. Revisit a policy-side read only if/when the platform grows a
+first-class pattern for it.
+
+The pull collector avoids every `link-push` gotcha — no `CollectExternal`, no
+SHA-targeting, no append/dup guard, no manifest-id shadow, no cross-component *write*
+permission. It's a self-write on the SHA being collected.
 
 ### To confirm at implementation (pull)
 
-1. **`get-json` perms/cost in a collector runtime** — confirm a consumer-side collector
-   may `get-json` a *different* component (read perm) and that it's cheap enough to run
-   each collection. Read is lower-privilege than the cross-component *write* push needs.
-2. **Consumer-side correlation** — push resolves app→service on the GitOps repo; pull
-   must resolve service→its GitOps `Application` from the *service* side. The annotation
-   lives on the `Application` (GitOps repo), so Flavor A still needs a discovery step
-   ("which GitOps component carries an `Application` that resolves to me") — a `lunar
-   sql` lookup over `.cd.gitops.native.argocd`, or a configured `gitops_component` input.
-3. **Strategy-3 in-policy SQL** — confirm the policy runtime can reach the SQL API
-   (egress + auth + endpoint) before committing to Flavor B; otherwise it's A.
+1. **`get-json` perms/cost** — confirm an app-repo collector may `get-json` a *different*
+   component (read perm) cheaply each collection. Read is lower-privilege than push's
+   cross-component *write*.
+2. **App-side correlation** — pull resolves service→its GitOps `Application` from the
+   *app* side, via a predeclared `catalog-info.yaml` mapping
+   (`lunar.earthly.dev/gitops-component` + `lunar.earthly.dev/argocd-application`), or a
+   direct `gitops_component` input. (Docker-image auto-correlation would need the build
+   collector to have run first — a collector-ordering dep we don't have yet.)
 
 ---
 

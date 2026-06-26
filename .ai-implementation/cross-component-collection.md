@@ -22,17 +22,18 @@ This doc is about **push** (writing onto another component). There's a second
 shape — **pull** (the consumer *reads* the other component's JSON) — and picking
 wrong costs you a day. Decide before you build:
 
-| | **Push** (`link-push`, this doc) | **Pull** (`get-json` / Strategy-3 SQL) |
+| | **Push** (central GitOps-repo collector, this doc) | **Pull** (app-repo collector, `get-json` self-write) |
 |--|--|--|
-| Direction | producer *writes* onto the target via `CollectExternal` | consumer *reads* the producer's JSON on demand |
-| Lands on | the target's **default-branch HEAD** (must be a real ingested SHA — gotcha #2) | wherever the consumer reads: a `get-json` self-write lands on the **SHA being collected** (incl. a **PR head SHA**); a Strategy-3 policy reads live at eval |
+| Direction | producer *writes* onto the target via `CollectExternal` | consumer *reads* the producer's JSON and self-writes it |
+| Lands on | the target's **default-branch HEAD** (must be a real ingested SHA — gotcha #2) | the **SHA being collected** in the consumer's own run — **including a PR head SHA** |
 | **Can it gate a PR?** | **No** — pushed data sits on post-merge main, not the PR's head SHA | **Yes** — that's the whole point |
 | Cost | the five gotchas below (stdout hijack, SHA targeting, id-churn shadow, append/dup, self-ref) | a read perm + correlation resolved from the consumer side; **no writes** |
 
-**Rule of thumb: PR enforcement → pull; main-branch dashboards/scoring → push.**
-The full pull spec (two flavors + confirm-at-impl) lives in
-`.agents/plans/argocd-collector.md` § "Push vs Pull". Everything below in *this*
-doc is the **push** field guide — every gotcha is a push concern.
+**Rule of thumb: PR enforcement → pull; main-branch dashboards/scoring → push.** They're
+two separate collectors on two repo classes (see `.agents/plans/argocd-collector.md`
+§ "Two collectors"). Everything below in *this* doc is the **push** field guide — every
+gotcha is a push concern. (A policy-side SQL read was considered and dropped: policies
+stay fast and node-only.)
 
 ---
 
