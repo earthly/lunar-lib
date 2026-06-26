@@ -314,10 +314,15 @@ component owns its own `.cd.gitops`; the consumer reads it.
 
 - **PR enforcement, today → Flavor A (`get-json` materialize).** It lands on the PR
   head SHA (it runs in the consumer's collection), the existing policies gate it with
-  zero changes, and `get-json` reads the GitOps posture live. Same correlation chain as
-  push (annotation → image → catalog → repoURL), resolved from the consumer side, but a
-  self-write instead of an out-of-band write — so none of Component 3's five gotchas
-  apply.
+  zero changes, and `get-json` reads the GitOps posture live. Self-write instead of an
+  out-of-band write — so none of Component 3's five gotchas apply. **Implemented as the
+  `link-pull` sub-collector** (`collectors/argocd/link_pull.sh`): rather than the
+  docker-image auto-correlation (which would need the build to have run — i.e. the
+  collector-dependency feature we don't have yet), it reads the app→Application mapping
+  **predeclared in `catalog-info.yaml`** (`lunar.earthly.dev/gitops-component` +
+  `lunar.earthly.dev/argocd-application` annotations), `get-json`s that GitOps
+  component, and materializes the matching app(s) onto the service. Reading catalog-info
+  straight from the checkout keeps it dependency-free (no cataloger-ordering needed).
 - **Clean endgame → Flavor B (Strategy-3 SQL).** Zero materialization, the policy
   asserts directly against the GitOps component. Gated on confirming in-policy SQL
   access (an SDK helper or sanctioned egress) and on tolerating the SQL view's lag.
