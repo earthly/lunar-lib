@@ -85,8 +85,12 @@ fi
 WANT=$(jq -nc --arg a "$APPLICATIONS" \
     '($a | split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0)))')
 
+# Dedupe by name: the GitOps component's own .cd.gitops.applications can carry
+# duplicate entries (its parse step appends on each hub re-run — the same
+# append-not-idempotent behaviour link-push guards against), so collapse repeats
+# rather than copying 14 identical "rust-service" records onto the service.
 APPS=$(echo "$GITOPS_JSON" | jq -c --argjson want "$WANT" \
-    '[.cd.gitops.applications[]? | select(($want | length) == 0 or (.name as $n | $want | index($n)))]')
+    '[.cd.gitops.applications[]? | select(($want | length) == 0 or (.name as $n | $want | index($n)))] | unique_by(.name)')
 APP_COUNT=$(echo "$APPS" | jq 'length')
 if [ "$APP_COUNT" -eq 0 ]; then
     echo "link-pull: '$GITOPS_COMPONENT' carries no Application matching [${APPLICATIONS:-<all>}] — skipping." >&2
@@ -97,13 +101,13 @@ fi
 # the allow-list checks have their data), plus the matching raw native entries.
 PROJ_NAMES=$(echo "$APPS" | jq -c '[.[].project] | unique')
 PROJS=$(echo "$GITOPS_JSON" | jq -c --argjson names "$PROJ_NAMES" \
-    '[.cd.gitops.projects[]? | select(.name as $n | $names | index($n))]')
+    '[.cd.gitops.projects[]? | select(.name as $n | $names | index($n))] | unique_by(.name)')
 APP_PATHS=$(echo "$APPS" | jq -c '[.[].path]')
 NAPPS=$(echo "$GITOPS_JSON" | jq -c --argjson paths "$APP_PATHS" \
-    '[.cd.gitops.native.argocd.applications[]? | select(.path as $p | $paths | index($p))]')
+    '[.cd.gitops.native.argocd.applications[]? | select(.path as $p | $paths | index($p))] | unique_by(.path)')
 PROJ_PATHS=$(echo "$PROJS" | jq -c '[.[].path]')
 NPROJS=$(echo "$GITOPS_JSON" | jq -c --argjson paths "$PROJ_PATHS" \
-    '[.cd.gitops.native.argocd.projects[]? | select(.path as $p | $paths | index($p))]')
+    '[.cd.gitops.native.argocd.projects[]? | select(.path as $p | $paths | index($p))] | unique_by(.path)')
 
 # Materialize onto THIS (service) component — a normal in-band local collect, so
 # it lands on the sha being collected. Same two-call shape as the parse step.
