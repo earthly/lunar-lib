@@ -70,6 +70,8 @@ def app(
     self_heal=True,
     repo="https://github.com/org/gitops.git",
     namespace="payments",
+    dest_server="https://kubernetes.default.svc",
+    dest_name=None,
 ):
     """Build one `.cd.gitops.applications[]` record."""
     return {
@@ -79,7 +81,7 @@ def app(
         "kind": "Application",
         "project": project,
         "sync_policy": {"automated": automated, "prune": prune, "self_heal": self_heal},
-        "destination": {"namespace": namespace, "server": "https://kubernetes.default.svc"},
+        "destination": {"namespace": namespace, "server": dest_server, "name": dest_name},
         "source_ref": {"repoURL": repo, "path": name, "targetRevision": "HEAD"},
         "images": [f"registry.io/{name}"],
     }
@@ -143,15 +145,34 @@ class TestSourceRepoAllowlist(unittest.TestCase):
 
 
 class TestDestinationAllowlist(unittest.TestCase):
-    def test_allowed_namespace_passes(self):
+    def test_bare_namespace_allows_any_cluster(self):
+        # "payments" with no cluster prefix matches the namespace on any cluster.
         with policy_vars(allowed_destinations="payments,frontend"):
             node = Node.from_component_json(gitops_data())
             self.assertEqual(check_destination_allowlist(node).status, CheckStatus.PASS)
 
-    def test_cluster_qualified_entry_matches_namespace(self):
-        with policy_vars(allowed_destinations="prod-cluster/payments"):
+    def test_cluster_qualified_matches_server_url(self):
+        # Default app destination is the in-cluster server URL; pinning to it passes.
+        with policy_vars(allowed_destinations="https://kubernetes.default.svc/payments"):
             node = Node.from_component_json(gitops_data())
             self.assertEqual(check_destination_allowlist(node).status, CheckStatus.PASS)
+
+    def test_cluster_qualified_matches_registered_name(self):
+        # App destination uses a registered cluster name; pinning to it passes.
+        with policy_vars(allowed_destinations="prod-cluster/payments"):
+            node = Node.from_component_json(
+                gitops_data([app(dest_name="prod-cluster", dest_server=None)])
+            )
+            self.assertEqual(check_destination_allowlist(node).status, CheckStatus.PASS)
+
+    def test_cluster_qualified_wrong_cluster_fails(self):
+        # App is on the default svc cluster; pinning to a different cluster fails
+        # (this is the granularity the bare-namespace match used to silently drop).
+        with policy_vars(allowed_destinations="prod-cluster/payments"):
+            node = Node.from_component_json(gitops_data())
+            check = check_destination_allowlist(node)
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("not in the allow-list", check.failure_reasons[0])
 
     def test_disallowed_namespace_fails(self):
         with policy_vars(allowed_destinations="frontend"):

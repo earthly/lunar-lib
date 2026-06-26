@@ -19,9 +19,19 @@ def main(node=None):
                 "allow-list must contain at least one entry. Configure allowed "
                 "destinations or exclude the destination-allowlist check."
             )
-        # An entry may be "namespace" or "cluster/namespace" — accept the
-        # trailing namespace segment for matching.
-        allowed_ns = {e.split("/")[-1] for e in allowed}
+        # Each entry is "namespace" (allowed on any cluster) or
+        # "cluster/namespace" (pinned to one cluster). The cluster segment is
+        # matched against the ArgoCD destination's registered `name` OR its
+        # `server` URL — whichever the Application specifies (the two are
+        # mutually exclusive in argo). Split on the LAST slash so a server URL
+        # ("https://host/namespace") parses cleanly.
+        rules = []  # (cluster_or_None, namespace)
+        for e in allowed:
+            if "/" in e:
+                cluster, ns = e.rsplit("/", 1)
+                rules.append((cluster, ns))
+            else:
+                rules.append((None, e))
 
         apps = c.get_node(".cd.gitops.applications")
         if apps.exists():
@@ -31,9 +41,21 @@ def main(node=None):
                 ns = app.get_value_or_default(".destination.namespace", None)
                 if ns is None:
                     continue
+                dest_name = app.get_value_or_default(".destination.name", None)
+                dest_server = app.get_value_or_default(".destination.server", None)
+                allowed_here = any(
+                    ns == r_ns
+                    and (
+                        r_cluster is None
+                        or r_cluster == dest_name
+                        or r_cluster == dest_server
+                    )
+                    for r_cluster, r_ns in rules
+                )
+                where = dest_name or dest_server or "<any-cluster>"
                 c.assert_true(
-                    ns in allowed_ns or ns in allowed,
-                    f"{path}: Application '{name}' destination namespace '{ns}' is "
+                    allowed_here,
+                    f"{path}: Application '{name}' destination '{where}/{ns}' is "
                     f"not in the allow-list",
                 )
     return c

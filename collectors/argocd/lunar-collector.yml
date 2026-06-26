@@ -109,10 +109,6 @@ inputs:
     description: Direct override of the ArgoCD Application name(s) for link-pull, comma-separated (bypasses catalog-info). Empty uses the catalog-info annotation.
     default: ""
 
-secrets:
-  GH_TOKEN:
-    description: GitHub token used by link-push to resolve each source repo's default-branch HEAD sha (the out-of-band write target).
-
 example_component_json: |
   {
     "cd": {

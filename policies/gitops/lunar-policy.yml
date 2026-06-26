@@ -67,7 +67,7 @@ inputs:
     description: Comma-separated allow-list of permitted Application source repoURLs for source-repo-allowlist. Required when that check is enabled (errors if empty).
     default: ""
   allowed_destinations:
-    description: Comma-separated allow-list of permitted destination namespaces (or `cluster/namespace`) for destination-allowlist. Required when that check is enabled (errors if empty).
+    description: 'Comma-separated allow-list of permitted destinations for destination-allowlist. Each entry is `namespace` (allowed on any cluster) or `cluster/namespace` (pinned to one cluster — the cluster segment matches the Application destination''s registered name or its server URL). Required when that check is enabled (errors if empty).'
     default: ""
   expected_tag:
     description: For gitops-managed — only enforce coverage on components whose catalog tags (.catalog.entity.tags, e.g. from a Backstage catalog-info.yaml) include this value. Empty enforces on every component the policy targets (via on:).
