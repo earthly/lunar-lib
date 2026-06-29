@@ -282,54 +282,78 @@ unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
-## Two collectors: deployment correlation (central repo) + deployment readiness (app repos)
+## One `argocd` plugin: `parse` + two correlation sub-collectors
 
-**Per review (Vlad):** push and pull serve very different use-cases, so they are **two
-separate collectors on two different repos** — not two sub-collectors of one plugin —
-and named for the user *outcome*, not the "push/pull" implementation mental model.
+ArgoCD config can live **with the service** (the repo ships its own `Application`) or in
+a **separate central GitOps repo**. To make the `gitops`/`argocd` policies evaluate on
+the **service** either way, the `argocd` collector carries two correlation sub-collectors
+alongside `parse`. Both feed the **same** normalized `.cd.gitops` and the **same**
+policies — two correlation front-ends, not duplicated policy surface.
+
+**One plugin, gated by `include`/`exclude`** *(per review — Brandon)*. Lib collectors
+group by *technology* and let the user select sub-collectors per repo with
+`include`/`exclude`; that mechanism already covers "different repos run different
+sub-collectors," so this stays a single `argocd` plugin rather than two. The central
+GitOps repo includes `parse` + the push sub-collector; an app/service repo includes the
+pull one (+ `parse` if it ships local Argo files).
 
 The distinction (Vlad's framing — past vs future):
 
-- **Currently deployed (the "push").** A collector on the **central GitOps repo**
-  validates the ArgoCD config and correlates each `Application` to the **service it
-  deploys**, recording that deployed posture onto the service. It writes at the
-  service's *default-branch HEAD* (it must — the Hub drops a SHA it hasn't ingested,
-  Component 3 gotcha #2), so it only ever describes **post-merge main**. It **cannot**
-  gate a PR; it answers "what is deployed, and which source repo does it come from."
-- **Going to be deployed (the "pull").** A collector on each **app/service repo** reads
-  *its own* ArgoCD deployment posture from the GitOps component and materializes it onto
-  the service at the SHA being collected — **including a PR head SHA** — so the
-  `gitops`/`argocd` policies enforce "does this change fit the deployment requirements"
-  **at PR time**.
+- **Currently deployed (push).** Runs on the **central GitOps repo**: correlates each
+  `Application` to the **service it deploys** (image-match) and records that deployed
+  posture onto the service via out-of-band `CollectExternal`. It writes at the service's
+  *default-branch HEAD* (it must — the Hub drops a SHA it hasn't ingested, Component 3
+  gotcha #2), so it describes **post-merge main only**. It **cannot** gate a PR; it
+  answers "what is deployed, and which source repo built it."
+- **Going to be deployed (pull).** Runs on each **app/service repo**: `get-json`s this
+  service's `Application` from the GitOps component and materializes `.cd.gitops` onto
+  the service at the SHA being collected — **including a PR head SHA** — so the policies
+  enforce "does this change fit the deployment requirements" **at PR time**.
 
-### The two collectors
+### The two sub-collectors
 
-| Collector | Runs on | Job | Today's code |
+| Sub-collector | Runs on | Job | Today's code |
 | -- | -- | -- | -- |
-| **`argocd`** | the central **GitOps repo** | parse + kubeconform-validate the argoproj CRDs, correlate each `Application` to the service it deploys (image-match), record the deployed posture onto those services | `parse.sh` + `link_push.sh` |
-| **`argocd-deployment`** *(name pending review)* | each **app / service repo** | `get-json` this service's `Application` from the GitOps component and materialize `.cd.gitops` onto the service, so PR checks validate the upcoming deployment | `link_pull.sh` |
+| **`push-deployed-state`** | central **GitOps repo** | correlate each `Application` → the service it deploys, record the deployed posture onto that service (out-of-band) | `link_push.sh` |
+| **`pull-deployment-readiness`** | each **app / service repo** | `get-json` this service's `Application` from the GitOps component and self-write `.cd.gitops` at the collected SHA, so PR checks validate the upcoming deployment | `link_pull.sh` |
 
-Both feed the **same** normalized `.cd.gitops` and the **same** `gitops`/`argocd`
-policies — the split is two correlation front-ends on two repo classes, not duplicated
-policy surface.
+> **Naming — converging, pending Vlad.** Both reviewers agree the bare
+> `link-push`/`link-pull` names leak our implementation mental-model. Brandon's proposal
+> keeps `push`/`pull` as a *locational* prefix (it says where the sub-collector runs)
+> **paired with the outcome**: `push-deployed-state` / `pull-deployment-readiness`.
+> Vlad's earlier note wanted push/pull *out* of the user-facing name entirely — so the
+> prefix is his call to bless. Pure-outcome fallbacks if he'd rather drop it:
+> `deployed-state` / `deployment-readiness`.
 
-> **Names — proposed, pending Vlad/Brandon.** Lib collectors are named for the source
-> they read (`snyk`, `jira`), so the central one stays **`argocd`**. The app-side one is
-> proposed as **`argocd-deployment`**; purer-outcome alternatives if preferred:
-> `deployment-readiness` or `gitops-deployment` (tool-agnostic — it just reads
-> `.cd.gitops`). I'll do the file restructure once the name is blessed; renaming a
-> user-facing collector is a churn-once decision.
+### Don't enable both on the same service — pick one
+
+Both write `.cd.gitops.applications`. If a service is **both** push-targeted (by the
+GitOps repo) **and** runs pull, both land at the same `(component, sha)` and the Hub
+**concatenates** the two collection records (it appends, never upserts) → the same
+`Application` appears **twice**. Policy *verdicts* don't flip (identical entries → same
+pass/fail), but coverage **counts double** and the two entries can **transiently
+disagree** (push = currently-deployed, pull = declared-at-this-SHA). So the guidance is
+**one per service**: push for zero-config post-merge correlation/dashboards (no PR
+gate); pull for PR-time enforcement (costs a `catalog-info` mapping). The push
+skip-guard only dedupes push-vs-push, so it won't catch a push+pull overlap — a proper
+fix is platform-side (supersede external records instead of appending).
+
+> **Decision pending (Vlad).** (1) One plugin + `include`/`exclude` *(recommended —
+> matches lib convention)* vs two separate plugins *(Vlad's original ask)*; (2) keep the
+> `push`/`pull` prefix in the sub-collector names *(Brandon: yes, it's locational)* vs
+> pure-outcome names *(Vlad's earlier note)*. I rename structure + sub-collectors in one
+> pass once these land.
 
 ### Pull is a collector read, NOT an in-policy SQL query
 
 An earlier sketch had a "Strategy-3" variant where the **policy** queried the Lunar SQL
 API directly at eval time. **Dropped (per Vlad):** the platform assumes policies are
 fast and self-contained, and there's no supported in-policy SQL pattern yet. The pull
-collector does a normal `get-json` self-write; the policies read `.cd.gitops` unchanged
-and stay node-only. Revisit a policy-side read only if/when the platform grows a
-first-class pattern for it.
+sub-collector does a normal `get-json` self-write; the policies read `.cd.gitops`
+unchanged and stay node-only. Revisit a policy-side read only if/when the platform grows
+a first-class pattern for it.
 
-The pull collector avoids every `link-push` gotcha — no `CollectExternal`, no
+The pull sub-collector avoids every push-side gotcha — no `CollectExternal`, no
 SHA-targeting, no append/dup guard, no manifest-id shadow, no cross-component *write*
 permission. It's a self-write on the SHA being collected.
 
@@ -446,9 +470,10 @@ Policies (`argocd`, specific):
 
 ```
 collectors/argocd/
-  lunar-collector.yml      # parse (code) + link-push (code) sub-collectors
-  main.sh                  # parse + kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
-  link_push.sh             # resolve Application -> source component, out-of-band lunar collect --component/--sha
+  lunar-collector.yml      # parse + push-deployed-state + pull-deployment-readiness sub-collectors (all code hooks)
+  main.sh                  # parse: kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
+  link_push.sh             # push-deployed-state: resolve Application -> source component, out-of-band lunar collect --component/--sha
+  link_pull.sh             # pull-deployment-readiness: get-json this service's Application from the GitOps component, self-write .cd.gitops
   Earthfile                # custom image: kubeconform + argoproj CRD schemas
 policies/gitops/           # tool-agnostic (any GitOps tool); reads normalized .cd.gitops
   sync_policy.py

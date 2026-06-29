@@ -29,11 +29,12 @@ wrong costs you a day. Decide before you build:
 | **Can it gate a PR?** | **No** — pushed data sits on post-merge main, not the PR's head SHA | **Yes** — that's the whole point |
 | Cost | the five gotchas below (stdout hijack, SHA targeting, id-churn shadow, append/dup, self-ref) | a read perm + correlation resolved from the consumer side; **no writes** |
 
-**Rule of thumb: PR enforcement → pull; main-branch dashboards/scoring → push.** They're
-two separate collectors on two repo classes (see `.agents/plans/argocd-collector.md`
-§ "Two collectors"). Everything below in *this* doc is the **push** field guide — every
-gotcha is a push concern. (A policy-side SQL read was considered and dropped: policies
-stay fast and node-only.)
+**Rule of thumb: PR enforcement → pull; main-branch dashboards/scoring → push.** In the
+`argocd` collector they're two sub-collectors of one plugin, selected per repo with
+`include`/`exclude` (see `.agents/plans/argocd-collector.md` § "One `argocd` plugin").
+Everything below in *this* doc is the **push** field guide — every gotcha is a push
+concern. (A policy-side SQL read was considered and dropped: policies stay fast and
+node-only.)
 
 ---
 
