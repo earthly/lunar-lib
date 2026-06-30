@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   components whose `catalog-info.yaml` resolves to no domain via
   `domain_annotation`, `spec.domain`, or `spec.system`. Mirrors the existing
   `default_owner` fallback and never overrides a domain the file already
-  provides (#XXX).
+  provides (#223).
 
 ## [1.5.0] — 2026-06-17
 
