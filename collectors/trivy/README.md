@@ -36,8 +36,7 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Trivy executions in CI; routes image scans (`trivy image <ref>`) to `.container_scan` and filesystem scans (`trivy fs`) to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs |
-| `container-ci` | ci-after-command | Scans the image shipped by `docker push` in CI and writes `.container_scan` |
-| `container-rescan` | cron | Re-scans the most recently pushed image (read from `.containers.builds[]`) on a schedule and overwrites `.container_scan` |
+| `container-rescan` | cron | Scans the most recently shipped image (read from `.containers.builds[]`) in the Trivy collector image on a schedule and writes `.container_scan` |
 
 ## Installation
 
@@ -63,11 +62,10 @@ collectors:
     exclude: [rescan]
 ```
 
-**Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Three sub-collectors feed it, none of which require the (not-yet-shipped) collector-dependency feature:
+**Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Two sub-collectors feed it, neither of which requires the (not-yet-shipped) collector-dependency feature, and neither of which installs Trivy in your pipeline:
 
-- **`container-ci`** — fires on `docker push` in CI, scans the just-shipped image (already present in the CI Docker daemon; the reference comes straight from the push command), and writes `.container_scan`.
-- **`cicd`** — if your pipeline already runs `trivy image <ref>` itself, that scan is captured to `.container_scan` automatically. A `trivy fs` scan still routes to `.sca`.
-- **`container-rescan`** — a nightly cron that reads the most recently pushed image from `.containers.builds[]` (populated by the [`docker`](../docker) collector) via `lunar component get-json`, pulls it, and re-scans — surfacing CVEs published after the image shipped.
+- **`cicd`** *(detect)* — if your pipeline already runs `trivy image <ref>` itself, that scan is captured to `.container_scan` automatically. A `trivy fs` scan still routes to `.sca`. No install, no extra config.
+- **`container-rescan`** *(auto-scan)* — a daily cron that reads the most recently shipped image from `.containers.builds[]` (populated by the [`docker`](../docker) collector) via `lunar component get-json`, then pulls and scans it **in the Trivy collector image**. This is how Lunar scans the image *itself* — without installing Trivy in your CI — and it also re-evaluates a shipped image against CVEs published after it was built.
 
 Because the cron reads already-persisted Component JSON (not another collector's output mid-run), it needs no collector-dependency feature. Enable the `docker` collector alongside this one so `.containers.builds[]` is populated:
 
@@ -79,6 +77,8 @@ collectors:
     on: ["domain:your-domain"]
 ```
 
-**Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` secrets. The `container-ci` scan runs inside your CI where the image is already local, so it usually needs no extra credentials. Both modes download Trivy's vulnerability database at scan time (a modest download — lighter than image-baked scanners).
+> A synchronous **on-push** auto-scan (scan the image the moment it's built, and only if CI didn't already) needs the component-JSON dependency feature — it follows once that lands.
+
+**Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` secrets. Trivy's vulnerability database is a modest download at scan time.
 
 > **Note:** If you already use the `snyk` collector, the `trivy` collector will overwrite `.sca` data since both write to the same paths. Use one SCA scanner per component, not both.

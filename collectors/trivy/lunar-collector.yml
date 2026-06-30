@@ -69,22 +69,6 @@ collectors:
       clone-code: true
     keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
 
-  - name: container-ci
-    description: |
-      Scans the container image shipped from CI. Hooks `docker push`,
-      extracts the image reference from the command, runs `trivy image` on
-      that image (already present in the CI Docker daemon), and writes
-      normalized results to .container_scan. The image and its reference are
-      both in scope at this hook, so no cross-collector dependency is needed.
-    mainBash: container-ci.sh
-    hook:
-      type: ci-after-command
-      binary:
-        name: docker
-      args:
-        - value: push
-    keywords: ["trivy", "container scan", "image scan", "ci", "docker push", "cve"]
-
   - name: container-rescan
     description: |
       Re-scans the most recently shipped container image on a schedule. Reads
