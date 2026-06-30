@@ -133,6 +133,7 @@ run_scenario() {
     unset LUNAR_VAR_TAG_PREFIX LUNAR_VAR_INCLUDE_DERIVED_TAGS
     unset LUNAR_VAR_OWNER_FORMAT LUNAR_VAR_DEFAULT_OWNER
     unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH
+    unset LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_DEFAULT_DOMAIN
 
     local expected_domains_jq=""
     local kv
@@ -140,7 +141,7 @@ run_scenario() {
         if [[ "$kv" == EXPECTED_DOMAINS_JQ=* ]]; then
             expected_domains_jq="${kv#EXPECTED_DOMAINS_JQ=}"
         else
-            export "$kv"
+            export "${kv?}"
         fi
     done
 
@@ -150,7 +151,7 @@ run_scenario() {
     local log
     log=$("$SCRIPT_DIR/main.sh" 2>&1) || {
         echo "  main.sh exited non-zero — FAIL"
-        echo "$log" | sed 's/^/    /'
+        echo "    ${log//$'\n'/$'\n'    }"
         FAILED=$((FAILED + 1))
         return
     }
@@ -292,6 +293,24 @@ run_scenario "domain_annotation_fallback" "annotation_match" "github.com/acme/pa
     '.["github.com/acme/payment-api"].domain == "platform.payments"' \
     LUNAR_VAR_DOMAIN_ANNOTATION=pantalasa.org/domain \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: default_domain fills in when the file resolves no domain ────
+# no_owner has no spec.domain / spec.system / domain annotation, so the
+# domain would normally be omitted. default_domain supplies the fallback
+# and a matching empty domain stub is written for validateDomainRefs.
+run_scenario "default_domain_fallback" "no_owner" "github.com/acme/orphan" \
+    '.["github.com/acme/orphan"].domain == "unassigned"' \
+    LUNAR_VAR_DEFAULT_DOMAIN=unassigned \
+    'EXPECTED_DOMAINS_JQ=.["unassigned"] == {}'
+
+# ── Scenario: default_domain does NOT override a resolved domain ──────────
+# annotation_match has spec.domain=platform.payments; default_domain is a
+# last-resort fallback only, so the real domain wins and "unassigned" is
+# never written.
+run_scenario "default_domain_no_override" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].domain == "platform.payments"' \
+    LUNAR_VAR_DEFAULT_DOMAIN=unassigned \
+    'EXPECTED_DOMAINS_JQ=(.["platform.payments"] == {}) and (has("unassigned") | not)'
 
 # ── Skip scenarios (expect no write) ──────────────────────────────────────
 # No file at any configured path (404 from GitHub Contents API)

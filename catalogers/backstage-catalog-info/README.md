@@ -15,7 +15,7 @@ This cataloger writes to the following Catalog JSON paths on each run:
 | Path | Type | Description |
 |------|------|-------------|
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
-| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system` when neither is set |
+| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
 | `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
 
@@ -143,6 +143,21 @@ catalogers:
 ```
 
 When set and the matched Component has that annotation, its value wins over `spec.domain` / `spec.system`. When the annotation is absent on a given entity, the cataloger falls back to `spec.domain` then `spec.system` as usual. Leave `domain_annotation` empty (the default) to use only the canonical Backstage fields.
+
+### Default Domain
+
+Not every `catalog-info.yaml` sets a domain. When a matched Component resolves to no domain at all — no `domain_annotation` value, no `spec.domain`, and no `spec.system` — the cataloger leaves the component's `domain` unset by default. Set `default_domain` to assign a fallback instead:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    with:
+      default_domain: "unassigned"
+```
+
+The value is written verbatim, and a stub `.domains["<default_domain>"]` entry is written alongside it so the hub's domain validation accepts the reference (the same stub-write the cataloger does for any other domain). `default_domain` is purely a last-resort fallback — it never overrides a domain that the file already provides through any of the sources above. Leave it empty (the default) to keep domain-less components unset.
+
+This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a catch-all domain rather than leaving them blank.
 
 ### Owner Format
 

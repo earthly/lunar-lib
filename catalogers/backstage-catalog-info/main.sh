@@ -28,6 +28,7 @@
 #   include_derived_tags     (default true)
 #   owner_format             (default as-is) as-is | bare-name
 #   default_owner            (default empty)
+#   default_domain           (default empty → no domain when file has none)
 #
 # Secrets:
 #   GH_TOKEN — required, fetched as LUNAR_SECRET_GH_TOKEN
@@ -45,6 +46,7 @@ TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
 if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
     export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
@@ -62,6 +64,7 @@ echo "Component id prefix: $COMPONENT_ID_PREFIX"
 echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
+[ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
 
 # --- Parse component ID into owner/repo -----------------------------------
 # Only github.com/<owner>/<repo> IDs are supported. Anything else (gitlab,
@@ -71,7 +74,7 @@ if [[ "$COMPONENT_ID" != "${COMPONENT_ID_PREFIX}"* ]]; then
     echo "Component id '$COMPONENT_ID' does not start with prefix '$COMPONENT_ID_PREFIX' — skipping"
     exit 0
 fi
-SLUG="${COMPONENT_ID#$COMPONENT_ID_PREFIX}"
+SLUG="${COMPONENT_ID#"$COMPONENT_ID_PREFIX"}"
 if [[ "$SLUG" != */* ]]; then
     echo "Component id '$COMPONENT_ID' is not in '$COMPONENT_ID_PREFIX<owner>/<repo>' form — skipping"
     exit 0
@@ -123,7 +126,7 @@ if [ -z "$YAML" ]; then
     echo "No catalog-info.yaml at any of '$PATHS' in '$SLUG' — skipping"
     exit 0
 fi
-echo "Fetched $FOUND_PATH from $SLUG ($(echo "$YAML" | wc -c) bytes)"
+echo "Fetched $FOUND_PATH from $SLUG (${#YAML} bytes)"
 
 # --- Parse YAML (multi-document) ------------------------------------------
 # `yq ea '[.]' -o=json` collects all documents in a multi-doc file into a
@@ -182,6 +185,7 @@ ENTRY=$(echo "$ENTITY" | jq \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
     --arg domain_annotation "$DOMAIN_ANNOTATION" \
+    --arg default_domain "$DEFAULT_DOMAIN" \
     '
     def bare(s):
         if (s | type) != "string" or s == "" then s
@@ -203,6 +207,7 @@ ENTRY=$(echo "$ENTITY" | jq \
     | (if ($annotated_domain | length) > 0 then $annotated_domain
         elif ($raw_domain | length) > 0 then $raw_domain
         elif ($raw_system | length) > 0 then bare($raw_system)
+        elif ($default_domain | length) > 0 then $default_domain
         else "" end) as $domain
     | (.metadata.tags // []) as $base_tags
     | ($base_tags | map($tag_prefix + .)) as $prefixed
