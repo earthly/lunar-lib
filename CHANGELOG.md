@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `backstage-catalog-info` cataloger: new `default_domain` input — assigns a
+  fallback domain (written verbatim, with a matching stub `.domains` entry) to
+  components whose `catalog-info.yaml` resolves to no domain via
+  `domain_annotation`, `spec.domain`, or `spec.system`. Mirrors the existing
+  `default_owner` fallback and never overrides a domain the file already
+  provides (#223).
+
 ## [1.5.0] — 2026-06-17
 
 ### Added
