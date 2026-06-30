@@ -38,12 +38,16 @@ collectors:
     description: |
       Detects Trivy executions in CI pipelines. Captures the command,
       version, and input arguments for audit and compliance tracking.
+      Routes results by scan type: an image scan (`trivy image <ref>`) is
+      normalized to .container_scan, while a filesystem scan (`trivy fs`)
+      stays in .sca — so a container scan already running in your pipeline
+      is collected automatically with no extra configuration.
     mainBash: cicd.sh
     hook:
       type: ci-after-command
       binary:
         name: trivy
-    keywords: ["trivy", "ci", "cicd", "command detection", "audit"]
+    keywords: ["trivy", "ci", "cicd", "command detection", "audit", "container scan", "image scan"]
 
   - name: rescan
     description: |
@@ -64,6 +68,44 @@ collectors:
       schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC (>= 10-min collector floor)
       clone-code: true
     keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
+
+  - name: container-rescan
+    description: |
+      Re-scans the most recently shipped container image on a schedule. Resolves
+      the image from what the component actually pushed — the most recent
+      `docker push` (or `--push` build) in the docker collector's recorded
+      commands (.containers.native.docker.cicd.cmds[]), read via `lunar component
+      get-json`. That's already-persisted data, so no collector dependency is
+      required. Pulls the image, scans it with Trivy, and overwrites
+      .container_scan so a shipped image is re-evaluated against CVEs published
+      after it was built. Override with the `container_image` input. No code
+      clone needed.
+    mainBash: container-rescan.sh
+    # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
+    # the .sca `rescan` collector). Default-branch only — one re-scan per
+    # component per tick. Offset to 03:00 so it doesn't pile onto the .sca
+    # rescan at 02:00.
+    runs_on: [default-branch]
+    hook:
+      type: cron
+      schedule: "0 3 * * *"  # Human-readable: daily at 03:00 UTC (>= 10-min collector floor)
+      clone-code: false      # reads component JSON + pulls the image; no repo clone needed
+    keywords: ["trivy", "container scan", "image scan", "cron rescan", "cve", "vulnerability"]
+
+inputs:
+  container_image:
+    description: |
+      Override the image reference the container-rescan cron scans. By default
+      the cron derives the image from the component's most recent
+      .containers.builds[] entry (populated by the docker collector). Set this
+      to pin a specific image, e.g. "ghcr.io/acme/app:latest".
+    default: ""
+
+secrets:
+  REGISTRY_USERNAME:
+    description: Username for pulling private container images in the container-rescan cron. Optional — public images need no auth.
+  REGISTRY_PASSWORD:
+    description: Password or token for pulling private container images in the container-rescan cron. Optional.
 
 example_component_json: |
   {
@@ -130,6 +172,51 @@ example_component_json: |
                 ]
               }
             ]
+          }
+        }
+      }
+    },
+    "container_scan": {
+      "source": {
+        "tool": "trivy",
+        "version": "0.69.3",
+        "integration": "ci"
+      },
+      "image": "myregistry.io/app:v1.2.3",
+      "os": {
+        "family": "alpine",
+        "version": "3.19"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 1,
+        "medium": 4,
+        "low": 7,
+        "total": 12
+      },
+      "findings": [
+        {
+          "severity": "high",
+          "package": "libssl3",
+          "version": "3.1.4-r5",
+          "ecosystem": "alpine",
+          "cve": "CVE-2024-2511",
+          "title": "OpenSSL unbounded memory growth in TLSv1.3 session handling",
+          "fix_version": "3.1.4-r6",
+          "fixable": true
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true,
+        "all_fixable": true
+      },
+      "native": {
+        "trivy": {
+          "results": {
+            "SchemaVersion": 2,
+            "ArtifactName": "myregistry.io/app:v1.2.3",
+            "ArtifactType": "container_image"
           }
         }
       }
