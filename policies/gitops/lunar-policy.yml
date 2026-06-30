@@ -1,0 +1,74 @@
+version: 0
+
+name: gitops
+description: Tool-agnostic GitOps continuous-delivery policies (any GitOps tool)
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "GitOps Guardrails"
+  long_description: |
+    Tool-agnostic GitOps best practices over normalized .cd.gitops: automated
+    sync (prune + self-heal), source/destination allow-lists, and adoption
+    coverage to flag components that should be on GitOps but aren't. Works for
+    any GitOps collector (argocd today, flux later).
+  category: "deployment-and-infrastructure"
+  icon: "assets/gitops.svg"
+  status: "beta"
+  requires:
+    - slug: "argocd"
+      type: "collector"
+      reason: "Provides parsed, normalized GitOps configuration these policies evaluate"
+
+  related:
+    - slug: "argocd"
+      type: "policy"
+      reason: "ArgoCD-specific checks: argoproj CRD validation and AppProject hygiene"
+
+policies:
+  - name: sync-policy
+    description: |
+      Requires Applications to use an automated sync policy with prune and
+      self-heal enabled. Drift between Git and the cluster is corrected
+      automatically instead of accumulating silently.
+    mainPython: sync_policy.py
+    keywords: ["argocd", "sync policy", "automated sync", "prune", "self-heal", "drift"]
+
+  - name: source-repo-allowlist
+    description: |
+      Requires each Application's manifest source repository to be within a
+      configured allow-list of trusted repositories. Prevents deployments from
+      unreviewed or untrusted Git sources.
+    mainPython: source_repo_allowlist.py
+    keywords: ["argocd", "source repo", "allowlist", "supply chain", "trusted source"]
+
+  - name: destination-allowlist
+    description: |
+      Requires each Application's destination namespace and cluster to be
+      within a configured allow-list. Stops Applications from targeting
+      clusters or namespaces they should not deploy to.
+    mainPython: destination_allowlist.py
+    keywords: ["argocd", "destination", "namespace", "cluster", "allowlist"]
+
+  - name: gitops-managed
+    description: |
+      Coverage check: requires every component this policy targets (optionally
+      narrowed to a tag) to actually be deployed by an ArgoCD Application — i.e.
+      to have resolved .cd.gitops data, whether parsed locally or link-pushed
+      from a separate GitOps repo. Surfaces components that should be on GitOps
+      but haven't been migrated. Unlike the other checks, absence of GitOps data
+      is a failure here, not a skip — that's the whole point.
+    mainPython: gitops_managed.py
+    keywords: ["argocd", "gitops adoption", "coverage", "migration", "deployment visibility"]
+
+inputs:
+  allowed_source_repos:
+    description: Comma-separated allow-list of permitted Application source repoURLs for source-repo-allowlist. Required when that check is enabled (errors if empty).
+    default: ""
+  allowed_destinations:
+    description: 'Comma-separated allow-list of permitted destinations for destination-allowlist. Each entry is `namespace` (allowed on any cluster) or `cluster/namespace` (pinned to one cluster — the cluster segment matches the Application destination''s registered name or its server URL). Required when that check is enabled (errors if empty).'
+    default: ""
+  expected_tag:
+    description: For gitops-managed — only enforce coverage on components whose catalog tags (.catalog.entity.tags, e.g. from a Backstage catalog-info.yaml) include this value. Empty enforces on every component the policy targets (via on:).
+    default: ""
