@@ -152,12 +152,12 @@ Not every `catalog-info.yaml` sets a domain. When a matched Component resolves t
 catalogers:
   - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     with:
-      default_domain: "unassigned"
+      default_domain: "engineering"
 ```
 
 The value is written verbatim, and a stub `.domains["<default_domain>"]` entry is written alongside it so the hub's domain validation accepts the reference (the same stub-write the cataloger does for any other domain). `default_domain` is purely a last-resort fallback — it never overrides a domain that the file already provides through any of the sources above. Leave it empty (the default) to keep domain-less components unset.
 
-This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a catch-all domain rather than leaving them blank.
+This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a sensible default domain rather than leaving them blank.
 
 ### Owner Format
 
