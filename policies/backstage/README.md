@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture. These checks apply to repositories that use Backstage as their service catalog and must be paired with the `backstage` collector.
 
-**Behavior when no catalog file is present:** The core checks (`catalog-info-exists`, `catalog-info-valid`, `owner-set`, `lifecycle-set`, `system-set`) fail. A repository enabled for this policy is expected to be registered in Backstage, so a missing `catalog-info.yaml` is treated as a policy violation (not a skip). The two configurable checks (`required-annotations`, `required-tag-patterns`) are **opt-in**: they are skipped entirely until you configure them, and only then do they also fail on a missing file.
+The five core checks fail when no `catalog-info.yaml` is present — a repository enabled for this policy is expected to be registered in Backstage. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured; see [Examples](#examples) for their no-file behavior.
 
 ## Policies
 
@@ -21,6 +21,8 @@ This plugin provides the following policies (use `include` to select a subset):
 | `system-set` | Validates that `spec.system` is defined |
 | `required-annotations` | Validates that configured annotation keys are present (opt-in via the `required_annotations` input) |
 | `required-tag-patterns` | Validates that the component's tags match configured glob patterns (opt-in via the `required_tag_patterns` input) |
+| `disallowed-annotations` | Fails if any forbidden annotation key is present (opt-in via the `disallowed_annotations` input) |
+| `disallowed-tag-patterns` | Fails if any tag matches a forbidden glob pattern (opt-in via the `disallowed_tag_patterns` input) |
 
 ## Required Data
 
@@ -34,8 +36,8 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.spec.owner` | string | `backstage` collector |
 | `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector |
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
-| `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations`) |
-| `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns`) |
+| `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
+| `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
 
 **Note:** Ensure the `backstage` collector is configured before enabling this policy.
 
@@ -53,9 +55,11 @@ policies:
     with:
       required_annotations: "backstage.io/source-location"
       required_tag_patterns: "location/*,runs-on/*"
+      disallowed_annotations: "backstage.io/skip-checks"
+      disallowed_tag_patterns: "deprecated/*"
 ```
 
-`required_annotations` and `required_tag_patterns` are comma-separated lists. Leave them unset (the default) and the `required-annotations` / `required-tag-patterns` checks are skipped. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively; each pattern must be matched by at least one of the component's tags.
+All four inputs are comma-separated lists; leave them unset (the default) and the corresponding check is skipped. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
 
 ## Examples
 
@@ -112,7 +116,7 @@ policies:
 {}
 ```
 
-The `.catalog.native.backstage` namespace is simply absent. The five core checks fail; the two configurable checks fail only if you have configured them (otherwise they are skipped).
+The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All four are skipped if unconfigured.
 
 **Failure messages:**
 - `"No catalog-info.yaml found"`
@@ -121,9 +125,9 @@ The `.catalog.native.backstage` namespace is simply absent. The five core checks
 - `"Lifecycle stage (spec.lifecycle) is not set in catalog-info.yaml"`
 - `"System (spec.system) is not set in catalog-info.yaml"`
 
-### Configurable checks: required annotations and tag patterns
+### Configurable checks: required and disallowed annotations / tag patterns
 
-With `required_annotations: "backstage.io/source-location"` and `required_tag_patterns: "location/*,runs-on/*"` configured, this component **passes** both configurable checks:
+With `required_annotations: "backstage.io/source-location"`, `required_tag_patterns: "location/*,runs-on/*"`, `disallowed_annotations: "backstage.io/skip-checks"`, and `disallowed_tag_patterns: "deprecated/*"` configured, this component **passes** all four configurable checks:
 
 ```json
 {
@@ -140,7 +144,7 @@ With `required_annotations: "backstage.io/source-location"` and `required_tag_pa
 }
 ```
 
-Remove the `backstage.io/source-location` annotation and `required-annotations` fails: `"catalog-info.yaml is missing required annotation(s): backstage.io/source-location"`. Drop every `runs-on/*` tag and `required-tag-patterns` fails: `"catalog-info.yaml has no tag matching required pattern(s): runs-on/*"`.
+Remove the `backstage.io/source-location` annotation and `required-annotations` fails: `"catalog-info.yaml is missing required annotation(s): backstage.io/source-location"`. Drop every `runs-on/*` tag and `required-tag-patterns` fails: `"catalog-info.yaml has no tag matching required pattern(s): runs-on/*"`. Conversely, add a `backstage.io/skip-checks` annotation and `disallowed-annotations` fails; add a `deprecated/legacy` tag and `disallowed-tag-patterns` fails: `"catalog-info.yaml has tag(s) matching disallowed pattern(s): deprecated/* (deprecated/legacy)"`.
 
 ## Remediation
 

@@ -24,6 +24,8 @@ def load_policy(filename):
 
 check_required_annotations = load_policy("required-annotations")
 check_required_tag_patterns = load_policy("required-tag-patterns")
+check_disallowed_annotations = load_policy("disallowed-annotations")
+check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
 
 
 @contextmanager
@@ -161,6 +163,81 @@ class TestRequiredTagPatterns(unittest.TestCase):
             data = backstage_data()  # file present, no metadata.tags
             self.assertEqual(
                 check_required_tag_patterns(Node.from_component_json(data)).status,
+                CheckStatus.FAIL,
+            )
+
+
+class TestDisallowedAnnotations(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        data = backstage_data(annotations={"backstage.io/skip-checks": "true"})
+        self.assertTrue(is_skipped(check_disallowed_annotations(Node.from_component_json(data))))
+
+    def test_forbidden_key_present_fails_and_names_it(self):
+        with policy_vars(disallowed_annotations="backstage.io/skip-checks,internal.only"):
+            data = backstage_data(annotations={"backstage.io/skip-checks": "true", "team": "x"})
+            check = check_disallowed_annotations(Node.from_component_json(data))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("backstage.io/skip-checks", check.failure_reasons[0])
+            self.assertNotIn("internal.only", check.failure_reasons[0])
+
+    def test_no_forbidden_key_passes(self):
+        with policy_vars(disallowed_annotations="backstage.io/skip-checks"):
+            data = backstage_data(annotations={"backstage.io/source-location": "url:x"})
+            self.assertEqual(
+                check_disallowed_annotations(Node.from_component_json(data)).status,
+                CheckStatus.PASS,
+            )
+
+    def test_no_catalog_file_passes(self):
+        # Pure deny-check: nothing present means nothing forbidden, even post-run.
+        with policy_vars(disallowed_annotations="backstage.io/skip-checks"):
+            self.assertEqual(
+                check_disallowed_annotations(finished_node({})).status,
+                CheckStatus.PASS,
+            )
+
+    def test_empty_value_still_counts_as_present(self):
+        with policy_vars(disallowed_annotations="backstage.io/skip-checks"):
+            data = backstage_data(annotations={"backstage.io/skip-checks": ""})
+            self.assertEqual(
+                check_disallowed_annotations(Node.from_component_json(data)).status,
+                CheckStatus.FAIL,
+            )
+
+
+class TestDisallowedTagPatterns(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        data = backstage_data(tags=["deprecated/legacy"])
+        self.assertTrue(is_skipped(check_disallowed_tag_patterns(Node.from_component_json(data))))
+
+    def test_matching_tag_fails_and_names_pattern_and_tag(self):
+        with policy_vars(disallowed_tag_patterns="deprecated/*,internal-only"):
+            data = backstage_data(tags=["deprecated/legacy", "tier1"])
+            check = check_disallowed_tag_patterns(Node.from_component_json(data))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("deprecated/*", check.failure_reasons[0])
+            self.assertIn("deprecated/legacy", check.failure_reasons[0])
+
+    def test_no_matching_tag_passes(self):
+        with policy_vars(disallowed_tag_patterns="deprecated/*"):
+            data = backstage_data(tags=["location/us-east-1", "tier1"])
+            self.assertEqual(
+                check_disallowed_tag_patterns(Node.from_component_json(data)).status,
+                CheckStatus.PASS,
+            )
+
+    def test_no_catalog_file_passes(self):
+        with policy_vars(disallowed_tag_patterns="deprecated/*"):
+            self.assertEqual(
+                check_disallowed_tag_patterns(finished_node({})).status,
+                CheckStatus.PASS,
+            )
+
+    def test_matching_is_case_insensitive(self):
+        with policy_vars(disallowed_tag_patterns="Deprecated/*"):
+            data = backstage_data(tags=["deprecated/legacy"])
+            self.assertEqual(
+                check_disallowed_tag_patterns(Node.from_component_json(data)).status,
                 CheckStatus.FAIL,
             )
 
