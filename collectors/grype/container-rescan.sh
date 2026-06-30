@@ -17,25 +17,36 @@ echo "Running Grype container image scan" >&2
 IMAGE_REF="${LUNAR_INPUT_CONTAINER_IMAGE:-}"
 
 if [ -z "$IMAGE_REF" ]; then
-  # Derive from the component's persisted .containers.builds[] (docker collector).
-  # Pick the most recent build entry that carries an image; reconstruct
-  # image:tag when the image field has no tag of its own.
+  # Derive the image from what the component actually PUSHED, not just what it
+  # built. The docker collector records every CI docker command in
+  # .containers.native.docker.cicd.cmds[]; we take the most recent one that
+  # shipped an image — a `docker push <ref>`, or a build with `--push`
+  # (`docker build --push` / `docker buildx build --push -t <ref>`).
+  # .containers.builds[] is "what was built" (test/dry-run builds that never
+  # shipped land there too, and a push in a separate job isn't reflected), so
+  # it's the wrong source for "what shipped". (Per Fry review on #221.)
   COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
   if [ -n "$COMPONENT_JSON" ]; then
     IMAGE_REF=$(echo "$COMPONENT_JSON" | jq -r '
-      (.containers.builds // [])
-      | map(select(.image != null and .image != ""))
-      | last
-      | if . == null then ""
-        elif (.tag != null and .tag != "" and ((.image | contains(":")) | not))
-          then "\(.image):\(.tag)"
-        else .image end
+      def ref_if_pushed:
+        (split(" ") | map(select(. != ""))) as $t
+        | (($t[1:] | map(select(startswith("-") | not)) | first) // "") as $sub
+        | if $sub == "push"
+          then ((($t | index("push")) // -1) as $pi
+                | if $pi < 0 then "" else ($t[($pi+1):] | map(select(startswith("-") | not)) | first // "") end)
+          elif ($t | any(. == "--push"))
+          then ([ range(0; ($t | length)) as $i | select($t[$i] == "-t" or $t[$i] == "--tag") | $t[$i+1] ] | first // "")
+          else "" end;
+      (.containers.native.docker.cicd.cmds // [])
+      | map((.cmd // "") | ref_if_pushed)
+      | map(select(. != "" and . != null))
+      | last // ""
     ' 2>/dev/null || echo "")
   fi
 fi
 
 if [ -z "$IMAGE_REF" ] || [ "$IMAGE_REF" = "null" ]; then
-  echo "No container image to scan (no container_image input and no .containers.builds[] in component JSON) — skipping." >&2
+  echo "No pushed container image to scan (no container_image input and no 'docker push' / '--push' build in .containers.native.docker.cicd.cmds[]) — skipping." >&2
   exit 0
 fi
 

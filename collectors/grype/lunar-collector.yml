@@ -73,13 +73,16 @@ collectors:
 
   - name: container-rescan
     description: |
-      Re-scans the most recently shipped container image on a schedule. Reads
-      the image reference from the component's existing .containers.builds
-      data (via `lunar component get-json` — already-persisted data, so no
-      collector dependency is required), pulls the image, scans it with
-      Grype, and overwrites .container_scan so a shipped image is re-evaluated
-      against CVEs published after it was built. No code clone needed; runs in
-      the Grype collector image, so the baked-in vulnerability DB is reused.
+      Re-scans the most recently shipped container image on a schedule. Resolves
+      the image from what the component actually pushed — the most recent
+      `docker push` (or `--push` build) in the docker collector's recorded
+      commands (.containers.native.docker.cicd.cmds[]), read via `lunar component
+      get-json`. That's already-persisted data, so no collector dependency is
+      required. Pulls the image, scans it with Grype, and overwrites
+      .container_scan so a shipped image is re-evaluated against CVEs published
+      after it was built. Override with the `container_image` input. No code
+      clone needed; runs in the Grype collector image, so the baked-in
+      vulnerability DB is reused.
     mainBash: container-rescan.sh
     # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
     # the .sca `rescan` collector). Default-branch only — one re-scan per
