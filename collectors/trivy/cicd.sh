@@ -16,6 +16,17 @@ else
     CMD_STR="$CMD_RAW"
 fi
 
+# Route by Trivy subcommand (the first non-flag token after the binary).
+# `trivy image <ref>` is a container image scan (→ .container_scan); a
+# `trivy fs|filesystem|rootfs <path>` scan stays in .sca. Default to .sca to
+# preserve existing behavior for any other subcommand.
+TRIVY_SUBCMD=$(echo "$CMD_STR" | awk '{for (i=2; i<=NF; i++) if (substr($i,1,1) != "-") { print $i; exit }}')
+case "$TRIVY_SUBCMD" in
+    image)                CATEGORY=".container_scan" ;;
+    fs|filesystem|rootfs) CATEGORY=".sca" ;;
+    *)                    CATEGORY=".sca" ;;
+esac
+
 # Capture Trivy version using the exact traced binary
 TRIVY_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-trivy}"
 TRIVY_VERSION=$("$TRIVY_BIN" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "unknown")
@@ -25,13 +36,13 @@ CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Write cicd command entry (no jq required)
 echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$TRIVY_VERSION\"}]}" | \
-    lunar collect -j ".sca.native.trivy.cicd" -
+    lunar collect -j "${CATEGORY}.native.trivy.cicd" -
 
 # Write source metadata
-lunar collect ".sca.source.tool" "trivy"
-lunar collect ".sca.source.integration" "ci"
+lunar collect "${CATEGORY}.source.tool" "trivy"
+lunar collect "${CATEGORY}.source.integration" "ci"
 if [ -n "$TRIVY_VERSION" ] && [ "$TRIVY_VERSION" != "unknown" ]; then
-    lunar collect ".sca.source.version" "$TRIVY_VERSION"
+    lunar collect "${CATEGORY}.source.version" "$TRIVY_VERSION"
 fi
 
 # Capture raw scan output if Trivy wrote to a file we can find.
@@ -58,8 +69,8 @@ fi
 
 RAW_PATH=""
 case "$OUTPUT_FORMAT" in
-    json)  RAW_PATH=".sca.native.trivy.cicd.raw" ;;
-    sarif) RAW_PATH=".sca.native.trivy.cicd.sarif" ;;
+    json)  RAW_PATH="${CATEGORY}.native.trivy.cicd.raw" ;;
+    sarif) RAW_PATH="${CATEGORY}.native.trivy.cicd.sarif" ;;
 esac
 
 if [ -n "$RAW_PATH" ] && [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then
