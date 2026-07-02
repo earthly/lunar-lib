@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "empty string disables the prefix" behavior. Previously an empty value set in
   config was silently replaced with the `bs-` default — Bash `${VAR:-bs-}`
   treats empty and unset alike — so the prefix could not be turned off (#227).
+- `github-org` cataloger: same `tag_prefix` fix as #227 — an explicit empty
+  `tag_prefix` now disables the topic prefix instead of being silently replaced
+  with the `gh-` default (`${VAR:-gh-}` treats empty and unset alike). The input
+  is now documented as "empty string disables the prefix" (#228).
 
 ## [1.5.0] — 2026-06-17
 
