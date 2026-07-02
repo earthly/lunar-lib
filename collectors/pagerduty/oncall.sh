@@ -3,71 +3,41 @@ set -e
 
 # ---------------------------------------------------------------------------
 # Backstage discovery (opt-in). When the service ID isn't set via component
-# meta or the service_id input, and backstage_discovery is "true", fetch the
-# component's own catalog-info.yaml via the GitHub Contents API and read the
-# PagerDuty service ID straight off its annotations — no cataloger and no
-# LUNAR_COMPONENT_META required. Same GH-Contents-API + yq approach as the
-# backstage-catalog-info cataloger (the base image ships curl + yq, not gh).
+# meta or the service_id input, and backstage_discovery is "true", read the
+# PagerDuty service ID straight off the component's own catalog-info.yaml —
+# no cataloger and no LUNAR_COMPONENT_META required. The cron hook runs with
+# clone-code: true, so the component's repo is checked out at the working
+# directory and the file is read locally — no GitHub token needed.
 #
 # Echoes the discovered service ID on stdout (empty if none); all diagnostics
 # go to stderr so the caller can capture the value cleanly. Never fails the
 # collector — every miss is a skip-safe `return 0`.
 # ---------------------------------------------------------------------------
 discover_service_id_from_backstage() {
-  local paths annotations branch token comp slug yaml found http_code errf url p
+  local paths annotations yaml found p
   local -a path_arr
 
   paths="${LUNAR_VAR_BACKSTAGE_CATALOG_PATHS:-catalog-info.yaml,catalog-info.yml}"
   annotations="${LUNAR_VAR_BACKSTAGE_ANNOTATIONS:-pagerduty.com/service-id,pagerduty/service-id}"
-  branch="${LUNAR_VAR_BACKSTAGE_BRANCH:-}"
-  token="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
 
-  comp="${LUNAR_COMPONENT_ID:-}"
-  if [ -z "$comp" ]; then
-    echo "backstage_discovery: LUNAR_COMPONENT_ID not set — skipping" >&2
-    return 0
-  fi
-  # Only github.com/<owner>/<repo> component IDs are supported (GH-specific).
-  case "$comp" in
-    github.com/*/*) slug="${comp#github.com/}" ;;
-    *) echo "backstage_discovery: '$comp' is not github.com/<owner>/<repo> — skipping" >&2; return 0 ;;
-  esac
-  if [ -z "$token" ]; then
-    echo "backstage_discovery: no GH_TOKEN secret set — cannot fetch catalog-info.yaml, skipping" >&2
-    return 0
-  fi
-
-  errf="$(mktemp)"
   yaml=""
   found=""
   IFS=',' read -ra path_arr <<< "$paths"
   for p in "${path_arr[@]}"; do
     p="$(echo "$p" | xargs)"
     [ -z "$p" ] && continue
-    url="https://api.github.com/repos/$slug/contents/$p"
-    [ -n "$branch" ] && url="${url}?ref=${branch}"
-    http_code=$(curl -sS -o "$errf.body" -w '%{http_code}' \
-      -H "Authorization: Bearer $token" \
-      -H "Accept: application/vnd.github.raw" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      "$url" 2>"$errf" || echo "000")
-    if [ "$http_code" = "200" ]; then
-      yaml="$(cat "$errf.body")"
+    if [ -f "./$p" ]; then
+      yaml="$(cat "./$p")"
       found="$p"
-      rm -f "$errf.body"
       break
     fi
-    # 404 → absent at this path, try next. Other errors → log but still skip.
-    [ "$http_code" != "404" ] && echo "backstage_discovery: GH Contents API $http_code for $url" >&2
-    rm -f "$errf.body"
   done
-  rm -f "$errf"
 
   if [ -z "$yaml" ]; then
-    echo "backstage_discovery: no catalog-info.yaml at '$paths' in '$slug' — skipping" >&2
+    echo "backstage_discovery: no catalog-info.yaml at '$paths' in the checkout — skipping" >&2
     return 0
   fi
-  echo "backstage_discovery: fetched $found from $slug (${#yaml} bytes)" >&2
+  echo "backstage_discovery: read $found (${#yaml} bytes)" >&2
 
   # Parse (multi-document), collect non-empty values for the configured
   # annotation keys across all Component entities (keys tried in listed
@@ -81,7 +51,7 @@ discover_service_id_from_backstage() {
 }
 
 # Resolve the service ID: component meta first, then the explicit input, then
-# optional Backstage discovery from the repo's catalog-info.yaml.
+# optional Backstage discovery from the repo's checked-out catalog-info.yaml.
 SERVICE_ID=""
 if [ -n "${LUNAR_COMPONENT_META:-}" ]; then
   SERVICE_ID="$(echo "$LUNAR_COMPONENT_META" | jq -r '."pagerduty/service-id" // empty')"
@@ -93,7 +63,7 @@ fi
 
 if [ -z "$SERVICE_ID" ] && [ "${LUNAR_VAR_BACKSTAGE_DISCOVERY:-false}" = "true" ]; then
   SERVICE_ID="$(discover_service_id_from_backstage | tr -d '[:space:]')"
-  [ -n "$SERVICE_ID" ] && echo "backstage_discovery: resolved service-id '$SERVICE_ID' for ${LUNAR_COMPONENT_ID:-?} from catalog-info.yaml"
+  [ -n "$SERVICE_ID" ] && echo "backstage_discovery: resolved service-id '$SERVICE_ID' from catalog-info.yaml"
 fi
 
 if [ -z "$SERVICE_ID" ]; then

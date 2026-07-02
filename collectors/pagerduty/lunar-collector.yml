@@ -28,9 +28,9 @@ collectors:
       annotation (set by a cataloger via
       `lunar catalog component --meta pagerduty/service-id <id>`), then the
       explicit service_id input, then — when `backstage_discovery` is enabled
-      — the component's own `catalog-info.yaml` (fetched via the GitHub
-      Contents API), reading the service ID directly from a
-      `pagerduty.com/service-id` / `pagerduty/service-id` annotation.
+      — the component's own `catalog-info.yaml` (read from the checked-out
+      repo; the cron hook clones the code), reading the service ID directly
+      from a `pagerduty.com/service-id` / `pagerduty/service-id` annotation.
       Fetches service details, on-call schedule participants, and escalation
       policy. Writes normalized data to .oncall.service, .oncall.schedule,
       .oncall.escalation, and .oncall.summary. Stores the raw API response
@@ -39,7 +39,7 @@ collectors:
     hook:
       type: cron
       schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
-      clone-code: false
+      clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
 
 inputs:
@@ -55,11 +55,12 @@ inputs:
     description: >
       When "true", and no service ID is found via component meta or the
       service_id input, discover it from the component's own
-      catalog-info.yaml: the collector fetches the file from the component's
-      GitHub repo (Contents API) and reads the PagerDuty service ID from the
-      annotation keys listed in backstage_annotations. Opt-in; requires the
-      GH_TOKEN secret. Lets the oncall guardrails work off the standard
-      PagerDuty Backstage annotation without a cataloger or component meta.
+      catalog-info.yaml: the collector reads the file from the checked-out
+      repo (the cron hook clones the code) and takes the PagerDuty service ID
+      from the annotation keys listed in backstage_annotations. Opt-in, and
+      needs no extra secret — the runner's checkout is used, not a token.
+      Lets the oncall guardrails work off the standard PagerDuty Backstage
+      annotation without a cataloger or component meta.
     default: "false"
   backstage_annotations:
     description: >
@@ -71,23 +72,13 @@ inputs:
     default: "pagerduty.com/service-id,pagerduty/service-id"
   backstage_catalog_paths:
     description: >
-      Comma-separated catalog-info file paths to try in the component's repo
+      Comma-separated catalog-info file paths to try in the checked-out repo
       (first match wins). Only used when backstage_discovery is "true".
     default: "catalog-info.yaml,catalog-info.yml"
-  backstage_branch:
-    description: >
-      Git ref to read catalog-info.yaml from. Empty means the repo's default
-      branch. Only used when backstage_discovery is "true".
-    default: ""
 
 secrets:
   PAGERDUTY_API_KEY:
     description: PagerDuty REST API key (read-only token with service and oncall scopes)
-  GH_TOKEN:
-    description: >
-      GitHub token used to fetch catalog-info.yaml via the Contents API when
-      backstage_discovery is enabled (needs Contents: Read on the component
-      repos). Optional — only required for Backstage discovery.
 
 example_component_json: |
   {

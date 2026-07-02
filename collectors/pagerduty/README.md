@@ -51,7 +51,8 @@ collectors:
 
 Secrets:
 - `PAGERDUTY_API_KEY` — PagerDuty REST API key (read-only, with service and oncall scopes). Required.
-- `GH_TOKEN` — GitHub token with `Contents: Read` on the component repos. Optional; only needed when `backstage_discovery` is enabled (to fetch `catalog-info.yaml`).
+
+(No GitHub token is needed for `backstage_discovery` — the cron hook runs with `clone-code: true`, so the collector reads `catalog-info.yaml` from the runner's checkout.)
 
 ### Service ID discovery
 
@@ -59,7 +60,7 @@ The collector resolves the PagerDuty service ID in this order:
 
 1. **Catalog meta annotation** — reads `pagerduty/service-id` from the component's lunar catalog meta. Set via `lunar catalog component --meta pagerduty/service-id <id>`, typically invoked by a company-specific cataloger that knows which components map to which PagerDuty services. This is the recommended approach for orgs where each component has its own service.
 2. **Explicit `service_id` input** — set in `lunar-config.yml` for static org-wide configurations, or when importing the collector multiple times with different `on:` scopes (e.g. one import per domain, each with its own service ID).
-3. **Backstage discovery (opt-in)** — when `backstage_discovery: "true"`, the collector fetches the component's own `catalog-info.yaml` via the GitHub Contents API and reads the service ID directly from its annotations (`backstage_annotations`, default `pagerduty.com/service-id,pagerduty/service-id`). This lets the `oncall` guardrails work off the [standard PagerDuty Backstage annotation](https://support.pagerduty.com/main/docs/backstage-integration-guide) with no cataloger and no component meta — useful today, while component-meta support (`LUNAR_COMPONENT_META`) is still landing in the hub. Requires a `GH_TOKEN` secret; component IDs must be `github.com/<owner>/<repo>`.
+3. **Backstage discovery (opt-in)** — when `backstage_discovery: "true"`, the collector reads the component's own `catalog-info.yaml` from the checked-out repo (the cron hook runs with `clone-code: true`) and takes the service ID directly from its annotations (`backstage_annotations`, default `pagerduty.com/service-id,pagerduty/service-id`). This lets the `oncall` guardrails work off the [standard PagerDuty Backstage annotation](https://support.pagerduty.com/main/docs/backstage-integration-guide) with no cataloger and no component meta — useful today, while component-meta support (`LUNAR_COMPONENT_META`) is still landing in the hub. No GitHub token needed: it reads the runner's checkout, not the API.
 
    ```yaml
    collectors:
@@ -77,7 +78,6 @@ The collector resolves the PagerDuty service ID in this order:
 |-------|---------|-------------|
 | `service_id` | *(empty — falls back to catalog meta)* | PagerDuty service ID (e.g. `PXXXXXX`). Optional if `pagerduty/service-id` meta annotation is set. |
 | `pagerduty_base_url` | `https://api.pagerduty.com` | PagerDuty API base URL |
-| `backstage_discovery` | `"false"` | When `"true"`, discover the service ID from the component's `catalog-info.yaml` annotations if meta/`service_id` don't provide one. Requires the `GH_TOKEN` secret. |
+| `backstage_discovery` | `"false"` | When `"true"`, discover the service ID from the component's checked-out `catalog-info.yaml` annotations if meta/`service_id` don't provide one. No token needed (uses the runner's `clone-code` checkout). |
 | `backstage_annotations` | `pagerduty.com/service-id,pagerduty/service-id` | Comma-separated annotation keys to read the service ID from (first non-empty wins), tried in order. Only used when `backstage_discovery` is `"true"`. |
-| `backstage_catalog_paths` | `catalog-info.yaml,catalog-info.yml` | Comma-separated catalog-info file paths to try in the repo (first match wins). Only used when `backstage_discovery` is `"true"`. |
-| `backstage_branch` | *(empty — default branch)* | Git ref to read `catalog-info.yaml` from. Only used when `backstage_discovery` is `"true"`. |
+| `backstage_catalog_paths` | `catalog-info.yaml,catalog-info.yml` | Comma-separated catalog-info file paths to try in the checked-out repo (first match wins). Only used when `backstage_discovery` is `"true"`. |
