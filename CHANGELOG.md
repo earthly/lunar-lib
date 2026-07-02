@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tag_prefix` now disables tag prefixing entirely, honoring the documented
   "empty string disables the prefix" behavior. Previously an empty value set in
   config was silently replaced with the `bs-` default — Bash `${VAR:-bs-}`
-  treats empty and unset alike — so the prefix could not be turned off (#NNN).
+  treats empty and unset alike — so the prefix could not be turned off (#227).
 
 ## [1.5.0] — 2026-06-17
 
