@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `default_owner` fallback and never overrides a domain the file already
   provides (#223).
 
+### Fixed
+
+- `github-org` cataloger: authenticate GitHub Enterprise Server hosts with
+  `LUNAR_SECRET_GH_ENTERPRISE_TOKEN` (falling back to `LUNAR_SECRET_GH_TOKEN`)
+  instead of always using `LUNAR_SECRET_GH_TOKEN`. Previously a distinct
+  enterprise token set via `LUNAR_SECRET_GH_ENTERPRISE_TOKEN` was ignored and
+  the github.com token was reused for GHE hosts. github.com behavior is
+  unchanged (#226).
+
 ## [1.5.0] — 2026-06-17
 
 ### Added
