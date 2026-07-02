@@ -262,6 +262,16 @@ run_scenario "no_derived_tags" "annotation_match" "github.com/acme/payment-api" 
     LUNAR_VAR_INCLUDE_DERIVED_TAGS=false \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
+# ── Scenario: tag_prefix="" disables prefixing entirely ───────────────────
+# An explicit empty tag_prefix must pass through un-prefixed, per the
+# documented "empty string disables the prefix" contract. Regression guard:
+# the old `${LUNAR_VAR_TAG_PREFIX:-bs-}` clobbered a config-supplied empty
+# value back to "bs-", so this scenario failed (tags came out "bs-*").
+run_scenario "tag_prefix_disabled" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"] | (.tags | sort) == (["payments","tier1","type-service","lifecycle-production"] | sort)' \
+    LUNAR_VAR_TAG_PREFIX= \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
 # ── Scenario: multi-Component file, one entity matches our ID ─────────────
 # System "payments-platform" in the file doesn't match the domain name
 # "platform.payments", so the stub stays empty.

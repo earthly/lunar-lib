@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `default_owner` fallback and never overrides a domain the file already
   provides (#223).
 
+### Fixed
+
+- `backstage-catalog-info` and `backstage` catalogers: an explicit empty
+  `tag_prefix` now disables tag prefixing entirely, honoring the documented
+  "empty string disables the prefix" behavior. Previously an empty value set in
+  config was silently replaced with the `bs-` default — Bash `${VAR:-bs-}`
+  treats empty and unset alike — so the prefix could not be turned off (#NNN).
+
 ## [1.5.0] — 2026-06-17
 
 ### Added
