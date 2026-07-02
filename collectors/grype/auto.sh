@@ -7,17 +7,19 @@ echo "Running Grype vulnerability scan" >&2
 # known CVEs. `dir:.` catalogs packages across all supported ecosystems in one
 # pass.
 #
-# DB source is controlled by the `db_auto_update` input (default true):
-#   - true (default): download the current DB at scan time so the scan sees CVEs
-#     published since the image was built. Grype's DB decompresses to ~1.7GB, so
-#     the auto/rescan collectors declare `size: large` to give the container the
+# DB source is controlled by the `db_auto_update` input (default false):
+#   - false (default): scan against the DB pre-baked into the image (see
+#     Earthfile), queried on-disk via SQLite — lighter, but only as fresh as the
+#     image build. VALIDATE_AGE is off so a slightly-older image's DB isn't
+#     rejected.
+#   - true: download the current DB at scan time so the scan sees CVEs published
+#     since the image was built. Grype's DB decompresses to ~1.7GB, so the
+#     auto/rescan collectors declare `size: large` to give the container the
 #     memory + ephemeral storage the runtime DB needs. Without that headroom the
-#     download OOM-kills the collector (exit 137), which is why this requires a
-#     Hub that honors collector size (ENG-983).
-#   - false: scan against the DB pre-baked into the image (see Earthfile),
-#     queried on-disk via SQLite — lighter, but only as fresh as the image
-#     build. VALIDATE_AGE is off so a slightly-older image's DB isn't rejected.
-if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-true}" = "true" ]; then
+#     download OOM-kills the collector (exit 137), so this requires a Hub that
+#     honors collector size (ENG-983) — kept default-off until size-aware Hub
+#     builds ship everywhere; flip back to true then.
+if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-false}" = "true" ]; then
   export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
   # GRYPE_DB_AUTO_UPDATE defaults true → fresh DB each scan
 else

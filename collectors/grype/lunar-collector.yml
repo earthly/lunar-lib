@@ -29,10 +29,12 @@ collectors:
       using Grype. Writes normalized findings to .sca with severity counts,
       CVE IDs, affected packages, and fix versions.
     mainBash: auto.sh
-    # Grype materializes a ~1.7GB vulnerability DB when db_auto_update is on
-    # (the default). large gives the container the memory + ephemeral-storage
-    # headroom that update needs; at the default profile the DB download
-    # OOM-kills the scan (exit 137). Requires a Hub that honors size (ENG-983).
+    # Grype materializes a ~1.7GB vulnerability DB when db_auto_update is enabled
+    # (opt-in; default off until size-aware Hub builds ship). large gives the
+    # container the memory + ephemeral-storage headroom that update needs; at the
+    # default profile the DB download OOM-kills the scan (exit 137). Kept here so
+    # re-enabling db_auto_update is a one-flag flip. Requires a Hub honoring size
+    # (ENG-983).
     size: large
     hook:
       type: code
@@ -77,12 +79,14 @@ inputs:
   db_auto_update:
     description: |
       Download the latest Grype vulnerability database at scan time so scans pick
-      up CVEs published since the collector image was built. Enabled by default:
-      the auto and rescan collectors declare size: large, giving the container
-      the memory + ephemeral-storage headroom the runtime DB (it decompresses to
-      ~1.7GB) needs. Set to "false" to scan against the lighter image-baked DB
-      instead — its freshness is then tied to the image rebuild cadence.
-    default: "true"
+      up CVEs published since the collector image was built. Disabled by default
+      for now: enabling it fetches a runtime DB that decompresses to ~1.7GB, which
+      needs the size: large profile the auto/rescan collectors declare — and that
+      only helps on a Hub that honors size (ENG-983), so it's kept off until
+      size-aware Hub builds ship everywhere. Set to "true" on a size-aware Hub to
+      scan the fresh DB; left "false" it scans the lighter image-baked DB, whose
+      freshness tracks the image rebuild cadence.
+    default: "false"
 
 example_component_json: |
   {
