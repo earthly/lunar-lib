@@ -23,11 +23,14 @@ landing_page:
 collectors:
   - name: oncall
     description: |
-      Queries the PagerDuty REST API for the component's service. Discovers
-      the service ID from the component's `pagerduty/service-id` meta
-      annotation (typically set by a company-specific cataloger via
-      `lunar catalog component --meta pagerduty/service-id <id>`), or falls
-      back to the explicit service_id input for static org-wide cases.
+      Queries the PagerDuty REST API for the component's service. Resolves
+      the service ID in order: the component's `pagerduty/service-id` meta
+      annotation (set by a cataloger via
+      `lunar catalog component --meta pagerduty/service-id <id>`), then the
+      explicit service_id input, then — when `backstage_discovery` is enabled
+      — the component's own `catalog-info.yaml` (fetched via the GitHub
+      Contents API), reading the service ID directly from a
+      `pagerduty.com/service-id` / `pagerduty/service-id` annotation.
       Fetches service details, on-call schedule participants, and escalation
       policy. Writes normalized data to .oncall.service, .oncall.schedule,
       .oncall.escalation, and .oncall.summary. Stores the raw API response
@@ -48,10 +51,43 @@ inputs:
   pagerduty_base_url:
     description: PagerDuty API base URL
     default: "https://api.pagerduty.com"
+  backstage_discovery:
+    description: >
+      When "true", and no service ID is found via component meta or the
+      service_id input, discover it from the component's own
+      catalog-info.yaml: the collector fetches the file from the component's
+      GitHub repo (Contents API) and reads the PagerDuty service ID from the
+      annotation keys listed in backstage_annotations. Opt-in; requires the
+      GH_TOKEN secret. Lets the oncall guardrails work off the standard
+      PagerDuty Backstage annotation without a cataloger or component meta.
+    default: "false"
+  backstage_annotations:
+    description: >
+      Comma-separated annotation keys to read the service ID from, tried in
+      order (first non-empty value across the file's Component entities wins).
+      Defaults to both conventional spellings — PagerDuty's Backstage
+      integration guide uses `pagerduty.com/service-id`; Lunar's meta uses
+      `pagerduty/service-id`. Only used when backstage_discovery is "true".
+    default: "pagerduty.com/service-id,pagerduty/service-id"
+  backstage_catalog_paths:
+    description: >
+      Comma-separated catalog-info file paths to try in the component's repo
+      (first match wins). Only used when backstage_discovery is "true".
+    default: "catalog-info.yaml,catalog-info.yml"
+  backstage_branch:
+    description: >
+      Git ref to read catalog-info.yaml from. Empty means the repo's default
+      branch. Only used when backstage_discovery is "true".
+    default: ""
 
 secrets:
   PAGERDUTY_API_KEY:
     description: PagerDuty REST API key (read-only token with service and oncall scopes)
+  GH_TOKEN:
+    description: >
+      GitHub token used to fetch catalog-info.yaml via the Contents API when
+      backstage_discovery is enabled (needs Contents: Read on the component
+      repos). Optional — only required for Backstage discovery.
 
 example_component_json: |
   {
