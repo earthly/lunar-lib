@@ -38,7 +38,12 @@ INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_REPOS="${LUNAR_VAR_INCLUDE_REPOS:-}"
 EXCLUDE_REPOS="${LUNAR_VAR_EXCLUDE_REPOS:-}"
-TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-gh-}"
+# `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+# prefixing (documented behavior). The hub always sets LUNAR_VAR_TAG_PREFIX —
+# to the manifest default `gh-` when unset in config, or to the user's value
+# (including "") when set — so `-gh-` only fires for a truly-unset var (direct
+# local invocation), not for a config-supplied empty string.
+TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 

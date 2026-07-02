@@ -100,7 +100,9 @@ inputs:
     default: ""
 
   tag_prefix:
-    description: Prefix for GitHub topics when converting to Lunar tags
+    description: |
+      Prefix for GitHub topics when converting to Lunar tags. Empty
+      string disables the prefix.
     default: "gh-"
 
   default_owner:
