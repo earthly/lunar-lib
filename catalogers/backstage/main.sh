@@ -32,7 +32,12 @@ ENTITY_KINDS="${LUNAR_VAR_ENTITY_KINDS:-Component,Domain}"
 NAMESPACE="${LUNAR_VAR_NAMESPACE:-default}"
 COMPONENT_ID_ANNOTATION="${LUNAR_VAR_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
-TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
+# `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+# prefixing (documented behavior). The hub always sets LUNAR_VAR_TAG_PREFIX —
+# to the manifest default `bs-` when unset in config, or to the user's value
+# (including "") when set — so `-bs-` only fires for a truly-unset var (direct
+# local invocation), not for a config-supplied empty string.
+TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
@@ -85,7 +90,7 @@ fetch_page() {
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF
-    while [ $attempt -le $MAX_RETRIES ]; do
+    while [ "$attempt" -le "$MAX_RETRIES" ]; do
         local response_file
         response_file=$(mktemp)
         local http_status
