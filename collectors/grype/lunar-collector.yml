@@ -108,7 +108,7 @@ inputs:
       the cron derives the image from the component's most recent
       .containers.builds[] entry (populated by the docker collector). Set this
       to pin a specific image, e.g. "ghcr.io/acme/app:latest".
-    default: ""
+    default: "alpine:3.14"  # TEMP for cronos testing (PR #221) — REVERT to "" before merge
 
 secrets:
   REGISTRY_USERNAME:
