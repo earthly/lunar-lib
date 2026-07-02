@@ -112,7 +112,8 @@ reset_env() {
     unset LUNAR_VAR_COMPONENT_ID_ANNOTATION LUNAR_VAR_COMPONENT_ID_PREFIX
     unset LUNAR_VAR_TAG_PREFIX LUNAR_VAR_INCLUDE_DERIVED_TAGS
     unset LUNAR_VAR_OWNER_FORMAT LUNAR_VAR_DEFAULT_OWNER
-    unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH LUNAR_VAR_DOMAIN_ANNOTATION
+    unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH
+    unset LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_DEFAULT_DOMAIN
 }
 
 # check_output <label> <expected_jq> <expected_domains_jq>
@@ -292,6 +293,16 @@ run_scenario "no_derived_tags" "annotation_match" "github.com/acme/payment-api" 
     LUNAR_VAR_INCLUDE_DERIVED_TAGS=false \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
+# ── Scenario: tag_prefix="" disables prefixing entirely ───────────────────
+# An explicit empty tag_prefix must pass through un-prefixed, per the
+# documented "empty string disables the prefix" contract. Regression guard:
+# the old `${LUNAR_VAR_TAG_PREFIX:-bs-}` clobbered a config-supplied empty
+# value back to "bs-", so this scenario failed (tags came out "bs-*").
+run_scenario "tag_prefix_disabled" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"] | (.tags | sort) == (["payments","tier1","type-service","lifecycle-production"] | sort)' \
+    LUNAR_VAR_TAG_PREFIX= \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
 # ── Scenario: multi-Component file, one entity matches our ID ─────────────
 # System "payments-platform" in the file doesn't match the domain name
 # "platform.payments", so the stub stays empty.
@@ -323,6 +334,24 @@ run_scenario "domain_annotation_fallback" "annotation_match" "github.com/acme/pa
     '.["github.com/acme/payment-api"].domain == "platform.payments"' \
     LUNAR_VAR_DOMAIN_ANNOTATION=pantalasa.org/domain \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: default_domain fills in when the file resolves no domain ────
+# no_owner has no spec.domain / spec.system / domain annotation, so the
+# domain would normally be omitted. default_domain supplies the fallback
+# and a matching empty domain stub is written for validateDomainRefs.
+run_scenario "default_domain_fallback" "no_owner" "github.com/acme/orphan" \
+    '.["github.com/acme/orphan"].domain == "unassigned"' \
+    LUNAR_VAR_DEFAULT_DOMAIN=unassigned \
+    'EXPECTED_DOMAINS_JQ=.["unassigned"] == {}'
+
+# ── Scenario: default_domain does NOT override a resolved domain ──────────
+# annotation_match has spec.domain=platform.payments; default_domain is a
+# last-resort fallback only, so the real domain wins and "unassigned" is
+# never written.
+run_scenario "default_domain_no_override" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].domain == "platform.payments"' \
+    LUNAR_VAR_DEFAULT_DOMAIN=unassigned \
+    'EXPECTED_DOMAINS_JQ=(.["platform.payments"] == {}) and (has("unassigned") | not)'
 
 # ── Skip scenarios (expect no write) ──────────────────────────────────────
 # No file at any configured path (404 from GitHub Contents API / absent in checkout)

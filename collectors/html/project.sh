@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_html_project; then
@@ -19,6 +20,7 @@ if [[ "$html_count" -gt 0 ]]; then
     jq -n \
         --argjson file_count "$html_count" \
         '{
+            project_exists: true,
             file_count: $file_count,
             source: { tool: "html", integration: "code" }
         }' | lunar collect -j ".lang.html" -
@@ -29,6 +31,7 @@ if [[ "$css_count" -gt 0 ]]; then
     jq -n \
         --argjson file_count "$css_count" \
         '{
+            project_exists: true,
             file_count: $file_count,
             source: { tool: "html", integration: "code" }
         }' | lunar collect -j ".lang.css" -
@@ -39,6 +42,7 @@ if [[ "$scss_count" -gt 0 ]]; then
     jq -n \
         --argjson file_count "$scss_count" \
         '{
+            project_exists: true,
             file_count: $file_count,
             source: { tool: "html", integration: "code" }
         }' | lunar collect -j ".lang.scss" -
@@ -49,6 +53,7 @@ if [[ "$less_count" -gt 0 ]]; then
     jq -n \
         --argjson file_count "$less_count" \
         '{
+            project_exists: true,
             file_count: $file_count,
             source: { tool: "html", integration: "code" }
         }' | lunar collect -j ".lang.less" -

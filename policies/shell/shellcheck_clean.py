@@ -20,6 +20,9 @@ def shellcheck_clean(max_warnings=None, min_severity=None, node=None):
         shell = c.get_node(".lang.shell")
         if not shell.exists():
             c.skip("No shell scripts detected")
+        project_exists_node = shell.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No shell project detected in this component")
 
         lint_node = shell.get_node(".lint")
         if not lint_node.exists():

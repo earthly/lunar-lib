@@ -4,7 +4,7 @@ Syncs components and domains from a Backstage software catalog into Lunar.
 
 ## Overview
 
-This cataloger reads entities from a [Backstage](https://backstage.io) instance via its REST API (`/api/catalog/entities`) and writes them into Lunar. Component entities populate `.components` (with owner, domain, tags); Domain entities populate `.domains` (description, owner). Use this when you run a Backstage instance and want Lunar to inherit its ownership/domain/tag metadata. Pair with [`backstage-catalog-info`](../backstage-catalog-info) for per-repo `catalog-info.yaml` augmentation (component-cron, layerable). The per-repo [`backstage` collector](../../collectors/backstage) is a different shape entirely — it writes `.catalog.native.backstage` during local / CI Lunar runs.
+This cataloger reads entities from a [Backstage](https://backstage.io) instance via its REST API (`/api/catalog/entities`) and writes them into Lunar. Component entities populate `.components` (with owner, domain, tags); Domain entities populate `.domains` (description, owner). Use this when you run a Backstage instance and want Lunar to inherit its ownership/domain/tag metadata. Pair with the separate [`backstage-catalog-info`](../backstage-catalog-info) cataloger for per-repo `catalog-info.yaml` augmentation (component-cron, layerable). The per-repo [`backstage` collector](../../collectors/backstage) is a different shape entirely — it writes `.catalog.native.backstage` during local / CI Lunar runs.
 
 ## Synced Data
 

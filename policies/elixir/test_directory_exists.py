@@ -12,6 +12,9 @@ def check_test_directory_exists(node=None):
         elixir = c.get_node(".lang.elixir")
         if not elixir.exists():
             c.skip("Not an Elixir project")
+        project_exists_node = elixir.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Elixir project detected in this component")
 
         test_dir_node = elixir.get_node(".test_directory_exists")
         has_test_dir = test_dir_node.get_value() if test_dir_node.exists() else False

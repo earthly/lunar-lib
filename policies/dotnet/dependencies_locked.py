@@ -8,6 +8,9 @@ def check_dependencies_locked(node=None):
         dotnet = c.get_node(".lang.dotnet")
         if not dotnet.exists():
             c.skip("Not a .NET project")
+        project_exists_node = dotnet.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No .NET project detected in this component")
 
         packages_lock_node = dotnet.get_node(".packages_lock_exists")
         if not packages_lock_node.exists() or not packages_lock_node.get_value():

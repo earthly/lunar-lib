@@ -25,6 +25,9 @@ def check_credo_or_dialyzer_configured(node=None):
         elixir = c.get_node(".lang.elixir")
         if not elixir.exists():
             c.skip("Not an Elixir project")
+        project_exists_node = elixir.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Elixir project detected in this component")
 
         credo_node = elixir.get_node(".credo_configured")
         dialyzer_node = elixir.get_node(".dialyzer_configured")

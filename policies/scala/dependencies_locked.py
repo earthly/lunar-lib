@@ -12,6 +12,9 @@ def check_dependencies_locked(node=None):
         scala = c.get_node(".lang.scala")
         if not scala.exists():
             c.skip("Not a Scala project")
+        project_exists_node = scala.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Scala project detected in this component")
 
         lock_node = scala.get_node(".lockfile_exists")
         has_lock = lock_node.get_value() if lock_node.exists() else False

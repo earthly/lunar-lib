@@ -11,6 +11,9 @@ def check_min_sbt_version(min_version=None, node=None):
         scala = c.get_node(".lang.scala")
         if not scala.exists():
             c.skip("Not a Scala project")
+        project_exists_node = scala.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Scala project detected in this component")
 
         sbt_exists_node = scala.get_node(".build_sbt_exists")
         uses_sbt = sbt_exists_node.get_value() if sbt_exists_node.exists() else False

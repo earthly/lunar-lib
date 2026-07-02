@@ -39,10 +39,16 @@ augment_component() {
     local COMPONENT_ID_ANNOTATION="${LUNAR_VAR_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
     local COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
     local DOMAIN_ANNOTATION="${LUNAR_VAR_DOMAIN_ANNOTATION:-}"
-    local TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
+    # `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+    # prefixing (documented behavior). The hub always sets LUNAR_VAR_TAG_PREFIX —
+    # to the manifest default `bs-` when unset in config, or to the user's value
+    # (including "") when set — so `-bs-` only fires for a truly-unset var (direct
+    # local invocation), not for a config-supplied empty string.
+    local TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-bs-}"
     local INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
     local OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
     local DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+    local DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
     echo "Annotation key: $COMPONENT_ID_ANNOTATION"
     echo "Component id prefix: $COMPONENT_ID_PREFIX"
@@ -50,6 +56,7 @@ augment_component() {
     echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
     echo "Owner format: $OWNER_FORMAT"
     [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
+    [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
 
     # --- Parse YAML (multi-document) ------------------------------------------
     # `yq ea '[.]' -o=json` collects all documents in a multi-doc file into a
@@ -112,6 +119,7 @@ augment_component() {
         --arg owner_format "$OWNER_FORMAT" \
         --arg default_owner "$DEFAULT_OWNER" \
         --arg domain_annotation "$DOMAIN_ANNOTATION" \
+        --arg default_domain "$DEFAULT_DOMAIN" \
         '
         def bare(s):
             if (s | type) != "string" or s == "" then s
@@ -133,6 +141,7 @@ augment_component() {
         | (if ($annotated_domain | length) > 0 then $annotated_domain
             elif ($raw_domain | length) > 0 then $raw_domain
             elif ($raw_system | length) > 0 then bare($raw_system)
+            elif ($default_domain | length) > 0 then $default_domain
             else "" end) as $domain
         | (.metadata.tags // []) as $base_tags
         | ($base_tags | map($tag_prefix + .)) as $prefixed

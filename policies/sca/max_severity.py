@@ -1,11 +1,12 @@
 """Ensure no findings at or above the configured severity threshold.
 
-When findings cross the threshold the check fails as usual. Additionally, if an
-`alert_url` input is configured, a best-effort webhook is POSTed describing the
-findings (payload schema in webhook.py). Delivery is fire-and-forget with a
-short timeout: a slow or unreachable endpoint never changes the check result —
-a failing check stays FAILED, it does not become an ERROR. Leave `alert_url`
-unset (the default) to disable alerting.
+When findings cross the threshold the check fails, listing the offending
+packages/CVEs in the failure message (when the collector emitted per-finding
+detail). Additionally, if an `alert_url` input is configured, a best-effort
+webhook is POSTed describing the findings (payload schema in webhook.py).
+Delivery is fire-and-forget with a short timeout: a slow or unreachable
+endpoint never changes the check result — a failing check stays FAILED, it does
+not become an ERROR. Leave `alert_url` unset (the default) to disable alerting.
 """
 
 import os
@@ -16,6 +17,11 @@ from lunar_policy import Check, variable_or_default
 import webhook
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
+
+# Cap on how many individual findings to enumerate in the failure message: a
+# GitHub check / PR comment listing more than this is a wall of text, and the
+# full set is always in the component JSON (and any webhook alert's findings).
+MAX_LISTED_FINDINGS = 10
 
 
 def _severities_in_scope(min_severity):
@@ -47,16 +53,55 @@ def _collect_findings(sca_node, in_scope):
     return out
 
 
-def _fire_alert(sca_node, min_severity, message):
+def _with_findings(headline, findings, multiline=False):
+    """Return the failure headline with the offending findings enumerated.
+
+    When the collector emitted per-finding detail, append an explicit list of
+    the in-scope findings (most severe first) so the failure names the actual
+    packages/CVEs — not just that the threshold was crossed. Summary-only
+    collectors (no `.findings`) return the headline unchanged. The list is
+    capped at MAX_LISTED_FINDINGS; any remainder is summarized as a
+    "+N more (see component JSON for full list)" tail.
+
+    `multiline=True` renders the findings as a Markdown sub-list — one per line,
+    indented 4 spaces so they nest under the failure bullet the hub emits
+    (`  * <message>`) and show as a tidy nested list in the GitHub PR comment.
+    The default single-line (`; `-joined) form is used for the webhook payload's
+    `message`, which is consumed as plain text and also ships structured
+    findings separately.
+    """
+    if not findings:
+        return headline
+
+    def _rank(finding):
+        severity = finding.get("severity")
+        return (
+            SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER),
+            finding.get("package") or "",
+            finding.get("id") or "",
+        )
+
+    ordered = sorted(findings, key=_rank)
+    lines = [webhook.finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
+    hidden = len(ordered) - len(lines)
+    if hidden > 0:
+        lines.append(f"+{hidden} more (see component JSON for full list)")
+    if multiline:
+        return f"{headline}:\n" + "\n".join(f"    * {line}" for line in lines)
+    return f"{headline}: " + "; ".join(lines)
+
+
+def _fire_alert(min_severity, message, findings):
     """Best-effort webhook on failure. Never raises; never changes the result.
 
-    No-op when `alert_url` is unset (alerting disabled).
+    No-op when `alert_url` is unset (alerting disabled). `findings` is the
+    already-collected, normalized in-scope list, shared with the failure
+    message so the alert and the check result never diverge.
     """
     alert_url = variable_or_default("alert_url", "").strip()
     if not alert_url:
         return
     try:
-        findings = _collect_findings(sca_node, set(_severities_in_scope(min_severity)))
         payload = webhook.build_payload(
             "sca",
             findings,
@@ -117,9 +162,13 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            # Fire the webhook (best-effort) alongside the failure.
-            _fire_alert(sca_node, min_severity, fail_message)
-            c.fail(fail_message)
+            # Name the offending packages/CVEs, not just that the threshold was
+            # crossed. The check failure text renders them as a Markdown sub-list
+            # (nests tidily in the GitHub PR comment); the webhook gets the
+            # compact single-line form plus the structured findings array.
+            findings = _collect_findings(sca_node, set(in_scope))
+            _fire_alert(min_severity, _with_findings(fail_message, findings), findings)
+            c.fail(_with_findings(fail_message, findings, multiline=True))
             return c
 
         # Scan data exists but reports no findings/summary — that's a collector

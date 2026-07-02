@@ -191,21 +191,25 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 
 After a successful release, update the cronos staging environment to reference the new version:
 
-1. **Open the cronos lunar config:**
+1. **Open the cronos lunar config** — the repo is `pantalasa-cronos/lunar`, in a **different GitHub org**, so `git`/`gh` need a `pantalasa-cronos` token (the default `earthly` token 404s here):
 
    ```bash
-   cd ~/repos/pantalasa-cronos
+   # Clone if missing; the local clone dir is ~/repos/pantalasa-cronos-lunar
+   TOKEN="$(bender-gh-token pantalasa-cronos)"
+   git clone "https://x-access-token:${TOKEN}@github.com/pantalasa-cronos/lunar.git" ~/repos/pantalasa-cronos-lunar 2>/dev/null || true
+   cd ~/repos/pantalasa-cronos-lunar
+   git remote set-url origin "https://x-access-token:${TOKEN}@github.com/pantalasa-cronos/lunar.git"
    git checkout main && git pull origin main
    ```
 
-   Edit `lunar/lunar-config.yml`.
+   The config is `lunar-config.yml` at the repo **root** (not under a `lunar/` subdirectory).
 
 2. **Update pinned version references:**
 
    Replace all `@v<old-version>` references with `@vX.Y.Z`:
 
    ```bash
-   sed -i 's|@v<old-version>|@vX.Y.Z|g' lunar/lunar-config.yml
+   sed -i 's|@v<old-version>|@vX.Y.Z|g' lunar-config.yml
    ```
 
    This updates collectors and policies that were pinned to the previous release. Plugins still on `@main` are tracking the main branch and don't need changes.
@@ -213,12 +217,14 @@ After a successful release, update the cronos staging environment to reference t
 3. **Commit and push:**
 
    ```bash
-   git add lunar/lunar-config.yml
+   git add lunar-config.yml
    git commit -m "Pin cronos lunar config to vX.Y.Z"
-   git push
+   git push origin HEAD:main
    ```
 
 4. **Verify the `Sync Lunar Config` workflow passes** in `pantalasa-cronos/lunar` — it runs `lunar hub pull` to push the updated manifest to the hub. If it fails, the hub won't pick up the new configuration.
+
+   > **Transient failures:** the `lunar hub pull` step intermittently dies with `failed to receive server stream: rpc error: code = Unavailable ... connection reset by peer`. If the log shows every plugin resolved (`fetching remote plugin: ...`) and only the hub stream errored, it's a transient infra blip — **not** a bad config — so just re-run it: `GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run rerun <run-id> --repo pantalasa-cronos/lunar --failed`.
 
 **Note:** Only update `@v<old>` → `@vX.Y.Z`. Do not change `@main` references — those are either development plugins being tested or plugins that intentionally track latest.
 

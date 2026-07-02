@@ -169,6 +169,16 @@ inputs:
       Backstage entity has no `spec.owner`. Leave empty to skip.
     default: ""
 
+  default_domain:
+    description: |
+      Fallback domain applied (verbatim) to components whose matched
+      Backstage entity resolves to no domain — i.e. none of
+      `domain_annotation`, `spec.domain`, or `spec.system` is set. A
+      stub `.domains["<default_domain>"]` entry is written alongside
+      so the hub's domain validation accepts the reference. Leave
+      empty to leave such components without a domain.
+    default: ""
+
 secrets:
   GH_TOKEN:
     description: |

@@ -8,6 +8,9 @@ def check_project_file_exists(node=None):
         dotnet = c.get_node(".lang.dotnet")
         if not dotnet.exists():
             c.skip("Not a .NET project")
+        project_exists_node = dotnet.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No .NET project detected in this component")
 
         project_files_node = dotnet.get_node(".project_files")
         if not project_files_node.exists():

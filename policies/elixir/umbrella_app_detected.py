@@ -12,6 +12,9 @@ def check_umbrella_app_detected(node=None):
         elixir = c.get_node(".lang.elixir")
         if not elixir.exists():
             c.skip("Not an Elixir project")
+        project_exists_node = elixir.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Elixir project detected in this component")
 
         umbrella_node = elixir.get_node(".umbrella")
         if not umbrella_node.exists():

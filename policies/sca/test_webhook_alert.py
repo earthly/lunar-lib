@@ -122,6 +122,21 @@ SCA_SUMMARY_ONLY = {
 }
 
 
+def many_findings_sca(n):
+    """A collector result with `n` distinct critical findings (cap-test fixture)."""
+    return {
+        "source": {"tool": "trivy", "integration": "code"},
+        "vulnerabilities": {"critical": n, "high": 0, "medium": 0, "low": 0, "total": n},
+        "findings": [
+            {"severity": "critical", "package": f"pkg{i:03d}", "version": "1.0.0",
+             "ecosystem": "gomod", "cve": f"CVE-2024-{i:04d}", "fix_version": "1.0.1",
+             "fixable": True}
+            for i in range(n)
+        ],
+        "summary": {"has_critical": True, "has_high": False},
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Env isolation + run helpers                                                  #
 # --------------------------------------------------------------------------- #
@@ -163,6 +178,12 @@ def resolved_status(c):
         if r.result == CheckStatus.SKIPPED:
             return CheckStatus.SKIPPED
     return c.status
+
+
+def failure_message(c):
+    """The single failure message a failed max-severity check emitted."""
+    reasons = c.failure_reasons
+    return reasons[0] if reasons else ""
 
 
 # --------------------------------------------------------------------------- #
@@ -296,6 +317,10 @@ class MaxSeverityAlertTests(unittest.TestCase):
         self.assertIsNone(body["pr"])
         self.assertEqual(body["min_severity"], "high")
         self.assertIn("vulnerability findings detected", body["message"])
+        # Webhook message: compact single-line summary that names findings, no
+        # Markdown (the multi-line sub-list form is for the GitHub check only).
+        self.assertIn("golang.org/x/net", body["message"])
+        self.assertNotIn("\n", body["message"])
         self.assertEqual(body["schema_version"], 1)
         self.assertIn("dedupe_key", body)
         # min_severity=high -> the two HIGH findings, medium excluded.
@@ -353,6 +378,61 @@ class MaxSeverityAlertTests(unittest.TestCase):
                       LUNAR_VAR_alert_url=r.url, LUNAR_SECRET_ALERT_AUTH_TOKEN="topsecret")
             headers, _ = r.requests[0]
         self.assertEqual(headers.get("Authorization"), "Bearer topsecret")
+
+
+# --------------------------------------------------------------------------- #
+# max-severity failure-message enumeration tests                               #
+# --------------------------------------------------------------------------- #
+
+
+class MaxSeverityFailureMessageTests(unittest.TestCase):
+    """The failure text must name the offending packages/CVEs, not just report
+    that the threshold was crossed, so the result is actionable on its own."""
+
+    def test_failure_message_lists_findings(self):
+        c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="high")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        msg = failure_message(c)
+        self.assertIn("High vulnerability findings detected", msg)
+        # Rendered as a Markdown sub-list: headline, then one indented bullet
+        # per finding (nests under the hub's failure bullet in the PR comment).
+        self.assertIn("High vulnerability findings detected:\n    * ", msg)
+        # Both HIGH findings named, with package + CVE + fix status.
+        self.assertIn("golang.org/x/net", msg)
+        self.assertIn("CVE-2023-44487", msg)
+        self.assertIn("fix: 0.17.0", msg)
+        self.assertIn("github.com/foo/bar", msg)
+        self.assertIn("CVE-2024-0001", msg)
+        self.assertIn("no fix available", msg)
+        # The MEDIUM finding is below the threshold -> excluded.
+        self.assertNotIn("baz", msg)
+        self.assertNotIn("CVE-2024-0002", msg)
+
+    def test_failure_message_widens_with_min_severity(self):
+        c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="medium")
+        msg = failure_message(c)
+        self.assertIn("baz", msg)            # medium finding now in scope
+        self.assertIn("CVE-2024-0002", msg)
+
+    def test_summary_only_has_no_enumeration(self):
+        # No `.findings` detail -> headline only, nothing to enumerate.
+        c = run_check(node(sca=SCA_SUMMARY_ONLY))
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        msg = failure_message(c)
+        self.assertEqual(msg, "Critical vulnerability findings detected")
+        self.assertNotIn("—", msg)
+        self.assertNotIn("CVE", msg)
+
+    def test_long_finding_list_is_capped(self):
+        n = max_severity.MAX_LISTED_FINDINGS + 5
+        c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        msg = failure_message(c)
+        self.assertIn("+5 more (see component JSON for full list)", msg)
+        # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
+        # a 4-space-indented Markdown sub-bullet under the headline.
+        bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]
+        self.assertEqual(len(bullets), max_severity.MAX_LISTED_FINDINGS + 1)
 
 
 if __name__ == "__main__":

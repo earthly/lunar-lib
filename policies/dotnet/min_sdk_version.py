@@ -40,6 +40,9 @@ def check_min_sdk_version(min_version=None, node=None):
         dotnet = c.get_node(".lang.dotnet")
         if not dotnet.exists():
             c.skip("Not a .NET project")
+        project_exists_node = dotnet.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No .NET project detected in this component")
 
         sdk_version_node = dotnet.get_node(".sdk_version")
         if not sdk_version_node.exists():

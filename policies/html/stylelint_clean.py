@@ -13,6 +13,9 @@ def stylelint_clean(max_warnings=None, node=None):
         css = c.get_node(".lang.css")
         if not css.exists():
             c.skip("Not a CSS project")
+        project_exists_node = css.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No CSS project detected in this component")
 
         lint_node = css.get_node(".lint")
         if not lint_node.exists():

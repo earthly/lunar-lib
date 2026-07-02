@@ -13,6 +13,9 @@ def check_max_unsafe_blocks(max_unsafe=None, node=None):
         rust = c.get_node(".lang.rust")
         if not rust.exists():
             c.skip("Not a Rust project")
+        project_exists_node = rust.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Rust project detected in this component")
 
         unsafe_blocks = rust.get_node(".unsafe_blocks")
         if not unsafe_blocks.exists():

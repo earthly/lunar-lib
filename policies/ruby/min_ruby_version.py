@@ -11,6 +11,9 @@ def check_min_ruby_version(min_version=None, node=None):
         ruby = c.get_node(".lang.ruby")
         if not ruby.exists():
             c.skip("Not a Ruby project")
+        project_exists_node = ruby.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No Ruby project detected in this component")
 
         version_node = ruby.get_node(".version")
         if not version_node.exists():

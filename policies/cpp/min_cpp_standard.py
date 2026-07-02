@@ -11,6 +11,9 @@ def min_cpp_standard(min_standard=None, node=None):
         cpp = c.get_node(".lang.cpp")
         if not cpp.exists():
             c.skip("Not a C/C++ project")
+        project_exists_node = cpp.get_node(".project_exists")
+        if not project_exists_node.exists() or not project_exists_node.get_value():
+            c.skip("No C/C++ project detected in this component")
 
         std_node = cpp.get_node(".cpp_standard")
         if not std_node.exists():
