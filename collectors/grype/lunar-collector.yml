@@ -91,7 +91,7 @@ collectors:
     runs_on: [default-branch]
     hook:
       type: cron
-      schedule: "*/10 * * * *"  # TEMP for cronos testing (PR #221) — REVERT to "0 3 * * *" before merge
+      schedule: "0 3 * * *"  # Human-readable: daily at 03:00 UTC (>= 10-min collector floor)
       clone-code: false      # reads component JSON + pulls the image; no repo clone needed
     keywords: ["grype", "container scan", "image scan", "cron rescan", "cve", "vulnerability"]
 
@@ -108,7 +108,7 @@ inputs:
       the cron derives the image from the component's most recent
       .containers.builds[] entry (populated by the docker collector). Set this
       to pin a specific image, e.g. "ghcr.io/acme/app:latest".
-    default: "alpine:3.14"  # TEMP for cronos testing (PR #221) — REVERT to "" before merge
+    default: ""
 
 secrets:
   REGISTRY_USERNAME:
