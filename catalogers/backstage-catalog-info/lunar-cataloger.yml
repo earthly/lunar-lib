@@ -32,7 +32,8 @@ example_catalog_json: |
       "github.com/acme/payment-api": {
         "owner": "group:default/team-payments",
         "domain": "platform.payments",
-        "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+        "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"],
+        "meta": {"pagerduty/service-id": "PABC123"}
       },
       "github.com/acme/web-app": {
         "owner": "group:default/team-web",
@@ -48,7 +49,8 @@ catalogers:
       For each existing Lunar component, fetches `catalog-info.yaml`
       from the component's GitHub repo via the Contents API, parses
       it (supports multi-document YAML), picks the matching
-      `Component` entity, and writes its owner, domain, and tags to
+      `Component` entity, and writes its owner, domain, tags, and
+      selected annotation-sourced meta to
       `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON.
       Repos with no `catalog-info.yaml`, an unparseable file, or no
       matching `Component` are skipped silently.
@@ -149,6 +151,22 @@ inputs:
       so the hub's domain validation accepts the reference. Leave
       empty to leave such components without a domain.
     default: ""
+
+  meta_annotations:
+    description: |
+      Comma-separated `<annotation-key>=<meta-key>` pairs. For each
+      pair, if the matched Backstage Component carries the annotation
+      `metadata.annotations[<annotation-key>]`, its value is written
+      to the Lunar component's `meta[<meta-key>]`. This is how tool
+      collectors discover their per-component IDs from catalog-info:
+      the `pagerduty` collector reads `pagerduty/service-id` from the
+      component meta, and the default here sources it from the
+      `pagerduty.com/service-id` annotation recommended by PagerDuty's
+      Backstage integration guide. Add pairs to feed other collectors,
+      e.g. `pagerduty.com/service-id=pagerduty/service-id,sonarqube.io/project-key=sonarqube/project-key`.
+      Whitespace around pairs and the `=` is trimmed. Set to empty to
+      write no meta.
+    default: "pagerduty.com/service-id=pagerduty/service-id"
 
 secrets:
   GH_TOKEN:

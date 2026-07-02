@@ -47,6 +47,9 @@ INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+# No-colon `-` so an explicitly-empty value disables meta mapping entirely;
+# an unset value (input not configured) still gets the PagerDuty default.
+META_ANNOTATIONS="${LUNAR_VAR_META_ANNOTATIONS-pagerduty.com/service-id=pagerduty/service-id}"
 
 if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
     export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
@@ -65,6 +68,7 @@ echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
+[ -n "$META_ANNOTATIONS" ] && echo "Meta annotations: $META_ANNOTATIONS"
 
 # --- Parse component ID into owner/repo -----------------------------------
 # Only github.com/<owner>/<repo> IDs are supported. Anything else (gitlab,
@@ -175,9 +179,16 @@ if [ "$ENTITY" = "null" ] || [ -z "$ENTITY" ]; then
 fi
 
 # --- Transform -------------------------------------------------------------
-# Project owner / domain / tags from the entity into the shape that goes
-# under `.components["$COMPONENT_ID"]`. Owner / domain are omitted from the
-# output when empty so we don't blow away upstream values with "".
+# Project owner / domain / tags / meta from the entity into the shape that
+# goes under `.components["$COMPONENT_ID"]`. Owner / domain / meta are omitted
+# from the output when empty so we don't blow away upstream values with "".
+#
+# `meta` maps selected catalog-info annotations onto the component's Lunar
+# meta field, per the `meta_annotations` "<annotation>=<meta-key>" mapping.
+# This is how tool collectors (PagerDuty, etc.) discover their IDs: the
+# `pagerduty` collector reads `pagerduty/service-id` from LUNAR_COMPONENT_META,
+# which by default we source from the `pagerduty.com/service-id` annotation
+# recommended by PagerDuty's Backstage integration guide.
 
 ENTRY=$(echo "$ENTITY" | jq \
     --arg tag_prefix "$TAG_PREFIX" \
@@ -186,6 +197,7 @@ ENTRY=$(echo "$ENTITY" | jq \
     --arg default_owner "$DEFAULT_OWNER" \
     --arg domain_annotation "$DOMAIN_ANNOTATION" \
     --arg default_domain "$DEFAULT_DOMAIN" \
+    --arg meta_annotations "$META_ANNOTATIONS" \
     '
     def bare(s):
         if (s | type) != "string" or s == "" then s
@@ -218,9 +230,25 @@ ENTRY=$(echo "$ENTITY" | jq \
                  then [$tag_prefix + "lifecycle-" + (.spec.lifecycle | tostring)] else [] end))
         else []
         end) as $derived
+    | ($e.metadata.annotations // {}) as $ann
+    | (reduce ($meta_annotations | split(",")[]) as $pair ({};
+        ($pair | gsub("^\\s+|\\s+$"; "")) as $p
+        | ($p | index("=")) as $eq
+        | if $eq == null then .
+          else
+            ($p[0:$eq] | gsub("^\\s+|\\s+$"; "")) as $ak
+            | ($p[$eq+1:] | gsub("^\\s+|\\s+$"; "")) as $mk
+            | ($ann[$ak] // "" | tostring) as $val
+            | if ($ak | length) > 0 and ($mk | length) > 0 and ($val | length) > 0
+              then . + {($mk): $val}
+              else .
+              end
+          end
+      )) as $meta
     | ({tags: ($prefixed + $derived)}
        + (if $owner != "" then {owner: $owner} else {} end)
-       + (if $domain != "" then {domain: $domain} else {} end))
+       + (if $domain != "" then {domain: $domain} else {} end)
+       + (if ($meta | length) > 0 then {meta: $meta} else {} end))
     ')
 
 echo ""
