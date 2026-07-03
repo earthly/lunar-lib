@@ -175,8 +175,12 @@ inputs:
       AWS region used to scope the SigV4 signature and to reach STS when
       assuming a web-identity (IRSA) role. Required when `auth_mode: sigv4`,
       unless `AWS_REGION` is already present in the cataloger pod's
-      environment (IRSA and most AWS runtimes set it). Ignored for
-      `auth_mode: bearer`.
+      environment (IRSA and most AWS runtimes set it, but not always). If
+      `auth_mode: sigv4` and neither this input nor the `AWS_REGION` env var
+      is set, the cataloger fails fast at startup with a clear
+      `aws_region required for sigv4` error rather than signing with an empty
+      region (which would surface as an opaque downstream AWS error).
+      Ignored for `auth_mode: bearer`.
     default: ""
 
   aws_service:

@@ -121,9 +121,18 @@ metadata:
 
 The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
 
-#### Alternative: `aws-sigv4-proxy` sidecar (no plugin config)
+#### Alternative: a standalone `aws-sigv4-proxy` service (no plugin config)
 
-If you'd rather keep signing out of the cataloger, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as a sidecar, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy (e.g. `http://localhost:8080`). The proxy signs every forwarded request with the pod's IAM role via the same credential chain. This also self-refreshes; it just moves the mechanism from the plugin to a deployment component.
+If you'd rather keep signing out of the cataloger entirely, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as its **own** Kubernetes `Deployment` + `Service`, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy's in-cluster DNS name:
+
+```yaml
+with:
+  backstage_url: "http://sigv4-proxy.<namespace>.svc.cluster.local:8080"
+```
+
+The proxy signs every forwarded request with **its own** pod's IAM role (IRSA on the proxy Deployment's service account) via the same credential chain, so this self-refreshes too — it just moves signing out of the plugin and into a separate service you operate.
+
+> **Not a same-pod sidecar.** Catalogers run in operator-spawned snippet pods whose container list is fixed by the Lunar operator — one snippet container (which `OPERATOR_SNIPPET_CONTAINER_SPEC_*` *replaces*, it does not append) plus the built-in Lunar sidecar. There is no hook to inject an extra container, so `aws-sigv4-proxy` cannot ride inside the cataloger's pod; it has to be its own Deployment reached over the cluster network. (For purely local testing, you can instead run the proxy on your laptop and point `backstage_url` at `http://host.docker.internal:8080`.)
 
 > A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.
 
