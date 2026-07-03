@@ -82,6 +82,18 @@ policies:
     mainPython: ai_authorship_annotated.py
     keywords: ["ai authorship", "git ai", "code attribution", "ai tracking"]
 
+  - name: no-undisclosed-ai
+    description: |
+      Flags commits that carry AI coding-assistant fingerprints but no disclosure annotation —
+      i.e. undisclosed AI-generated code. Reads ai.fingerprints (detection: which commits look
+      AI-authored, via which tool/signal) and the per-commit disclosed flag the ai-fingerprints
+      collector sets by cross-referencing ai.authorship (git-ai notes / AI- trailers). Passes
+      when undisclosed_commits is at or below max_undisclosed_commits. Skips when no fingerprint
+      data exists (the ai collector isn't running the ai-fingerprints sub-collector). Defaults to
+      warning severity — fingerprints are a heuristic signal, not proof of low-quality code.
+    mainPython: no_undisclosed_ai.py
+    keywords: ["undisclosed ai", "llm code", "ai detection", "authorship disclosure"]
+
 inputs:
   canonical_filename:
     description: The canonical (vendor-neutral) instruction filename
@@ -100,6 +112,11 @@ inputs:
     default: "Project Overview,Build Commands"
   min_annotation_percentage:
     description: Minimum percentage of commits that should have AI annotations (0 = awareness mode)
+    default: "0"
+  max_undisclosed_commits:
+    description: |
+      Maximum number of AI-fingerprinted-but-undisclosed commits allowed before no-undisclosed-ai
+      fails (0 = any undisclosed AI commit fails)
     default: "0"
 
 example_component_json: |
@@ -134,6 +151,19 @@ example_component_json: |
         "provider": "git-ai",
         "total_commits": 12,
         "annotated_commits": 8
+      },
+      "fingerprints": {
+        "total_commits": 50,
+        "fingerprinted_commits": 12,
+        "undisclosed_commits": 9,
+        "commits": [
+          {
+            "sha": "a1b2c3d4",
+            "tools": ["claude-code"],
+            "signals": ["coauthor-trailer", "generated-footer"],
+            "disclosed": false
+          }
+        ]
       }
     }
   }

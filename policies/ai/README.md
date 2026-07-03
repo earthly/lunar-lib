@@ -17,6 +17,7 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | `instruction-file-sections` | warning | Root instruction file must contain required section headings |
 | `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
 | `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
+| `no-undisclosed-ai` | warning | Commits with AI fingerprints but no disclosure annotation must stay at or below the configured threshold |
 
 ## Required Data
 
@@ -26,6 +27,7 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | `.ai.instructions` | `ai`, `claude`, `codex`, `gemini` collectors | Instruction file metadata — `ai` writes root/AGENTS.md, tool collectors append to `all[]` via array append |
 | `.ai.plans_dir` | `ai` collector | Plans directory existence and file count |
 | `.ai.authorship` | `ai` collector | AI authorship annotation coverage |
+| `.ai.fingerprints` | `ai` collector | Detected AI-authorship fingerprints per commit, with a per-commit disclosed flag and an undisclosed count |
 
 ## Installation
 
@@ -88,3 +90,4 @@ No code reviewer detected, no instruction file:
 - **canonical-naming**: Rename to AGENTS.md (vendor-neutral) or symlink it
 - **plans-dir-exists**: Create a `.agents/plans` directory for AI agent task planning
 - **ai-authorship-annotated**: Enable git-ai or add AI-model trailers to commits
+- **no-undisclosed-ai**: Disclose AI-assisted commits — annotate them with git-ai notes or an `AI-` trailer (e.g. `AI-model: claude-4`) so detected fingerprints are matched by a disclosure. Tune `max_undisclosed_commits` to allow a grace threshold.
