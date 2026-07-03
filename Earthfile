@@ -73,6 +73,9 @@ test:
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
+    BUILD ./policies/ai+test
+    BUILD ./policies/git+test
+    BUILD ./policies/vcs+test
 
 lint:
     FROM python:3.12-alpine
