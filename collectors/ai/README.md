@@ -17,7 +17,7 @@ This collector writes to the following Component JSON paths:
 | `.ai.instructions` | object | Agent instruction files: root file info, all files with sections/symlink status, per-directory grouping, total byte count |
 | `.ai.plans_dir` | object | Plans directory existence, path, and file count |
 | `.ai.authorship` | object | AI authorship annotation coverage across commits (Git AI notes or git trailers) |
-| `.ai.fingerprints` | object | Detected AI-assistant authorship fingerprints in commit history: per-commit tools/signals, whether each is disclosed, an undisclosed count, and informational marker files |
+| `.ai.fingerprints` | object | Detected AI-assistant authorship fingerprints in commit history: per-commit tools/signals, a tool rollup, a fingerprinted-commit count, and informational marker files |
 
 ## Collectors
 
@@ -28,7 +28,7 @@ This integration provides the following collectors (use `include` to select a su
 | `instruction-files` | `code` | Discovers AGENTS.md files with metadata and symlink status |
 | `plans-dir` | `code` | Checks for a dedicated AI plans directory |
 | `ai-authorship` | `code` | Collects AI authorship annotations from commits via Git AI standard or git trailers |
-| `ai-fingerprints` | `code` | Detects AI-assistant authorship fingerprints in commits and records whether each is disclosed |
+| `ai-fingerprints` | `code` | Detects AI-assistant authorship fingerprints (co-author/generated trailers, bot identities) in commits |
 
 ## Installation
 

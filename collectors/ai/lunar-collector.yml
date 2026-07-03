@@ -68,22 +68,19 @@ collectors:
   - name: ai-fingerprints
     description: |
       Heuristically detects AI coding-assistant authorship fingerprints in commit history —
-      the incidental markers tools leave behind whether or not the author disclosed AI use.
-      Scans each commit in scope for auto-inserted trailers and footers (e.g. "Co-Authored-By:
-      Claude", "Generated with Claude Code", "Co-authored-by: Copilot", Cursor Agent, aider,
-      Devin) and AI/bot author or committer identities. For every fingerprinted commit it also
-      records whether that same commit carries a disclosure annotation (a git-ai note or an
-      AI- trailer), so a downstream policy can flag AI-authored commits that were never
-      disclosed. Also records AI marker files present in the tree (CLAUDE.md, .cursor/,
-      copilot-instructions) as informational context only — marker presence signals the repo
-      uses a tool, not that any given commit is AI-authored, so it is not counted toward the
-      undisclosed total. Complements ai-authorship (which measures opt-in disclosure) with
-      detection. This is a heuristic signal, not a verdict: trailers can be stripped, and a
+      the incidental markers tools leave behind. Scans each commit in scope for auto-inserted
+      trailers and footers (e.g. "Co-Authored-By: Claude", "Generated with Claude Code",
+      "Co-authored-by: Copilot", Cursor Agent, aider, Devin) and AI/bot author or committer
+      identities, and records which tools and signals matched. Also records AI marker files
+      present in the tree (CLAUDE.md, .cursor/, copilot-instructions) as informational context
+      only — marker presence signals the repo uses a tool, not that any given commit is
+      AI-authored. Pure detection: it makes no disclosure judgment (that's what ai-authorship
+      is for). This is a heuristic signal, not a verdict: trailers can be stripped, and a
       co-author line means an assistant touched the commit, not that the code is low quality.
     mainBash: ai-fingerprints.sh
     hook:
       type: code
-    keywords: ["ai detection", "llm code", "undisclosed ai", "commit fingerprint", "ai authorship"]
+    keywords: ["ai detection", "llm code", "ai authored", "commit fingerprint", "ai authorship"]
 
 inputs:
   md_find_command:
@@ -101,7 +98,7 @@ inputs:
   ai_marker_paths:
     description: |
       Comma-separated list of AI marker files/directories to record as informational
-      context (weak signal; not counted toward the undisclosed total)
+      context (weak signal; marker presence is not counted as an AI-authored commit)
     default: "CLAUDE.md,.cursor,.aider.conf.yml,.github/copilot-instructions.md,GEMINI.md,.codeium"
 
 example_component_json: |
@@ -148,7 +145,6 @@ example_component_json: |
       "fingerprints": {
         "total_commits": 50,
         "fingerprinted_commits": 12,
-        "undisclosed_commits": 9,
         "tools": [
           { "tool": "claude-code", "commits": 8 },
           { "tool": "copilot", "commits": 3 },
@@ -158,8 +154,7 @@ example_component_json: |
           {
             "sha": "a1b2c3d4",
             "tools": ["claude-code"],
-            "signals": ["coauthor-trailer", "generated-footer"],
-            "disclosed": false
+            "signals": ["coauthor-trailer", "generated-footer"]
           }
         ],
         "markers": [
