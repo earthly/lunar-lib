@@ -1,0 +1,113 @@
+version: 0
+
+name: argocd-remote-push
+description: Correlates ArgoCD Applications in a central GitOps repo to the service components they deploy and pushes each service's deployment posture onto its own Component JSON (out-of-band)
+
+author: earthly
+
+# Reuses the argocd collector's image: link_push.sh sources parse.sh, which
+# validates with kubeconform against the baked-in argoproj CRD schemas.
+default_image: earthly/lunar-lib:argocd-main
+
+landing_page:
+  display_name: "ArgoCD Remote Push"
+  long_description: |
+    Runs on the repo that HOLDS the ArgoCD files (a central GitOps repo). For
+    each Application it correlates the app to the source/service component that
+    builds its image (annotation -> image-match -> repoURL, first match wins)
+    and writes that app's deployment posture onto THAT service's Component JSON
+    out-of-band (lunar collect --component/--sha), so the gitops/argocd policies
+    evaluate on the service even though the ArgoCD config lives elsewhere.
+
+    Because the out-of-band write lands on the service's default-branch HEAD, the
+    posture only ever describes post-merge main — it CANNOT gate a PR. Use it for
+    correlation and dashboards with zero configuration in the service repos.
+
+    Careful: do NOT also run argocd-remote-pull on the same service. Both write
+    .cd.gitops.applications and the hub appends across collection records, so the
+    same Application would appear twice (verdicts don't change, but coverage
+    double-counts). Pick one path per service — push (this one; zero service
+    config, post-merge only) or pull (PR-time gating).
+  categories: ["ci-cd", "orchestration"]
+  icon: "assets/argocd.svg"
+  status: "experimental"
+  related:
+    - slug: "argocd"
+      type: "collector"
+      reason: "Parses/validates the ArgoCD resources this collector correlates"
+    - slug: "argocd-remote-pull"
+      type: "collector"
+      reason: "The pull counterpart — use one or the other per service, not both"
+    - slug: "gitops"
+      type: "policy"
+      reason: "Evaluates the pushed deployment posture on the service component"
+
+collectors:
+  - name: push
+    description: |
+      Correlates each ArgoCD Application back to the source-code component it
+      deploys (annotation -> image -> tag -> repoURL, first match wins), then
+      writes that application's deployment posture onto the source component's
+      Component JSON using the out-of-band collect syntax
+      (lunar collect --component <id> --sha <sha>). Applications that can't be
+      resolved are skipped with a logged reason — no bogus cross-component
+      writes. Only ever lands on the source's default-branch HEAD, so it is a
+      post-merge system of record and cannot gate PRs.
+    mainBash: link_push.sh
+    hook:
+      type: code
+    keywords: ["argocd", "gitops", "cross-component", "out-of-band collect", "deployment posture", "correlation", "continuous delivery"]
+
+inputs:
+  find_command:
+    description: Command to find candidate YAML files (must output one file path per line).
+    default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+  correlate_by:
+    description: Ordered, comma-separated correlation strategies (first match wins). Options annotation, image, tag, repoURL.
+    default: "annotation,image,repoURL"
+  component_annotation:
+    description: Application annotation key that carries the source component id, for the annotation correlation strategy.
+    default: "lunar.earthly.dev/component"
+  image_registry_aliases:
+    description: Comma-separated old=new registry-host aliases used to normalize image references for the image correlation strategy. Empty disables normalization.
+    default: ""
+  tag_key:
+    description: Component meta/tag field that maps a component to its ArgoCD app name, for the tag correlation strategy.
+    default: ""
+
+example_component_json: |
+  {
+    "cd": {
+      "gitops": {
+        "source": {
+          "tool": "argocd",
+          "integration": "external"
+        },
+        "linked_from": "github.com/org/gitops",
+        "applications": [
+          {
+            "name": "payment-api",
+            "path": "apps/payment-api.yaml",
+            "valid": true,
+            "kind": "Application",
+            "project": "platform",
+            "sync_policy": {
+              "automated": true,
+              "prune": true,
+              "self_heal": true
+            },
+            "destination": {
+              "server": "https://kubernetes.default.svc",
+              "namespace": "payments"
+            },
+            "source_ref": {
+              "repoURL": "https://github.com/org/gitops.git",
+              "path": "payment-api",
+              "targetRevision": "HEAD"
+            },
+            "images": ["myregistry.io/payment-api"]
+          }
+        ]
+      }
+    }
+  }

@@ -1,11 +1,11 @@
 #!/bin/bash
-# link-push: correlate each ArgoCD Application to the source component it deploys
+# argocd-remote-push: correlate each ArgoCD Application to the source component it deploys
 # (annotation -> image -> tag -> repoURL, first match wins), then write that
 # app's deployment posture onto the source component's JSON out-of-band
 # (lunar collect --component <id> --sha <sha>). Runs on the GitOps repo.
 set -e
 
-# shellcheck source=collectors/argocd/parse.sh disable=SC1091
+# shellcheck source=collectors/argocd-remote-push/parse.sh disable=SC1091
 source "$(dirname "$0")/parse.sh"
 
 if [ -z "$LUNAR_COMPONENT_ID" ]; then
@@ -23,11 +23,11 @@ TAG_KEY="${LUNAR_VAR_TAG_KEY:-}"
 # the image/tag/repoURL strategies can't resolve — degrade gracefully.
 CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
 if [ -z "$CONN_STRING" ] || [[ "$CONN_STRING" == *"Error"* ]]; then
-    echo "link-push: hub SQL connection unavailable, skipping." >&2
+    echo "argocd-remote-push: hub SQL connection unavailable, skipping." >&2
     exit 0
 fi
 if ! command -v psql >/dev/null 2>&1; then
-    apk add --no-cache postgresql-client >/dev/null 2>&1 || { echo "link-push: psql unavailable." >&2; exit 0; }
+    apk add --no-cache postgresql-client >/dev/null 2>&1 || { echo "argocd-remote-push: psql unavailable." >&2; exit 0; }
 fi
 
 sql_escape() { local s="$1"; printf '%s' "${s//\'/\'\'}"; }
@@ -129,7 +129,7 @@ RESULT=$(parse_argocd)
 APPS=$(echo "$RESULT" | jq -c '.applications')
 APP_COUNT=$(echo "$APPS" | jq 'length')
 if [ "$APP_COUNT" -eq 0 ]; then
-    echo "link-push: no ArgoCD Applications found, nothing to link." >&2
+    echo "argocd-remote-push: no ArgoCD Applications found, nothing to link." >&2
     exit 0
 fi
 
@@ -150,20 +150,20 @@ for ((i=0; i<APP_COUNT; i++)); do
     jq -n --arg n "$NAME" --arg imgs "$(echo "$APP" | jq -c '.images')" --arg line "$(printf '%s' "$LINE" | tr '\t' '|')" \
         '{app:$n, images:$imgs, resolved:$line}' >> "$DBG_APPS"
     if [ -z "$LINE" ]; then
-        echo "link-push: could not resolve a source component for app '$NAME' — skipping." >&2
+        echo "argocd-remote-push: could not resolve a source component for app '$NAME' — skipping." >&2
         continue
     fi
     TARGET_ID=$(printf '%s' "$LINE" | cut -f1)
     TARGET_SHA=$(printf '%s' "$LINE" | cut -f2)
     STRAT=$(printf '%s' "$LINE" | cut -f3)
     if [ -z "$TARGET_ID" ] || [ -z "$TARGET_SHA" ]; then
-        echo "link-push: app '$NAME' resolved but missing component/sha — skipping." >&2
+        echo "argocd-remote-push: app '$NAME' resolved but missing component/sha — skipping." >&2
         continue
     fi
     if [ "$TARGET_ID" = "$LUNAR_COMPONENT_ID" ]; then
         continue  # don't push onto the GitOps repo itself
     fi
-    echo "link-push: app '$NAME' -> $TARGET_ID@${TARGET_SHA:0:8} (via $STRAT)" >&2
+    echo "argocd-remote-push: app '$NAME' -> $TARGET_ID@${TARGET_SHA:0:8} (via $STRAT)" >&2
     jq -n --arg id "$TARGET_ID" --arg sha "$TARGET_SHA" --argjson rec "$APP" \
         '{target_id: $id, target_sha: $sha, record: $rec}' >> "$RESOLVED"
 done
@@ -208,7 +208,7 @@ for ((g=0; g<GROUP_COUNT; g++)); do
         | jq -cS --arg lf "$LUNAR_COMPONENT_ID" \
             'if (.cd.gitops.linked_from == $lf) then ([.cd.gitops.applications[]?.name] | unique) else empty end' 2>/dev/null)
     if [ -n "$HAVE_NAMES" ] && [ "$HAVE_NAMES" = "$WANT_NAMES" ]; then
-        echo "link-push: $TID already linked from $LUNAR_COMPONENT_ID with the same app set — skipping (idempotent)." >&2
+        echo "argocd-remote-push: $TID already linked from $LUNAR_COMPONENT_ID with the same app set — skipping (idempotent)." >&2
         jq -n --arg t "$TID" '{target:$t, ok:true, skipped:true}' >> "$DBG_PUSH"
         continue
     fi
@@ -225,7 +225,7 @@ for ((g=0; g<GROUP_COUNT; g++)); do
         PUSHED=$((PUSHED+1))
         jq -n --arg t "$TID" '{target:$t, ok:true}' >> "$DBG_PUSH"
     else
-        echo "link-push: out-of-band push to $TID failed: $(cat /tmp/oob-err 2>/dev/null)" >&2
+        echo "argocd-remote-push: out-of-band push to $TID failed: $(cat /tmp/oob-err 2>/dev/null)" >&2
         jq -n --arg t "$TID" --arg e "$(head -c 300 /tmp/oob-err 2>/dev/null)" '{target:$t, ok:false, err:$e}' >> "$DBG_PUSH"
     fi
 done
@@ -236,4 +236,4 @@ jq -n --argjson pushes "$(jq -s '.' "$DBG_PUSH")" --arg pushed "$PUSHED" \
     | lunar collect -j ".cd.gitops._push_debug" - 2>/dev/null || true
 rm -f "$DBG_PUSH"
 
-echo "link-push: pushed deployment posture to $PUSHED source component(s)." >&2
+echo "argocd-remote-push: pushed deployment posture to $PUSHED source component(s)." >&2

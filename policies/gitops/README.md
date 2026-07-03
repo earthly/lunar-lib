@@ -4,7 +4,7 @@ Tool-agnostic GitOps continuous-delivery best practices, for any GitOps tool.
 
 ## Overview
 
-This policy holds the GitOps checks that aren't tied to a specific tool — they read the normalized `.cd.gitops` paths, so they work for any GitOps collector (ArgoCD today, Flux later). It enforces automated sync with prune and self-heal, source-repo and destination allow-lists, and GitOps adoption coverage. Because the `argocd` collector also link-pushes `.cd.gitops` onto a source component from a separate GitOps repo, these guardrails apply on the service repo, not just the GitOps repo. The config checks skip cleanly when a component has no GitOps data; the `gitops-managed` coverage check inverts that, failing components that should be on GitOps but aren't. Pair it with the `argocd` policy for ArgoCD-specific checks (CRD validation, AppProject hygiene).
+This policy holds the GitOps checks that aren't tied to a specific tool — they read the normalized `.cd.gitops` paths, so they work for any GitOps collector (ArgoCD today, Flux later). It enforces automated sync with prune and self-heal, source-repo and destination allow-lists, and GitOps adoption coverage. Because the `argocd-remote-push` collector pushes `.cd.gitops` onto a source component from a separate GitOps repo, these guardrails apply on the service repo, not just the GitOps repo. The config checks skip cleanly when a component has no GitOps data; the `gitops-managed` coverage check inverts that, failing components that should be on GitOps but aren't. Pair it with the `argocd` policy for ArgoCD-specific checks (CRD validation, AppProject hygiene).
 
 ## Policies
 
@@ -108,7 +108,7 @@ An Application with manual sync and no prune/self-heal:
 
 ### Coverage Failure (`gitops-managed`)
 
-A component the org expects on GitOps, with no resolved `.cd.gitops` — nothing parsed locally and nothing link-pushed from the GitOps repo:
+A component the org expects on GitOps, with no resolved `.cd.gitops` — nothing parsed locally and nothing pushed by `argocd-remote-push` from the GitOps repo:
 
 ```json
 {
@@ -125,6 +125,6 @@ When this policy fails, resolve it by:
 1. **For `sync-policy` failures:** Enable automated sync with `prune: true` and `selfHeal: true` (`spec.syncPolicy.automated` in ArgoCD).
 2. **For `source-repo-allowlist` failures:** Point the Application's source `repoURL` at an allow-listed repository, or add the repository to `allowed_source_repos`.
 3. **For `destination-allowlist` failures:** Set the destination to an allow-listed namespace/cluster, or extend `allowed_destinations`.
-4. **For `gitops-managed` failures:** Either migrate the component to GitOps (create an Application that deploys it, so `link-push` resolves and stamps `.cd.gitops`), or narrow the policy's scope (`on:` targeting, or `expected_tag`) so it isn't expected on GitOps. This check converges once the `argocd` collector has processed the GitOps repo and pushed the link.
+4. **For `gitops-managed` failures:** Either migrate the component to GitOps (create an Application that deploys it, so `argocd-remote-push` resolves and stamps `.cd.gitops`), or narrow the policy's scope (`on:` targeting, or `expected_tag`) so it isn't expected on GitOps. This check converges once `argocd-remote-push` has processed the GitOps repo and pushed the link.
 
 Consumers who want any of these surfaced without blocking can pin `enforcement: report-pr` at config time.

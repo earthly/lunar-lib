@@ -9,10 +9,17 @@ default_image: earthly/lunar-lib:argocd-main
 landing_page:
   display_name: "ArgoCD Collector"
   long_description: |
-    Parses and validates ArgoCD Application, ApplicationSet, and AppProject
-    manifests into a normalized .cd.gitops view, and pushes each app's
-    deployment posture onto its source component (out-of-band) so GitOps
-    guardrails work even when ArgoCD config lives in a separate repo.
+    Scans a repository for ArgoCD custom resources (argoproj.io/*), validates
+    each against the argoproj CRD schemas with kubeconform, and writes a
+    normalized, tool-agnostic view of the GitOps configuration to .cd.gitops on
+    the repo's own component. Works for a dedicated GitOps repo (many
+    Applications) or a service repo that ships its own ArgoCD files.
+
+    When the ArgoCD config lives in a SEPARATE repo from the services it deploys,
+    two companion collectors carry the posture cross-component: argocd-remote-push
+    (runs on the GitOps repo, pushes each service's posture onto that service)
+    and argocd-remote-pull (runs on a service repo, pulls its posture for PR-time
+    checks). Use one of those per service — not both.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "beta"
@@ -23,6 +30,12 @@ landing_page:
     - slug: "argocd"
       type: "policy"
       reason: "ArgoCD-specific checks: argoproj CRD validation and AppProject hygiene"
+    - slug: "argocd-remote-push"
+      type: "collector"
+      reason: "Cross-component: push a service's deployment posture from a separate GitOps repo"
+    - slug: "argocd-remote-pull"
+      type: "collector"
+      reason: "Cross-component: pull deployment posture onto a service for PR-time checks"
     - slug: "k8s"
       type: "collector"
       reason: "Parses the workload manifests ArgoCD Applications deploy"
@@ -45,69 +58,10 @@ collectors:
       type: code
     keywords: ["argocd", "gitops", "argo", "application", "appproject", "sync policy", "validation", "continuous delivery"]
 
-  - name: link-push
-    description: |
-      Correlates each ArgoCD Application back to the source-code component it
-      deploys (annotation → image → catalog/tag → repoURL, first match wins),
-      then writes that application's deployment posture onto the source
-      component's Component JSON using the out-of-band collect syntax
-      (lunar collect --component <id> --sha <sha>). This makes the GitOps
-      guardrails evaluate on the service repo even when the ArgoCD config lives
-      in a separate GitOps repo. Applications that can't be resolved are skipped
-      with a logged reason — no bogus cross-component writes.
-    mainBash: link_push.sh
-    hook:
-      type: code
-    keywords: ["argocd", "gitops", "cross-component", "out-of-band collect", "deployment posture", "correlation", "continuous delivery"]
-
-  - name: link-pull
-    description: |
-      The pull counterpart to link-push. Runs on a SERVICE repo and materializes
-      that service's ArgoCD deployment posture onto its own Component JSON by
-      reading a predeclared app->Application mapping from catalog-info.yaml
-      (gitops-component + argocd-application annotations) and pulling the matching
-      Application(s) from the GitOps component via `lunar component get-json`.
-      Because it runs in the service's own collection it lands on the sha being
-      collected (including a PR head sha), so the gitops/argocd policies gate it
-      at PR time — unlike link-push, whose out-of-band write only ever lands on
-      the source's default-branch HEAD. It does no automatic correlation: the
-      dev team predeclares the mapping. Skips when no mapping is present.
-    mainBash: link_pull.sh
-    hook:
-      type: code
-    keywords: ["argocd", "gitops", "cross-component", "get-json", "pull", "pr enforcement", "deployment posture", "catalog-info", "continuous delivery"]
-
 inputs:
   find_command:
-    description: Command to find candidate YAML files (must output one file path per line). Used by the parse sub-collector.
+    description: Command to find candidate YAML files (must output one file path per line). Used by the parse collector.
     default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
-  correlate_by:
-    description: Ordered, comma-separated correlation strategies for link-push (first match wins). Options annotation, image, tag, repoURL.
-    default: "annotation,image,repoURL"
-  component_annotation:
-    description: Application annotation key that carries the source component id, for the annotation correlation strategy.
-    default: "lunar.earthly.dev/component"
-  image_registry_aliases:
-    description: Comma-separated old=new registry-host aliases used to normalize image references for the image correlation strategy. Empty disables normalization.
-    default: ""
-  tag_key:
-    description: Component meta/tag field that maps a component to its ArgoCD app name, for the tag correlation strategy.
-    default: ""
-  catalog_info_paths:
-    description: Comma-separated catalog-info file paths link-pull reads the predeclared mapping from (first match wins).
-    default: "catalog-info.yaml,catalog-info.yml"
-  gitops_component_annotation:
-    description: catalog-info annotation key carrying the GitOps component id to pull from, for link-pull.
-    default: "lunar.earthly.dev/gitops-component"
-  application_annotation:
-    description: catalog-info annotation key carrying the ArgoCD Application name(s) (comma-separated) to pull, for link-pull. Empty pulls every app the GitOps component holds.
-    default: "lunar.earthly.dev/argocd-application"
-  gitops_component:
-    description: Direct override of the GitOps component id for link-pull (bypasses catalog-info). Empty uses the catalog-info annotation.
-    default: ""
-  application:
-    description: Direct override of the ArgoCD Application name(s) for link-pull, comma-separated (bypasses catalog-info). Empty uses the catalog-info annotation.
-    default: ""
 
 example_component_json: |
   {
