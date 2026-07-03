@@ -87,6 +87,46 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 
 The cataloger reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed.
 
+### AWS SigV4 Authentication (IAM-role-signed)
+
+Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gateway) and reject Bearer tokens — every request must carry an AWS Signature V4. Set `auth_mode: sigv4` to sign requests instead of sending a Bearer token:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.1.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-east-1"
+      aws_service: "execute-api"   # default; API Gateway. Override for other fronting.
+```
+
+**No credentials are configured as Lunar secrets, and nothing needs manual rotation.** In `sigv4` mode the cataloger resolves AWS credentials at runtime from the standard AWS credential provider chain and re-resolves them on every run, so short-lived IAM-role credentials always sign with a fresh, valid signature. The chain is tried in this order:
+
+1. **IRSA (EKS) — recommended.** The cataloger pod runs under a service account annotated with an IAM role; EKS injects a web-identity token, which the cataloger exchanges for temporary credentials via STS. The projected token rotates automatically and each run re-exchanges it — zero human involvement.
+2. **ECS task role** — the container credentials endpoint (`AWS_CONTAINER_CREDENTIALS_*`).
+3. **EC2 instance profile** — IMDSv2 on the node.
+4. **Static keys** — only if the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (/ `AWS_SESSION_TOKEN`) secrets are set. This is an escape hatch for runners with no attached IAM identity; static keys do **not** self-refresh, so prefer one of the role-based sources above.
+
+#### One-time setup: attach the role to the cataloger's service account
+
+Catalogers execute in **operator-spawned snippet pods**, which run under their **own** service account (`OPERATOR_POD_SERVICE_ACCOUNT`, the Lunar chart's `<release>-script-pod`) — *not* the Lunar hub's service account. So annotate **that** service account with the role that is allowed to invoke your Backstage API:
+
+```yaml
+# service account used by cataloger/collector/policy snippet pods
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/lunar-backstage-sigv4
+```
+
+The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
+
+#### Alternative: `aws-sigv4-proxy` sidecar (no plugin config)
+
+If you'd rather keep signing out of the cataloger, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as a sidecar, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy (e.g. `http://localhost:8080`). The proxy signs every forwarded request with the pod's IAM role via the same credential chain. This also self-refreshes; it just moves the mechanism from the plugin to a deployment component.
+
+> A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.
+
 ### Layering with the GitHub Org Cataloger
 
 For organisations that already run [`github-org`](../github-org) to enumerate repos, run Backstage *after* it so its owner/domain/tag values override the GitHub defaults:
@@ -162,7 +202,7 @@ If you'd rather store bare names, set `owner_format: bare-name` to strip the `<k
 This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/features/software-catalog/software-catalog-api/) — specifically the `/api/catalog/entities` endpoint. It requires:
 
 1. **Network reach** from the Lunar Runner to the Backstage instance
-2. **A bearer token** (`LUNAR_SECRET_BACKSTAGE_TOKEN`) if the instance enforces authentication
+2. **Authentication** if the instance enforces it — either a bearer token (`LUNAR_SECRET_BACKSTAGE_TOKEN`, the default) or AWS SigV4 signing (`auth_mode: sigv4`; see [AWS SigV4 Authentication](#aws-sigv4-authentication-iam-role-signed))
 3. **Read access** to the kinds configured in `entity_kinds`
 
 Pagination is handled automatically; the cataloger streams pages until all matching entities are fetched.
