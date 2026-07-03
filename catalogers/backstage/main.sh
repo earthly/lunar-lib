@@ -27,8 +27,8 @@
 # Secrets:
 #   LUNAR_SECRET_BACKSTAGE_TOKEN   (bearer mode; sent as Bearer if present)
 #   LUNAR_SECRET_AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY / _SESSION_TOKEN
-#     (sigv4 mode; optional static-key escape hatch — role-based creds from
-#      the ambient AWS credential chain are preferred and self-refresh)
+#     (sigv4 mode; optional static-key escape hatch, tried LAST — role-based
+#      creds (IRSA / Pod Identity / ECS / EC2) are preferred and self-refresh)
 
 set -euo pipefail
 
@@ -66,23 +66,22 @@ AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
 # scheduled run re-resolves fresh ones (self-refreshing, nothing to rotate).
 AUTH_ARGS=()
 
-# resolve_aws_credentials walks the standard AWS credential provider chain and
-# sets AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
-# Order: static keys -> IRSA web-identity (STS) -> ECS task role -> EC2 IMDSv2.
+# resolve_aws_credentials walks the AWS credential provider chain and sets
+# AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
+#
+# Role-based sources are tried FIRST so an attached role always wins and stays
+# self-refreshing; explicit static keys (LUNAR_SECRET_AWS_*) are the last-resort
+# escape hatch for runners with no IAM identity. We deliberately do NOT read the
+# ambient AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env — a stray env var (from a
+# sidecar, a Secret mount, dev tooling) must not silently preempt an annotated
+# role, which would break the self-refresh guarantee the docs promise. This
+# matches the README's numbering (IRSA #1 recommended ... static #4 escape hatch).
+# Order: IRSA / EKS Pod Identity -> ECS task role -> EC2 IMDSv2 -> static secret.
 # Uses only curl + jq + python3 (all in base-main); no aws CLI / botocore.
 resolve_aws_credentials() {
     AWS_SIGV4_KEY=""; AWS_SIGV4_SECRET=""; AWS_SIGV4_TOKEN=""; CRED_SOURCE=""
 
-    # 1. Static keys — Lunar secrets first, then ambient AWS_* env.
-    local k="${LUNAR_SECRET_AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
-    local s="${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
-    local t="${LUNAR_SECRET_AWS_SESSION_TOKEN:-${AWS_SESSION_TOKEN:-}}"
-    if [ -n "$k" ] && [ -n "$s" ]; then
-        AWS_SIGV4_KEY="$k"; AWS_SIGV4_SECRET="$s"; AWS_SIGV4_TOKEN="$t"
-        CRED_SOURCE="static-keys"; return 0
-    fi
-
-    # 2. IRSA / web identity: exchange the projected token for temp creds via
+    # 1. IRSA / web identity: exchange the projected token for temp creds via
     #    STS AssumeRoleWithWebIdentity (token-authenticated POST, no signing).
     if [ -n "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" ] && [ -n "${AWS_ROLE_ARN:-}" ] \
        && [ -f "${AWS_WEB_IDENTITY_TOKEN_FILE}" ]; then
@@ -124,27 +123,35 @@ print(kid); print(sec); print(tok)
         return 1
     fi
 
-    # 3. ECS task role — container credentials endpoint (JSON).
+    # 2. ECS task role / EKS Pod Identity — container credentials endpoint (JSON).
+    #    ECS sets AWS_CONTAINER_CREDENTIALS_RELATIVE_URI + a direct-value token env;
+    #    Pod Identity (AWS's successor to IRSA) sets AWS_CONTAINER_CREDENTIALS_FULL_URI
+    #    + a token FILE that rotates, so read the file fresh at resolve time.
     if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ] || [ -n "${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI:-}" ]; then
-        local ecs_url resp; local hdr=()
+        local ecs_url resp auth_val=""; local hdr=()
         if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ]; then
             ecs_url="$AWS_CONTAINER_CREDENTIALS_FULL_URI"
         else
             ecs_url="http://169.254.170.2${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI}"
         fi
-        [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN:-}" ] && hdr=(-H "Authorization: ${AWS_CONTAINER_AUTHORIZATION_TOKEN}")
+        if [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE:-}" ] && [ -f "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE}" ]; then
+            auth_val="$(cat "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE}")"
+        elif [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN:-}" ]; then
+            auth_val="${AWS_CONTAINER_AUTHORIZATION_TOKEN}"
+        fi
+        [ -n "$auth_val" ] && hdr=(-H "Authorization: $auth_val")
         resp="$(curl -sS --connect-timeout 3 "${hdr[@]}" "$ecs_url" 2>/dev/null)" || true
         AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
         AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
         AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
         if [ -n "$AWS_SIGV4_KEY" ] && [ -n "$AWS_SIGV4_SECRET" ]; then
-            CRED_SOURCE="ecs-task-role"; return 0
+            CRED_SOURCE="container-credentials"; return 0
         fi
-        echo "ERROR: sigv4 ECS task-role credential resolution failed." >&2
+        echo "ERROR: sigv4 container-credentials (ECS / EKS Pod Identity) resolution failed." >&2
         return 1
     fi
 
-    # 4. EC2 instance profile via IMDSv2 (PUT token, then GET creds).
+    # 3. EC2 instance profile via IMDSv2 (PUT token, then GET creds).
     local imds_token role resp
     imds_token="$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
         -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 2>/dev/null)" || true
@@ -163,10 +170,20 @@ print(kid); print(sec); print(tok)
         fi
     fi
 
+    # 4. Static keys — deliberate opt-in escape hatch via LUNAR_SECRET_AWS_*
+    #    (NOT ambient AWS_* env). Last resort; these do not self-refresh.
+    if [ -n "${LUNAR_SECRET_AWS_ACCESS_KEY_ID:-}" ] && [ -n "${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY:-}" ]; then
+        AWS_SIGV4_KEY="${LUNAR_SECRET_AWS_ACCESS_KEY_ID}"
+        AWS_SIGV4_SECRET="${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY}"
+        AWS_SIGV4_TOKEN="${LUNAR_SECRET_AWS_SESSION_TOKEN:-}"
+        CRED_SOURCE="static-keys"; return 0
+    fi
+
     echo "ERROR: auth_mode=sigv4 but no AWS credentials could be resolved." >&2
-    echo "  Tried: static keys, IRSA web-identity (AWS_WEB_IDENTITY_TOKEN_FILE +" >&2
-    echo "  AWS_ROLE_ARN), ECS task role, EC2 IMDSv2. Attach an IAM role to the" >&2
-    echo "  cataloger's snippet-pod service account (see README) or set static keys." >&2
+    echo "  Tried (in order): IRSA / EKS Pod Identity web-identity, ECS / Pod Identity" >&2
+    echo "  container credentials, EC2 IMDSv2, then static LUNAR_SECRET_AWS_* keys." >&2
+    echo "  Attach an IAM role to the cataloger's snippet-pod service account (see" >&2
+    echo "  README), or set the LUNAR_SECRET_AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY secrets." >&2
     return 1
 }
 
