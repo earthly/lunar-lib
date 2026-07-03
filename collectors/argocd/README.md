@@ -4,14 +4,7 @@ Parses and validates ArgoCD `Application`, `ApplicationSet`, and `AppProject` ma
 
 ## Overview
 
-This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas with kubeconform, and records a normalized, tool-agnostic view of the GitOps deployment configuration under `.cd.gitops` on the repo's own component. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope deployments, and preserves the raw ArgoCD resource shapes under `.cd.gitops.native.argocd`. The normalized data feeds the tool-agnostic `gitops` and ArgoCD-specific `argocd` policy sets.
-
-When the ArgoCD config lives in a **separate repo** from the services it deploys, two companion collectors carry the posture cross-component:
-
-- **[`argocd-remote-push`](../argocd-remote-push/)** — runs on the GitOps repo, correlates each Application to the service it deploys, and pushes that service's posture onto the service's own component. Post-merge only (good for dashboards; can't gate PRs).
-- **[`argocd-remote-pull`](../argocd-remote-pull/)** — runs on a service repo, pulls its posture from the GitOps component at the collected sha. Gates PRs; needs a `catalog-info` mapping.
-
-Use **one** of those per service — never both (they'd both write `.cd.gitops.applications` and duplicate entries).
+This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas with kubeconform, and records a normalized, tool-agnostic view of the GitOps config under `.cd.gitops` on the repo's own component. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope deployments, and preserves the raw resource shapes under `.cd.gitops.native.argocd`. The normalized data feeds the tool-agnostic `gitops` and ArgoCD-specific `argocd` policy sets. When the ArgoCD config lives in a separate repo, the companion `argocd-remote-push` and `argocd-remote-pull` collectors carry the posture cross-component (use one per service, not both).
 
 ## Collected Data
 
@@ -25,7 +18,6 @@ This collector writes to the following Component JSON paths:
 | `.cd.gitops.applications[].sync_policy` | object | Sync policy flags (`automated`, `prune`, `self_heal`) |
 | `.cd.gitops.applications[].destination` | object | Deploy target (`server`, `name`, `namespace`) |
 | `.cd.gitops.applications[].source_ref` | object | Manifest source (`repoURL`, `path`, `targetRevision`) |
-| `.cd.gitops.applications[].component_annotation` | string | Source-component link from the `lunar.earthly.dev/component` annotation, when present |
 | `.cd.gitops.projects[]` | array | AppProjects (`name`, `valid`, `is_default`, `source_repos`, `destinations`) |
 | `.cd.gitops.native.argocd` | object | Raw, ArgoCD-specific parsed resources for advanced guardrail use |
 
