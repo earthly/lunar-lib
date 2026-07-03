@@ -282,67 +282,63 @@ unit and gates the PR's "ready" flip on its e2e.
 
 ---
 
-## One `argocd` plugin: `parse` + two correlation sub-collectors
+## Three plugins: `argocd` (validate) + `argocd-remote-push` + `argocd-remote-pull`
 
-ArgoCD config can live **with the service** (the repo ships its own `Application`) or in
-a **separate central GitOps repo**. To make the `gitops`/`argocd` policies evaluate on
-the **service** either way, the `argocd` collector carries two correlation sub-collectors
-alongside `parse`. Both feed the **same** normalized `.cd.gitops` and the **same**
-policies — two correlation front-ends, not duplicated policy surface.
+**Decision (Brandon, 2026-07-03): ship as three separate plugins**, not one plugin with
+sub-collectors. ArgoCD's validate step and its two cross-component correlation steps are
+*never* co-enabled the same way — unlike every other lib collector, whose sub-collectors
+are complementary (you'd enable them together). push and pull are mutually-exclusive
+**by repo class**, so bundling them would make the "add the collector, get all its
+sub-collectors" default actively wrong. Splitting isolates the safe/stable validate path
+(**beta**) from the two sharp cross-component paths (**experimental**, opt-in). All three
+feed the **same** normalized `.cd.gitops` and the **same** `gitops`/`argocd` policies.
 
-**One plugin, gated by `include`/`exclude`** *(per review — Brandon)*. Lib collectors
-group by *technology* and let the user select sub-collectors per repo with
-`include`/`exclude`; that mechanism already covers "different repos run different
-sub-collectors," so this stays a single `argocd` plugin rather than two. The central
-GitOps repo includes `parse` + the push sub-collector; an app/service repo includes the
-pull one (+ `parse` if it ships local Argo files).
+| Plugin | Status | Runs on | What it does | Code |
+| -- | -- | -- | -- | -- |
+| **`argocd`** | beta | any repo containing ArgoCD files | parse + kubeconform-validate `argoproj.io/*` CRDs → normalized `.cd.gitops` on that repo's own component | `main.sh` / `parse.sh` |
+| **`argocd-remote-push`** | experimental | the repo that holds the ArgoCD files (central GitOps repo) | correlate each `Application` → the app/service component in Lunar (image-match/annotation), push its deployment posture onto **that** component out-of-band (`lunar collect --component/--sha`) | `link_push.sh` |
+| **`argocd-remote-pull`** | experimental | an app/service repo | pull this service's `Application` from the GitOps component (`get-json` via a `catalog-info` mapping) and self-write `.cd.gitops` at the collected SHA (incl. a PR head) | `link_pull.sh` |
 
-The distinction (Vlad's framing — past vs future):
+### When to use each
 
-- **Currently deployed (push).** Runs on the **central GitOps repo**: correlates each
-  `Application` to the **service it deploys** (image-match) and records that deployed
-  posture onto the service via out-of-band `CollectExternal`. It writes at the service's
-  *default-branch HEAD* (it must — the Hub drops a SHA it hasn't ingested, Component 3
-  gotcha #2), so it describes **post-merge main only**. It **cannot** gate a PR; it
-  answers "what is deployed, and which source repo built it."
-- **Going to be deployed (pull).** Runs on each **app/service repo**: `get-json`s this
-  service's `Application` from the GitOps component and materializes `.cd.gitops` onto
-  the service at the SHA being collected — **including a PR head SHA** — so the policies
-  enforce "does this change fit the deployment requirements" **at PR time**.
+- **`argocd`** — you have ArgoCD YAML in a repo and want it validated + surfaced as
+  `.cd.gitops` for the guardrails. The common case; safe; start here.
+- **`argocd-remote-push`** — your ArgoCD config lives in a *central GitOps repo* and you
+  want each service's deployment posture to appear on the *service's* own component
+  automatically, with **zero config in the service repos**. Runs on the GitOps repo. It
+  re-parses internally (sources `parse.sh`), so it's self-contained — you needn't also
+  enable `argocd`, though you may want it so the GitOps repo's *own* component shows its
+  validated config. **Only ever lands on the service's default-branch HEAD → cannot gate
+  PRs; it's a post-merge system of record.**
+- **`argocd-remote-pull`** — you want your service's deployment posture on your *own*
+  component **at PR time**, so policies gate your PRs. Runs on the service repo; needs a
+  `catalog-info.yaml` mapping (or a direct input) naming the GitOps component +
+  Application(s). **Lands on the collected SHA incl. a PR head → the only one that gates
+  PRs.**
 
-### The two sub-collectors
+### Be careful running push + pull together
 
-| Sub-collector | Runs on | Job | Today's code |
-| -- | -- | -- | -- |
-| **`push-deployed-state`** | central **GitOps repo** | correlate each `Application` → the service it deploys, record the deployed posture onto that service (out-of-band) | `link_push.sh` |
-| **`pull-deployment-readiness`** | each **app / service repo** | `get-json` this service's `Application` from the GitOps component and self-write `.cd.gitops` at the collected SHA, so PR checks validate the upcoming deployment | `link_pull.sh` |
+`argocd-remote-push` and `argocd-remote-pull` can both end up writing
+`.cd.gitops.applications` onto the **same service component** — push from the GitOps
+repo's run, pull from the service's own run. The Hub **appends** across collection
+records (never upserts), so the same `Application` lands **twice**: policy *verdicts*
+don't flip (identical entries → same pass/fail), but coverage **counts double** and the
+two can **transiently disagree** (push = currently-deployed at main HEAD; pull =
+declared-at-this-SHA). **So pick ONE propagation path per service:**
 
-> **Naming — converging, pending Vlad.** Both reviewers agree the bare
-> `link-push`/`link-pull` names leak our implementation mental-model. Brandon's proposal
-> keeps `push`/`pull` as a *locational* prefix (it says where the sub-collector runs)
-> **paired with the outcome**: `push-deployed-state` / `pull-deployment-readiness`.
-> Vlad's earlier note wanted push/pull *out* of the user-facing name entirely — so the
-> prefix is his call to bless. Pure-outcome fallbacks if he'd rather drop it:
-> `deployed-state` / `deployment-readiness`.
+- **push** — zero service-repo config, post-merge correlation/dashboards, *no* PR gate.
+- **pull** — PR-time enforcement, costs a `catalog-info` mapping.
 
-### Don't enable both on the same service — pick one
+(`argocd` + `argocd-remote-push` on the same GitOps repo is fine — complementary. The
+push skip-guard only dedupes push-vs-push, so it won't catch a push+pull overlap; a
+hub-side supersede-instead-of-append is the real fix.)
 
-Both write `.cd.gitops.applications`. If a service is **both** push-targeted (by the
-GitOps repo) **and** runs pull, both land at the same `(component, sha)` and the Hub
-**concatenates** the two collection records (it appends, never upserts) → the same
-`Application` appears **twice**. Policy *verdicts* don't flip (identical entries → same
-pass/fail), but coverage **counts double** and the two entries can **transiently
-disagree** (push = currently-deployed, pull = declared-at-this-SHA). So the guidance is
-**one per service**: push for zero-config post-merge correlation/dashboards (no PR
-gate); pull for PR-time enforcement (costs a `catalog-info` mapping). The push
-skip-guard only dedupes push-vs-push, so it won't catch a push+pull overlap — a proper
-fix is platform-side (supersede external records instead of appending).
-
-> **Decision pending (Vlad).** (1) One plugin + `include`/`exclude` *(recommended —
-> matches lib convention)* vs two separate plugins *(Vlad's original ask)*; (2) keep the
-> `push`/`pull` prefix in the sub-collector names *(Brandon: yes, it's locational)* vs
-> pure-outcome names *(Vlad's earlier note)*. I rename structure + sub-collectors in one
-> pass once these land.
+> **Naming — Brandon's call (2026-07-03), pending Vlad's nod.** `argocd` (beta) +
+> `argocd-remote-push` / `argocd-remote-pull` (experimental). These keep `push`/`pull` —
+> which Vlad earlier flagged as implementation-jargon — but pair them with `remote` to
+> signal the cross-component nature and the *direction* of the data flow (which **is**
+> user-observable when you're deciding which plugin goes on which repo). Easy swap to
+> pure-outcome names before the restructure if Vlad prefers.
 
 ### Pull is a collector read, NOT an in-policy SQL query
 
@@ -469,12 +465,23 @@ Policies (`argocd`, specific):
 ## File layout
 
 ```
-collectors/argocd/
-  lunar-collector.yml      # parse + push-deployed-state + pull-deployment-readiness sub-collectors (all code hooks)
-  main.sh                  # parse: kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
-  link_push.sh             # push-deployed-state: resolve Application -> source component, out-of-band lunar collect --component/--sha
-  link_pull.sh             # pull-deployment-readiness: get-json this service's Application from the GitOps component, self-write .cd.gitops
-  Earthfile                # custom image: kubeconform + argoproj CRD schemas
+collectors/argocd/                 # plugin 1 (beta) — validate
+  lunar-collector.yml              # name: argocd; one `parse` collector (code hook)
+  main.sh / parse.sh               # parse + kubeconform-validate argoproj.io/* CRDs -> .cd.gitops
+  Earthfile                        # image: kubeconform + argoproj CRD schemas
+  README.md, assets/
+collectors/argocd-remote-push/     # plugin 2 (experimental) — cross-component push
+  lunar-collector.yml              # name: argocd-remote-push
+  link_push.sh + parse.sh          # re-parses (sources parse.sh), correlate App -> service, out-of-band lunar collect --component/--sha
+  Earthfile                        # image: kubeconform + CRD schemas + lunar CLI/jq
+  README.md, assets/
+collectors/argocd-remote-pull/     # plugin 3 (experimental) — cross-component pull
+  lunar-collector.yml              # name: argocd-remote-pull
+  link_pull.sh                     # get-json GitOps component -> self-write .cd.gitops at collected sha (incl PR head)
+  Earthfile                        # image: lunar CLI + jq
+  README.md, assets/
+# NOTE: parse.sh is shared (remote-push sources it). Plugin dirs are self-contained, so
+# remote-push carries its own copy (or we extract a shared snippet) — confirm at impl.
 policies/gitops/           # tool-agnostic (any GitOps tool); reads normalized .cd.gitops
   sync_policy.py
   source_repo_allowlist.py
