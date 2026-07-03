@@ -10,24 +10,12 @@ author: earthly
 default_image: earthly/lunar-lib:argocd-main
 
 landing_page:
-  display_name: "ArgoCD Remote Push"
+  display_name: "ArgoCD Remote Push Collector"
   long_description: |
-    Runs on the repo that HOLDS the ArgoCD files (a central GitOps repo). For
-    each Application it correlates the app to the source/service component that
-    builds its image (annotation -> image-match -> repoURL, first match wins)
-    and writes that app's deployment posture onto THAT service's Component JSON
-    out-of-band (lunar collect --component/--sha), so the gitops/argocd policies
-    evaluate on the service even though the ArgoCD config lives elsewhere.
-
-    Because the out-of-band write lands on the service's default-branch HEAD, the
-    posture only ever describes post-merge main — it CANNOT gate a PR. Use it for
-    correlation and dashboards with zero configuration in the service repos.
-
-    Careful: do NOT also run argocd-remote-pull on the same service. Both write
-    .cd.gitops.applications and the hub appends across collection records, so the
-    same Application would appear twice (verdicts don't change, but coverage
-    double-counts). Pick one path per service — push (this one; zero service
-    config, post-merge only) or pull (PR-time gating).
+    Runs on a central GitOps repo, correlates each ArgoCD Application to the
+    service that builds its image, and pushes that service's deployment posture
+    onto its own component out-of-band. Post-merge only (cannot gate PRs). Do
+    not also run argocd-remote-pull on the same service.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "experimental"

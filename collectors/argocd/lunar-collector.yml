@@ -9,17 +9,10 @@ default_image: earthly/lunar-lib:argocd-main
 landing_page:
   display_name: "ArgoCD Collector"
   long_description: |
-    Scans a repository for ArgoCD custom resources (argoproj.io/*), validates
-    each against the argoproj CRD schemas with kubeconform, and writes a
-    normalized, tool-agnostic view of the GitOps configuration to .cd.gitops on
-    the repo's own component. Works for a dedicated GitOps repo (many
-    Applications) or a service repo that ships its own ArgoCD files.
-
-    When the ArgoCD config lives in a SEPARATE repo from the services it deploys,
-    two companion collectors carry the posture cross-component: argocd-remote-push
-    (runs on the GitOps repo, pushes each service's posture onto that service)
-    and argocd-remote-pull (runs on a service repo, pulls its posture for PR-time
-    checks). Use one of those per service — not both.
+    Parses and validates ArgoCD Application, ApplicationSet, and AppProject
+    manifests against the argoproj CRD schemas and writes a normalized
+    .cd.gitops view for the gitops and argocd policies. Works for a central
+    GitOps repo or a service that ships its own ArgoCD files.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "beta"

@@ -8,31 +8,19 @@ author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "ArgoCD Remote Pull"
+  display_name: "ArgoCD Remote Pull Collector"
   long_description: |
-    Runs on an app/service repo. Reads a predeclared app -> Application mapping
-    from catalog-info.yaml (or direct inputs), pulls the matching Application(s)
-    from the central GitOps component via lunar component get-json, and
-    materializes .cd.gitops onto the service's OWN component.
-
-    Because it runs in the service's own collection it lands on the sha being
-    collected — including a PR head sha — so the gitops/argocd policies gate the
-    upcoming deployment at PR time. This is the only variant that enforces at PR
-    time. It does no automatic correlation: the dev team predeclares the mapping.
-
-    Careful: do NOT also target the same service with argocd-remote-push. Both
-    write .cd.gitops.applications and the hub appends across collection records,
-    so the same Application would appear twice (verdicts don't change, but
-    coverage double-counts). Pick one path per service — pull (this one; PR-time
-    gating, needs a catalog-info mapping) or push (zero service config,
-    post-merge only).
+    Runs on a service repo and pulls that service's ArgoCD deployment posture
+    from a central GitOps component (via a catalog-info mapping) onto its own
+    component at the collected sha, so policies gate at PR time. Do not also
+    target the service with argocd-remote-push.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "experimental"
   related:
     - slug: "argocd"
       type: "collector"
-      reason: "Parses/validates the ArgoCD resources in the GitOps repo this collector pulls from"
+      reason: "Validates the ArgoCD resources in the GitOps repo this collector pulls from"
     - slug: "argocd-remote-push"
       type: "collector"
       reason: "The push counterpart — use one or the other per service, not both"
