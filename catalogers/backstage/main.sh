@@ -20,8 +20,15 @@
 #   default_owner             (default empty)
 #   domain_default_description (default empty)
 #   filter                    (default empty) Raw Backstage filter clause
+#   auth_mode                 (default bearer) bearer | sigv4
+#   aws_region                (sigv4 only; falls back to AWS_REGION env)
+#   aws_service               (sigv4 only; default execute-api)
 #
-# Secret: LUNAR_SECRET_BACKSTAGE_TOKEN (optional; sent as Bearer if present)
+# Secrets:
+#   LUNAR_SECRET_BACKSTAGE_TOKEN   (bearer mode; sent as Bearer if present)
+#   LUNAR_SECRET_AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY / _SESSION_TOKEN
+#     (sigv4 mode; optional static-key escape hatch — role-based creds from
+#      the ambient AWS credential chain are preferred and self-refresh)
 
 set -euo pipefail
 
@@ -49,12 +56,154 @@ MAX_RETRIES="${MAX_RETRIES:-5}"
 INITIAL_BACKOFF="${INITIAL_BACKOFF:-5}"
 BATCH_SIZE="${BATCH_SIZE:-1000}"
 
-AUTH_HEADER=()
-if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
-    AUTH_HEADER=(-H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN")
-fi
+AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
+
+# --- Authentication -------------------------------------------------------
+# AUTH_ARGS holds the curl arguments used for every request: a Bearer header
+# (bearer mode) or the SigV4 signing flags + session-token header (sigv4).
+# For sigv4 we resolve credentials ONCE here and reuse them for all pages —
+# temporary role credentials last well beyond a single catalog walk, and each
+# scheduled run re-resolves fresh ones (self-refreshing, nothing to rotate).
+AUTH_ARGS=()
+
+# resolve_aws_credentials walks the standard AWS credential provider chain and
+# sets AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
+# Order: static keys -> IRSA web-identity (STS) -> ECS task role -> EC2 IMDSv2.
+# Uses only curl + jq + python3 (all in base-main); no aws CLI / botocore.
+resolve_aws_credentials() {
+    AWS_SIGV4_KEY=""; AWS_SIGV4_SECRET=""; AWS_SIGV4_TOKEN=""; CRED_SOURCE=""
+
+    # 1. Static keys — Lunar secrets first, then ambient AWS_* env.
+    local k="${LUNAR_SECRET_AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
+    local s="${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+    local t="${LUNAR_SECRET_AWS_SESSION_TOKEN:-${AWS_SESSION_TOKEN:-}}"
+    if [ -n "$k" ] && [ -n "$s" ]; then
+        AWS_SIGV4_KEY="$k"; AWS_SIGV4_SECRET="$s"; AWS_SIGV4_TOKEN="$t"
+        CRED_SOURCE="static-keys"; return 0
+    fi
+
+    # 2. IRSA / web identity: exchange the projected token for temp creds via
+    #    STS AssumeRoleWithWebIdentity (token-authenticated POST, no signing).
+    if [ -n "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" ] && [ -n "${AWS_ROLE_ARN:-}" ] \
+       && [ -f "${AWS_WEB_IDENTITY_TOKEN_FILE}" ]; then
+        local wit resp
+        wit="$(cat "$AWS_WEB_IDENTITY_TOKEN_FILE")"
+        resp="$(curl -sS -X POST "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
+            --data-urlencode "Action=AssumeRoleWithWebIdentity" \
+            --data-urlencode "Version=2011-06-15" \
+            --data-urlencode "RoleArn=${AWS_ROLE_ARN}" \
+            --data-urlencode "RoleSessionName=${AWS_ROLE_SESSION_NAME:-lunar-backstage-cataloger}" \
+            --data-urlencode "DurationSeconds=3600" \
+            --data-urlencode "WebIdentityToken=${wit}" 2>/dev/null)" || true
+        # STS query protocol returns XML; parse with python3 stdlib.
+        local parsed
+        parsed="$(printf '%s' "$resp" | python3 -c '
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.fromstring(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+def find(tag):
+    for el in root.iter():
+        if el.tag.split("}")[-1] == tag:
+            return el.text or ""
+    return ""
+kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
+if not (kid and sec):
+    sys.exit(1)
+print(kid); print(sec); print(tok)
+' 2>/dev/null)" || true
+        if [ -n "$parsed" ]; then
+            AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+            AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+            AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+            CRED_SOURCE="irsa-web-identity"; return 0
+        fi
+        echo "ERROR: sigv4 web-identity (IRSA) credential resolution failed. STS response head:" >&2
+        printf '%s' "$resp" | head -c 300 >&2; echo "" >&2
+        return 1
+    fi
+
+    # 3. ECS task role — container credentials endpoint (JSON).
+    if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ] || [ -n "${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI:-}" ]; then
+        local ecs_url resp; local hdr=()
+        if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ]; then
+            ecs_url="$AWS_CONTAINER_CREDENTIALS_FULL_URI"
+        else
+            ecs_url="http://169.254.170.2${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI}"
+        fi
+        [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN:-}" ] && hdr=(-H "Authorization: ${AWS_CONTAINER_AUTHORIZATION_TOKEN}")
+        resp="$(curl -sS --connect-timeout 3 "${hdr[@]}" "$ecs_url" 2>/dev/null)" || true
+        AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
+        AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
+        AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
+        if [ -n "$AWS_SIGV4_KEY" ] && [ -n "$AWS_SIGV4_SECRET" ]; then
+            CRED_SOURCE="ecs-task-role"; return 0
+        fi
+        echo "ERROR: sigv4 ECS task-role credential resolution failed." >&2
+        return 1
+    fi
+
+    # 4. EC2 instance profile via IMDSv2 (PUT token, then GET creds).
+    local imds_token role resp
+    imds_token="$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 2>/dev/null)" || true
+    if [ -n "$imds_token" ]; then
+        role="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+            "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>/dev/null)" || true
+        if [ -n "$role" ]; then
+            resp="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+                "http://169.254.169.254/latest/meta-data/iam/security-credentials/${role}" 2>/dev/null)" || true
+            AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
+            AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
+            AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
+            if [ -n "$AWS_SIGV4_KEY" ] && [ -n "$AWS_SIGV4_SECRET" ]; then
+                CRED_SOURCE="ec2-instance-profile"; return 0
+            fi
+        fi
+    fi
+
+    echo "ERROR: auth_mode=sigv4 but no AWS credentials could be resolved." >&2
+    echo "  Tried: static keys, IRSA web-identity (AWS_WEB_IDENTITY_TOKEN_FILE +" >&2
+    echo "  AWS_ROLE_ARN), ECS task role, EC2 IMDSv2. Attach an IAM role to the" >&2
+    echo "  cataloger's snippet-pod service account (see README) or set static keys." >&2
+    return 1
+}
+
+case "$AUTH_MODE" in
+    bearer)
+        if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
+            AUTH_ARGS=(-H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN")
+        fi
+        ;;
+    sigv4)
+        AWS_SIGV4_REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
+        AWS_SIGV4_SERVICE="${LUNAR_VAR_AWS_SERVICE:-execute-api}"
+        if [ -z "$AWS_SIGV4_REGION" ]; then
+            echo "ERROR: aws_region required for sigv4 (set the aws_region input or the AWS_REGION env var)" >&2
+            exit 1
+        fi
+        if ! resolve_aws_credentials; then
+            exit 1
+        fi
+        AUTH_ARGS=(--aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:${AWS_SIGV4_SERVICE}" \
+                   --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}")
+        if [ -n "${AWS_SIGV4_TOKEN:-}" ]; then
+            AUTH_ARGS+=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+        fi
+        ;;
+    *)
+        echo "ERROR: invalid auth_mode '$AUTH_MODE' (expected 'bearer' or 'sigv4')" >&2
+        exit 1
+        ;;
+esac
 
 echo "Cataloging Backstage entities from: $BACKSTAGE_URL"
+if [ "$AUTH_MODE" = "sigv4" ]; then
+    echo "Auth: SigV4 (region=$AWS_SIGV4_REGION service=$AWS_SIGV4_SERVICE, credentials via $CRED_SOURCE)"
+else
+    echo "Auth: bearer${LUNAR_SECRET_BACKSTAGE_TOKEN:+ (token set)}"
+fi
 echo "Kinds: $ENTITY_KINDS"
 echo "Namespace: $NAMESPACE"
 echo "Component id: $COMPONENT_ID_PREFIX + <annotation '$COMPONENT_ID_ANNOTATION'>"
@@ -95,7 +244,7 @@ fetch_page() {
         response_file=$(mktemp)
         local http_status
         http_status=$(curl -sS -o "$response_file" -w '%{http_code}' \
-            "${AUTH_HEADER[@]}" \
+            "${AUTH_ARGS[@]}" \
             -H "Accept: application/json" \
             "$url" 2>/dev/null || echo "000")
         local body
