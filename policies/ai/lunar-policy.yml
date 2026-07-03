@@ -89,8 +89,9 @@ policies:
       AI-authored, via which tool/signal) and the per-commit disclosed flag the ai-fingerprints
       collector sets by cross-referencing ai.authorship (git-ai notes / AI- trailers). Passes
       when undisclosed_commits is at or below max_undisclosed_commits. Skips when no fingerprint
-      data exists (the ai collector isn't running the ai-fingerprints sub-collector). Defaults to
-      warning severity — fingerprints are a heuristic signal, not proof of low-quality code.
+      data exists (the ai collector isn't running the ai-fingerprints sub-collector). This is a
+      heuristic signal, not a verdict: a co-author trailer means an assistant touched the commit,
+      not that the code is low quality.
     mainPython: no_undisclosed_ai.py
     keywords: ["undisclosed ai", "llm code", "ai detection", "authorship disclosure"]
 

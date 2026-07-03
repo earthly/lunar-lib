@@ -8,16 +8,16 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 
 ## Policies
 
-| Policy | Severity | Description |
-|--------|----------|-------------|
-| `code-reviewer` | error | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
-| `instruction-file-exists` | error | An agent instruction file must exist at the repo root |
-| `canonical-naming` | warning | Root instruction file should use the vendor-neutral name (AGENTS.md) |
-| `instruction-file-length` | warning | Root instruction file must be within configured length bounds |
-| `instruction-file-sections` | warning | Root instruction file must contain required section headings |
-| `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
-| `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
-| `no-undisclosed-ai` | warning | Commits with AI fingerprints but no disclosure annotation must stay at or below the configured threshold |
+| Policy | Description |
+|--------|-------------|
+| `code-reviewer` | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
+| `instruction-file-exists` | An agent instruction file must exist at the repo root |
+| `canonical-naming` | Root instruction file should use the vendor-neutral name (AGENTS.md) |
+| `instruction-file-length` | Root instruction file must be within configured length bounds |
+| `instruction-file-sections` | Root instruction file must contain required section headings |
+| `plans-dir-exists` | A dedicated AI plans directory should exist |
+| `ai-authorship-annotated` | Commits should include AI authorship annotations |
+| `no-undisclosed-ai` | Commits with AI fingerprints but no disclosure annotation must stay at or below the configured threshold |
 
 ## Required Data
 
