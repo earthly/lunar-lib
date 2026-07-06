@@ -10,7 +10,9 @@ landing_page:
   long_description: |
     Parses and lints Backstage catalog-info.yaml files. Writes the raw
     Backstage descriptor (apiVersion, kind, metadata, spec) to
-    .catalog.native.backstage, preserving annotations as-is.
+    .catalog.native.backstage, preserving annotations as-is. Optionally
+    verifies the referenced domain and system exist in a live Backstage
+    catalog.
   categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "beta"
@@ -28,15 +30,47 @@ collectors:
       with their `backstage.io/` or vendor prefixes. Lints the file for
       schema/syntax issues and writes any findings to
       `.catalog.native.backstage.valid` and `.catalog.native.backstage.errors[]`.
+      When `backstage_url` is configured, it additionally performs a
+      referential-integrity check: for each grouping reference declared in the
+      file (`spec.domain`, `spec.system`) it queries the Backstage catalog API
+      (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and
+      records whether the referenced entity exists under
+      `.catalog.native.backstage.refs`. A 200 means the entity exists
+      (`exists: true`); a 404 means it is declared but missing (`exists: false`).
+      When `backstage_url` is empty (the default) no lookups run and `.refs` is
+      not written — behavior is identical to today.
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint"]
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity"]
 
 inputs:
   paths:
     description: Comma-separated list of catalog file paths to check (first match wins)
     default: "catalog-info.yaml,catalog-info.yml"
+  backstage_url:
+    description: |
+      Base URL of the Backstage instance (e.g. https://backstage.example.com).
+      When set, the collector cross-checks each declared spec.domain and
+      spec.system against the Backstage catalog API and records the result
+      under `.catalog.native.backstage.refs`. Empty (the default) disables
+      referential-integrity lookups — the collector only parses and lints the
+      local file, exactly as before.
+    default: ""
+  namespace:
+    description: |
+      Backstage namespace used when resolving entity references via
+      `/api/catalog/entities/by-name/<kind>/<namespace>/<name>`. Only used when
+      `backstage_url` is set.
+    default: "default"
+
+secrets:
+  BACKSTAGE_TOKEN:
+    description: |
+      Bearer token for the Backstage catalog API, sent as an
+      `Authorization: Bearer` header. Only used when `backstage_url` is set;
+      required if the Backstage instance needs authentication (many internal
+      deployments do).
 
 example_component_json: |
   {
@@ -63,10 +97,15 @@ example_component_json: |
             "type": "service",
             "owner": "team-payments",
             "lifecycle": "production",
+            "domain": "payments",
             "system": "payment-platform",
             "providesApis": ["payment-api"],
             "consumesApis": ["user-api", "notification-api"],
             "dependsOn": ["resource:database-payments", "resource:cache-redis"]
+          },
+          "refs": {
+            "domain": { "name": "payments", "exists": true },
+            "system": { "name": "payment-platform", "exists": true }
           }
         }
       }
