@@ -30,6 +30,12 @@ collectors:
       using Trivy. Writes normalized findings to .sca with severity counts,
       CVE IDs, affected packages, and fix versions.
     mainBash: auto.sh
+    # trivy fs materializes the vulnerability DB and scans the cloned repo, whose
+    # combined footprint overruns the default (medium) 1Gi ephemeral-storage limit
+    # and gets the pod evicted (ENG-1127). large raises the ephemeral limit to 4Gi.
+    # Mirrors the sibling grype collector, which declares large for the same reason.
+    # Requires a Hub honoring size (ENG-983).
+    size: large
     hook:
       type: code
     keywords: ["trivy", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
@@ -53,6 +59,9 @@ collectors:
       dependency picks up a new CVE later. Runs the same scan as the `auto`
       collector (the sibling auto.sh) in the Trivy collector image.
     mainBash: auto.sh
+    # Same scan as `auto` (the sibling auto.sh), so the same large profile for the
+    # vulnerability-DB + repo disk footprint that overruns the default 1Gi limit.
+    size: large
     # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
     # self-default ([default-branch]) blocks runs_on inheritance from a
     # consumer's `uses:` line, so the import line cannot toggle this — the value
