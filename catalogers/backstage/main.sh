@@ -2,7 +2,7 @@
 #
 # Backstage Cataloger — sync entities from a Backstage instance into Lunar.
 #
-# Fetches /api/catalog/entities (paginated), routes:
+# Fetches <api_path_prefix>/catalog/entities (paginated), routes:
 #   - Component, API, Resource → .components (keyed by <id_prefix><annotation value>)
 #   - Domain, System          → .domains    (keyed by metadata.name)
 # Applies owner_format (as-is | bare-name), derived bs-type-*/bs-lifecycle-*
@@ -10,6 +10,8 @@
 #
 # Inputs (LUNAR_VAR_*):
 #   backstage_url             (required) Base URL of the Backstage instance
+#   api_path_prefix           (default /api) Path prefix before /catalog/entities;
+#                             set to "" for a Backstage API mounted at the root
 #   entity_kinds              (default Component,Domain) Comma-separated kinds
 #   namespace                 (default default) Namespace, or "*" for all
 #   component_id_annotation   (default github.com/project-slug)
@@ -27,6 +29,22 @@ set -euo pipefail
 
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:?backstage_url input is required}"
 BACKSTAGE_URL="${BACKSTAGE_URL%/}"
+
+# Path prefix prepended before `/catalog/entities`. Defaults to `/api` (the
+# standard Backstage layout). Set to "" for an instance whose catalog API is
+# mounted at the root — e.g. behind an API gateway that strips the `/api` hop.
+# `-` not `:-` (same treatment as TAG_PREFIX below): an explicit empty value
+# must survive so it can disable the prefix. The hub always sets
+# LUNAR_VAR_API_PATH_PREFIX — to the manifest default `/api` when unset in
+# config, or the user's value (including "") when set — so `-/api` only fires
+# for a truly-unset var (direct local invocation), not a config-supplied "".
+API_PATH_PREFIX="${LUNAR_VAR_API_PATH_PREFIX-/api}"
+# Normalize: drop any trailing slash, and ensure a non-empty value leads with a
+# slash — so `api`, `/api`, and `/api/` all resolve to `/api`, and "" stays "".
+API_PATH_PREFIX="${API_PATH_PREFIX%/}"
+if [ -n "$API_PATH_PREFIX" ] && [ "${API_PATH_PREFIX#/}" = "$API_PATH_PREFIX" ]; then
+    API_PATH_PREFIX="/$API_PATH_PREFIX"
+fi
 
 ENTITY_KINDS="${LUNAR_VAR_ENTITY_KINDS:-Component,Domain}"
 NAMESPACE="${LUNAR_VAR_NAMESPACE:-default}"
@@ -54,7 +72,7 @@ if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
     AUTH_HEADER=(-H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN")
 fi
 
-echo "Cataloging Backstage entities from: $BACKSTAGE_URL"
+echo "Cataloging Backstage entities from: $BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities"
 echo "Kinds: $ENTITY_KINDS"
 echo "Namespace: $NAMESPACE"
 echo "Component id: $COMPONENT_ID_PREFIX + <annotation '$COMPONENT_ID_ANNOTATION'>"
@@ -86,7 +104,7 @@ done
 # --- Paginated fetch -----------------------------------------------------
 fetch_page() {
     local offset="$1"
-    local url="$BACKSTAGE_URL/api/catalog/entities?limit=$PAGE_SIZE&offset=$offset$FILTER_QUERY"
+    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities?limit=$PAGE_SIZE&offset=$offset$FILTER_QUERY"
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF
