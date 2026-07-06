@@ -103,8 +103,8 @@ done
 
 # --- Paginated fetch -----------------------------------------------------
 fetch_page() {
-    local offset="$1"
-    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE$FILTER_QUERY"
+    local cursor="$1"
+    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&after=$cursor}$FILTER_QUERY"
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF
@@ -126,19 +126,19 @@ fetch_page() {
         fi
 
         if [ "$http_status" = "429" ] || [[ "$http_status" =~ ^5 ]] || [ "$http_status" = "000" ]; then
-            echo "Transient $http_status from Backstage (attempt $attempt/$MAX_RETRIES, offset=$offset), waiting ${backoff}s..." >&2
+            echo "Transient $http_status from Backstage (attempt $attempt/$MAX_RETRIES, cursor=$cursor), waiting ${backoff}s..." >&2
             sleep "$backoff"
             backoff=$((backoff * 2))
             attempt=$((attempt + 1))
             continue
         fi
 
-        echo "Error from Backstage ($http_status) at offset=$offset:" >&2
+        echo "Error from Backstage ($http_status) at cursor=$cursor:" >&2
         echo "$body" | head -c 500 >&2
         echo "" >&2
         return 1
     done
-    echo "Failed to fetch page at offset=$offset after $MAX_RETRIES attempts" >&2
+    echo "Failed to fetch page at cursor=$cursor after $MAX_RETRIES attempts" >&2
     return 1
 }
 
@@ -146,10 +146,11 @@ ALL_ENTITIES=$(mktemp)
 trap 'rm -f "$ALL_ENTITIES" "${ALL_ENTITIES}.chunk" "${ALL_ENTITIES}.new" "${ALL_ENTITIES}.entries"' EXIT
 echo "[]" > "$ALL_ENTITIES"
 
-OFFSET=0
+CURSOR=""
 TOTAL_FETCHED=0
 while true; do
-    PAGE=$(fetch_page "$OFFSET")
+    RESPONSE=$(fetch_page "$CURSOR")
+    PAGE=$(echo "$RESPONSE" | jq '.items')
     PAGE_COUNT=$(echo "$PAGE" | jq 'length')
 
     if [ "$PAGE_COUNT" -eq 0 ]; then
@@ -162,13 +163,13 @@ while true; do
     rm -f "${ALL_ENTITIES}.chunk"
 
     TOTAL_FETCHED=$((TOTAL_FETCHED + PAGE_COUNT))
-    echo "  fetched offset=$OFFSET page=$PAGE_COUNT total=$TOTAL_FETCHED"
+    echo "  fetched cursor=${CURSOR:-start} page=$PAGE_COUNT total=$TOTAL_FETCHED"
 
-    if [ "$PAGE_COUNT" -lt "$PAGE_SIZE" ]; then
+    NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.pageInfo.nextCursor // empty')
+    if [ -z "$NEXT_CURSOR" ]; then
         break
     fi
-
-    OFFSET=$((OFFSET + PAGE_SIZE))
+    CURSOR="$NEXT_CURSOR"
 done
 
 echo "Total entities fetched: $TOTAL_FETCHED"
