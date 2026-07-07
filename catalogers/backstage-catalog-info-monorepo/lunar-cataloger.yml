@@ -94,19 +94,23 @@ inputs:
       repo's default branch.
     default: ""
 
-  skip_root_file:
+  exclude_paths:
     description: |
-      When `true` (the default), a `catalog-info.yaml` at the repo
-      root is ignored and only files in subdirectories become
-      components. This cataloger is designed to run alongside the
-      `backstage-catalog-info` cataloger, which already reads the root
-      file onto the repo-level component — so by default this one
-      stays out of the root and just adds the per-subdirectory
-      subcomponents, giving a clean division of labor with no
-      double-writes. Set it to `false` to also process the root file
-      (mapping it to the repo-level component id) when you run this
-      cataloger on its own without `backstage-catalog-info`.
-    default: "true"
+      Comma-separated list of file paths (relative to the repo root)
+      to skip during discovery. An entry matches a discovered file by
+      exact path or as a glob (e.g. `legacy/*/catalog-info.yaml`).
+      Excluded files never become components. The default excludes a
+      root `catalog-info.yaml` / `.yml`, because this cataloger is
+      designed to run alongside the `backstage-catalog-info`
+      cataloger, which already reads the root file onto the repo-level
+      component — so out of the box this one stays out of the root and
+      just adds the per-subdirectory subcomponents, no double-writes.
+      Set it to an empty string to also process the root file (mapping
+      it to the repo-level component id) when you run this cataloger on
+      its own, or extend it to fence off additional paths. This is the
+      platform-controlled exclusion: it lives in `lunar-config.yml`,
+      so dev teams can't override it from their repos.
+    default: "catalog-info.yaml,catalog-info.yml"
 
   component_id_prefix:
     description: |
@@ -163,6 +167,24 @@ inputs:
       reference. Leave empty to leave such components without a
       domain.
     default: ""
+
+  allow_ignore_annotation:
+    description: |
+      When `true`, a discovered `Component` whose `catalog-info.yaml`
+      carries the ignore annotation (see `ignore_annotation`) set to a
+      truthy value (`true` / `yes` / `1`) is skipped — no component is
+      created for it. This delegates opt-out to the dev teams that own
+      the `catalog-info.yaml` files. Leave `false` (the default) to
+      ignore the annotation entirely, keeping exclusion under platform
+      control via `exclude_paths`.
+    default: "false"
+
+  ignore_annotation:
+    description: |
+      Annotation key checked when `allow_ignore_annotation` is `true`.
+      A `Component` with this annotation set to `true` / `yes` / `1`
+      is skipped. Ignored unless `allow_ignore_annotation` is enabled.
+    default: "lunar.io/ignore"
 
 secrets:
   GH_TOKEN:

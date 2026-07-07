@@ -105,7 +105,7 @@ Set the GitHub token used to walk each repo's tree and fetch each `catalog-info.
 lunar secret set GH_TOKEN <your-github-token>
 ```
 
-The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`filenames`, `branch`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`) are documented in `lunar-cataloger.yml`.
+The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
 
 ### Layering With Component-Defining Catalogers
 
@@ -114,7 +114,7 @@ This cataloger and [`github-org`](../github-org) both *create* components, at di
 - **`github-org`** creates one **repo-level** component per repository (`github.com/acme/monorepo`).
 - **`backstage-catalog-info-monorepo`** creates one component per **`catalog-info.yaml`** — for a monorepo, that's a subcomponent per service directory (`github.com/acme/monorepo/services/payments`).
 
-Running both is the intended monorepo setup: `github-org` (and/or the augment `backstage-catalog-info`) owns the repo-level component, and this cataloger adds one subcomponent per catalog-info file. By default (`skip_root_file: true`) this cataloger ignores a root `catalog-info.yaml` and creates subcomponents only, so it never competes for the repo-level id. Set `skip_root_file: false` to also map a root file to `github.com/<owner>/<repo>` when you run this cataloger on its own.
+Running both is the intended monorepo setup: `github-org` (and/or the augment `backstage-catalog-info`) owns the repo-level component, and this cataloger adds one subcomponent per catalog-info file. By default `exclude_paths` (`catalog-info.yaml,catalog-info.yml`) excludes a root `catalog-info.yaml`, so this cataloger creates subcomponents only and never competes for the repo-level id. Clear `exclude_paths` to also map a root file to `github.com/<owner>/<repo>` when you run this cataloger on its own.
 
 ### Monorepo vs the augment cataloger
 
@@ -134,9 +134,16 @@ If you only need to enrich repo-level components that another cataloger already 
 Enabling both together is the expected setup, and by default they divide cleanly with no shared writes:
 
 - **Subdirectory files** (`services/*/catalog-info.yaml`, …) are exclusive to this cataloger. The augment cataloger only reads the first configured path (root-relative) and never descends, so it never sees them.
-- **A root `catalog-info.yaml`** is left to the augment cataloger. Because `skip_root_file` defaults to `true`, this cataloger ignores the root file and only creates subcomponents — so the two never write the same component id.
+- **A root `catalog-info.yaml`** is left to the augment cataloger. Because `exclude_paths` defaults to `catalog-info.yaml,catalog-info.yml`, this cataloger skips the root file and only creates subcomponents — so the two never write the same component id.
 
-If you instead run this cataloger **on its own** and want the root file to produce the repo-level component too, set `skip_root_file: false`. In that mode a root file maps to `github.com/<owner>/<repo>` — the same id the augment cataloger and `github-org` use. That's still an idempotent re-assert when they share the same transform inputs, but keeping `skip_root_file: true` alongside `backstage-catalog-info` avoids any chance of the two writing divergent values (e.g. different `tag_prefix`) to the repo-level component.
+If you instead run this cataloger **on its own** and want the root file to produce the repo-level component too, clear `exclude_paths`. A root file then maps to `github.com/<owner>/<repo>` — the same id the augment cataloger and `github-org` use. That's still an idempotent re-assert when they share the same transform inputs, but keeping the default `exclude_paths` alongside `backstage-catalog-info` avoids any chance of the two writing divergent values (e.g. different `tag_prefix`) to the repo-level component.
+
+### Excluding files and components
+
+Two mechanisms decide what does **not** become a component, at different levels of control:
+
+- **`exclude_paths`** (platform-controlled) — a list of repo-relative paths/globs skipped before a component is ever created. It lives in `lunar-config.yml`, so dev teams can't override it. The default excludes the root `catalog-info.yaml`; add globs like `legacy/*/catalog-info.yaml` to fence off more.
+- **`lunar.io/ignore` annotation** (dev-delegated, gated) — set `allow_ignore_annotation: true` and any `Component` whose `catalog-info.yaml` carries `lunar.io/ignore: "true"` (key configurable via `ignore_annotation`) opts itself out. Left off by default, so opt-out stays platform-controlled unless you choose to delegate it.
 
 ## Source System
 

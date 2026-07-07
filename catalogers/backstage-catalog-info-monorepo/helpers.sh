@@ -25,8 +25,10 @@
 #   owner_format             (default as-is) as-is | bare-name
 #   default_owner            (default empty)
 #   default_domain           (default empty)
+#   allow_ignore_annotation  (default false)
+#   ignore_annotation        (default lunar.io/ignore)
 #
-# Discovery inputs (repos, filenames, branch, skip_root_file,
+# Discovery inputs (repos, filenames, branch, exclude_paths,
 # component_id_prefix) and the secret (GH_TOKEN) are handled by the entrypoint,
 # not here.
 
@@ -53,6 +55,8 @@ create_component() {
     local OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
     local DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
     local DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+    local ALLOW_IGNORE_ANNOTATION="${LUNAR_VAR_ALLOW_IGNORE_ANNOTATION:-false}"
+    local IGNORE_ANNOTATION="${LUNAR_VAR_IGNORE_ANNOTATION:-lunar.io/ignore}"
 
     echo ""
     echo "Creating component '$COMPONENT_ID' from $SRC_PATH"
@@ -87,6 +91,21 @@ create_component() {
     fi
     local ENTITY
     ENTITY=$(echo "$ENTITIES" | jq 'first(.[] | select((.kind // "") == "Component"))')
+
+    # --- Honor the lunar.io/ignore annotation (gated) -------------------------
+    # When allow_ignore_annotation is on, a Component that carries the ignore
+    # annotation set to a truthy value opts itself out — no component is created.
+    # This delegates opt-out to the dev team that owns the catalog-info.yaml.
+    if [ "$ALLOW_IGNORE_ANNOTATION" = "true" ]; then
+        local IGNORE_VAL
+        IGNORE_VAL=$(echo "$ENTITY" | jq -r \
+            --arg k "$IGNORE_ANNOTATION" \
+            '(.metadata.annotations // {})[$k] // "" | tostring | ascii_downcase')
+        if [ "$IGNORE_VAL" = "true" ] || [ "$IGNORE_VAL" = "yes" ] || [ "$IGNORE_VAL" = "1" ]; then
+            echo "$SRC_PATH carries $IGNORE_ANNOTATION=$IGNORE_VAL and allow_ignore_annotation is on — skipping"
+            return 0
+        fi
+    fi
 
     # --- Transform -------------------------------------------------------------
     # Project owner / domain / tags from the entity into the shape that goes

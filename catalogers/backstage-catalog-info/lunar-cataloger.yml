@@ -179,6 +179,36 @@ inputs:
       empty to leave such components without a domain.
     default: ""
 
+  ignore_components:
+    description: |
+      Comma-separated list of component ids to skip — no augmentation,
+      no write. An entry matches `$LUNAR_COMPONENT_ID` by exact id or
+      as a glob (e.g. `github.com/acme/legacy-*`). This is the
+      platform-controlled exclusion: it lives in `lunar-config.yml`,
+      so dev teams can't override it from their repos. Use it to keep
+      specific components out of the catalog regardless of what their
+      `catalog-info.yaml` says.
+    default: ""
+
+  allow_ignore_annotation:
+    description: |
+      When `true`, a matched `Component` whose `catalog-info.yaml`
+      carries the ignore annotation (see `ignore_annotation`) set to a
+      truthy value (`true` / `yes` / `1`) is skipped — that component
+      is not augmented. This delegates opt-out to the dev teams that
+      own the `catalog-info.yaml` files. Leave `false` (the default)
+      to ignore the annotation entirely, keeping exclusion under
+      platform control via `ignore_components`.
+    default: "false"
+
+  ignore_annotation:
+    description: |
+      Annotation key checked when `allow_ignore_annotation` is `true`.
+      A matched `Component` with this annotation set to `true` / `yes`
+      / `1` is skipped. Ignored unless `allow_ignore_annotation` is
+      enabled.
+    default: "lunar.io/ignore"
+
 secrets:
   GH_TOKEN:
     description: |

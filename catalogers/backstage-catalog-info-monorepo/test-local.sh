@@ -97,10 +97,12 @@ indent() { sed 's/^/    /'; }
 
 reset_env() {
     unset LUNAR_VAR_REPOS LUNAR_VAR_FILENAMES LUNAR_VAR_BRANCH \
-          LUNAR_VAR_SKIP_ROOT_FILE LUNAR_VAR_COMPONENT_ID_PREFIX \
+          LUNAR_VAR_EXCLUDE_PATHS LUNAR_VAR_COMPONENT_ID_PREFIX \
           LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_TAG_PREFIX \
           LUNAR_VAR_INCLUDE_DERIVED_TAGS LUNAR_VAR_OWNER_FORMAT \
-          LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN MOCK_LUNAR_FAIL 2>/dev/null || true
+          LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN \
+          LUNAR_VAR_ALLOW_IGNORE_ANNOTATION LUNAR_VAR_IGNORE_ANNOTATION \
+          MOCK_LUNAR_FAIL 2>/dev/null || true
     export LUNAR_VAR_REPOS="acme/monorepo"
     export LUNAR_SECRET_GH_TOKEN="stub-token"
 }
@@ -154,14 +156,14 @@ assert_main_fails() {
     fi
 }
 
-# ── Scenario: monorepo, two service dirs, skip_root_file default (true) ────
-echo "── monorepo_two_services (default skip_root) ──"
+# ── Scenario: monorepo, two service dirs, default exclude_paths (root out) ─
+echo "── monorepo_two_services (default exclude root) ──"
 fresh_repo; reset_out; reset_env
 place payments.yaml "services/payments/catalog-info.yaml"
 place web.yaml      "services/web/catalog-info.yaml"
-place payments.yaml "catalog-info.yaml"   # root — should be skipped by default
+place payments.yaml "catalog-info.yaml"   # root — excluded by default exclude_paths
 run_main
-assert "two subcomponents, root skipped" \
+assert "two subcomponents, root excluded" \
     '(.["github.com/acme/monorepo/services/payments"].owner == "group:default/team-payments")
      and (.["github.com/acme/monorepo/services/payments"].domain == "platform.payments")
      and (.["github.com/acme/monorepo/services/web"].owner == "group:default/team-web")
@@ -169,10 +171,10 @@ assert "two subcomponents, root skipped" \
      and (has("github.com/acme/monorepo") | not)' \
     '(.["platform.payments"] == {}) and (.["storefront"] == {})'
 
-# ── Scenario: skip_root_file=false → root file also becomes repo-level ────
-echo "── skip_root_file_false ──"
+# ── Scenario: empty exclude_paths → root file also becomes repo-level ─────
+echo "── exclude_paths_empty (process root) ──"
 fresh_repo; reset_out; reset_env
-export LUNAR_VAR_SKIP_ROOT_FILE="false"
+export LUNAR_VAR_EXCLUDE_PATHS=""
 place payments.yaml "catalog-info.yaml"
 place web.yaml      "services/web/catalog-info.yaml"
 run_main
@@ -180,6 +182,36 @@ assert "root maps to repo-level id + subdir subcomponent" \
     '(.["github.com/acme/monorepo"].owner == "group:default/team-payments")
      and (.["github.com/acme/monorepo/services/web"].owner == "group:default/team-web")' \
     ''
+
+# ── Scenario: exclude_paths glob fences off a subdirectory ────────────────
+echo "── exclude_paths_glob ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_EXCLUDE_PATHS="catalog-info.yaml,catalog-info.yml,services/web/*"
+place payments.yaml "services/payments/catalog-info.yaml"
+place web.yaml      "services/web/catalog-info.yaml"
+run_main
+assert "glob excludes services/web, keeps payments" \
+    '(.["github.com/acme/monorepo/services/payments"].owner == "group:default/team-payments")
+     and (has("github.com/acme/monorepo/services/web") | not)' ''
+
+# ── Scenario: lunar.io/ignore annotation, gate OFF (default) → still created
+echo "── ignore_annotation_gate_off ──"
+fresh_repo; reset_out; reset_env
+place ignored.yaml "services/ignored/catalog-info.yaml"
+run_main
+assert "annotation ignored when gate off → component created" \
+    '.["github.com/acme/monorepo/services/ignored"].owner == "group:default/team-x"' ''
+
+# ── Scenario: lunar.io/ignore annotation, gate ON → skipped ───────────────
+echo "── ignore_annotation_gate_on ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_ALLOW_IGNORE_ANNOTATION="true"
+place ignored.yaml   "services/ignored/catalog-info.yaml"
+place payments.yaml  "services/payments/catalog-info.yaml"
+run_main
+assert "gate on → annotated component skipped, others created" \
+    '(has("github.com/acme/monorepo/services/ignored") | not)
+     and (.["github.com/acme/monorepo/services/payments"].owner == "group:default/team-payments")' ''
 
 # ── Scenario: deeply nested dir + .yml extension ─────────────────────────
 echo "── nested_and_yml ──"

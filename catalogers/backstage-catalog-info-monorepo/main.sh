@@ -14,10 +14,12 @@
 #   catalog-info.yaml (repo root)          -> github.com/<owner>/<repo>
 #   services/payments/catalog-info.yaml    -> github.com/<owner>/<repo>/services/payments
 #
-# By default (`skip_root_file=true`) a root catalog-info.yaml is ignored — the
-# augment `backstage-catalog-info` cataloger owns the repo-level component — and
-# only subdirectory files become (sub)components. Set skip_root_file=false to
-# also map a root file to the repo-level id (standalone use).
+# By default `exclude_paths` skips a root catalog-info.yaml — the augment
+# `backstage-catalog-info` cataloger owns the repo-level component — and only
+# subdirectory files become (sub)components. Clear exclude_paths to also map a
+# root file to the repo-level id (standalone use), or extend it to fence off
+# additional paths. Dev teams can also opt a file out via the `lunar.io/ignore`
+# annotation when `allow_ignore_annotation` is enabled (handled in helpers.sh).
 #
 # Silent skips (exit 0 with a log line, no write):
 #   - No GH_TOKEN, or empty `repos` input (nothing to do)
@@ -29,9 +31,9 @@
 #   repos                (required; comma-separated <owner>/<repo>)
 #   filenames            (default catalog-info.yaml,catalog-info.yml)
 #   branch               (default empty -> each repo's default branch)
-#   skip_root_file       (default true)
+#   exclude_paths        (default catalog-info.yaml,catalog-info.yml)
 #   component_id_prefix  (default github.com/)
-#   ...transform inputs are read in helpers.sh
+#   ...transform + ignore-annotation inputs are read in helpers.sh
 #
 # Secrets:
 #   GH_TOKEN — required, fetched as LUNAR_SECRET_GH_TOKEN
@@ -41,7 +43,11 @@ set -euo pipefail
 REPOS="${LUNAR_VAR_REPOS:-}"
 FILENAMES="${LUNAR_VAR_FILENAMES:-catalog-info.yaml,catalog-info.yml}"
 BRANCH="${LUNAR_VAR_BRANCH:-}"
-SKIP_ROOT_FILE="${LUNAR_VAR_SKIP_ROOT_FILE:-true}"
+# `-` not `:-`: an explicit empty exclude_paths must survive so it can disable
+# exclusion (process the root too). The hub always sets LUNAR_VAR_EXCLUDE_PATHS —
+# to the manifest default when unset in config, or to the user's value (including
+# "") when set — so the default only fires for a truly-unset var (local runs).
+EXCLUDE_PATHS="${LUNAR_VAR_EXCLUDE_PATHS-catalog-info.yaml,catalog-info.yml}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
 
 if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
@@ -60,7 +66,7 @@ fi
 echo "Repos: $REPOS"
 echo "Filenames: $FILENAMES"
 [ -n "$BRANCH" ] && echo "Branch: $BRANCH"
-echo "Skip root file: $SKIP_ROOT_FILE"
+echo "Exclude paths: ${EXCLUDE_PATHS:-<none>}"
 echo "Component id prefix: $COMPONENT_ID_PREFIX"
 
 # helpers.sh lives next to this script; resolved at runtime via dirname.
@@ -89,6 +95,21 @@ is_catalog_file() {
         name="$(echo "$name" | xargs)"
         [ -z "$name" ] && continue
         [ "$base" = "$name" ] && return 0
+    done
+    return 1
+}
+
+# is_excluded <path> — true if the repo-relative path matches any EXCLUDE_PATHS
+# entry, by exact path or as a glob (e.g. `legacy/*/catalog-info.yaml`).
+is_excluded() {
+    local p="$1" pat
+    IFS=',' read -ra _ex <<< "$EXCLUDE_PATHS"
+    for pat in "${_ex[@]}"; do
+        pat="$(echo "$pat" | xargs)"
+        [ -z "$pat" ] && continue
+        # Unquoted $pat on the RHS enables glob matching; intentional.
+        # shellcheck disable=SC2053
+        [[ "$p" == $pat ]] && return 0
     done
     return 1
 }
@@ -138,12 +159,13 @@ for raw_repo in "${REPO_ARRAY[@]}"; do
         [ -z "$path" ] && continue
         is_catalog_file "$path" || continue
 
+        if is_excluded "$path"; then
+            echo "Excluding $path in $SLUG (matches exclude_paths)"
+            continue
+        fi
+
         dir="$(dirname "$path")"
         if [ "$dir" = "." ]; then
-            if [ "$SKIP_ROOT_FILE" = "true" ]; then
-                echo "Skipping root $path in $SLUG (skip_root_file=true)"
-                continue
-            fi
             COMPONENT_ID="${COMPONENT_ID_PREFIX}${SLUG}"
         else
             COMPONENT_ID="${COMPONENT_ID_PREFIX}${SLUG}/${dir}"
