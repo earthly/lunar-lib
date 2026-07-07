@@ -76,11 +76,11 @@ catalogers:
       components only — a component-defining cataloger such as
       `github-org` must run first — and cannot create new ones.
     mainBash: main-on-commit.sh
-    # TODO(post-merge): the third variant floated on PR earthly/lunar-lib#181
-    # is a `cron`-hooked org-walker that CREATES components from
-    # catalog-info.yaml for full day-1 coverage (vs the two augment-only
-    # variants here, which only enrich components that already exist).
-    # Different shape — defer it to its own PR.
+    # NOTE: the create-per-file variant (a global-hook walker that CREATES one
+    # component per discovered catalog-info.yaml, including monorepo
+    # subdirectories) lives in its own plugin, `catalogers/backstage-catalog-discovery`
+    # (ENG-1061). It needs a global hook (cron/repo) to create components, which
+    # can't be mixed with the per-component hooks these augment-only variants use.
     hook:
       type: component-repo
       # Request a checkout of the component's repo so main-on-commit.sh can
