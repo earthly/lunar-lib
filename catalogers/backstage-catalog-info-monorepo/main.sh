@@ -93,7 +93,6 @@ is_catalog_file() {
     return 1
 }
 
-CREATED=0
 SCANNED=0
 
 IFS=',' read -ra REPO_ARRAY <<< "$REPOS"
@@ -160,11 +159,14 @@ for raw_repo in "${REPO_ARRAY[@]}"; do
         fi
         YAML=$(cat "$BODY_FILE")
 
-        if create_component "$COMPONENT_ID" "$YAML" "$SLUG/$path"; then
-            CREATED=$((CREATED + 1))
-        fi
+        # Bare call — NOT wrapped in `if`. create_component returns non-zero
+        # only on a hard `lunar catalog raw` write failure; the `set -e` at the
+        # top then aborts the run so the hub retries it (the contract documented
+        # in helpers.sh) instead of exiting 0 with a partially-written catalog.
+        # Silent skips (parse error, no/many Components) return 0 and continue.
+        create_component "$COMPONENT_ID" "$YAML" "$SLUG/$path"
     done
 done
 
 echo ""
-echo "Discovery complete: scanned $SCANNED catalog-info file(s), created/updated $CREATED component(s)"
+echo "Discovery complete: processed $SCANNED catalog-info file(s) across the configured repo(s)"

@@ -73,6 +73,8 @@ cat > "$TEST_DIR/lunar" << 'EOF'
 #!/bin/bash
 set -euo pipefail
 TEST_DIR_ENV="${MOCK_LUNAR_TEST_DIR:?MOCK_LUNAR_TEST_DIR must be set}"
+# Simulate a hard hub write failure (e.g. transient blip) when asked.
+[ "${MOCK_LUNAR_FAIL:-}" = "1" ] && exit 1
 if [ "${1:-}" = "catalog" ] && [ "${2:-}" = "raw" ] && [ "${3:-}" = "--json" ]; then
     case "${4:-}" in
         .components) cat >> "$TEST_DIR_ENV/components.out"; echo "" >> "$TEST_DIR_ENV/components.out"; exit 0 ;;
@@ -98,7 +100,7 @@ reset_env() {
           LUNAR_VAR_SKIP_ROOT_FILE LUNAR_VAR_COMPONENT_ID_PREFIX \
           LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_TAG_PREFIX \
           LUNAR_VAR_INCLUDE_DERIVED_TAGS LUNAR_VAR_OWNER_FORMAT \
-          LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN 2>/dev/null || true
+          LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN MOCK_LUNAR_FAIL 2>/dev/null || true
     export LUNAR_VAR_REPOS="acme/monorepo"
     export LUNAR_SECRET_GH_TOKEN="stub-token"
 }
@@ -140,6 +142,15 @@ run_main() {
     local log
     if log=$("$SCRIPT_DIR/main.sh" 2>&1); then :; else
         echo "  main.sh exited non-zero:"; echo "$log" | indent; FAILED=$((FAILED+1)); return 1
+    fi
+}
+
+# assert_main_fails <label> — main.sh MUST exit non-zero (failure propagation).
+assert_main_fails() {
+    if "$SCRIPT_DIR/main.sh" >/dev/null 2>&1; then
+        echo "  [$1] FAIL — main.sh exited 0, expected non-zero"; FAILED=$((FAILED+1))
+    else
+        echo "  [$1] OK"; PASSED=$((PASSED+1))
     fi
 }
 
@@ -271,6 +282,15 @@ fresh_repo; reset_out; reset_env
 export LUNAR_VAR_REPOS=""
 run_main
 assert "empty repos → no writes, exit 0" "" ""
+
+# ── Scenario: hard write failure propagates (non-zero exit → hub retries) ──
+# Regression guard for the `if create_component` bug: a failed `lunar catalog
+# raw` write must abort the run (exit non-zero), not be swallowed into exit 0.
+echo "── write_failure_propagates ──"
+fresh_repo; reset_out; reset_env
+place payments.yaml "services/payments/catalog-info.yaml"
+export MOCK_LUNAR_FAIL="1"
+assert_main_fails "hard write failure → main.sh exits non-zero"
 
 echo ""
 echo "=========================================="
