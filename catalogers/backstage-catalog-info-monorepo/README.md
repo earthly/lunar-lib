@@ -72,7 +72,7 @@ This cataloger only creates components from `kind: Component` entities. `Domain`
 
 ### Files With Multiple Components
 
-The common monorepo layout is one `catalog-info.yaml` per service directory, each declaring a single `Component` — one file, one component. A single file that declares **multiple** `Component` entities is the ambiguous case; how it should map to components (one per file vs one per entity, and how each would be keyed) is called out as an open question in the spec PR and will be documented here once decided.
+The common monorepo layout is one `catalog-info.yaml` per service directory, each declaring a single `Component` — one file, one component. A file that declares **zero** `Component` entities (e.g. only a `System` or `Domain`) or **more than one** `Component` is skipped, with a log line. This cataloger creates exactly one component per file and keys it to the file's directory, so it won't guess which of several `Component`s a multi-Component file maps to — give each `Component` its own directory's `catalog-info.yaml` to have it discovered. (A `Domain` / `System` alongside the single `Component` is still read to enrich the `.domains` stub.)
 
 ## Catalogers
 
