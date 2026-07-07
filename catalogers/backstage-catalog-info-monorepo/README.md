@@ -114,7 +114,7 @@ This cataloger and [`github-org`](../github-org) both *create* components, at di
 - **`github-org`** creates one **repo-level** component per repository (`github.com/acme/monorepo`).
 - **`backstage-catalog-info-monorepo`** creates one component per **`catalog-info.yaml`** — for a monorepo, that's a subcomponent per service directory (`github.com/acme/monorepo/services/payments`).
 
-Running both is the intended monorepo setup: the repo-level component plus one subcomponent per catalog-info file. For a repo with a single root `catalog-info.yaml`, this cataloger writes the same `github.com/<owner>/<repo>` id that `github-org` creates, so the two simply re-assert the same component — no conflict.
+Running both is the intended monorepo setup: `github-org` (and/or the augment `backstage-catalog-info`) owns the repo-level component, and this cataloger adds one subcomponent per catalog-info file. By default (`skip_root_file: true`) this cataloger ignores a root `catalog-info.yaml` and creates subcomponents only, so it never competes for the repo-level id. Set `skip_root_file: false` to also map a root file to `github.com/<owner>/<repo>` when you run this cataloger on its own.
 
 ### Monorepo vs the augment cataloger
 
@@ -131,15 +131,12 @@ If you only need to enrich repo-level components that another cataloger already 
 
 #### Running both on the same repo
 
-They can be enabled together, and the only place they touch the same data is a **root** `catalog-info.yaml`:
+Enabling both together is the expected setup, and by default they divide cleanly with no shared writes:
 
-- **Subdirectory files** (`services/*/catalog-info.yaml`, …) are exclusive to this cataloger. The augment cataloger only reads the first configured path (root-relative) and never descends, so it never sees them — no overlap.
-- **A root `catalog-info.yaml`** is read by both: the augment cataloger writes it onto the repo-level component (`github.com/<owner>/<repo>`), and this cataloger maps a root file to that same repo-level id. Both derive owner/domain/tags from the same file with the same transform, so they write the **same id with the same data** — an idempotent re-assert, not a conflict.
+- **Subdirectory files** (`services/*/catalog-info.yaml`, …) are exclusive to this cataloger. The augment cataloger only reads the first configured path (root-relative) and never descends, so it never sees them.
+- **A root `catalog-info.yaml`** is left to the augment cataloger. Because `skip_root_file` defaults to `true`, this cataloger ignores the root file and only creates subcomponents — so the two never write the same component id.
 
-The one caveat is configuration drift: if the two catalogers are configured with *different* transform inputs (e.g. different `tag_prefix`), they'd write different values to the repo-level component and the last writer in a cycle would win. Two ways to avoid it:
-
-- Keep their transform inputs consistent (or just run this cataloger alone — it's a superset that handles the root *and* the subdirectories), or
-- Set `skip_root_file: true` on this cataloger so it only creates subcomponents and cedes the repo-level component to `backstage-catalog-info` / `github-org`.
+If you instead run this cataloger **on its own** and want the root file to produce the repo-level component too, set `skip_root_file: false`. In that mode a root file maps to `github.com/<owner>/<repo>` — the same id the augment cataloger and `github-org` use. That's still an idempotent re-assert when they share the same transform inputs, but keeping `skip_root_file: true` alongside `backstage-catalog-info` avoids any chance of the two writing divergent values (e.g. different `tag_prefix`) to the repo-level component.
 
 ## Source System
 

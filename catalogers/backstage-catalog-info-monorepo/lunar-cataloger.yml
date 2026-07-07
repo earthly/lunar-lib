@@ -96,17 +96,17 @@ inputs:
 
   skip_root_file:
     description: |
-      When `true`, a `catalog-info.yaml` at the repo root is ignored
-      and only files in subdirectories become components. Set this
-      when you also run the `backstage-catalog-info` cataloger (which
-      already reads the root file onto the repo-level component) so
-      the two don't both write the repo-level component. Default
-      `false` — the root file is processed and maps to the repo-level
-      component id, which is what you want when this cataloger runs on
-      its own. The write is idempotent either way (same id, same
-      transform), so leaving it `false` alongside `backstage-catalog-info`
-      is safe as long as both use the same transform inputs.
-    default: "false"
+      When `true` (the default), a `catalog-info.yaml` at the repo
+      root is ignored and only files in subdirectories become
+      components. This cataloger is designed to run alongside the
+      `backstage-catalog-info` cataloger, which already reads the root
+      file onto the repo-level component — so by default this one
+      stays out of the root and just adds the per-subdirectory
+      subcomponents, giving a clean division of labor with no
+      double-writes. Set it to `false` to also process the root file
+      (mapping it to the repo-level component id) when you run this
+      cataloger on its own without `backstage-catalog-info`.
+    default: "true"
 
   component_id_prefix:
     description: |
