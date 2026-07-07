@@ -1,4 +1,4 @@
-# Backstage catalog-info.yaml Discovery Cataloger
+# Backstage catalog-info.yaml Monorepo Cataloger
 
 Discovers every `catalog-info.yaml` in a repository — including files in subdirectories — and creates one Lunar component per discovered file.
 
@@ -94,7 +94,7 @@ Add to your `lunar-config.yml` and list the repositories to scan:
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-discovery@v1.0.0
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
     with:
       repos: "acme/monorepo,acme/platform"
 ```
@@ -112,15 +112,15 @@ The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a cla
 This cataloger and [`github-org`](../github-org) both *create* components, at different granularities:
 
 - **`github-org`** creates one **repo-level** component per repository (`github.com/acme/monorepo`).
-- **`backstage-catalog-discovery`** creates one component per **`catalog-info.yaml`** — for a monorepo, that's a subcomponent per service directory (`github.com/acme/monorepo/services/payments`).
+- **`backstage-catalog-info-monorepo`** creates one component per **`catalog-info.yaml`** — for a monorepo, that's a subcomponent per service directory (`github.com/acme/monorepo/services/payments`).
 
 Running both is the intended monorepo setup: the repo-level component plus one subcomponent per catalog-info file. For a repo with a single root `catalog-info.yaml`, this cataloger writes the same `github.com/<owner>/<repo>` id that `github-org` creates, so the two simply re-assert the same component — no conflict.
 
-### Discovery vs the Augment Cataloger
+### Monorepo vs the augment cataloger
 
-`backstage-catalog-discovery` and [`backstage-catalog-info`](../backstage-catalog-info) are complementary, not alternatives:
+`backstage-catalog-info-monorepo` and [`backstage-catalog-info`](../backstage-catalog-info) are complementary, not alternatives:
 
-| | `backstage-catalog-discovery` (this) | [`backstage-catalog-info`](../backstage-catalog-info) |
+| | `backstage-catalog-info-monorepo` (this) | [`backstage-catalog-info`](../backstage-catalog-info) |
 |--|--------------------------------------|-------------------------------------------------------|
 | **Action** | **Creates** components | **Augments** existing components |
 | **Files per repo** | Discovers **all** `catalog-info.yaml` files | Reads **one** (first configured path) |
@@ -128,6 +128,18 @@ Running both is the intended monorepo setup: the repo-level component plus one s
 | **Hook** | `cron` (global — can create) | `component-cron` / `component-repo` (per-component — augment only) |
 
 If you only need to enrich repo-level components that another cataloger already created, use `backstage-catalog-info`. If a repo holds several catalog-info files that should each become their own component, use this cataloger.
+
+#### Running both on the same repo
+
+They can be enabled together, and the only place they touch the same data is a **root** `catalog-info.yaml`:
+
+- **Subdirectory files** (`services/*/catalog-info.yaml`, …) are exclusive to this cataloger. The augment cataloger only reads the first configured path (root-relative) and never descends, so it never sees them — no overlap.
+- **A root `catalog-info.yaml`** is read by both: the augment cataloger writes it onto the repo-level component (`github.com/<owner>/<repo>`), and this cataloger maps a root file to that same repo-level id. Both derive owner/domain/tags from the same file with the same transform, so they write the **same id with the same data** — an idempotent re-assert, not a conflict.
+
+The one caveat is configuration drift: if the two catalogers are configured with *different* transform inputs (e.g. different `tag_prefix`), they'd write different values to the repo-level component and the last writer in a cycle would win. Two ways to avoid it:
+
+- Keep their transform inputs consistent (or just run this cataloger alone — it's a superset that handles the root *and* the subdirectories), or
+- Set `skip_root_file: true` on this cataloger so it only creates subcomponents and cedes the repo-level component to `backstage-catalog-info` / `github-org`.
 
 ## Source System
 

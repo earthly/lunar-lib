@@ -1,12 +1,12 @@
 version: 0
 
-name: backstage-catalog-discovery
+name: backstage-catalog-info-monorepo
 description: Discovers every catalog-info.yaml in a repository (including subdirectories) and creates one Lunar component per file, keyed to the file's path
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Backstage catalog-info.yaml Discovery Cataloger"
+  display_name: "Backstage catalog-info.yaml Monorepo Cataloger"
   long_description: |
     Scans each configured repository for every `catalog-info.yaml`
     — not just the root — and creates one Lunar component per file,
@@ -14,7 +14,7 @@ landing_page:
     component per service. Each gets the owner, domain, and tags
     from its Backstage entity.
   categories: ["service-catalog", "vcs"]
-  icon: "assets/backstage-catalog-discovery.svg"
+  icon: "assets/backstage-catalog-info-monorepo.svg"
   status: "beta"
   related:
     - slug: "backstage-catalog-info"
@@ -93,6 +93,20 @@ inputs:
       Git ref to read the tree and files from. Empty means each
       repo's default branch.
     default: ""
+
+  skip_root_file:
+    description: |
+      When `true`, a `catalog-info.yaml` at the repo root is ignored
+      and only files in subdirectories become components. Set this
+      when you also run the `backstage-catalog-info` cataloger (which
+      already reads the root file onto the repo-level component) so
+      the two don't both write the repo-level component. Default
+      `false` — the root file is processed and maps to the repo-level
+      component id, which is what you want when this cataloger runs on
+      its own. The write is idempotent either way (same id, same
+      transform), so leaving it `false` alongside `backstage-catalog-info`
+      is safe as long as both use the same transform inputs.
+    default: "false"
 
   component_id_prefix:
     description: |

@@ -78,7 +78,7 @@ catalogers:
     mainBash: main-on-commit.sh
     # NOTE: the create-per-file variant (a global-hook walker that CREATES one
     # component per discovered catalog-info.yaml, including monorepo
-    # subdirectories) lives in its own plugin, `catalogers/backstage-catalog-discovery`
+    # subdirectories) lives in its own plugin, `catalogers/backstage-catalog-info-monorepo`
     # (ENG-1061). It needs a global hook (cron/repo) to create components, which
     # can't be mixed with the per-component hooks these augment-only variants use.
     hook:
