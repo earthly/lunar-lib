@@ -1,0 +1,88 @@
+version: 0
+
+name: istio
+description: Istio service-mesh security and traffic policies
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Istio Guardrails"
+  long_description: |
+    Enforce Istio service-mesh best practices: STRICT mutual TLS, authorization
+    policies in place, no blanket-allow authz rules, TLS on ingress gateways, and
+    sidecar injection on mesh namespaces. Flags brittle EnvoyFilter usage and
+    invalid Istio config.
+  category: "deployment-and-infrastructure"
+  icon: "assets/istio.svg"
+  status: "experimental"
+  requires:
+    - slug: "istio"
+      type: "collector"
+      reason: "Provides parsed Istio mesh config that these policies evaluate"
+
+policies:
+  - name: valid
+    description: |
+      Validates that all Istio custom resources parse and pass `istioctl analyze`
+      (run offline). Invalid mesh config can silently drop routing or security
+      rules once applied to the cluster.
+    mainPython: valid.py
+    keywords: ["istio", "istioctl analyze", "validation", "mesh config", "yaml"]
+
+  - name: mtls-strict
+    description: |
+      Requires mesh-wide mutual TLS to be STRICT. A PeerAuthentication in the
+      Istio root namespace must set mode STRICT, and no namespace or workload
+      PeerAuthentication may downgrade to PERMISSIVE or DISABLE. PERMISSIVE
+      accepts plaintext, so a workload without a sidecar (or an attacker on the
+      pod network) can bypass mesh encryption.
+    mainPython: mtls_strict.py
+    keywords: ["mtls", "mutual tls", "peerauthentication", "strict", "encryption in transit", "zero trust"]
+
+  - name: authorization-policies-defined
+    description: |
+      Requires at least one AuthorizationPolicy in the mesh. mTLS authenticates
+      workloads but does not authorize them — without an AuthorizationPolicy every
+      authenticated workload can call every other. Establishes a zero-trust authz
+      baseline.
+    mainPython: authorization_policies.py
+    keywords: ["authorizationpolicy", "authorization", "zero trust", "least privilege", "rbac"]
+
+  - name: no-permissive-authz
+    description: |
+      Fails when an AuthorizationPolicy grants blanket access — an ALLOW action
+      with a rule that has no from/to/when constraints (matches every source).
+      Accidental allow-all rules quietly negate the rest of the mesh's authz.
+    mainPython: no_permissive_authz.py
+    keywords: ["authorizationpolicy", "allow-all", "permissive", "over-permissive", "least privilege"]
+
+  - name: gateway-tls
+    description: |
+      Requires ingress Gateways to terminate or pass through TLS: HTTPS/TLS
+      servers must set a tls config, and plain HTTP servers must set
+      httpsRedirect. Catches ingress that serves plaintext to the internet.
+    mainPython: gateway_tls.py
+    keywords: ["gateway", "tls", "https", "httpsRedirect", "ingress", "encryption in transit"]
+
+  - name: sidecar-injection
+    description: |
+      Requires namespaces running mesh workloads to have sidecar injection enabled
+      (istio-injection=enabled or an istio.io/rev label) and flags workloads that
+      opt out via sidecar.istio.io/inject: "false". Without the sidecar a workload
+      silently bypasses mesh mTLS, authz, and telemetry.
+    mainPython: sidecar_injection.py
+    keywords: ["sidecar injection", "istio-injection", "envoy sidecar", "mesh membership", "istio.io/rev"]
+
+  - name: no-envoy-filter
+    description: |
+      Advisory (info): flags use of EnvoyFilter. EnvoyFilter patches the raw Envoy
+      config and is brittle across Istio upgrades, bypassing the higher-level
+      networking and security APIs. Surfaced so mesh owners can review each use.
+    mainPython: no_envoy_filter.py
+    keywords: ["envoyfilter", "envoy", "technical debt", "upgrade risk", "advisory"]
+
+inputs:
+  required_mtls_mode:
+    description: Required mesh-wide mTLS mode for the mtls-strict check (STRICT or PERMISSIVE)
+    default: "STRICT"
