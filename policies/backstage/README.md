@@ -19,7 +19,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `owner-set` | Validates that `spec.owner` is populated |
 | `lifecycle-set` | Validates that `spec.lifecycle` is defined |
 | `system-set` | Validates that `spec.system` is defined |
-| `required-annotations` | Validates that configured annotation keys are present (opt-in via the `required_annotations` input) |
+| `required-annotations` | Validates that configured annotation keys are present, and optionally that their values match typed constraints (opt-in via the `required_annotations` input) |
 | `required-tag-patterns` | Validates that the component's tags match configured glob patterns (opt-in via the `required_tag_patterns` input) |
 | `disallowed-annotations` | Fails if any forbidden annotation key is present (opt-in via the `disallowed_annotations` input) |
 | `disallowed-tag-patterns` | Fails if any tag matches a forbidden glob pattern (opt-in via the `disallowed_tag_patterns` input) |
@@ -59,7 +59,7 @@ policies:
       disallowed_tag_patterns: "deprecated/*"
 ```
 
-All four inputs are comma-separated lists; leave them unset (the default) and the corresponding check is skipped. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
+All four inputs are comma-separated lists; leave them unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
 
 ## Examples
 
@@ -145,6 +145,39 @@ With `required_annotations: "backstage.io/source-location"`, `required_tag_patte
 ```
 
 Remove the `backstage.io/source-location` annotation and `required-annotations` fails: `"catalog-info.yaml is missing required annotation(s): backstage.io/source-location"`. Drop every `runs-on/*` tag and `required-tag-patterns` fails: `"catalog-info.yaml has no tag matching required pattern(s): runs-on/*"`. Conversely, add a `backstage.io/skip-checks` annotation and `disallowed-annotations` fails; add a `deprecated/legacy` tag and `disallowed-tag-patterns` fails: `"catalog-info.yaml has tag(s) matching disallowed pattern(s): deprecated/* (deprecated/legacy)"`.
+
+### Typed value constraints on required annotations
+
+`required-annotations` can also assert that an annotation's **value** meets a constraint, not just that the key is present. Pass `required_annotations` as a YAML list instead of a comma-separated string; each entry is either a bare key (presence-only, as before) or a mapping with a `key` and one or more constraints:
+
+```yaml
+with:
+  required_annotations: |
+    - key: example.com/service-tier      # integer in 0–5
+      type: integer
+      min: 0
+      max: 5
+    - key: example.com/contact-email     # must look like an email address
+      type: string
+      pattern: '^[^@]+@[^@]+\.[^@]+$'
+    - key: example.com/environment       # one of a fixed set
+      enum: [production, staging, development]
+    - backstage.io/source-location       # bare key = presence-only
+```
+
+Supported constraints:
+
+| Constraint | Applies to | Meaning |
+|------------|-----------|---------|
+| `type` | all | `string` (default), `integer`, `number`, or `boolean`. The value is coerced to this type before the other constraints run. |
+| `min` / `max` | integer, number | Inclusive numeric bounds. |
+| `min_length` / `max_length` | string | Inclusive length bounds. |
+| `pattern` | string | Full-match regular expression. Quote it with single quotes (`'...'`) so backslashes pass through literally. |
+| `enum` | all | The (coerced) value must be one of the listed values. |
+
+Backstage annotation values are strings, so `type` validates that the value *parses* as the declared type: `"2"` satisfies `type: integer`, `"2.5"` does not. A value that violates its constraint fails the check with a specific message (for example, `annotation "example.com/service-tier": value "7" is above maximum 5`). A malformed constraint spec — an unknown `type`, `min` greater than `max`, or an invalid regex — makes the check **error** rather than fail, so the misconfiguration surfaces immediately instead of silently passing.
+
+The comma-separated form (`required_annotations: "key1,key2"`) still works and remains presence-only; it is equivalent to a YAML list of bare keys.
 
 ## Remediation
 
