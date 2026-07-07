@@ -112,7 +112,9 @@ inputs:
 
 secrets:
   REGISTRY_USERNAME:
-    description: Username for pulling private container images in the container-rescan cron. Optional — public images need no auth.
+    description: Username for pulling private container images in the container-rescan cron. Optional — public images need no auth. REGISTRY_USER is accepted as an alias.
+  REGISTRY_USER:
+    description: Alias for REGISTRY_USERNAME (common registry/CI convention). Optional; used only when REGISTRY_USERNAME is unset.
   REGISTRY_PASSWORD:
     description: Password or token for pulling private container images in the container-rescan cron. Optional.
 

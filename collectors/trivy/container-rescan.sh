@@ -53,9 +53,12 @@ fi
 echo "Scanning image: $IMAGE_REF" >&2
 
 # --- 2. Registry auth for private images (optional) ---
-# Trivy reads registry credentials from TRIVY_USERNAME / TRIVY_PASSWORD.
-if [ -n "${LUNAR_SECRET_REGISTRY_USERNAME:-}" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
-  export TRIVY_USERNAME="$LUNAR_SECRET_REGISTRY_USERNAME"
+# Trivy reads registry credentials from TRIVY_USERNAME / TRIVY_PASSWORD. The
+# username is accepted under either REGISTRY_USERNAME or REGISTRY_USER — both are
+# common registry/CI conventions, so match whatever the deployer already has.
+REG_USER="${LUNAR_SECRET_REGISTRY_USERNAME:-${LUNAR_SECRET_REGISTRY_USER:-}}"
+if [ -n "$REG_USER" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
+  export TRIVY_USERNAME="$REG_USER"
   export TRIVY_PASSWORD="$LUNAR_SECRET_REGISTRY_PASSWORD"
 fi
 

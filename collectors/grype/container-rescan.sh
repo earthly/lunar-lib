@@ -54,9 +54,12 @@ echo "Scanning image: $IMAGE_REF" >&2
 
 # --- 2. Registry auth for private images (optional) ---
 # Grype/Stereoscope reads registry credentials from these env vars. Public
-# images need none.
-if [ -n "${LUNAR_SECRET_REGISTRY_USERNAME:-}" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
-  export GRYPE_REGISTRY_AUTH_USERNAME="$LUNAR_SECRET_REGISTRY_USERNAME"
+# images need none. The username is accepted under either REGISTRY_USERNAME or
+# REGISTRY_USER — both are common registry/CI conventions, so match whatever the
+# deployer already has configured rather than forcing one spelling.
+REG_USER="${LUNAR_SECRET_REGISTRY_USERNAME:-${LUNAR_SECRET_REGISTRY_USER:-}}"
+if [ -n "$REG_USER" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
+  export GRYPE_REGISTRY_AUTH_USERNAME="$REG_USER"
   export GRYPE_REGISTRY_AUTH_PASSWORD="$LUNAR_SECRET_REGISTRY_PASSWORD"
 fi
 
