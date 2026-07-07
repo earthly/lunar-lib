@@ -3,7 +3,7 @@ version: 0
 name: git
 description: Git-ecosystem guardrails — pre-commit baseline, gitattributes, and gitmodules checks
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.7.0
 
 landing_page:
   display_name: "Git Guardrails"
