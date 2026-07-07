@@ -1,0 +1,143 @@
+version: 0
+
+name: kotlin
+description: Collect Kotlin project information, dependencies, CI/CD commands, and test coverage. Gates on the presence of `*.kt` / `*.kts` source files — Groovy-only-Java / Maven-only-Java repos receive no `.lang.kotlin` data.
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Kotlin Collector"
+  long_description: |
+    Analyze Kotlin projects to collect project metadata, dependencies, CI/CD
+    command tracking, and test coverage. Supports Gradle (Kotlin & Groovy DSL)
+    and Maven. Detects the Kotlin version, JVM/Android/Multiplatform targets,
+    test frameworks (JUnit, Kotest, MockK), and detekt/ktlint.
+  categories: ["languages", "build"]
+  icon: "assets/kotlin.svg"
+  status: "beta"
+  related:
+    - slug: "kotlin"
+      type: "policy"
+      reason: "Kotlin project guardrails using collected metadata"
+    - slug: "testing"
+      type: "policy"
+      reason: "Testing guardrails including coverage thresholds using collected metrics"
+
+collectors:
+  - name: project
+    description: |
+      Analyzes Kotlin project structure by detecting build.gradle.kts,
+      build.gradle (Groovy DSL applying a Kotlin plugin), settings.gradle(.kts),
+      pom.xml (with kotlin-maven-plugin), gradle/libs.versions.toml (version
+      catalog), gradle.lockfile, the Gradle wrapper, detekt/ktlint config, and
+      the test source directory. Parses the Kotlin compiler version (from the
+      Gradle `kotlin(...)` plugin, pom `<kotlin.version>`, or the version
+      catalog), project name/version, Gradle version, detected test frameworks,
+      framework flags (Ktor, Spring, Compose, Coroutines), and the JVM /
+      Android / Multiplatform target. Skips when no `*.kt` / `*.kts` source
+      files are present. Writes project metadata to `.lang.kotlin`.
+    mainBash: project.sh
+    hook:
+      type: code
+    keywords: ["kotlin", "gradle", "kotlin dsl", "build.gradle.kts", "kotlin-maven-plugin", "android", "multiplatform", "ktor"]
+
+  - name: dependencies
+    description: |
+      Extracts direct dependencies from build.gradle.kts / build.gradle
+      (dependencies block, including `libs.` version-catalog references),
+      pom.xml, or gradle/libs.versions.toml. When gradle.lockfile is present,
+      also extracts resolved transitive versions. Writes dependency data to
+      .lang.kotlin.dependencies.
+    mainBash: dependencies.sh
+    hook:
+      type: code
+    keywords: ["kotlin dependencies", "gradle dependencies", "version catalog", "libs.versions.toml", "supply chain"]
+
+  - name: cicd
+    description: |
+      Records every kotlinc / kotlin command executed in CI pipelines along
+      with the compiler version. Writes command strings and version info to
+      .lang.kotlin.cicd for audit trails and build reproducibility analysis.
+      Gradle and Maven invocations are already tracked by the java collector's
+      gradle-cicd / maven-cicd sub-collectors, so this focuses on direct
+      Kotlin-compiler usage.
+    mainBash: cicd.sh
+    hook:
+      type: ci-before-command
+      binary:
+        name_pattern: ^(kotlinc|kotlin)$
+    keywords: ["kotlin ci", "kotlinc", "ci commands", "build tracking"]
+
+  - name: test-coverage
+    description: |
+      Extracts coverage percentage from Kover XML reports
+      (build/reports/kover/report.xml) or, as a fallback, JaCoCo XML reports,
+      after Gradle or Maven test runs complete. Parses coverage reports and
+      writes results to .lang.kotlin.tests.coverage and the normalized
+      .testing.coverage path.
+    mainBash: test-coverage.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(gradle|gradlew|mvn|mvnw)$
+      args:
+        - value_pattern: ^(test|check|koverXmlReport|.+[/.](test|check|koverXmlReport))$
+    keywords: ["kover", "jacoco", "kotlin test coverage", "gradle test", "coverage metrics"]
+
+example_component_json: |
+  {
+    "lang": {
+      "kotlin": {
+        "version": "1.9.22",
+        "build_systems": ["gradle"],
+        "build_gradle_kts_exists": true,
+        "build_gradle_exists": false,
+        "settings_gradle_exists": true,
+        "pom_xml_exists": false,
+        "version_catalog_exists": true,
+        "gradlew_exists": true,
+        "lockfile_exists": false,
+        "detekt_configured": true,
+        "ktlint_configured": false,
+        "test_directory_exists": true,
+        "project_name": "my-service",
+        "project_version": "0.1.0",
+        "gradle_version": "8.5",
+        "target": "jvm",
+        "is_multiplatform": false,
+        "is_android": false,
+        "test_frameworks": ["junit", "kotest", "mockk"],
+        "frameworks": ["ktor", "coroutines"],
+        "source": { "tool": "gradle", "integration": "code" },
+        "cicd": {
+          "cmds": [
+            { "cmd": "kotlinc src -include-runtime -d app.jar", "version": "1.9.22" }
+          ]
+        },
+        "tests": {
+          "coverage": {
+            "percentage": 81.3,
+            "source": { "tool": "kover", "integration": "ci" }
+          }
+        },
+        "dependencies": {
+          "direct": [
+            { "path": "io.ktor:ktor-server-core", "version": "2.3.7" },
+            { "path": "org.jetbrains.kotlinx:kotlinx-coroutines-core", "version": "1.7.3" }
+          ],
+          "transitive": [
+            { "path": "org.jetbrains.kotlin:kotlin-stdlib", "version": "1.9.22" }
+          ],
+          "source": { "tool": "gradle", "integration": "code" }
+        }
+      }
+    },
+    "testing": {
+      "coverage": {
+        "percentage": 81.3,
+        "source": { "tool": "kover", "integration": "ci" }
+      }
+    }
+  }
