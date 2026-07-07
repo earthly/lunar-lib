@@ -104,7 +104,7 @@ done
 # --- Paginated fetch -----------------------------------------------------
 fetch_page() {
     local cursor="$1"
-    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&after=$cursor}$FILTER_QUERY"
+    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&cursor=$cursor}$FILTER_QUERY"
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF
