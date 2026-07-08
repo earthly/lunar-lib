@@ -4,7 +4,7 @@ Parses and validates ArgoCD `Application`, `ApplicationSet`, and `AppProject` ma
 
 ## Overview
 
-This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas with kubeconform, and records a normalized, tool-agnostic view of the GitOps config under `.cd.gitops` on the repo's own component. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope deployments, and preserves the raw resource shapes under `.cd.gitops.native.argocd`. The normalized data feeds the tool-agnostic `gitops` and ArgoCD-specific `argocd` policy sets. When the ArgoCD config lives in a separate repo, the companion `argocd-remote-push` and `argocd-remote-pull` collectors carry the posture cross-component (use one per service, not both).
+This collector scans the cloned repository for ArgoCD custom resources (`apiVersion: argoproj.io/*`), validates each against the argoproj CRD schemas with kubeconform, and records a normalized, tool-agnostic view of the GitOps config under `.cd.gitops` on the repo's own component. It captures each Application's project, sync policy, destination, and source reference, plus the AppProjects that scope deployments, and preserves the raw resource shapes under `.cd.gitops.native.argocd`. The normalized data feeds the tool-agnostic `gitops` and ArgoCD-specific `argocd` policy sets. When the ArgoCD config lives in a separate repo, the companion `argocd-deployment-tracking` and `argocd-deployment-gate` collectors carry the posture cross-component (use one per service, not both).
 
 ## Collected Data
 

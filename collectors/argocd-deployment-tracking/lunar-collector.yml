@@ -1,6 +1,6 @@
 version: 0
 
-name: argocd-remote-push
+name: argocd-deployment-tracking
 description: Correlates ArgoCD Applications in a central GitOps repo to the service components they deploy and pushes each service's deployment posture onto its own Component JSON (out-of-band)
 
 author: earthly
@@ -10,12 +10,12 @@ author: earthly
 default_image: earthly/lunar-lib:argocd-main
 
 landing_page:
-  display_name: "ArgoCD Remote Push Collector"
+  display_name: "ArgoCD Deployment Tracking Collector"
   long_description: |
     Runs on a central GitOps repo, correlates each ArgoCD Application to the
     service that builds its image, and pushes that service's deployment posture
     onto its own component out-of-band. Post-merge only (cannot gate PRs). Do
-    not also run argocd-remote-pull on the same service.
+    not also run argocd-deployment-gate on the same service.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "experimental"
@@ -23,7 +23,7 @@ landing_page:
     - slug: "argocd"
       type: "collector"
       reason: "Parses/validates the ArgoCD resources this collector correlates"
-    - slug: "argocd-remote-pull"
+    - slug: "argocd-deployment-gate"
       type: "collector"
       reason: "The pull counterpart — use one or the other per service, not both"
     - slug: "gitops"
@@ -31,7 +31,7 @@ landing_page:
       reason: "Evaluates the pushed deployment posture on the service component"
 
 collectors:
-  - name: push
+  - name: tracking
     description: |
       Correlates each ArgoCD Application back to the source-code component it
       deploys (annotation -> image -> tag -> repoURL, first match wins), then

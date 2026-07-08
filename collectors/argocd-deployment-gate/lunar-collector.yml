@@ -1,6 +1,6 @@
 version: 0
 
-name: argocd-remote-pull
+name: argocd-deployment-gate
 description: Pulls a service's ArgoCD deployment posture from a central GitOps component onto the service's own Component JSON so guardrails gate at PR time
 
 author: earthly
@@ -8,12 +8,12 @@ author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "ArgoCD Remote Pull Collector"
+  display_name: "ArgoCD Deployment Gate Collector"
   long_description: |
     Runs on a service repo and pulls that service's ArgoCD deployment posture
     from a central GitOps component (via a catalog-info mapping) onto its own
     component at the collected sha, so policies gate at PR time. Do not also
-    target the service with argocd-remote-push.
+    target the service with argocd-deployment-tracking.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "experimental"
@@ -21,7 +21,7 @@ landing_page:
     - slug: "argocd"
       type: "collector"
       reason: "Validates the ArgoCD resources in the GitOps repo this collector pulls from"
-    - slug: "argocd-remote-push"
+    - slug: "argocd-deployment-tracking"
       type: "collector"
       reason: "The push counterpart — use one or the other per service, not both"
     - slug: "gitops"
@@ -29,7 +29,7 @@ landing_page:
       reason: "Gates the pulled deployment posture at PR time"
 
 collectors:
-  - name: pull
+  - name: gate
     description: |
       Runs on a SERVICE repo and materializes that service's ArgoCD deployment
       posture onto its own Component JSON by reading a predeclared

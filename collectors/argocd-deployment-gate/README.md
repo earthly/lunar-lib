@@ -1,10 +1,10 @@
-# ArgoCD Remote Pull Collector
+# ArgoCD Deployment Gate Collector
 
 Pulls a service's ArgoCD deployment posture from a central GitOps component onto the service's own component, gating at PR time.
 
 ## Overview
 
-Experimental. Runs on an app/service repo, reads a predeclared app-to-Application mapping from `catalog-info.yaml` (or direct inputs), pulls the matching Application(s) from the central GitOps component via `lunar component get-json`, and materializes `.cd.gitops` onto the service's own component. Because it runs in the service's own collection it lands on the sha being collected — including a PR head sha — so the `gitops`/`argocd` policies gate the upcoming deployment at PR time, the only variant that enforces on PRs. Do not also target the same service with `argocd-remote-push`: both write `.cd.gitops.applications` and the hub appends across records, so pick one path per service.
+Experimental. Runs on an app/service repo, reads a predeclared app-to-Application mapping from `catalog-info.yaml` (or direct inputs), pulls the matching Application(s) from the central GitOps component via `lunar component get-json`, and materializes `.cd.gitops` onto the service's own component. Because it runs in the service's own collection it lands on the sha being collected — including a PR head sha — so the `gitops`/`argocd` policies gate the upcoming deployment at PR time, the only variant that enforces on PRs. Do not also target the same service with `argocd-deployment-tracking`: both write `.cd.gitops.applications` and the hub appends across records, so pick one path per service.
 
 ## Collected Data
 
@@ -22,7 +22,7 @@ Add to the **service repo's** `lunar-config.yml`:
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/argocd-remote-pull@v1.0.0
+  - uses: github://earthly/lunar-lib/collectors/argocd-deployment-gate@v1.0.0
     on: ["domain:your-service-repo"]
 ```
 
