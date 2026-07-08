@@ -1,137 +1,149 @@
-[
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Component",
-    "metadata": {
-      "name": "payment-api",
-      "namespace": "default",
-      "description": "Payment processing service",
-      "annotations": {
-        "github.com/project-slug": "acme/payment-api",
-        "backstage.io/source-location": "url:https://github.com/acme/payment-api"
+{
+  "items": [
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "payment-api",
+        "namespace": "default",
+        "description": "Payment processing service",
+        "annotations": {
+          "github.com/project-slug": "acme/payment-api",
+          "backstage.io/source-location": "url:https://github.com/acme/payment-api"
+        },
+        "tags": [
+          "payments",
+          "tier1"
+        ]
       },
-      "tags": ["payments", "tier1"]
-    },
-    "spec": {
-      "type": "service",
-      "lifecycle": "production",
-      "owner": "group:default/team-payments",
-      "system": "system:default/payments",
-      "domain": "platform.payments"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Component",
-    "metadata": {
-      "name": "web-app",
-      "namespace": "default",
-      "annotations": {
-        "github.com/project-slug": "acme/web-app"
-      },
-      "tags": ["frontend"]
-    },
-    "spec": {
-      "type": "website",
-      "lifecycle": "production",
-      "owner": "group:default/team-web",
-      "system": "system:default/storefront"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Component",
-    "metadata": {
-      "name": "no-annotation",
-      "namespace": "default",
-      "tags": ["orphan"]
-    },
-    "spec": {
-      "type": "service",
-      "lifecycle": "experimental",
-      "owner": "group:default/team-payments"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "API",
-    "metadata": {
-      "name": "payment-api-grpc",
-      "namespace": "default",
-      "annotations": {
-        "github.com/project-slug": "acme/payment-api-proto"
-      },
-      "tags": ["grpc"]
-    },
-    "spec": {
-      "type": "grpc",
-      "lifecycle": "production",
-      "owner": "group:default/team-payments"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Resource",
-    "metadata": {
-      "name": "payments-db",
-      "namespace": "default",
-      "annotations": {
-        "github.com/project-slug": "acme/payments-db-iac"
+      "spec": {
+        "type": "service",
+        "lifecycle": "production",
+        "owner": "group:default/team-payments",
+        "system": "system:default/payments",
+        "domain": "platform.payments"
       }
     },
-    "spec": {
-      "type": "database",
-      "owner": "group:default/team-platform",
-      "system": "system:default/payments"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Domain",
-    "metadata": {
-      "name": "platform.payments",
-      "namespace": "default",
-      "description": "Payment processing and billing"
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "web-app",
+        "namespace": "default",
+        "annotations": {
+          "github.com/project-slug": "acme/web-app"
+        },
+        "tags": [
+          "frontend"
+        ]
+      },
+      "spec": {
+        "type": "website",
+        "lifecycle": "production",
+        "owner": "group:default/team-web",
+        "system": "system:default/storefront"
+      }
     },
-    "spec": {
-      "owner": "group:default/platform-leads"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "Domain",
-    "metadata": {
-      "name": "platform.frontend",
-      "namespace": "default"
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "no-annotation",
+        "namespace": "default",
+        "tags": [
+          "orphan"
+        ]
+      },
+      "spec": {
+        "type": "service",
+        "lifecycle": "experimental",
+        "owner": "group:default/team-payments"
+      }
     },
-    "spec": {
-      "owner": "group:default/platform-leads"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "System",
-    "metadata": {
-      "name": "payments",
-      "namespace": "default",
-      "description": "Payments system grouping"
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "API",
+      "metadata": {
+        "name": "payment-api-grpc",
+        "namespace": "default",
+        "annotations": {
+          "github.com/project-slug": "acme/payment-api-proto"
+        },
+        "tags": [
+          "grpc"
+        ]
+      },
+      "spec": {
+        "type": "grpc",
+        "lifecycle": "production",
+        "owner": "group:default/team-payments"
+      }
     },
-    "spec": {
-      "owner": "group:default/team-payments",
-      "domain": "platform.payments"
-    }
-  },
-  {
-    "apiVersion": "backstage.io/v1alpha1",
-    "kind": "User",
-    "metadata": {
-      "name": "jane",
-      "namespace": "default"
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Resource",
+      "metadata": {
+        "name": "payments-db",
+        "namespace": "default",
+        "annotations": {
+          "github.com/project-slug": "acme/payments-db-iac"
+        }
+      },
+      "spec": {
+        "type": "database",
+        "owner": "group:default/team-platform",
+        "system": "system:default/payments"
+      }
     },
-    "spec": {
-      "profile": {
-        "email": "jane@acme.com"
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Domain",
+      "metadata": {
+        "name": "platform.payments",
+        "namespace": "default",
+        "description": "Payment processing and billing"
+      },
+      "spec": {
+        "owner": "group:default/platform-leads"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Domain",
+      "metadata": {
+        "name": "platform.frontend",
+        "namespace": "default"
+      },
+      "spec": {
+        "owner": "group:default/platform-leads"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "System",
+      "metadata": {
+        "name": "payments",
+        "namespace": "default",
+        "description": "Payments system grouping"
+      },
+      "spec": {
+        "owner": "group:default/team-payments",
+        "domain": "platform.payments"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "User",
+      "metadata": {
+        "name": "jane",
+        "namespace": "default"
+      },
+      "spec": {
+        "profile": {
+          "email": "jane@acme.com"
+        }
       }
     }
-  }
-]
+  ],
+  "pageInfo": {}
+}
