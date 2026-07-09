@@ -19,6 +19,7 @@ This collector writes to the following Component JSON paths:
 | `.sca.findings[]` | array | Individual vulnerability findings with CVE, package, fix info |
 | `.sca.summary` | object | Summary booleans (has_critical, has_high, all_fixable) |
 | `.sca.history[]` | array | *(opt-in)* Bounded list of prior scan snapshots (source, counts, summary) for point-in-time audit; oldest first, `[0]` is the release-time scan. Absent unless `scan_history_size > 0` |
+| `.sca.rescan_count` | number | *(opt-in)* Monotonic tally of completed re-scans, used to enforce `max_rescans` independently of the (capped) `.sca.history[]` length. Present when scan history or `max_rescans` is enabled |
 | `.sca.native.trivy.cicd` | object | CI command detection data (command, version) |
 | `.container_scan.source` | object | Source metadata for the container image scan (tool, version, integration) |
 | `.container_scan.image` | string | The scanned image reference (e.g. `registry/app:tag`) |
@@ -95,7 +96,7 @@ policy evaluation — `.sca` behaves identically whether history is on or off.
 | Input | Default | Effect |
 |-------|---------|--------|
 | `scan_history_size` | `0` | Max entries kept in `.sca.history[]`. `0` disables history (today's overwrite-only behavior). At the cap the release-time entry (`[0]`) is kept and the second-oldest entry is dropped. |
-| `max_rescans` | `0` | Stop re-scanning a component after this many re-scans (`0` = unlimited). Counted from `.sca.history[]` length, so set `scan_history_size >= max_rescans` for the limit to be reachable. |
+| `max_rescans` | `0` | Stop re-scanning a component after this many re-scans (`0` = unlimited). Counted independently via `.sca.rescan_count`, so it stands alone — no dependency on `scan_history_size`. |
 
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
 maintains history — the on-push `auto` scan ignores these inputs.

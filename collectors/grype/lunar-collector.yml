@@ -128,12 +128,11 @@ inputs:
   max_rescans:
     description: |
       Stop re-scanning a component after this many scheduled re-scans; 0
-      (default) means unlimited. The count comes from the length of
-      .sca.history[], so this only takes effect with scan_history_size enabled
-      and set >= max_rescans (otherwise the history cap keeps the count below the
-      limit). Once the limit is reached the cron skips the component, retaining
-      the last scan and its history. Bounds both the re-scan count and
-      .sca.history growth.
+      (default) means unlimited. Counted independently via .sca.rescan_count (a
+      monotonic tally of completed re-scans), so it stands alone and does not
+      depend on scan_history_size — scan_history_size bounds how many scans you
+      KEEP, max_rescans bounds how many you RUN. Once the limit is reached the
+      cron skips the component, keeping the last scan and its history.
     default: "0"
   db_auto_update:
     description: |
@@ -207,6 +206,7 @@ example_component_json: |
           "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
         }
       ],
+      "rescan_count": 2,
       "native": {
         "grype": {
           "cicd": {
