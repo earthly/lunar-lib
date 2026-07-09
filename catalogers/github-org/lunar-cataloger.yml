@@ -68,7 +68,9 @@ inputs:
       "github.acme.com") to catalog from a self-hosted GHE instance.
       A full URL such as "https://github.acme.com" is also accepted —
       the scheme and any trailing path are stripped automatically.
-      The same LUNAR_SECRET_GH_TOKEN is used regardless of host.
+      github.com authenticates with LUNAR_SECRET_GH_TOKEN; a GitHub
+      Enterprise Server host authenticates with LUNAR_SECRET_GH_ENTERPRISE_TOKEN
+      (falling back to LUNAR_SECRET_GH_TOKEN if the enterprise secret is unset).
     default: "github.com"
 
   include_public:
@@ -100,7 +102,9 @@ inputs:
     default: ""
 
   tag_prefix:
-    description: Prefix for GitHub topics when converting to Lunar tags
+    description: |
+      Prefix for GitHub topics when converting to Lunar tags. Empty
+      string disables the prefix.
     default: "gh-"
 
   default_owner:

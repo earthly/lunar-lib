@@ -2,7 +2,7 @@
 #
 # Backstage Cataloger — sync entities from a Backstage instance into Lunar.
 #
-# Fetches /api/catalog/entities (paginated), routes:
+# Fetches <api_path_prefix>/catalog/entities (paginated), routes:
 #   - Component, API, Resource → .components (keyed by <id_prefix><annotation value>)
 #   - Domain, System          → .domains    (keyed by metadata.name)
 # Applies owner_format (as-is | bare-name), derived bs-type-*/bs-lifecycle-*
@@ -10,6 +10,8 @@
 #
 # Inputs (LUNAR_VAR_*):
 #   backstage_url             (required) Base URL of the Backstage instance
+#   api_path_prefix           (default /api) Path prefix before /catalog/entities;
+#                             set to "" for a Backstage API mounted at the root
 #   entity_kinds              (default Component,Domain) Comma-separated kinds
 #   namespace                 (default default) Namespace, or "*" for all
 #   component_id_annotation   (default github.com/project-slug)
@@ -28,11 +30,32 @@ set -euo pipefail
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:?backstage_url input is required}"
 BACKSTAGE_URL="${BACKSTAGE_URL%/}"
 
+# Path prefix prepended before `/catalog/entities`. Defaults to `/api` (the
+# standard Backstage layout). Set to "" for an instance whose catalog API is
+# mounted at the root — e.g. behind an API gateway that strips the `/api` hop.
+# `-` not `:-` (same treatment as TAG_PREFIX below): an explicit empty value
+# must survive so it can disable the prefix. The hub always sets
+# LUNAR_VAR_API_PATH_PREFIX — to the manifest default `/api` when unset in
+# config, or the user's value (including "") when set — so `-/api` only fires
+# for a truly-unset var (direct local invocation), not a config-supplied "".
+API_PATH_PREFIX="${LUNAR_VAR_API_PATH_PREFIX-/api}"
+# Normalize: drop any trailing slash, and ensure a non-empty value leads with a
+# slash — so `api`, `/api`, and `/api/` all resolve to `/api`, and "" stays "".
+API_PATH_PREFIX="${API_PATH_PREFIX%/}"
+if [ -n "$API_PATH_PREFIX" ] && [ "${API_PATH_PREFIX#/}" = "$API_PATH_PREFIX" ]; then
+    API_PATH_PREFIX="/$API_PATH_PREFIX"
+fi
+
 ENTITY_KINDS="${LUNAR_VAR_ENTITY_KINDS:-Component,Domain}"
 NAMESPACE="${LUNAR_VAR_NAMESPACE:-default}"
 COMPONENT_ID_ANNOTATION="${LUNAR_VAR_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
-TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-bs-}"
+# `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+# prefixing (documented behavior). The hub always sets LUNAR_VAR_TAG_PREFIX —
+# to the manifest default `bs-` when unset in config, or to the user's value
+# (including "") when set — so `-bs-` only fires for a truly-unset var (direct
+# local invocation), not for a config-supplied empty string.
+TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
@@ -49,7 +72,7 @@ if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
     AUTH_HEADER=(-H "Authorization: Bearer $LUNAR_SECRET_BACKSTAGE_TOKEN")
 fi
 
-echo "Cataloging Backstage entities from: $BACKSTAGE_URL"
+echo "Cataloging Backstage entities from: $BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities"
 echo "Kinds: $ENTITY_KINDS"
 echo "Namespace: $NAMESPACE"
 echo "Component id: $COMPONENT_ID_PREFIX + <annotation '$COMPONENT_ID_ANNOTATION'>"
@@ -80,12 +103,12 @@ done
 
 # --- Paginated fetch -----------------------------------------------------
 fetch_page() {
-    local offset="$1"
-    local url="$BACKSTAGE_URL/api/catalog/entities?limit=$PAGE_SIZE&offset=$offset$FILTER_QUERY"
+    local cursor="$1"
+    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&cursor=$cursor}$FILTER_QUERY"
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF
-    while [ $attempt -le $MAX_RETRIES ]; do
+    while [ "$attempt" -le "$MAX_RETRIES" ]; do
         local response_file
         response_file=$(mktemp)
         local http_status
@@ -103,19 +126,19 @@ fetch_page() {
         fi
 
         if [ "$http_status" = "429" ] || [[ "$http_status" =~ ^5 ]] || [ "$http_status" = "000" ]; then
-            echo "Transient $http_status from Backstage (attempt $attempt/$MAX_RETRIES, offset=$offset), waiting ${backoff}s..." >&2
+            echo "Transient $http_status from Backstage (attempt $attempt/$MAX_RETRIES, cursor=$cursor), waiting ${backoff}s..." >&2
             sleep "$backoff"
             backoff=$((backoff * 2))
             attempt=$((attempt + 1))
             continue
         fi
 
-        echo "Error from Backstage ($http_status) at offset=$offset:" >&2
+        echo "Error from Backstage ($http_status) at cursor=$cursor:" >&2
         echo "$body" | head -c 500 >&2
         echo "" >&2
         return 1
     done
-    echo "Failed to fetch page at offset=$offset after $MAX_RETRIES attempts" >&2
+    echo "Failed to fetch page at cursor=$cursor after $MAX_RETRIES attempts" >&2
     return 1
 }
 
@@ -123,10 +146,11 @@ ALL_ENTITIES=$(mktemp)
 trap 'rm -f "$ALL_ENTITIES" "${ALL_ENTITIES}.chunk" "${ALL_ENTITIES}.new" "${ALL_ENTITIES}.entries"' EXIT
 echo "[]" > "$ALL_ENTITIES"
 
-OFFSET=0
+CURSOR=""
 TOTAL_FETCHED=0
 while true; do
-    PAGE=$(fetch_page "$OFFSET")
+    RESPONSE=$(fetch_page "$CURSOR")
+    PAGE=$(echo "$RESPONSE" | jq '.items')
     PAGE_COUNT=$(echo "$PAGE" | jq 'length')
 
     if [ "$PAGE_COUNT" -eq 0 ]; then
@@ -139,13 +163,13 @@ while true; do
     rm -f "${ALL_ENTITIES}.chunk"
 
     TOTAL_FETCHED=$((TOTAL_FETCHED + PAGE_COUNT))
-    echo "  fetched offset=$OFFSET page=$PAGE_COUNT total=$TOTAL_FETCHED"
+    echo "  fetched cursor=${CURSOR:-start} page=$PAGE_COUNT total=$TOTAL_FETCHED"
 
-    if [ "$PAGE_COUNT" -lt "$PAGE_SIZE" ]; then
+    NEXT_CURSOR=$(echo "$RESPONSE" | jq -r '.pageInfo.nextCursor // empty')
+    if [ -z "$NEXT_CURSOR" ]; then
         break
     fi
-
-    OFFSET=$((OFFSET + PAGE_SIZE))
+    CURSOR="$NEXT_CURSOR"
 done
 
 echo "Total entities fetched: $TOTAL_FETCHED"

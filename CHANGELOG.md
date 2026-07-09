@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `backstage-catalog-info` cataloger: new `augment-on-commit` sub-cataloger — a
+  commit-triggered companion to the scheduled `augment`. Runs on the
+  `component-repo` hook (`clone-code: true`) so it refreshes a component's
+  owner/domain/tags the moment its repo is committed to, reading
+  `catalog-info.yaml` from the checkout. Shares the parse/match/transform/write
+  pipeline with `augment` via `helpers.sh`; enable either or both with `include`
+  (#212).
 - `backstage-catalog-info` cataloger: new `meta_annotations` input — maps
   selected `catalog-info.yaml` annotations onto the Lunar component `meta`
   field. Defaults to `pagerduty.com/service-id=pagerduty/service-id`, so the
@@ -16,12 +23,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PagerDuty service straight from the annotation PagerDuty's Backstage
   integration guide recommends — no per-component config. Accepts multiple
   `<annotation>=<meta-key>` pairs for other collectors; set empty to disable.
+  (#224)
 - `backstage-catalog-info` cataloger: new `default_domain` input — assigns a
   fallback domain (written verbatim, with a matching stub `.domains` entry) to
   components whose `catalog-info.yaml` resolves to no domain via
   `domain_annotation`, `spec.domain`, or `spec.system`. Mirrors the existing
   `default_owner` fallback and never overrides a domain the file already
   provides (#223).
+
+### Fixed
+
+- `github-org` cataloger: authenticate GitHub Enterprise Server hosts with
+  `LUNAR_SECRET_GH_ENTERPRISE_TOKEN` (falling back to `LUNAR_SECRET_GH_TOKEN`)
+  instead of always using `LUNAR_SECRET_GH_TOKEN`. Previously a distinct
+  enterprise token set via `LUNAR_SECRET_GH_ENTERPRISE_TOKEN` was ignored and
+  the github.com token was reused for GHE hosts. github.com behavior is
+  unchanged (#226).
+- `backstage-catalog-info` and `backstage` catalogers: an explicit empty
+  `tag_prefix` now disables tag prefixing entirely, honoring the documented
+  "empty string disables the prefix" behavior. Previously an empty value set in
+  config was silently replaced with the `bs-` default — Bash `${VAR:-bs-}`
+  treats empty and unset alike — so the prefix could not be turned off (#227).
+- `github-org` cataloger: same `tag_prefix` fix as #227 — an explicit empty
+  `tag_prefix` now disables the topic prefix instead of being silently replaced
+  with the `gh-` default (`${VAR:-gh-}` treats empty and unset alike). The input
+  is now documented as "empty string disables the prefix" (#228).
 
 ## [1.5.0] — 2026-06-17
 

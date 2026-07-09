@@ -5,8 +5,7 @@ def main(node=None):
     c = Check("code-reviewer", "At least one AI code reviewer should be active", node=node)
     with c:
         reviewers_node = c.get_node(".ai.code_reviewers")
-        reviewers_list = reviewers_node.get_value_or_default(".", None)
-        if reviewers_list is None:
+        if not reviewers_node.exists():
             c.fail(
                 "No AI code reviewer data found — enable a tool-specific collector "
                 "(claude, coderabbit). Exclude this policy if code review is not "

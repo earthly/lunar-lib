@@ -32,6 +32,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_high` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
+| `.container_scan.findings[]` | array | Container scanner collector — used to list the offending packages/CVEs in the `max-severity` failure message (`cve`, `severity`, `package`, `fix_version`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
@@ -71,6 +72,10 @@ policies:
   "container_scan": {
     "source": { "tool": "trivy", "integration": "cicd" },
     "vulnerabilities": { "critical": 3, "high": 8, "medium": 15, "total": 40 },
+    "findings": [
+      { "severity": "critical", "package": "openssl", "cve": "CVE-2026-1234", "fix_version": "3.0.14" },
+      { "severity": "high", "package": "libcurl", "cve": "CVE-2026-5678", "fix_version": null }
+    ],
     "summary": { "has_critical": true, "has_high": true }
   }
 }
@@ -78,7 +83,13 @@ policies:
 
 **Failure messages:**
 - `executed`: "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured."
-- `max-severity`: "Critical container vulnerabilities detected (3 found)"
+- `max-severity`: names the offending packages/CVEs (most severe first, capped at 10 with a `+N more` tail), the same format the `sca` policy uses. When the scanner emits per-finding detail it renders as a nested list:
+  ```
+  Critical container vulnerabilities detected:
+      * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
+      * high: libcurl — CVE-2026-5678 (no fix available)
+  ```
+  A summary-only scanner (no `.container_scan.findings[]`) falls back to the headline alone (e.g. `Critical container vulnerabilities detected`).
 - `max-total`: "Total container vulnerability findings (40) exceeds threshold (10)"
 
 ## Remediation

@@ -114,9 +114,12 @@ class TestBranchProtectionEnabled(unittest.TestCase):
         self.assertIn("not enabled", check.failure_reasons[0])
 
     def test_missing_data_fails(self):
-        """Missing VCS data should fail with clear message."""
+        """Missing VCS data should fail once collection has finished."""
         data = {}
-        node = Node.from_component_json(data)
+        # workflows_finished=True models completed collection, where absent data
+        # is a genuine violation (FAIL). During the interim it (correctly) PENDs
+        # — see TestInterimPending below.
+        node = Node.from_component_json(data, bundle_info={"workflows_finished": True})
         check = check_branch_protection_enabled(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("VCS data not found", check.failure_reasons[0])
@@ -386,9 +389,9 @@ class TestRequirePrivate(unittest.TestCase):
         self.assertIn("private", check.failure_reasons[0])
 
     def test_missing_visibility_fails(self):
-        """Missing visibility data should fail."""
+        """Missing visibility data should fail once collection has finished."""
         data = {}
-        node = Node.from_component_json(data)
+        node = Node.from_component_json(data, bundle_info={"workflows_finished": True})
         check = check_require_private(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("VCS data not found", check.failure_reasons[0])
@@ -641,6 +644,25 @@ class TestRulesetsDerivedData(unittest.TestCase):
         self.assertEqual(
             check_require_pull_request(node).status, CheckStatus.PASS
         )
+
+
+class TestInterimPending(unittest.TestCase):
+    """ENG-1114: absent VCS data during the collection interim must PEND, not FAIL.
+
+    The github collector may not have reported yet when a policy first runs.
+    With workflows_finished=False the checks must render PENDING (⏳), only
+    resolving to FAIL once collection has finished (see test_missing_data_fails).
+    """
+
+    def test_missing_data_pends_during_interim(self):
+        node = Node.from_component_json({}, bundle_info={"workflows_finished": False})
+        self.assertEqual(
+            check_branch_protection_enabled(node).status, CheckStatus.PENDING
+        )
+
+    def test_missing_visibility_pends_during_interim(self):
+        node = Node.from_component_json({}, bundle_info={"workflows_finished": False})
+        self.assertEqual(check_require_private(node).status, CheckStatus.PENDING)
 
 
 if __name__ == "__main__":

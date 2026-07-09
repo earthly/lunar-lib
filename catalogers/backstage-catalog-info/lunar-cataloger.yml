@@ -8,10 +8,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Backstage catalog-info.yaml Cataloger"
   long_description: |
-    Augments existing Lunar components with owner, domain, and tag
-    metadata read from each repo's `catalog-info.yaml`. Fetches files
-    via the GitHub Contents API on a schedule. Runs per component. Use
-    when Backstage data lives in repo files, not in a Backstage server.
+    Augments existing Lunar components with owner, domain, tag, and
+    annotation-sourced meta read from each repo's `catalog-info.yaml` — on a schedule
+    via the GitHub API, or the moment a repo is committed to. Runs per
+    component. Use when Backstage data lives in repo files, not a
+    Backstage server.
   categories: ["service-catalog", "vcs"]
   icon: "assets/backstage-catalog-info.svg"
   status: "beta"
@@ -46,24 +47,48 @@ example_catalog_json: |
 catalogers:
   - name: augment
     description: |
-      For each existing Lunar component, fetches `catalog-info.yaml`
-      from the component's GitHub repo via the Contents API, parses
-      it (supports multi-document YAML), picks the matching
-      `Component` entity, and writes its owner, domain, tags, and
-      selected annotation-sourced meta to
-      `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON.
-      Repos with no `catalog-info.yaml`, an unparseable file, or no
-      matching `Component` are skipped silently.
+      from the component's GitHub repo via the Contents API, parses it
+      (supports multi-document YAML), picks the matching `Component`
+      entity, and writes its owner, domain, tags, and selected
+      annotation-sourced meta to `.components["$LUNAR_COMPONENT_ID"]`
+      in the Catalog JSON. Repos with no `catalog-info.yaml`, an
+      unparseable file, or no matching `Component` are skipped
+      silently. Runs on a fixed cadence regardless of repo activity —
+      pair with `augment-on-commit` (below) for updates the moment a
+      repo's `catalog-info.yaml` changes instead of at the next cron.
     mainBash: main.sh
-    # TODO(post-merge): also ship a `cron`-hooked variant that walks
-    # an org and creates components from catalog-info.yaml. Trade-off
-    # is full-day-1 catalog coverage (`cron`) vs near-real-time updates
-    # when an individual repo's catalog-info.yaml changes
-    # (`component-cron`). Discussed on PR earthly/lunar-lib#181.
     hook:
       type: component-cron
       schedule: "0 3 * * *"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment"]
+
+  - name: augment-on-commit
+    description: |
+      Commit-triggered companion to `augment`: identical owner /
+      domain / tag / meta augmentation, but fired the moment a
+      component's repo receives a commit instead of waiting for the
+      daily cron.
+      Runs via the `component-repo` hook, which checks out the
+      component's repo, so it reads `catalog-info.yaml` straight from
+      the working tree — no GitHub Contents API call and no `GH_TOKEN`
+      required. Same matching rules, same inputs (except `branch`,
+      which only applies to the API-fetch `augment` variant), and the
+      same silent-skip behavior. Like `augment`, it augments existing
+      components only — a component-defining cataloger such as
+      `github-org` must run first — and cannot create new ones.
+    mainBash: main-on-commit.sh
+    # TODO(post-merge): the third variant floated on PR earthly/lunar-lib#181
+    # is a `cron`-hooked org-walker that CREATES components from
+    # catalog-info.yaml for full day-1 coverage (vs the two augment-only
+    # variants here, which only enrich components that already exist).
+    # Different shape — defer it to its own PR.
+    hook:
+      type: component-repo
+      # Request a checkout of the component's repo so main-on-commit.sh can
+      # read catalog-info.yaml from the working tree (vs. fetching over the
+      # GitHub API like the scheduled `augment` variant).
+      clone-code: true
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "ownership", "augment", "commit-triggered", "real-time"]
 
 inputs:
   paths:
@@ -76,7 +101,10 @@ inputs:
   branch:
     description: |
       Git ref to read `catalog-info.yaml` from. Empty means the
-      repo's default branch.
+      repo's default branch. Applies to the `augment` (Contents API)
+      variant only — `augment-on-commit` reads whatever ref the
+      `component-repo` hook checked out, so this input is ignored
+      there.
     default: ""
 
   component_id_annotation:
@@ -171,8 +199,10 @@ inputs:
 secrets:
   GH_TOKEN:
     description: |
-      GitHub token used to fetch `catalog-info.yaml` from component
-      repos via the Contents API. Needs `Contents: Read` on the
-      target repos (`repo` scope on a classic PAT, or
-      `contents: read` on a fine-grained PAT / GitHub App
-      installation token).
+      GitHub token used by the `augment` variant to fetch
+      `catalog-info.yaml` from component repos via the Contents API.
+      Needs `Contents: Read` on the target repos (`repo` scope on a
+      classic PAT, or `contents: read` on a fine-grained PAT / GitHub
+      App installation token). Not required by `augment-on-commit`,
+      which reads the file from the `component-repo` checkout; if you
+      run only that variant you can leave `GH_TOKEN` unset.

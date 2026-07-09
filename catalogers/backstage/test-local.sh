@@ -2,7 +2,7 @@
 #
 # Local offline test for the Backstage cataloger.
 #
-# Mocks both `curl` (against /api/catalog/entities) and `lunar` (capturing
+# Mocks both `curl` (against <api_path_prefix>/catalog/entities) and `lunar` (capturing
 # catalog writes) so the cataloger can be exercised end-to-end without
 # network access. The mock curl serves the bundled sample-catalog.json on
 # the first request and an empty array on subsequent requests to terminate
@@ -14,6 +14,7 @@ TEST_DIR=$(mktemp -d)
 COMPONENTS_OUT="$TEST_DIR/components.json"
 DOMAINS_OUT="$TEST_DIR/domains.json"
 CURL_CALLS="$TEST_DIR/curl-calls"
+CURL_URLS="$TEST_DIR/curl-urls"
 
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -28,14 +29,16 @@ cat > "$TEST_DIR/curl" << EOF
 # Mock curl — first call returns the fixture, subsequent calls return [].
 OUT=""
 WRITE_FILE=""
+REQ_URL=""
 while [ \$# -gt 0 ]; do
     case "\$1" in
         -o) WRITE_FILE="\$2"; shift 2 ;;
         -w) shift 2 ;;
         -sS|-H|-X) shift 1; [ \$# -gt 0 ] && case "\$1" in -*) ;; *) shift 1 ;; esac ;;
-        *) shift 1 ;;
+        *) REQ_URL="\$1"; shift 1 ;;
     esac
 done
+echo "\$REQ_URL" >> "$CURL_URLS"
 CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
 echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
 if [ "\$CALL_NUM" = "0" ]; then
@@ -69,6 +72,9 @@ export PATH="$TEST_DIR:$PATH"
 
 # --- Cataloger inputs -----------------------------------------------------
 export LUNAR_VAR_BACKSTAGE_URL="${TEST_BACKSTAGE_URL:-https://backstage.example.com}"
+# `-` not `:-` so `TEST_API_PATH_PREFIX=""` exercises the root-mounted case
+# (no /api hop), mirroring how the hub forwards an explicit empty config value.
+export LUNAR_VAR_API_PATH_PREFIX="${TEST_API_PATH_PREFIX-/api}"
 export LUNAR_VAR_ENTITY_KINDS="${TEST_ENTITY_KINDS:-Component,Domain,System,API,Resource}"
 export LUNAR_VAR_NAMESPACE="${TEST_NAMESPACE:-default}"
 export LUNAR_VAR_COMPONENT_ID_ANNOTATION="${TEST_COMPONENT_ID_ANNOTATION:-github.com/project-slug}"
@@ -88,6 +94,7 @@ export INITIAL_BACKOFF="${INITIAL_BACKOFF:-1}"
 echo ""
 echo "=== Running cataloger with settings ==="
 echo "Backstage URL:  $LUNAR_VAR_BACKSTAGE_URL"
+echo "API path prefix: ${LUNAR_VAR_API_PATH_PREFIX:-<none>}"
 echo "Kinds:          $LUNAR_VAR_ENTITY_KINDS"
 echo "Namespace:      $LUNAR_VAR_NAMESPACE"
 echo "Owner format:   $LUNAR_VAR_OWNER_FORMAT"
@@ -98,6 +105,7 @@ echo ""
 : > "$COMPONENTS_OUT"
 : > "$DOMAINS_OUT"
 : > "$CURL_CALLS"
+: > "$CURL_URLS"
 
 echo "=== Cataloger output ==="
 "$SCRIPT_DIR/main.sh"
@@ -111,7 +119,28 @@ echo "=== Captured .domains ==="
 jq -s 'add // {}' "$DOMAINS_OUT"
 
 echo ""
+echo "=== Requested URLs ==="
+cat "$CURL_URLS"
+
+echo ""
 echo "=== Summary ==="
 echo "Components: $(jq -s 'add // {} | keys | length' "$COMPONENTS_OUT")"
 echo "Domains:    $(jq -s 'add // {} | keys | length' "$DOMAINS_OUT")"
 echo "curl calls: $(wc -l < "$CURL_CALLS")"
+
+# --- Assert api_path_prefix plumbing -------------------------------------
+# The resolved prefix must sit directly before /catalog/entities. Normalize
+# the same way main.sh does (drop trailing slash, ensure leading slash) so the
+# expectation holds for the default, the empty (root-mounted) case, and any
+# custom prefix passed via TEST_API_PATH_PREFIX.
+NP="${LUNAR_VAR_API_PATH_PREFIX%/}"
+if [ -n "$NP" ] && [ "${NP#/}" = "$NP" ]; then NP="/$NP"; fi
+EXPECT="${LUNAR_VAR_BACKSTAGE_URL}${NP}/catalog/entities"
+FIRST_URL=$(head -1 "$CURL_URLS")
+case "$FIRST_URL" in
+    "$EXPECT"?*)
+        echo "PASS: request URL uses api_path_prefix='${NP:-<none>}' → $EXPECT" ;;
+    *)
+        echo "FAIL: expected request URL to start with '$EXPECT' but got '$FIRST_URL'" >&2
+        exit 1 ;;
+esac

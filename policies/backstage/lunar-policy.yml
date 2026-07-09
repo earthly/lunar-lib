@@ -60,3 +60,73 @@ policies:
       and architectural visibility. Fails if no catalog file is present.
     mainPython: ./system-set.py
     keywords: ["backstage", "system", "grouping", "architecture"]
+
+  - name: required-annotations
+    description: |
+      Verifies that catalog-info.yaml declares a configurable set of
+      required annotation keys (e.g. backstage.io/source-location).
+      Configure via the `required_annotations` input. Skipped when no
+      annotations are required (the default). Fails if the catalog file
+      is missing or any required annotation key is absent or empty.
+    mainPython: ./required-annotations.py
+    keywords: ["backstage", "annotations", "metadata", "required", "source-location"]
+
+  - name: required-tag-patterns
+    description: |
+      Verifies that catalog-info.yaml carries at least one tag matching
+      each configured glob pattern (e.g. `location/*`, `runs-on/*`).
+      Configure via the `required_tag_patterns` input. Skipped when no
+      patterns are required (the default). Fails if the catalog file is
+      missing or any pattern is unmatched by the component's tags.
+    mainPython: ./required-tag-patterns.py
+    keywords: ["backstage", "tags", "tag patterns", "glob", "required", "metadata"]
+
+  - name: disallowed-annotations
+    description: |
+      Verifies that catalog-info.yaml declares none of a configurable set
+      of forbidden annotation keys. Configure via the
+      `disallowed_annotations` input. Skipped when no annotations are
+      forbidden (the default). Fails if any forbidden annotation key is
+      present in `metadata.annotations`.
+    mainPython: ./disallowed-annotations.py
+    keywords: ["backstage", "annotations", "metadata", "disallowed", "forbidden"]
+
+  - name: disallowed-tag-patterns
+    description: |
+      Verifies that none of the component's tags match a configured glob
+      pattern. Configure via the `disallowed_tag_patterns` input. Skipped
+      when no patterns are forbidden (the default). Fails if any tag
+      matches any forbidden pattern.
+    mainPython: ./disallowed-tag-patterns.py
+    keywords: ["backstage", "tags", "tag patterns", "glob", "disallowed", "forbidden"]
+
+inputs:
+  required_annotations:
+    description: |
+      Comma-separated list of annotation keys that must be present (and
+      non-empty) in catalog-info.yaml `metadata.annotations`. Example:
+      `backstage.io/source-location,pagerduty.com/integration-key`.
+      Empty (the default) disables the `required-annotations` check.
+    default: ""
+  required_tag_patterns:
+    description: |
+      Comma-separated list of glob patterns; the component's
+      `metadata.tags` must include at least one tag matching each
+      pattern. Example: `location/*,runs-on/*`. Matching is
+      case-insensitive. Empty (the default) disables the
+      `required-tag-patterns` check.
+    default: ""
+  disallowed_annotations:
+    description: |
+      Comma-separated list of annotation keys that must NOT be present in
+      catalog-info.yaml `metadata.annotations`. Example:
+      `backstage.io/skip-checks`. Empty (the default) disables the
+      `disallowed-annotations` check.
+    default: ""
+  disallowed_tag_patterns:
+    description: |
+      Comma-separated list of glob patterns; the component's
+      `metadata.tags` must NOT include any tag matching these patterns.
+      Example: `deprecated/*,internal-only`. Matching is case-insensitive.
+      Empty (the default) disables the `disallowed-tag-patterns` check.
+    default: ""

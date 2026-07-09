@@ -120,10 +120,11 @@ catalogers:
 ```
 
 A full URL (e.g. `https://github.acme.com`) is also accepted — the scheme and
-any trailing path are stripped automatically. Authentication uses the same
-`LUNAR_SECRET_GH_TOKEN` secret regardless of host (it's routed to the GitHub CLI
-as `GH_ENTERPRISE_TOKEN` for GHE hosts). Component IDs reflect the host, so a
-repo on GHE is keyed as `github.acme.com/<org>/<repo>`.
+any trailing path are stripped automatically. Authentication for a GHE host uses
+`LUNAR_SECRET_GH_ENTERPRISE_TOKEN` (routed to the GitHub CLI as
+`GH_ENTERPRISE_TOKEN`), falling back to `LUNAR_SECRET_GH_TOKEN` if that secret is
+not set — so a github.com and a GHE server can use distinct credentials. Component
+IDs reflect the host, so a repo on GHE is keyed as `github.acme.com/<org>/<repo>`.
 
 ### Include Only Specific Repos
 
@@ -144,7 +145,9 @@ This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:
    - `repo` scope for private/internal repositories
    - `read:org` scope for public repositories only
 
-   The same secret is used for GitHub Enterprise Server; the cataloger routes it
-   to the GitHub CLI as `GH_ENTERPRISE_TOKEN` when `github_host` is not github.com.
+   For GitHub Enterprise Server (`github_host` other than github.com) the
+   cataloger reads `LUNAR_SECRET_GH_ENTERPRISE_TOKEN` and routes it to the GitHub
+   CLI as `GH_ENTERPRISE_TOKEN`. If that secret is unset it falls back to
+   `LUNAR_SECRET_GH_TOKEN`, so existing single-token setups keep working.
 
 The cataloger makes API calls to list repositories and their topics. For large organizations, it fetches up to 10,000 repositories per visibility level.

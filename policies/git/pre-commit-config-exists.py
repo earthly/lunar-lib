@@ -8,10 +8,7 @@ def main(node=None):
         node=node,
     )
     with c:
-        pre_commit = (
-            c.get_node(".git.pre_commit").get_value_or_default(".", None)
-        )
-        if pre_commit is None:
+        if not c.get_node(".git.pre_commit").exists():
             c.fail(
                 "No `.pre-commit-config.yaml` found. Add a config (e.g. "
                 "`pre-commit sample-config > .pre-commit-config.yaml`) to "
