@@ -100,6 +100,7 @@ ai-context:
 
 all:
     BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/argocd+image
     BUILD --pass-args ./collectors/ast-grep+image
     BUILD --pass-args ./collectors/claude+image
     BUILD --pass-args ./collectors/docker+image
