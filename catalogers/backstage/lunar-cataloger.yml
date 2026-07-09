@@ -10,7 +10,8 @@ landing_page:
   long_description: |
     Sync components and domains from a Backstage software catalog into Lunar.
     Maps Backstage entities to Lunar catalog with owner, domain, and tags,
-    using the Backstage REST API.
+    using the Backstage REST API. Authenticates with a Bearer token or with
+    AWS SigV4 for Backstage APIs behind AWS IAM auth.
   categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "experimental"
@@ -168,8 +169,62 @@ inputs:
       means no extra filter.
     default: ""
 
+  auth_mode:
+    description: |
+      How the cataloger authenticates to the Backstage API.
+      - `bearer` — send `Authorization: Bearer <BACKSTAGE_TOKEN>`. Default;
+                   unchanged behavior.
+      - `sigv4`  — sign every request with AWS Signature V4, for a Backstage
+                   API fronted by AWS IAM auth (typically Amazon API Gateway).
+                   Credentials are resolved at runtime from the standard AWS
+                   credential chain — IRSA (EKS), ECS task role, EC2 instance
+                   profile, or `AWS_*` env — so they **auto-refresh and are
+                   never supplied by hand**. See the README "AWS SigV4
+                   Authentication" section for the (one-time) IAM-role setup.
+    default: "bearer"
+
+  aws_region:
+    description: |
+      AWS region used to scope the SigV4 signature and to reach STS when
+      assuming a web-identity (IRSA) role. Required when `auth_mode: sigv4`,
+      unless `AWS_REGION` is already present in the cataloger pod's
+      environment (IRSA and most AWS runtimes set it, but not always). If
+      `auth_mode: sigv4` and neither this input nor the `AWS_REGION` env var
+      is set, the cataloger fails fast at startup with a clear
+      `aws_region required for sigv4` error rather than signing with an empty
+      region (which would surface as an opaque downstream AWS error).
+      Ignored for `auth_mode: bearer`.
+    default: ""
+
+  aws_service:
+    description: |
+      AWS service name for the SigV4 signature scope. For a Backstage API
+      behind Amazon API Gateway this is `execute-api` (the default). Override
+      only for other fronting (e.g. a Lambda function URL signs as `lambda`).
+      Ignored for `auth_mode: bearer`.
+    default: "execute-api"
+
 secrets:
   BACKSTAGE_TOKEN:
     description: |
-      Bearer token for the Backstage API. Required if the Backstage
-      instance requires authentication; many internal deployments do.
+      Bearer token for the Backstage API. Used when `auth_mode: bearer`
+      (the default). Required if the Backstage instance enforces bearer
+      auth; many internal deployments do. Not used for `sigv4`.
+
+  AWS_ACCESS_KEY_ID:
+    description: |
+      Optional, `auth_mode: sigv4` only. A static-credentials escape hatch
+      for runners with **no** attached IAM identity (no IRSA / ECS / EC2
+      role). Leave unset for role-based auth, which is the recommended path
+      because it self-refreshes — static keys do **not** auto-rotate.
+
+  AWS_SECRET_ACCESS_KEY:
+    description: |
+      Optional, `auth_mode: sigv4` only. Paired with `AWS_ACCESS_KEY_ID`
+      for the static-credentials escape hatch (see that secret's note).
+
+  AWS_SESSION_TOKEN:
+    description: |
+      Optional, `auth_mode: sigv4` only. Set alongside the static AWS keys
+      when they are themselves temporary credentials. Because temporary keys
+      expire, this path needs manual refresh — prefer role-based auth.
