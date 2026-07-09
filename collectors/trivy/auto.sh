@@ -3,6 +3,47 @@ set -eo pipefail
 
 echo "Running Trivy vulnerability scan" >&2
 
+# --- Scan-history preamble (opt-in; rescan/cron path only) -------------------
+# This script is shared by the `auto` (code hook) and `rescan` (cron hook)
+# sub-collectors (the cron one's name ends in "rescan", e.g. "trivy.rescan").
+# INTEGRATION stamps .sca.source so it's clear whether the data came from an
+# on-push scan ("code") or a scheduled re-scan ("cron").
+#
+# With scan_history_size > 0 the rescan snapshots the current .sca into a
+# bounded .sca.history[] before overwriting it (point-in-time audit), and
+# max_rescans optionally caps the total number of re-scans. Both default 0 =
+# today's overwrite-only behavior. Only the rescan path participates.
+case "${LUNAR_COLLECTOR_NAME:-}" in
+  *rescan) INTEGRATION="cron"; IS_RESCAN=true ;;
+  *)       INTEGRATION="code"; IS_RESCAN=false ;;
+esac
+
+HIST_SIZE="${LUNAR_INPUT_SCAN_HISTORY_SIZE:-0}"
+MAX_RESCANS="${LUNAR_INPUT_MAX_RESCANS:-0}"
+case "$HIST_SIZE" in ''|*[!0-9]*) HIST_SIZE=0 ;; esac
+case "$MAX_RESCANS" in ''|*[!0-9]*) MAX_RESCANS=0 ;; esac
+
+# Read the current merged .sca once (feeds both history and max_rescans). The
+# runtime provides the hub connection + LUNAR_COMPONENT_ID, so this is the
+# authoritative pre-overwrite view (same read container-rescan.sh uses).
+CUR_SCA="{}"
+if [ "$IS_RESCAN" = true ] && { [ "$HIST_SIZE" -gt 0 ] || [ "$MAX_RESCANS" -gt 0 ]; }; then
+  if [ -n "${LUNAR_COMPONENT_ID:-}" ]; then
+    CUR_SCA=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null | jq -c '.sca // {}' 2>/dev/null || echo "{}")
+    [ -n "$CUR_SCA" ] || CUR_SCA="{}"
+  fi
+  # max_rescans: stop re-scanning once the monotonic tally reaches the cap.
+  if [ "$MAX_RESCANS" -gt 0 ]; then
+    CUR_COUNT=$(echo "$CUR_SCA" | jq -r '.rescan_count // 0' 2>/dev/null || echo 0)
+    case "$CUR_COUNT" in ''|*[!0-9]*) CUR_COUNT=0 ;; esac
+    if [ "$CUR_COUNT" -ge "$MAX_RESCANS" ]; then
+      echo "Scan history: max_rescans ($MAX_RESCANS) reached (rescan_count=$CUR_COUNT) — skipping re-scan" >&2
+      exit 0
+    fi
+  fi
+fi
+# ---------------------------------------------------------------------------
+
 # Get Trivy version for source metadata
 TRIVY_VERSION=$(trivy version -f json 2>/dev/null | jq -r '.Version // empty' || trivy version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "")
 
@@ -60,36 +101,57 @@ fi
 # (CVSS scores, References, Description, CweIDs, DataSource, etc.).
 lunar collect -j ".sca.native.trivy.results" - < "$RESULTS_FILE"
 
-# This script is shared by the `auto` (code hook) and `rescan` (cron hook)
-# sub-collectors. Stamp .sca.source.integration so it's obvious whether the
-# data came from an on-push scan ("code") or a scheduled re-scan ("cron").
-# The cron sub-collector's name ends in "rescan" (e.g. "trivy.rescan").
-case "${LUNAR_COLLECTOR_NAME:-}" in
-  *rescan) INTEGRATION="cron" ;;
-  *)       INTEGRATION="code" ;;
-esac
-
-# Build source metadata JSON
-SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATION" '{
+# Build source metadata JSON. collected_at dates each scan so a snapshot pushed
+# into .sca.history[] is self-describing — integration + timestamp identify the
+# release-time "code" scan vs a scheduled "cron" re-scan.
+COLLECTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATION" --arg collected_at "$COLLECTED_AT" '{
   tool: "trivy",
-  integration: $integration
+  integration: $integration,
+  collected_at: $collected_at
 } + (if $version != "" then {version: $version} else {} end)')
+
+# Build the .sca.history + rescan_count fragment, merged into the .sca write
+# below via `+ $extra`. Only the rescan path with scan_history_size > 0 does
+# this. Snapshot the CURRENT scan (about to be overwritten) as a compact
+# {source, vulnerabilities, summary} entry — no findings/native (those arrays
+# concatenate across the code+cron records, so snapshotting them would double
+# and bloat) and no nested history. latest-cron-per-collector keeps only this
+# run's cron record, so .sca.history never self-concatenates across runs.
+HISTORY_JSON="{}"
+if [ "$IS_RESCAN" = true ] && [ "$HIST_SIZE" -gt 0 ]; then
+  if echo "$CUR_SCA" | jq -e 'has("source") or has("vulnerabilities") or has("summary")' >/dev/null 2>&1; then
+    HISTORY_JSON=$(echo "$CUR_SCA" | jq -c --argjson size "$HIST_SIZE" '
+      (.history // []) as $hist
+      | (.rescan_count // 0) as $count
+      | ({source, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
+      | ($hist + [$snap]) as $all
+      | ($all | length) as $len
+      | {
+          history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end),
+          rescan_count: ($count + 1)
+        }' 2>/dev/null || echo "{}")
+    [ -n "$HISTORY_JSON" ] || HISTORY_JSON="{}"
+  else
+    echo "Scan history: no prior .sca to snapshot — writing current scan only this run" >&2
+  fi
+fi
 
 # Check if any vulnerabilities found
 VULN_COUNT=$(jq '[.Results[]? | .Vulnerabilities[]?] | length' "$RESULTS_FILE")
 if [ "$VULN_COUNT" = "0" ] || [ -z "$VULN_COUNT" ]; then
   echo "No vulnerabilities found" >&2
   # Write everything in a single collect call to avoid merge fragmentation
-  jq -n --argjson source "$SOURCE_JSON" '{
+  jq -n --argjson source "$SOURCE_JSON" --argjson extra "$HISTORY_JSON" '{
     source: $source,
     vulnerabilities: {critical: 0, high: 0, medium: 0, low: 0, total: 0},
     summary: {has_critical: false, has_high: false, all_fixable: true}
-  }' | lunar collect -j ".sca" -
+  } + $extra' | lunar collect -j ".sca" -
   exit 0
 fi
 
 # Build normalized findings, counts, and source in a single JSON blob
-jq -c --argjson source "$SOURCE_JSON" '{
+jq -c --argjson source "$SOURCE_JSON" --argjson extra "$HISTORY_JSON" '{
   source: $source,
   vulnerabilities: {
     critical: [.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length,
@@ -113,6 +175,6 @@ jq -c --argjson source "$SOURCE_JSON" '{
     has_high:     ([.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length > 0),
     all_fixable:  ([.Results[]?.Vulnerabilities[]? | select(.FixedVersion == null or .FixedVersion == "")] | length == 0)
   }
-}' "$RESULTS_FILE" | lunar collect -j ".sca" -
+} + $extra' "$RESULTS_FILE" | lunar collect -j ".sca" -
 
 echo "Found $VULN_COUNT vulnerabilities" >&2
