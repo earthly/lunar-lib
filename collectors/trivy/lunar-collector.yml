@@ -113,14 +113,19 @@ inputs:
   scan_history_size:
     description: |
       Maximum number of prior SCA scans to retain in .sca.history[] on each cron
-      re-scan. Snapshots are ordered oldest-first: .sca.history[0] is the
-      release-time scan and the current scan stays in the main .sca fields, so
-      the SCA policy is unaffected. 0 (default) disables history entirely — .sca
-      is overwritten each run exactly as today and no .sca.history is written, so
-      existing consumers see no change. When the cap is reached the release-time
-      entry (index 0) is preserved and the second-oldest entry is dropped. Only
-      the rescan (cron) sub-collector maintains history; the on-push auto scan
-      ignores this.
+      re-scan. Snapshots are ordered oldest-first and the current scan stays in
+      the main .sca fields, so the SCA policy is unaffected. Each entry carries
+      its own source (integration + collected_at), so the release-time scan is
+      identifiable as the integration="code" entry — that's .sca.history[0] when
+      history is enabled from the component's first scan (the intended setup for
+      release-time audit). Enabling it later on a component that has already been
+      re-scanned captures the current .sca as the oldest entry, since the
+      release-time scan was already overwritten. 0 (default) disables history
+      entirely — .sca is overwritten each run exactly as today and no
+      .sca.history is written, so existing consumers see no change. When the cap
+      is reached the oldest entry (index 0) is preserved and the second-oldest is
+      dropped. Only the rescan (cron) sub-collector maintains history; the
+      on-push auto scan ignores this.
     default: "0"
   max_rescans:
     description: |

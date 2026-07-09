@@ -16,7 +16,7 @@ This collector writes to the following Component JSON paths:
 | `.sca.vulnerabilities` | object | Severity counts (critical, high, medium, low, total) |
 | `.sca.findings[]` | array | Individual vulnerability findings with CVE, package, fix info |
 | `.sca.summary` | object | Summary booleans (has_critical, has_high, all_fixable) |
-| `.sca.history[]` | array | *(opt-in)* Bounded list of prior scan snapshots (source, counts, summary) for point-in-time audit; oldest first, `[0]` is the release-time scan. Absent unless `scan_history_size > 0` |
+| `.sca.history[]` | array | *(opt-in)* Bounded list of prior scan snapshots (source, counts, summary) for point-in-time audit; oldest first. `[0]` is the oldest retained scan — the release-time (`integration="code"`) scan when history is enabled from the first scan. Absent unless `scan_history_size > 0` |
 | `.sca.rescan_count` | number | *(opt-in)* Monotonic tally of completed re-scans, used to enforce `max_rescans` independently of the (capped) `.sca.history[]` length. Present when scan history or `max_rescans` is enabled |
 | `.sca.native.grype` | object | Raw Grype match output and CI command detection data |
 | `.container_scan.source` | object | Source metadata for the container image scan (tool, version, integration) |
@@ -84,16 +84,26 @@ With `scan_history_size > 0`, each re-scan snapshots the current `.sca`
 `.sca.history[]` **before** overwriting `.sca`:
 
 - `.sca` (unchanged) — the **current** scan the SCA policy evaluates.
-- `.sca.history[0]` — the **release-time** scan (the initial on-push `auto`
-  scan), preserved even once the cap is reached.
+- `.sca.history[0]` — the **oldest retained** scan, preserved even once the cap
+  is reached. When history is enabled from the component's first scan (the
+  intended setup) this is the **release-time** scan; each entry carries its own
+  `source` (`integration` + `collected_at`), so the release-time scan is the
+  `integration: "code"` entry — not an assumption about position.
 - `.sca.history[1..]` — successive prior re-scans, oldest first.
+
+> **Enabling history on an already-scanned component:** if a component has
+> already been re-scanning (overwriting `.sca`) before you turn on
+> `scan_history_size`, its release-time scan is already gone, so `.sca.history[0]`
+> will be the current `.sca` at enable time (an `integration: "cron"` entry), not
+> the original `code` scan. For guaranteed release-time capture, enable history
+> from the component's first scan.
 
 The SCA policy never reads `.sca.history`, so enabling this changes nothing for
 policy evaluation — `.sca` behaves identically whether history is on or off.
 
 | Input | Default | Effect |
 |-------|---------|--------|
-| `scan_history_size` | `0` | Max entries kept in `.sca.history[]`. `0` disables history (today's overwrite-only behavior). At the cap the release-time entry (`[0]`) is kept and the second-oldest entry is dropped. |
+| `scan_history_size` | `0` | Max entries kept in `.sca.history[]`. `0` disables history (today's overwrite-only behavior). At the cap the oldest entry (`[0]`) is kept and the second-oldest is dropped. |
 | `max_rescans` | `0` | Stop re-scanning a component after this many re-scans (`0` = unlimited). Counted independently via `.sca.rescan_count`, so it stands alone — no dependency on `scan_history_size`. |
 
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
