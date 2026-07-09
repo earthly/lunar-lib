@@ -5,3 +5,5 @@ __pycache__/
 
 pkg-install.lock
 pkg-install.log
+.venv/
+venv/
