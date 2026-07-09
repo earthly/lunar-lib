@@ -124,10 +124,15 @@ inputs:
 
       Annotation values are strings in Backstage, so `type` validates that
       the value *parses* as the declared type (`"2"` satisfies `integer`,
-      `"2.5"` does not). A value that violates a constraint fails the
-      check; a malformed constraint (unknown type, min greater than max,
-      invalid regex) makes it error. Empty (the default) disables the
-      check.
+      `"2.5"` does not). `enum` inherits `type`: its entries are coerced to
+      the declared type before comparison, so `type: integer` with
+      `enum: [1,2,3]` compares integers while the default `type: string`
+      compares strings. Constraints must match the declared type (`min`/`max`
+      for integer/number; `min_length`/`max_length`/`pattern` for string). A
+      value that violates a constraint fails the check; a malformed
+      constraint (unknown type, min greater than max, invalid regex, a
+      constraint on the wrong type, or an enum entry not of the declared
+      type) makes it error. Empty (the default) disables the check.
     default: ""
   required_tag_patterns:
     description: |

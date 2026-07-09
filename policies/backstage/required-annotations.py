@@ -1,5 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
+from constraints import parse_required_annotations, validate_value
+
 
 def main(node=None):
     c = Check(
@@ -8,19 +10,23 @@ def main(node=None):
         node=node,
     )
     with c:
-        required_str = variable_or_default("required_annotations", "")
-        required = [a.strip() for a in required_str.split(",") if a.strip()]
-        if not required:
+        raw = variable_or_default("required_annotations", "")
+        # A malformed input or constraint spec raises ConstraintConfigError
+        # (a ValueError), which the Check surfaces as an error — deliberately,
+        # so a broken policy config never silently passes.
+        entries = parse_required_annotations(raw)
+        if not entries:
             # Opt-in check: with nothing configured there is nothing to enforce.
             c.skip(
                 "No required_annotations configured. Set the "
                 "`required_annotations` input to enforce annotation keys."
             )
 
+        keys = [entry["key"] for entry in entries]
         if not c.exists(".catalog.native.backstage"):
             c.fail(
                 "No catalog-info.yaml found, so required annotations cannot be "
-                f"verified. Required: {', '.join(required)}. Add a "
+                f"verified. Required: {', '.join(keys)}. Add a "
                 "catalog-info.yaml with these annotations under metadata.annotations."
             )
             return c
@@ -31,15 +37,21 @@ def main(node=None):
         if not isinstance(annotations, dict):
             annotations = {}
 
-        missing = [
-            key for key in required
-            if not str(annotations.get(key, "")).strip()
-        ]
-        if missing:
-            c.fail(
-                "catalog-info.yaml is missing required annotation(s): "
-                f"{', '.join(missing)}. Add them under metadata.annotations."
-            )
+        for entry in entries:
+            key = entry["key"]
+            raw_value = annotations.get(key)
+            if raw_value is None or not str(raw_value).strip():
+                c.fail(
+                    f'catalog-info.yaml is missing required annotation "{key}". '
+                    "Add it under metadata.annotations."
+                )
+                continue
+
+            constraints = entry["constraints"]
+            if constraints:
+                message = validate_value(key, raw_value, constraints)
+                if message:
+                    c.fail("catalog-info.yaml " + message)
     return c
 
 
