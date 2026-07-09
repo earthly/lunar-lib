@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 
 pkg-install.lock
 pkg-install.log
