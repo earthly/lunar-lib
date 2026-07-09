@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ArgoCD GitOps guardrail set — three collectors and two policies over a
+  normalized `.cd.gitops` view: `argocd` (beta) parses and
+  kubeconform-validates argoproj CRDs (Application / ApplicationSet /
+  AppProject); `argocd-deployment-tracking` (experimental) correlates each
+  Application to the service it deploys and records that service's deployment
+  posture out-of-band; `argocd-deployment-gate` (experimental) pulls the posture
+  back for PR-time enforcement (mapping defaults to a cataloger-set meta
+  annotation, with Backstage `catalog-info` opt-in). Adds the tool-agnostic
+  `gitops` policy and the ArgoCD-specific `argocd` policy. Push and pull are
+  mutually exclusive per service (#218).
+
+### Changed
+
+- `backstage` cataloger: switch to the `/catalog/entities/by-query` endpoint
+  with cursor pagination, paging through large catalogs instead of issuing a
+  single unpaginated request (#240).
+
 ## [1.7.0] — 2026-07-07
 
 ### Added
