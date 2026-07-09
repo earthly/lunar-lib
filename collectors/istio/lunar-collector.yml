@@ -4,7 +4,7 @@ name: istio
 description: Parses Istio service-mesh configuration (traffic, security, and injection) from repository manifests
 author: earthly
 
-default_image: earthly/lunar-lib:istio-main
+default_image: earthly/lunar-lib:istio-bender-istio-collector-policy-spec # TEMP cronos re-test — REVERT to istio-main before merge
 default_image_ci_collectors: native
 
 landing_page:
