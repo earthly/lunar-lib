@@ -70,7 +70,20 @@ inputs:
   backstage_url:
     description: |
       Base URL of the Backstage instance (e.g. https://backstage.example.com).
-      The cataloger appends `/api/catalog/entities` to this URL. Required.
+      The cataloger appends `<api_path_prefix>/catalog/entities` to this URL
+      (by default `/api/catalog/entities`). Required.
+
+  api_path_prefix:
+    description: |
+      Path prefix prepended before `/catalog/entities` when calling the
+      Backstage catalog API. Defaults to `/api`, matching the standard
+      Backstage layout (`<backstage_url>/api/catalog/entities`). Set to an
+      empty string (`""`) when the catalog API is mounted at the root — e.g.
+      behind an API gateway that already strips the `/api` hop, where
+      `<backstage_url>/catalog/entities` is the live endpoint and
+      `/api/catalog/entities` returns 403/404. A leading slash is optional and
+      any trailing slash is ignored (`api`, `/api`, `/api/` are equivalent).
+    default: "/api"
 
   entity_kinds:
     description: |

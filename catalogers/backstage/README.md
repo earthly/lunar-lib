@@ -136,6 +136,20 @@ The proxy signs every forwarded request with **its own** pod's IAM role (IRSA on
 
 > A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.
 
+### API Path Prefix
+
+By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching a standard Backstage deployment. Some setups put the catalog API behind a gateway mounted at the root, so the live endpoint is `<backstage_url>/catalog/entities` and the `/api` hop returns `403`/`404`. Set `api_path_prefix` to an empty string to drop the prefix:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      api_path_prefix: ""   # gateway is mounted at root — no /api hop
+```
+
+`api_path_prefix` defaults to `/api`, so existing configs are unaffected. Any other prefix works too (e.g. `/backstage/api`); the leading slash is optional and a trailing slash is ignored. The resolved endpoint is echoed on the first line of the cataloger's output, so `lunar cataloger dev backstage --verbose` shows exactly which URL it will call.
+
 ### Layering with the GitHub Org Cataloger
 
 For organisations that already run [`github-org`](../github-org) to enumerate repos, run Backstage *after* it so its owner/domain/tag values override the GitHub defaults:
@@ -208,7 +222,7 @@ If you'd rather store bare names, set `owner_format: bare-name` to strip the `<k
 
 ## Source System
 
-This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/features/software-catalog/software-catalog-api/) — specifically the `/api/catalog/entities` endpoint. It requires:
+This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/features/software-catalog/software-catalog-api/) — specifically the `/catalog/entities` endpoint, reached at `<backstage_url>/api/catalog/entities` by default (see [API Path Prefix](#api-path-prefix) to change the `/api` segment). It requires:
 
 1. **Network reach** from the Lunar Runner to the Backstage instance
 2. **Authentication** if the instance enforces it — either a bearer token (`LUNAR_SECRET_BACKSTAGE_TOKEN`, the default) or AWS SigV4 signing (`auth_mode: sigv4`; see [AWS SigV4 Authentication](#aws-sigv4-authentication-iam-role-signed))

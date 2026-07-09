@@ -5,8 +5,7 @@ def main(node=None):
     c = Check("ai-authorship-annotated", "Commits should include AI authorship annotations", node=node)
     with c:
         authorship = c.get_node(".ai.authorship")
-        authorship_data = authorship.get_value_or_default(".", None)
-        if authorship_data is None:
+        if not authorship.exists():
             c.fail(
                 "No authorship data found — ensure the ai collector is enabled. "
                 "Exclude this policy if authorship tracking is not required for this component."
