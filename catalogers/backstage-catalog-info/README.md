@@ -162,6 +162,26 @@ If the file has multiple `Component` entities and none are annotated, the catalo
 
 This cataloger only processes `kind: Component` entities. `Domain`, `System`, `API`, `Resource`, `User`, `Group`, `Location`, etc. are ignored — they're either container-level concepts (handled by a global cataloger like [`backstage`](../backstage)) or not Lunar catalog concerns.
 
+### Excluding Components from Augmentation
+
+Two inputs decide which components this cataloger skips, giving platform teams a choice between keeping control and delegating opt-out to dev teams:
+
+- **`ignore_components` (platform-controlled).** A comma-separated list of component ids to skip — matched by exact id or glob (e.g. `github.com/acme/legacy-*`). A matched component is skipped before its `catalog-info.yaml` is even fetched. Because the list lives in `lunar-config.yml`, dev teams can't override it — this is the "platform team keeps control" path.
+
+  ```yaml
+  with:
+    ignore_components: "github.com/acme/sandbox,github.com/acme/legacy-*"
+  ```
+
+- **`lunar.io/ignore` annotation (dev-delegated, gated).** When `allow_ignore_annotation: true`, any component whose matched `Component` carries `lunar.io/ignore: "true"` (values `true` / `yes` / `1`; key configurable via `ignore_annotation`) opts itself out of augmentation. This is the "platform team delegates opt-out to dev teams" path. It's **off by default** — until you enable the gate, the annotation is ignored and exclusion stays entirely platform-controlled.
+
+  ```yaml
+  with:
+    allow_ignore_annotation: true   # let repos self-exclude via lunar.io/ignore
+  ```
+
+The two compose: `ignore_components` is always enforced; the annotation only when its gate is on. Use the list alone for hard central control, the gate alone (or both) to let dev teams remove their own components.
+
 ### Sourcing the Domain from a Custom Annotation
 
 Some orgs model component domains via a custom annotation rather than the canonical Backstage `spec.domain` field — for example, to express a hierarchical name like `engineering.tooling.observability` that Backstage's flat `spec.domain` doesn't model well. Set `domain_annotation` to that key and the cataloger reads it from `metadata.annotations[<key>]`:

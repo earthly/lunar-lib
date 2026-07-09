@@ -56,6 +56,26 @@ augment_component() {
     # while a truly-unset var (direct local invocation) still gets the PagerDuty
     # default. Same rationale as TAG_PREFIX above — the hub always sets the var.
     local META_ANNOTATIONS="${LUNAR_VAR_META_ANNOTATIONS-pagerduty.com/service-id=pagerduty/service-id}"
+    local IGNORE_COMPONENTS="${LUNAR_VAR_IGNORE_COMPONENTS:-}"
+    local ALLOW_IGNORE_ANNOTATION="${LUNAR_VAR_ALLOW_IGNORE_ANNOTATION:-false}"
+    local IGNORE_ANNOTATION="${LUNAR_VAR_IGNORE_ANNOTATION:-lunar.io/ignore}"
+
+    # --- Platform hard-ignore (by component id) -------------------------------
+    # ignore_components is a platform-controlled list in lunar-config.yml that
+    # dev teams cannot override. If this component matches (exact id or glob),
+    # skip before fetching/parsing — no augmentation, no write.
+    local _pat
+    IFS=',' read -ra _ignore_list <<< "$IGNORE_COMPONENTS"
+    for _pat in "${_ignore_list[@]}"; do
+        _pat="$(echo "$_pat" | xargs)"
+        [ -z "$_pat" ] && continue
+        # Unquoted $_pat enables glob matching (e.g. github.com/acme/legacy-*).
+        # shellcheck disable=SC2053
+        if [[ "$COMPONENT_ID" == $_pat ]]; then
+            echo "$COMPONENT_ID is in ignore_components — skipping"
+            return 0
+        fi
+    done
 
     echo "Annotation key: $COMPONENT_ID_ANNOTATION"
     echo "Component id prefix: $COMPONENT_ID_PREFIX"
@@ -114,6 +134,23 @@ augment_component() {
         COMPONENT_COUNT=$(echo "$ENTITIES" | jq '[.[] | select((.kind // "") == "Component")] | length')
         echo "No matching Component entity for $COMPONENT_ID (Component count: $COMPONENT_COUNT) — skipping"
         return 0
+    fi
+
+    # --- Honor the lunar.io/ignore annotation (gated) -------------------------
+    # When allow_ignore_annotation is on, a matched Component that carries the
+    # ignore annotation set to a truthy value opts itself out of augmentation.
+    # This delegates opt-out to the dev team that owns the catalog-info.yaml;
+    # leave the gate off (default) to keep exclusion platform-controlled via
+    # ignore_components.
+    if [ "$ALLOW_IGNORE_ANNOTATION" = "true" ]; then
+        local IGNORE_VAL
+        IGNORE_VAL=$(echo "$ENTITY" | jq -r \
+            --arg k "$IGNORE_ANNOTATION" \
+            '(.metadata.annotations // {})[$k] // "" | tostring | ascii_downcase')
+        if [ "$IGNORE_VAL" = "true" ] || [ "$IGNORE_VAL" = "yes" ] || [ "$IGNORE_VAL" = "1" ]; then
+            echo "$COMPONENT_ID carries $IGNORE_ANNOTATION=$IGNORE_VAL and allow_ignore_annotation is on — skipping"
+            return 0
+        fi
     fi
 
     # --- Transform -------------------------------------------------------------

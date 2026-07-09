@@ -1,0 +1,95 @@
+version: 0
+
+name: kotlin
+description: Enforces Kotlin project structure, versioning, and dependency standards
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Kotlin Project Guardrails"
+  long_description: |
+    Enforce Kotlin project standards: build manifest presence, Kotlin version
+    pinning, Gradle wrapper commit, dependency locking, test source layout, and
+    detekt/ktlint configuration. Supports Gradle (Kotlin & Groovy DSL) and Maven
+    (kotlin-maven-plugin).
+  category: "devex-build-and-ci"
+  icon: "assets/kotlin.svg"
+  status: "beta"
+  requires:
+    - slug: "kotlin"
+      type: "collector"
+      reason: "Provides Kotlin project metadata"
+  related: []
+
+policies:
+  - name: build-tool-manifest-exists
+    description: |
+      Ensures the project has a recognised Kotlin build manifest:
+      `build.gradle.kts` (Gradle Kotlin DSL), `build.gradle` (Gradle Groovy DSL
+      applying a Kotlin plugin), or `pom.xml` with the kotlin-maven-plugin.
+      Required for any Kotlin project so that the build is reproducible and
+      tooling-discoverable.
+    mainPython: build_tool_manifest_exists.py
+    keywords: ["build.gradle.kts", "build.gradle", "pom.xml", "gradle", "kotlin-maven-plugin", "manifest"]
+
+  - name: kotlin-version-pinned
+    description: |
+      Ensures the Kotlin compiler version is declared — via the Gradle
+      `kotlin("jvm") version "..."` / `id("org.jetbrains.kotlin.jvm")` plugin,
+      `<kotlin.version>` in pom.xml, or a `kotlin` entry in
+      gradle/libs.versions.toml. Pinning the compiler version prevents drift
+      between developers and CI.
+    mainPython: kotlin_version_pinned.py
+    keywords: ["kotlin version", "kotlin plugin", "version pinning"]
+
+  - name: min-kotlin-version
+    description: |
+      Ensures the declared Kotlin compiler version meets the configured
+      minimum (default: "1.8"). Reads `.lang.kotlin.version`. Skips when the
+      version is not detected — pair with `kotlin-version-pinned` if you want
+      presence to be enforced too.
+    mainPython: min_kotlin_version.py
+    keywords: ["kotlin version", "version floor", "compatibility", "security"]
+
+  - name: build-tool-wrapper-exists
+    description: |
+      Ensures the Gradle wrapper (`gradlew` + `gradle/wrapper/`) is committed
+      for Gradle projects. Wrappers pin the build tool version and give
+      reproducible builds without a pre-installed Gradle. Skips for Maven-only
+      projects.
+    mainPython: build_tool_wrapper_exists.py
+    keywords: ["gradle wrapper", "gradlew", "reproducible builds"]
+
+  - name: dependencies-locked
+    description: |
+      Ensures dependencies are locked for reproducible builds via Gradle
+      dependency locking (`gradle.lockfile`). Informational by default — most
+      Kotlin/Gradle projects do not lock dependencies, but doing so produces
+      reproducible CI builds.
+    mainPython: dependencies_locked.py
+    keywords: ["gradle.lockfile", "lockfile", "reproducibility", "dependency locking"]
+
+  - name: test-directory-exists
+    description: |
+      Ensures a `src/test/kotlin` directory (or the equivalent for Android /
+      Multiplatform layouts) exists with test sources. Skips on non-Kotlin
+      projects.
+    mainPython: test_directory_exists.py
+    keywords: ["src/test/kotlin", "junit", "kotest", "testing", "test layout"]
+
+  - name: linter-configured
+    description: |
+      Ensures a Kotlin static-analysis / formatting tool is configured —
+      detekt (`detekt.yml`) or ktlint. These enforce consistent code quality
+      and formatting and are the de facto standard for Kotlin. Informational.
+    mainPython: linter_configured.py
+    keywords: ["detekt", "ktlint", "formatting", "static analysis", "code style"]
+
+inputs:
+  min_kotlin_version:
+    description: |
+      Minimum required Kotlin compiler version (e.g., "1.8", "1.9", "2.0").
+      Compared with semantic-version semantics — "1.8" matches 1.8.x and above,
+      but rejects 1.7.x.
+    default: "1.8"

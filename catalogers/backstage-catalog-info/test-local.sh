@@ -115,6 +115,8 @@ reset_env() {
     unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH
     unset LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_DEFAULT_DOMAIN
     unset LUNAR_VAR_META_ANNOTATIONS
+    unset LUNAR_VAR_IGNORE_COMPONENTS LUNAR_VAR_ALLOW_IGNORE_ANNOTATION
+    unset LUNAR_VAR_IGNORE_ANNOTATION
 }
 
 # check_output <label> <expected_jq> <expected_domains_jq>
@@ -407,6 +409,29 @@ run_scenario "skip_invalid_yaml" "invalid" "github.com/acme/payment-api" ""
 # the fetch; main-on-commit.sh reads the checkout but the matcher finds no
 # annotated entity equal to the (non-github) ID, so it skips too — both no-write.
 run_scenario "skip_prefix_mismatch" "annotation_match" "gitlab.com/acme/payment-api" ""
+
+# ── Ignore controls ───────────────────────────────────────────────────────
+# ignore_components (platform hard-control): component id in the list → no write.
+run_scenario "ignore_components_exact" "annotation_match" "github.com/acme/payment-api" "" \
+    LUNAR_VAR_IGNORE_COMPONENTS=github.com/acme/payment-api
+
+# ignore_components glob match → no write.
+run_scenario "ignore_components_glob" "annotation_match" "github.com/acme/payment-api" "" \
+    LUNAR_VAR_IGNORE_COMPONENTS=github.com/acme/other,github.com/acme/pay*
+
+# lunar.io/ignore annotation present but gate OFF (default) → still augments.
+run_scenario "ignore_annotation_gate_off" "ignore_annotated" "github.com/acme/ignorable" \
+    '.["github.com/acme/ignorable"].owner == "group:default/team-x"'
+
+# lunar.io/ignore annotation + gate ON → skipped, no write.
+run_scenario "ignore_annotation_gate_on" "ignore_annotated" "github.com/acme/ignorable" "" \
+    LUNAR_VAR_ALLOW_IGNORE_ANNOTATION=true
+
+# gate ON but annotation absent → augments normally (gate only skips annotated).
+run_scenario "ignore_annotation_gate_on_no_annotation" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].owner == "group:default/team-payments"' \
+    LUNAR_VAR_ALLOW_IGNORE_ANNOTATION=true \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo ""

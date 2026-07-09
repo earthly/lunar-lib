@@ -2,32 +2,39 @@
 #
 # Local offline test for the Backstage cataloger.
 #
-# Mocks both `curl` (against <api_path_prefix>/catalog/entities) and `lunar` (capturing
-# catalog writes) so the cataloger can be exercised end-to-end without
-# network access. The mock curl serves the bundled sample-catalog.json on
-# the first request and an empty array on subsequent requests to terminate
-# pagination.
+# Mocks `curl` (against the by-query catalog endpoint) and `lunar` (capturing
+# catalog writes) so the cataloger runs end-to-end without network access.
+#
+# The mock serves the bundled sample-catalog.json as a paginated
+# /catalog/entities/by-query response: it splits the fixture's `.items` across
+# TWO pages and only advances to page 2 when the request carries the cursor as
+# `cursor=<value>` — exactly how real Backstage behaves (it ignores an unknown
+# key such as `after=` and just re-serves page 1). That makes the multi-page
+# path a real assertion: a regression to the wrong query-param name re-serves
+# page 1 forever and trips the "exactly 2 requests" / "domains came back" checks
+# below. (This is the bug class that shipped in the by-query migration.)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FIXTURE="$SCRIPT_DIR/sample-catalog.json"
 TEST_DIR=$(mktemp -d)
 COMPONENTS_OUT="$TEST_DIR/components.json"
 DOMAINS_OUT="$TEST_DIR/domains.json"
 CURL_CALLS="$TEST_DIR/curl-calls"
 CURL_URLS="$TEST_DIR/curl-urls"
+RUN_OUT="$TEST_DIR/run.out"
 
 trap 'rm -rf "$TEST_DIR"' EXIT
 
 echo "Test directory: $TEST_DIR"
 
 # --- Mock curl ------------------------------------------------------------
-# Serves the sample catalog once, then empty arrays. Writes the actual HTTP
-# response body to whatever file curl was told to write to via -o, and
-# echoes 200 to stdout so curl's -w '%{http_code}' contract is preserved.
+# Returns by-query envelopes: page 1 = items[0:5] + pageInfo.nextCursor, page 2
+# (only when the URL contains cursor=CURSOR_P2) = items[5:] with no nextCursor.
+# A safety valve returns an empty page after several calls so a pagination
+# regression fails an assertion instead of hanging CI.
 cat > "$TEST_DIR/curl" << EOF
 #!/bin/bash
-# Mock curl — first call returns the fixture, subsequent calls return [].
-OUT=""
 WRITE_FILE=""
 REQ_URL=""
 while [ \$# -gt 0 ]; do
@@ -41,10 +48,12 @@ done
 echo "\$REQ_URL" >> "$CURL_URLS"
 CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
 echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
-if [ "\$CALL_NUM" = "0" ]; then
-    cp "$SCRIPT_DIR/sample-catalog.json" "\$WRITE_FILE"
+if [ "\$CALL_NUM" -ge 4 ]; then
+    echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
+elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
+    jq -c '{items: .items[5:], pageInfo: {}}' "$FIXTURE" > "\$WRITE_FILE"
 else
-    echo "[]" > "\$WRITE_FILE"
+    jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "$FIXTURE" > "\$WRITE_FILE"
 fi
 echo "200"
 EOF
@@ -108,7 +117,7 @@ echo ""
 : > "$CURL_URLS"
 
 echo "=== Cataloger output ==="
-"$SCRIPT_DIR/main.sh"
+"$SCRIPT_DIR/main.sh" 2>&1 | tee "$RUN_OUT"
 
 echo ""
 echo "=== Captured .components ==="
@@ -122,25 +131,69 @@ echo ""
 echo "=== Requested URLs ==="
 cat "$CURL_URLS"
 
+COMPONENTS_GOT=$(jq -s 'add // {} | keys | length' "$COMPONENTS_OUT")
+DOMAINS_GOT=$(jq -s 'add // {} | keys | length' "$DOMAINS_OUT")
+CALLS=$(wc -l < "$CURL_CALLS")
+
 echo ""
 echo "=== Summary ==="
-echo "Components: $(jq -s 'add // {} | keys | length' "$COMPONENTS_OUT")"
-echo "Domains:    $(jq -s 'add // {} | keys | length' "$DOMAINS_OUT")"
-echo "curl calls: $(wc -l < "$CURL_CALLS")"
+echo "Components: $COMPONENTS_GOT"
+echo "Domains:    $DOMAINS_GOT"
+echo "curl calls: $CALLS"
 
-# --- Assert api_path_prefix plumbing -------------------------------------
-# The resolved prefix must sit directly before /catalog/entities. Normalize
-# the same way main.sh does (drop trailing slash, ensure leading slash) so the
-# expectation holds for the default, the empty (root-mounted) case, and any
-# custom prefix passed via TEST_API_PATH_PREFIX.
+# --- Expected values, derived from the fixture ---------------------------
+# Components come from Component/API/Resource entities that carry the id
+# annotation (keyed by it, so dedup on that value). Domains come from
+# Domain/System entities (keyed by name). Total = every item across all pages.
+EXPECTED_TOTAL=$(jq '.items | length' "$FIXTURE")
+EXPECTED_COMPONENTS=$(jq --arg ann "$LUNAR_VAR_COMPONENT_ID_ANNOTATION" \
+    '[.items[] | select(.kind=="Component" or .kind=="API" or .kind=="Resource")
+       | (.metadata.annotations[$ann] // "")] | map(select(. != "")) | unique | length' "$FIXTURE")
+EXPECTED_DOMAINS=$(jq \
+    '[.items[] | select(.kind=="Domain" or .kind=="System") | .metadata.name] | unique | length' "$FIXTURE")
+
+# --- Assertions ----------------------------------------------------------
+FAILED=0
+fail() { echo "FAIL: $1" >&2; FAILED=1; }
+
+# 1. Pagination advanced via cursor= and terminated after exactly two pages.
+#    A wrong param name (e.g. after=) re-serves page 1 -> more than 2 calls.
+[ "$CALLS" -eq 2 ] || fail "expected exactly 2 paginated requests, got $CALLS — pagination did not advance/terminate cleanly (wrong cursor param re-serves page 1?)"
+
+# 2. The page-2 request carried the cursor as cursor=, and nothing used after=.
+SECOND_URL=$(sed -n '2p' "$CURL_URLS")
+case "$SECOND_URL" in
+    *"cursor=CURSOR_P2"*) : ;;
+    *) fail "page-2 request must send cursor=CURSOR_P2; got: ${SECOND_URL:-<none>}" ;;
+esac
+if grep -q 'after=' "$CURL_URLS"; then
+    fail "a request used after= — Backstage by-query expects cursor="
+fi
+
+# 3. Every entity across BOTH pages was collected. Domains live entirely on
+#    page 2, so a correct domain count also proves page 2 was fetched+parsed.
+if grep -q "Total entities fetched: $EXPECTED_TOTAL" "$RUN_OUT"; then :; else
+    fail "expected 'Total entities fetched: $EXPECTED_TOTAL' in output"
+fi
+[ "$COMPONENTS_GOT" -eq "$EXPECTED_COMPONENTS" ] || fail "expected $EXPECTED_COMPONENTS components, got $COMPONENTS_GOT"
+[ "$DOMAINS_GOT" -eq "$EXPECTED_DOMAINS" ] || fail "expected $EXPECTED_DOMAINS domains, got $DOMAINS_GOT (page 2 not consumed?)"
+
+# 4. The api_path_prefix sits directly before /catalog/entities/by-query.
+#    Normalize the prefix the same way main.sh does so this holds for the
+#    default, the empty (root-mounted) case, and any custom TEST_API_PATH_PREFIX.
 NP="${LUNAR_VAR_API_PATH_PREFIX%/}"
 if [ -n "$NP" ] && [ "${NP#/}" = "$NP" ]; then NP="/$NP"; fi
-EXPECT="${LUNAR_VAR_BACKSTAGE_URL}${NP}/catalog/entities"
+EXPECT="${LUNAR_VAR_BACKSTAGE_URL}${NP}/catalog/entities/by-query"
 FIRST_URL=$(head -1 "$CURL_URLS")
 case "$FIRST_URL" in
-    "$EXPECT"?*)
-        echo "PASS: request URL uses api_path_prefix='${NP:-<none>}' → $EXPECT" ;;
-    *)
-        echo "FAIL: expected request URL to start with '$EXPECT' but got '$FIRST_URL'" >&2
-        exit 1 ;;
+    "$EXPECT"?*) : ;;
+    *) fail "expected first request URL to start with '$EXPECT' but got '$FIRST_URL'" ;;
 esac
+
+echo ""
+if [ "$FAILED" -eq 0 ]; then
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains"
+else
+    echo "TEST FAILED" >&2
+    exit 1
+fi

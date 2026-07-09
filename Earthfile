@@ -70,12 +70,14 @@ test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD ./collectors/github+test
+    BUILD ./catalogers/backstage+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
     BUILD ./policies/ai+test
     BUILD ./policies/git+test
     BUILD ./policies/vcs+test
+    BUILD ./policies/backstage+test
 
 lint:
     FROM python:3.12-alpine
@@ -100,6 +102,7 @@ ai-context:
 
 all:
     BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/argocd+image
     BUILD --pass-args ./collectors/ast-grep+image
     BUILD --pass-args ./collectors/claude+image
     BUILD --pass-args ./collectors/docker+image
