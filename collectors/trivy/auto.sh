@@ -23,18 +23,28 @@ MAX_RESCANS="${LUNAR_VAR_MAX_RESCANS:-0}"
 case "$HIST_SIZE" in ''|*[!0-9]*) HIST_SIZE=0 ;; esac
 case "$MAX_RESCANS" in ''|*[!0-9]*) MAX_RESCANS=0 ;; esac
 
-# Read the current merged .sca once (feeds both history and max_rescans). The
-# runtime provides the hub connection + LUNAR_COMPONENT_ID, so this is the
-# authoritative pre-overwrite view (same read container-rescan.sh uses).
+# Read the current merged .sca once (feeds both history and max_rescans). If the
+# read fails while history/max_rescans is enabled, SKIP the re-scan (exit 0)
+# rather than overwrite .sca: latest-cron-per-collector replaces the prior cron
+# record wholesale, so a new record missing history/rescan_count would wipe the
+# accumulated audit trail this feature exists to preserve. Skipping keeps the
+# last good record; the next tick retries. (The default path — both inputs 0 —
+# never reads and never skips, so today's overwrite-only behavior is unchanged.)
 CUR_SCA="{}"
 if [ "$IS_RESCAN" = true ] && { [ "$HIST_SIZE" -gt 0 ] || [ "$MAX_RESCANS" -gt 0 ]; }; then
-  if [ -n "${LUNAR_COMPONENT_ID:-}" ]; then
-    CUR_SCA=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null | jq -c '.sca // {}' 2>/dev/null || echo "{}")
-    [ -n "$CUR_SCA" ] || CUR_SCA="{}"
+  RAW_JSON=""
+  if [ -n "${LUNAR_COMPONENT_ID:-}" ] \
+     && RAW_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null) \
+     && [ -n "$RAW_JSON" ] \
+     && printf '%s' "$RAW_JSON" | jq -e . >/dev/null 2>&1; then
+    CUR_SCA=$(printf '%s' "$RAW_JSON" | jq -c '.sca // {}')
+  else
+    echo "Scan history: could not read current component JSON (LUNAR_COMPONENT_ID unset or get-json failed) — skipping this re-scan to preserve existing .sca.history / rescan_count" >&2
+    exit 0
   fi
   # max_rescans: stop re-scanning once the monotonic tally reaches the cap.
   if [ "$MAX_RESCANS" -gt 0 ]; then
-    CUR_COUNT=$(echo "$CUR_SCA" | jq -r '.rescan_count // 0' 2>/dev/null || echo 0)
+    CUR_COUNT=$(printf '%s' "$CUR_SCA" | jq -r '.rescan_count // 0' 2>/dev/null || echo 0)
     case "$CUR_COUNT" in ''|*[!0-9]*) CUR_COUNT=0 ;; esac
     if [ "$CUR_COUNT" -ge "$MAX_RESCANS" ]; then
       echo "Scan history: max_rescans ($MAX_RESCANS) reached (rescan_count=$CUR_COUNT) — skipping re-scan" >&2
@@ -112,29 +122,27 @@ SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATI
 } + (if $version != "" then {version: $version} else {} end)')
 
 # Build the .sca.history + rescan_count fragment, merged into the .sca write
-# below via `+ $extra`. Only the rescan path with scan_history_size > 0 does
-# this. Snapshot the CURRENT scan (about to be overwritten) as a compact
-# {source, vulnerabilities, summary} entry — no findings/native (those arrays
-# concatenate across the code+cron records, so snapshotting them would double
-# and bloat) and no nested history. latest-cron-per-collector keeps only this
-# run's cron record, so .sca.history never self-concatenates across runs.
+# below via `+ $extra`. rescan_count is bumped whenever EITHER input is set, so
+# max_rescans works standalone (no dependency on scan_history_size). The history
+# array is maintained only when scan_history_size > 0. The prior scan is
+# snapshotted as a compact {source, vulnerabilities, summary} entry — no
+# findings/native (those arrays concatenate across the code+cron records, so
+# snapshotting them would double and bloat) and no nested history. Only appended
+# when there's a real prior scan ($snap != {}). latest-cron-per-collector keeps
+# only this run's cron record, so .sca.history never self-concatenates.
 HISTORY_JSON="{}"
-if [ "$IS_RESCAN" = true ] && [ "$HIST_SIZE" -gt 0 ]; then
-  if echo "$CUR_SCA" | jq -e 'has("source") or has("vulnerabilities") or has("summary")' >/dev/null 2>&1; then
-    HISTORY_JSON=$(echo "$CUR_SCA" | jq -c --argjson size "$HIST_SIZE" '
-      (.history // []) as $hist
-      | (.rescan_count // 0) as $count
-      | ({source, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
-      | ($hist + [$snap]) as $all
-      | ($all | length) as $len
-      | {
-          history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end),
-          rescan_count: ($count + 1)
-        }' 2>/dev/null || echo "{}")
-    [ -n "$HISTORY_JSON" ] || HISTORY_JSON="{}"
-  else
-    echo "Scan history: no prior .sca to snapshot — writing current scan only this run" >&2
-  fi
+if [ "$IS_RESCAN" = true ] && { [ "$HIST_SIZE" -gt 0 ] || [ "$MAX_RESCANS" -gt 0 ]; }; then
+  HISTORY_JSON=$(printf '%s' "$CUR_SCA" | jq -c --argjson size "$HIST_SIZE" '
+    (.history // []) as $hist
+    | (.rescan_count // 0) as $count
+    | ({source, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
+    | (if ($size > 0 and $snap != {}) then ($hist + [$snap]) else $hist end) as $all
+    | ($all | length) as $len
+    | ({rescan_count: ($count + 1)}
+       + (if $size > 0
+          then {history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end)}
+          else {} end))' 2>/dev/null || echo "{}")
+  [ -n "$HISTORY_JSON" ] || HISTORY_JSON="{}"
 fi
 
 # Check if any vulnerabilities found
