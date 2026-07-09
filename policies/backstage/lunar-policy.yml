@@ -64,12 +64,16 @@ policies:
   - name: required-annotations
     description: |
       Verifies that catalog-info.yaml declares a configurable set of
-      required annotation keys (e.g. backstage.io/source-location).
-      Configure via the `required_annotations` input. Skipped when no
-      annotations are required (the default). Fails if the catalog file
-      is missing or any required annotation key is absent or empty.
+      required annotation keys (e.g. backstage.io/source-location), and
+      optionally that their values satisfy typed constraints — a declared
+      data type (integer, number, boolean, string) with numeric bounds,
+      string length, a regular-expression pattern, or an allowed-value
+      set. Configure via the `required_annotations` input. Skipped when no
+      annotations are required (the default). Fails if the catalog file is
+      missing, a required key is absent or empty, or a value violates its
+      declared constraint.
     mainPython: ./required-annotations.py
-    keywords: ["backstage", "annotations", "metadata", "required", "source-location"]
+    keywords: ["backstage", "annotations", "metadata", "required", "type validation", "value constraints"]
 
   - name: required-tag-patterns
     description: |
@@ -103,10 +107,32 @@ policies:
 inputs:
   required_annotations:
     description: |
-      Comma-separated list of annotation keys that must be present (and
-      non-empty) in catalog-info.yaml `metadata.annotations`. Example:
+      Annotation keys that must be present (and non-empty) in
+      catalog-info.yaml `metadata.annotations`. Two forms are accepted.
+
+      Comma-separated keys (presence-only, unchanged), e.g.
       `backstage.io/source-location,pagerduty.com/integration-key`.
-      Empty (the default) disables the `required-annotations` check.
+
+      Or a YAML list, where each entry is either a bare key (presence-only)
+      or a mapping with a `key` and optional value constraints: `type`
+      (string|integer|number|boolean, default string), `min`/`max`
+      (integer/number bounds), `min_length`/`max_length` (string length),
+      `pattern` (full-match regex), and `enum` (allowed values). For
+      example, a `key: example.com/service-tier` with `type: integer`,
+      `min: 0`, `max: 5` requires that annotation to parse as an integer
+      in 0–5.
+
+      Annotation values are strings in Backstage, so `type` validates that
+      the value *parses* as the declared type (`"2"` satisfies `integer`,
+      `"2.5"` does not). `enum` inherits `type`: its entries are coerced to
+      the declared type before comparison, so `type: integer` with
+      `enum: [1,2,3]` compares integers while the default `type: string`
+      compares strings. Constraints must match the declared type (`min`/`max`
+      for integer/number; `min_length`/`max_length`/`pattern` for string). A
+      value that violates a constraint fails the check; a malformed
+      constraint (unknown type, min greater than max, invalid regex, a
+      constraint on the wrong type, or an enum entry not of the declared
+      type) makes it error. Empty (the default) disables the check.
     default: ""
   required_tag_patterns:
     description: |
