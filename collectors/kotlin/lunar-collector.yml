@@ -73,18 +73,20 @@ collectors:
   - name: test-coverage
     description: |
       Extracts coverage percentage from Kover XML reports
-      (build/reports/kover/report.xml) or, as a fallback, JaCoCo XML reports,
-      after Gradle or Maven test runs complete. Parses coverage reports and
-      writes results to .lang.kotlin.tests.coverage and the normalized
-      .testing.coverage path.
+      (build/reports/kover/report.xml) after a Gradle test / koverXmlReport run.
+      Kover is the Kotlin-native coverage tool; JaCoCo is intentionally left to
+      the java collector's test-coverage sub-collector — matching the
+      per-language convention (scala→scoverage, java→jacoco, kotlin→kover) and
+      avoiding a double-write to the normalized .testing.coverage path. Writes
+      to .lang.kotlin.tests.coverage and .testing.coverage.
     mainBash: test-coverage.sh
     hook:
       type: ci-after-command
       binary:
-        name_pattern: ^(gradle|gradlew|mvn|mvnw)$
+        name_pattern: ^(gradle|gradlew)$
       args:
         - value_pattern: ^(test|check|koverXmlReport|.+[/.](test|check|koverXmlReport))$
-    keywords: ["kover", "jacoco", "kotlin test coverage", "gradle test", "coverage metrics"]
+    keywords: ["kover", "kotlin test coverage", "gradle test", "coverage metrics"]
 
 example_component_json: |
   {

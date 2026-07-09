@@ -49,7 +49,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `project` | code | Collects project structure, versions, target, framework detection, test framework detection |
 | `dependencies` | code | Collects dependencies from build.gradle.kts, build.gradle, pom.xml, or the version catalog |
 | `cicd` | ci-before-command | Tracks `kotlinc`/`kotlin` commands run in CI with compiler version |
-| `test-coverage` | ci-after-command | Extracts coverage from Kover (or JaCoCo) XML reports |
+| `test-coverage` | ci-after-command | Extracts coverage from Kover XML reports (Kotlin-native; JaCoCo is left to the `java` collector) |
 
 **Note on Gradle/Maven CI commands:** `gradle`/`gradlew` and `mvn`/`mvnw` invocations are already tracked by the [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector's `gradle-cicd` / `maven-cicd` sub-collectors (they fire regardless of language), so this collector's `cicd` sub-collector focuses on direct Kotlin-compiler usage rather than duplicating that data.
 
