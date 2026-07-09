@@ -21,15 +21,33 @@ if [ -z "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
-CATALOG_PATHS="${LUNAR_VAR_CATALOG_INFO_PATHS:-catalog-info.yaml,catalog-info.yml}"
+# Resolve the app -> Application mapping (which GitOps component + which
+# Application(s) to pull). Precedence, most explicit first:
+#   1. explicit inputs (gitops_component / application)
+#   2. cataloger-set component meta annotations — the DEFAULT — read from
+#      LUNAR_COMPONENT_META (`argocd/gitops-component` + `argocd/application`,
+#      e.g. `lunar catalog component --meta argocd/gitops-component <id>`).
+#      This mirrors the pagerduty collector and keeps the default tool-agnostic.
+#   3. Backstage catalog-info.yaml annotations — OPT-IN (set catalog_info_paths).
+META_GITOPS_KEY="argocd/gitops-component"
+META_APP_KEY="argocd/application"
+CATALOG_PATHS="${LUNAR_VAR_CATALOG_INFO_PATHS:-}"   # opt-in: empty = don't read catalog-info
 GITOPS_ANNOTATION="${LUNAR_VAR_GITOPS_COMPONENT_ANNOTATION:-lunar.earthly.dev/gitops-component}"
 APP_ANNOTATION="${LUNAR_VAR_APPLICATION_ANNOTATION:-lunar.earthly.dev/argocd-application}"
 
-# Direct overrides — declare the mapping in lunar-config inputs instead of the
-# repo's catalog-info (handy for testing and for configs that prefer it).
+# 1. Explicit inputs (highest precedence).
 GITOPS_COMPONENT="${LUNAR_VAR_GITOPS_COMPONENT:-}"
 APPLICATIONS="${LUNAR_VAR_APPLICATION:-}"
 MAP_SRC="input"
+
+# 2. Default: cataloger-set component meta annotations (LUNAR_COMPONENT_META).
+if [ -z "$GITOPS_COMPONENT" ] && [ -n "${LUNAR_COMPONENT_META:-}" ]; then
+    GITOPS_COMPONENT=$(echo "$LUNAR_COMPONENT_META" | jq -r --arg k "$META_GITOPS_KEY" '.[$k] // empty' 2>/dev/null)
+    if [ -n "$GITOPS_COMPONENT" ]; then
+        MAP_SRC="meta:$META_GITOPS_KEY"
+        [ -z "$APPLICATIONS" ] && APPLICATIONS=$(echo "$LUNAR_COMPONENT_META" | jq -r --arg k "$META_APP_KEY" '.[$k] // empty' 2>/dev/null)
+    fi
+fi
 
 # Read a single annotation value from a catalog-info file; "" when absent.
 read_annotation() {
@@ -39,8 +57,8 @@ read_annotation() {
     printf '%s' "$v"
 }
 
-# Resolve the mapping from the first catalog-info file found, unless overridden.
-if [ -z "$GITOPS_COMPONENT" ]; then
+# 3. Opt-in: Backstage catalog-info.yaml (only when catalog_info_paths is set).
+if [ -z "$GITOPS_COMPONENT" ] && [ -n "$CATALOG_PATHS" ]; then
     IFS=',' read -ra _paths <<< "$CATALOG_PATHS"
     for p in "${_paths[@]}"; do
         p=$(echo "$p" | tr -d '[:space:]')
@@ -55,10 +73,10 @@ if [ -z "$GITOPS_COMPONENT" ]; then
     done
 fi
 
-# No predeclared GitOps mapping -> this component isn't a pull target. Skip
+# No mapping from any source -> this component isn't a pull target. Skip
 # (object presence is the signal; write nothing).
 if [ -z "$GITOPS_COMPONENT" ]; then
-    echo "argocd-deployment-gate: no '$GITOPS_ANNOTATION' mapping in catalog-info and no override — skipping." >&2
+    echo "argocd-deployment-gate: no mapping found (checked gitops_component input, '$META_GITOPS_KEY' meta annotation, and catalog-info) — skipping." >&2
     exit 0
 fi
 if [ "$GITOPS_COMPONENT" = "$LUNAR_COMPONENT_ID" ]; then

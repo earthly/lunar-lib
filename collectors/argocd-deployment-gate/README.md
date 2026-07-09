@@ -4,7 +4,7 @@ Pulls a service's ArgoCD deployment posture from a central GitOps component onto
 
 ## Overview
 
-Experimental. Runs on an app/service repo, reads a predeclared app-to-Application mapping from `catalog-info.yaml` (or direct inputs), pulls the matching Application(s) from the central GitOps component via `lunar component get-json`, and materializes `.cd.gitops` onto the service's own component. Because it runs in the service's own collection it lands on the sha being collected — including a PR head sha — so the `gitops`/`argocd` policies gate the upcoming deployment at PR time, the only variant that enforces on PRs. Do not also target the same service with `argocd-deployment-tracking`: both write `.cd.gitops.applications` and the hub appends across records, so pick one path per service.
+Experimental. Runs on an app/service repo: it resolves which GitOps component + Application(s) to pull, then `lunar component get-json`s them and materializes `.cd.gitops` onto the service's own component. The mapping defaults to the component's `argocd/gitops-component` (+ `argocd/application`) meta annotations set by a cataloger, falls back to explicit inputs, and optionally reads Backstage `catalog-info.yaml` when `catalog_info_paths` is set. It lands on the sha being collected — including a PR head sha — so the `gitops`/`argocd` policies gate the upcoming deployment at PR time. Don't also target the same service with `argocd-deployment-tracking` (both write `.cd.gitops.applications` and the hub appends across records, so pick one path per service).
 
 ## Collected Data
 
@@ -26,13 +26,11 @@ collectors:
     on: ["domain:your-service-repo"]
 ```
 
-Predeclare the mapping in the service repo's `catalog-info.yaml`:
+By default the mapping comes from cataloger-set component **meta annotations** — set them (typically from your own cataloger) with:
 
-```yaml
-metadata:
-  annotations:
-    lunar.earthly.dev/gitops-component: github.com/org/gitops
-    lunar.earthly.dev/argocd-application: payment-api
+```
+lunar catalog component --meta argocd/gitops-component github.com/org/gitops
+lunar catalog component --meta argocd/application payment-api   # optional; omit to pull every app the GitOps component holds
 ```
 
-Or pass `gitops_component` / `application` directly as inputs.
+Alternatively pass `gitops_component` / `application` directly as inputs, or **opt into** Backstage `catalog-info.yaml` by setting `catalog_info_paths` (it then reads the `lunar.earthly.dev/gitops-component` + `lunar.earthly.dev/argocd-application` annotations).

@@ -10,10 +10,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "ArgoCD Deployment Gate Collector"
   long_description: |
-    Runs on a service repo and pulls that service's ArgoCD deployment posture
-    from a central GitOps component (via a catalog-info mapping) onto its own
-    component at the collected sha, so policies gate at PR time. Do not also
-    target the service with argocd-deployment-tracking.
+    Pulls a service's ArgoCD deployment posture from a central GitOps component
+    onto its own component at the collected sha, so policies gate at PR time. The
+    GitOps mapping defaults to a cataloger-set meta annotation (catalog-info
+    opt-in). Use this or argocd-deployment-tracking per service, not both.
   categories: ["ci-cd", "orchestration"]
   icon: "assets/argocd.svg"
   status: "experimental"
@@ -32,34 +32,46 @@ collectors:
   - name: gate
     description: |
       Runs on a SERVICE repo and materializes that service's ArgoCD deployment
-      posture onto its own Component JSON by reading a predeclared
-      app -> Application mapping from catalog-info.yaml (gitops-component +
-      argocd-application annotations) and pulling the matching Application(s)
-      from the GitOps component via `lunar component get-json`. Because it runs
-      in the service's own collection it lands on the sha being collected
+      posture onto its own Component JSON. Resolves which GitOps component +
+      Application(s) to pull from — by default — the component's
+      `argocd/gitops-component` (+ `argocd/application`) meta annotations,
+      typically set by a company-specific cataloger via
+      `lunar catalog component --meta argocd/gitops-component <id>`; falls back
+      to the explicit gitops_component / application inputs, and optionally to
+      Backstage catalog-info.yaml annotations when catalog_info_paths is set.
+      Pulls the matching Application(s) from the GitOps component via
+      `lunar component get-json` and writes them at the sha being collected
       (including a PR head sha), so the gitops/argocd policies gate it at PR
-      time. Skips when no mapping is present.
+      time. Skips when no mapping is found.
     mainBash: link_pull.sh
     hook:
       type: code
     keywords: ["argocd", "gitops", "cross-component", "get-json", "pull", "pr enforcement", "deployment posture", "catalog-info", "continuous delivery"]
 
 inputs:
-  catalog_info_paths:
-    description: Comma-separated catalog-info file paths to read the predeclared mapping from (first match wins).
-    default: "catalog-info.yaml,catalog-info.yml"
-  gitops_component_annotation:
-    description: catalog-info annotation key carrying the GitOps component id to pull from.
-    default: "lunar.earthly.dev/gitops-component"
-  application_annotation:
-    description: catalog-info annotation key carrying the ArgoCD Application name(s) (comma-separated) to pull. Empty pulls every app the GitOps component holds.
-    default: "lunar.earthly.dev/argocd-application"
   gitops_component:
-    description: Direct override of the GitOps component id (bypasses catalog-info). Empty uses the catalog-info annotation.
+    description: >
+      GitOps component id to pull the deployment posture from. Optional if the
+      component has an `argocd/gitops-component` meta annotation set by a cataloger.
     default: ""
   application:
-    description: Direct override of the ArgoCD Application name(s), comma-separated (bypasses catalog-info). Empty uses the catalog-info annotation.
+    description: >
+      ArgoCD Application name(s) to pull, comma-separated. Optional; defaults to the
+      `argocd/application` meta annotation, or every app the GitOps component holds
+      when neither is set.
     default: ""
+  catalog_info_paths:
+    description: >
+      Opt-in: comma-separated Backstage catalog-info file paths to read the mapping
+      from (first match wins). Empty (default) uses the component meta annotation
+      instead. Set e.g. "catalog-info.yaml,catalog-info.yml" to enable.
+    default: ""
+  gitops_component_annotation:
+    description: catalog-info annotation key carrying the GitOps component id (only used when catalog_info_paths is set).
+    default: "lunar.earthly.dev/gitops-component"
+  application_annotation:
+    description: catalog-info annotation key carrying the ArgoCD Application name(s) (only used when catalog_info_paths is set).
+    default: "lunar.earthly.dev/argocd-application"
 
 example_component_json: |
   {
