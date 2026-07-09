@@ -25,7 +25,7 @@ When a catalog-info file is found, this collector writes to the following Compon
 | `.catalog.native.backstage.refs.domain` | object | `{ name, exists }` for the declared `spec.domain` — present only when a domain is declared and the lookup resolved |
 | `.catalog.native.backstage.refs.system` | object | `{ name, exists }` for the declared `spec.system` — same semantics as `refs.domain` |
 
-**Referential integrity.** When `backstage_url` is set, the collector resolves each declared grouping reference against the Backstage catalog API (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and records the outcome under `.refs`:
+**Referential integrity.** When `backstage_url` is set, the collector resolves each declared grouping reference against the Backstage catalog API (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and records the outcome under `.refs`. The `<namespace>` is taken from the reference itself — a qualified ref (`ns/name`) carries its own, otherwise the component's own `metadata.namespace` is used, falling back to `default`, so there is no namespace input to configure:
 
 - `spec.domain` → `.refs.domain = { "name": "<value>", "exists": <bool> }`
 - `spec.system` → `.refs.system = { "name": "<value>", "exists": <bool> }`
@@ -62,7 +62,6 @@ collectors:
     on: ["domain:your-domain"]
     with:
       backstage_url: "https://backstage.example.com"
-      # namespace: "default"   # Backstage namespace to resolve refs in
 ```
 
 Most internal Backstage deployments require a bearer token. Configure it as a Lunar secret:

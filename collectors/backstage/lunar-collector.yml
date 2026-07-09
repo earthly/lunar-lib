@@ -37,8 +37,11 @@ collectors:
       records whether the referenced entity exists under
       `.catalog.native.backstage.refs`. A 200 means the entity exists
       (`exists: true`); a 404 means it is declared but missing (`exists: false`).
-      When `backstage_url` is empty (the default) no lookups run and `.refs` is
-      not written — behavior is identical to today.
+      The `<namespace>` is derived from the reference itself — a qualified ref
+      (`ns/name`) carries its own, otherwise the component's own
+      `metadata.namespace` is used, falling back to `default` — so no namespace
+      configuration is required. When `backstage_url` is empty (the default) no
+      lookups run and `.refs` is not written — behavior is identical to today.
     mainBash: main.sh
     hook:
       type: code
@@ -57,12 +60,6 @@ inputs:
       referential-integrity lookups — the collector only parses and lints the
       local file, exactly as before.
     default: ""
-  namespace:
-    description: |
-      Backstage namespace used when resolving entity references via
-      `/api/catalog/entities/by-name/<kind>/<namespace>/<name>`. Only used when
-      `backstage_url` is set.
-    default: "default"
 
 secrets:
   BACKSTAGE_TOKEN:
