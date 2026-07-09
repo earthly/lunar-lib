@@ -145,6 +145,29 @@ Two mechanisms decide what does **not** become a component, at different levels 
 - **`exclude_paths`** (platform-controlled) — a list of repo-relative paths/globs skipped before a component is ever created. It lives in `lunar-config.yml`, so dev teams can't override it. The default excludes the root `catalog-info.yaml`; add globs like `legacy/*/catalog-info.yaml` to fence off more.
 - **`lunar.io/ignore` annotation** (dev-delegated, gated) — set `allow_ignore_annotation: true` and any `Component` whose `catalog-info.yaml` carries `lunar.io/ignore: "true"` (key configurable via `ignore_annotation`) opts itself out. Left off by default, so opt-out stays platform-controlled unless you choose to delegate it.
 
+### Targeting monorepos in a mixed fleet (monorepo + polyrepo)
+
+An org often has **both** polyrepos (one service per repo, root `catalog-info.yaml` → the repo-level component) and monorepos (many services in subdirectories, and no root component wanted). The two strategies coexist without conflict: target the monorepos explicitly and let the normal repo-level flow handle everything else.
+
+```yaml
+catalogers:
+  # Repo-level components for the whole org, EXCEPT the monorepos.
+  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+    with:
+      org_name: "acme"
+      exclude_repos: "big-monorepo"       # no repo-level component for the monorepo
+
+  # Polyrepos: augment each root catalog-info onto its repo-level component.
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+
+  # Monorepos: one component per subdirectory catalog-info, root excluded by default.
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    with:
+      repos: "acme/big-monorepo"
+```
+
+Each polyrepo gets a repo-level component from its root `catalog-info.yaml`; the monorepo gets one component per subdirectory and **no** root component. The flows don't overlap: `github-org` excludes the monorepo, and this cataloger is scoped to it by an explicit `repos` list rather than running across every repo. (The augment cataloger harmlessly no-ops on the monorepo's subcomponents — it looks for a root file at a path that isn't a real repo and skips on the 404.) This is the "target the monorepo directly" posture; because targeting is just the `repos` list plus `github-org`'s `exclude_repos`, a fleet can mix both strategies without a one-size-fits-all cataloger.
+
 ## Source System
 
 [GitHub](https://github.com) — the cataloger calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once per configured repo to enumerate files, then the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml`. Requirements:
