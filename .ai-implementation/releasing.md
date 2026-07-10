@@ -19,7 +19,7 @@ A lunar-lib release produces **versioned Docker images** for every collector, po
 main (HEAD) → release script → branch vX.Y.Z + tag vX.Y.Z → CI → Docker images pushed
 ```
 
-> **Dogfooding is part of the release.** Because consumers pin `@vX.Y.Z`, a release isn't "done" when the images publish. The new version is pinned on the **cronos dogfood hub** (Step 7) and confirmed to actually collect and produce checks there (Step 8) before anyone relies on it. A release's changes have usually already been exercised in dogfood via `@main`-tracking configs before the tag is cut, so Steps 7–8 exist to verify the *pinned, released* `@vX.Y.Z` images specifically.
+> **Dogfood vs. cronos — two different environments.** lunar-lib plugins are *dogfooded* continuously: the internal dogfood hub tracks `@main` and runs them against Earthly's own repositories, so a change is exercised in real conditions the moment it merges — before any release is cut. **cronos is a separate demo/QA environment** (a synthetic repo fleet) pinned to release versions — it is **not** the dogfood hub. A release pins the new `@vX.Y.Z` images on cronos (Step 7) and verifies them there (Step 8); the dogfood hub needs no release-time action since it already tracks `@main`.
 
 ### What gets published
 
@@ -237,9 +237,9 @@ After a successful release, update the cronos staging environment to reference t
 
 **Note:** Only update `@v<old>` → `@vX.Y.Z`. Leave two other ref kinds untouched: `@main` refs (development plugins being tested, or plugins that intentionally track latest) and any commit-SHA pins (`@<40-char-sha>`, e.g. a plugin held at a specific fix). The `@v<old>`-only sed already skips both — but eyeball the diff to confirm it moved only the version pins you expected.
 
-### Step 8: Dogfood-verify the release on cronos
+### Step 8: Verify the release on cronos
 
-Bumping the pins (Step 7) only tells the hub *which* images to use — it doesn't prove they work. cronos now runs the released `@vX.Y.Z` images against real repositories, so confirm they actually collect and render checks before you call the release done.
+Bumping the pins (Step 7) only tells the hub *which* images to use — it doesn't prove they work. cronos now runs the released `@vX.Y.Z` images against its repo fleet, so confirm they actually collect and render checks before you call the release done.
 
 1. **Wait for the manifest to land.** The `Sync Lunar Config` workflow from Step 7 must finish — that's what pushes the new manifest to the hub. Until it's green, the hub is still on the old version.
 

@@ -15,7 +15,7 @@ From the repo root, on `main`, with a clean working tree:
 3. Rewrites all starter-pack refs: `@<anything>` → `@vX.Y.Z`
 4. Commits, pushes branch + tag to `origin`, restores your previous branch
 
-After that, CI builds and publishes images for the new tag. The new version is then pinned on the cronos dogfood hub and verified there — collectors run and checks render for the new images — before the release is considered done. Consumers can then pin `@vX.Y.Z`.
+After that, CI builds and publishes images for the new tag. The new version is then pinned on the cronos demo environment and verified there — collectors run and checks render for the new images — before the release is considered done. Consumers can then pin `@vX.Y.Z`.
 
 ## Before you run
 
@@ -24,4 +24,4 @@ After that, CI builds and publishes images for the new tag. The new version is t
 
 ## AI agents
 
-See [`.ai-implementation/releasing.md`](.ai-implementation/releasing.md) for the full release workflow — version proposals, CI monitoring, GitHub Release creation, notifications, cronos updates, and dogfood validation.
+See [`.ai-implementation/releasing.md`](.ai-implementation/releasing.md) for the full release workflow — version proposals, CI monitoring, GitHub Release creation, notifications, and cronos updates + verification.
