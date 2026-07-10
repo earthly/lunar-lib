@@ -1,13 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
+from helpers import mesh_present
+
 
 def main(node=None):
     """Requires mesh-wide mTLS to be STRICT with no permissive/disable overrides."""
     c = Check("mtls-strict", "Mesh-wide mTLS should be STRICT", node=node)
     with c:
-        mesh = c.get_node(".mesh")
-        if not mesh.exists():
-            c.skip("No service-mesh configuration found in this repository")
+        mesh_present(c)
 
         required = (variable_or_default("required_mtls_mode", "STRICT") or "STRICT").upper()
 
@@ -23,17 +23,16 @@ def main(node=None):
         # When STRICT is required, no namespace/workload override may downgrade it.
         if required == "STRICT":
             pas = c.get_node(".mesh.peer_authentications")
-            if pas.exists():
-                for pa in pas:
-                    mode = pa.get_value_or_default(".mode", None)
-                    name = pa.get_value_or_default(".name", "<unknown>")
-                    namespace = pa.get_value_or_default(".namespace", "default")
-                    scope = pa.get_value_or_default(".scope", "namespace")
-                    c.assert_true(
-                        mode not in ("PERMISSIVE", "DISABLE"),
-                        f"PeerAuthentication {namespace}/{name} ({scope} scope) sets mTLS "
-                        f"mode {mode} — downgrades encryption below STRICT"
-                    )
+            for pa in (pas if pas.exists() else []):
+                mode = pa.get_value_or_default(".mode", None)
+                name = pa.get_value_or_default(".name", "<unknown>")
+                namespace = pa.get_value_or_default(".namespace", "default")
+                scope = pa.get_value_or_default(".scope", "namespace")
+                c.assert_true(
+                    mode not in ("PERMISSIVE", "DISABLE"),
+                    f"PeerAuthentication {namespace}/{name} ({scope} scope) sets mTLS "
+                    f"mode {mode} — downgrades encryption below STRICT"
+                )
 
     return c
 

@@ -1,23 +1,21 @@
 from lunar_policy import Check
 
+from helpers import mesh_present
+
 
 def main(node=None):
     """Requires ingress Gateways to use TLS (or redirect plain HTTP to HTTPS)."""
     c = Check("gateway-tls", "Gateway servers should use TLS", node=node)
     with c:
-        gateways = c.get_node(".mesh.gateways")
-        if not gateways.exists():
-            c.skip("No Istio Gateways found in this repository")
+        mesh_present(c)
 
-        for gw in gateways:
+        gateways = c.get_node(".mesh.gateways")
+        for gw in (gateways if gateways.exists() else []):
             name = gw.get_value_or_default(".name", "<unknown>")
             namespace = gw.get_value_or_default(".namespace", "default")
 
             servers = gw.get_node(".servers")
-            if not servers.exists():
-                continue
-
-            for s in servers:
+            for s in (servers if servers.exists() else []):
                 port = s.get_value_or_default(".port", "?")
                 protocol = (s.get_value_or_default(".protocol", "") or "").upper()
                 tls_mode = s.get_value_or_default(".tls_mode", None)
