@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `github-org` and `backstage-catalog-info-monorepo` catalogers: opt repos
+  into the catalog by GitHub topic. Both gain `allowed_topics` /
+  `disallowed_topics` inputs (allow = repo must carry ≥1 listed topic;
+  disallow = repo must carry none; block wins over allow). The
+  `backstage-catalog-info-monorepo` cataloger additionally gains org
+  auto-discovery: a new `orgs` input enumerates each org's repos and filters
+  them by topic (honoring `include_archived`) before scanning, so a monorepo
+  opts in via a repo topic instead of a hand-maintained `repos` list —
+  explicitly-listed `repos` are always scanned. Additive; all new inputs
+  default to empty/false (#250).
 - ArgoCD GitOps guardrail set — three collectors and two policies over a
   normalized `.cd.gitops` view: `argocd` (beta) parses and
   kubeconform-validates argoproj CRDs (Application / ApplicationSet /
