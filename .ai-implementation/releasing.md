@@ -19,6 +19,8 @@ A lunar-lib release produces **versioned Docker images** for every collector, po
 main (HEAD) → release script → branch vX.Y.Z + tag vX.Y.Z → CI → Docker images pushed
 ```
 
+> **Dogfooding is part of the release.** Because consumers pin `@vX.Y.Z`, a release isn't "done" when the images publish. The new version is pinned on the **cronos dogfood hub** (Step 7) and confirmed to actually collect and produce checks there (Step 8) before anyone relies on it. A release's changes have usually already been exercised in dogfood via `@main`-tracking configs before the tag is cut, so Steps 7–8 exist to verify the *pinned, released* `@vX.Y.Z` images specifically.
+
 ### What gets published
 
 Every plugin with an `+image` target in its Earthfile gets a Docker image on Docker Hub:
@@ -234,6 +236,22 @@ After a successful release, update the cronos staging environment to reference t
    > **Transient failures:** the `lunar hub pull` step intermittently dies with `failed to receive server stream: rpc error: code = Unavailable ... connection reset by peer`. If the log shows every plugin resolved (`fetching remote plugin: ...`) and only the hub stream errored, it's a transient infra blip — **not** a bad config — so just re-run it: `GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run rerun <run-id> --repo pantalasa-cronos/lunar --failed`.
 
 **Note:** Only update `@v<old>` → `@vX.Y.Z`. Leave two other ref kinds untouched: `@main` refs (development plugins being tested, or plugins that intentionally track latest) and any commit-SHA pins (`@<40-char-sha>`, e.g. a plugin held at a specific fix). The `@v<old>`-only sed already skips both — but eyeball the diff to confirm it moved only the version pins you expected.
+
+### Step 8: Dogfood-verify the release on cronos
+
+Bumping the pins (Step 7) only tells the hub *which* images to use — it doesn't prove they work. cronos now runs the released `@vX.Y.Z` images against real repositories, so confirm they actually collect and render checks before you call the release done.
+
+1. **Wait for the manifest to land.** The `Sync Lunar Config` workflow from Step 7 must finish — that's what pushes the new manifest to the hub. Until it's green, the hub is still on the old version.
+
+2. **Let a collection cycle run.** Collectors, policies, and catalogers run on the hub's schedule (or on a repo event). Give it a cycle so the new version's plugins execute against the cronos repos. Pushing a trivial commit to one component is a quick way to force a fresh run instead of waiting for the cron.
+
+3. **Check the cronos Grafana dashboard.** On the component-details **Checks** tab, confirm the collectors ran and the checks rendered for the components touched by this release. Spot-check anything new or changed: a new collector should be producing its checks; a changed policy should reflect the new behavior.
+
+4. **Wait for the checks to fully settle before declaring green.** A check showing an asterisk (`*`), or a *stale/pending* disclaimer at the bottom of the panel, means the view is still settling — refresh/poll until it clears. Database counts (snippet runs finished, `checks` populated at the new git SHA) are **necessary but not sufficient**; the dashboard UI itself must be settled before you trust it.
+
+5. **If the markers don't clear after a reasonable wait, treat it as a possible pipeline problem and flag it** — don't report a half-settled dashboard as a passing release. A release that publishes images but can't produce checks on a real hub is not done.
+
+> Pinning is exactly when a phantom image ref surfaces — a plugin whose `default_image` points at an image that `+all` never built (see Step 4). Those resolve fine on `@main` but 404 once pinned to `@vX.Y.Z`, and the dashboard is where you'll catch the missing checks.
 
 ---
 
