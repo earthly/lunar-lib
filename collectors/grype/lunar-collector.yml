@@ -49,6 +49,14 @@ collectors:
       collector (the sibling auto.sh) in the Grype collector image, and stamps
       .sca.source.integration="cron" (vs "code" for the on-push scan) so it's
       clear the data came from a scheduled re-scan.
+
+      Opt-in scan history: with scan_history_size > 0 the re-scan first snapshots
+      the current .sca (counts + summary + source, including the scan timestamp)
+      into a bounded .sca.history[] array before overwriting .sca, preserving
+      point-in-time scan results for audit. The SCA policy keeps reading the
+      current .sca and behaves identically whether history is on or off. Default
+      0 keeps today's overwrite-only behavior — no history, no schema change for
+      existing consumers.
     mainBash: auto.sh
     # Same scan as `auto`, so same large profile for the runtime DB update.
     size: large
@@ -105,6 +113,32 @@ collectors:
     keywords: ["grype", "container scan", "image scan", "cron rescan", "cve", "vulnerability"]
 
 inputs:
+  scan_history_size:
+    description: |
+      Maximum number of prior SCA scans to retain in .sca.history[] on each cron
+      re-scan. Snapshots are ordered oldest-first and the current scan stays in
+      the main .sca fields, so the SCA policy is unaffected. Each entry carries
+      its own source (integration + collected_at), so the release-time scan is
+      identifiable as the integration="code" entry — that's .sca.history[0] when
+      history is enabled from the component's first scan (the intended setup for
+      release-time audit). Enabling it later on a component that has already been
+      re-scanned captures the current .sca as the oldest entry, since the
+      release-time scan was already overwritten. 0 (default) disables history
+      entirely — .sca is overwritten each run exactly as today and no
+      .sca.history is written, so existing consumers see no change. When the cap
+      is reached the oldest entry (index 0) is preserved and the second-oldest is
+      dropped. Only the rescan (cron) sub-collector maintains history; the
+      on-push auto scan ignores this.
+    default: "0"
+  max_rescans:
+    description: |
+      Stop re-scanning a component after this many scheduled re-scans; 0
+      (default) means unlimited. Counted independently via .sca.rescan_count (a
+      monotonic tally of completed re-scans), so it stands alone and does not
+      depend on scan_history_size — scan_history_size bounds how many scans you
+      KEEP, max_rescans bounds how many you RUN. Once the limit is reached the
+      cron skips the component, keeping the last scan and its history.
+    default: "0"
   db_auto_update:
     description: |
       Download the latest Grype vulnerability database at scan time so scans pick
@@ -138,7 +172,8 @@ example_component_json: |
       "source": {
         "tool": "grype",
         "version": "0.74.0",
-        "integration": "code"
+        "integration": "cron",
+        "collected_at": "2026-07-08T02:00:07Z"
       },
       "vulnerabilities": {
         "critical": 0,
@@ -164,6 +199,19 @@ example_component_json: |
         "has_high": true,
         "all_fixable": true
       },
+      "history": [
+        {
+          "source": {"tool": "grype", "version": "0.74.0", "integration": "code", "collected_at": "2026-07-01T02:00:11Z"},
+          "vulnerabilities": {"critical": 0, "high": 1, "medium": 5, "low": 3, "total": 9},
+          "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
+        },
+        {
+          "source": {"tool": "grype", "version": "0.74.0", "integration": "cron", "collected_at": "2026-07-05T02:00:09Z"},
+          "vulnerabilities": {"critical": 0, "high": 2, "medium": 5, "low": 3, "total": 10},
+          "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
+        }
+      ],
+      "rescan_count": 2,
       "native": {
         "grype": {
           "cicd": {
