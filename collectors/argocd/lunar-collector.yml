@@ -4,7 +4,7 @@ name: argocd
 description: Parses and validates ArgoCD Application, ApplicationSet, and AppProject manifests into a normalized .cd.gitops view
 author: earthly
 
-default_image: earthly/lunar-lib:argocd-main
+default_image: earthly/lunar-lib:argocd-v1.8.1
 
 landing_page:
   display_name: "ArgoCD Collector"

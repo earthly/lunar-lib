@@ -4,7 +4,7 @@ name: kotlin
 description: Collect Kotlin project information, dependencies, CI/CD commands, and test coverage. Gates on the presence of `*.kt` / `*.kts` source files — Groovy-only-Java / Maven-only-Java repos receive no `.lang.kotlin` data.
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.8.1
 default_image_ci_collectors: native
 
 landing_page:

@@ -5,7 +5,7 @@ description: |
   Scan source code dependencies for known vulnerabilities using Grype.
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:grype-main
+default_image: earthly/lunar-lib:grype-v1.8.1
 default_image_ci_collectors: native
 
 landing_page:

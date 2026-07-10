@@ -7,7 +7,7 @@ author: earthly
 
 # Reuses the argocd collector's image: link_push.sh sources parse.sh, which
 # validates with kubeconform against the baked-in argoproj CRD schemas.
-default_image: earthly/lunar-lib:argocd-main
+default_image: earthly/lunar-lib:argocd-v1.8.1
 
 landing_page:
   display_name: "ArgoCD Deployment Tracking Collector"
