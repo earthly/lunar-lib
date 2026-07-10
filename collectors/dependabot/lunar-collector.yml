@@ -3,7 +3,7 @@ version: 0
 name: dependabot
 description: Parse Dependabot configuration and collect dependency update settings
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.8.0
 
 landing_page:
   display_name: "Dependabot Collector"
