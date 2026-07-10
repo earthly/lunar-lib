@@ -23,6 +23,9 @@
 #   include_derived_tags     (default true)
 #   owner_format             (default as-is) as-is | bare-name
 #   default_owner            (default empty)
+#   meta_annotations         (default pagerduty.com/service-id=pagerduty/service-id)
+#                            comma-separated <annotation>=<meta-key> pairs mapped
+#                            onto component .meta; empty disables
 #
 # Acquisition-only inputs (paths, branch) and secrets (GH_TOKEN) are handled
 # by the entrypoints, not here.
@@ -49,6 +52,10 @@ augment_component() {
     local OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
     local DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
     local DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+    # `-` not `:-` so an explicitly-empty value disables meta mapping entirely,
+    # while a truly-unset var (direct local invocation) still gets the PagerDuty
+    # default. Same rationale as TAG_PREFIX above — the hub always sets the var.
+    local META_ANNOTATIONS="${LUNAR_VAR_META_ANNOTATIONS-pagerduty.com/service-id=pagerduty/service-id}"
     local IGNORE_COMPONENTS="${LUNAR_VAR_IGNORE_COMPONENTS:-}"
     local ALLOW_IGNORE_ANNOTATION="${LUNAR_VAR_ALLOW_IGNORE_ANNOTATION:-false}"
     local IGNORE_ANNOTATION="${LUNAR_VAR_IGNORE_ANNOTATION:-lunar.io/ignore}"
@@ -77,6 +84,7 @@ augment_component() {
     echo "Owner format: $OWNER_FORMAT"
     [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
     [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
+    [ -n "$META_ANNOTATIONS" ] && echo "Meta annotations: $META_ANNOTATIONS"
 
     # --- Parse YAML (multi-document) ------------------------------------------
     # `yq ea '[.]' -o=json` collects all documents in a multi-doc file into a
@@ -146,9 +154,16 @@ augment_component() {
     fi
 
     # --- Transform -------------------------------------------------------------
-    # Project owner / domain / tags from the entity into the shape that goes
-    # under `.components["$COMPONENT_ID"]`. Owner / domain are omitted from the
-    # output when empty so we don't blow away upstream values with "".
+    # Project owner / domain / tags / meta from the entity into the shape that
+    # goes under `.components["$COMPONENT_ID"]`. Owner / domain / meta are omitted
+    # from the output when empty so we don't blow away upstream values with "".
+    #
+    # `meta` maps selected catalog-info annotations onto the component's Lunar
+    # meta field, per the `meta_annotations` "<annotation>=<meta-key>" mapping.
+    # This is how tool collectors (PagerDuty, etc.) discover their IDs: the
+    # `pagerduty` collector reads `pagerduty/service-id` from LUNAR_COMPONENT_META
+    # (now live hub-side, ENG-1102), which by default we source from the
+    # `pagerduty.com/service-id` annotation PagerDuty's Backstage guide recommends.
     local ENTRY
     ENTRY=$(echo "$ENTITY" | jq \
         --arg tag_prefix "$TAG_PREFIX" \
@@ -157,6 +172,7 @@ augment_component() {
         --arg default_owner "$DEFAULT_OWNER" \
         --arg domain_annotation "$DOMAIN_ANNOTATION" \
         --arg default_domain "$DEFAULT_DOMAIN" \
+        --arg meta_annotations "$META_ANNOTATIONS" \
         '
         def bare(s):
             if (s | type) != "string" or s == "" then s
@@ -189,9 +205,25 @@ augment_component() {
                      then [$tag_prefix + "lifecycle-" + (.spec.lifecycle | tostring)] else [] end))
             else []
             end) as $derived
+        | ($e.metadata.annotations // {}) as $ann
+        | (reduce ($meta_annotations | split(",")[]) as $pair ({};
+            ($pair | gsub("^\\s+|\\s+$"; "")) as $p
+            | ($p | index("=")) as $eq
+            | if $eq == null then .
+              else
+                ($p[0:$eq] | gsub("^\\s+|\\s+$"; "")) as $ak
+                | ($p[$eq+1:] | gsub("^\\s+|\\s+$"; "")) as $mk
+                | ($ann[$ak] // "" | tostring) as $val
+                | if ($ak | length) > 0 and ($mk | length) > 0 and ($val | length) > 0
+                  then . + {($mk): $val}
+                  else .
+                  end
+              end
+          )) as $meta
         | ({tags: ($prefixed + $derived)}
            + (if $owner != "" then {owner: $owner} else {} end)
-           + (if $domain != "" then {domain: $domain} else {} end))
+           + (if $domain != "" then {domain: $domain} else {} end)
+           + (if ($meta | length) > 0 then {meta: $meta} else {} end))
         ')
 
     echo ""

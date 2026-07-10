@@ -114,6 +114,7 @@ reset_env() {
     unset LUNAR_VAR_OWNER_FORMAT LUNAR_VAR_DEFAULT_OWNER
     unset LUNAR_VAR_PATHS LUNAR_VAR_BRANCH
     unset LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_DEFAULT_DOMAIN
+    unset LUNAR_VAR_META_ANNOTATIONS
     unset LUNAR_VAR_IGNORE_COMPONENTS LUNAR_VAR_ALLOW_IGNORE_ANNOTATION
     unset LUNAR_VAR_IGNORE_ANNOTATION
 }
@@ -354,6 +355,36 @@ run_scenario "default_domain_no_override" "annotation_match" "github.com/acme/pa
     '.["github.com/acme/payment-api"].domain == "platform.payments"' \
     LUNAR_VAR_DEFAULT_DOMAIN=unassigned \
     'EXPECTED_DOMAINS_JQ=(.["platform.payments"] == {}) and (has("unassigned") | not)'
+
+# ── Scenario: default meta_annotations maps pagerduty.com/service-id ──────
+# The pagerduty_annotation fixture carries pagerduty.com/service-id=PABC123.
+# With the default meta_annotations mapping, that lands in
+# .meta["pagerduty/service-id"] — what the pagerduty collector reads from
+# LUNAR_COMPONENT_META.
+run_scenario "meta_pagerduty_default" "pagerduty_annotation" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].meta == {"pagerduty/service-id": "PABC123"}' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: no meta when the mapped annotation is absent ────────────────
+# annotation_match has no pagerduty.com/service-id annotation, so with the
+# default mapping no meta key is emitted (.meta is omitted entirely).
+run_scenario "meta_absent_annotation" "annotation_match" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"] | (has("meta") | not)' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: custom meta_annotations mapping (tolerates whitespace) ──────
+# A custom mapping picks a different annotation/target key and tolerates
+# surrounding whitespace around the pair and the '='.
+run_scenario "meta_custom_mapping" "pagerduty_annotation" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"].meta == {"pagerduty/integration-key": "0123456789abcdef0123456789abcdef"}' \
+    'LUNAR_VAR_META_ANNOTATIONS= pagerduty.com/integration-key = pagerduty/integration-key ' \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
+
+# ── Scenario: explicitly-empty meta_annotations disables meta mapping ─────
+run_scenario "meta_disabled" "pagerduty_annotation" "github.com/acme/payment-api" \
+    '.["github.com/acme/payment-api"] | (has("meta") | not)' \
+    LUNAR_VAR_META_ANNOTATIONS= \
+    'EXPECTED_DOMAINS_JQ=.["platform.payments"] == {}'
 
 # ── Skip scenarios (expect no write) ──────────────────────────────────────
 # No file at any configured path (404 from GitHub Contents API / absent in checkout)

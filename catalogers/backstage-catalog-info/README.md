@@ -4,7 +4,7 @@ Augments existing Lunar components with metadata read from each repo's `catalog-
 
 ## Overview
 
-Augments existing Lunar components with owner, domain, and tag metadata read from each repo's `catalog-info.yaml` — it picks the matching `Component` entity and writes owner / domain / tags to that component's catalog entry. The same augmentation runs in two trigger variants: `augment` refreshes the catalog on a daily schedule (fetching the file via the GitHub Contents API), while `augment-on-commit` updates a component the moment its repo is committed to (reading the file from the checkout, no token). Both only enrich components that already exist, so pair this with a component-defining cataloger such as [`github-org`](../github-org).
+Augments existing Lunar components with owner, domain, tag, and meta metadata read from each repo's `catalog-info.yaml` — it picks the matching `Component` entity and writes owner / domain / tags / meta to that component's catalog entry. The same augmentation runs in two trigger variants: `augment` refreshes the catalog on a daily schedule (fetching the file via the GitHub Contents API), while `augment-on-commit` updates a component the moment its repo is committed to (reading the file from the checkout, no token). Both only enrich components that already exist, so pair this with a component-defining cataloger such as [`github-org`](../github-org).
 
 ## Synced Data
 
@@ -15,6 +15,7 @@ This cataloger writes to the following Catalog JSON paths on each run:
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
 | `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
+| `.components["$LUNAR_COMPONENT_ID"].meta` | object | Key/value meta sourced from annotations per the `meta_annotations` mapping. By default maps the `pagerduty.com/service-id` annotation onto `pagerduty/service-id`, which the [`pagerduty`](../../collectors/pagerduty) collector reads. Omitted entirely when no mapped annotation is present. |
 | `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
 
 This cataloger does **not** define new components — both the `component-cron` and `component-repo` hooks augment existing components only. Pair with a component-defining cataloger (see [Layering](#layering-with-a-component-defining-cataloger)). Domain entries are written as stubs only; for a richer global domain catalog, layer with the [`backstage`](../backstage) cataloger.
@@ -28,7 +29,8 @@ This cataloger does **not** define new components — both the `component-cron` 
     "github.com/acme/payment-api": {
       "owner": "group:default/team-payments",
       "domain": "platform.payments",
-      "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+      "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"],
+      "meta": {"pagerduty/service-id": "PABC123"}
     },
     "github.com/acme/web-app": {
       "owner": "group:default/team-web",
@@ -52,7 +54,7 @@ This cataloger does **not** define new components — both the `component-cron` 
 
 | Cataloger | Description |
 |-----------|-------------|
-| `augment` | **Scheduled.** Fetches `catalog-info.yaml` from the current component's GitHub repo via the Contents API, parses the YAML (multi-document files supported), picks the matching `Component` entity, and writes its owner / domain / tags to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON. Runs on a `component-cron` schedule. Requires `GH_TOKEN`. |
+| `augment` | **Scheduled.** Fetches `catalog-info.yaml` from the current component's GitHub repo via the Contents API, parses the YAML (multi-document files supported), picks the matching `Component` entity, and writes its owner / domain / tags / meta to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON. Runs on a `component-cron` schedule. Requires `GH_TOKEN`. |
 | `augment-on-commit` | **Commit-triggered.** Same parsing, matching, and output as `augment`, but runs on the `component-repo` hook — it fires when the component's repo receives a commit and reads `catalog-info.yaml` from the checkout instead of the Contents API. No `GH_TOKEN` required. Use it for near-real-time updates; see [Choosing a variant](#choosing-a-variant). |
 
 ## Hook Type
@@ -207,6 +209,37 @@ catalogers:
 The value is written verbatim, and a stub `.domains["<default_domain>"]` entry is written alongside it so the hub's domain validation accepts the reference (the same stub-write the cataloger does for any other domain). `default_domain` is purely a last-resort fallback — it never overrides a domain that the file already provides through any of the sources above. Leave it empty (the default) to keep domain-less components unset.
 
 This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a sensible default domain rather than leaving them blank.
+
+### Mapping Annotations to Component Meta (PagerDuty and others)
+
+Several lunar-lib collectors resolve their per-component target from the Lunar component **meta** field rather than from config — for example, the [`pagerduty`](../../collectors/pagerduty) collector reads `pagerduty/service-id` from `LUNAR_COMPONENT_META` to know which PagerDuty service to query. That meta value has to come from somewhere; this cataloger sources it from a `catalog-info.yaml` annotation.
+
+`meta_annotations` is a comma-separated list of `<annotation-key>=<meta-key>` pairs. For each pair, if the matched `Component` carries that annotation, its value is written to `.components["$LUNAR_COMPONENT_ID"].meta[<meta-key>]`. The default maps the annotation PagerDuty's [Backstage integration guide](https://support.pagerduty.com/main/docs/backstage-integration-guide) recommends:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    # default: meta_annotations: "pagerduty.com/service-id=pagerduty/service-id"
+```
+
+So a repo whose `catalog-info.yaml` has:
+
+```yaml
+metadata:
+  annotations:
+    pagerduty.com/service-id: PABC123
+```
+
+gets `meta: {"pagerduty/service-id": "PABC123"}`, and the `pagerduty` collector (and the `oncall` guardrails behind it) works with no further per-component config. Note the annotation namespace is `pagerduty.com/` (the Backstage/PagerDuty convention) while the Lunar meta key is `pagerduty/service-id` — the mapping bridges the two.
+
+Add pairs to feed other collectors:
+
+```yaml
+    with:
+      meta_annotations: "pagerduty.com/service-id=pagerduty/service-id,sonarqube.io/project-key=sonarqube/project-key"
+```
+
+Whitespace around each pair and its `=` is trimmed. Set `meta_annotations` to empty to write no meta at all. A pair whose annotation is absent on a given component is skipped, and `.meta` is omitted entirely when nothing matches (so it never clobbers meta set elsewhere with an empty object).
 
 ### Owner Format
 

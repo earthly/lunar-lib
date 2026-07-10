@@ -69,6 +69,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `catalog-info.yaml` from the checkout. Shares the parse/match/transform/write
   pipeline with `augment` via `helpers.sh`; enable either or both with `include`
   (#212).
+- `backstage-catalog-info` cataloger: new `meta_annotations` input — maps
+  selected `catalog-info.yaml` annotations onto the Lunar component `meta`
+  field. Defaults to `pagerduty.com/service-id=pagerduty/service-id`, so the
+  `pagerduty` collector (and the `oncall` guardrails) discover a component's
+  PagerDuty service straight from the annotation PagerDuty's Backstage
+  integration guide recommends — no per-component config. Accepts multiple
+  `<annotation>=<meta-key>` pairs for other collectors; set empty to disable.
+  (#224)
 - `backstage-catalog-info` cataloger: new `default_domain` input — assigns a
   fallback domain (written verbatim, with a matching stub `.domains` entry) to
   components whose `catalog-info.yaml` resolves to no domain via
