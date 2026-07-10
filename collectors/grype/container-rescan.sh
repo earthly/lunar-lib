@@ -14,7 +14,7 @@ set -eo pipefail
 echo "Running Grype container image scan" >&2
 
 # --- 1. Resolve the image reference to scan ---
-IMAGE_REF="${LUNAR_INPUT_CONTAINER_IMAGE:-}"
+IMAGE_REF="${LUNAR_VAR_CONTAINER_IMAGE:-}"
 
 if [ -z "$IMAGE_REF" ]; then
   # Derive the image from what the component actually PUSHED, not just what it
