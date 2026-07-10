@@ -70,7 +70,7 @@ fi
 #     download OOM-kills the collector (exit 137), so this requires a Hub that
 #     honors collector size (ENG-983) — kept default-off until size-aware Hub
 #     builds ship everywhere; flip back to true then.
-if [ "${LUNAR_INPUT_DB_AUTO_UPDATE:-false}" = "true" ]; then
+if [ "${LUNAR_VAR_DB_AUTO_UPDATE:-false}" = "true" ]; then
   export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
   # GRYPE_DB_AUTO_UPDATE defaults true → fresh DB each scan
 else
