@@ -186,6 +186,29 @@ unset LUNAR_VAR_TAG_PREFIX
 run_scenario "unset_prefix_defaults_to_gh" \
     "($PA) == ([\"gh-backend\",\"gh-go\",\"github-visibility-public\"] | sort)"
 
+# ── Topic allowlist: only repos carrying an allowed topic are cataloged ───
+# payment-api has topics backend/go; frontend-app has react. allow=go keeps
+# payment-api, drops frontend-app.
+export LUNAR_VAR_TAG_PREFIX="gh-"
+export LUNAR_VAR_ALLOWED_TOPICS="go"
+run_scenario "allowed_topics" \
+    '(has("github.com/acme/payment-api")) and (has("github.com/acme/frontend-app") | not)'
+unset LUNAR_VAR_ALLOWED_TOPICS
+
+# ── Topic blocklist: a repo carrying a disallowed topic is excluded ───────
+export LUNAR_VAR_DISALLOWED_TOPICS="react"
+run_scenario "disallowed_topics" \
+    '(has("github.com/acme/payment-api")) and (has("github.com/acme/frontend-app") | not)'
+unset LUNAR_VAR_DISALLOWED_TOPICS
+
+# ── Block wins over allow when a repo matches both lists ──────────────────
+# allow=go,react matches both repos; disallow=go then removes payment-api.
+export LUNAR_VAR_ALLOWED_TOPICS="go,react"
+export LUNAR_VAR_DISALLOWED_TOPICS="go"
+run_scenario "disallow_beats_allow" \
+    '(has("github.com/acme/payment-api") | not) and (has("github.com/acme/frontend-app"))'
+unset LUNAR_VAR_ALLOWED_TOPICS LUNAR_VAR_DISALLOWED_TOPICS
+
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"
 

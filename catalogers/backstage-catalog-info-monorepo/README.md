@@ -53,7 +53,7 @@ The owner / domain / tag shaping is identical to the [`backstage-catalog-info`](
 
 ### How Files Are Discovered and Keyed
 
-1. **Tree walk.** For each repository in `repos`, the cataloger makes one recursive [Git Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree) call (`GET /repos/<owner>/<repo>/git/trees/<branch>?recursive=1`) and filters the tree to blobs whose basename is in `filenames` (default `catalog-info.yaml,catalog-info.yml`). One API call finds every descriptor in the repo, regardless of nesting depth.
+1. **Tree walk.** For each repository in the scan set (the `repos` list plus any topic-matched repos discovered from `orgs` — see [Discovering repos by topic](#discovering-repos-by-topic)), the cataloger makes one recursive [Git Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree) call (`GET /repos/<owner>/<repo>/git/trees/<branch>?recursive=1`) and filters the tree to blobs whose basename is in `filenames` (default `catalog-info.yaml,catalog-info.yml`). One API call finds every descriptor in the repo, regardless of nesting depth.
 2. **Fetch + parse.** Each matched file is fetched via the Contents API (raw) and parsed (multi-document files supported).
 3. **Component identity.** The created component's id is derived from the file's location:
 
@@ -78,13 +78,13 @@ The common monorepo layout is one `catalog-info.yaml` per service directory, eac
 
 | Cataloger | Description |
 |-----------|-------------|
-| `discover` | **Scheduled.** Walks each configured repo's tree via the Git Trees API, finds every `catalog-info.yaml`, fetches and parses each, and creates one component per file keyed to the file's directory. Writes owner / domain / tags plus `.domains` stubs. Runs on a `cron` schedule. Requires `GH_TOKEN`. |
+| `discover` | **Scheduled.** Builds a scan set from `repos` plus any topic-matched repos discovered from `orgs`, walks each repo's tree via the Git Trees API, finds every `catalog-info.yaml`, fetches and parses each, and creates one component per file keyed to the file's directory. Writes owner / domain / tags plus `.domains` stubs. Runs on a `cron` schedule. Requires `GH_TOKEN`. |
 
 ## Hook Type
 
 | Cataloger | Hook | Schedule / Trigger | Description |
 |-----------|------|--------------------|-------------|
-| `discover` | `cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per run (global), scanning every repo in `repos` |
+| `discover` | `cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per run (global), scanning every repo in the scan set (`repos` plus topic-matched repos from `orgs`) |
 
 The `cron` hook is global (once per run, no repo checkout), which is what lets this cataloger *create* components — per-component hooks (`component-cron`, `component-repo`) can only augment components that already exist. Daily at 03:00 is offset from the standard `0 2 * * *` so it lands after component-defining catalogers run. Tighten the cadence by overriding `hook.schedule` in a fork.
 
@@ -105,7 +105,28 @@ Set the GitHub token used to walk each repo's tree and fetch each `catalog-info.
 lunar secret set GH_TOKEN <your-github-token>
 ```
 
-The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+
+### Discovering repos by topic
+
+Instead of hand-maintaining the `repos` list, you can auto-discover repositories across one or more organizations and opt them in by **GitHub topic**. Set `orgs` to the org(s) to scan and `allowed_topics` to the topic that marks a repo for monorepo cataloging:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    with:
+      orgs: "acme"                       # discover every repo in the acme org…
+      allowed_topics: "lunar-monorepo"   # …but only those tagged `lunar-monorepo`
+      disallowed_topics: "no-catalog"    # …and never those tagged `no-catalog`
+```
+
+Onboarding a new monorepo is then just adding the `lunar-monorepo` topic on GitHub — no `lunar-config.yml` change.
+
+- **`orgs`** — comma-separated org names. Every repo in each org is enumerated via the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) and added to the scan set after topic filtering. Archived repos are skipped unless `include_archived: "true"`.
+- **`allowed_topics`** — when set, a discovered repo is scanned only if it carries at least one of these topics. Empty (the default) means every discovered repo passes.
+- **`disallowed_topics`** — a discovered repo carrying any of these topics is skipped, even if it also matches an allowed topic (block wins over allow).
+
+Topics are matched exactly (case-sensitive) against the repository's GitHub topics. `repos` and `orgs` can be combined — the scan set is their union — and at least one of the two must be set. **The topic filters gate only the org-discovered set; repos you name explicitly in `repos` are always scanned** (naming a repo is itself the opt-in). When using `orgs`, the `GH_TOKEN` must also be able to list the org's repositories (see [Source System](#source-system)).
 
 ### Layering With Component-Defining Catalogers
 
@@ -168,16 +189,17 @@ catalogers:
 
 Each polyrepo gets a repo-level component from its root `catalog-info.yaml`; the monorepo gets one component per subdirectory and **no** root component. The flows don't overlap: `github-org` excludes the monorepo, and this cataloger is scoped to it by an explicit `repos` list rather than running across every repo. (The augment cataloger harmlessly no-ops on the monorepo's subcomponents — it looks for a root file at a path that isn't a real repo and skips on the 404.) This is the "target the monorepo directly" posture; because targeting is just the `repos` list plus `github-org`'s `exclude_repos`, a fleet can mix both strategies without a one-size-fits-all cataloger.
 
+Instead of naming each monorepo, you can flip this to **topic-driven** targeting: give this cataloger `orgs` + `allowed_topics` (e.g. tag your monorepos `lunar-monorepo`) and let `github-org` skip the same set with a matching `disallowed_topics`. Onboarding a monorepo is then a GitHub topic, not a config edit on either cataloger. See [Discovering repos by topic](#discovering-repos-by-topic).
+
 ## Source System
 
-[GitHub](https://github.com) — the cataloger calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once per configured repo to enumerate files, then the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml`. Requirements:
+[GitHub](https://github.com) — when `orgs` is set the cataloger calls the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) (paged, 100/page) to enumerate candidate repos and filter them by topic; then, for every repo in the scan set, it calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once to enumerate files and the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml`. Requirements:
 
-- **`GH_TOKEN` secret** with read access to every repo in `repos`.
+- **`GH_TOKEN` secret** with `Contents: Read` on every repo in the scan set. When `orgs` is set, it must also be able to list the org's repositories (`read:org` / org membership for private repos, or `Metadata: Read` on a fine-grained PAT / App installation).
 - **GitHub-hosted repos.** Component ids are constructed as `<component_id_prefix><owner>/<repo>[/<dir>]`; the default prefix is `github.com/`.
 
 ### Scope and Roadmap
 
-v1 targets the **single-repo / explicit-repo-list** case that motivated it (a monorepo whose services each ship a `catalog-info.yaml`). Two extensions are noted as follow-ups rather than built here:
+The cataloger targets the monorepo case that motivated it (a repo whose services each ship a `catalog-info.yaml`), scoped either by an explicit `repos` list or by org discovery with a GitHub-topic allow/blocklist (see [Discovering repos by topic](#discovering-repos-by-topic)). One extension is noted as a follow-up rather than built here:
 
-- **Org-wide discovery** — scan every repo in an org (or every repo already cataloged by `github-org`) instead of an explicit `repos` list.
 - **Commit-triggered variant** — a checkout-based companion (mirroring `backstage-catalog-info`'s `augment-on-commit`) for near-real-time updates without the daily cron.
