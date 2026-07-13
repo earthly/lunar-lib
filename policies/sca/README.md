@@ -169,7 +169,7 @@ the findings as normal and the delivery failure is logged to stderr.
 > - critical: lodash — CVE-2021-23337 (fix: 4.17.21)
 > - high: axios — CVE-2023-45857 (no fix available)
 
-Up to the first 10 are shown, with a `+N more (see component JSON for full list)` tail when there are more (the full set is always in the component JSON). If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form.
+Up to the first 10 are shown, with a `+N more (see More details below for full list)` tail when there are more — pointing readers at the check's **More Details** expander in the PR comment. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form, tailed with a bare `+N more` (it ships the full structured findings separately).
 
 ## Remediation
 

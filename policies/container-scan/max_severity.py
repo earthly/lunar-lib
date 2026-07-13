@@ -67,11 +67,13 @@ def _with_findings(headline, findings, multiline=False):
     """Append the offending findings to the failure headline (most severe first).
 
     Summary-only scans (no `.findings`) return the headline unchanged. The list
-    is capped at MAX_LISTED_FINDINGS; any remainder is summarized as a
-    "+N more (see component JSON for full list)" tail. `multiline=True` renders
-    the findings as a Markdown sub-list — one per line, indented 4 spaces so
-    they nest under the failure bullet the hub emits (`  * <message>`) and show
-    as a tidy nested list in the GitHub PR comment.
+    is capped at MAX_LISTED_FINDINGS; any remainder is summarized as a "+N more"
+    tail. `multiline=True` renders the findings as a Markdown sub-list — one per
+    line, indented 4 spaces so they nest under the failure bullet the hub emits
+    (`  * <message>`) and show as a tidy nested list in the GitHub PR comment;
+    in that form the tail points at the check's expander
+    ("+N more (see More details below for full list)"). The single-line form
+    keeps a bare "+N more".
     """
     if not findings:
         return headline
@@ -88,7 +90,12 @@ def _with_findings(headline, findings, multiline=False):
     lines = [finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
     hidden = len(ordered) - len(lines)
     if hidden > 0:
-        lines.append(f"+{hidden} more (see component JSON for full list)")
+        # PR comment (multiline): point at the check's "More Details" expander,
+        # which renders directly below. Single-line: bare "+N more".
+        if multiline:
+            lines.append(f"+{hidden} more (see More details below for full list)")
+        else:
+            lines.append(f"+{hidden} more")
     if multiline:
         return f"{headline}:\n" + "\n".join(f"    * {line}" for line in lines)
     return f"{headline}: " + "; ".join(lines)

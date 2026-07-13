@@ -379,6 +379,22 @@ class MaxSeverityAlertTests(unittest.TestCase):
             headers, _ = r.requests[0]
         self.assertEqual(headers.get("Authorization"), "Bearer topsecret")
 
+    def test_webhook_message_tail_is_bare_no_pr_comment_wording(self):
+        # The webhook `message` is single-line plain text and ships the full
+        # structured findings separately; there is no "More Details" expander on
+        # that surface to point at. Its truncation tail must therefore stay a
+        # bare "+N more" — never the PR-comment wording, never "component JSON".
+        n = max_severity.MAX_LISTED_FINDINGS + 5
+        with Receiver(status=200) as r:
+            run_check(node(sca=many_findings_sca(n)),
+                      LUNAR_VAR_alert_url=r.url, LUNAR_VAR_min_severity="critical")
+            _, body = r.requests[0]
+        msg = body["message"]
+        self.assertIn("+5 more", msg)
+        self.assertNotIn("More details", msg)   # PR-comment-only wording
+        self.assertNotIn("component JSON", msg)  # internal jargon, removed
+        self.assertNotIn("\n", msg)              # single-line
+
 
 # --------------------------------------------------------------------------- #
 # max-severity failure-message enumeration tests                               #
@@ -428,7 +444,9 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
-        self.assertIn("+5 more (see component JSON for full list)", msg)
+        # PR-comment (multiline) tail points at the check's "More Details"
+        # expander — no internal "component JSON" jargon.
+        self.assertIn("+5 more (see More details below for full list)", msg)
         # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
         # a 4-space-indented Markdown sub-bullet under the headline.
         bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]

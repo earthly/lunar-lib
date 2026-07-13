@@ -184,7 +184,8 @@ class MaxSeverityTests(unittest.TestCase):
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
         self.assertEqual(msg.count("\n    * "), 11)  # 10 findings + the "+N more" tail
-        self.assertIn("+5 more (see component JSON for full list)", msg)
+        # Tail points at the check's "More Details" expander (no internal jargon).
+        self.assertIn("+5 more (see More details below for full list)", msg)
 
     def test_no_scan_data_fails(self):
         c = run_check(node(container_scan=None))
