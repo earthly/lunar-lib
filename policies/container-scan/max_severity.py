@@ -70,10 +70,11 @@ def _with_findings(headline, findings, multiline=False):
     is capped at MAX_LISTED_FINDINGS; any remainder is summarized as a "+N more"
     tail. `multiline=True` renders the findings as a Markdown sub-list — one per
     line, indented 4 spaces so they nest under the failure bullet the hub emits
-    (`  * <message>`) and show as a tidy nested list in the GitHub PR comment;
-    in that form the tail gives the exact click path
-    ('+N more (see "More Details" > "JSON" for full list)'). The single-line
-    form keeps a bare "+N more".
+    (`  * <message>`). This is the check's failure_reasons string, which renders
+    on BOTH the GitHub PR comment AND the Grafana dashboard, so the tail points
+    at the JSON generically ("+N more (full list in the JSON)") rather than a
+    PR-comment-only "More Details" click path. The single-line form keeps a bare
+    "+N more".
     """
     if not findings:
         return headline
@@ -90,11 +91,11 @@ def _with_findings(headline, findings, multiline=False):
     lines = [finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
     hidden = len(ordered) - len(lines)
     if hidden > 0:
-        # PR comment (multiline): give the exact click path — the full list
-        # lives in the check's "More Details" > "JSON" view. Single-line: bare
-        # "+N more".
+        # The check message renders on both the PR comment and the Grafana
+        # dashboard (same failure_reasons string), so point at the JSON
+        # generically rather than a PR-only "More Details" click path.
         if multiline:
-            lines.append(f'+{hidden} more (see "More Details" > "JSON" for full list)')
+            lines.append(f"+{hidden} more (full list in the JSON)")
         else:
             lines.append(f"+{hidden} more")
     if multiline:

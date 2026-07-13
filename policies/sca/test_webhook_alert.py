@@ -379,11 +379,11 @@ class MaxSeverityAlertTests(unittest.TestCase):
             headers, _ = r.requests[0]
         self.assertEqual(headers.get("Authorization"), "Bearer topsecret")
 
-    def test_webhook_message_tail_is_bare_no_pr_comment_wording(self):
+    def test_webhook_message_tail_is_bare_no_check_pointer(self):
         # The webhook `message` is single-line plain text and ships the full
-        # structured findings separately; there is no "More Details" expander on
-        # that surface to point at. Its truncation tail must therefore stay a
-        # bare "+N more" — never the PR-comment wording, never "component JSON".
+        # structured findings array separately, so its truncation tail stays a
+        # bare "+N more" — not the check message's "(full list in the JSON)"
+        # pointer, and never the old "component JSON" jargon.
         n = max_severity.MAX_LISTED_FINDINGS + 5
         with Receiver(status=200) as r:
             run_check(node(sca=many_findings_sca(n)),
@@ -391,9 +391,9 @@ class MaxSeverityAlertTests(unittest.TestCase):
             _, body = r.requests[0]
         msg = body["message"]
         self.assertIn("+5 more", msg)
-        self.assertNotIn("More Details", msg)    # PR-comment-only navigation
-        self.assertNotIn("component JSON", msg)  # internal jargon, removed
-        self.assertNotIn("\n", msg)              # single-line
+        self.assertNotIn("full list in the JSON", msg)  # check-message-only pointer
+        self.assertNotIn("component JSON", msg)          # old jargon, removed
+        self.assertNotIn("\n", msg)                      # single-line
 
 
 # --------------------------------------------------------------------------- #
@@ -444,9 +444,11 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
-        # PR-comment (multiline) tail gives the exact click path to the full
-        # list — no internal "component JSON" jargon.
-        self.assertIn('+5 more (see "More Details" > "JSON" for full list)', msg)
+        # The check message (renders on PR comment AND dashboard) uses a
+        # surface-agnostic pointer to the JSON — no "component JSON" jargon,
+        # no PR-comment-only "More Details" path.
+        self.assertIn("+5 more (full list in the JSON)", msg)
+        self.assertNotIn("component JSON", msg)
         # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
         # a 4-space-indented Markdown sub-bullet under the headline.
         bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]

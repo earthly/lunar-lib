@@ -169,7 +169,7 @@ the findings as normal and the delivery failure is logged to stderr.
 > - critical: lodash — CVE-2021-23337 (fix: 4.17.21)
 > - high: axios — CVE-2023-45857 (no fix available)
 
-Up to the first 10 are shown, with a `+N more (see "More Details" > "JSON" for full list)` tail when there are more — giving readers the exact click path to the full list in the PR comment. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form, tailed with a bare `+N more` (that "More Details" > "JSON" navigation is GitHub-specific, and it ships the full structured findings separately anyway).
+Up to the first 10 are shown, with a `+N more (full list in the JSON)` tail when there are more. The check message renders on both the GitHub PR comment and the Grafana dashboard, so the tail points at the JSON generically (reachable from either surface) rather than a PR-comment-only click path. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form, tailed with a bare `+N more` (it ships the full structured findings array separately).
 
 ## Remediation
 

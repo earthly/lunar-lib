@@ -65,14 +65,14 @@ def _with_findings(headline, findings, multiline=False):
 
     `multiline=True` renders the findings as a Markdown sub-list — one per line,
     indented 4 spaces so they nest under the failure bullet the hub emits
-    (`  * <message>`) and show as a tidy nested list in the GitHub PR comment.
-    In that form the tail points at the check's expander with the exact click
-    path ('+N more (see "More Details" > "JSON" for full list)'). The default
-    single-line (`; `-joined) form is used for the webhook payload's `message`,
-    which is consumed as plain text and also ships the full structured findings
-    separately — so there its tail stays a bare "+N more" (the "More Details" >
-    "JSON" navigation is GitHub-PR-comment-specific and doesn't exist on that
-    surface to point at).
+    (`  * <message>`) and show as a tidy nested list. This is the check's
+    failure_reasons string, which renders on BOTH the GitHub PR comment AND the
+    Grafana dashboard (the SDK can't tell which surface will render it), so the
+    tail uses a surface-agnostic pointer — the full list lives in the JSON,
+    reachable from either surface — rather than a PR-comment-only "More Details"
+    click path. The default single-line (`; `-joined) form is the webhook
+    payload's `message`; it's plain text and ships the full structured findings
+    array separately, so its tail stays a bare "+N more".
     """
     if not findings:
         return headline
@@ -89,12 +89,12 @@ def _with_findings(headline, findings, multiline=False):
     lines = [webhook.finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
     hidden = len(ordered) - len(lines)
     if hidden > 0:
-        # PR comment: give the exact click path — the full list lives in the
-        # check's "More Details" > "JSON" view. Webhook: bare "+N more" — the
-        # payload already ships the full structured findings, and that
-        # GitHub-only navigation doesn't exist on that surface.
+        # The check message renders on both the PR comment and the Grafana
+        # dashboard (same failure_reasons string — the SDK can't tell which),
+        # so point at the JSON generically rather than a PR-only "More Details"
+        # click path. Webhook: bare "+N more" — it ships the full findings array.
         if multiline:
-            lines.append(f'+{hidden} more (see "More Details" > "JSON" for full list)')
+            lines.append(f"+{hidden} more (full list in the JSON)")
         else:
             lines.append(f"+{hidden} more")
     if multiline:
