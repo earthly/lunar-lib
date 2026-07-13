@@ -1,20 +1,15 @@
 """Ensure no findings at or above the configured severity threshold.
 
-When findings cross the threshold the check fails, listing the offending
-packages/CVEs in the failure message (when the collector emitted per-finding
-detail in `.container_scan.findings[]`). This mirrors the `sca` policy's
-`max-severity` output so a container-image scan and a code-level SCA scan read
-identically in the GitHub check / PR comment.
+When findings cross the threshold the check fails with one assertion per
+offending package/CVE (when the collector emitted per-finding detail in
+`.container_scan.findings[]`), so the hub renders and truncates the list. This
+mirrors the `sca` policy's `max-severity` output so a container-image scan and
+a code-level SCA scan read identically in the GitHub check / PR comment.
 """
 
 from lunar_policy import Check, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
-
-# Cap on how many individual findings to enumerate in the failure message: a
-# GitHub check / PR comment listing more than this is a wall of text, and the
-# full set is always in the component JSON.
-MAX_LISTED_FINDINGS = 10
 
 
 def _severities_in_scope(min_severity):
@@ -63,44 +58,14 @@ def _collect_findings(scan_node, in_scope):
     return out
 
 
-def _with_findings(headline, findings, multiline=False):
-    """Append the offending findings to the failure headline (most severe first).
-
-    Summary-only scans (no `.findings`) return the headline unchanged. The list
-    is capped at MAX_LISTED_FINDINGS; any remainder is summarized as a "+N more"
-    tail. `multiline=True` renders the findings as a Markdown sub-list — one per
-    line, indented 4 spaces so they nest under the failure bullet the hub emits
-    (`  * <message>`). This is the check's failure_reasons string, which renders
-    on BOTH the GitHub PR comment AND the Grafana dashboard, so the tail points
-    at the JSON generically ("+N more (full list in the JSON)") rather than a
-    PR-comment-only "More Details" click path. The single-line form keeps a bare
-    "+N more".
-    """
-    if not findings:
-        return headline
-
-    def _rank(finding):
-        severity = finding.get("severity")
-        return (
-            SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER),
-            finding.get("package") or "",
-            finding.get("id") or "",
-        )
-
-    ordered = sorted(findings, key=_rank)
-    lines = [finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
-    hidden = len(ordered) - len(lines)
-    if hidden > 0:
-        # The check message renders on both the PR comment and the Grafana
-        # dashboard (same failure_reasons string), so point at the JSON
-        # generically rather than a PR-only "More Details" click path.
-        if multiline:
-            lines.append(f"+{hidden} more (full list in the JSON)")
-        else:
-            lines.append(f"+{hidden} more")
-    if multiline:
-        return f"{headline}:\n" + "\n".join(f"    * {line}" for line in lines)
-    return f"{headline}: " + "; ".join(lines)
+def _rank(finding):
+    """Sort key: most-severe first, then package, then CVE id (stable order)."""
+    severity = finding.get("severity")
+    return (
+        SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER),
+        finding.get("package") or "",
+        finding.get("id") or "",
+    )
 
 
 def main(node=None):
@@ -142,11 +107,17 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            # Name the offending packages/CVEs, not just that the threshold was
-            # crossed — same treatment as the `sca` policy. Renders as a Markdown
-            # sub-list so it nests tidily in the GitHub PR comment.
             findings = _collect_findings(scan_node, set(in_scope))
-            c.fail(_with_findings(fail_message, findings, multiline=True))
+            if findings:
+                # One failing assertion per offending package/CVE (most severe
+                # first) — same treatment as the `sca` policy. The hub renders
+                # each as its own line and truncates the list for display
+                # (hub/poster maxAssertionListSize); no policy-side cap or
+                # "+N more" tail. Summary-only scans fall back to the headline.
+                for finding in sorted(findings, key=_rank):
+                    c.fail(finding_text(finding))
+            else:
+                c.fail(fail_message)
             return c
 
         # Scan data exists but reports no findings/summary — that's a collector

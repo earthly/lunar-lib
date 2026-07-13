@@ -4,10 +4,11 @@
 Run from this directory:
     python3 -m unittest test_max_severity -v
 
-These prove the check enumerates the offending packages/CVEs in its failure
-message — mirroring the `sca` policy — with severity filtering, most-severe-first
-ordering, the MAX_LISTED_FINDINGS cap + "+N more" tail, and graceful degradation
-to a headline-only message when the collector emitted no per-finding detail.
+These prove the check emits one failing assertion per offending package/CVE —
+mirroring the `sca` policy — with severity filtering, most-severe-first
+ordering, no policy-side cap (the hub truncates the display), and graceful
+degradation to a headline-only failure when the collector emitted no
+per-finding detail.
 """
 
 import contextlib
@@ -156,20 +157,27 @@ class MaxSeverityTests(unittest.TestCase):
     def test_fails_and_enumerates_findings(self):
         c = run_check(node(container_scan=CS_WITH_HIGH), LUNAR_VAR_min_severity="high")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        msg = failure_message(c)
-        # Headline preserved, then a Markdown sub-list of the in-scope findings.
-        self.assertIn("High container vulnerabilities detected", msg)
-        self.assertIn("high: github.com/sirupsen/logrus — GHSA-4f99-4q7p-p3gh (fix: 1.9.1)", msg)
-        self.assertIn("high: libnghttp2-14 — CVE-2026-58055 (no fix available)", msg)
-        self.assertIn("\n    * ", msg)  # multiline nested-list rendering
-        # medium is below the `high` threshold — excluded from the enumeration.
-        self.assertNotIn("GO-2026-5024", msg)
+        reasons = c.failure_reasons
+        # One failing assertion per in-scope finding — no headline reason, no
+        # manual sub-list.
+        self.assertEqual(len(reasons), 2)   # 2 HIGH; medium below threshold
+        joined = "\n".join(reasons)
+        self.assertIn("high: github.com/sirupsen/logrus — GHSA-4f99-4q7p-p3gh (fix: 1.9.1)", joined)
+        self.assertIn("high: libnghttp2-14 — CVE-2026-58055 (no fix available)", joined)
+        # medium is below the `high` threshold — excluded.
+        self.assertNotIn("GO-2026-5024", joined)
+        # No enumerated headline reason, no jargon tail.
+        self.assertNotIn("vulnerabilities detected", joined)
+        self.assertNotIn("JSON", joined)
 
     def test_orders_most_severe_first(self):
         c = run_check(node(container_scan=CS_MIXED), LUNAR_VAR_min_severity="high")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        msg = failure_message(c)
-        self.assertLess(msg.index("CVE-CRIT"), msg.index("CVE-HIGH"))
+        reasons = c.failure_reasons
+        # Critical sorts before high — it's the first assertion.
+        self.assertIn("CVE-CRIT", reasons[0])
+        joined = "\n".join(reasons)
+        self.assertLess(joined.index("CVE-CRIT"), joined.index("CVE-HIGH"))
 
     def test_summary_only_degrades_to_headline(self):
         c = run_check(node(container_scan=CS_SUMMARY_ONLY), LUNAR_VAR_min_severity="high")
@@ -179,13 +187,17 @@ class MaxSeverityTests(unittest.TestCase):
         # No per-finding detail available -> no enumeration, no crash.
         self.assertNotIn("* ", msg)
 
-    def test_caps_at_ten_with_more_tail(self):
+    def test_long_finding_list_emits_all_as_assertions(self):
+        # No policy-side cap: every finding is its own failing assertion; the
+        # hub truncates the display. No "+N more" / "JSON" tail, no sub-list.
         c = run_check(node(container_scan=many_findings(15)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        msg = failure_message(c)
-        self.assertEqual(msg.count("\n    * "), 11)  # 10 findings + the "+N more" tail
-        # Surface-agnostic pointer to the JSON (no internal jargon).
-        self.assertIn("+5 more (full list in the JSON)", msg)
+        reasons = c.failure_reasons
+        self.assertEqual(len(reasons), 15)
+        joined = "\n".join(reasons)
+        self.assertNotIn("more", joined)
+        self.assertNotIn("JSON", joined)
+        self.assertNotIn("\n    * ", joined)
 
     def test_no_scan_data_fails(self):
         c = run_check(node(container_scan=None))
