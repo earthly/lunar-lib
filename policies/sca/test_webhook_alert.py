@@ -391,7 +391,7 @@ class MaxSeverityAlertTests(unittest.TestCase):
             _, body = r.requests[0]
         msg = body["message"]
         self.assertIn("+5 more", msg)
-        self.assertNotIn("More details", msg)   # PR-comment-only wording
+        self.assertNotIn("More Details", msg)    # PR-comment-only navigation
         self.assertNotIn("component JSON", msg)  # internal jargon, removed
         self.assertNotIn("\n", msg)              # single-line
 
@@ -444,9 +444,9 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         msg = failure_message(c)
-        # PR-comment (multiline) tail points at the check's "More Details"
-        # expander — no internal "component JSON" jargon.
-        self.assertIn("+5 more (see More details below for full list)", msg)
+        # PR-comment (multiline) tail gives the exact click path to the full
+        # list — no internal "component JSON" jargon.
+        self.assertIn('+5 more (see "More Details" > "JSON" for full list)', msg)
         # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
         # a 4-space-indented Markdown sub-bullet under the headline.
         bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]

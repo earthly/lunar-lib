@@ -66,12 +66,13 @@ def _with_findings(headline, findings, multiline=False):
     `multiline=True` renders the findings as a Markdown sub-list — one per line,
     indented 4 spaces so they nest under the failure bullet the hub emits
     (`  * <message>`) and show as a tidy nested list in the GitHub PR comment.
-    In that form the tail points at the check's expander
-    ("+N more (see More details below for full list)"). The default single-line
-    (`; `-joined) form is used for the webhook payload's `message`, which is
-    consumed as plain text and also ships the full structured findings
-    separately — so there its tail stays a bare "+N more" (no "More details"
-    link exists on that surface to point at).
+    In that form the tail points at the check's expander with the exact click
+    path ('+N more (see "More Details" > "JSON" for full list)'). The default
+    single-line (`; `-joined) form is used for the webhook payload's `message`,
+    which is consumed as plain text and also ships the full structured findings
+    separately — so there its tail stays a bare "+N more" (the "More Details" >
+    "JSON" navigation is GitHub-PR-comment-specific and doesn't exist on that
+    surface to point at).
     """
     if not findings:
         return headline
@@ -88,11 +89,12 @@ def _with_findings(headline, findings, multiline=False):
     lines = [webhook.finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
     hidden = len(ordered) - len(lines)
     if hidden > 0:
-        # PR comment: point at the check's "More Details" expander (renders
-        # right below). Webhook: bare "+N more" — the payload already ships the
-        # full structured findings, and no such expander exists on that surface.
+        # PR comment: give the exact click path — the full list lives in the
+        # check's "More Details" > "JSON" view. Webhook: bare "+N more" — the
+        # payload already ships the full structured findings, and that
+        # GitHub-only navigation doesn't exist on that surface.
         if multiline:
-            lines.append(f"+{hidden} more (see More details below for full list)")
+            lines.append(f'+{hidden} more (see "More Details" > "JSON" for full list)')
         else:
             lines.append(f"+{hidden} more")
     if multiline:
