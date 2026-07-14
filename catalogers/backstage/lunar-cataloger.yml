@@ -94,31 +94,6 @@ inputs:
       Other kinds (User, Group, Location) are ignored.
     default: "Component,Domain"
 
-  domain_hierarchy:
-    description: |
-      How Backstage domain nesting is reflected in the Lunar catalog. Lunar
-      encodes domain hierarchy through dot-notation naming (`a.b.c` is a child
-      of `a.b`) — there is no explicit parent field — so "nesting" here means
-      the dotted key each domain is written under.
-      - `flat` — Default; unchanged behavior. Every `Domain` and `System`
-                 entity becomes a top-level domain keyed by its bare
-                 `metadata.name`. `spec.subdomainOf` and a System's
-                 `spec.domain` are ignored, so a nested Backstage taxonomy
-                 lands as unrelated flat domains.
-      - `nested` — Walk the parent chain and key each domain by its full
-                 dotted path. A `Domain` is keyed by its `spec.subdomainOf`
-                 ancestry (`grandparent.parent.name`); a `System` is nested as
-                 a subdomain of the domain it belongs to via `spec.domain`
-                 (`<domain-path>.<system-name>`); a `Component` resolves its
-                 domain to the full dotted path of its `spec.system` (or
-                 `spec.domain` when no system is set). Parent resolution only
-                 sees entities that were synced, so include every level in
-                 `entity_kinds` (e.g. `Component,Domain,System`); an
-                 unresolved parent falls back to the bare name for that hop
-                 and is logged. Opt-in because switching re-keys domains,
-                 which shifts domain-targeted policies/initiatives.
-    default: "flat"
-
   namespace:
     description: |
       Backstage namespace to query. Use `*` to query all namespaces.
