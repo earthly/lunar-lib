@@ -36,8 +36,8 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Grype executions in CI; routes image scans (`grype <image>`) to `.container_scan` and dir/SBOM scans to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
-| `container-scan` | after-json | Scans the just-**pushed** image **synchronously at publish time**: fires once the docker collector has recorded the CI docker commands (`.containers.native.docker.cicd.cmds[]`), resolves the pushed image, scans it in the Grype collector image, and writes `.container_scan` (`integration: "after-json"`) |
-| `container-rescan` | cron | Scheduled complement to `container-scan`: re-scans the most recently **pushed** image on a tick so an already-shipped image is re-evaluated against CVEs disclosed since it was built. Same resolution + scan, `integration: "cron"` |
+| `container-scan` | after-json | Automatically scans the image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`), as soon as it's published — resolves it, pulls it, scans it, writes `.container_scan` |
+| `container-rescan` | cron | Re-scans the most recently **pushed** image on a schedule, so an already-shipped image is re-checked against CVEs disclosed since it was built |
 
 ## Installation
 
@@ -113,8 +113,8 @@ maintains history — the on-push `auto` scan ignores these inputs.
 **Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Three sub-collectors feed it, and — crucially — **none installs Grype (or its ~1.7GB vulnerability DB) in your pipeline**:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `grype <image>` itself, that scan is captured to `.container_scan` automatically. A `grype dir:`/`sbom:` scan still routes to `.sca`. No install, no extra config.
-- **`container-scan`** *(on-push)* — scans the image **the moment its push is recorded**. It hooks `after-json` on `.containers.native.docker.cicd.cmds`, so once a component's collection settles with the docker collector's CI commands present, Lunar resolves the most recently **pushed** image (the latest `docker push`, or a `--push` build), pulls it, and scans it — no schedule lag between shipping and scanning. Stamped `integration: "after-json"`.
-- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that same shipped image on a tick, so an already-published image is re-evaluated against CVEs **disclosed after it was built**. Resolving from *pushes* (`.containers.native.docker.cicd.cmds[]`) rather than `.containers.builds[]` means a built-but-never-pushed (test/dry-run) image isn't scanned.
+- **`container-scan`** *(on-push)* — automatically scans the image the moment it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so when the docker collector records a pushed image, Lunar resolves it, pulls it, and scans it — no schedule lag.
+- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that shipped image on a tick, catching CVEs **disclosed after it was built**. Resolves from *pushes* (`.containers.native.docker.cicd.cmds[]`), not `.containers.builds[]`, so a built-but-never-pushed image isn't scanned.
 
 All three run **in the Grype collector image, where the vulnerability DB is already baked in** — Lunar scans the shipped image *itself* with no install on your side. (No push recorded → nothing to scan; the sub-collector skips. Use the `container_image` input to pin an image explicitly.) Enable the [`docker`](../docker) collector alongside this one so its CI `docker push` commands are recorded:
 
