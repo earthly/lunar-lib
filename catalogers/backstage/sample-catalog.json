@@ -133,6 +133,77 @@
     },
     {
       "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Domain",
+      "metadata": {
+        "name": "commerce",
+        "namespace": "default",
+        "description": "Commerce bounded context"
+      },
+      "spec": {
+        "owner": "group:default/commerce-leads"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Domain",
+      "metadata": {
+        "name": "checkout",
+        "namespace": "default",
+        "description": "Checkout subdomain"
+      },
+      "spec": {
+        "owner": "group:default/team-checkout",
+        "subdomainOf": "domain:default/commerce"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Domain",
+      "metadata": {
+        "name": "orders",
+        "namespace": "default",
+        "description": "Orders subdomain"
+      },
+      "spec": {
+        "owner": "group:default/team-orders",
+        "subdomainOf": "domain:default/checkout"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "System",
+      "metadata": {
+        "name": "fulfillment",
+        "namespace": "default",
+        "description": "Fulfillment system"
+      },
+      "spec": {
+        "owner": "group:default/team-orders",
+        "domain": "domain:default/orders"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "fulfillment-api",
+        "namespace": "default",
+        "annotations": {
+          "github.com/project-slug": "acme/fulfillment-api"
+        },
+        "tags": [
+          "nested"
+        ]
+      },
+      "spec": {
+        "type": "service",
+        "lifecycle": "production",
+        "owner": "group:default/team-orders",
+        "system": "fulfillment"
+      }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
       "kind": "User",
       "metadata": {
         "name": "jane",
