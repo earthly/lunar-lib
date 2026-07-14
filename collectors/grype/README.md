@@ -36,7 +36,8 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Grype executions in CI; routes image scans (`grype <image>`) to `.container_scan` and dir/SBOM scans to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
-| `container-rescan` | cron | Scans the most recently **pushed** image (resolved from the docker collector's recorded `docker push` / `--push` commands) in the Grype collector image on a schedule and writes `.container_scan` |
+| `container-scan` | after-json | Scans the just-**pushed** image **synchronously at publish time**: fires once the docker collector has recorded the CI docker commands (`.containers.native.docker.cicd.cmds[]`), resolves the pushed image, scans it in the Grype collector image, and writes `.container_scan` (`integration: "after-json"`) |
+| `container-rescan` | cron | Scheduled complement to `container-scan`: re-scans the most recently **pushed** image on a tick so an already-shipped image is re-evaluated against CVEs disclosed since it was built. Same resolution + scan, `integration: "cron"` |
 
 ## Installation
 
@@ -109,12 +110,13 @@ policy evaluation — `.sca` behaves identically whether history is on or off.
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
 maintains history — the on-push `auto` scan ignores these inputs.
 
-**Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Two sub-collectors feed it, neither of which requires the (not-yet-shipped) collector-dependency feature, and — crucially — **neither installs Grype (or its ~1.7GB vulnerability DB) in your pipeline**:
+**Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Three sub-collectors feed it, and — crucially — **none installs Grype (or its ~1.7GB vulnerability DB) in your pipeline**:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `grype <image>` itself, that scan is captured to `.container_scan` automatically. A `grype dir:`/`sbom:` scan still routes to `.sca`. No install, no extra config.
-- **`container-rescan`** *(auto-scan)* — a daily cron that resolves the most recently **pushed** image from the [`docker`](../docker) collector's recorded commands (`.containers.native.docker.cicd.cmds[]` — the latest `docker push`, or a `--push` build) via `lunar component get-json`, then pulls and scans it **in the Grype collector image, where the vulnerability DB is already baked in**. Resolving from *pushes* rather than `.containers.builds[]` means a built-but-never-pushed (test/dry-run) image isn't scanned. This is how Lunar scans the shipped image *itself* with no install on your side, and it re-evaluates that image against CVEs published after it was built. (No push recorded → nothing to scan; the cron skips. Use the `container_image` input to pin an image explicitly.)
+- **`container-scan`** *(on-push)* — scans the image **the moment its push is recorded**. It hooks `after-json` on `.containers.native.docker.cicd.cmds`, so once a component's collection settles with the docker collector's CI commands present, Lunar resolves the most recently **pushed** image (the latest `docker push`, or a `--push` build), pulls it, and scans it — no schedule lag between shipping and scanning. Stamped `integration: "after-json"`.
+- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that same shipped image on a tick, so an already-published image is re-evaluated against CVEs **disclosed after it was built**. Resolving from *pushes* (`.containers.native.docker.cicd.cmds[]`) rather than `.containers.builds[]` means a built-but-never-pushed (test/dry-run) image isn't scanned.
 
-Because the cron reads already-persisted Component JSON (not another collector's output mid-run), it needs no collector-dependency feature. Enable the `docker` collector alongside this one so its CI `docker push` commands are recorded:
+All three run **in the Grype collector image, where the vulnerability DB is already baked in** — Lunar scans the shipped image *itself* with no install on your side. (No push recorded → nothing to scan; the sub-collector skips. Use the `container_image` input to pin an image explicitly.) Enable the [`docker`](../docker) collector alongside this one so its CI `docker push` commands are recorded:
 
 ```yaml
 collectors:
@@ -124,7 +126,7 @@ collectors:
     on: ["domain:your-domain"]
 ```
 
-> A synchronous **on-push** auto-scan (scan the image the moment it's built, and only if CI didn't already) needs the component-JSON dependency feature — it follows once that lands.
+> **On-push scanning requires a Hub with the `after-json` collector hook.** The `cicd` and `container-rescan` sub-collectors work on any Hub; `container-scan` needs the `after-json` hook. On a Hub without it, keep the scheduled `container-rescan` for image coverage and `exclude: [container-scan]`.
 
 **Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
 
