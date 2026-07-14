@@ -91,20 +91,15 @@ collectors:
   - name: container-scan
     description: |
       Automatically scans the container image this component published, as soon
-      as it's detected. Hooks after-json on the docker collector's record of the
-      pushed image (.containers.native.docker.cicd.cmds[]): resolves the pushed
-      image, pulls it, scans it with Grype, and writes .container_scan. No push
-      recorded → nothing to scan. Override the image with the `container_image`
-      input.
+      as it's detected. Via the after-json hook, resolves the pushed image from
+      the docker collector's record (.containers.native.docker.cicd.cmds[]) and
+      scans it with Grype into .container_scan.
     mainBash: container-rescan.sh
-    # after-json fires at the hub doneness gate once collection has settled and
-    # the path below is present — i.e. after the docker collector recorded the
-    # push. Runs in the Grype collector image (not native): pulls + scans an
-    # image and reads the merged Component JSON, no repo clone or CI context.
+    # Fires at the doneness gate once .containers.native.docker.cicd.cmds is
+    # present. Runs in the collector image (not native), reads merged Component JSON.
     runs_on: [default-branch]
     hook:
       type: after-json
-      # The docker collector's recorded CI commands — holds any docker push / --push.
       path: .containers.native.docker.cicd.cmds
     keywords: ["grype", "container scan", "image scan", "after-json", "on-push", "cve", "vulnerability"]
 
@@ -172,12 +167,9 @@ inputs:
     default: "false"
   container_image:
     description: |
-      Override the image reference the container scans resolve (both the on-push
-      container-scan and the container-rescan cron). By default they derive the
-      image from what the component most recently pushed — the latest
-      `docker push` (or `--push` build) in .containers.native.docker.cicd.cmds[]
-      (recorded by the docker collector). Set this to pin a specific image, e.g.
-      "ghcr.io/acme/app:latest".
+      Pin the image the container scans (container-scan + container-rescan) scan.
+      Default: the most recently pushed image in .containers.native.docker.cicd.cmds[]
+      (recorded by the docker collector). e.g. "ghcr.io/acme/app:latest".
     default: ""
 
 secrets:
