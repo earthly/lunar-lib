@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture. These checks apply to repositories that use Backstage as their service catalog and must be paired with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The two referential-integrity checks (`domain-exists`, `system-exists`) confirm the declared domain and system actually exist in Backstage, and stay pending until the collector is configured with a `backstage_url`.
+The five core checks fail when no `catalog-info.yaml` is present. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The two referential-integrity checks (`domain-exists`, `system-exists`) confirm the declared domain and system actually exist in Backstage; they are opt-in too — skipped (and passing) until the collector is configured with a `backstage_url`, so simply enabling them without the collector configured never turns a component red.
 
 ## Policies
 
@@ -40,10 +40,11 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 | `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
 | `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
-| `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` for `spec.domain`; read by `domain-exists` |
-| `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` for `spec.system`; read by `system-exists` |
+| `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; both RI checks skip (pass) when absent |
+| `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }` on a transient lookup failure) for `spec.domain`; read by `domain-exists` |
+| `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`; read by `system-exists` |
 
-**Note:** Ensure the `backstage` collector is configured before enabling this policy. The `domain-exists` and `system-exists` checks additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they stay **pending** because referential integrity cannot be verified.
+**Note:** Ensure the `backstage` collector is configured before enabling this policy. The `domain-exists` and `system-exists` checks additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they **skip (and pass)** rather than fail, since referential integrity cannot be verified. (A durable "pending" state isn't available — post-collection the SDK resolves a data-less check to fail/error, not pending — so these checks skip to pass when unverified, mirroring the opt-in `required-*` / `disallowed-*` checks.)
 
 ## Installation
 
@@ -152,16 +153,21 @@ Remove the `backstage.io/source-location` annotation and `required-annotations` 
 
 ### Referential integrity: domain-exists and system-exists
 
-These checks read the `.refs` block the `backstage` collector writes when it is configured with a `backstage_url`. Here the declared domain resolves in Backstage but the system is a typo that does not:
+These checks read the `.refs` block the `backstage` collector writes when it is configured with a `backstage_url`. The `.refs.checked` marker (always written when the collector is configured) is what lets the checks tell "configured" from "not configured."
+
+> **Which check fires depends on the entity kind.** In Backstage, `spec.system` lives on `Component` entities and `spec.domain` lives on `System` entities. So `system-exists` is the everyday check (the common one-`Component`-per-repo case), while `domain-exists` only does work when the repo's `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). Each check passes silently when its reference isn't declared.
+
+**Component → system.** The declared system is a typo that doesn't resolve in Backstage:
 
 ```json
 {
   "catalog": {
     "native": {
       "backstage": {
-        "spec": { "domain": "payments", "system": "typo-platform" },
+        "kind": "Component",
+        "spec": { "system": "typo-platform" },
         "refs": {
-          "domain": { "name": "payments", "exists": true },
+          "checked": true,
           "system": { "name": "typo-platform", "exists": false }
         }
       }
@@ -170,7 +176,36 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 }
 ```
 
-`domain-exists` **passes** (`payments` exists in Backstage). `system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. When a component declares no `spec.domain` / `spec.system`, the corresponding check **passes** (nothing to cross-reference). When the collector has no `backstage_url` configured, `.refs` is absent and both checks are **pending** — referential integrity could not be verified — rather than failing.
+`system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. `domain-exists` **passes** — no `spec.domain` is declared on this Component, so there's nothing to cross-reference.
+
+**System → domain.** A `kind: System` catalog file whose declared domain does resolve:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "kind": "System",
+        "spec": { "domain": "payments" },
+        "refs": {
+          "checked": true,
+          "domain": { "name": "payments", "exists": true }
+        }
+      }
+    }
+  }
+}
+```
+
+`domain-exists` **passes** (`payments` exists in Backstage).
+
+**Not configured / transient outage — both skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and both checks **skip (pass)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:
+
+```json
+{ "catalog": { "native": { "backstage": {
+  "refs": { "checked": true, "system": { "name": "payment-platform", "error": "502 Bad Gateway" } }
+} } } }
+```
 
 ## Remediation
 

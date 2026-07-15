@@ -21,16 +21,20 @@ When a catalog-info file is found, this collector writes to the following Compon
 | `.catalog.native.backstage.kind` | string | Entity kind (e.g. `Component`, `System`, `API`) |
 | `.catalog.native.backstage.metadata` | object | Raw `metadata` block (`name`, `description`, `annotations`, `tags`, etc.) |
 | `.catalog.native.backstage.spec` | object | Raw `spec` block (`type`, `owner`, `lifecycle`, `system`, `providesApis`, `consumesApis`, `dependsOn`, etc.) |
-| `.catalog.native.backstage.refs` | object | Referential-integrity results; written only when `backstage_url` is configured |
-| `.catalog.native.backstage.refs.domain` | object | `{ name, exists }` for the declared `spec.domain` — present only when a domain is declared and the lookup resolved |
-| `.catalog.native.backstage.refs.system` | object | `{ name, exists }` for the declared `spec.system` — same semantics as `refs.domain` |
+| `.catalog.native.backstage.refs` | object | Referential-integrity results; written (as an object) only when `backstage_url` is configured |
+| `.catalog.native.backstage.refs.checked` | boolean | `true` whenever `backstage_url` is set — the "referential integrity ran" signal the policy keys off to distinguish *configured* from *not configured* |
+| `.catalog.native.backstage.refs.domain` | object | For the declared `spec.domain`: `{ name, exists }` when the lookup resolved (200/404), or `{ name, error }` on a transient failure. Absent when no domain is declared |
+| `.catalog.native.backstage.refs.system` | object | For the declared `spec.system` — same semantics as `refs.domain` |
 
 **Referential integrity.** When `backstage_url` is set, the collector resolves each declared grouping reference against the Backstage catalog API (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and records the outcome under `.refs`. The `<namespace>` is taken from the reference itself — a qualified ref (`ns/name`) carries its own, otherwise the component's own `metadata.namespace` is used, falling back to `default`, so there is no namespace input to configure:
 
-- `spec.domain` → `.refs.domain = { "name": "<value>", "exists": <bool> }`
-- `spec.system` → `.refs.system = { "name": "<value>", "exists": <bool> }`
+- `.refs.checked = true` — always written when `backstage_url` is set, regardless of what (if anything) is declared. This is the signal the policy uses to tell "collector configured" from "not configured."
+- `spec.domain` → `.refs.domain = { "name": "<value>", "exists": <bool> }` on a definitive lookup, or `{ "name": "<value>", "error": "<reason>" }` on a transient failure.
+- `spec.system` → `.refs.system` — same shape and semantics as `refs.domain`.
 
-`exists` is `true` on a `200` (the entity was found) and `false` on a `404` (declared but missing). An entry is recorded only when the reference is declared **and** the lookup returns a definitive `200`/`404`. On a transient error (timeout, `5xx`), or when `backstage_url` is unset, the corresponding `.refs` entry is omitted — so downstream checks pend rather than fail on a false negative. The `backstage` policy's `domain-exists` and `system-exists` checks consume these fields.
+`exists` is `true` on a `200` (the entity was found) and `false` on a `404` (declared but missing). A per-reference entry is written only when that reference is **declared**; an undeclared ref has no entry. On a transient error (timeout, `5xx`) the entry is written with an `error` field instead of `exists`, so a Backstage outage stays distinguishable from a real miss — the policy skips (passes) an errored ref rather than failing it. When `backstage_url` is unset, `.refs` is not written at all (no `checked` marker), and the policy's referential-integrity checks skip (pass) because there is nothing to verify. The `backstage` policy's `domain-exists` and `system-exists` checks consume these fields.
+
+> **Backstage entity model.** In Backstage, `spec.system` lives on `Component` entities (a component belongs to a system) while `spec.domain` lives on `System` entities (a system belongs to a domain). So `system-exists` is the check that fires for the common one-`Component`-per-repo case, and `domain-exists` applies to repos whose `catalog-info.yaml` is itself a `kind: System` (or a `Component` that carries a custom `spec.domain`). Each check only does work when its reference is actually declared.
 
 ## Collectors
 
