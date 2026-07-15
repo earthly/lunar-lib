@@ -9,6 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ArgoCD GitOps guardrail set — three collectors and two policies over a
+  normalized `.cd.gitops` view: `argocd` (beta) parses and
+  kubeconform-validates argoproj CRDs (Application / ApplicationSet /
+  AppProject); `argocd-deployment-tracking` (experimental) correlates each
+  Application to the service it deploys and records that service's deployment
+  posture out-of-band; `argocd-deployment-gate` (experimental) pulls the posture
+  back for PR-time enforcement (mapping defaults to a cataloger-set meta
+  annotation, with Backstage `catalog-info` opt-in). Adds the tool-agnostic
+  `gitops` policy and the ArgoCD-specific `argocd` policy. Push and pull are
+  mutually exclusive per service (#218).
+
+### Changed
+
+- `backstage` cataloger: switch to the `/catalog/entities/by-query` endpoint
+  with cursor pagination, paging through large catalogs instead of issuing a
+  single unpaginated request (#240).
+
+## [1.7.0] — 2026-07-07
+
+### Added
+
+- `trivy` and `grype` collectors: container-image vulnerability scanning. A new
+  `container-rescan` sub-collector resolves the most recently shipped image
+  (from a `docker push` / `--push` build recorded in
+  `.containers.native.docker.cicd.cmds[]`), then pulls and scans it inside the
+  collector's baked-DB image (daemonless), normalizing results to
+  `.container_scan`. The `cicd` sub-collector now also routes a user's own
+  `trivy image` / `grype <ref>` runs to `.container_scan` (while `fs`/`dir:`/
+  `sbom:` scans still feed `.sca`). Feeds the existing `container-scan` policy,
+  whose `max-severity` check now lists the offending packages/CVEs. Registry
+  auth via the `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` secrets (#221).
+- `backstage` cataloger: new input to configure the Backstage API path prefix
+  instead of hard-coding it (#236).
+
+### Changed
+
+- `trivy` collector: the scan sub-collectors now declare `size: large` (#235).
+
+### Fixed
+
+- Collector-backed presence checks (seven `ai/*` checks and two `git/*` checks)
+  now PEND instead of FAIL while collection is still in flight. They gate on
+  `node.exists()` (the pattern the `vcs` checks already use), so a missing value
+  pends during the collection interim and only fails once collection has
+  genuinely finished — eliminating the spurious FAILs that appeared on in-flight
+  PRs and then flipped to pass/pending (#230).
+
+## [1.6.0] — 2026-07-02
+
+### Added
+
+- `github-org` cataloger: new `default_domain` fallback input and GitHub
+  Enterprise Server support (#220).
 - `backstage-catalog-info` cataloger: new `augment-on-commit` sub-cataloger — a
   commit-triggered companion to the scheduled `augment`. Runs on the
   `component-repo` hook (`clone-code: true`) so it refreshes a component's
@@ -16,12 +69,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `catalog-info.yaml` from the checkout. Shares the parse/match/transform/write
   pipeline with `augment` via `helpers.sh`; enable either or both with `include`
   (#212).
+- `backstage-catalog-info` cataloger: new `meta_annotations` input — maps
+  selected `catalog-info.yaml` annotations onto the Lunar component `meta`
+  field. Defaults to `pagerduty.com/service-id=pagerduty/service-id`, so the
+  `pagerduty` collector (and the `oncall` guardrails) discover a component's
+  PagerDuty service straight from the annotation PagerDuty's Backstage
+  integration guide recommends — no per-component config. Accepts multiple
+  `<annotation>=<meta-key>` pairs for other collectors; set empty to disable.
+  (#224)
 - `backstage-catalog-info` cataloger: new `default_domain` input — assigns a
   fallback domain (written verbatim, with a matching stub `.domains` entry) to
   components whose `catalog-info.yaml` resolves to no domain via
   `domain_annotation`, `spec.domain`, or `spec.system`. Mirrors the existing
   `default_owner` fallback and never overrides a domain the file already
   provides (#223).
+- `backstage` policy: new required/disallowed annotation checks and tag-pattern
+  checks (#222).
+- `pagerduty` collector: opt-in Backstage discovery of the service ID from
+  `catalog-info.yaml` (#225).
+
+### Changed
+
+- `grype` collector: declares `size: large`; `db_auto_update` stays `false` by
+  default until a size-aware Hub ships (#210, #229).
+- Language policies now gate on project detection, while CI minimum-version
+  checks stay ungated (#209).
+- `sca` policy: the `max-severity` failure text drops the webhook mention and
+  lists the offending findings (#214).
+- Lint: block dev/personal `earthly/lunar-lib` image tags in manifests (#211).
 
 ### Fixed
 
@@ -40,6 +115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tag_prefix` now disables the topic prefix instead of being silently replaced
   with the `gh-` default (`${VAR:-gh-}` treats empty and unset alike). The input
   is now documented as "empty string disables the prefix" (#228).
+- `github` collector (branch-protection): don't fail open to `enabled=false` on
+  transient API errors (#215).
 
 ## [1.5.0] — 2026-06-17
 
@@ -253,7 +330,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/earthly/lunar-lib/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/earthly/lunar-lib/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/earthly/lunar-lib/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/earthly/lunar-lib/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/earthly/lunar-lib/compare/v1.2.0...v1.3.0

@@ -30,6 +30,12 @@ collectors:
       using Trivy. Writes normalized findings to .sca with severity counts,
       CVE IDs, affected packages, and fix versions.
     mainBash: auto.sh
+    # trivy fs materializes the vulnerability DB and scans the cloned repo, whose
+    # combined footprint overruns the default (medium) 1Gi ephemeral-storage limit
+    # and gets the pod evicted (ENG-1127). large raises the ephemeral limit to 4Gi.
+    # Mirrors the sibling grype collector, which declares large for the same reason.
+    # Requires a Hub honoring size (ENG-983).
+    size: large
     hook:
       type: code
     keywords: ["trivy", "vulnerability", "cve", "sca", "dependency scanning", "auto"]
@@ -38,12 +44,16 @@ collectors:
     description: |
       Detects Trivy executions in CI pipelines. Captures the command,
       version, and input arguments for audit and compliance tracking.
+      Routes results by scan type: an image scan (`trivy image <ref>`) is
+      normalized to .container_scan, while a filesystem scan (`trivy fs`)
+      stays in .sca — so a container scan already running in your pipeline
+      is collected automatically with no extra configuration.
     mainBash: cicd.sh
     hook:
       type: ci-after-command
       binary:
         name: trivy
-    keywords: ["trivy", "ci", "cicd", "command detection", "audit"]
+    keywords: ["trivy", "ci", "cicd", "command detection", "audit", "container scan", "image scan"]
 
   - name: rescan
     description: |
@@ -52,7 +62,18 @@ collectors:
       first scanned — closing the gap where a branch passes at scan time but a
       dependency picks up a new CVE later. Runs the same scan as the `auto`
       collector (the sibling auto.sh) in the Trivy collector image.
+
+      Opt-in scan history: with scan_history_size > 0 the re-scan first snapshots
+      the current .sca (counts + summary + source, including the scan timestamp)
+      into a bounded .sca.history[] array before overwriting .sca, preserving
+      point-in-time scan results for audit. The SCA policy keeps reading the
+      current .sca and behaves identically whether history is on or off. Default
+      0 keeps today's overwrite-only behavior — no history, no schema change for
+      existing consumers.
     mainBash: auto.sh
+    # Same scan as `auto` (the sibling auto.sh), so the same large profile for the
+    # vulnerability-DB + repo disk footprint that overruns the default 1Gi limit.
+    size: large
     # Cron-only sub-collector: set runs_on here, on the sub-collector. The cron
     # self-default ([default-branch]) blocks runs_on inheritance from a
     # consumer's `uses:` line, so the import line cannot toggle this — the value
@@ -65,13 +86,80 @@ collectors:
       clone-code: true
     keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
 
+  - name: container-rescan
+    description: |
+      Re-scans the most recently shipped container image on a schedule. Resolves
+      the image from what the component actually pushed — the most recent
+      `docker push` (or `--push` build) in the docker collector's recorded
+      commands (.containers.native.docker.cicd.cmds[]), read via `lunar component
+      get-json`. That's already-persisted data, so no collector dependency is
+      required. Pulls the image, scans it with Trivy, and overwrites
+      .container_scan so a shipped image is re-evaluated against CVEs published
+      after it was built. Override with the `container_image` input. No code
+      clone needed.
+    mainBash: container-rescan.sh
+    # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
+    # the .sca `rescan` collector). Default-branch only — one re-scan per
+    # component per tick. Offset to 03:00 so it doesn't pile onto the .sca
+    # rescan at 02:00.
+    runs_on: [default-branch]
+    hook:
+      type: cron
+      schedule: "0 3 * * *"  # Human-readable: daily at 03:00 UTC (>= 10-min collector floor)
+      clone-code: false      # reads component JSON + pulls the image; no repo clone needed
+    keywords: ["trivy", "container scan", "image scan", "cron rescan", "cve", "vulnerability"]
+
+inputs:
+  scan_history_size:
+    description: |
+      Maximum number of prior SCA scans to retain in .sca.history[] on each cron
+      re-scan. Snapshots are ordered oldest-first and the current scan stays in
+      the main .sca fields, so the SCA policy is unaffected. Each entry carries
+      its own source (integration + collected_at), so the release-time scan is
+      identifiable as the integration="code" entry — that's .sca.history[0] when
+      history is enabled from the component's first scan (the intended setup for
+      release-time audit). Enabling it later on a component that has already been
+      re-scanned captures the current .sca as the oldest entry, since the
+      release-time scan was already overwritten. 0 (default) disables history
+      entirely — .sca is overwritten each run exactly as today and no
+      .sca.history is written, so existing consumers see no change. When the cap
+      is reached the oldest entry (index 0) is preserved and the second-oldest is
+      dropped. Only the rescan (cron) sub-collector maintains history; the
+      on-push auto scan ignores this.
+    default: "0"
+  max_rescans:
+    description: |
+      Stop re-scanning a component after this many scheduled re-scans; 0
+      (default) means unlimited. Counted independently via .sca.rescan_count (a
+      monotonic tally of completed re-scans), so it stands alone and does not
+      depend on scan_history_size — scan_history_size bounds how many scans you
+      KEEP, max_rescans bounds how many you RUN. Once the limit is reached the
+      cron skips the component, keeping the last scan and its history.
+    default: "0"
+  container_image:
+    description: |
+      Override the image reference the container-rescan cron scans. By default
+      the cron derives the image from the component's most recent
+      .containers.builds[] entry (populated by the docker collector). Set this
+      to pin a specific image, e.g. "ghcr.io/acme/app:latest".
+    default: ""
+
+secrets:
+  REGISTRY_USERNAME:
+    description: Username for pulling private container images in the container-rescan cron. Optional — public images need no auth. REGISTRY_USER is accepted as an alias.
+  REGISTRY_USER:
+    description: Alias for REGISTRY_USERNAME (common registry/CI convention). Optional; used only when REGISTRY_USERNAME is unset.
+  REGISTRY_PASSWORD:
+    description: Password or token for pulling private container images in the container-rescan cron. Optional.
+
 example_component_json: |
   {
     "sca": {
       "source": {
         "tool": "trivy",
         "version": "0.69.3",
-        "integration": "code"
+        "integration": "cron",
+        "collected_at": "2026-07-08T02:00:07Z"
       },
       "vulnerabilities": {
         "critical": 0,
@@ -97,6 +185,19 @@ example_component_json: |
         "has_high": true,
         "all_fixable": true
       },
+      "history": [
+        {
+          "source": {"tool": "trivy", "version": "0.69.3", "integration": "code", "collected_at": "2026-07-01T02:00:11Z"},
+          "vulnerabilities": {"critical": 0, "high": 1, "medium": 5, "low": 3, "total": 9},
+          "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
+        },
+        {
+          "source": {"tool": "trivy", "version": "0.69.3", "integration": "cron", "collected_at": "2026-07-05T02:00:09Z"},
+          "vulnerabilities": {"critical": 0, "high": 2, "medium": 5, "low": 3, "total": 10},
+          "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
+        }
+      ],
+      "rescan_count": 2,
       "native": {
         "trivy": {
           "cicd": {
@@ -130,6 +231,51 @@ example_component_json: |
                 ]
               }
             ]
+          }
+        }
+      }
+    },
+    "container_scan": {
+      "source": {
+        "tool": "trivy",
+        "version": "0.69.3",
+        "integration": "ci"
+      },
+      "image": "myregistry.io/app:v1.2.3",
+      "os": {
+        "family": "alpine",
+        "version": "3.19"
+      },
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 1,
+        "medium": 4,
+        "low": 7,
+        "total": 12
+      },
+      "findings": [
+        {
+          "severity": "high",
+          "package": "libssl3",
+          "version": "3.1.4-r5",
+          "ecosystem": "alpine",
+          "cve": "CVE-2024-2511",
+          "title": "OpenSSL unbounded memory growth in TLSv1.3 session handling",
+          "fix_version": "3.1.4-r6",
+          "fixable": true
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true,
+        "all_fixable": true
+      },
+      "native": {
+        "trivy": {
+          "results": {
+            "SchemaVersion": 2,
+            "ArtifactName": "myregistry.io/app:v1.2.3",
+            "ArtifactType": "container_image"
           }
         }
       }

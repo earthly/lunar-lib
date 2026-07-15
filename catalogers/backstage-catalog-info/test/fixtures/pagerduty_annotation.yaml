@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  description: Payment processing API
+  annotations:
+    github.com/project-slug: acme/payment-api
+    pagerduty.com/service-id: PABC123
+    pagerduty.com/integration-key: 0123456789abcdef0123456789abcdef
+  tags:
+    - payments
+    - tier1
+spec:
+  type: service
+  owner: group:default/team-payments
+  lifecycle: production
+  domain: platform.payments

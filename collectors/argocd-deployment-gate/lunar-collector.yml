@@ -1,0 +1,111 @@
+version: 0
+
+name: argocd-deployment-gate
+description: Pulls a service's ArgoCD deployment posture from a central GitOps component onto the service's own Component JSON so guardrails gate at PR time
+
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "ArgoCD Deployment Gate Collector"
+  long_description: |
+    Pulls a service's ArgoCD deployment posture from a central GitOps component
+    onto its own component at the collected sha, so policies gate at PR time. The
+    GitOps mapping defaults to a cataloger-set meta annotation (catalog-info
+    opt-in). Use this or argocd-deployment-tracking per service, not both.
+  categories: ["ci-cd", "orchestration"]
+  icon: "assets/argocd.svg"
+  status: "experimental"
+  related:
+    - slug: "argocd"
+      type: "collector"
+      reason: "Validates the ArgoCD resources in the GitOps repo this collector pulls from"
+    - slug: "argocd-deployment-tracking"
+      type: "collector"
+      reason: "The push counterpart — use one or the other per service, not both"
+    - slug: "gitops"
+      type: "policy"
+      reason: "Gates the pulled deployment posture at PR time"
+
+collectors:
+  - name: gate
+    description: |
+      Runs on a SERVICE repo and materializes that service's ArgoCD deployment
+      posture onto its own Component JSON. Resolves which GitOps component +
+      Application(s) to pull from — by default — the component's
+      `argocd/gitops-component` (+ `argocd/application`) meta annotations,
+      typically set by a company-specific cataloger via
+      `lunar catalog component --meta argocd/gitops-component <id>`; falls back
+      to the explicit gitops_component / application inputs, and optionally to
+      Backstage catalog-info.yaml annotations when catalog_info_paths is set.
+      Pulls the matching Application(s) from the GitOps component via
+      `lunar component get-json` and writes them at the sha being collected
+      (including a PR head sha), so the gitops/argocd policies gate it at PR
+      time. Skips when no mapping is found.
+    mainBash: link_pull.sh
+    hook:
+      type: code
+    keywords: ["argocd", "gitops", "cross-component", "get-json", "pull", "pr enforcement", "deployment posture", "catalog-info", "continuous delivery"]
+
+inputs:
+  gitops_component:
+    description: >
+      GitOps component id to pull the deployment posture from. Optional if the
+      component has an `argocd/gitops-component` meta annotation set by a cataloger.
+    default: ""
+  application:
+    description: >
+      ArgoCD Application name(s) to pull, comma-separated. Optional; defaults to the
+      `argocd/application` meta annotation, or every app the GitOps component holds
+      when neither is set.
+    default: ""
+  catalog_info_paths:
+    description: >
+      Opt-in: comma-separated Backstage catalog-info file paths to read the mapping
+      from (first match wins). Empty (default) uses the component meta annotation
+      instead. Set e.g. "catalog-info.yaml,catalog-info.yml" to enable.
+    default: ""
+  gitops_component_annotation:
+    description: catalog-info annotation key carrying the GitOps component id (only used when catalog_info_paths is set).
+    default: "lunar.earthly.dev/gitops-component"
+  application_annotation:
+    description: catalog-info annotation key carrying the ArgoCD Application name(s) (only used when catalog_info_paths is set).
+    default: "lunar.earthly.dev/argocd-application"
+
+example_component_json: |
+  {
+    "cd": {
+      "gitops": {
+        "source": {
+          "tool": "argocd",
+          "integration": "pull",
+          "pulled_from": "github.com/org/gitops"
+        },
+        "applications": [
+          {
+            "name": "payment-api",
+            "path": "apps/payment-api.yaml",
+            "valid": true,
+            "kind": "Application",
+            "project": "platform",
+            "sync_policy": {
+              "automated": true,
+              "prune": true,
+              "self_heal": true
+            },
+            "destination": {
+              "server": "https://kubernetes.default.svc",
+              "namespace": "payments"
+            },
+            "source_ref": {
+              "repoURL": "https://github.com/org/gitops.git",
+              "path": "payment-api",
+              "targetRevision": "HEAD"
+            },
+            "images": ["myregistry.io/payment-api"]
+          }
+        ]
+      }
+    }
+  }

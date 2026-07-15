@@ -1,10 +1,16 @@
 VERSION 0.8
 
-# Unit tests for the backstage policy checks. Wired into the root +test target.
+# Unit tests for the backstage policy checks, including the typed value
+# constraints on required-annotations. The constraint parser shells out to yq
+# (present in the lunar-scripts runtime image), so the test image installs it
+# too for parity. Wired into the root +test target.
 # (No image: target — the backstage policy runs on the shared base image.)
 test:
     FROM python:3.12-alpine
     WORKDIR /workspace
+    ARG TARGETARCH
+    RUN wget -q https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${TARGETARCH} -O /usr/local/bin/yq \
+        && chmod +x /usr/local/bin/yq
     COPY requirements.txt .
     RUN pip install --no-cache-dir -r requirements.txt
     COPY *.py .

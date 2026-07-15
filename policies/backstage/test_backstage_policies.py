@@ -29,6 +29,12 @@ check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
 check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
 
+from constraints import (
+    parse_required_annotations,
+    validate_value,
+    ConstraintConfigError,
+)
+
 
 @contextmanager
 def policy_vars(**kwargs):
@@ -337,6 +343,245 @@ class TestSystemExists(unittest.TestCase):
                 )
             )
         )
+
+
+class TestConstraintParsing(unittest.TestCase):
+    """Parsing the required_annotations input into normalized entries."""
+
+    def test_empty_is_no_entries(self):
+        self.assertEqual(parse_required_annotations(""), [])
+        self.assertEqual(parse_required_annotations("   "), [])
+
+    def test_legacy_comma_string_is_presence_only(self):
+        entries = parse_required_annotations("a.io/one, b.io/two")
+        self.assertEqual(entries, [
+            {"key": "a.io/one", "constraints": {}},
+            {"key": "b.io/two", "constraints": {}},
+        ])
+
+    def test_single_bare_key(self):
+        self.assertEqual(
+            parse_required_annotations("backstage.io/source-location"),
+            [{"key": "backstage.io/source-location", "constraints": {}}],
+        )
+
+    def test_yaml_list_mixed_bare_and_typed(self):
+        raw = (
+            "- key: example.com/service-tier\n"
+            "  type: integer\n"
+            "  min: 0\n"
+            "  max: 5\n"
+            "- backstage.io/source-location\n"
+        )
+        entries = parse_required_annotations(raw)
+        self.assertEqual(entries[0]["key"], "example.com/service-tier")
+        self.assertEqual(entries[0]["constraints"],
+                         {"type": "integer", "min": 0, "max": 5})
+        self.assertEqual(entries[1], {"key": "backstage.io/source-location",
+                                      "constraints": {}})
+
+    def test_invalid_yaml_is_misconfig(self):
+        with self.assertRaises(ConstraintConfigError):
+            parse_required_annotations("- key: x\n bad: [unclosed\n")
+
+    def test_top_level_mapping_is_misconfig(self):
+        with self.assertRaises(ConstraintConfigError):
+            parse_required_annotations("key: just-a-mapping")
+
+    def test_entry_without_key_is_misconfig(self):
+        with self.assertRaises(ConstraintConfigError):
+            parse_required_annotations("- type: integer\n  min: 0\n")
+
+    def test_non_scalar_non_mapping_entry_is_misconfig(self):
+        with self.assertRaises(ConstraintConfigError):
+            parse_required_annotations("- [1, 2, 3]\n")
+
+
+class TestConstraintSpecMisconfig(unittest.TestCase):
+    """A broken constraint spec must raise (surfacing as an error), detected at
+    parse time so it fires even when the annotation is absent."""
+
+    def _bad(self, raw):
+        with self.assertRaises(ConstraintConfigError):
+            parse_required_annotations(raw)
+
+    def test_unknown_type(self):
+        self._bad("- key: k\n  type: date\n")
+
+    def test_min_greater_than_max(self):
+        self._bad("- key: k\n  type: integer\n  min: 10\n  max: 5\n")
+
+    def test_min_length_greater_than_max_length(self):
+        self._bad("- key: k\n  type: string\n  min_length: 10\n  max_length: 2\n")
+
+    def test_invalid_regex(self):
+        self._bad("- key: k\n  type: string\n  pattern: '([unclosed'\n")
+
+    def test_numeric_bound_on_string(self):
+        self._bad("- key: k\n  type: string\n  min: 3\n")
+
+    def test_pattern_on_integer(self):
+        self._bad("- key: k\n  type: integer\n  pattern: '\\d+'\n")
+
+    def test_length_on_boolean(self):
+        self._bad("- key: k\n  type: boolean\n  min_length: 1\n")
+
+    def test_enum_item_wrong_type(self):
+        self._bad("- key: k\n  type: integer\n  enum: [1, two, 3]\n")
+
+    def test_empty_enum(self):
+        self._bad("- key: k\n  enum: []\n")
+
+    def test_non_numeric_min(self):
+        self._bad("- key: k\n  type: integer\n  min: abc\n")
+
+
+class TestValidateValue(unittest.TestCase):
+    """validate_value on an already-parsed constraint spec (no YAML needed)."""
+
+    def test_integer_in_range_passes(self):
+        self.assertIsNone(validate_value("k", "3", {"type": "integer",
+                                                    "min": 0, "max": 5}))
+
+    def test_integer_above_max_fails(self):
+        msg = validate_value("k", "7", {"type": "integer", "min": 0, "max": 5})
+        self.assertIn("above maximum 5", msg)
+
+    def test_integer_below_min_fails(self):
+        msg = validate_value("k", "-1", {"type": "integer", "min": 0, "max": 5})
+        self.assertIn("below minimum 0", msg)
+
+    def test_non_integer_value_fails(self):
+        msg = validate_value("k", "2.5", {"type": "integer"})
+        self.assertIn("not a valid integer", msg)
+
+    def test_number_accepts_decimal(self):
+        self.assertIsNone(validate_value("k", "2.5", {"type": "number",
+                                                      "max": 3}))
+
+    def test_string_pattern_match_passes(self):
+        self.assertIsNone(validate_value(
+            "k", "user@example.com",
+            {"type": "string", "pattern": r"^[^@]+@[^@]+\.[^@]+$"}))
+
+    def test_string_pattern_mismatch_fails(self):
+        msg = validate_value(
+            "k", "nope",
+            {"type": "string", "pattern": r"^[^@]+@[^@]+\.[^@]+$"})
+        self.assertIn("does not match", msg)
+
+    def test_pattern_is_full_match(self):
+        # A partial match must fail: pattern must anchor the whole value.
+        msg = validate_value("k", "abc123", {"type": "string",
+                                             "pattern": r"[a-z]+"})
+        self.assertIn("does not match", msg)
+
+    def test_min_length_fails(self):
+        msg = validate_value("k", "ab", {"type": "string", "min_length": 3})
+        self.assertIn("shorter than", msg)
+
+    def test_max_length_fails(self):
+        msg = validate_value("k", "abcd", {"type": "string", "max_length": 3})
+        self.assertIn("longer than", msg)
+
+    def test_boolean_passes(self):
+        self.assertIsNone(validate_value("k", "true", {"type": "boolean"}))
+
+    def test_boolean_rejects_non_bool(self):
+        self.assertIn("not a valid boolean",
+                      validate_value("k", "yes", {"type": "boolean"}))
+
+
+class TestEnumTypeInteraction(unittest.TestCase):
+    """Fry's flagged gap: enum items are typed by YAML on parse, so enum
+    comparison must happen in the declared type's domain. Exercised end-to-end
+    through parse + validate."""
+
+    def _spec(self, raw):
+        return parse_required_annotations(raw)[0]["constraints"]
+
+    def test_string_enum_of_yaml_ints_matches_string_value(self):
+        # `type: string` (default) + `enum: [1, 2, 3]`: without coercion the
+        # compare would be "2" == 2 (always false). Items must coerce to string.
+        spec = self._spec("- key: k\n  enum: [1, 2, 3]\n")
+        self.assertIsNone(validate_value("k", "2", spec))
+
+    def test_integer_enum_matches_integer_value(self):
+        spec = self._spec("- key: k\n  type: integer\n  enum: [1, 2, 3]\n")
+        self.assertIsNone(validate_value("k", "2", spec))
+
+    def test_value_outside_enum_fails(self):
+        spec = self._spec("- key: k\n  type: integer\n  enum: [1, 2, 3]\n")
+        self.assertIn("not one of", validate_value("k", "9", spec))
+
+    def test_string_enum_of_words(self):
+        spec = self._spec("- key: k\n  enum: [production, staging, development]\n")
+        self.assertIsNone(validate_value("k", "staging", spec))
+        self.assertIn("not one of", validate_value("k", "qa", spec))
+
+
+class TestRequiredAnnotationsTyped(unittest.TestCase):
+    """Integration: the check end-to-end with typed constraints."""
+
+    def test_integer_range_passes(self):
+        raw = "- key: example.com/service-tier\n  type: integer\n  min: 0\n  max: 5\n"
+        with policy_vars(required_annotations=raw):
+            data = backstage_data(annotations={"example.com/service-tier": "3"})
+            self.assertEqual(
+                check_required_annotations(Node.from_component_json(data)).status,
+                CheckStatus.PASS,
+            )
+
+    def test_integer_out_of_range_fails_with_message(self):
+        raw = "- key: example.com/service-tier\n  type: integer\n  min: 0\n  max: 5\n"
+        with policy_vars(required_annotations=raw):
+            data = backstage_data(annotations={"example.com/service-tier": "7"})
+            check = check_required_annotations(Node.from_component_json(data))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("above maximum 5", check.failure_reasons[0])
+
+    def test_regex_constraint(self):
+        raw = ("- key: example.com/contact\n  type: string\n"
+               "  pattern: '^[^@]+@[^@]+\\.[^@]+$'\n")
+        with policy_vars(required_annotations=raw):
+            good = backstage_data(annotations={"example.com/contact": "a@b.com"})
+            self.assertEqual(
+                check_required_annotations(Node.from_component_json(good)).status,
+                CheckStatus.PASS,
+            )
+            bad = backstage_data(annotations={"example.com/contact": "not-an-email"})
+            self.assertEqual(
+                check_required_annotations(Node.from_component_json(bad)).status,
+                CheckStatus.FAIL,
+            )
+
+    def test_missing_typed_key_fails(self):
+        raw = "- key: example.com/service-tier\n  type: integer\n  min: 0\n  max: 5\n"
+        with policy_vars(required_annotations=raw):
+            data = backstage_data(annotations={"other": "x"})
+            check = check_required_annotations(Node.from_component_json(data))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("example.com/service-tier", check.failure_reasons[0])
+
+    def test_yaml_list_presence_only_still_works(self):
+        raw = "- backstage.io/source-location\n- pagerduty.com/integration-key\n"
+        with policy_vars(required_annotations=raw):
+            data = backstage_data(annotations={
+                "backstage.io/source-location": "url:x",
+                "pagerduty.com/integration-key": "PXXXX",
+            })
+            self.assertEqual(
+                check_required_annotations(Node.from_component_json(data)).status,
+                CheckStatus.PASS,
+            )
+
+    def test_misconfig_surfaces_as_error(self):
+        # min > max is a broken spec: the check must not silently pass.
+        raw = "- key: k\n  type: integer\n  min: 10\n  max: 0\n"
+        with policy_vars(required_annotations=raw):
+            data = backstage_data(annotations={"k": "5"})
+            with self.assertRaises(ConstraintConfigError):
+                check_required_annotations(Node.from_component_json(data))
 
 
 if __name__ == "__main__":

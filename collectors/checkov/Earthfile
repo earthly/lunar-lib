@@ -4,9 +4,14 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install Checkov via pip
-    # Build deps needed for some native extensions (pycep-parser, etc.)
+    # Build deps needed for some native extensions (pycep-parser, etc.).
+    # cargo (+ its rust dep) is required to build the rustworkx wheel from
+    # source: alpine 3.24 ships a newer python3 with no prebuilt musl wheel
+    # for rustworkx, so pip falls back to a source build that needs a Rust
+    # toolchain. All build deps are virtual and removed after install, so the
+    # runtime image is unaffected.
     ARG CHECKOV_VERSION=3.2.360
-    RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev libffi-dev && \
+    RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev libffi-dev cargo && \
         pip install --no-cache-dir --break-system-packages "checkov==${CHECKOV_VERSION}" && \
         apk del .build-deps
 

@@ -70,6 +70,7 @@ test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD ./collectors/github+test
+    BUILD ./catalogers/backstage+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
@@ -101,10 +102,12 @@ ai-context:
 
 all:
     BUILD --pass-args +base-image
+    BUILD --pass-args ./collectors/argocd+image
     BUILD --pass-args ./collectors/ast-grep+image
     BUILD --pass-args ./collectors/claude+image
     BUILD --pass-args ./collectors/docker+image
     BUILD --pass-args ./collectors/k8s+image
+    BUILD --pass-args ./collectors/istio+image
     BUILD --pass-args ./collectors/helm+image
     BUILD --pass-args ./collectors/golang+image
     BUILD --pass-args ./collectors/nodejs+image

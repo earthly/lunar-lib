@@ -87,6 +87,69 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 
 The cataloger reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed.
 
+### AWS SigV4 Authentication (IAM-role-signed)
+
+Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gateway) and reject Bearer tokens — every request must carry an AWS Signature V4. Set `auth_mode: sigv4` to sign requests instead of sending a Bearer token:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.1.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-east-1"
+      aws_service: "execute-api"   # default; API Gateway. Override for other fronting.
+```
+
+**No credentials are configured as Lunar secrets, and nothing needs manual rotation.** In `sigv4` mode the cataloger resolves AWS credentials at runtime from the standard AWS credential provider chain and re-resolves them on every run, so short-lived IAM-role credentials always sign with a fresh, valid signature. The chain is tried in this order:
+
+1. **IRSA (EKS) — recommended.** The cataloger pod runs under a service account annotated with an IAM role; EKS injects a web-identity token, which the cataloger exchanges for temporary credentials via STS. The projected token rotates automatically and each run re-exchanges it — zero human involvement.
+2. **ECS task role** — the container credentials endpoint (`AWS_CONTAINER_CREDENTIALS_*`).
+3. **EC2 instance profile** — IMDSv2 on the node.
+4. **Static keys** — only if the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (/ `AWS_SESSION_TOKEN`) secrets are set. This is an escape hatch for runners with no attached IAM identity; static keys do **not** self-refresh, so prefer one of the role-based sources above.
+
+#### One-time setup: attach the role to the cataloger's service account
+
+Catalogers execute in **operator-spawned snippet pods**, which run under their **own** service account (`OPERATOR_POD_SERVICE_ACCOUNT`, the Lunar chart's `<release>-script-pod`) — *not* the Lunar hub's service account. So annotate **that** service account with the role that is allowed to invoke your Backstage API:
+
+```yaml
+# service account used by cataloger/collector/policy snippet pods
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/lunar-backstage-sigv4
+```
+
+The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
+
+#### Alternative: a standalone `aws-sigv4-proxy` service (no plugin config)
+
+If you'd rather keep signing out of the cataloger entirely, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as its **own** Kubernetes `Deployment` + `Service`, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy's in-cluster DNS name:
+
+```yaml
+with:
+  backstage_url: "http://sigv4-proxy.<namespace>.svc.cluster.local:8080"
+```
+
+The proxy signs every forwarded request with **its own** pod's IAM role (IRSA on the proxy Deployment's service account) via the same credential chain, so this self-refreshes too — it just moves signing out of the plugin and into a separate service you operate.
+
+> **Not a same-pod sidecar.** Catalogers run in operator-spawned snippet pods whose container list is fixed by the Lunar operator — one snippet container (which `OPERATOR_SNIPPET_CONTAINER_SPEC_*` *replaces*, it does not append) plus the built-in Lunar sidecar. There is no hook to inject an extra container, so `aws-sigv4-proxy` cannot ride inside the cataloger's pod; it has to be its own Deployment reached over the cluster network. (For purely local testing, you can instead run the proxy on your laptop and point `backstage_url` at `http://host.docker.internal:8080`.)
+
+> A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.
+
+### API Path Prefix
+
+By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching a standard Backstage deployment. Some setups put the catalog API behind a gateway mounted at the root, so the live endpoint is `<backstage_url>/catalog/entities` and the `/api` hop returns `403`/`404`. Set `api_path_prefix` to an empty string to drop the prefix:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      api_path_prefix: ""   # gateway is mounted at root — no /api hop
+```
+
+`api_path_prefix` defaults to `/api`, so existing configs are unaffected. Any other prefix works too (e.g. `/backstage/api`); the leading slash is optional and a trailing slash is ignored. The resolved endpoint is echoed on the first line of the cataloger's output, so `lunar cataloger dev backstage --verbose` shows exactly which URL it will call.
+
 ### Layering with the GitHub Org Cataloger
 
 For organisations that already run [`github-org`](../github-org) to enumerate repos, run Backstage *after* it so its owner/domain/tag values override the GitHub defaults:
@@ -140,6 +203,64 @@ with:
 | `Domain`, `System` | `.domains` |
 | Other kinds (`User`, `Group`, `Location`, …) | Ignored |
 
+### Domain Hierarchy (`subdomainOf` + systems)
+
+Backstage expresses grouping with `spec.subdomainOf` (Domain → Domain) and the `spec.domain` a `System` belongs to. Lunar models domain hierarchy through **dot-notation naming** — `a.b.c` is a child of `a.b` — rather than an explicit parent field. This cataloger bridges the two: it walks the parent chain and keys each domain by its full dotted path.
+
+- **Domains** are keyed by their full `spec.subdomainOf` ancestry: a domain `c` that is `subdomainOf` `b`, itself `subdomainOf` `a`, is written as `a.b.c`.
+- **Systems** are treated as the deepest grouping level — a `System` is nested as a subdomain of the domain it belongs to (`spec.domain`), keyed `<domain-path>.<system-name>`.
+- **Components** resolve their `domain` to the full dotted path of their `spec.system` (or `spec.domain` when no system is set).
+
+A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdomainOf`, or a `System` with no `spec.domain`, is keyed by its bare `metadata.name` — byte-for-byte what a flat sync produced. The hierarchy only surfaces where Backstage actually expresses it, which is why there is no "flat vs nested" switch: nesting *is* the faithful mapping, and it degrades to flat exactly when there's nothing to nest.
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.2.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain
+```
+
+Given a Backstage catalog like:
+
+```
+commerce                     (Domain, top — no subdomainOf)
+ └─ payments                 (Domain, subdomainOf commerce)
+     └─ ledger               (Domain, subdomainOf payments)
+         └─ billing          (System, spec.domain: ledger)
+             └─ invoicing-api (Component, spec.system: billing)
+```
+
+the cataloger produces:
+
+```json
+{
+  "domains": {
+    "commerce": { "description": "…", "owner": "…" },
+    "commerce.payments": { "description": "…", "owner": "…" },
+    "commerce.payments.ledger": { "description": "…", "owner": "…" },
+    "commerce.payments.ledger.billing": { "description": "…", "owner": "…" }
+  },
+  "components": {
+    "github.com/acme/invoicing-api": {
+      "owner": "group:default/team-billing",
+      "domain": "commerce.payments.ledger.billing",
+      "tags": ["bs-type-service", "bs-lifecycle-production"]
+    }
+  }
+}
+```
+
+The same component synced from a catalog with no `subdomainOf` / system links would instead get `domain: "billing"`, alongside bare `commerce` / `payments` / `ledger` / `billing` domains — the pre-hierarchy behavior, unchanged.
+
+**Notes & caveats**
+
+- **Upgrade note.** If you already run this cataloger against a Backstage instance that *does* use `subdomainOf` or systems-under-domains, upgrading re-keys those domains from bare names (`billing`) to dotted paths (`commerce.payments.ledger.billing`), and any policy or initiative that targets them by name must be updated to the new key. Catalogs with no hierarchy links are unaffected — their keys don't change.
+- **Sync the parent kinds.** Parent resolution only sees entities the cataloger fetched, so include every level in `entity_kinds` (e.g. `Component,Domain,System`). A `subdomainOf` / `spec.domain` reference to an entity that wasn't synced falls back to the bare name for that hop, and the gap is logged.
+- **Entity refs are normalised.** `subdomainOf` / `spec.domain` / `spec.system` values such as `domain:default/payments` are stripped to their bare name (`payments`) before joining.
+- **Separator.** Path segments join with `.`, Lunar's hierarchy separator. Backstage names that themselves contain a `.` are rare and would be indistinguishable from a level boundary; hyphenated names (`payment-gateway`) are unaffected.
+- **Dangling or cyclic chains.** A missing parent stops the walk (partial path, logged); a cycle is broken defensively so a malformed catalog can't hang the run.
+
 ### Filtering Entities
 
 Pass a raw [Backstage filter expression](https://backstage.io/docs/features/software-catalog/software-catalog-api/#get-entities) through `filter`:
@@ -159,10 +280,10 @@ If you'd rather store bare names, set `owner_format: bare-name` to strip the `<k
 
 ## Source System
 
-This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/features/software-catalog/software-catalog-api/) — specifically the `/api/catalog/entities` endpoint. It requires:
+This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/features/software-catalog/software-catalog-api/) — specifically the `/catalog/entities` endpoint, reached at `<backstage_url>/api/catalog/entities` by default (see [API Path Prefix](#api-path-prefix) to change the `/api` segment). It requires:
 
 1. **Network reach** from the Lunar Runner to the Backstage instance
-2. **A bearer token** (`LUNAR_SECRET_BACKSTAGE_TOKEN`) if the instance enforces authentication
+2. **Authentication** if the instance enforces it — either a bearer token (`LUNAR_SECRET_BACKSTAGE_TOKEN`, the default) or AWS SigV4 signing (`auth_mode: sigv4`; see [AWS SigV4 Authentication](#aws-sigv4-authentication-iam-role-signed))
 3. **Read access** to the kinds configured in `entity_kinds`
 
 Pagination is handled automatically; the cataloger streams pages until all matching entities are fetched.
