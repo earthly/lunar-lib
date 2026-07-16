@@ -43,6 +43,15 @@ while [ $# -gt 0 ]; do
 done
 [ -z "$OUT" ] && { echo "mock curl: -o required" >&2; exit 1; }
 case "$URL" in
+    *"/orgs/"*"/repos"*)
+        # Org discovery: emit the fake repo list (with topics) on page 1, an
+        # empty page afterwards so pagination terminates. MOCK_ORG_REPOS is a
+        # JSON array of {full_name, archived, topics}.
+        case "$URL" in
+            *"page=1&"*) printf '%s' "${MOCK_ORG_REPOS:-[]}" > "$OUT"; printf '200' ;;
+            *)           printf '[]' > "$OUT"; printf '200' ;;
+        esac
+        ;;
     *"/git/trees/"*)
         ( cd "$REPO_DIR_ENV" && find . -type f | sed 's|^\./||' ) \
             | jq -R -s 'split("\n") | map(select(length > 0))
@@ -96,13 +105,15 @@ PASSED=0
 indent() { sed 's/^/    /'; }
 
 reset_env() {
-    unset LUNAR_VAR_REPOS LUNAR_VAR_FILENAMES LUNAR_VAR_BRANCH \
+    unset LUNAR_VAR_REPOS LUNAR_VAR_ORGS LUNAR_VAR_ALLOWED_TOPICS \
+          LUNAR_VAR_DISALLOWED_TOPICS LUNAR_VAR_INCLUDE_ARCHIVED \
+          LUNAR_VAR_FILENAMES LUNAR_VAR_BRANCH \
           LUNAR_VAR_EXCLUDE_PATHS LUNAR_VAR_COMPONENT_ID_PREFIX \
           LUNAR_VAR_DOMAIN_ANNOTATION LUNAR_VAR_TAG_PREFIX \
           LUNAR_VAR_INCLUDE_DERIVED_TAGS LUNAR_VAR_OWNER_FORMAT \
           LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN \
           LUNAR_VAR_ALLOW_IGNORE_ANNOTATION LUNAR_VAR_IGNORE_ANNOTATION \
-          MOCK_LUNAR_FAIL 2>/dev/null || true
+          MOCK_LUNAR_FAIL MOCK_ORG_REPOS 2>/dev/null || true
     export LUNAR_VAR_REPOS="acme/monorepo"
     export LUNAR_SECRET_GH_TOKEN="stub-token"
 }
@@ -308,12 +319,74 @@ place payments.yaml "services/payments/catalog-info.yaml"
 run_main
 assert "missing token → no writes, exit 0" "" ""
 
-# ── Scenario: empty repos input → graceful no-op ─────────────────────────
-echo "── empty_repos ──"
+# ── Scenario: neither repos nor orgs → graceful no-op ────────────────────
+echo "── empty_repos_and_orgs ──"
 fresh_repo; reset_out; reset_env
 export LUNAR_VAR_REPOS=""
 run_main
-assert "empty repos → no writes, exit 0" "" ""
+assert "no repos and no orgs → no writes, exit 0" "" ""
+
+# Fake org repo list reused by the org-discovery scenarios below. Four repos:
+# svc-a (topic, active), svc-b (no topic), svc-c (topic, ARCHIVED), svc-d
+# (topic + a blocklist topic). The mock curl serves the same fake repo tree
+# (services/payments/catalog-info.yaml) for every slug, so each SCANNED repo
+# `acme/X` yields the component `github.com/acme/X/services/payments`.
+ORG_REPOS_JSON='[
+  {"full_name":"acme/svc-a","archived":false,"topics":["lunar-monorepo"]},
+  {"full_name":"acme/svc-b","archived":false,"topics":["other"]},
+  {"full_name":"acme/svc-c","archived":true,"topics":["lunar-monorepo"]},
+  {"full_name":"acme/svc-d","archived":false,"topics":["lunar-monorepo","no-catalog"]}
+]'
+
+# ── Scenario: org discovery + allowed_topics (opt in by topic) ───────────
+echo "── org_discovery_allow_topic ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="" LUNAR_VAR_ORGS="acme" LUNAR_VAR_ALLOWED_TOPICS="lunar-monorepo"
+export MOCK_ORG_REPOS="$ORG_REPOS_JSON"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "only topic-tagged, non-archived repos scanned" \
+    '(has("github.com/acme/svc-a/services/payments"))
+     and (has("github.com/acme/svc-d/services/payments"))
+     and (has("github.com/acme/svc-b/services/payments") | not)
+     and (has("github.com/acme/svc-c/services/payments") | not)' ''
+
+# ── Scenario: org discovery + disallowed_topics (block wins) ─────────────
+echo "── org_discovery_disallow_topic ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="" LUNAR_VAR_ORGS="acme" \
+       LUNAR_VAR_ALLOWED_TOPICS="lunar-monorepo" LUNAR_VAR_DISALLOWED_TOPICS="no-catalog"
+export MOCK_ORG_REPOS="$ORG_REPOS_JSON"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "disallowed topic excludes svc-d even though it is allow-tagged" \
+    '(has("github.com/acme/svc-a/services/payments"))
+     and (has("github.com/acme/svc-d/services/payments") | not)' ''
+
+# ── Scenario: include_archived brings archived repos into discovery ──────
+echo "── org_discovery_include_archived ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="" LUNAR_VAR_ORGS="acme" \
+       LUNAR_VAR_ALLOWED_TOPICS="lunar-monorepo" LUNAR_VAR_INCLUDE_ARCHIVED="true"
+export MOCK_ORG_REPOS="$ORG_REPOS_JSON"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "archived svc-c included when include_archived=true" \
+    '(has("github.com/acme/svc-c/services/payments"))
+     and (has("github.com/acme/svc-a/services/payments"))' ''
+
+# ── Scenario: explicit repos ∪ org discovery (explicit always scanned) ───
+echo "── repos_and_orgs_union ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="acme/explicit" LUNAR_VAR_ORGS="acme" \
+       LUNAR_VAR_ALLOWED_TOPICS="lunar-monorepo"
+export MOCK_ORG_REPOS="$ORG_REPOS_JSON"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "explicit repo scanned regardless of topic; discovery still topic-gated" \
+    '(has("github.com/acme/explicit/services/payments"))
+     and (has("github.com/acme/svc-a/services/payments"))
+     and (has("github.com/acme/svc-b/services/payments") | not)' ''
 
 # ── Scenario: hard write failure propagates (non-zero exit → hub retries) ──
 # Regression guard for the `if create_component` bug: a failed `lunar catalog

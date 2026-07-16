@@ -2,13 +2,16 @@
 #
 # Backstage catalog-info Monorepo Discovery Cataloger — SCHEDULED variant (cron).
 #
-# Runs once per cron tick (global, no repo checkout). For each repo in the
-# `repos` input, walks the whole file tree via the GitHub Git Trees API (one
-# recursive call), finds every `catalog-info.yaml` / `.yml` (including files in
-# subdirectories), fetches each via the Contents API, and CREATES one component
-# per discovered file — keyed to the file's directory so a monorepo becomes one
-# component per service. Owner / domain / tags come from the file's `Component`
-# entity via the shared pipeline in `helpers.sh`.
+# Runs once per cron tick (global, no repo checkout). Builds a scan list from the
+# explicit `repos` input plus any repos auto-discovered from the `orgs` input
+# (filtered by the `allowed_topics` / `disallowed_topics` GitHub-topic lists), so
+# you can opt monorepos into cataloging with a repo topic instead of a
+# hand-maintained list. For each repo, walks the whole file tree via the GitHub
+# Git Trees API (one recursive call), finds every `catalog-info.yaml` / `.yml`
+# (including files in subdirectories), fetches each via the Contents API, and
+# CREATES one component per discovered file — keyed to the file's directory so a
+# monorepo becomes one component per service. Owner / domain / tags come from the
+# file's `Component` entity via the shared pipeline in `helpers.sh`.
 #
 # Component id per file (with default component_id_prefix `github.com/`):
 #   catalog-info.yaml (repo root)          -> github.com/<owner>/<repo>
@@ -22,18 +25,26 @@
 # annotation when `allow_ignore_annotation` is enabled (handled in helpers.sh).
 #
 # Silent skips (exit 0 with a log line, no write):
-#   - No GH_TOKEN, or empty `repos` input (nothing to do)
+#   - No GH_TOKEN, or both `repos` and `orgs` empty (nothing to do)
+#   - Org discovery API error for an org (logged, that org skipped)
 #   - A repo id that isn't `<owner>/<repo>`
 #   - Git Trees / Contents API errors for a repo (logged, repo skipped)
 #   - Per-file: parse error / not exactly one Component (handled in helpers.sh)
 #
 # Inputs (LUNAR_VAR_*):
-#   repos                (required; comma-separated <owner>/<repo>)
+#   repos                (comma-separated <owner>/<repo>; always scanned)
+#   orgs                 (comma-separated org names to auto-discover repos from)
+#   allowed_topics       (org-discovery allowlist; empty -> all repos pass)
+#   disallowed_topics    (org-discovery blocklist; block wins over allow)
+#   include_archived     (default false; include archived repos in discovery)
 #   filenames            (default catalog-info.yaml,catalog-info.yml)
 #   branch               (default empty -> each repo's default branch)
 #   exclude_paths        (default catalog-info.yaml,catalog-info.yml)
 #   component_id_prefix  (default github.com/)
 #   ...transform + ignore-annotation inputs are read in helpers.sh
+#
+# Either `repos` or `orgs` (or both) must be set. Topic filters apply to the
+# org-discovered set only; explicitly-listed `repos` are always scanned.
 #
 # Secrets:
 #   GH_TOKEN — required, fetched as LUNAR_SECRET_GH_TOKEN
@@ -41,6 +52,10 @@
 set -euo pipefail
 
 REPOS="${LUNAR_VAR_REPOS:-}"
+ORGS="${LUNAR_VAR_ORGS:-}"
+ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
+DISALLOWED_TOPICS="${LUNAR_VAR_DISALLOWED_TOPICS:-}"
+INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 FILENAMES="${LUNAR_VAR_FILENAMES:-catalog-info.yaml,catalog-info.yml}"
 BRANCH="${LUNAR_VAR_BRANCH:-}"
 # `-` not `:-`: an explicit empty exclude_paths must survive so it can disable
@@ -58,12 +73,16 @@ if [ -z "${GH_TOKEN:-}" ]; then
     exit 0
 fi
 
-if [ -z "$REPOS" ]; then
-    echo "No repos configured (input 'repos' is empty) — nothing to scan"
+if [ -z "$REPOS" ] && [ -z "$ORGS" ]; then
+    echo "Neither 'repos' nor 'orgs' configured — nothing to scan"
     exit 0
 fi
 
-echo "Repos: $REPOS"
+[ -n "$REPOS" ] && echo "Explicit repos: $REPOS"
+[ -n "$ORGS" ] && echo "Discover orgs: $ORGS"
+[ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics (org discovery): $ALLOWED_TOPICS"
+[ -n "$DISALLOWED_TOPICS" ] && echo "Disallowed topics (org discovery): $DISALLOWED_TOPICS"
+[ -n "$ORGS" ] && echo "Include archived (org discovery): $INCLUDE_ARCHIVED"
 echo "Filenames: $FILENAMES"
 [ -n "$BRANCH" ] && echo "Branch: $BRANCH"
 echo "Exclude paths: ${EXCLUDE_PATHS:-<none>}"
@@ -84,6 +103,50 @@ gh_get() {
         -H "Accept: $1" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "$2" 2>"$ERR_FILE" || echo "000"
+}
+
+# discover_org_repos <org> — prints, one per line, the `<owner>/<repo>` of every
+# repo in <org> that passes the topic allow/blocklist (and the archived filter).
+# Pages through the List-org-repositories API (100/page). Reuses $BODY_FILE, so
+# call it BEFORE the scan loop (which also reuses $BODY_FILE). Emits only repo
+# slugs on stdout — progress/errors go to stderr — so callers can `read` it.
+discover_org_repos() {
+    local org="$1" page=1 code count
+    while :; do
+        code=$(gh_get "application/vnd.github+json" \
+            "https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=all")
+        if [ "$code" != "200" ]; then
+            echo "Org discovery for '$org' failed (HTTP $code): $(head -c 200 "$BODY_FILE" 2>/dev/null) — skipping org" >&2
+            return 0
+        fi
+        count=$(jq 'length' "$BODY_FILE")
+        if [ "$count" = "0" ]; then
+            break
+        fi
+        # Filter by archived + topics; emit full_name. Topic set arithmetic:
+        # ($allow - ($allow - $topics)) is the intersection allow ∩ topics.
+        jq -r \
+            --arg allowed "$ALLOWED_TOPICS" \
+            --arg disallowed "$DISALLOWED_TOPICS" \
+            --arg include_archived "$INCLUDE_ARCHIVED" \
+            '
+            def csv_set($s): ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)));
+            (csv_set($allowed)) as $allow
+            | (csv_set($disallowed)) as $deny
+            | .[]
+            | select($include_archived == "true" or (.archived != true))
+            | (.topics // []) as $topics
+            | select( ($allow | length) == 0 or (($allow - ($allow - $topics)) | length) > 0 )
+            | select( ($deny  | length) == 0 or (($deny  - ($deny  - $topics)) | length) == 0 )
+            | .full_name
+            ' "$BODY_FILE"
+        # A short page (< per_page) is the last one.
+        if [ "$count" -lt 100 ]; then
+            break
+        fi
+        page=$((page + 1))
+    done
+    return 0
 }
 
 # is_catalog_file <path> — true if the path's basename is in FILENAMES.
@@ -114,9 +177,59 @@ is_excluded() {
     return 1
 }
 
+# Build the effective scan list: explicit `repos` plus any repos discovered from
+# `orgs` (filtered by topic), de-duplicated with order preserved. Explicit repos
+# are ALWAYS scanned (you named them); the topic allow/blocklist gates only the
+# org-discovered set.
+declare -a _collected=()
+
+if [ -n "$REPOS" ]; then
+    IFS=',' read -ra _explicit <<< "$REPOS"
+    for r in "${_explicit[@]}"; do
+        r="$(echo "$r" | xargs)"
+        [ -n "$r" ] && _collected+=("$r")
+    done
+fi
+
+if [ -n "$ORGS" ]; then
+    IFS=',' read -ra _orgs <<< "$ORGS"
+    for org in "${_orgs[@]}"; do
+        org="$(echo "$org" | xargs)"
+        [ -z "$org" ] && continue
+        echo ""
+        echo "=== Discovering repos in org '$org' ==="
+        found_count=0
+        while IFS= read -r found; do
+            [ -z "$found" ] && continue
+            _collected+=("$found")
+            found_count=$((found_count + 1))
+        done < <(discover_org_repos "$org")
+        echo "Discovered $found_count repo(s) in '$org' matching the topic filter"
+    done
+fi
+
+# De-duplicate, preserving first-seen order.
+declare -a REPO_ARRAY=()
+declare -A _seen=()
+if [ ${#_collected[@]} -gt 0 ]; then
+    for r in "${_collected[@]}"; do
+        if [ -z "${_seen[$r]:-}" ]; then
+            _seen[$r]=1
+            REPO_ARRAY+=("$r")
+        fi
+    done
+fi
+
+if [ ${#REPO_ARRAY[@]} -eq 0 ]; then
+    echo ""
+    echo "No repositories to scan (no explicit 'repos', and org discovery matched none) — nothing to do"
+    exit 0
+fi
+echo ""
+echo "Total repositories to scan: ${#REPO_ARRAY[@]}"
+
 SCANNED=0
 
-IFS=',' read -ra REPO_ARRAY <<< "$REPOS"
 for raw_repo in "${REPO_ARRAY[@]}"; do
     SLUG="$(echo "$raw_repo" | xargs)"
     [ -z "$SLUG" ] && continue
@@ -191,4 +304,4 @@ for raw_repo in "${REPO_ARRAY[@]}"; do
 done
 
 echo ""
-echo "Discovery complete: processed $SCANNED catalog-info file(s) across the configured repo(s)"
+echo "Discovery complete: processed $SCANNED catalog-info file(s) across ${#REPO_ARRAY[@]} repo(s)"
