@@ -130,6 +130,11 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
+    # Built FROM earthly/lunar-scripts, so base-* inherits that image's non-root
+    # support (writable HOME at /home/lunar for uid 1000 / root-group uids, used
+    # by the lunar CLI's ~/.lunar and git under securityContext.runAsUser).
+    # NOTE: a change in lunar-scripts only reaches base-* once this image is
+    # rebuilt — CI rebuilds + pushes on any main merge, so merge to refresh.
     ARG SCRIPTS_VERSION=main-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Add postgresql-client for collectors that need to query the Hub database
