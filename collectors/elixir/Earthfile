@@ -1,10 +1,22 @@
 VERSION 0.8
 
+# This collector builds on the DEBIAN lunar-scripts variant, not the shared
+# alpine +base-image the other collectors use. alpine 3.24's musl erlang aborts
+# on startup ("sys_sigaltstack: Failed to set alternate signal stack", exit 134)
+# on modern kernels, so every erl/elixir/mix invocation dies — build-time and at
+# runtime. Debian's glibc erlang runs fine. See ENG-1216.
+#
+# SCRIPTS_VERSION_DEBIAN tracks main-debian for rolling builds. When base-image's
+# SCRIPTS_VERSION gets pinned to a released alpine tag, pin this to the matching
+# debian tag (same version, -debian suffix instead of -alpine).
 image:
-    FROM --pass-args ../../+base-image
+    ARG SCRIPTS_VERSION_DEBIAN=main-debian
+    FROM earthly/lunar-scripts:$SCRIPTS_VERSION_DEBIAN
 
-    # Install Elixir (pulls in erlang/OTP as a dep on Alpine).
-    RUN apk add --no-cache elixir
+    # Install Elixir (pulls in erlang/OTP as a dep).
+    RUN apt-get update \
+        && apt-get install -y --no-install-recommends erlang elixir \
+        && rm -rf /var/lib/apt/lists/*
 
     # Verify installations
     RUN elixir --version && mix --version
