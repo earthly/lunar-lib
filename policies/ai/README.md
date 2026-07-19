@@ -8,15 +8,16 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 
 ## Policies
 
-| Policy | Severity | Description |
-|--------|----------|-------------|
-| `code-reviewer` | error | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
-| `instruction-file-exists` | error | An agent instruction file must exist at the repo root |
-| `canonical-naming` | warning | Root instruction file should use the vendor-neutral name (AGENTS.md) |
-| `instruction-file-length` | warning | Root instruction file must be within configured length bounds |
-| `instruction-file-sections` | warning | Root instruction file must contain required section headings |
-| `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
-| `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
+| Policy | Description |
+|--------|-------------|
+| `code-reviewer` | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
+| `instruction-file-exists` | An agent instruction file must exist at the repo root |
+| `canonical-naming` | Root instruction file should use the vendor-neutral name (AGENTS.md) |
+| `instruction-file-length` | Root instruction file must be within configured length bounds |
+| `instruction-file-sections` | Root instruction file must contain required section headings |
+| `plans-dir-exists` | A dedicated AI plans directory should exist |
+| `ai-authorship-annotated` | Commits should include AI authorship annotations |
+| `no-ai-authored-commits` | Fails when AI-authored commits are detected; scope it to the right components via `on:` targeting |
 
 ## Required Data
 
@@ -26,6 +27,7 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | `.ai.instructions` | `ai`, `claude`, `codex`, `gemini` collectors | Instruction file metadata — `ai` writes root/AGENTS.md, tool collectors append to `all[]` via array append |
 | `.ai.plans_dir` | `ai` collector | Plans directory existence and file count |
 | `.ai.authorship` | `ai` collector | AI authorship annotation coverage |
+| `.ai.fingerprints` | `ai` collector | Detected AI-authorship fingerprints per commit (tools/signals) and a fingerprinted-commit count |
 
 ## Installation
 
@@ -88,3 +90,4 @@ No code reviewer detected, no instruction file:
 - **canonical-naming**: Rename to AGENTS.md (vendor-neutral) or symlink it
 - **plans-dir-exists**: Create a `.agents/plans` directory for AI agent task planning
 - **ai-authorship-annotated**: Enable git-ai or add AI-model trailers to commits
+- **no-ai-authored-commits**: Apply this policy only to the components where AI-authored commits should be flagged (via `on:` tags/domains). It fails when detected AI-authored commits exceed `max_ai_commits` (default 0).
