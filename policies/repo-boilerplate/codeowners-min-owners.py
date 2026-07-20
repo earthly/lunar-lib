@@ -10,7 +10,7 @@ def main(node=None):
     with c:
         exists = c.get_node(".ownership.codeowners.exists")
         if not (exists.exists() and bool(exists.get_value())):
-            c.skip("No CODEOWNERS file found (codeowners-exists covers this case)")
+            c.fail("No CODEOWNERS file found")
         else:
             min_owners = int(variable_or_default("min_owners_per_rule", "2"))
 

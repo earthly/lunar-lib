@@ -10,7 +10,7 @@ def main(node=None):
     with c:
         exists = c.get_node(".ownership.codeowners.exists")
         if not (exists.exists() and bool(exists.get_value())):
-            c.skip("No CODEOWNERS file found (codeowners-exists covers this case)")
+            c.fail("No CODEOWNERS file found")
         else:
             has_catchall = False
             for rule in c.get_node(".ownership.codeowners.rules"):

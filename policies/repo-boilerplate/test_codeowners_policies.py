@@ -1,17 +1,18 @@
 """Unit tests for the CODEOWNERS repo-boilerplate policies.
 
-Regression guard for ENG-1249 (Barclays POV): the codeowners sub-checks were
-gating on a raw ``c.get_value(".ownership.codeowners.exists")``. When the
-codeowners collector produced no data for a component, that raises — leaving
-the check stuck in a non-terminal state (PENDING during collection, then
-ERROR once collection finished, rendered amber "No data at path" forever)
-instead of resolving.
+Regression guard for ENG-1249: the codeowners sub-checks were gating on a raw
+``c.get_value(".ownership.codeowners.exists")``. When the codeowners collector
+produced no data for a component, that raises — leaving the check stuck in a
+non-terminal state (PENDING during collection, then ERROR once collection
+finished, rendered amber "No data at path" forever) instead of resolving.
 
-The fix mirrors ``codeowners-exists`` and the git presence-check policies:
-gate on the workflows-aware ``get_node(...).exists()`` so the check always
-resolves to a terminal state — SKIP when there is no CODEOWNERS file
-(codeowners-exists owns that failure), PASS/FAIL on the actual content,
-and PENDING only while collection is genuinely still running.
+The fix mirrors ``codeowners-exists``: gate on the workflows-aware
+``get_node(...).exists()`` so the check always resolves to a terminal state —
+FAIL when there is no CODEOWNERS file, PASS/FAIL on the actual content, and
+PENDING only while collection is genuinely still running. Absence FAILS (not
+skips): a repo with no CODEOWNERS file must not score better than one with an
+empty/malformed file (a skipped check leaves the denominator, a failed one
+does not).
 """
 
 import contextlib
@@ -24,8 +25,7 @@ from pathlib import Path
 from lunar_policy import CheckStatus, Node
 
 # Sub-checks that only apply once a CODEOWNERS file exists. When the file is
-# absent these must resolve to SKIP (codeowners-exists carries the failure),
-# never get stuck pending/errored.
+# absent these must resolve to a terminal FAIL — never get stuck pending/errored.
 SUB_CHECKS = [
     "codeowners-catchall",
     "codeowners-valid",
@@ -92,7 +92,7 @@ VIOLATIONS = {
     },
 }
 
-# Collector produced no ownership data at all (the Barclays symptom).
+# Collector produced no ownership data at all (the reported symptom).
 ABSENT = {}
 # Collector ran and found no CODEOWNERS file (exists explicitly false).
 NO_FILE = {"ownership": {"codeowners": {"exists": False}}}
@@ -122,47 +122,41 @@ def run(filename, data, workflows_finished=True):
         data, bundle_info={"workflows_finished": workflows_finished}
     )
     with contextlib.redirect_stdout(io.StringIO()):
-        return main(node)
-
-
-def observed_status(check):
-    # Check.status collapses a pure-skip to PASS, so detect SKIP explicitly.
-    if any(r.result == CheckStatus.SKIPPED for r in check._results):
-        return CheckStatus.SKIPPED
-    return check.status
+        return main(node).status
 
 
 class TestStuckPendingRegression(unittest.TestCase):
     """ENG-1249: absent collector data must resolve to a terminal state."""
 
-    def test_absent_data_resolves_to_skip_after_collection(self):
-        # THE core guard: no codeowners data + collection finished must SKIP,
+    def test_absent_data_fails_after_collection(self):
+        # THE core guard: no codeowners data + collection finished must FAIL,
         # never stay amber (PENDING/ERROR "No data at path ...").
         for check in SUB_CHECKS:
             with self.subTest(check=check):
-                status = observed_status(run(check, ABSENT, workflows_finished=True))
+                status = run(check, ABSENT, workflows_finished=True)
                 self.assertEqual(
                     status,
-                    CheckStatus.SKIPPED,
-                    f"{check}: absent data after collection must SKIP, got {status}",
+                    CheckStatus.FAIL,
+                    f"{check}: absent data after collection must FAIL, got {status}",
                 )
 
-    def test_no_file_resolves_to_skip(self):
-        # Collector ran and wrote exists=false → sub-checks skip (exists fails).
+    def test_no_file_fails(self):
+        # Collector ran and wrote exists=false → the sub-checks fail too, so a
+        # repo with no CODEOWNERS can't out-score one with an empty/bad file.
         for check in SUB_CHECKS:
             with self.subTest(check=check):
-                status = observed_status(run(check, NO_FILE, workflows_finished=True))
+                status = run(check, NO_FILE, workflows_finished=True)
                 self.assertEqual(
                     status,
-                    CheckStatus.SKIPPED,
-                    f"{check}: no CODEOWNERS file must SKIP, got {status}",
+                    CheckStatus.FAIL,
+                    f"{check}: no CODEOWNERS file must FAIL, got {status}",
                 )
 
     def test_absent_data_pends_during_collection(self):
         # While collection is still running, absence is not yet a verdict.
         for check in SUB_CHECKS:
             with self.subTest(check=check):
-                status = observed_status(run(check, ABSENT, workflows_finished=False))
+                status = run(check, ABSENT, workflows_finished=False)
                 self.assertEqual(
                     status,
                     CheckStatus.PENDING,
@@ -176,7 +170,7 @@ class TestSubCheckContent(unittest.TestCase):
     def test_compliant_passes(self):
         for check in SUB_CHECKS:
             with self.subTest(check=check):
-                status = observed_status(run(check, COMPLIANT, workflows_finished=True))
+                status = run(check, COMPLIANT, workflows_finished=True)
                 self.assertEqual(
                     status,
                     CheckStatus.PASS,
@@ -186,9 +180,7 @@ class TestSubCheckContent(unittest.TestCase):
     def test_violation_fails(self):
         for check, overrides in VIOLATIONS.items():
             with self.subTest(check=check):
-                status = observed_status(
-                    run(check, _compliant_with(overrides), workflows_finished=True)
-                )
+                status = run(check, _compliant_with(overrides), workflows_finished=True)
                 self.assertEqual(
                     status,
                     CheckStatus.FAIL,
@@ -197,24 +189,28 @@ class TestSubCheckContent(unittest.TestCase):
 
 
 class TestCodeownersExists(unittest.TestCase):
-    """codeowners-exists owns the file-existence verdict: it FAILS when absent
-    (this is the single actionable failure the sub-checks defer to)."""
+    """codeowners-exists owns the file-existence verdict: it FAILS when absent."""
 
     def test_absent_after_collection_fails(self):
-        status = observed_status(run("codeowners-exists", ABSENT, workflows_finished=True))
-        self.assertEqual(status, CheckStatus.FAIL)
+        self.assertEqual(
+            run("codeowners-exists", ABSENT, workflows_finished=True), CheckStatus.FAIL
+        )
 
     def test_no_file_fails(self):
-        status = observed_status(run("codeowners-exists", NO_FILE, workflows_finished=True))
-        self.assertEqual(status, CheckStatus.FAIL)
+        self.assertEqual(
+            run("codeowners-exists", NO_FILE, workflows_finished=True), CheckStatus.FAIL
+        )
 
     def test_absent_pends_during_collection(self):
-        status = observed_status(run("codeowners-exists", ABSENT, workflows_finished=False))
-        self.assertEqual(status, CheckStatus.PENDING)
+        self.assertEqual(
+            run("codeowners-exists", ABSENT, workflows_finished=False),
+            CheckStatus.PENDING,
+        )
 
     def test_present_passes(self):
-        status = observed_status(run("codeowners-exists", COMPLIANT, workflows_finished=True))
-        self.assertEqual(status, CheckStatus.PASS)
+        self.assertEqual(
+            run("codeowners-exists", COMPLIANT, workflows_finished=True), CheckStatus.PASS
+        )
 
 
 if __name__ == "__main__":
