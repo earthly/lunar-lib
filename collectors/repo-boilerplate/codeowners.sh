@@ -13,7 +13,10 @@ IFS=',' read -ra CODEOWNERS_CANDIDATES <<< "$LUNAR_VAR_CODEOWNERS_PATHS"
 #   repo-root     - only the repository root (global CODEOWNERS)
 SCOPE_MODE="${LUNAR_VAR_CODEOWNERS_SCOPE:-auto}"
 
-COMPONENT_DIR="$PWD"
+# Physical path (pwd -P) so it lines up with `git rev-parse --show-toplevel`,
+# which is also physical — otherwise a working dir reached through a symlink
+# would make the repo-root strip below miss and mislabel .path / .scope.
+COMPONENT_DIR="$(pwd -P)"
 
 # Find the repository root. In a monorepo the collector runs from the
 # component's subdirectory (the hub sets the working dir to <repo>/<subdir>),
