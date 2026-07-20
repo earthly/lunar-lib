@@ -38,7 +38,8 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Trivy executions in CI; routes image scans (`trivy image <ref>`) to `.container_scan` and filesystem scans (`trivy fs`) to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
-| `container-rescan` | cron | Scans the most recently **pushed** image (resolved from the docker collector's recorded `docker push` / `--push` commands) in the Trivy collector image on a schedule and writes `.container_scan` |
+| `container-scan` | after-json | Automatically scans the image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as it's published; writes `.container_scan` |
+| `container-rescan` | cron | Re-scans the most recently **pushed** image on a schedule, catching CVEs disclosed since it was built |
 
 ## Installation
 
@@ -111,12 +112,13 @@ policy evaluation — `.sca` behaves identically whether history is on or off.
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
 maintains history — the on-push `auto` scan ignores these inputs.
 
-**Container image scanning.** Beyond source dependencies, this collector scans **built container images** and writes results to the normalized `.container_scan` path, consumed by the [`container-scan`](../../policies/container-scan) policy. Two sub-collectors feed it, neither of which requires the (not-yet-shipped) collector-dependency feature, and neither of which installs Trivy in your pipeline:
+**Container image scanning.** Beyond source dependencies, this collector scans **built container images** into the normalized `.container_scan` path (consumed by the [`container-scan`](../../policies/container-scan) policy). Three sub-collectors feed it, none installing Trivy in your pipeline:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `trivy image <ref>` itself, that scan is captured to `.container_scan` automatically. A `trivy fs` scan still routes to `.sca`. No install, no extra config.
-- **`container-rescan`** *(auto-scan)* — a daily cron that resolves the most recently **pushed** image from the [`docker`](../docker) collector's recorded commands (`.containers.native.docker.cicd.cmds[]` — the latest `docker push`, or a `--push` build) via `lunar component get-json`, then pulls and scans it **in the Trivy collector image**. Resolving from *pushes* rather than `.containers.builds[]` means a built-but-never-pushed (test/dry-run) image isn't scanned. This is how Lunar scans the shipped image *itself* — without installing Trivy in your CI — and it re-evaluates that image against CVEs published after it was built. (No push recorded → nothing to scan; the cron skips. Use the `container_image` input to pin an image explicitly.)
+- **`container-scan`** *(on-push)* — automatically scans the image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag.
+- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that image, catching CVEs **disclosed after it was built**.
 
-Because the cron reads already-persisted Component JSON (not another collector's output mid-run), it needs no collector-dependency feature. Enable the `docker` collector alongside this one so its CI `docker push` commands are recorded:
+All three scan the shipped image *itself* in the Trivy collector image — no install in your CI. Enable the [`docker`](../docker) collector alongside this one so its `docker push` commands are recorded:
 
 ```yaml
 collectors:
@@ -126,7 +128,7 @@ collectors:
     on: ["domain:your-domain"]
 ```
 
-> A synchronous **on-push** auto-scan (scan the image the moment it's built, and only if CI didn't already) needs the component-JSON dependency feature — it follows once that lands.
+> **`container-scan` needs a Hub with the `after-json` hook.** Without it, `exclude: [container-scan]` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
 
 **Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets. Trivy's vulnerability database is a modest download at scan time.
 

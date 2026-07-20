@@ -86,6 +86,21 @@ collectors:
       clone-code: true
     keywords: ["sca", "cve", "trivy", "dependency scanning", "cron rescan", "vulnerability"]
 
+  - name: container-scan
+    description: |
+      Automatically scans the container image this component published, as soon
+      as it's detected. Via the after-json hook, resolves the pushed image from
+      the docker collector's record (.containers.native.docker.cicd.cmds[]) and
+      scans it with Trivy into .container_scan.
+    mainBash: container-rescan.sh
+    # Fires at the doneness gate once .containers.native.docker.cicd.cmds is
+    # present. Runs in the collector image (not native), reads merged Component JSON.
+    runs_on: [default-branch]
+    hook:
+      type: after-json
+      path: .containers.native.docker.cicd.cmds
+    keywords: ["trivy", "container scan", "image scan", "after-json", "on-push", "cve", "vulnerability"]
+
   - name: container-rescan
     description: |
       Re-scans the most recently shipped container image on a schedule. Resolves
@@ -138,10 +153,9 @@ inputs:
     default: "0"
   container_image:
     description: |
-      Override the image reference the container-rescan cron scans. By default
-      the cron derives the image from the component's most recent
-      .containers.builds[] entry (populated by the docker collector). Set this
-      to pin a specific image, e.g. "ghcr.io/acme/app:latest".
+      Pin the image the container scans (container-scan + container-rescan) scan.
+      Default: the most recently pushed image in .containers.native.docker.cicd.cmds[]
+      (recorded by the docker collector). e.g. "ghcr.io/acme/app:latest".
     default: ""
 
 secrets:

@@ -1,17 +1,25 @@
 #!/bin/bash
 set -eo pipefail
 
-# container-rescan: scan the most recently shipped container image for this
-# component and write normalized results to .container_scan.
+# Scan the most recently shipped container image for this component and write
+# normalized results to .container_scan.
 #
-# Cron hook, runs in the Trivy collector image, clone-code: false. The image
-# reference comes from already-persisted Component JSON — `.containers.builds[]`,
-# written by the `docker` collector — read via `lunar component get-json`. That's
-# a prior-eval read, not a same-eval collector dependency, so no dependency
-# feature is required. Override the derived image with the `container_image`
-# input.
+# Shared by two sub-collectors: the on-push `container-scan` (after-json hook)
+# and the scheduled `container-rescan` (cron). Both run in the Trivy collector
+# image, no code clone. The image is resolved from the docker collector's
+# pushed-image record (.containers.native.docker.cicd.cmds[]) via
+# `lunar component get-json`, or pinned with the `container_image` input. Only
+# source.integration differs between the two.
 
 echo "Running Trivy container image scan" >&2
+
+# On-push (after-json) vs scheduled (cron) — same scan, label the source so
+# consumers can tell which fired. container-scan → after-json; anything else
+# (container-rescan) keeps the original cron label.
+case "${LUNAR_COLLECTOR_NAME:-}" in
+  *container-scan) INTEGRATION="after-json" ;;
+  *)               INTEGRATION="cron" ;;
+esac
 
 # --- 1. Resolve the image reference to scan ---
 IMAGE_REF="${LUNAR_VAR_CONTAINER_IMAGE:-}"
@@ -77,9 +85,10 @@ OS_VERSION=$(jq -r '.Metadata.OS.Name // empty' "$RESULTS_FILE")
 # Preserve the raw Trivy results so policies can read fields we don't normalize.
 lunar collect -j ".container_scan.native.trivy.results" - < "$RESULTS_FILE"
 
-SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" '{
+# Source metadata (integration set above: after-json on-push, or cron re-scan).
+SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATION" '{
   tool: "trivy",
-  integration: "cron"
+  integration: $integration
 } + (if $version != "" then {version: $version} else {} end)')
 
 OS_JSON=$(jq -n --arg f "$OS_FAMILY" --arg v "$OS_VERSION" '
