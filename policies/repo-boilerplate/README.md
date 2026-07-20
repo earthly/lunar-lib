@@ -31,6 +31,13 @@ This plugin provides the following policies (use `include` to select a subset):
 | `codeowners-no-empty-rules` | Flags rules with no owners assigned |
 | `codeowners-max-owners` | Maximum owners per rule (default 10) |
 
+> **Monorepos:** these checks work against a single global CODEOWNERS at the
+> repository root. Because a CODEOWNERS file is only honored at the repo root
+> (never inside a component subdirectory), the `repo-boilerplate` collector
+> resolves the repository root so the global file populates
+> `.ownership.codeowners` for every component in a monorepo — no per-component
+> CODEOWNERS file required. See the collector's `codeowners_scope` input.
+
 ### Standard File Checks
 
 | Policy | Description |

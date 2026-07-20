@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `backstage` cataloger: switch to the `/catalog/entities/by-query` endpoint
   with cursor pagination, paging through large catalogs instead of issuing a
   single unpaginated request (#240).
+- `repo-boilerplate` collector (`codeowners`): make the CODEOWNERS checks work
+  in a monorepo. A CODEOWNERS file is only honored at the repository root, but
+  in a monorepo each component runs from its own subdirectory, so the check
+  previously reported `exists: false` for every component. It now resolves the
+  repository root and falls back to the global CODEOWNERS there, records a new
+  `.ownership.codeowners.scope` field (`repo` vs `component`), and exposes a
+  `codeowners_scope` input (`auto` | `repo-root` | `component-dir`, default
+  `auto`) to control the behavior (ENG-1248).
 
 ## [1.7.0] — 2026-07-07
 
