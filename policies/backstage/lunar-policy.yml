@@ -61,6 +61,38 @@ policies:
     mainPython: ./system-set.py
     keywords: ["backstage", "system", "grouping", "architecture"]
 
+  - name: domain-exists
+    description: |
+      Verifies that the domain referenced by spec.domain in catalog-info.yaml
+      actually exists in the Backstage catalog (referential integrity). Reads
+      the collector's lookup result at `.catalog.native.backstage.refs.domain`.
+      Fails when the declared domain is absent from Backstage (collector
+      recorded exists=false). Passes when no domain is declared (nothing to
+      cross-check — `system-set`/`*-set` own "should it be set"). Skips (passes)
+      when referential integrity was not performed — i.e. the `backstage`
+      collector is not configured with `backstage_url` (no `.refs.checked`), or
+      the lookup errored transiently (`.refs.domain.error`) — so an unconfigured
+      collector or a Backstage outage never turns this red. Note `spec.domain`
+      lives on `System` entities, so this check does work only for `kind: System`
+      catalog files (or Components carrying a custom domain).
+    mainPython: ./domain-exists.py
+    keywords: ["backstage", "domain", "referential integrity", "catalog", "cross-reference"]
+
+  - name: system-exists
+    description: |
+      Verifies that the system referenced by spec.system in catalog-info.yaml
+      actually exists in the Backstage catalog (referential integrity). Reads
+      the collector's lookup result at `.catalog.native.backstage.refs.system`.
+      Fails when the declared system is absent from Backstage (collector
+      recorded exists=false). Passes when no system is declared (nothing to
+      cross-check — `system-set` owns "should it be set"). Skips (passes) when
+      referential integrity was not performed — i.e. the `backstage` collector
+      is not configured with `backstage_url` (no `.refs.checked`), or the lookup
+      errored transiently (`.refs.system.error`) — so an unconfigured collector
+      or a Backstage outage never turns this red.
+    mainPython: ./system-exists.py
+    keywords: ["backstage", "system", "referential integrity", "catalog", "cross-reference"]
+
   - name: required-annotations
     description: |
       Verifies that catalog-info.yaml declares a configurable set of
