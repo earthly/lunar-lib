@@ -97,7 +97,11 @@ collectors:
     mainBash: container-rescan.sh
     # Fires at the doneness gate once .containers.native.docker.cicd.cmds is
     # present. Runs in the collector image (not native), reads merged Component JSON.
-    runs_on: [default-branch]
+    # Runs on PRs AND the default branch: an image pushed by a PR build gets scanned
+    # at PR time (shift-left), and default-branch / release images on merge. Skip-safe
+    # where no image was pushed (the resolver finds no ref → no-op), so repos that
+    # don't push images on PRs are unaffected.
+    runs_on: [default-branch, prs]
     hook:
       type: after-json
       path: .containers.native.docker.cicd.cmds
