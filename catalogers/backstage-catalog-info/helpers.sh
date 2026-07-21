@@ -153,6 +153,51 @@ augment_component() {
         fi
     fi
 
+    # --- Resolve nested domain paths (ENG-1200) -------------------------------
+    # Mirror the live-API `backstage` cataloger (ENG-1197): when this repo's
+    # catalog-info file ALSO declares the parent hierarchy (Domain entities with
+    # `spec.subdomainOf`, System entities with `spec.domain`), translate
+    # Backstage's reference-based nesting into Lunar's dotted domain keys —
+    # `a.b.c` is a child of `a.b`. A file that declares only a Component has no
+    # parents to walk, so PATHS is empty and every lookup below falls back to the
+    # bare name: output is byte-identical to the pre-ENG-1200 behavior. Parent
+    # resolution only sees in-file entities; a reference to a parent that isn't in
+    # the file contributes its bare name as one segment and stops the walk there.
+    # Cycles are broken defensively so a malformed file can't hang the run.
+    local PATHS
+    PATHS=$(echo "$ENTITIES" | jq '
+        def bare(s):
+            if (s | type) != "string" or s == "" then s
+            elif (s | contains("/")) then (s | split("/") | last)
+            else s
+            end;
+
+        ( [ .[] | select(.kind == "Domain")
+            | { key: (.metadata.name | tostring),
+                value: ((.spec.subdomainOf // "") | tostring | if . == "" then null else bare(.) end) } ]
+          | from_entries ) as $domain_parent
+        | ( [ .[] | select(.kind == "System")
+              | { key: (.metadata.name | tostring),
+                  value: ((.spec.domain // "") | tostring | if . == "" then null else bare(.) end) } ]
+            | from_entries ) as $system_parent
+        | ( def dpath($n; $seen):
+              if $n == null or $n == "" then []
+              elif ($seen | index($n)) then []
+              else ($domain_parent[$n] // null) as $p
+                   | (if $p == null then [$n] else dpath($p; $seen + [$n]) + [$n] end)
+              end;
+            {
+              domains: ( [ $domain_parent | keys[] as $k
+                           | { key: $k, value: (dpath($k; []) | join(".")) } ] | from_entries ),
+              systems: ( [ $system_parent | to_entries[] | .key as $k | (.value) as $dom
+                           | { key: $k,
+                               value: (if $dom == null then $k
+                                       else (dpath($dom; []) | join(".")) as $dp
+                                            | (if $dp == "" then $k else $dp + "." + $k end)
+                                       end) } ] | from_entries )
+            } )
+        ')
+
     # --- Transform -------------------------------------------------------------
     # Project owner / domain / tags / meta from the entity into the shape that
     # goes under `.components["$COMPONENT_ID"]`. Owner / domain / meta are omitted
@@ -173,6 +218,7 @@ augment_component() {
         --arg domain_annotation "$DOMAIN_ANNOTATION" \
         --arg default_domain "$DEFAULT_DOMAIN" \
         --arg meta_annotations "$META_ANNOTATIONS" \
+        --argjson paths "$PATHS" \
         '
         def bare(s):
             if (s | type) != "string" or s == "" then s
@@ -191,9 +237,14 @@ augment_component() {
             else "" end) as $annotated_domain
         | (.spec.domain // "" | tostring) as $raw_domain
         | (.spec.system // "" | tostring) as $raw_system
+        # Selection precedence is unchanged; only the resolved value may now be a
+        # dotted path when the file declares the parent hierarchy (ENG-1200). The
+        # spec.domain / spec.system lookups fall back to the pre-ENG-1200 value,
+        # so an empty $paths (no declared hierarchy) yields identical output.
+        # Explicit overrides (domain annotation, default_domain) are used as-is.
         | (if ($annotated_domain | length) > 0 then $annotated_domain
-            elif ($raw_domain | length) > 0 then $raw_domain
-            elif ($raw_system | length) > 0 then bare($raw_system)
+            elif ($raw_domain | length) > 0 then ($paths.domains[bare($raw_domain)] // $raw_domain)
+            elif ($raw_system | length) > 0 then (bare($raw_system) as $sn | $paths.systems[$sn] // $sn)
             elif ($default_domain | length) > 0 then $default_domain
             else "" end) as $domain
         | (.metadata.tags // []) as $base_tags
@@ -230,22 +281,28 @@ augment_component() {
     echo "Augmenting $COMPONENT_ID with:"
     echo "$ENTRY" | jq .
 
-    # --- Write to Catalog JSON -------------------------------------------------
+    # --- Write .domains rows ---------------------------------------------------
     # Hub `validateDomainRefs` rejects (and silently drops) the entire catalog
     # merge save if a component references a domain that isn't present under
     # `.domains`. Per-component runs accumulate via merge, so writing
-    # `.domains["<name>"] = {…}` here dedupes naturally across runs.
-    # If the same YAML carries a `kind: Domain` / `kind: System` entity with a
-    # matching `metadata.name`, propagate its description + owner so the domain
-    # row is informative rather than an empty stub.
+    # `.domains["<key>"] = {…}` here dedupes naturally across runs.
+    #
+    # Emit a row for every Domain / System entity declared in THIS file, keyed by
+    # its nested dotted path (ENG-1200) and carrying its description / owner, so a
+    # monorepo file that ships the full hierarchy contributes informative rows.
+    # Then guarantee the component's own resolved domain key exists. For the
+    # common single-Component file (no Domain/System entities) that guarantee is
+    # the only row written — an empty stub keyed by the component's domain,
+    # exactly as before ENG-1200.
     local DOMAIN_NAME
     DOMAIN_NAME=$(echo "$ENTRY" | jq -r '.domain // ""')
     if [ -n "$DOMAIN_NAME" ]; then
-        local DOMAIN_VALUE
-        DOMAIN_VALUE=$(echo "$ENTITIES" | jq \
-            --arg name "$DOMAIN_NAME" \
+        local DOMAINS_JSON
+        DOMAINS_JSON=$(echo "$ENTITIES" | jq \
+            --argjson paths "$PATHS" \
             --arg owner_format "$OWNER_FORMAT" \
             --arg default_owner "$DEFAULT_OWNER" \
+            --arg component_domain "$DOMAIN_NAME" \
             '
             def bare(s):
                 if (s | type) != "string" or s == "" then s
@@ -256,26 +313,29 @@ augment_component() {
             def format_owner(o):
                 if $owner_format == "bare-name" then bare(o) else o end;
 
-            ([.[]
-              | select((.kind // "") == "Domain" or (.kind // "") == "System")
-              | select(((.metadata.name // "") | tostring) == $name)]
-             | first) as $d
-            | if $d == null then {}
-              else
-                (($d.spec.owner // "" | tostring) as $raw_owner
-                 | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
-                 | ($d.metadata.description // "" | tostring) as $desc
-                 | ({}
-                    + (if $desc != "" then {description: $desc} else {} end)
-                    + (if $owner != "" then {owner: $owner} else {} end)))
-              end
+            ( [ .[]
+                | select((.kind // "") == "Domain" or (.kind // "") == "System")
+                | (.metadata.name | tostring) as $name
+                | (if .kind == "System" then ($paths.systems[$name] // $name)
+                   else ($paths.domains[$name] // $name) end) as $key
+                | (.spec.owner // "" | tostring) as $raw_owner
+                | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
+                | (.metadata.description // "" | tostring) as $desc
+                | { key: $key, value:
+                    ({}
+                     + (if $desc != "" then {description: $desc} else {} end)
+                     + (if $owner != "" then {owner: $owner} else {} end)) } ]
+              | from_entries ) as $declared
+            | $declared
+              + (if ($declared | has($component_domain)) then {}
+                 else {($component_domain): {}} end)
             ')
-        echo "Writing domain '$DOMAIN_NAME':"
-        echo "$DOMAIN_VALUE" | jq .
-        if echo "$DOMAIN_VALUE" | jq --arg name "$DOMAIN_NAME" '{($name): .}' | lunar catalog raw --json '.domains' -; then
-            echo "Wrote domain '$DOMAIN_NAME'"
+        echo "Writing domains:"
+        echo "$DOMAINS_JSON" | jq .
+        if echo "$DOMAINS_JSON" | lunar catalog raw --json '.domains' -; then
+            echo "Wrote domains"
         else
-            echo "Failed to write domain '$DOMAIN_NAME'" >&2
+            echo "Failed to write domains" >&2
             return 1
         fi
     fi

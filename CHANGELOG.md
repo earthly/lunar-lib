@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-07-21
+
+### Added
+
+- `backstage` collector + policy: referential-integrity checks `domain-exists`
+  and `system-exists` — cross-reference the `spec.domain` / `spec.system` a
+  repo's `catalog-info.yaml` declares against what actually exists in the
+  Backstage catalog. Adds `backstage_url` / `namespace` inputs, a
+  `BACKSTAGE_TOKEN` secret, and a normalized `.refs` view (#234).
+- `trivy` and `grype` collectors: new `container-scan` sub-collector that scans
+  a component's container image synchronously at publish time, via the new
+  `after-json` collector hook (#254).
+- `backstage-catalog-info` cataloger: nested subdomain/system domain paths —
+  ports the nested-taxonomy resolver (added to the live-API `backstage`
+  cataloger in #253) to the per-repo cataloger, so a `catalog-info.yaml` that
+  declares its parent `Domain` / `System` chain in-file expands the component's
+  domain to the full dotted path (`a.b.c`) instead of flattening into unrelated
+  top-level domains (#259).
+
+## [1.9.0] — 2026-07-17
+
 ### Added
 
 - `github-org` and `backstage-catalog-info-monorepo` catalogers: opt repos
@@ -19,6 +40,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opts in via a repo topic instead of a hand-maintained `repos` list —
   explicitly-listed `repos` are always scanned. Additive; all new inputs
   default to empty/false (#250).
+- `backstage` cataloger: opt-in `domain_hierarchy: nested` mode — resolves
+  Backstage's nested taxonomy (`domain → subdomain → system → component`) via
+  `spec.subdomainOf` into Lunar's dotted domain keys, instead of flattening a
+  nested catalog into unrelated top-level domains (#253).
+
+### Changed
+
+- `gitops` policy: trim the `gitops-managed` check description from eight lines
+  down to three (#255).
+
+### Fixed
+
+- `elixir` collector: build on the debian `lunar-scripts` base — the Alpine
+  3.24 base aborts the Erlang build (#257).
+- Pin `lunar-scripts` to 1.1.5, picking up the non-root collector fix (#258).
+
+## [1.8.1] — 2026-07-10
+
+### Fixed
+
+- `checkov` collector: install a Rust toolchain so the `rustworkx` wheel builds
+  on Alpine 3.24, fixing the `checkov` image build (#249).
+
+## [1.8.0] — 2026-07-10
+
+### Added
+
 - ArgoCD GitOps guardrail set — three collectors and two policies over a
   normalized `.cd.gitops` view: `argocd` (beta) parses and
   kubeconform-validates argoproj CRDs (Application / ApplicationSet /
@@ -29,6 +77,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   annotation, with Backstage `catalog-info` opt-in). Adds the tool-agnostic
   `gitops` policy and the ArgoCD-specific `argocd` policy. Push and pull are
   mutually exclusive per service (#218).
+- `kotlin` collector + policy: JVM-language detection and guardrails, filling
+  the gap alongside the existing `java` and `scala` plugins (#242).
+- `istio` collector + policy (experimental): parses Istio service-mesh
+  configuration from the repo and applies guardrails over it (#245).
+- `backstage-catalog-info-monorepo` cataloger: scans each configured repo for
+  every `catalog-info.yaml` it contains — including files in subdirectories —
+  creating one Lunar component per discovered file, keyed to the file's
+  directory. Adds `catalog-info` ignore / exclude controls (#243).
+- `backstage` cataloger: AWS SigV4 authentication with self-refreshing
+  IAM-role credentials, for Backstage APIs fronted by AWS IAM auth (e.g. Amazon
+  API Gateway) that reject Bearer tokens (#232).
+- `backstage-catalog-info` cataloger: `meta_annotations` input — maps selected
+  `catalog-info.yaml` annotations onto the Lunar component `meta` field.
+  Defaults to `pagerduty.com/service-id=pagerduty/service-id`, so the
+  `pagerduty` collector (and the `oncall` guardrails) discover a component's
+  PagerDuty service straight from the annotation — no per-component config.
+  Accepts multiple `<annotation>=<meta-key>` pairs; set empty to disable
+  (#224).
+- `backstage` policy: typed value constraints on `required-annotations` —
+  assert an annotation's value is an integer in a range, matches a regex, or is
+  drawn from a fixed set, not just that the key is present (#244).
+- `trivy` and `grype` collectors: opt-in scan-history preservation — the
+  `rescan` cron keeps prior results in `.sca.history` instead of overwriting
+  the previous scan (#247).
 
 ### Changed
 
@@ -43,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.ownership.codeowners.scope` field (`repo` vs `component`), and exposes a
   `codeowners_scope` input (`auto` | `repo-root` | `component-dir`, default
   `auto`) to control the behavior (ENG-1248).
+
+### Fixed
+
+- Collector inputs are now read via the `LUNAR_VAR_<NAME>` environment prefix.
+  Six reads across five collectors used `LUNAR_INPUT_*` and were silently
+  ignored — the script always fell back to its default (#248).
 
 ## [1.7.0] — 2026-07-07
 
@@ -87,14 +165,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `catalog-info.yaml` from the checkout. Shares the parse/match/transform/write
   pipeline with `augment` via `helpers.sh`; enable either or both with `include`
   (#212).
-- `backstage-catalog-info` cataloger: new `meta_annotations` input — maps
-  selected `catalog-info.yaml` annotations onto the Lunar component `meta`
-  field. Defaults to `pagerduty.com/service-id=pagerduty/service-id`, so the
-  `pagerduty` collector (and the `oncall` guardrails) discover a component's
-  PagerDuty service straight from the annotation PagerDuty's Backstage
-  integration guide recommends — no per-component config. Accepts multiple
-  `<annotation>=<meta-key>` pairs for other collectors; set empty to disable.
-  (#224)
 - `backstage-catalog-info` cataloger: new `default_domain` input — assigns a
   fallback domain (written verbatim, with a matching stub `.domains` entry) to
   components whose `catalog-info.yaml` resolves to no domain via

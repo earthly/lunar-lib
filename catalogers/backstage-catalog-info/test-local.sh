@@ -320,6 +320,16 @@ run_scenario "domain_entity_in_yaml" "domain_entity_in_yaml" "github.com/acme/pa
     '.["github.com/acme/payment-api"].domain == "platform.payments"' \
     'EXPECTED_DOMAINS_JQ=.["platform.payments"] | (.description == "Payments platform — billing, ledger, settlement" and .owner == "group:default/team-payments")'
 
+# ── Scenario: nested hierarchy declared in the file → dotted domain path ──
+# The file ships the full Domain chain (engineering → platform → observability
+# via subdomainOf), a System under it, and the Component under that System.
+# ENG-1200: the component's domain resolves to the nested dotted path, and every
+# declared Domain / System is written under its own nested key with its
+# description / owner propagated.
+run_scenario "nested_hierarchy" "nested_hierarchy" "github.com/acme/telemetry-api" \
+    '.["github.com/acme/telemetry-api"].domain == "engineering.platform.observability.telemetry"' \
+    'EXPECTED_DOMAINS_JQ=(.["engineering"] == {}) and (.["engineering.platform"].description == "Platform engineering") and (.["engineering.platform.observability"] == {}) and (.["engineering.platform.observability.telemetry"] | (.description == "Telemetry system" and .owner == "group:default/team-telemetry"))'
+
 # ── Scenario: domain_annotation sources domain from a custom annotation ───
 # Component has no spec.domain / spec.system but carries a custom
 # pantalasa.org/domain annotation. Setting domain_annotation makes the
