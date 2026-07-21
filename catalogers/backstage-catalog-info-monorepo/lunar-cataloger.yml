@@ -3,7 +3,7 @@ version: 0
 name: backstage-catalog-info-monorepo
 description: Discovers every catalog-info.yaml in a repository (including subdirectories) and creates one Lunar component per file, keyed to the file's path
 author: earthly
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.10.1
 
 landing_page:
   display_name: "Backstage catalog-info.yaml Monorepo Cataloger"
