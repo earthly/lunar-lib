@@ -4,7 +4,7 @@ name: kotlin
 description: Enforces Kotlin project structure, versioning, and dependency standards
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.10.0
 
 landing_page:
   display_name: "Kotlin Project Guardrails"
