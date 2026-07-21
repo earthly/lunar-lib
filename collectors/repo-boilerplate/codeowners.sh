@@ -5,7 +5,10 @@ set -e
 SCRIPT_DIR="$(dirname "$0")"
 
 # Where CODEOWNERS files may live (first match wins), relative to a base dir.
-IFS=',' read -ra CODEOWNERS_CANDIDATES <<< "$LUNAR_VAR_CODEOWNERS_PATHS"
+# The hub always injects LUNAR_VAR_CODEOWNERS_PATHS from the manifest default;
+# the in-script fallback (same value as the manifest default) keeps the collector
+# self-contained when run standalone, e.g. via `lunar collector dev --script`.
+IFS=',' read -ra CODEOWNERS_CANDIDATES <<< "${LUNAR_VAR_CODEOWNERS_PATHS:-CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS}"
 
 # How to locate the CODEOWNERS file (see lunar-collector.yml `codeowners_scope`):
 #   auto          - component dir first, then fall back to the repo root (global)

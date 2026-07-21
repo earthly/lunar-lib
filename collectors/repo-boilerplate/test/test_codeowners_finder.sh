@@ -62,11 +62,13 @@ make_stub_failing_git "$STUBS_NOGIT"
 
 DEFAULT_PATHS="CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
 
-# run_collector <stubs_dir> <cwd> [scope]
+# run_collector <stubs_dir> <cwd> [scope] [paths_mode]
 # Sets up capture files and runs codeowners.sh; leaves results in
 # $CAP_ARGS (argv lines) and $CAP_PAYLOAD (json payload, if any).
+# paths_mode="unset" leaves LUNAR_VAR_CODEOWNERS_PATHS unset (exercises the
+# in-script default); anything else uses $DEFAULT_PATHS.
 run_collector() {
-  local stubs="$1" cwd="$2" scope="${3:-}"
+  local stubs="$1" cwd="$2" scope="${3:-}" paths_mode="${4:-}"
   local work; work="$(mktemp -d)"
   CAP_ARGS="$work/args"
   CAP_PAYLOAD="$work/payload"
@@ -77,7 +79,11 @@ run_collector() {
     export PATH="$stubs:$PATH"
     export LUNAR_CAPTURE="$CAP_ARGS"
     export LUNAR_PAYLOAD="$CAP_PAYLOAD"
-    export LUNAR_VAR_CODEOWNERS_PATHS="$DEFAULT_PATHS"
+    if [ "$paths_mode" = "unset" ]; then
+      unset LUNAR_VAR_CODEOWNERS_PATHS
+    else
+      export LUNAR_VAR_CODEOWNERS_PATHS="$DEFAULT_PATHS"
+    fi
     if [ -n "$scope" ]; then
       export LUNAR_VAR_CODEOWNERS_SCOPE="$scope"
     else
@@ -212,6 +218,22 @@ no_git_fallback() {
   assert_eq "no-git fallback: path" ".github/CODEOWNERS" "$(field .path)"
 }
 
+# ---------------------------------------------------------------------------
+# 9. LUNAR_VAR_CODEOWNERS_PATHS unset -> in-script default still finds the file
+#    (so `lunar collector dev --script`, which doesn't apply manifest input
+#    defaults, resolves the global CODEOWNERS from a monorepo subdir).
+# ---------------------------------------------------------------------------
+no_paths_var_uses_default() {
+  local root; root="$(mktemp -d)"
+  git -C "$root" init -q
+  mkdir -p "$root/.github" "$root/services/backend"
+  printf '* @acme/platform\n' > "$root/.github/CODEOWNERS"
+  run_collector "$STUBS" "$root/services/backend" "" "unset"
+  assert_eq "unset paths var: exists" "true" "$(field .exists)"
+  assert_eq "unset paths var: scope" "repo" "$(field .scope)"
+  assert_eq "unset paths var: path" ".github/CODEOWNERS" "$(field .path)"
+}
+
 single_repo_root
 single_repo_github
 monorepo_global_auto
@@ -220,6 +242,7 @@ monorepo_none
 scope_repo_root_forces_global
 scope_component_dir_ignores_global
 no_git_fallback
+no_paths_var_uses_default
 
 echo
 echo "-------------------------------------"
