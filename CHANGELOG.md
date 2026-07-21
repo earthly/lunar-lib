@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] — 2026-07-21
+
+### Changed
+
+- `trivy` and `grype` collectors (`container-scan`): scan PR-pushed images too,
+  not just merge/release images — dropped the `runs_on: [default-branch]` pin so
+  the container-scan sub-collector defaults to `[prs, default-branch]`
+  (skip-safe: a PR that pushed no image no-ops). Fleet-wide default for every
+  hub importing `container-scan`; opt out per-import with
+  `exclude: [container-scan]` (#265).
+
 ### Fixed
 
+- `repo-boilerplate` policy: the CODEOWNERS sub-checks no longer hang on
+  "No data at path …" when the `codeowners` collector reports no data for a
+  component — they now resolve to a definitive result. A repo with no CODEOWNERS
+  file fails the check rather than sitting pending (or erroring) indefinitely
+  (#261).
 - `repo-boilerplate` collector (`codeowners`): make the CODEOWNERS checks work
   in a monorepo. A CODEOWNERS file is only honored at the repository root, but
   in a monorepo each component runs from its own subdirectory, so the collector
@@ -118,14 +134,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `backstage` cataloger: switch to the `/catalog/entities/by-query` endpoint
   with cursor pagination, paging through large catalogs instead of issuing a
   single unpaginated request (#240).
-- `repo-boilerplate` collector (`codeowners`): make the CODEOWNERS checks work
-  in a monorepo. A CODEOWNERS file is only honored at the repository root, but
-  in a monorepo each component runs from its own subdirectory, so the check
-  previously reported `exists: false` for every component. It now resolves the
-  repository root and falls back to the global CODEOWNERS there, records a new
-  `.ownership.codeowners.scope` field (`repo` vs `component`), and exposes a
-  `codeowners_scope` input (`auto` | `repo-root` | `component-dir`, default
-  `auto`) to control the behavior (ENG-1248).
 
 ### Fixed
 
