@@ -19,7 +19,7 @@ This collector writes to the following Component JSON paths:
 | `.repo.contributing` | object | CONTRIBUTING.md metadata (exists, path, lines, sections) |
 | `.repo.editorconfig` | object | .editorconfig metadata (exists, path, sections) |
 | `.repo.changelog` | object | CHANGELOG metadata (exists, path, lines, sections) |
-| `.ownership.codeowners` | object | Parsed CODEOWNERS data (exists, valid, owners, rules) |
+| `.ownership.codeowners` | object | Parsed CODEOWNERS data (exists, valid, path, scope, owners, rules) |
 
 ## Collectors
 
@@ -47,5 +47,27 @@ collectors:
     # with:
     #   readme_paths: "README.md,README,README.txt,README.rst"
     #   codeowners_paths: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
+    #   codeowners_scope: "auto"   # auto | repo-root | component-dir
     #   changelog_paths: "CHANGELOG.md,CHANGELOG,CHANGES.md,HISTORY.md,RELEASES.md"
 ```
+
+### Monorepos
+
+In a monorepo, each Lunar component is a subdirectory of one git repository,
+but a CODEOWNERS file is only honored by GitHub/GitLab at the repository root
+(`CODEOWNERS`, `.github/CODEOWNERS`, `docs/CODEOWNERS`) — never inside a
+component subdirectory. The `codeowners` collector handles this by default:
+when a component's own subdirectory has no CODEOWNERS file, it falls back to
+the global file at the repository root, so `.ownership.codeowners` (and every
+CODEOWNERS policy) is populated for every component from that one shared file.
+The `.ownership.codeowners.scope` field records whether the file was found at
+the repository root (`"repo"`) or in the component's own subdirectory
+(`"component"`).
+
+The `codeowners_scope` input controls this:
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Check the component's own directory first, then fall back to the repository root. Correct for both single-repo and monorepo layouts. |
+| `repo-root` | Only use the global CODEOWNERS at the repository root. |
+| `component-dir` | Only use the component's own directory (the pre-monorepo behavior). |
