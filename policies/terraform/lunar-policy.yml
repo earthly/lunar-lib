@@ -281,6 +281,44 @@ policies:
     mainPython: aws_cloudtrail_kms_encryption.py
     keywords: ["cloudtrail", "kms", "encryption at rest", "audit log", "sse-kms", "soc2"]
 
+  # --- Resource tagging (reads the normalized .iac.modules[] view) ---
+  - name: aws-resources-tagged
+    description: |
+      Requires every taggable AWS resource to carry a configurable set of tag
+      keys (e.g. backstage.com/entity_ref). Reads the normalized
+      .iac.modules[].resources[] view and is `default_tags`-aware: a resource is
+      considered to carry a key if the key is on its own `tags` map OR on the
+      module's provider-level `default_tags`, so a repo that tags everything via
+      `default_tags` does not false-positive. Configure the required key(s) via
+      the `required_tags` input; skipped when none are configured (the default).
+      Resources whose `tags` value is an unresolved expression (`tags_expression`,
+      e.g. `tags = merge(...)`) are skipped rather than failed, because hcl2json
+      never evaluates and the keys cannot be extracted. Resource types listed in
+      `exempt_resource_types` (associations, attachments, and other untaggable
+      shapes) are ignored. Fails when a non-exempt resource is missing a required
+      tag key.
+    mainPython: aws_resources_tagged.py
+    keywords: ["aws", "tags", "resource tagging", "default_tags", "backstage", "entity_ref", "governance"]
+
+  - name: entity-ref-valid
+    description: |
+      Validates that the `entity_ref_tag_key` tag value on each AWS resource is a
+      well-formed Backstage entity reference of the form
+      `[<kind>:][<namespace>/]<name>`, and — when the collector is configured with
+      `backstage_url` (referential integrity, signalled by `.iac.refs.checked`) —
+      that the referenced entity actually exists in the Backstage catalog. Reads
+      the normalized `.iac.modules[].resources[]` tags and the collector's lookup
+      results at `.iac.refs`. Only validates resources that carry a concrete
+      entity-ref tag value: a resource without the tag is left to
+      `aws-resources-tagged`, and an unresolved value (`${...}`) is skipped
+      (it can't be verified without `terraform plan`). Optionally require a
+      specific kind (e.g. `component`) via `entity_ref_kind`. Fails on a
+      malformed value, a wrong kind, or a value the collector resolved to
+      `exists: false`; skips (passes) a value the collector could not resolve due
+      to a transient Backstage error, so an outage never turns this red.
+    mainPython: entity_ref_valid.py
+    keywords: ["backstage", "entity_ref", "referential integrity", "tags", "aws", "catalog"]
+
 inputs:
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
@@ -306,3 +344,31 @@ inputs:
   min_password_length:
     description: Minimum IAM account password length required by aws-iam-password-min-length
     default: "14"
+  required_tags:
+    description: |
+      Comma-separated list of tag keys that every taggable AWS resource must
+      carry, checked by aws-resources-tagged. A resource satisfies a key if the
+      key is on its own `tags` map or on the module's provider `default_tags`.
+      Example: `backstage.com/entity_ref,cost-center`. Empty (the default)
+      disables the aws-resources-tagged check.
+    default: ""
+  entity_ref_tag_key:
+    description: |
+      The tag key whose value entity-ref-valid validates as a Backstage entity
+      reference. Should match the collector's `entity_ref_tag_key` input so
+      referential-integrity results line up.
+    default: "backstage.com/entity_ref"
+  entity_ref_kind:
+    description: |
+      When set, entity-ref-valid requires the entity_ref tag value to name this
+      Backstage kind (e.g. `component`). A ref may state the kind explicitly
+      (`component:default/foo`) or omit it; when omitted this expected kind is
+      assumed. Empty (the default) accepts any kind.
+    default: ""
+  exempt_resource_types:
+    description: |
+      Comma-separated list of Terraform resource types that aws-resources-tagged
+      ignores because they are not taggable (associations, attachments, policy
+      documents, etc.). The default covers the common untaggable AWS shapes;
+      override to add or replace it.
+    default: "aws_wafv2_web_acl_association,aws_iam_role_policy_attachment,aws_iam_user_policy_attachment,aws_iam_group_policy_attachment,aws_iam_policy_attachment,aws_route_table_association,aws_subnet_route_table_association,aws_security_group_rule,aws_vpc_security_group_ingress_rule,aws_vpc_security_group_egress_rule,aws_lb_listener_certificate,aws_route53_record,aws_s3_bucket_policy,aws_s3_bucket_public_access_block,aws_s3_bucket_server_side_encryption_configuration"
