@@ -4,7 +4,7 @@ Catalogs all repositories from a GitHub organization as Lunar components.
 
 ## Overview
 
-This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility and repository name patterns, and can optionally stamp a default owner and domain on all components. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
+This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility, repository name patterns, and repository topics (allow/blocklist), and can optionally stamp a default owner and domain on all components. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
 
 ## Synced Data
 
@@ -135,6 +135,32 @@ catalogers:
       org_name: "acme-corp"
       include_repos: "api-*,backend-*,frontend-*"
 ```
+
+### Filter by Topic (allowlist / blocklist)
+
+Instead of maintaining a repository-name list, you can opt repos into the
+catalog by **GitHub topic**. Tag the repos you want cataloged (e.g. add the
+`lunar` topic on GitHub) and set `allowed_topics`:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+    with:
+      org_name: "acme-corp"
+      allowed_topics: "lunar"          # only repos carrying the `lunar` topic
+      disallowed_topics: "no-catalog"  # …but never repos carrying `no-catalog`
+```
+
+- **`allowed_topics`** — when set, a repo is cataloged only if it carries **at
+  least one** of the listed topics. Empty (default) means no allowlist: every
+  repo passes.
+- **`disallowed_topics`** — a repo carrying **any** of the listed topics is
+  excluded. Block wins over allow, so a repo matching both an allowed and a
+  disallowed topic is excluded.
+
+Topics are matched exactly (case-sensitive) against the repository's GitHub
+topics, and both lists compose with the visibility and name-pattern
+(`include_repos` / `exclude_repos`) filters — a repo must pass all of them.
 
 ## Source System
 

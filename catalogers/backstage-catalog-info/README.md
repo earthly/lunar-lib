@@ -13,10 +13,10 @@ This cataloger writes to the following Catalog JSON paths on each run:
 | Path | Type | Description |
 |------|------|-------------|
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
-| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set |
+| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set. When the file also declares the parent hierarchy (`Domain` entities with `spec.subdomainOf`, `System` entities with `spec.domain`), the resolved `spec.domain` / `spec.system` is expanded to its full nested dotted path — see [Nested Domain Hierarchy](#nested-domain-hierarchy-subdomains-and-systems) |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
 | `.components["$LUNAR_COMPONENT_ID"].meta` | object | Key/value meta sourced from annotations per the `meta_annotations` mapping. By default maps the `pagerduty.com/service-id` annotation onto `pagerduty/service-id`, which the [`pagerduty`](../../collectors/pagerduty) collector reads. Omitted entirely when no mapped annotation is present. |
-| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
+| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares `kind: Domain` / `kind: System` entities, each is written under its nested dotted key (see [Nested Domain Hierarchy](#nested-domain-hierarchy-subdomains-and-systems)) with its `metadata.description` and `spec.owner` propagated. |
 
 This cataloger does **not** define new components — both the `component-cron` and `component-repo` hooks augment existing components only. Pair with a component-defining cataloger (see [Layering](#layering-with-a-component-defining-cataloger)). Domain entries are written as stubs only; for a richer global domain catalog, layer with the [`backstage`](../backstage) cataloger.
 
@@ -209,6 +209,38 @@ catalogers:
 The value is written verbatim, and a stub `.domains["<default_domain>"]` entry is written alongside it so the hub's domain validation accepts the reference (the same stub-write the cataloger does for any other domain). `default_domain` is purely a last-resort fallback — it never overrides a domain that the file already provides through any of the sources above. Leave it empty (the default) to keep domain-less components unset.
 
 This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a sensible default domain rather than leaving them blank.
+
+### Nested Domain Hierarchy (subdomains and systems)
+
+Backstage models a nested taxonomy through references — a `Domain` points at its parent with `spec.subdomainOf`, and a `System` points at its domain with `spec.domain`. Lunar encodes hierarchy purely as dot-notation (`a.b.c` is a child of `a.b`), with no explicit parent field, so the dotted key *is* the hierarchy. When a repo's `catalog-info.yaml` **declares those parent entities in the file** — typically a monorepo file that ships its `Component` alongside the `System` and the `Domain` chain it belongs to — the cataloger walks the chain and expands the component's domain to the full dotted path:
+
+```yaml
+# catalog-info.yaml (one multi-document file)
+kind: Domain
+metadata: { name: engineering }
+---
+kind: Domain
+metadata: { name: platform }
+spec: { subdomainOf: engineering }
+---
+kind: Domain
+metadata: { name: observability }
+spec: { subdomainOf: platform }
+---
+kind: System
+metadata: { name: telemetry }
+spec: { domain: observability }
+---
+kind: Component
+metadata:
+  name: telemetry-api
+  annotations: { github.com/project-slug: acme/telemetry-api }
+spec: { system: telemetry }
+```
+
+resolves `telemetry-api`'s domain to `engineering.platform.observability.telemetry`, and writes a `.domains` row for each declared `Domain` / `System` keyed by its own nested path.
+
+Resolution only sees entities **in the same file**. A reference to a parent that isn't declared in the file contributes its bare name as a single segment and stops there — the per-repo cataloger sees one repo's file, not the whole Backstage catalog. For a catalog whose domain tree lives centrally (the common case), use the live-API [`backstage`](../backstage) cataloger, which fetches the entire catalog and resolves the full hierarchy. A file that declares only a `Component` has nothing to nest and behaves exactly as before — the bare `spec.domain` / `spec.system` name is used unchanged, so existing installs see byte-identical output.
 
 ### Mapping Annotations to Component Meta (PagerDuty and others)
 

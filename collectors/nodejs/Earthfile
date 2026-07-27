@@ -2,7 +2,7 @@ VERSION 0.8
 
 image:
     # Use Debian variant for glibc compatibility with Node.js binaries
-    ARG SCRIPTS_VERSION=main-debian
+    ARG SCRIPTS_VERSION=1.1.5-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
     # Install Node.js (download from official source for latest LTS)

@@ -50,7 +50,11 @@ example_catalog_json: |
 catalogers:
   - name: discover
     description: |
-      Walks each configured repository's file tree via the GitHub
+      Builds a scan list from the explicit `repos` input plus any repos
+      auto-discovered from the `orgs` input (filtered by the
+      `allowed_topics` / `disallowed_topics` GitHub-topic lists), so you
+      can opt monorepos in with a repo topic instead of a hand-kept
+      list. Walks each resulting repository's file tree via the GitHub
       Git Trees API (one recursive call per repo), finds every
       `catalog-info.yaml` / `catalog-info.yml`, fetches each via the
       Contents API, parses it (multi-document supported), and CREATES
@@ -67,18 +71,60 @@ catalogers:
     hook:
       type: cron
       schedule: "0 3 * * *"
-    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership"]
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership", "topics", "org"]
 
 inputs:
   repos:
     description: |
       Comma-separated list of `<owner>/<repo>` repositories to scan
-      (e.g. `acme/monorepo,acme/platform`). Each is walked in full
-      for `catalog-info.yaml` files. Required — leave empty and the
-      cataloger has nothing to scan. Org-wide auto-discovery (scan
-      every repo in an org, or every repo already cataloged by
-      `github-org`) is a planned follow-up; see the README.
+      (e.g. `acme/monorepo,acme/platform`). Each is walked in full for
+      `catalog-info.yaml` files, and is ALWAYS scanned (topic filters
+      apply only to org-discovered repos, not to ones you name here).
+      Either `repos` or `orgs` must be set — leave both empty and the
+      cataloger has nothing to scan.
     default: ""
+
+  orgs:
+    description: |
+      Comma-separated list of GitHub organization names to
+      auto-discover repositories from (e.g. `acme,acme-labs`). Every
+      repo in each org is enumerated via the GitHub API and, after the
+      `allowed_topics` / `disallowed_topics` filters are applied, added
+      to the scan set alongside any explicit `repos`. Lets you opt
+      monorepos into cataloging by tagging them with a GitHub topic
+      instead of maintaining a `repos` list. Empty (the default)
+      disables discovery. The `GH_TOKEN` secret must be able to list
+      the org's repos.
+    default: ""
+
+  allowed_topics:
+    description: |
+      Comma-separated list of GitHub repository topics used as an
+      allowlist for org discovery (the `orgs` input). When set, only
+      discovered repos carrying at least one of these topics are
+      scanned; empty (the default) means every discovered repo passes.
+      Matched exactly (case-sensitive) against a repo's GitHub topics.
+      Does not affect repos named explicitly in `repos`. Examples:
+      "lunar,backstage"
+    default: ""
+
+  disallowed_topics:
+    description: |
+      Comma-separated list of GitHub repository topics used as a
+      blocklist for org discovery. A discovered repo carrying any of
+      these topics is skipped, even when it also matches
+      `allowed_topics` (block wins over allow). Empty (the default)
+      disables the blocklist. Does not affect repos named explicitly in
+      `repos`. Examples: "archived,no-catalog"
+    default: ""
+
+  include_archived:
+    description: |
+      When `true`, archived repositories are included during org
+      discovery (the `orgs` input). Defaults to `false` so archived
+      repos are skipped. Does not affect repos named explicitly in
+      `repos`.
+    default: "false"
 
   filenames:
     description: |
@@ -193,6 +239,10 @@ secrets:
       fetch each `catalog-info.yaml` (Contents API). Needs
       `Contents: Read` on the target repos (`repo` scope on a classic
       PAT, or `contents: read` on a fine-grained PAT / GitHub App
-      installation token). Reused across most lunar-lib GitHub
-      plugins, so if `GH_TOKEN` is already set for `github-org` this
-      cataloger picks it up automatically.
+      installation token). When the `orgs` input is set, the token must
+      also be able to list the org's repositories (List organization
+      repositories API — `read:org` / org membership for private repos,
+      or `Metadata: Read` on a fine-grained PAT / App installation).
+      Reused across most lunar-lib GitHub plugins, so if `GH_TOKEN` is
+      already set for `github-org` this cataloger picks it up
+      automatically.

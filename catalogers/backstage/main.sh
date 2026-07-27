@@ -345,13 +345,56 @@ if [ "$TOTAL_FETCHED" -eq 0 ]; then
     exit 0
 fi
 
-# --- Transform to Lunar catalog entries ----------------------------------
-# Components from Component / API / Resource keyed by <prefix><annotation>.
-# Domains from Domain / System keyed by metadata.name.
-# spec.domain (verbatim) takes precedence; fall back to spec.system stripped
-# to bare name so it lines up with how we keyed Systems above.
+# --- Resolve nested domain paths -----------------------------------------
+# Lunar encodes domain hierarchy as dotted names (a.b.c is a child of a.b), so
+# translate Backstage's reference-based nesting into dotted keys:
+#   - a Domain's key is its full spec.subdomainOf ancestry (a.b.c)
+#   - a System is nested under the domain it belongs to (spec.domain):
+#     <domain-path>.<system-name>
+# Parent resolution only sees fetched entities; a reference to an un-synced
+# parent contributes its bare name as one segment and stops the walk there.
+# Cycles are broken defensively so a malformed catalog can't hang the run.
+# Produces {domains: {name: path}, systems: {name: path}} for the transforms
+# below to look up.
+PATHS=$(jq '
+    def bare(s):
+        if (s | type) != "string" or s == "" then s
+        elif (s | contains("/")) then (s | split("/") | last)
+        else s
+        end;
 
+    ( [ .[] | select(.kind == "Domain")
+        | { key: (.metadata.name | tostring),
+            value: ((.spec.subdomainOf // "") | tostring | if . == "" then null else bare(.) end) } ]
+      | from_entries ) as $domain_parent
+    | ( [ .[] | select(.kind == "System")
+          | { key: (.metadata.name | tostring),
+              value: ((.spec.domain // "") | tostring | if . == "" then null else bare(.) end) } ]
+        | from_entries ) as $system_parent
+    | ( def dpath($n; $seen):
+          if $n == null or $n == "" then []
+          elif ($seen | index($n)) then []
+          else ($domain_parent[$n] // null) as $p
+               | (if $p == null then [$n] else dpath($p; $seen + [$n]) + [$n] end)
+          end;
+        {
+          domains: ( [ $domain_parent | keys[] as $k
+                       | { key: $k, value: (dpath($k; []) | join(".")) } ] | from_entries ),
+          systems: ( [ $system_parent | to_entries[] | .key as $k | (.value) as $dom
+                       | { key: $k,
+                           value: (if $dom == null then $k
+                                   else (dpath($dom; []) | join(".")) as $dp
+                                        | (if $dp == "" then $k else $dp + "." + $k end)
+                                   end) } ] | from_entries )
+        } )
+    ' "$ALL_ENTITIES")
+
+# --- Transform to Lunar catalog entries ----------------------------------
+# Components from Component / API / Resource keyed by <prefix><annotation>; a
+# component's domain is the nested dotted path of its spec.system (else
+# spec.domain). Domains from Domain / System keyed by their nested dotted path.
 COMPONENTS=$(jq \
+    --argjson paths "$PATHS" \
     --arg annotation "$COMPONENT_ID_ANNOTATION" \
     --arg id_prefix "$COMPONENT_ID_PREFIX" \
     --arg tag_prefix "$TAG_PREFIX" \
@@ -371,8 +414,10 @@ COMPONENTS=$(jq \
     def domain_ref(e):
         (e.spec.domain // "") as $d
         | (e.spec.system // "") as $s
-        | if ($d | tostring | length) > 0 then ($d | tostring)
-          elif ($s | tostring | length) > 0 then bare($s | tostring)
+        | if ($s | tostring | length) > 0 then
+            (bare($s | tostring)) as $sn | ($paths.systems[$sn] // $sn)
+          elif ($d | tostring | length) > 0 then
+            (bare($d | tostring)) as $dn | ($paths.domains[$dn] // $dn)
           else ""
           end;
 
@@ -403,6 +448,7 @@ COMPONENTS=$(jq \
     | from_entries' "$ALL_ENTITIES")
 
 DOMAINS=$(jq \
+    --argjson paths "$PATHS" \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
     --arg default_desc "$DOMAIN_DEFAULT_DESCRIPTION" \
@@ -418,12 +464,14 @@ DOMAINS=$(jq \
 
     [.[]
      | select(.kind == "Domain" or .kind == "System")
-     | .metadata.name as $name
+     | (.metadata.name | tostring) as $name
+     | (if .kind == "System" then ($paths.systems[$name] // $name)
+        else ($paths.domains[$name] // $name) end) as $key
      | (.spec.owner // "" | tostring) as $raw_owner
      | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
      | (.metadata.description // "" | tostring) as $raw_desc
      | (if $raw_desc == "" then $default_desc else $raw_desc end) as $desc
-     | {key: $name, value:
+     | {key: $key, value:
          ({}
           + (if $desc != "" then {description: $desc} else {} end)
           + (if $owner != "" then {owner: $owner} else {} end))}

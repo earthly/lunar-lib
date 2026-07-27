@@ -26,6 +26,8 @@ check_required_annotations = load_policy("required-annotations")
 check_required_tag_patterns = load_policy("required-tag-patterns")
 check_disallowed_annotations = load_policy("disallowed-annotations")
 check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
+check_domain_exists = load_policy("domain-exists")
+check_system_exists = load_policy("system-exists")
 
 from constraints import (
     parse_required_annotations,
@@ -246,6 +248,101 @@ class TestDisallowedTagPatterns(unittest.TestCase):
                 check_disallowed_tag_patterns(Node.from_component_json(data)).status,
                 CheckStatus.FAIL,
             )
+
+
+def refs_node(refs=None):
+    """Finished node with an optional .catalog.native.backstage.refs block.
+
+    Referential-integrity checks read a data-less path when the collector isn't
+    configured; the SDK only resolves that to a definite skip once workflows
+    finish (mid-run it is PENDING), so these tests use a finished node.
+    """
+    backstage = {"valid": True}
+    if refs is not None:
+        backstage["refs"] = refs
+    data = {"catalog": {"native": {"backstage": backstage}}}
+    return Node.from_component_json(data, {"workflows_finished": True})
+
+
+class TestDomainExists(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        # Collector parsed catalog-info but backstage_url is not set: no .refs.
+        self.assertTrue(is_skipped(check_domain_exists(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        # No catalog-info.yaml at all — nothing to cross-check, so skip (not
+        # fail; the *-set checks own "should the field be set").
+        self.assertTrue(is_skipped(check_domain_exists(finished_node({}))))
+
+    def test_no_domain_declared_passes(self):
+        # Configured, but this component declares no spec.domain.
+        self.assertEqual(
+            check_domain_exists(refs_node({"checked": True})).status,
+            CheckStatus.PASS,
+        )
+
+    def test_exists_passes(self):
+        self.assertEqual(
+            check_domain_exists(
+                refs_node({"checked": True, "domain": {"name": "payments", "exists": True}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_missing_domain_fails_and_names_it(self):
+        check = check_domain_exists(
+            refs_node({"checked": True, "domain": {"name": "typo-domain", "exists": False}})
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("typo-domain", check.failure_reasons[0])
+
+    def test_transient_error_skips(self):
+        # An outage records {name, error}; the check must skip, not false-fail.
+        self.assertTrue(
+            is_skipped(
+                check_domain_exists(
+                    refs_node({"checked": True, "domain": {"name": "payments", "error": "HTTP 502"}})
+                )
+            )
+        )
+
+
+class TestSystemExists(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        self.assertTrue(is_skipped(check_system_exists(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        self.assertTrue(is_skipped(check_system_exists(finished_node({}))))
+
+    def test_no_system_declared_passes(self):
+        self.assertEqual(
+            check_system_exists(refs_node({"checked": True})).status,
+            CheckStatus.PASS,
+        )
+
+    def test_exists_passes(self):
+        self.assertEqual(
+            check_system_exists(
+                refs_node({"checked": True, "system": {"name": "payment-platform", "exists": True}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_missing_system_fails_and_names_it(self):
+        check = check_system_exists(
+            refs_node({"checked": True, "system": {"name": "typo-platform", "exists": False}})
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("typo-platform", check.failure_reasons[0])
+
+    def test_transient_error_skips(self):
+        self.assertTrue(
+            is_skipped(
+                check_system_exists(
+                    refs_node({"checked": True, "system": {"name": "payment-platform", "error": "timeout"}})
+                )
+            )
+        )
 
 
 class TestConstraintParsing(unittest.TestCase):

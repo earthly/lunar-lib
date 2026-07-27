@@ -80,6 +80,7 @@ test:
     BUILD ./policies/backstage+test
     BUILD ./policies/sca+test
     BUILD ./policies/container-scan+test
+    BUILD ./policies/repo-boilerplate+test
 
 lint:
     FROM python:3.12-alpine
@@ -132,7 +133,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=main-alpine
+    ARG SCRIPTS_VERSION=1.1.5-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client

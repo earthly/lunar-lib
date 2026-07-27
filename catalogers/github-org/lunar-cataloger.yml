@@ -49,6 +49,7 @@ catalogers:
       - Maps GitHub topics to Lunar tags with configurable prefix
       - Supports filtering by visibility (public, private, internal)
       - Supports include/exclude patterns for repository names
+      - Supports topic allow/blocklists (allowed_topics / disallowed_topics)
       - Optionally includes archived repositories
     mainBash: main.sh
     hook:
@@ -99,6 +100,26 @@ inputs:
     description: |
       Comma-separated list of glob patterns for repos to exclude.
       Examples: "sandbox-*,deprecated-*,test-*"
+    default: ""
+
+  allowed_topics:
+    description: |
+      Comma-separated list of GitHub repository topics used as an
+      allowlist. When set, only repositories carrying at least one of
+      these topics are cataloged; empty (the default) disables the
+      allowlist so every repo passes. Matched against a repo's GitHub
+      topics exactly (case-sensitive). Lets you opt repos into the
+      catalog by tagging them with a topic instead of maintaining a
+      name list. Examples: "lunar,catalog"
+    default: ""
+
+  disallowed_topics:
+    description: |
+      Comma-separated list of GitHub repository topics used as a
+      blocklist. A repository carrying any of these topics is excluded,
+      even when it also matches allowed_topics (block wins over allow).
+      Empty (the default) disables the blocklist. Examples:
+      "archived,no-catalog"
     default: ""
 
   tag_prefix:

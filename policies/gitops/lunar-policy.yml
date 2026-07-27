@@ -53,13 +53,9 @@ policies:
 
   - name: gitops-managed
     description: |
-      Coverage check: requires every component this policy targets (optionally
-      narrowed to a tag) to actually be deployed by an ArgoCD Application — i.e.
-      to have resolved .cd.gitops data, whether parsed locally or pushed by the
-      argocd-deployment-tracking collector from a separate GitOps repo. Surfaces
-      components that should be on GitOps
-      but haven't been migrated. Unlike the other checks, absence of GitOps data
-      is a failure here, not a skip — that's the whole point.
+      Flags components that should be GitOps-managed but have no resolved
+      .cd.gitops data (no ArgoCD Application deploys them). Unlike the other
+      checks, missing GitOps data is a failure here, not a skip.
     mainPython: gitops_managed.py
     keywords: ["argocd", "gitops adoption", "coverage", "migration", "deployment visibility"]
 

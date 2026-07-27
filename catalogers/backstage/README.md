@@ -203,6 +203,64 @@ with:
 | `Domain`, `System` | `.domains` |
 | Other kinds (`User`, `Group`, `Location`, …) | Ignored |
 
+### Domain Hierarchy (`subdomainOf` + systems)
+
+Backstage expresses grouping with `spec.subdomainOf` (Domain → Domain) and the `spec.domain` a `System` belongs to. Lunar models domain hierarchy through **dot-notation naming** — `a.b.c` is a child of `a.b` — rather than an explicit parent field. This cataloger bridges the two: it walks the parent chain and keys each domain by its full dotted path.
+
+- **Domains** are keyed by their full `spec.subdomainOf` ancestry: a domain `c` that is `subdomainOf` `b`, itself `subdomainOf` `a`, is written as `a.b.c`.
+- **Systems** are treated as the deepest grouping level — a `System` is nested as a subdomain of the domain it belongs to (`spec.domain`), keyed `<domain-path>.<system-name>`.
+- **Components** resolve their `domain` to the full dotted path of their `spec.system` (or `spec.domain` when no system is set).
+
+A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdomainOf`, or a `System` with no `spec.domain`, is keyed by its bare `metadata.name` — byte-for-byte what a flat sync produced. The hierarchy only surfaces where Backstage actually expresses it, which is why there is no "flat vs nested" switch: nesting *is* the faithful mapping, and it degrades to flat exactly when there's nothing to nest.
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.2.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain
+```
+
+Given a Backstage catalog like:
+
+```
+commerce                     (Domain, top — no subdomainOf)
+ └─ payments                 (Domain, subdomainOf commerce)
+     └─ ledger               (Domain, subdomainOf payments)
+         └─ billing          (System, spec.domain: ledger)
+             └─ invoicing-api (Component, spec.system: billing)
+```
+
+the cataloger produces:
+
+```json
+{
+  "domains": {
+    "commerce": { "description": "…", "owner": "…" },
+    "commerce.payments": { "description": "…", "owner": "…" },
+    "commerce.payments.ledger": { "description": "…", "owner": "…" },
+    "commerce.payments.ledger.billing": { "description": "…", "owner": "…" }
+  },
+  "components": {
+    "github.com/acme/invoicing-api": {
+      "owner": "group:default/team-billing",
+      "domain": "commerce.payments.ledger.billing",
+      "tags": ["bs-type-service", "bs-lifecycle-production"]
+    }
+  }
+}
+```
+
+The same component synced from a catalog with no `subdomainOf` / system links would instead get `domain: "billing"`, alongside bare `commerce` / `payments` / `ledger` / `billing` domains — the pre-hierarchy behavior, unchanged.
+
+**Notes & caveats**
+
+- **Upgrade note.** If you already run this cataloger against a Backstage instance that *does* use `subdomainOf` or systems-under-domains, upgrading re-keys those domains from bare names (`billing`) to dotted paths (`commerce.payments.ledger.billing`), and any policy or initiative that targets them by name must be updated to the new key. Catalogs with no hierarchy links are unaffected — their keys don't change.
+- **Sync the parent kinds.** Parent resolution only sees entities the cataloger fetched, so include every level in `entity_kinds` (e.g. `Component,Domain,System`). A `subdomainOf` / `spec.domain` reference to an entity that wasn't synced falls back to the bare name for that hop, and the gap is logged.
+- **Entity refs are normalised.** `subdomainOf` / `spec.domain` / `spec.system` values such as `domain:default/payments` are stripped to their bare name (`payments`) before joining.
+- **Separator.** Path segments join with `.`, Lunar's hierarchy separator. Backstage names that themselves contain a `.` are rare and would be indistinguishable from a level boundary; hyphenated names (`payment-gateway`) are unaffected.
+- **Dangling or cyclic chains.** A missing parent stops the walk (partial path, logged); a cycle is broken defensively so a malformed catalog can't hang the run.
+
 ### Filtering Entities
 
 Pass a raw [Backstage filter expression](https://backstage.io/docs/features/software-catalog/software-catalog-api/#get-entities) through `filter`:

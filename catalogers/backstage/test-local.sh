@@ -190,9 +190,25 @@ case "$FIRST_URL" in
     *) fail "expected first request URL to start with '$EXPECT' but got '$FIRST_URL'" ;;
 esac
 
+# 5. Nested hierarchy: spec.subdomainOf builds dotted domain keys, a System is
+#    nested under its spec.domain, and a Component resolves its domain to the
+#    full dotted path of its system. The fixture's commerce > checkout > orders
+#    > fulfillment (System) > fulfillment-api (Component) chain exercises all
+#    three, including entity-ref (domain:default/...) normalization.
+CAPTURED_DOMAINS=$(jq -s 'add // {}' "$DOMAINS_OUT")
+CAPTURED_COMPONENTS=$(jq -s 'add // {}' "$COMPONENTS_OUT")
+for expect_dom in "commerce" "commerce.checkout" "commerce.checkout.orders" "commerce.checkout.orders.fulfillment"; do
+    if echo "$CAPTURED_DOMAINS" | jq -e --arg k "$expect_dom" 'has($k)' >/dev/null; then :; else
+        fail "expected nested domain key '$expect_dom' in .domains (subdomainOf / system nesting)"
+    fi
+done
+FULFILL_DOMAIN=$(echo "$CAPTURED_COMPONENTS" | jq -r '.["github.com/acme/fulfillment-api"].domain // ""')
+[ "$FULFILL_DOMAIN" = "commerce.checkout.orders.fulfillment" ] || \
+    fail "fulfillment-api domain: expected 'commerce.checkout.orders.fulfillment', got '$FULFILL_DOMAIN'"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths verified"
 else
     echo "TEST FAILED" >&2
     exit 1
