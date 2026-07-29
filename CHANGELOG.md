@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `secrets` policy (`no-hardcoded-secrets`): report each finding individually
+  with its file, line, and rule instead of a single aggregate count, so PR
+  comments and dashboards show exactly where each secret is (#268).
+
 ## [1.10.1] — 2026-07-21
 
 ### Changed
