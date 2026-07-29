@@ -84,6 +84,7 @@ fetch_pr_title() {
   local title
   title="$(echo "$response" | jq -r '.title // empty')"
   if [ -z "$title" ]; then
+    echo "Unable to parse PR ${LUNAR_COMPONENT_PR} title from GitHub response." >&2
     return 1
   fi
   echo "$title"
