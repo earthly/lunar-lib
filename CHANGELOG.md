@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`, `26.0.1_8-jre-alpine`). Previously the
   tag had to be *exactly* a semver (optionally `v`-prefixed / `-`-suffixed),
   which flagged these pinned, immutable tags as unstable. Partial versions like
-  `20` or `16.1` still fail (#XXX).
+  `20` or `16.1` still fail (#270).
 
 ## [1.10.1] — 2026-07-21
 
