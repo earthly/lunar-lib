@@ -13,7 +13,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
-| `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Image uses unstable tag (partial version, branch name, etc.) |
+| `stable-tags` | Tags must be a digest or contain a full semver (e.g., `1.2.3`, `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`) | Image uses unstable tag (partial version, branch name, etc.) |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
 | `required-labels` | Required labels must be present (Dockerfile or build command) | Missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
@@ -132,12 +132,15 @@ policies:
 
 Replace unstable tags with:
 - **Digest** (most stable): `alpine@sha256:abc123...`
-- **Full semver** (stable): `alpine:3.18.4`
+- **Full semver** (stable): `alpine:3.18.4`. A tag that *contains* a full
+  `major.minor.patch` version is accepted too, so registry- or vendor-specific
+  prefixes and suffixes are fine (e.g. `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`,
+  `26.0.1_8-jre-alpine`).
 
 Avoid:
 - Implicit latest: `FROM alpine`
 - Explicit latest: `FROM alpine:latest`
-- Partial versions: `FROM node:20` or `FROM node:20-alpine`
+- Partial versions: `FROM node:20` or `FROM node:16.1` (no patch component)
 
 ### allowed-registries
 

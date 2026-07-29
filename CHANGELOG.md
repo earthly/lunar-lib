@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `container` policy (`stable-tags`): a base image tag is now considered stable
+  when it *contains* a full `major.minor.patch` semantic version anywhere in the
+  tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
+  `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`, `26.0.1_8-jre-alpine`). Previously the
+  tag had to be *exactly* a semver (optionally `v`-prefixed / `-`-suffixed),
+  which flagged these pinned, immutable tags as unstable. Partial versions like
+  `20` or `16.1` still fail (#XXX).
+
 ## [1.10.1] — 2026-07-21
 
 ### Changed
