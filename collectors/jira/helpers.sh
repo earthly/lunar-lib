@@ -53,14 +53,26 @@ extract_ticket_id() {
 #   Prints the PR title to stdout, or nothing on failure.
 #   Returns 0 on success, 1 on failure.
 fetch_pr_title() {
-  local repo="${LUNAR_COMPONENT_ID#github.com/}"
+  # Component IDs are <host>/<owner>/<repository>[/<subpath>...]; monorepo
+  # components append the component path after the repository. Keep only
+  # owner/repository for the GitHub API URL.
+  local host="${LUNAR_COMPONENT_ID%%/*}"
+  local rest="${LUNAR_COMPONENT_ID#*/}"
+  local owner="${rest%%/*}"
+  rest="${rest#*/}"
+  local repo="${owner}/${rest%%/*}"
+
+  local api_url="https://api.github.com"
+  if [ "$host" != "github.com" ]; then
+    api_url="https://${host}/api/v3"
+  fi
 
   set +e
   local response
   response="$(curl -fsS \
     -H 'Accept: application/vnd.github+json' \
     -H "Authorization: token ${LUNAR_SECRET_GH_TOKEN}" \
-    "https://api.github.com/repos/${repo}/pulls/${LUNAR_COMPONENT_PR}")"
+    "${api_url}/repos/${repo}/pulls/${LUNAR_COMPONENT_PR}")"
   local status=$?
   set -e
 
@@ -72,6 +84,7 @@ fetch_pr_title() {
   local title
   title="$(echo "$response" | jq -r '.title // empty')"
   if [ -z "$title" ]; then
+    echo "Unable to parse PR ${LUNAR_COMPONENT_PR} title from GitHub response." >&2
     return 1
   fi
   echo "$title"

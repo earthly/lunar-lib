@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag had to be *exactly* a semver (optionally `v`-prefixed / `-`-suffixed),
   which flagged these pinned, immutable tags as unstable. Partial versions like
   `20` or `16.1` still fail (#270).
+- `jira` collector: errors now fail the run with a non-zero exit code instead
+  of silently exiting 0 — a missing `GH_TOKEN` secret, a failed GitHub
+  PR-metadata fetch (both sub-collectors), a missing `psql` client, and a
+  failed reuse-count query (`ticket-history`) all surface as failed runs.
+  Normal-outcome skips (not in PR context, no ticket in the PR title, optional
+  Jira validation not configured, no SQL API in hub-less dev) still exit 0. A
+  failed Jira issue lookup also still exits 0, deliberately: the Hub discards a
+  failed run's collected values, and that path must preserve the already
+  collected ticket reference (#269).
+
+### Fixed
+
+- `jira` collector: the PR-metadata fetch built an invalid GitHub API URL for
+  monorepo sub-path components (`github.com/<owner>/<repo>/<path>`), so
+  `ticket` and `ticket-history` collected nothing for them. The component ID is
+  now parsed as `<host>/<owner>/<repository>[/<subpath>...]`, and the API base
+  URL is derived from the host, so GHES components work too (#269).
+- `secrets` policy (`no-hardcoded-secrets`): report each finding individually
+  with its file, line, and rule instead of a single aggregate count, so PR
+  comments and dashboards show exactly where each secret is (#268).
 
 ## [1.10.1] — 2026-07-21
 
