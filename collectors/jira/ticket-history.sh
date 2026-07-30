@@ -12,11 +12,11 @@ fi
 # Require GH_TOKEN to fetch PR title.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "ticket-history requires GH_TOKEN secret to query GitHub." >&2
-  exit 0
+  exit 1
 fi
 
 # Fetch PR title from GitHub.
-PR_TITLE="$(fetch_pr_title)" || exit 0
+PR_TITLE="$(fetch_pr_title)" || exit 1
 
 # Extract ticket ID from PR title.
 TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
@@ -33,10 +33,11 @@ if [ -z "$CONN_STRING" ]; then
   exit 0
 fi
 
-# Verify psql is available.
+# Verify psql is available. The SQL API is reachable (connection string above),
+# so a missing client is a broken runtime image, not an unsupported environment.
 if ! command -v psql &> /dev/null; then
-  echo "psql not found, skipping ticket-history." >&2
-  exit 0
+  echo "psql not found, cannot query ticket reuse." >&2
+  exit 1
 fi
 
 # Sanitize inputs for SQL.
@@ -57,8 +58,8 @@ REUSE_COUNT=$(psql "$CONN_STRING" -t -A -c "$QUERY" 2>&1) || true
 
 # Validate result is a number.
 if ! [[ "$REUSE_COUNT" =~ ^[0-9]+$ ]]; then
-  echo "Failed to query ticket reuse count, skipping." >&2
-  exit 0
+  echo "Failed to query ticket reuse count: ${REUSE_COUNT}" >&2
+  exit 1
 fi
 
 lunar collect -j ".vcs.pr.ticket.reuse_count" "$REUSE_COUNT"

@@ -12,11 +12,11 @@ fi
 # Require GH_TOKEN to fetch PR title.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "Jira collector requires GH_TOKEN secret to query GitHub." >&2
-  exit 0
+  exit 1
 fi
 
 # Fetch PR title from GitHub.
-PR_TITLE="$(fetch_pr_title)" || exit 0
+PR_TITLE="$(fetch_pr_title)" || exit 1
 
 # Extract ticket ID from PR title.
 TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
@@ -67,6 +67,10 @@ CURL_STATUS=$?
 set -e
 
 if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
+  # Exit 0, not 1: a non-zero exit makes the Hub discard every value this run
+  # collected, which would erase the ticket reference written above and
+  # misreport the PR as ticket-less whenever Jira is unreachable. Keep the
+  # collected ticket and leave .valid unset (the ticket-valid check skips).
   echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_API_URL}." >&2
   exit 0
 fi
