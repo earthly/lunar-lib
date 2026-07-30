@@ -10,8 +10,12 @@ def main():
         if not definitions.exists():
             return
         
-        # Pattern for full semantic version (major.minor.patch with optional suffix)
-        semver_pattern = r'^v?\d+\.\d+\.\d+(-[a-zA-Z0-9._-]+)?$'
+        # A tag is stable if it *contains* a full semantic version
+        # (major.minor.patch) anywhere in the tag. This accepts registry- or
+        # vendor-specific prefixes and suffixes (e.g. "v4-bpl-3.24.0",
+        # "9.6.1-jdk25-alpine", "26.0.1_8-jre-alpine"), while partial versions
+        # like "20" or "16.1" — which can still move — are rejected.
+        semver_pattern = r'\d+\.\d+\.\d+'
         
         for definition in definitions:
             if not definition.get_value_or_default(".valid", False):
@@ -41,14 +45,15 @@ def main():
                 if tag.startswith("sha256:") or tag.startswith("sha512:"):
                     continue
                 
-                # Full semantic versions are stable
-                if re.match(semver_pattern, tag):
+                # Tags containing a full semantic version are stable
+                if re.search(semver_pattern, tag):
                     continue
                 
                 # Everything else is unstable
                 c.fail(
                     f"'{path}' uses unstable tag '{tag}' in '{reference}'. "
-                    f"Use a digest (@sha256:...) or full semantic version (e.g., :1.2.3)"
+                    f"Use a digest (@sha256:...) or a tag containing a full "
+                    f"semantic version (e.g., :1.2.3)"
                 )
 
 
