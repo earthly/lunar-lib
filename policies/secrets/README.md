@@ -69,7 +69,7 @@ policies:
 
 **Failure messages:**
 - `executed`: "No secret scanning data found. Ensure a scanner (Gitleaks, TruffleHog, etc.) is configured."
-- `no-hardcoded-secrets`: "Hardcoded secrets detected in code. Review .secrets.issues for details."
+- `no-hardcoded-secrets`: one failure per finding, each naming the file, line, and rule, e.g. "Hardcoded secret detected at config.py:10 (generic-api-key): Detected a Generic API Key, potentially exposing access to various services and sensitive operations."
 - `max-issues`: "Secret issues (3) exceeds threshold (5)"
 
 ## Remediation
