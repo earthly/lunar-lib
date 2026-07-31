@@ -58,6 +58,14 @@ inputs:
       PR descriptions — narrow it to your project keys (e.g.
       (ABC|OPS)-[0-9]+) to avoid picking one up as a ticket.
     default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
+  ticket_keywords:
+    description: |
+      Regex alternation of the keywords that mark a description reference as
+      this PR's own ticket ("Fixes ABC-123", "Ticket: ABC-123"). Matched
+      case-insensitively and tried before any bare reference, so a dependency
+      or related ticket mentioned earlier in the body does not win. Only
+      applies to the description; the title is always matched bare.
+    default: "fixes|fixed|fix|closes|closed|close|resolves|resolved|resolve|ticket|issue"
   jira_base_url:
     description: Jira instance base URL (e.g. https://acme.atlassian.net)
   jira_user:

@@ -11,13 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `jira` collector: ticket references are now detected in the PR description as
   well as the title. `ticket` and `ticket-history` read both fields from the
-  same GitHub PR fetch and match the title first, so a title reference still
-  wins and the description is only consulted when the title carries none. PRs
-  that keep their ticket in the body (a `Fixes ABC-123` line, a Jira browse
-  link) now collect `.vcs.pr.ticket` instead of nothing. The permissive default
-  `ticket_pattern` also matches tokens like `UTF-8` or `SHA-256`, which are far
-  likelier in a description than a title — narrow it to your project keys (e.g.
-  `(ABC|OPS)-[0-9]+`) if your descriptions carry that kind of noise (#271).
+  same GitHub PR fetch and resolve in three steps — the title, then a
+  keyword-anchored reference in the description (`Fixes ABC-123`,
+  `Ticket: ABC-123`), then the first bare reference in the description. A title
+  reference still wins, and PRs that keep their ticket in the body now collect
+  `.vcs.pr.ticket` instead of nothing. The keyword step matters because a
+  description usually names several tickets and the first to appear is often a
+  dependency rather than the PR's own; the new `ticket_keywords` input sets the
+  vocabulary (GitHub's closing keywords plus `ticket`/`issue` by default). Only
+  one ticket is collected — `.vcs.pr.ticket.id` is single-valued. Note the
+  permissive default `ticket_pattern` also matches tokens like `UTF-8` or
+  `SHA-256`, far likelier in a description than a title — narrow it to your
+  project keys (e.g. `(ABC|OPS)-[0-9]+`) if your descriptions carry that
+  kind of noise (#271).
 - `container` policy (`stable-tags`): a base image tag is now considered stable
   when it *contains* a full `major.minor.patch` semantic version anywhere in the
   tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.

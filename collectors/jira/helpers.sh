@@ -16,18 +16,19 @@ escape_string() {
   printf "%s" "$escaped"
 }
 
-# extract_ticket_id: Extracts a Jira ticket ID from PR text.
+# extract_ticket_id: Extracts the first Jira ticket ID appearing in a text.
 #
 # Uses LUNAR_VAR_TICKET_PREFIX, LUNAR_VAR_TICKET_SUFFIX, and
 # LUNAR_VAR_TICKET_PATTERN environment variables (from collector inputs).
 #
 # Arguments:
-#   $@ - texts to search, in precedence order (PR title, then PR description)
+#   $1 - text to search
 #
 # Outputs:
-#   Prints the uppercase ticket key of the first text that matches, or nothing
-#   if none do. Returns 0 if found, 1 if not found.
+#   Prints the uppercase ticket key to stdout, or nothing if not found.
+#   Returns 0 if found, 1 if not found.
 extract_ticket_id() {
+  local text="$1"
   local prefix="${LUNAR_VAR_TICKET_PREFIX:-}"
   local suffix="${LUNAR_VAR_TICKET_SUFFIX:-}"
   local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
@@ -37,14 +38,75 @@ extract_ticket_id() {
   suffix_pattern="[[:space:]]*$(escape_string "$suffix")"
   regex="${prefix_pattern}(${pattern})${suffix_pattern}"
 
-  local text
-  for text in "$@"; do
-    if [[ $text =~ $regex ]]; then
-      echo "${BASH_REMATCH[1]^^}"
-      return 0
-    fi
-  done
+  if [[ $text =~ $regex ]]; then
+    echo "${BASH_REMATCH[1]^^}"
+    return 0
+  fi
   return 1
+}
+
+# extract_ticket_id_keyword: Extracts the ticket ID that a keyword marks as the
+# text's own ticket, e.g. "Fixes ABC-123" or "Ticket: ABC-123".
+#
+# A PR description routinely names several tickets — dependencies, reverts,
+# related work — so taking the first one that appears attributes the PR to
+# whichever the author happened to mention first. Anchoring on a keyword picks
+# the one they flagged as this PR's.
+#
+# Uses LUNAR_VAR_TICKET_KEYWORDS on top of the prefix/suffix/pattern variables.
+# Keywords match case-insensitively.
+#
+# Arguments:
+#   $1 - text to search
+#
+# Outputs:
+#   Prints the uppercase ticket key to stdout, or nothing if the text has no
+#   keyword-anchored reference. Returns 0 if found, 1 if not found.
+extract_ticket_id_keyword() {
+  local text="$1"
+  local keywords="${LUNAR_VAR_TICKET_KEYWORDS:-fixes|fixed|fix|closes|closed|close|resolves|resolved|resolve|ticket|issue}"
+  local prefix="${LUNAR_VAR_TICKET_PREFIX:-}"
+  local suffix="${LUNAR_VAR_TICKET_SUFFIX:-}"
+  local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
+
+  # Group 1 is the leading boundary (keeps "prefixes" from matching "fixes"),
+  # group 2 the keyword, group 3 the ticket key. A caller-supplied pattern may
+  # add groups of its own, but they can only open after group 3.
+  local regex
+  regex="(^|[^[:alnum:]])(${keywords})[[:space:]:]+"
+  regex+="$(escape_string "$prefix")[[:space:]]*(${pattern})"
+  regex+="[[:space:]]*$(escape_string "$suffix")"
+
+  local restore key=""
+  restore="$(shopt -p nocasematch)"
+  shopt -s nocasematch
+  if [[ $text =~ $regex ]]; then
+    key="${BASH_REMATCH[3]^^}"
+  fi
+  eval "$restore"
+
+  if [ -n "$key" ]; then
+    echo "$key"
+    return 0
+  fi
+  return 1
+}
+
+# resolve_ticket_id: Resolves the PR's ticket ID from PR_TITLE and PR_BODY,
+# which fetch_pr_metadata populates.
+#
+# Precedence:
+#   1. The PR title.
+#   2. A keyword-anchored reference in the description ("Fixes ABC-123").
+#   3. The first bare reference in the description.
+#
+# Outputs:
+#   Prints the uppercase ticket key to stdout, or nothing if the PR references
+#   no ticket. Returns 0 if found, 1 if not found.
+resolve_ticket_id() {
+  extract_ticket_id "$PR_TITLE" && return 0
+  extract_ticket_id_keyword "$PR_BODY" && return 0
+  extract_ticket_id "$PR_BODY"
 }
 
 # fetch_pr_metadata: Fetches the PR title and description from GitHub API.

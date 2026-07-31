@@ -18,8 +18,8 @@ fi
 # Fetch PR title and description from GitHub.
 fetch_pr_metadata || exit 1
 
-# Extract ticket ID, preferring the title over the description.
-TICKET_KEY="$(extract_ticket_id "$PR_TITLE" "$PR_BODY")" || exit 0
+# Resolve the ticket ID from the title, then the description.
+TICKET_KEY="$(resolve_ticket_id)" || exit 0
 
 if [ -z "$TICKET_KEY" ]; then
   exit 0

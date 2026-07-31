@@ -81,9 +81,26 @@ Needs read access to the PR (`GET /repos/{owner}/{repo}/pulls/{number}`).
 
 ### Ticket matching
 
-Both sub-collectors look for a ticket ID in the PR title first and fall back to the PR description when the title has none, so a title reference always wins over one in the body.
+Both sub-collectors resolve the ticket in three steps, stopping at the first hit:
 
-Descriptions carry far more incidental text than titles, and the default `ticket_pattern` also matches tokens like `UTF-8`, `SHA-256`, or `x86-64`. If your descriptions contain that kind of noise, narrow the pattern to your project keys:
+1. **The PR title**, matched bare — a title reference always wins.
+2. **A keyword-anchored reference in the description**, e.g. `Fixes ABC-123` or `Ticket: ABC-123`. The keywords come from `ticket_keywords` and match case-insensitively.
+3. **The first bare reference in the description**.
+
+Step 2 exists because a description usually names more than one ticket, and the first one to appear is often not the PR's own. Given this body, step 3 alone would collect `OPS-500`; the keyword anchor correctly picks `ENG-1234`:
+
+```markdown
+## Related
+- Depends on OPS-500
+- Reverts OPS-412
+
+## Fixes
+ENG-1234
+```
+
+Only one ticket is ever collected — `.vcs.pr.ticket.id` is a single value, so the others are dropped.
+
+Descriptions also carry far more incidental text than titles, and the default `ticket_pattern` matches tokens like `UTF-8`, `SHA-256`, or `x86-64`. If your descriptions contain that kind of noise, narrow the pattern to your project keys:
 
 ```yaml
 with:
