@@ -10,20 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `jira` collector: ticket references are now detected in the PR description as
-  well as the title. `ticket` and `ticket-history` read both fields from the
-  same GitHub PR fetch and resolve in three steps — the title, then a
+  well as the title, and checked against Jira before one is collected. `ticket`
+  and `ticket-history` read both fields from the same GitHub PR fetch and build
+  a candidate list, best first — every bare reference in the title, then every
   keyword-anchored reference in the description (`Fixes ABC-123`,
-  `Ticket: ABC-123`), then the first bare reference in the description. A title
-  reference still wins, and PRs that keep their ticket in the body now collect
-  `.vcs.pr.ticket` instead of nothing. The keyword step matters because a
+  `Ticket: ABC-123`), then every bare reference in the description — and
+  collect the first candidate Jira confirms exists. A title reference still
+  wins, and PRs that keep their ticket in the body now collect
+  `.vcs.pr.ticket` instead of nothing. Keyword anchoring matters because a
   description usually names several tickets and the first to appear is often a
   dependency rather than the PR's own; the new `ticket_keywords` input sets the
-  vocabulary (GitHub's closing keywords plus `ticket`/`issue` by default). Only
-  one ticket is collected — `.vcs.pr.ticket.id` is single-valued. Note the
-  permissive default `ticket_pattern` also matches tokens like `UTF-8` or
-  `SHA-256`, far likelier in a description than a title — narrow it to your
-  project keys (e.g. `(ABC|OPS)-[0-9]+`) if your descriptions carry that
-  kind of noise (#271).
+  vocabulary (GitHub's closing keywords plus `ticket`/`issue` by default).
+  Skipping candidates Jira does not know keeps the permissive default
+  `ticket_pattern` from collecting a token like `UTF-8` as the ticket, and the
+  new `max_ticket_candidates` (default 5) bounds the lookups that costs. Both
+  sub-collectors resolve through the same validated path, so the reuse count
+  keys off the ticket that was actually collected. Only one ticket is
+  collected — `.vcs.pr.ticket.id` is single-valued (#271).
+- `jira` collector: Jira lookups now tell their failure modes apart. A
+  transient failure — connection refused, timeout, `429`, `5xx` — is retried
+  `jira_retries` times (default 3); if Jira is still unreachable the run keeps
+  the ticket reference and records `.vcs.pr.ticket.tracker_error` =
+  `unreachable`, so an outage does not misreport the PR as ticket-less. When
+  every candidate is checked and none exists, that is recorded as `not_found`.
+  Rejected credentials (`401`/`403`) are not retried and fail the run, since a
+  bad token is a misconfiguration an operator has to fix rather than a property
+  of the PR. The `ticket-valid` policy reads `tracker_error` and names the
+  actual cause instead of guessing between them (#271).
 - `container` policy (`stable-tags`): a base image tag is now considered stable
   when it *contains* a full `major.minor.patch` semantic version anywhere in the
   tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
