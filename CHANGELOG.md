@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link) now collect `.vcs.pr.ticket` instead of nothing. The permissive default
   `ticket_pattern` also matches tokens like `UTF-8` or `SHA-256`, which are far
   likelier in a description than a title — narrow it to your project keys (e.g.
-  `(ABC|OPS)-[0-9]+`) if your descriptions carry that kind of noise (#PRNUM).
+  `(ABC|OPS)-[0-9]+`) if your descriptions carry that kind of noise (#271).
 - `container` policy (`stable-tags`): a base image tag is now considered stable
   when it *contains* a full `major.minor.patch` semantic version anywhere in the
   tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
