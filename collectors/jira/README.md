@@ -100,7 +100,9 @@ ENG-1234
 
 Only one ticket is ever collected — `.vcs.pr.ticket.id` is a single value, so the others are dropped.
 
-Descriptions also carry far more incidental text than titles, and the default `ticket_pattern` matches tokens like `UTF-8`, `SHA-256`, or `x86-64`. If your descriptions contain that kind of noise, narrow the pattern to your project keys:
+A reference at any of the three steps is whatever `ticket_pattern` matches. The default accepts a project key of two or more characters, so `XX-1` is collected as readily as `ABC-123`.
+
+Descriptions also carry far more incidental text than titles, and that default matches tokens like `UTF-8`, `SHA-256`, or `x86-64` too. If your descriptions contain that kind of noise, narrow the pattern to your project keys:
 
 ```yaml
 with:

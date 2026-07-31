@@ -53,10 +53,11 @@ inputs:
     default: ""
   ticket_pattern:
     description: |
-      Regex pattern for ticket ID (without prefix/suffix). The permissive
-      default also matches tokens like UTF-8 or SHA-256, which are common in
-      PR descriptions — narrow it to your project keys (e.g.
-      (ABC|OPS)-[0-9]+) to avoid picking one up as a ticket.
+      Regex pattern for ticket ID (without prefix/suffix). The default accepts
+      a project key of two or more characters, so XX-1 matches as well as
+      ABC-123. It is permissive enough to also match tokens like UTF-8 or
+      SHA-256, which are common in PR descriptions — narrow it to your project
+      keys (e.g. (ABC|OPS)-[0-9]+) to avoid picking one up as a ticket.
     default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
   ticket_keywords:
     description: |
