@@ -18,60 +18,44 @@ fi
 # Fetch PR title and description from GitHub.
 fetch_pr_metadata || exit 1
 
-# Resolve the ticket ID from the title, then the description.
-TICKET_KEY="$(resolve_ticket_id)" || exit 0
+# Resolve the ticket, validating candidates against Jira in order.
+RESOLVE_STATUS=0
+resolve_ticket || RESOLVE_STATUS=$?
 
-if [ -z "$TICKET_KEY" ]; then
-  exit 0
-fi
+case $RESOLVE_STATUS in
+  1)
+    echo "PR references no ticket." >&2
+    exit 0
+    ;;
+  2)
+    # Exit 1: rejected credentials are a misconfiguration an operator has to
+    # fix, not a property of this PR, so the run itself has to show as failed.
+    echo "Jira rejected the credentials for ${LUNAR_VAR_JIRA_USER}." >&2
+    exit 1
+    ;;
+esac
 
-# Write the ticket ID and source regardless of Jira API result.
-JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
-TICKET_URL=""
-if [ -n "$JIRA_BASE_URL" ]; then
-  TICKET_URL="${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
-fi
-
+# Write the ticket reference. This happens even when Jira could not confirm the
+# ticket, so an outage does not make the PR look ticket-less.
 lunar collect ".vcs.pr.ticket.id" "$TICKET_KEY"
 jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j ".vcs.pr.ticket.source" -
 
-if [ -n "$TICKET_URL" ]; then
-  lunar collect ".vcs.pr.ticket.url" "$TICKET_URL"
+JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
+if [ -n "$JIRA_BASE_URL" ]; then
+  lunar collect ".vcs.pr.ticket.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
 fi
 
-# Validate required Jira API configuration.
-if [ -z "$JIRA_BASE_URL" ]; then
-  echo "jira_base_url input not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-JIRA_USER="${LUNAR_VAR_JIRA_USER:-}"
-if [ -z "$JIRA_USER" ]; then
-  echo "jira_user input not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-if [ -z "${LUNAR_SECRET_JIRA_TOKEN:-}" ]; then
-  echo "JIRA_TOKEN secret not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-# Fetch ticket from Jira REST API using classic API token + HTTP Basic auth.
-JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
-set +e
-JIRA_RESPONSE="$(curl -fsS \
-  -u "${JIRA_USER}:${LUNAR_SECRET_JIRA_TOKEN}" \
-  -H 'Accept: application/json' \
-  "$JIRA_API_URL")"
-CURL_STATUS=$?
-set -e
-
-if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
+if [ -z "$TICKET_VALID" ]; then
   # Exit 0, not 1: a non-zero exit makes the Hub discard every value this run
   # collected, which would erase the ticket reference written above and
-  # misreport the PR as ticket-less whenever Jira is unreachable. Keep the
-  # collected ticket and leave .valid unset (the ticket-valid check skips).
-  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_API_URL}." >&2
+  # misreport the PR as ticket-less. tracker_error tells the ticket-valid
+  # policy why .valid is missing, so it can name the real cause; leaving it
+  # unset means validation was never configured.
+  if [ -n "$TICKET_ERROR" ]; then
+    lunar collect ".vcs.pr.ticket.tracker_error" "$TICKET_ERROR"
+  else
+    echo "Jira API validation not configured, skipping." >&2
+  fi
   exit 0
 fi
 

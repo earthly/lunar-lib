@@ -18,12 +18,23 @@ fi
 # Fetch PR title and description from GitHub.
 fetch_pr_metadata || exit 1
 
-# Resolve the ticket ID from the title, then the description.
-TICKET_KEY="$(resolve_ticket_id)" || exit 0
+# Resolve the ticket the same way the ticket sub-collector does, validating
+# candidates against Jira. Resolving independently but unvalidated would count
+# reuse for a different key than the one ticket collected whenever the first
+# candidate turns out not to exist.
+RESOLVE_STATUS=0
+resolve_ticket || RESOLVE_STATUS=$?
 
-if [ -z "$TICKET_KEY" ]; then
-  exit 0
-fi
+case $RESOLVE_STATUS in
+  1)
+    echo "PR references no ticket." >&2
+    exit 0
+    ;;
+  2)
+    echo "Jira rejected the credentials for ${LUNAR_VAR_JIRA_USER}." >&2
+    exit 1
+    ;;
+esac
 
 # Get database connection string.
 CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true

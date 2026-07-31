@@ -4,7 +4,7 @@ Extract Jira ticket references from pull request titles and descriptions and val
 
 ## Overview
 
-This collector parses the PR title for a Jira ticket ID (e.g. `[ABC-123] Fix bug`), falls back to the PR description when the title has none, validates the ticket against the Jira REST API, and writes normalized ticket data to `.vcs.pr.ticket` and native Jira data to `.vcs.pr.ticket.native.jira`. It also detects ticket reuse across PRs by querying the Lunar SQL database.
+This collector finds Jira ticket references in the PR title and description (e.g. `[ABC-123] Fix bug`, or `Fixes ABC-123` in the body), validates them against the Jira REST API and keeps the best one that exists, and writes normalized ticket data to `.vcs.pr.ticket` and native Jira data to `.vcs.pr.ticket.native.jira`. It also detects ticket reuse across PRs by querying the Lunar SQL database.
 
 The normalized `.vcs.pr.ticket` paths match the Linear collector's shape, so the shared `ticket` policy works regardless of which issue tracker provided the data.
 
@@ -14,10 +14,11 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.vcs.pr.ticket.id` | string | Ticket key extracted from the PR title or description (e.g. `ABC-123`) |
+| `.vcs.pr.ticket.id` | string | Ticket key resolved from the PR title or description (e.g. `ABC-123`) |
 | `.vcs.pr.ticket.source` | object | Source metadata (`{tool: "jira", integration: "api"}`) |
 | `.vcs.pr.ticket.url` | string | Direct link to the ticket on the Jira instance |
-| `.vcs.pr.ticket.valid` | boolean | `true` when the Jira API returned the ticket |
+| `.vcs.pr.ticket.valid` | boolean | `true` when the Jira API returned the ticket; absent when it could not be confirmed |
+| `.vcs.pr.ticket.tracker_error` | string | Why `.valid` is absent: `not_found` or `unreachable` |
 | `.vcs.pr.ticket.status` | string | Ticket status name (e.g. `In Progress`) |
 | `.vcs.pr.ticket.type` | string | Issue type name (e.g. `Story`, `Bug`) |
 | `.vcs.pr.ticket.summary` | string | Ticket summary |
@@ -31,8 +32,8 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Description |
 |-----------|-------------|
-| `ticket` | Extracts ticket ID from the PR title or description and fetches Jira issue metadata via the Jira REST API |
-| `ticket-history` | Queries Lunar SQL for ticket reuse count across PRs (no Jira API call) |
+| `ticket` | Resolves the ticket from the PR title or description and fetches its metadata via the Jira REST API |
+| `ticket-history` | Queries Lunar SQL for ticket reuse count across PRs, resolving the ticket the same way `ticket` does |
 
 ## Installation
 
@@ -79,15 +80,15 @@ Needs read access to the PR (`GET /repos/{owner}/{repo}/pulls/{number}`).
 - Fine-grained PAT or GitHub App: `Metadata: Read` + `Pull requests: Read`
 - GitHub Actions `GITHUB_TOKEN`: works as-is
 
-### Ticket matching
+### Ticket resolution
 
-Both sub-collectors resolve the ticket in three steps, stopping at the first hit:
+Both sub-collectors build a list of candidate keys from the PR, best first, and collect the first one Jira confirms exists:
 
-1. **The PR title**, matched bare — a title reference always wins.
-2. **A keyword-anchored reference in the description**, e.g. `Fixes ABC-123` or `Ticket: ABC-123`. The keywords come from `ticket_keywords` and match case-insensitively.
-3. **The first bare reference in the description**.
+1. **Every bare reference in the PR title**, left to right — a title reference always wins.
+2. **Every keyword-anchored reference in the description**, e.g. `Fixes ABC-123` or `Ticket: ABC-123`. The keywords come from `ticket_keywords` and match in either case.
+3. **Every bare reference in the description**.
 
-Step 2 exists because a description usually names more than one ticket, and the first one to appear is often not the PR's own. Given this body, step 3 alone would collect `OPS-500`; the keyword anchor correctly picks `ENG-1234`:
+Step 2 outranks step 3 because a description usually names more than one ticket, and the first one to appear is often not the PR's own. Given this body, the list leads with `ENG-1234` rather than `OPS-500`:
 
 ```markdown
 ## Related
@@ -98,13 +99,25 @@ Step 2 exists because a description usually names more than one ticket, and the 
 ENG-1234
 ```
 
-Only one ticket is ever collected — `.vcs.pr.ticket.id` is a single value, so the others are dropped.
+A candidate Jira does not know is skipped rather than collected, so the incidental tokens a description carries — `UTF-8`, `SHA-256`, `x86-64` — cost a lookup instead of becoming the PR's ticket. `max_ticket_candidates` caps how many are tried. Only one ticket is ever collected: `.vcs.pr.ticket.id` is a single value, so the rest are dropped.
 
-A reference at any of the three steps is whatever `ticket_pattern` matches. The default accepts a project key of two or more characters, so `XX-1` is collected as readily as `ABC-123`.
-
-Descriptions also carry far more incidental text than titles, and that default matches tokens like `UTF-8`, `SHA-256`, or `x86-64` too. If your descriptions contain that kind of noise, narrow the pattern to your project keys:
+A candidate is whatever `ticket_pattern` matches. The default accepts a project key of two or more characters, so `XX-1` is collected as readily as `ABC-123`. Narrowing it to your project keys avoids the wasted lookups, and matters more when Jira validation is not configured, since then the best candidate is taken unchecked:
 
 ```yaml
 with:
   ticket_pattern: "(ABC|OPS)-[0-9]+"
 ```
+
+### When Jira cannot confirm the ticket
+
+| Situation | Collected | Run |
+|---|---|---|
+| A candidate exists | that ticket, `.valid` true, plus status, type, summary, assignee | succeeds |
+| No candidate exists in Jira | the best candidate, `.tracker_error` = `not_found` | succeeds |
+| Jira unreachable after `jira_retries` | the best candidate, `.tracker_error` = `unreachable` | succeeds |
+| Jira rejects the credentials | nothing | **fails** |
+| Jira validation not configured | the best candidate, unchecked | succeeds |
+
+Transient failures — connection refused, timeouts, `429`, `5xx` — are retried `jira_retries` times before the collector calls Jira unreachable. Rejected credentials are never retried: that is a misconfiguration rather than a property of the PR, so the run fails and an operator has to fix it.
+
+The runs that succeed keep the ticket reference, so an outage does not make the PR look ticket-less — `ticket-present` still passes, and `ticket-valid` fails naming the real cause. A failed run does the opposite: the Hub discards everything the run collected, so `ticket-present` fails with "PR does not reference a ticket" until the credentials are fixed.
