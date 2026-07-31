@@ -13,7 +13,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `ticket-present` | PRs must reference a ticket | No ticket ID found in PR title |
-| `ticket-valid` | Referenced ticket must exist | Ticket ID was parsed but doesn't exist in the issue tracker |
+| `ticket-valid` | Referenced ticket must exist | Ticket ID was parsed but the tracker did not confirm it exists |
 | `ticket-source` | Ticket must come from an approved tracker | Ticket source not in allowed list |
 | `ticket-status` | Ticket must be in an acceptable status | Ticket status is disallowed or not in allowed list |
 | `ticket-type` | Ticket must be an acceptable issue type | Issue type not in allowed list |
@@ -28,6 +28,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.pr.ticket.id` | string | Ticket ID extracted from PR title |
 | `.vcs.pr.ticket.source` | string | Issue tracker name (e.g. "jira", "linear") |
 | `.vcs.pr.ticket.valid` | boolean | Whether ticket exists in the tracker |
+| `.vcs.pr.ticket.tracker_error` | string | Why `.valid` is absent, when the collector reports it (`not_found`, `unreachable`) |
 | `.vcs.pr.ticket.status` | string | Ticket workflow status |
 | `.vcs.pr.ticket.type` | string | Issue type (e.g. Story, Bug) |
 | `.vcs.pr.ticket.reuse_count` | number | Count of other PRs using same ticket |
