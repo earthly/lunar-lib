@@ -234,7 +234,11 @@ resolve_ticket() {
         return 2
         ;;
       *)
+        # Every candidate before this one came back a definitive 404, so this
+        # is the best one still standing. Reporting candidates[0] here would
+        # name a key Jira already denied and blame the outage for it.
         echo "Jira unreachable while looking up ${key}." >&2
+        TICKET_KEY="$key"
         TICKET_ERROR="unreachable"
         return 0
         ;;
