@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `jira` collector: ticket references are now detected in the PR description as
+  well as the title. `ticket` and `ticket-history` read both fields from the
+  same GitHub PR fetch and match the title first, so a title reference still
+  wins and the description is only consulted when the title carries none. PRs
+  that keep their ticket in the body (a `Fixes ABC-123` line, a Jira browse
+  link) now collect `.vcs.pr.ticket` instead of nothing. The permissive default
+  `ticket_pattern` also matches tokens like `UTF-8` or `SHA-256`, which are far
+  likelier in a description than a title — narrow it to your project keys (e.g.
+  `(ABC|OPS)-[0-9]+`) if your descriptions carry that kind of noise (#PRNUM).
 - `container` policy (`stable-tags`): a base image tag is now considered stable
   when it *contains* a full `major.minor.patch` semantic version anywhere in the
   tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
@@ -20,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of silently exiting 0 — a missing `GH_TOKEN` secret, a failed GitHub
   PR-metadata fetch (both sub-collectors), a missing `psql` client, and a
   failed reuse-count query (`ticket-history`) all surface as failed runs.
-  Normal-outcome skips (not in PR context, no ticket in the PR title, optional
+  Normal-outcome skips (not in PR context, no ticket reference found, optional
   Jira validation not configured, no SQL API in hub-less dev) still exit 0. A
   failed Jira issue lookup also still exits 0, deliberately: the Hub discards a
   failed run's collected values, and that path must preserve the already

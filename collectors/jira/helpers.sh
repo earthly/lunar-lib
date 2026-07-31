@@ -16,19 +16,18 @@ escape_string() {
   printf "%s" "$escaped"
 }
 
-# extract_ticket_id: Extracts a Jira ticket ID from a PR title.
+# extract_ticket_id: Extracts a Jira ticket ID from PR text.
 #
 # Uses LUNAR_VAR_TICKET_PREFIX, LUNAR_VAR_TICKET_SUFFIX, and
 # LUNAR_VAR_TICKET_PATTERN environment variables (from collector inputs).
 #
 # Arguments:
-#   $1 - PR title string
+#   $@ - texts to search, in precedence order (PR title, then PR description)
 #
 # Outputs:
-#   Prints the uppercase ticket key to stdout, or nothing if not found.
-#   Returns 0 if found, 1 if not found.
+#   Prints the uppercase ticket key of the first text that matches, or nothing
+#   if none do. Returns 0 if found, 1 if not found.
 extract_ticket_id() {
-  local pr_title="$1"
   local prefix="${LUNAR_VAR_TICKET_PREFIX:-}"
   local suffix="${LUNAR_VAR_TICKET_SUFFIX:-}"
   local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
@@ -38,21 +37,24 @@ extract_ticket_id() {
   suffix_pattern="[[:space:]]*$(escape_string "$suffix")"
   regex="${prefix_pattern}(${pattern})${suffix_pattern}"
 
-  if [[ $pr_title =~ $regex ]]; then
-    echo "${BASH_REMATCH[1]^^}"
-    return 0
-  fi
+  local text
+  for text in "$@"; do
+    if [[ $text =~ $regex ]]; then
+      echo "${BASH_REMATCH[1]^^}"
+      return 0
+    fi
+  done
   return 1
 }
 
-# fetch_pr_title: Fetches the PR title from GitHub API.
+# fetch_pr_metadata: Fetches the PR title and description from GitHub API.
 #
 # Requires LUNAR_SECRET_GH_TOKEN, LUNAR_COMPONENT_ID, and LUNAR_COMPONENT_PR.
 #
 # Outputs:
-#   Prints the PR title to stdout, or nothing on failure.
-#   Returns 0 on success, 1 on failure.
-fetch_pr_title() {
+#   Sets PR_TITLE and PR_BODY in the caller's scope; PR_BODY is empty when the
+#   PR has no description. Returns 0 on success, 1 on failure.
+fetch_pr_metadata() {
   # Component IDs are <host>/<owner>/<repository>[/<subpath>...]; monorepo
   # components append the component path after the repository. Keep only
   # owner/repository for the GitHub API URL.
@@ -81,12 +83,11 @@ fetch_pr_title() {
     return 1
   fi
 
-  local title
-  title="$(echo "$response" | jq -r '.title // empty')"
-  if [ -z "$title" ]; then
+  PR_TITLE="$(echo "$response" | jq -r '.title // empty')"
+  PR_BODY="$(echo "$response" | jq -r '.body // empty')"
+  if [ -z "$PR_TITLE" ]; then
     echo "Unable to parse PR ${LUNAR_COMPONENT_PR} title from GitHub response." >&2
     return 1
   fi
-  echo "$title"
   return 0
 }

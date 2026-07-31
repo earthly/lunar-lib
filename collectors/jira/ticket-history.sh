@@ -9,17 +9,17 @@ if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
   exit 0
 fi
 
-# Require GH_TOKEN to fetch PR title.
+# Require GH_TOKEN to fetch PR metadata.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "ticket-history requires GH_TOKEN secret to query GitHub." >&2
   exit 1
 fi
 
-# Fetch PR title from GitHub.
-PR_TITLE="$(fetch_pr_title)" || exit 1
+# Fetch PR title and description from GitHub.
+fetch_pr_metadata || exit 1
 
-# Extract ticket ID from PR title.
-TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
+# Extract ticket ID, preferring the title over the description.
+TICKET_KEY="$(extract_ticket_id "$PR_TITLE" "$PR_BODY")" || exit 0
 
 if [ -z "$TICKET_KEY" ]; then
   exit 0
