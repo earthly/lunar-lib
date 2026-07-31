@@ -69,11 +69,11 @@ extract_ticket_id_keyword() {
   local suffix="${LUNAR_VAR_TICKET_SUFFIX:-}"
   local pattern="${LUNAR_VAR_TICKET_PATTERN:-[A-Za-z][A-Za-z0-9]+-[0-9]+}"
 
-  # Group 1 is the leading boundary (keeps "prefixes" from matching "fixes"),
-  # group 2 the keyword, group 3 the ticket key. A caller-supplied pattern may
-  # add groups of its own, but they can only open after group 3.
+  # \b keeps a word like "prefixes" from registering as the "fixes" keyword.
+  # Group 1 is the keyword, group 2 the ticket key. A caller-supplied pattern
+  # may add groups of its own, but they can only open after group 2.
   local regex
-  regex="(^|[^[:alnum:]])(${keywords})[[:space:]:]+"
+  regex="\b(${keywords})[[:space:]:]+"
   regex+="$(escape_string "$prefix")[[:space:]]*(${pattern})"
   regex+="[[:space:]]*$(escape_string "$suffix")"
 
@@ -81,7 +81,7 @@ extract_ticket_id_keyword() {
   restore="$(shopt -p nocasematch)"
   shopt -s nocasematch
   if [[ $text =~ $regex ]]; then
-    key="${BASH_REMATCH[3]^^}"
+    key="${BASH_REMATCH[2]^^}"
   fi
   eval "$restore"
 
