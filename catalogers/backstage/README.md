@@ -263,7 +263,7 @@ The same component synced from a catalog with no `subdomainOf` / system links wo
 
 ### Filtering Entities
 
-Large catalogs rarely want *everything* in Lunar at once. Two common needs:
+Most of the time you'll want your whole catalog in Lunar. But there are cases where you don't need *everything* at once — two common ones:
 
 - **Onboard incrementally** — bring one domain live today (say `platform-engineering`), the next tomorrow, instead of syncing thousands of components in one shot.
 - **Cut noise** — sync only production services, not experimental libraries; or exclude a single problem component while you sort it out.
