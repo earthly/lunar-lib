@@ -22,8 +22,11 @@ def check_engines_pinned(node=None):
             return c
 
         value = engines_node.get_value()
+        # assert_true is a strict identity check (v is True), so the truthy
+        # string/None expression must be coerced to a real bool — otherwise a
+        # valid engines.node like ">=18" (a truthy string, not True) false-fails.
         c.assert_true(
-            value and str(value).strip(),
+            bool(value and str(value).strip()),
             "engines.node is empty in package.json. "
             "Set a version constraint, e.g.: \">=18\""
         )
