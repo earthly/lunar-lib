@@ -161,106 +161,69 @@ inputs:
       set in Backstage.
     default: ""
 
-  # --- Structured include/exclude filters ---------------------------------
-  # Friendly, field-level filters applied CLIENT-SIDE after the fetch (the
-  # Backstage `?filter=` query param supports equality/existence but NOT
-  # negation, so exclude cannot be pushed server-side). Across every pair the
-  # rule is: empty = disabled; a non-empty `include_*` is an allowlist; a
-  # non-empty `exclude_*` is a denylist; and EXCLUDE WINS over include when an
-  # entity matches both (same precedence as the github-org cataloger's
-  # allowed_topics / disallowed_topics). All matching is case-insensitive and
-  # comma-separated. Filters are KIND-AWARE: a filter over a field an entity
-  # kind doesn't carry (a Domain/System has no spec.type or spec.lifecycle)
-  # never drops that entity — so the domain/system hierarchy always survives
-  # for the hub's validateDomainRefs even when components are filtered down.
+  # Structured include/exclude filters. Empty = off; `include_*` are
+  # allowlists, `exclude_*` are denylists, and exclude wins over include.
+  # Full semantics (kind-awareness, why they run client-side) live in the
+  # README "Filtering Entities" section.
 
-  # -- type / lifecycle (the core ask) --
+  # -- type / lifecycle --
   include_types:
     description: |
-      Comma-separated allowlist of Backstage `spec.type` values to sync
-      (e.g. `service` or `service,website`). Empty (the default) applies no
-      type allowlist. Applies only to kinds that carry `spec.type`
-      (Component, API, Resource); kinds without it (Domain, System) are
-      unaffected and always pass. Case-insensitive. See `exclude_types` for
-      precedence.
+      Only sync entities whose Backstage `spec.type` is in this
+      comma-separated list (e.g. `service,website`). Empty syncs all types.
+      Case-insensitive.
     default: ""
 
   exclude_types:
     description: |
-      Comma-separated denylist of Backstage `spec.type` values. An entity
-      whose `spec.type` matches is dropped, even if it also matches
-      `include_types` — exclude wins over include. Empty (the default)
-      disables the denylist. Case-insensitive; Component / API / Resource
-      only.
+      Skip entities whose `spec.type` is in this comma-separated list. Wins
+      over `include_types`. Empty excludes nothing.
     default: ""
 
   include_lifecycles:
     description: |
-      Comma-separated allowlist of Backstage `spec.lifecycle` values to sync
-      (e.g. `production` or `production,experimental`). Empty (the default)
-      means all lifecycles pass. Applies only to kinds that carry
-      `spec.lifecycle` (Component, API); other kinds are unaffected.
-      Case-insensitive.
+      Only sync entities whose `spec.lifecycle` is in this comma-separated
+      list (e.g. `production`). Empty syncs all lifecycles. Case-insensitive.
     default: ""
 
   exclude_lifecycles:
     description: |
-      Comma-separated denylist of Backstage `spec.lifecycle` values. An
-      entity whose lifecycle matches is dropped, even if it also matches
-      `include_lifecycles` (exclude wins). Empty (the default) disables the
-      denylist. Case-insensitive; Component / API only.
+      Skip entities whose `spec.lifecycle` is in this comma-separated list.
+      Wins over `include_lifecycles`. Empty excludes nothing.
     default: ""
 
-  # -- domain / system (the phased-onboarding extension — SCOPE: confirm in
-  #    review whether these ship in this PR or as a fast-follow; see README) --
+  # -- domain / system (phased onboarding) --
   include_domains:
     description: |
-      Comma-separated allowlist of domains to sync, matched against each
-      entity's RESOLVED domain path — the same dotted path written to
-      `.components[*].domain` (see "Domain Hierarchy"). A value matches the
-      resolved path exactly or as a dotted-prefix ancestor: `commerce`
-      matches `commerce`, `commerce.payments`, and everything nested beneath.
-      This is the phased-onboarding control — e.g. `platform-engineering`
-      syncs only that domain's components (and its systems). Empty (the
-      default) means all domains pass. Domain/System entities themselves are
-      still synced so component domain refs resolve. Case-insensitive.
+      Only sync components under these domains (comma-separated, e.g.
+      `platform-engineering`) — bring one domain live at a time. Matches the
+      resolved domain path, so a value also matches its nested subdomains.
+      Empty syncs all domains. Case-insensitive.
     default: ""
 
   exclude_domains:
     description: |
-      Comma-separated denylist of domains, matched against the resolved
-      dotted domain path (exact or dotted-prefix ancestor, as with
-      `include_domains`). A component under a matching domain is dropped even
-      if it also matches `include_domains` (exclude wins). Empty (the
-      default) disables the denylist. Case-insensitive.
+      Skip components under these domains (comma-separated; also matches
+      nested subdomains). Wins over `include_domains`. Empty excludes nothing.
     default: ""
 
   include_systems:
     description: |
-      Comma-separated allowlist of Backstage system names (bare
-      `metadata.name`; entity-ref prefixes like `system:default/` are
-      stripped before matching). A Component is synced only if its
-      `spec.system` matches; the System entity itself matches by its name.
-      Empty (the default) means all systems pass. Case-insensitive.
+      Only sync components in these Backstage systems (comma-separated, by
+      name). Empty syncs all systems. Case-insensitive.
     default: ""
 
   exclude_systems:
     description: |
-      Comma-separated denylist of Backstage system names. A Component whose
-      `spec.system` matches (or the System entity itself) is dropped even if
-      it also matches `include_systems` (exclude wins). Empty (the default)
-      disables the denylist. Case-insensitive.
+      Skip components in these Backstage systems (comma-separated, by name).
+      Wins over `include_systems`. Empty excludes nothing.
     default: ""
 
   filter:
     description: |
-      Escape hatch for filters the structured inputs above don't cover: a
-      raw Backstage filter expression passed through to the `?filter=` query
-      parameter and applied SERVER-SIDE (e.g.
-      `metadata.annotations.team=platform`). Because it runs server-side it
-      also trims the Backstage API payload, unlike the client-side structured
-      filters. Empty means no extra filter. Combine freely — the raw filter
-      narrows the fetch, the structured filters refine the result.
+      Raw Backstage filter expression for cases the structured filters above
+      don't cover (e.g. `metadata.annotations.team=platform`). Applied
+      server-side, so it also trims the fetch. Empty means no extra filter.
     default: ""
 
   auth_mode:
