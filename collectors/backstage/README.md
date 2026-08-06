@@ -36,6 +36,16 @@ When a catalog-info file is found, this collector writes to the following Compon
 
 > **Backstage entity model.** In Backstage, `spec.system` lives on `Component` entities (a component belongs to a system) while `spec.domain` lives on `System` entities (a system belongs to a domain). So `system-exists` is the check that fires for the common one-`Component`-per-repo case, and `domain-exists` applies to repos whose `catalog-info.yaml` is itself a `kind: System` (or a `Component` that carries a custom `spec.domain`). Each check only does work when its reference is actually declared.
 
+### Lint checks
+
+The `valid` / `errors[]` fields above come from a lint that mirrors the rules the Backstage **server** enforces on ingest, so violations surface in CI (via the `backstage` policy's `catalog-info-valid` check) instead of failing silently at registration. It reports:
+
+- `apiVersion` present, a string, and starting with `backstage.io/`
+- `kind` present, a string, and a known entity kind
+- `metadata.name` present, a string, and DNS-compatible
+- **`metadata.tags` — each tag valid.** Backstage requires each tag to be lowercase `[a-z0-9+#]` segments joined by single dashes, at most 63 characters (`Validators.isValidTag`). The `catalog-info.yaml` schema itself accepts any string, so a tag like `hosting/internal` parses fine but the Backstage server **rejects the whole entity** at ingest (`"tags.0" is not valid; expected a string that is sequences of [a-z0-9+#] separated by [-]`). The lint flags such tags as errors — use dashes instead (e.g. `hosting-internal`).
+- `spec` present (a mapping) for non-`Location` kinds
+
 ## Collectors
 
 This plugin provides the following collectors (use `include` to select a subset):
