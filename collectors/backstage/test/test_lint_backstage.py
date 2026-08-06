@@ -324,5 +324,141 @@ class TestMetadataNameEdgeCases(unittest.TestCase):
         self.assertTrue(any("DNS-compatible" in w["message"] for w in warnings))
 
 
+def _component_with_tags(tags):
+    return {
+        "apiVersion": "backstage.io/v1alpha1",
+        "kind": "Component",
+        "metadata": {"name": "svc", "tags": tags},
+        "spec": {},
+    }
+
+
+class TestValidTags(unittest.TestCase):
+    def _lint(self, tags):
+        return lint(_component_with_tags(tags), "catalog-info.yaml")
+
+    def test_simple_tags_valid(self):
+        result = self._lint(["payments", "api", "go"])
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+    def test_plus_and_hash_allowed(self):
+        # Backstage's isValidTag permits '+' and '#' (common for language tags).
+        result = self._lint(["c++", "c#", "f#"])
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+    def test_digits_and_dashes_valid(self):
+        result = self._lint(["v1", "us-east-1", "team-payments-2"])
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+    def test_max_length_63_valid(self):
+        result = self._lint(["a" * 63])
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+    def test_no_tags_field_valid(self):
+        result = lint(
+            {
+                "apiVersion": "backstage.io/v1alpha1",
+                "kind": "Component",
+                "metadata": {"name": "svc"},
+                "spec": {},
+            },
+            "catalog-info.yaml",
+        )
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+    def test_empty_tag_list_valid(self):
+        result = self._lint([])
+        self.assertTrue(result["valid"])
+        self.assertEqual(errors_with_severity(result, "error"), [])
+
+
+class TestSlashTagRejected(unittest.TestCase):
+    """The reported FR: catalog-info.yaml permits a slash but Backstage rejects it."""
+
+    def setUp(self):
+        self.result = lint(
+            _component_with_tags(["hosting/internal"]), "catalog-info.yaml"
+        )
+
+    def test_invalid(self):
+        self.assertFalse(self.result["valid"])
+
+    def test_error_names_the_offending_tag(self):
+        messages = [e["message"] for e in self.result["errors"]]
+        self.assertTrue(any("hosting/internal" in m for m in messages))
+
+    def test_error_severity_is_error(self):
+        self.assertTrue(
+            any(
+                e["severity"] == "error" and "tags" in e["message"]
+                for e in self.result["errors"]
+            )
+        )
+
+
+class TestInvalidTagShapes(unittest.TestCase):
+    def _lint(self, tags):
+        result = lint(_component_with_tags(tags), "catalog-info.yaml")
+        return result, errors_with_severity(result, "error")
+
+    def test_uppercase_rejected(self):
+        result, errs = self._lint(["Backend"])
+        self.assertFalse(result["valid"])
+        self.assertTrue(errs)
+
+    def test_space_rejected(self):
+        result, errs = self._lint(["my tag"])
+        self.assertFalse(result["valid"])
+        self.assertTrue(errs)
+
+    def test_dot_rejected(self):
+        result, errs = self._lint(["my.tag"])
+        self.assertFalse(result["valid"])
+        self.assertTrue(errs)
+
+    def test_leading_dash_rejected(self):
+        result, _ = self._lint(["-foo"])
+        self.assertFalse(result["valid"])
+
+    def test_trailing_dash_rejected(self):
+        result, _ = self._lint(["foo-"])
+        self.assertFalse(result["valid"])
+
+    def test_double_dash_rejected(self):
+        result, _ = self._lint(["a--b"])
+        self.assertFalse(result["valid"])
+
+    def test_over_63_chars_rejected(self):
+        result, errs = self._lint(["a" * 64])
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("63" in e["message"] for e in errs))
+
+    def test_empty_string_tag_rejected(self):
+        result, _ = self._lint([""])
+        self.assertFalse(result["valid"])
+
+    def test_non_string_tag_rejected(self):
+        result, _ = self._lint([123])
+        self.assertFalse(result["valid"])
+
+    def test_tags_not_a_list_rejected(self):
+        # A bare string (not a list) — Backstage requires an array.
+        result, errs = self._lint("payments")
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("list" in e["message"] for e in errs))
+
+    def test_multiple_invalid_tags_each_reported(self):
+        result, errs = self._lint(["valid-tag", "bad/tag", "AlsoBad"])
+        self.assertFalse(result["valid"])
+        joined = " ".join(e["message"] for e in errs)
+        self.assertIn("bad/tag", joined)
+        self.assertIn("AlsoBad", joined)
+
+
 if __name__ == "__main__":
     unittest.main()
