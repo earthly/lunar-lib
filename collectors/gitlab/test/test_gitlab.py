@@ -51,6 +51,7 @@ class Base(unittest.TestCase):
                 for a in "$@"; do url="$a"; done
                 case "$url" in
                   */merge_requests/*)   cat "$MOCK_DIR/mr.json" ;;
+                  */approval_rules)     cat "$MOCK_DIR/approval_rules.json" 2>/dev/null || echo '[]' ;;
                   */approvals)          cat "$MOCK_DIR/approvals.json" 2>/dev/null || echo '{}' ;;
                   */protected_branches) cat "$MOCK_DIR/protected.json" 2>/dev/null || echo '[]' ;;
                   */members/all*)       cat "$MOCK_DIR/members.json" 2>/dev/null || echo '[]' ;;
@@ -194,6 +195,51 @@ class RepositoryTest(Base):
         result, log = self.run_script("repository.sh", dict(self.BASE_ENV))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('.vcs.merge_strategies.allow_squash_merge false', log)
+
+
+class BranchProtectionTest(Base):
+    PROJECT = '{"id":1,"default_branch":"main","only_allow_merge_if_pipeline_succeeds":true}'
+    PROTECTED = ('[{"name":"main","allow_force_push":false,'
+                 '"code_owner_approval_required":true,'
+                 '"push_access_levels":[{"access_level":40}],'
+                 '"merge_access_levels":[{"access_level":30}]}]')
+
+    def test_protected_with_approval_rules(self):
+        self.fixture("project.json", self.PROJECT)
+        self.fixture("protected.json", self.PROTECTED)
+        # Two rules apply to main (one all-branches, one main-scoped); a third is
+        # scoped to a different branch and must be excluded. Sum = 2 + 1 = 3.
+        self.fixture("approval_rules.json", (
+            '[{"name":"All","approvals_required":2,"protected_branches":[]},'
+            '{"name":"Sec","approvals_required":1,"protected_branches":[{"name":"main"}]},'
+            '{"name":"Rel","approvals_required":5,"protected_branches":[{"name":"release"}]}]'
+        ))
+        result, log = self.run_script("branch_protection.sh", dict(self.BASE_ENV))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('.vcs.branch_protection.enabled true', log)
+        self.assertIn('.vcs.branch_protection.source "gitlab"', log)
+        self.assertIn('.vcs.branch_protection.required_approvals 3', log)
+        self.assertIn('.vcs.branch_protection.require_codeowner_review true', log)
+        self.assertIn('.vcs.branch_protection.require_status_checks true', log)
+        self.assertIn('.vcs.branch_protection.restrictions.push_access_level maintainer', log)
+        self.assertIn('.vcs.branch_protection.restrictions.merge_access_level developer', log)
+
+    def test_falls_back_to_approvals_before_merge(self):
+        # approval_rules 403s (unlicensed) -> stub returns [] -> fall back.
+        self.fixture("project.json", self.PROJECT)
+        self.fixture("protected.json", self.PROTECTED)
+        self.fixture("approvals.json", '{"approvals_before_merge":2}')
+        result, log = self.run_script("branch_protection.sh", dict(self.BASE_ENV))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('.vcs.branch_protection.required_approvals 2', log)
+
+    def test_unprotected_default_branch(self):
+        self.fixture("project.json", self.PROJECT)
+        self.fixture("protected.json", '[]')
+        result, log = self.run_script("branch_protection.sh", dict(self.BASE_ENV))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('.vcs.branch_protection.enabled false', log)
+        self.assertIn('.vcs.branch_protection.source "gitlab"', log)
 
 
 if __name__ == "__main__":

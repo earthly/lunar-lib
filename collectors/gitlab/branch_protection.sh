@@ -64,10 +64,26 @@ REQUIRE_CODEOWNER=$(echo "$PB" | jq '.code_owner_approval_required // false')
 PUSH_LEVEL=$(echo "$PB" | jq -r '.push_access_levels[0].access_level // empty')
 MERGE_LEVEL=$(echo "$PB" | jq -r '.merge_access_levels[0].access_level // empty')
 
-# Project-level MR approvals. approvals_before_merge is broadly available; the
-# richer approval_rules endpoint is premium-only, so degrade gracefully to 0.
-APPROVALS=$(gl_api "/projects/${PROJECT_ENC}/approvals" 2>/dev/null || echo "{}")
-REQUIRED_APPROVALS=$(echo "$APPROVALS" | jq '.approvals_before_merge // 0' 2>/dev/null || echo 0)
+# Required approvals: prefer the approval_rules endpoint (the real, current
+# source on instances that enforce MR approval rules), summing approvals_required
+# across rules that apply to the default branch — a rule with no protected_branches
+# applies to all branches. Fall back to the deprecated project-level
+# approvals_before_merge, then 0. approval_rules 403s on instances without the
+# approvals feature licensed, so degrade gracefully.
+RULES=$(gl_api "/projects/${PROJECT_ENC}/approval_rules" 2>/dev/null || echo "")
+REQUIRED_APPROVALS=""
+if echo "$RULES" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+  REQUIRED_APPROVALS=$(echo "$RULES" | jq --arg b "$DEFAULT_BRANCH" '
+    [ .[]
+      | select(((.protected_branches // []) | length == 0)
+               or ((.protected_branches // []) | any(.name == $b)))
+      | (.approvals_required // 0) ]
+    | add // 0' 2>/dev/null)
+fi
+if [ -z "$REQUIRED_APPROVALS" ] || [ "$REQUIRED_APPROVALS" = "null" ]; then
+  APPROVALS=$(gl_api "/projects/${PROJECT_ENC}/approvals" 2>/dev/null || echo "{}")
+  REQUIRED_APPROVALS=$(echo "$APPROVALS" | jq '.approvals_before_merge // 0' 2>/dev/null || echo 0)
+fi
 
 # A protected default branch restricts direct pushes, so changes land via MR,
 # and GitLab does not allow deleting a protected branch.
