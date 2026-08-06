@@ -10,3 +10,4 @@ test:
     COPY --dir checks .
     COPY --dir test .
     RUN python test/test_project_gating.py
+    RUN python test/test_engines_pinned.py

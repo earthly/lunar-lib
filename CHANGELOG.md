@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `nodejs` policy (`engines-pinned`): a project that correctly pins
+  `engines.node` no longer false-fails. `lunar_policy`'s `assert_true` is a
+  strict identity check (`v is True`), and the check passed it the truthy
+  `engines.node` string (e.g. `">=18"`) instead of a bool, so the assertion
+  could never pass on a real version constraint — it only ever "passed" by
+  taking the missing-data path. The value is now coerced to a bool (#273).
 - `jira` collector: the PR-metadata fetch built an invalid GitHub API URL for
   monorepo sub-path components (`github.com/<owner>/<repo>/<path>`), so
   `ticket` and `ticket-history` collected nothing for them. The component ID is
