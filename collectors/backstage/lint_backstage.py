@@ -22,14 +22,20 @@ import sys
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9\-_.]*[a-z0-9])?$")
 
 # Backstage validates every metadata.tags entry with this exact rule
-# (@backstage/catalog-model Validators.isValidTag): lowercase [a-z0-9+#] segments
-# joined by single dashes, 1-63 chars. The catalog-info.yaml *schema* only
-# requires a non-empty string (no pattern), so a tag like "hosting/internal"
-# passes YAML/schema validation but the Backstage *server* rejects the whole
-# entity at ingest ("Policy check failed ... 'tags.0' is not valid; expected a
-# string that is sequences of [a-z0-9+#] separated by [-], at most 63
-# characters"). We replicate the server-side rule here so the problem surfaces
-# in CI (via the catalog-info-valid check) instead of at Backstage registration.
+# (@backstage/catalog-model CommonValidatorFunctions.isValidTag): lowercase
+# [a-z0-9+#] segments joined by single dashes, 1-63 chars. The catalog-info.yaml
+# *schema* only requires a non-empty string (no pattern), so a tag like
+# "hosting/internal" passes YAML/schema validation but the Backstage *server*
+# rejects the whole entity at ingest ("Policy check failed ... 'tags.0' is not
+# valid; expected a string that is sequences of [a-z0-9+#] separated by [-], at
+# most 63 characters"). We replicate the server-side rule here so the problem
+# surfaces in CI (via the catalog-info-valid check) instead of at Backstage
+# registration.
+#
+# Match the CODE, not the descriptor-format docs: the docs prose lists
+# "[a-z0-9:+#]" (with a colon), but isValidTag does NOT allow a colon. Following
+# the docs would let e.g. "type:service" pass this lint and still be rejected by
+# Backstage — the exact failure we're preventing. Widen only if isValidTag does.
 TAG_RE = re.compile(r"^[a-z0-9+#]+(-[a-z0-9+#]+)*$")
 TAG_MAX_LEN = 63
 
