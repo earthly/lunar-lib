@@ -284,19 +284,20 @@ with:
 - `include_types` / `include_lifecycles` are **allowlists** — non-empty means "sync only these values".
 - `exclude_types` / `exclude_lifecycles` are **denylists** — "sync everything except these".
 - All are comma-separated and **case-insensitive**; empty (the default) disables the filter.
+- An entity with **no value** for the field is left alone — a `Resource` (which has no `spec.lifecycle`) is never dropped by a lifecycle filter, and non-component kinds are untouched. See [Semantics](#semantics-all-structured-filters).
 
 #### By domain and system (phased onboarding)
-
-> **Scope note (spec review):** domain/system filtering is the primary phased-onboarding driver from the customer call, but it's a bigger lift than the direct `spec.type`/`spec.lifecycle` field reads above — it matches against the **resolved** dotted domain path (see [Domain Hierarchy](#domain-hierarchy-subdomainof--systems)). Confirm in review whether it ships in this PR or as a fast-follow.
 
 ```yaml
 with:
   include_domains: "platform-engineering"  # go-live one domain at a time
 ```
 
-`include_domains` / `exclude_domains` match each component's **resolved** domain path — the same dotted value written to `.components[*].domain`. A filter value matches exactly **or** as a dotted-prefix ancestor: `commerce` matches `commerce`, `commerce.payments`, and everything nested beneath. `include_systems` / `exclude_systems` match a component's `spec.system` by bare name.
+`include_domains` / `exclude_domains` match each component's **resolved** domain path — the same dotted value written to `.components[*].domain` (see [Domain Hierarchy](#domain-hierarchy-subdomainof--systems)). A filter value matches exactly **or** as a dotted-prefix ancestor: `commerce` matches `commerce`, `commerce.payments`, and everything nested beneath. `include_systems` / `exclude_systems` match a component's `spec.system` by bare name.
 
-The referenced `Domain` and `System` entities are always synced regardless of these filters, so the components that *do* pass still resolve their domain refs (the hub's `validateDomainRefs` stays satisfied).
+These are **membership** filters: a component with no resolved domain (or no system) isn't a member of anything, so an `include_domains` / `include_systems` allowlist excludes it. (An `exclude_*` denylist leaves it alone — there's nothing to match.)
+
+The referenced `Domain` and `System` entities are always synced regardless of these filters, so the components that *do* pass still resolve their domain refs (the hub's `validateDomainRefs` stays satisfied). Onboarding one domain therefore leaves the *other* domains present but empty — harmless catalog structure, not dangling refs.
 
 #### Semantics (all structured filters)
 
@@ -304,8 +305,9 @@ The referenced `Domain` and `System` entities are always synced regardless of th
 |------|----------|
 | **Empty = disabled** | An unset `include_*`/`exclude_*` never filters anything. |
 | **Exclude wins over include** | An entity matching both an allowlist and a denylist is **dropped** — same precedence as github-org's `allowed_topics` / `disallowed_topics`. |
-| **Kind-aware** | A filter over a field a kind doesn't carry never drops that kind. `Domain`/`System` have no `spec.type`/`spec.lifecycle`, so type/lifecycle filters leave them intact — the hierarchy always survives even when components are filtered down. |
-| **Client-side** | Applied after the fetch. Backstage's `?filter=` supports equality/existence but **no negation**, so exclude can't be pushed server-side; for consistency include isn't either. |
+| **Type/lifecycle — absence passes** | Attribute filters. An entity with no value for the field isn't judged by it: a `Resource` (no `spec.lifecycle`) survives a lifecycle filter, and `Domain`/`System` are never touched — so the hierarchy always survives even when components are filtered down. |
+| **Domain/system — absence = non-member** | Membership filters. For an `include_*`, a component with no resolved domain/system is excluded (it's in no group). An `exclude_*` leaves it alone (nothing to match). |
+| **Client-side** | Applied after the fetch. Backstage's `?filter=` supports equality/existence but **no negation**, so exclude can't be pushed server-side; for consistency include isn't either. The run logs how many candidate components the filters dropped. |
 
 > **Scale caveat.** Structured filters run **after** the full catalog walk — they shrink what's *written to Lunar*, not what's *fetched from Backstage*. On a very large instance the paginated fetch still pulls every entity before filtering. To also trim the API payload, add a server-side `filter` (below) or a `namespace`. Pushing `include_types` down to the server is a candidate optimization, but it can't be applied naively to a multi-kind sync (it would also drop the `Domain`/`System` entities that carry no `spec.type`), so it's deferred.
 
