@@ -56,7 +56,14 @@ URL=$(echo "$MR" | jq -r '.web_url // empty')
 SOURCE_BRANCH=$(echo "$MR" | jq -r '.source_branch // empty')
 TARGET_BRANCH=$(echo "$MR" | jq -r '.target_branch // empty')
 AUTHOR=$(echo "$MR" | jq -r '.author.username // empty')
+# Normalize GitLab's MR state (opened/closed/merged/locked) to the canonical
+# .vcs.pr.state vocabulary shared with the github collector (open/closed/merged),
+# so a cross-forge policy checking `.vcs.pr.state == "open"` behaves the same on
+# both. (Same reason merge_strategies/branch_protection are normalized.)
 STATE=$(echo "$MR" | jq -r '.state // empty')
+case "$STATE" in
+  opened | locked) STATE="open" ;;
+esac
 IID=$(echo "$MR" | jq '.iid')
 # .draft is the modern field; .work_in_progress is the legacy alias.
 DRAFT=$(echo "$MR" | jq '.draft // .work_in_progress // false')

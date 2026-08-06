@@ -129,7 +129,8 @@ class MergeRequestTest(Base):
         self.assertIn('.vcs.pr.source_branch eng-1-rate-limiting', log)
         self.assertIn('.vcs.pr.target_branch main', log)
         self.assertIn('.vcs.pr.author alice', log)
-        self.assertIn('.vcs.pr.state opened', log)
+        # GitLab "opened" is normalized to the canonical "open".
+        self.assertIn('.vcs.pr.state open', log)
         self.assertIn('.vcs.pr.number 42', log)
         self.assertIn('.vcs.pr.draft false', log)
         # labels are piped as JSON on stdin

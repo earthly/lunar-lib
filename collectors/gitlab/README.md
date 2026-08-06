@@ -34,7 +34,7 @@ This collector writes to the following Component JSON paths:
 | `.vcs.pr.author` | string | Author username |
 | `.vcs.pr.labels` | array | MR label names |
 | `.vcs.pr.draft` | boolean | Whether the MR is a draft |
-| `.vcs.pr.state` | string | MR state (opened, merged, closed) |
+| `.vcs.pr.state` | string | MR state, normalized to the shared vocabulary (`open`, `closed`, `merged`) |
 
 ## Collectors
 
