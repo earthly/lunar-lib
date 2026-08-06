@@ -37,6 +37,8 @@ This integration provides the following collectors (use `include` to select a su
 | `ticket-from-json` | Same as `ticket`, but reads the title from `.vcs.pr.title` in Component JSON via the after-json hook instead of calling the GitHub API — provider-agnostic (GitHub or GitLab), needs no `GH_TOKEN` |
 | `ticket-history` | Queries Lunar SQL for ticket reuse count across PRs (no Jira API call) |
 
+> **Note:** `ticket-from-json` is transitional. Once the after-json hook is no longer experimental, its logic will be folded into the main `ticket` collector (which will read `.vcs.pr.title` from Component JSON instead of calling the GitHub API) and `ticket-from-json` will be removed.
+
 ## Installation
 
 Add to your `lunar-config.yml`:
