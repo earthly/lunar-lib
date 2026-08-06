@@ -67,7 +67,7 @@ A GitLab personal or project access token with `read_api` scope. Used for all Gi
 
 ### Why `.vcs.pr.*` matters
 
-The `jira` and `linear` ticket collectors extract a ticket ID from the merge/pull-request title to populate `.vcs.pr.ticket.*`, which the `ticket` and change-management (e.g. change→ticket) policies enforce. On GitHub the title is fetched from the GitHub API; on GitLab that source does not exist, so this collector's `merge-request` sub-collector supplies `.vcs.pr.*`. The ticket collectors read `.vcs.pr.title` from Component JSON when present so they work provider-agnostically.
+The `jira` and `linear` ticket collectors extract a ticket ID from the merge/pull-request title to populate `.vcs.pr.ticket.*`, which the `ticket` and change-management (e.g. change→ticket) policies enforce. The `github` and `gitlab` collectors are the source of `.vcs.pr.*`: on GitLab, this collector's `merge-request` sub-collector supplies it; on GitHub, the `github` collector's `pull-request` sub-collector does. The ticket collectors' after-json variant (e.g. jira's `ticket-from-json`) then reads `.vcs.pr.title` from Component JSON — no SCM API call, provider-agnostic.
 
 ### Self-managed instances and nested namespaces
 

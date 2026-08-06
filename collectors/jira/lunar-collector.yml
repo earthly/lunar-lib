@@ -31,6 +31,21 @@ collectors:
       type: code
     keywords: ["jira", "ticket", "pr", "issue tracking"]
 
+  - name: ticket-from-json
+    description: |
+      After-json variant of `ticket`: reads the PR/MR title from .vcs.pr.title
+      in Component JSON (populated by the github or gitlab collector) instead of
+      calling the GitHub API, extracts the Jira ticket ID, validates it against
+      the Jira REST API, and writes the same .vcs.pr.ticket (+ .vcs.pr.ticket.native.jira).
+      Works on any VCS provider that populates .vcs.pr and needs no GH_TOKEN.
+      Uses the experimental after-json hook; the code-hook `ticket` collector
+      above is kept for compatibility.
+    mainBash: ticket_from_json.sh
+    hook:
+      type: after-json
+      path: .vcs.pr.title
+    keywords: ["jira", "ticket", "after-json", "vcs.pr", "provider-agnostic"]
+
   - name: ticket-history
     description: |
       Queries the Lunar SQL database to count how many other PRs reference
