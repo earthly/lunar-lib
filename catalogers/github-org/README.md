@@ -144,7 +144,7 @@ catalog by **GitHub topic**. Tag the repos you want cataloged (e.g. add the
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme-corp"
       allowed_topics: "lunar"          # only repos carrying the `lunar` topic

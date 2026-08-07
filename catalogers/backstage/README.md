@@ -93,7 +93,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.1.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -142,7 +142,7 @@ By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching 
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
       api_path_prefix: ""   # gateway is mounted at root — no /api hop
@@ -215,7 +215,7 @@ A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdo
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.2.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.2.0
     with:
       backstage_url: "https://backstage.example.com"
       entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain

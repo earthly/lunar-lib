@@ -95,14 +95,14 @@ Pick a single variant with `include` (see [Choosing a variant](#choosing-a-varia
 ```yaml
 catalogers:
   # Commit-triggered only — near-real-time, no GitHub token needed
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment-on-commit]
 ```
 
 ```yaml
 catalogers:
   # Scheduled only — daily backfill via the GitHub Contents API
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment]
 ```
 
@@ -250,7 +250,7 @@ Several lunar-lib collectors resolve their per-component target from the Lunar c
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     # default: meta_annotations: "pagerduty.com/service-id=pagerduty/service-id"
 ```
 
