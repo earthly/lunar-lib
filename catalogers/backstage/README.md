@@ -72,7 +72,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -93,11 +93,11 @@ For organisations that already run [`github-org`](../github-org) to enumerate re
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme"
 
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -110,7 +110,7 @@ Backstage components are matched to Lunar components by reading an annotation on
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
       component_id_annotation: "github.com/project-slug"  # value: "acme/payment-api"

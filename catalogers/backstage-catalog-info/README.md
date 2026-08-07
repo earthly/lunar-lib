@@ -72,7 +72,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
 Set the GitHub token used to fetch `catalog-info.yaml` from each repo:
@@ -91,11 +91,11 @@ Because `component-cron` only augments existing components, a component-defining
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme"
 
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
 ### Pick This or the Live Backstage Cataloger — Not Both
@@ -137,7 +137,7 @@ Some orgs model component domains via a custom annotation rather than the canoni
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     with:
       domain_annotation: "yourorg.example.com/domain"
 ```
@@ -150,7 +150,7 @@ Not every `catalog-info.yaml` sets a domain. When a matched Component resolves t
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     with:
       default_domain: "engineering"
 ```
