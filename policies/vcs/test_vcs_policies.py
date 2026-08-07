@@ -665,5 +665,76 @@ class TestInterimPending(unittest.TestCase):
         self.assertEqual(check_require_private(node).status, CheckStatus.PENDING)
 
 
+class TestGitLabNormalizedData(unittest.TestCase):
+    """ENG-1474: the gitlab collector normalizes GitLab settings into the same
+    .vcs.* schema as github, so these shared checks must evaluate GitLab-sourced
+    data identically. A well-protected GitLab repo should pass every check that
+    has a GitLab analog. (require-branches-up-to-date has no GitLab equivalent —
+    GitLab does not populate the field — so it is intentionally github-only.)
+    """
+
+    GITLAB_DATA = {
+        "vcs": {
+            "provider": "gitlab",
+            "visibility": "private",
+            "default_branch": "main",
+            "merge_strategies": {
+                "allow_merge_commit": False,
+                "allow_squash_merge": True,
+                "allow_rebase_merge": True,
+            },
+            "branch_protection": {
+                "enabled": True,
+                "source": "gitlab",
+                "branch": "main",
+                "require_pr": True,
+                "required_approvals": 2,
+                "require_codeowner_review": True,
+                "dismiss_stale_reviews": True,
+                "require_status_checks": True,
+                "required_checks": ["security-gate"],
+                "require_signed_commits": True,
+                "require_linear_history": True,
+                "allow_force_push": False,
+                "allow_deletions": False,
+                "restrictions": {
+                    "push_access_level": "maintainer",
+                    "merge_access_level": "developer",
+                },
+            },
+        }
+    }
+
+    def _node(self):
+        return Node.from_component_json(
+            self.GITLAB_DATA, bundle_info={"workflows_finished": True}
+        )
+
+    def test_analogous_checks_pass_on_gitlab_data(self):
+        cases = [
+            check_branch_protection_enabled(self._node()),
+            check_require_pull_request(self._node()),
+            check_minimum_approvals(self._node(), min_approvals_override="2"),
+            check_require_codeowner_review(self._node()),
+            check_dismiss_stale_reviews(self._node()),
+            check_require_status_checks(self._node()),
+            check_require_signed_commits(self._node()),
+            check_require_linear_history(self._node()),
+            check_disallow_force_push(self._node()),
+            check_disallow_branch_deletion(self._node()),
+            check_allowed_merge_strategies(
+                self._node(), allowed_strategies_override="squash,rebase"
+            ),
+            check_require_private(self._node()),
+            check_require_default_branch(self._node()),
+        ]
+        for check in cases:
+            self.assertEqual(
+                check.status, CheckStatus.PASS,
+                f"{check.name} should PASS on GitLab data, got {check.status.name}: "
+                f"{getattr(check, 'failure_reasons', None)}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

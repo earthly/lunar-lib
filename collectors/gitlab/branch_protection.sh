@@ -46,6 +46,10 @@ if [ -z "$PROJECT" ] || [ "$(echo "$PROJECT" | jq -r 'has("id")' 2>/dev/null)" !
 fi
 DEFAULT_BRANCH=$(echo "$PROJECT" | jq -r '.default_branch // empty')
 REQUIRE_STATUS_CHECKS=$(echo "$PROJECT" | jq '.only_allow_merge_if_pipeline_succeeds // false')
+# GitLab's "fast-forward merge" (ff) enforces a linear history — the closest
+# analog to GitHub's require_linear_history.
+MERGE_METHOD=$(echo "$PROJECT" | jq -r '.merge_method // "merge"')
+if [ "$MERGE_METHOD" = "ff" ]; then REQUIRE_LINEAR_HISTORY=true; else REQUIRE_LINEAR_HISTORY=false; fi
 
 PROTECTED=$(gl_api "/projects/${PROJECT_ENC}/protected_branches")
 PB=$(echo "$PROTECTED" | jq -c --arg b "$DEFAULT_BRANCH" \
@@ -80,9 +84,34 @@ if echo "$RULES" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
       | (.approvals_required // 0) ]
     | add // 0' 2>/dev/null)
 fi
+# Project MR-approval settings: the approvals_before_merge fallback above, plus
+# reset_approvals_on_push (GitLab's equivalent of GitHub's dismiss_stale_reviews).
+APPROVAL_SETTINGS=$(gl_api "/projects/${PROJECT_ENC}/approvals" 2>/dev/null || echo "{}")
 if [ -z "$REQUIRED_APPROVALS" ] || [ "$REQUIRED_APPROVALS" = "null" ]; then
-  APPROVALS=$(gl_api "/projects/${PROJECT_ENC}/approvals" 2>/dev/null || echo "{}")
-  REQUIRED_APPROVALS=$(echo "$APPROVALS" | jq '.approvals_before_merge // 0' 2>/dev/null || echo 0)
+  REQUIRED_APPROVALS=$(echo "$APPROVAL_SETTINGS" | jq '.approvals_before_merge // 0' 2>/dev/null || echo 0)
+fi
+DISMISS_STALE=$(echo "$APPROVAL_SETTINGS" | jq '.reset_approvals_on_push // false' 2>/dev/null || echo false)
+
+# require_signed_commits: GitLab enforces this via the push rule
+# reject_unsigned_commits (premium). 403 on unlicensed → graceful false.
+PUSH_RULE=$(gl_api "/projects/${PROJECT_ENC}/push_rule" 2>/dev/null || echo "{}")
+REQUIRE_SIGNED_COMMITS=$(echo "$PUSH_RULE" | jq '.reject_unsigned_commits // false' 2>/dev/null || echo false)
+
+# External Status Checks gate MR merge via external systems (premium) — the
+# GitLab mechanism for blocking an MR on external checks. Fold their presence
+# into require_status_checks (alongside the pipeline-success gate) and surface
+# the names in required_checks, mirroring the github collector. 403 → graceful.
+EXTERNAL_CHECKS=$(gl_api "/projects/${PROJECT_ENC}/external_status_checks" 2>/dev/null || echo "")
+REQUIRED_CHECKS='[]'
+if echo "$EXTERNAL_CHECKS" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+  REQUIRED_CHECKS=$(echo "$EXTERNAL_CHECKS" | jq -c --arg b "$DEFAULT_BRANCH" \
+    '[ .[]
+       | select(((.protected_branches // []) | length == 0)
+                or ((.protected_branches // []) | any(.name == $b)))
+       | .name ]' 2>/dev/null || echo '[]')
+fi
+if [ "$REQUIRE_STATUS_CHECKS" != "true" ] && [ "$(echo "$REQUIRED_CHECKS" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+  REQUIRE_STATUS_CHECKS=true
 fi
 
 # A protected default branch restricts direct pushes, so changes land via MR,
@@ -93,7 +122,10 @@ lunar collect -j \
       ".vcs.branch_protection.require_pr" true \
       ".vcs.branch_protection.required_approvals" "$REQUIRED_APPROVALS" \
       ".vcs.branch_protection.require_codeowner_review" "$REQUIRE_CODEOWNER" \
+      ".vcs.branch_protection.dismiss_stale_reviews" "$DISMISS_STALE" \
       ".vcs.branch_protection.require_status_checks" "$REQUIRE_STATUS_CHECKS" \
+      ".vcs.branch_protection.require_signed_commits" "$REQUIRE_SIGNED_COMMITS" \
+      ".vcs.branch_protection.require_linear_history" "$REQUIRE_LINEAR_HISTORY" \
       ".vcs.branch_protection.allow_force_push" "$ALLOW_FORCE_PUSH" \
       ".vcs.branch_protection.allow_deletions" false
 
@@ -101,3 +133,5 @@ lunar collect \
       ".vcs.branch_protection.branch" "$DEFAULT_BRANCH" \
       ".vcs.branch_protection.restrictions.push_access_level" "$(level_name "$PUSH_LEVEL")" \
       ".vcs.branch_protection.restrictions.merge_access_level" "$(level_name "$MERGE_LEVEL")"
+
+echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -

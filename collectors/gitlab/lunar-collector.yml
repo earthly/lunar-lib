@@ -49,11 +49,15 @@ collectors:
 
   - name: branch-protection
     description: |
-      Fetches protected-branch configuration and merge-request approval rules
-      for the default branch from the GitLab API, normalizing them into the
-      shared .vcs.branch_protection shape with a .source field of "gitlab".
-      Collects required approvals, code-owner approval, allowed force push,
-      required status checks, and push/merge access levels.
+      Fetches protected-branch config, MR approval rules, external status
+      checks, and push rules for the default branch from the GitLab API,
+      normalizing them into the shared .vcs.branch_protection shape with a
+      .source field of "gitlab". Collects required approvals (from approval
+      rules), code-owner approval, reset-on-push (dismiss stale reviews),
+      required status checks (pipeline-success and/or external status checks,
+      with their names in required_checks), signed-commit and linear-history
+      enforcement, allowed force push, and push/merge access levels. Licensed-
+      only signals degrade gracefully to their safe defaults on CE/unlicensed.
     mainBash: branch_protection.sh
     hook:
       type: code
@@ -110,8 +114,11 @@ example_component_json: |
         "require_pr": true,
         "required_approvals": 2,
         "require_codeowner_review": true,
+        "dismiss_stale_reviews": true,
         "require_status_checks": true,
-        "required_checks": ["build", "test", "sast"],
+        "required_checks": ["security-gate"],
+        "require_signed_commits": false,
+        "require_linear_history": false,
         "allow_force_push": false,
         "allow_deletions": false,
         "restrictions": {

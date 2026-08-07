@@ -52,6 +52,8 @@ class Base(unittest.TestCase):
                 case "$url" in
                   */merge_requests/*)   cat "$MOCK_DIR/mr.json" ;;
                   */approval_rules)     cat "$MOCK_DIR/approval_rules.json" 2>/dev/null || echo '[]' ;;
+                  */external_status_checks) cat "$MOCK_DIR/external_status_checks.json" 2>/dev/null || echo '[]' ;;
+                  */push_rule)          cat "$MOCK_DIR/push_rule.json" 2>/dev/null || echo '{}' ;;
                   */approvals)          cat "$MOCK_DIR/approvals.json" 2>/dev/null || echo '{}' ;;
                   */protected_branches) cat "$MOCK_DIR/protected.json" 2>/dev/null || echo '[]' ;;
                   */members/all*)       cat "$MOCK_DIR/members.json" 2>/dev/null || echo '[]' ;;
@@ -223,6 +225,29 @@ class BranchProtectionTest(Base):
         self.assertIn('.vcs.branch_protection.require_status_checks true', log)
         self.assertIn('.vcs.branch_protection.restrictions.push_access_level maintainer', log)
         self.assertIn('.vcs.branch_protection.restrictions.merge_access_level developer', log)
+        # Licensed-only fields absent here → graceful false defaults.
+        self.assertIn('.vcs.branch_protection.require_signed_commits false', log)
+        self.assertIn('.vcs.branch_protection.dismiss_stale_reviews false', log)
+        self.assertIn('.vcs.branch_protection.require_linear_history false', log)
+
+    def test_licensed_gating_fields(self):
+        # Pipeline gating OFF; external status checks + push rule + reset-on-push
+        # + ff merge method ON. Exercises the GitLab→shared-schema mappings.
+        self.fixture("project.json", '{"id":1,"default_branch":"main",'
+                     '"only_allow_merge_if_pipeline_succeeds":false,"merge_method":"ff"}')
+        self.fixture("protected.json", self.PROTECTED)
+        self.fixture("external_status_checks.json",
+                     '[{"name":"security-gate","protected_branches":[]}]')
+        self.fixture("push_rule.json", '{"reject_unsigned_commits":true}')
+        self.fixture("approvals.json", '{"approvals_before_merge":0,"reset_approvals_on_push":true}')
+        result, log = self.run_script("branch_protection.sh", dict(self.BASE_ENV))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # External status checks flip require_status_checks even with pipeline off.
+        self.assertIn('.vcs.branch_protection.require_status_checks true', log)
+        self.assertIn('"security-gate"', log)
+        self.assertIn('.vcs.branch_protection.require_signed_commits true', log)
+        self.assertIn('.vcs.branch_protection.dismiss_stale_reviews true', log)
+        self.assertIn('.vcs.branch_protection.require_linear_history true', log)
 
     def test_falls_back_to_approvals_before_merge(self):
         # approval_rules 403s (unlicensed) -> stub returns [] -> fall back.

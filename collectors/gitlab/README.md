@@ -44,7 +44,7 @@ This integration provides the following collectors (use `include` to select a su
 |----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `merge-request`      | Populates `.vcs.pr.*` with the metadata of the MR being evaluated (title, description, branches, author, labels, draft, state, URL). Runs only in merge-request context. This is the GitLab source of `.vcs.pr.*` that the ticket and change-management policies consume. |
 | `repository`         | Collects basic project settings including visibility, default branch, topics, and the merge method mapped onto `.vcs.merge_strategies`.                               |
-| `branch-protection`  | Collects protected-branch configuration and MR approval rules for the default branch, normalized into `.vcs.branch_protection` with `source: "gitlab"`.               |
+| `branch-protection`  | Collects protected-branch config, MR approval rules, external status checks, and push rules for the default branch, normalized into `.vcs.branch_protection` with `source: "gitlab"`. |
 | `access-permissions` | Collects project members and shared groups (does not expand group memberships).                                                                                      |
 
 ## Installation
@@ -76,3 +76,18 @@ Set the `gitlab_host` input to your instance host; the API base is derived from 
 ### Merge-method mapping
 
 GitLab exposes a single `merge_method` (`merge`, `rebase_merge`, `ff`) plus squash options rather than GitHub's three independent booleans. These are normalized onto `.vcs.merge_strategies.allow_merge_commit` / `allow_rebase_merge` / `allow_squash_merge` so the shared `vcs` policy applies unchanged.
+
+### Branch-protection field mapping
+
+`.vcs.branch_protection` is normalized so the shared `vcs` policy checks evaluate GitLab the same as GitHub:
+
+| `.vcs.branch_protection` field | GitLab source |
+|---|---|
+| `required_approvals` | sum of `approval_rules[].approvals_required` for the default branch; falls back to the deprecated `approvals_before_merge` |
+| `require_status_checks` / `required_checks` | `only_allow_merge_if_pipeline_succeeds`, **and** configured **External Status Checks** (their names populate `required_checks`) |
+| `require_codeowner_review` | protected branch `code_owner_approval_required` |
+| `dismiss_stale_reviews` | MR approval setting `reset_approvals_on_push` |
+| `require_signed_commits` | push rule `reject_unsigned_commits` |
+| `require_linear_history` | `merge_method == "ff"` (fast-forward merges enforce linear history) |
+
+Approval rules, external status checks, and push rules are GitLab **premium/Ultimate** features; on CE/unlicensed instances those endpoints return `403` and the corresponding fields degrade to their safe defaults (`0` / `false`). GitHub's `require_branches_up_to_date` has no GitLab equivalent and is left unset (the `require-branches-up-to-date` check is GitHub-specific).
