@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  annotations:
+    github.com/project-slug: acme/payment-api
+    pagerduty.com/service-id: PABC123
+spec:
+  type: service
+  owner: team-payments

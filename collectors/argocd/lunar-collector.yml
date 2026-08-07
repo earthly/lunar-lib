@@ -1,0 +1,119 @@
+version: 0
+
+name: argocd
+description: Parses and validates ArgoCD Application, ApplicationSet, and AppProject manifests into a normalized .cd.gitops view
+author: earthly
+
+default_image: earthly/lunar-lib:argocd-main
+
+landing_page:
+  display_name: "ArgoCD Collector"
+  long_description: |
+    Parses and validates ArgoCD Application, ApplicationSet, and AppProject
+    manifests against the argoproj CRD schemas and writes a normalized
+    .cd.gitops view for the gitops and argocd policies. Works for a central
+    GitOps repo or a service that ships its own ArgoCD files.
+  categories: ["ci-cd", "orchestration"]
+  icon: "assets/argocd.svg"
+  status: "beta"
+  related:
+    - slug: "gitops"
+      type: "policy"
+      reason: "Tool-agnostic GitOps checks over this collector's normalized data"
+    - slug: "argocd"
+      type: "policy"
+      reason: "ArgoCD-specific checks: argoproj CRD validation and AppProject hygiene"
+    - slug: "argocd-deployment-tracking"
+      type: "collector"
+      reason: "Cross-component: push a service's deployment posture from a separate GitOps repo"
+    - slug: "argocd-deployment-gate"
+      type: "collector"
+      reason: "Cross-component: pull deployment posture onto a service for PR-time checks"
+    - slug: "k8s"
+      type: "collector"
+      reason: "Parses the workload manifests ArgoCD Applications deploy"
+
+collectors:
+  - name: parse
+    description: |
+      Scans the cloned repository for ArgoCD custom resources (argoproj.io/*),
+      validates each against the argoproj CRD schemas, and writes a normalized,
+      tool-agnostic view of the GitOps configuration, including:
+      - Applications and ApplicationSets (project, sync policy, destination, source)
+      - AppProjects (allowed source repos and destinations)
+      - Schema validity of each resource
+      - Whether Argo Rollouts (canary/blue-green) are referenced
+      Raw, ArgoCD-specific resource shapes are preserved under .cd.gitops.native.argocd.
+      Works for both a dedicated GitOps repo (many Applications) and a component
+      repo that ships its own ArgoCD files.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["argocd", "gitops", "argo", "application", "appproject", "sync policy", "validation", "continuous delivery"]
+
+inputs:
+  find_command:
+    description: Command to find candidate YAML files (must output one file path per line). Used by the parse collector.
+    default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+
+example_component_json: |
+  {
+    "cd": {
+      "gitops": {
+        "source": {
+          "tool": "argocd",
+          "integration": "code"
+        },
+        "applications": [
+          {
+            "name": "payment-api",
+            "path": "apps/payment-api.yaml",
+            "valid": true,
+            "kind": "Application",
+            "project": "platform",
+            "component_annotation": "github.com/org/payment-api",
+            "sync_policy": {
+              "automated": true,
+              "prune": true,
+              "self_heal": true
+            },
+            "destination": {
+              "server": "https://kubernetes.default.svc",
+              "namespace": "payments"
+            },
+            "source_ref": {
+              "repoURL": "https://github.com/org/gitops.git",
+              "path": "payment-api",
+              "targetRevision": "HEAD"
+            },
+            "images": ["myregistry.io/payment-api"],
+            "canary": {
+              "rollout": true
+            }
+          }
+        ],
+        "projects": [
+          {
+            "name": "platform",
+            "path": "projects/platform.yaml",
+            "valid": true,
+            "is_default": false,
+            "source_repos": ["https://github.com/org/gitops.git"],
+            "destinations": [
+              {"namespace": "payments", "server": "https://kubernetes.default.svc"}
+            ]
+          }
+        ],
+        "native": {
+          "argocd": {
+            "applications": [
+              {"path": "apps/payment-api.yaml", "resource": {"apiVersion": "argoproj.io/v1alpha1", "kind": "Application", "spec": {}}}
+            ],
+            "projects": [
+              {"path": "projects/platform.yaml", "resource": {"apiVersion": "argoproj.io/v1alpha1", "kind": "AppProject", "spec": {}}}
+            ]
+          }
+        }
+      }
+    }
+  }

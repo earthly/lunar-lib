@@ -1,0 +1,143 @@
+version: 0
+
+name: istio
+description: Parses Istio service-mesh configuration (traffic, security, and injection) from repository manifests
+author: earthly
+
+default_image: earthly/lunar-lib:istio-main
+default_image_ci_collectors: native
+
+landing_page:
+  display_name: "Istio Collector"
+  long_description: |
+    Parse Istio config from repository manifests: mTLS mode, authorization
+    policies, JWT authentication, traffic routing (VirtualService,
+    DestinationRule, Gateway), sidecars, telemetry, install profile, and
+    sidecar-injection settings. Also records istioctl commands run in CI.
+  categories: ["security", "orchestration"]
+  icon: "assets/istio.svg"
+  status: "experimental"
+  related:
+    - slug: "istio"
+      type: "policy"
+      reason: "Enforces service-mesh best practices using this collector's data"
+    - slug: "k8s"
+      type: "collector"
+      reason: "Collects the Kubernetes workloads that Istio sidecars are injected into"
+
+collectors:
+  - name: istio
+    description: |
+      Parses all Istio custom resources in the repository and collects:
+      - mTLS posture from PeerAuthentication (STRICT / PERMISSIVE / DISABLE, and scope)
+      - AuthorizationPolicy actions and whether any rule grants blanket access
+      - RequestAuthentication (JWT) issuers
+      - Traffic management: VirtualService, DestinationRule, Gateway, ServiceEntry,
+        Sidecar, EnvoyFilter
+      - Telemetry resources (tracing / metrics / access logging)
+      - Install profile from IstioOperator
+      - Sidecar injection: namespace labels (istio-injection / istio.io/rev) and
+        per-workload sidecar.istio.io/inject overrides
+      Each resource is validated with `istioctl analyze` (offline, no cluster required).
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["istio", "service mesh", "mtls", "peerauthentication", "authorizationpolicy", "virtualservice", "destinationrule", "gateway", "sidecar injection", "envoy"]
+
+  - name: cicd
+    description: |
+      Records every istioctl command executed in CI pipelines along with the
+      istioctl client version. Writes command strings and version info to
+      .mesh.cicd for audit trails and deployment traceability (istioctl install,
+      istioctl analyze, istioctl upgrade, etc.).
+    mainBash: cicd.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name: istioctl
+    keywords: ["istioctl", "istio ci", "istioctl install", "istioctl analyze", "mesh deployment", "ci commands"]
+
+inputs:
+  find_command:
+    description: Command to find Istio manifest files (must output one file path per line)
+    default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+
+example_component_json: |
+  {
+    "mesh": {
+      "source": {
+        "tool": "istio",
+        "version": "1.22.0",
+        "integration": "code"
+      },
+      "provider": "istio",
+      "resources": [
+        {"kind": "VirtualService", "name": "reviews", "namespace": "bookinfo", "path": "istio/reviews-vs.yaml", "valid": true},
+        {"kind": "PeerAuthentication", "name": "default", "namespace": "istio-system", "path": "istio/mtls.yaml", "valid": true}
+      ],
+      "peer_authentications": [
+        {"name": "default", "namespace": "istio-system", "scope": "mesh", "mode": "STRICT", "path": "istio/mtls.yaml"}
+      ],
+      "authorization_policies": [
+        {"name": "require-jwt", "namespace": "bookinfo", "action": "ALLOW", "rule_count": 1, "allows_all": false, "path": "istio/authz.yaml"}
+      ],
+      "request_authentications": [
+        {"name": "jwt-example", "namespace": "bookinfo", "issuers": ["https://accounts.example.com"], "path": "istio/reqauth.yaml"}
+      ],
+      "virtual_services": [
+        {"name": "reviews", "namespace": "bookinfo", "hosts": ["reviews"], "gateways": ["mesh"], "has_timeout": true, "has_retries": true, "has_fault_injection": false, "path": "istio/reviews-vs.yaml"}
+      ],
+      "destination_rules": [
+        {"name": "reviews", "namespace": "bookinfo", "host": "reviews", "tls_mode": "ISTIO_MUTUAL", "has_outlier_detection": true, "has_connection_pool": true, "subsets": ["v1", "v2"], "path": "istio/reviews-dr.yaml"}
+      ],
+      "gateways": [
+        {
+          "name": "bookinfo-gateway",
+          "namespace": "istio-system",
+          "servers": [
+            {"port": 443, "protocol": "HTTPS", "tls_mode": "SIMPLE", "https_redirect": false},
+            {"port": 80, "protocol": "HTTP", "https_redirect": true}
+          ],
+          "path": "istio/gateway.yaml"
+        }
+      ],
+      "service_entries": [
+        {"name": "external-api", "namespace": "bookinfo", "hosts": ["api.example.com"], "location": "MESH_EXTERNAL", "resolution": "DNS", "path": "istio/service-entry.yaml"}
+      ],
+      "sidecars": [
+        {"name": "default", "namespace": "bookinfo", "restricts_egress": true, "egress_hosts": ["./*", "istio-system/*"], "path": "istio/sidecar.yaml"}
+      ],
+      "envoy_filters": [
+        {"name": "custom-lua", "namespace": "bookinfo", "path": "istio/envoyfilter.yaml"}
+      ],
+      "telemetry": [
+        {"name": "mesh-default", "namespace": "istio-system", "has_tracing": true, "has_metrics": true, "has_access_logging": true, "path": "istio/telemetry.yaml"}
+      ],
+      "install": [
+        {"kind": "IstioOperator", "name": "control-plane", "namespace": "istio-system", "profile": "default", "path": "istio/istiooperator.yaml"}
+      ],
+      "injection": {
+        "namespaces": [
+          {"name": "bookinfo", "enabled": true, "revision": null, "path": "istio/ns-bookinfo.yaml"}
+        ],
+        "workload_overrides": [
+          {"kind": "Deployment", "name": "legacy-batch", "namespace": "bookinfo", "inject": false, "path": "deploy/legacy.yaml"}
+        ]
+      },
+      "cicd": {
+        "cmds": [
+          {"cmd": "istioctl install -y", "version": "1.22.0"},
+          {"cmd": "istioctl analyze ./istio", "version": "1.22.0"}
+        ],
+        "source": {"tool": "istioctl", "integration": "ci"}
+      },
+      "summary": {
+        "mtls_default_mode": "STRICT",
+        "mtls_strict": true,
+        "has_authorization_policies": true,
+        "all_gateways_tls": true,
+        "injection_enabled": true,
+        "uses_envoy_filters": true
+      }
+    }
+  }

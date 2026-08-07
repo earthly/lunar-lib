@@ -1,0 +1,47 @@
+# Multi-entity catalog-info.yaml that declares the full domain hierarchy in the
+# file itself: engineering → platform → observability (domains via subdomainOf),
+# a telemetry system under observability, and the component under that system.
+# Exercises ENG-1200 nested dotted-path resolution for the per-repo cataloger.
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: engineering
+spec: {}
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: platform
+  description: Platform engineering
+spec:
+  subdomainOf: engineering
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: observability
+spec:
+  subdomainOf: platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: telemetry
+  description: Telemetry system
+spec:
+  domain: observability
+  owner: group:default/team-telemetry
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: telemetry-api
+  annotations:
+    github.com/project-slug: acme/telemetry-api
+  tags:
+    - observability
+spec:
+  type: service
+  owner: group:default/team-telemetry
+  lifecycle: production
+  system: telemetry

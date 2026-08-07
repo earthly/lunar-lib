@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: web-app
+  tags:
+    - frontend
+spec:
+  type: website
+  lifecycle: production
+  owner: group:default/team-web
+  system: storefront

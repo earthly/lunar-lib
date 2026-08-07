@@ -16,6 +16,15 @@ else
     CMD_STR="$CMD_RAW"
 fi
 
+# Route by scan target. Grype filesystem/SBOM scans use the dir:/sbom:/file:
+# schemes; anything else (a bare image ref, or docker:/registry:/podman:/oci-)
+# is a container image scan, which belongs in .container_scan rather than .sca.
+if echo "$CMD_STR" | grep -qE '(^|[[:space:]])(dir:|sbom:|file:)'; then
+    CATEGORY=".sca"
+else
+    CATEGORY=".container_scan"
+fi
+
 # Capture Grype version using the exact traced binary
 GRYPE_BIN="${LUNAR_CI_COMMAND_BIN_DIR:+$LUNAR_CI_COMMAND_BIN_DIR/}${LUNAR_CI_COMMAND_BIN:-grype}"
 GRYPE_VERSION=$("$GRYPE_BIN" version 2>/dev/null | grep -iE 'version:' | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "unknown")
@@ -25,13 +34,13 @@ CMD_ESCAPED=$(echo "$CMD_STR" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Write cicd command entry (no jq required)
 echo "{\"cmds\":[{\"cmd\":\"$CMD_ESCAPED\",\"version\":\"$GRYPE_VERSION\"}]}" | \
-    lunar collect -j ".sca.native.grype.cicd" -
+    lunar collect -j "${CATEGORY}.native.grype.cicd" -
 
 # Write source metadata
-lunar collect ".sca.source.tool" "grype"
-lunar collect ".sca.source.integration" "ci"
+lunar collect "${CATEGORY}.source.tool" "grype"
+lunar collect "${CATEGORY}.source.integration" "ci"
 if [ -n "$GRYPE_VERSION" ] && [ "$GRYPE_VERSION" != "unknown" ]; then
-    lunar collect ".sca.source.version" "$GRYPE_VERSION"
+    lunar collect "${CATEGORY}.source.version" "$GRYPE_VERSION"
 fi
 
 # Capture raw scan output if Grype wrote to a file we can find.
@@ -63,8 +72,8 @@ fi
 
 RAW_PATH=""
 case "$OUTPUT_FORMAT" in
-    json)  RAW_PATH=".sca.native.grype.cicd.raw" ;;
-    sarif) RAW_PATH=".sca.native.grype.cicd.sarif" ;;
+    json)  RAW_PATH="${CATEGORY}.native.grype.cicd.raw" ;;
+    sarif) RAW_PATH="${CATEGORY}.native.grype.cicd.sarif" ;;
 esac
 
 if [ -n "$RAW_PATH" ] && [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ]; then

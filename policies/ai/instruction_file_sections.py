@@ -20,8 +20,7 @@ def main(node=None):
                 "Configure required sections or exclude this check."
             )
 
-        instr_data = instructions.get_value_or_default(".", None)
-        if instr_data is None:
+        if not instructions.exists():
             c.fail(
                 "No instruction file data found — ensure the ai collector is enabled. "
                 "Exclude this policy if instruction files are not required for this component."

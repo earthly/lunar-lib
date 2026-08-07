@@ -1,0 +1,101 @@
+version: 0
+
+name: argocd-deployment-tracking
+description: Correlates ArgoCD Applications in a central GitOps repo to the service components they deploy and pushes each service's deployment posture onto its own Component JSON (out-of-band)
+
+author: earthly
+
+# Reuses the argocd collector's image: link_push.sh sources parse.sh, which
+# validates with kubeconform against the baked-in argoproj CRD schemas.
+default_image: earthly/lunar-lib:argocd-main
+
+landing_page:
+  display_name: "ArgoCD Deployment Tracking Collector"
+  long_description: |
+    Runs on a central GitOps repo, correlates each ArgoCD Application to the
+    service that builds its image, and pushes that service's deployment posture
+    onto its own component out-of-band. Post-merge only (cannot gate PRs). Do
+    not also run argocd-deployment-gate on the same service.
+  categories: ["ci-cd", "orchestration"]
+  icon: "assets/argocd.svg"
+  status: "experimental"
+  related:
+    - slug: "argocd"
+      type: "collector"
+      reason: "Parses/validates the ArgoCD resources this collector correlates"
+    - slug: "argocd-deployment-gate"
+      type: "collector"
+      reason: "The pull counterpart — use one or the other per service, not both"
+    - slug: "gitops"
+      type: "policy"
+      reason: "Evaluates the pushed deployment posture on the service component"
+
+collectors:
+  - name: tracking
+    description: |
+      Correlates each ArgoCD Application back to the source-code component it
+      deploys (annotation -> image -> tag -> repoURL, first match wins), then
+      writes that application's deployment posture onto the source component's
+      Component JSON using the out-of-band collect syntax
+      (lunar collect --component <id> --sha <sha>). Applications that can't be
+      resolved are skipped with a logged reason — no bogus cross-component
+      writes. Only ever lands on the source's default-branch HEAD, so it is a
+      post-merge system of record and cannot gate PRs.
+    mainBash: link_push.sh
+    hook:
+      type: code
+    keywords: ["argocd", "gitops", "cross-component", "out-of-band collect", "deployment posture", "correlation", "continuous delivery"]
+
+inputs:
+  find_command:
+    description: Command to find candidate YAML files (must output one file path per line).
+    default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+  correlate_by:
+    description: Ordered, comma-separated correlation strategies (first match wins). Options annotation, image, tag, repoURL.
+    default: "annotation,image,repoURL"
+  component_annotation:
+    description: Application annotation key that carries the source component id, for the annotation correlation strategy.
+    default: "lunar.earthly.dev/component"
+  image_registry_aliases:
+    description: Comma-separated old=new registry-host aliases used to normalize image references for the image correlation strategy. Empty disables normalization.
+    default: ""
+  tag_key:
+    description: Component meta/tag field that maps a component to its ArgoCD app name, for the tag correlation strategy.
+    default: ""
+
+example_component_json: |
+  {
+    "cd": {
+      "gitops": {
+        "source": {
+          "tool": "argocd",
+          "integration": "external"
+        },
+        "linked_from": "github.com/org/gitops",
+        "applications": [
+          {
+            "name": "payment-api",
+            "path": "apps/payment-api.yaml",
+            "valid": true,
+            "kind": "Application",
+            "project": "platform",
+            "sync_policy": {
+              "automated": true,
+              "prune": true,
+              "self_heal": true
+            },
+            "destination": {
+              "server": "https://kubernetes.default.svc",
+              "namespace": "payments"
+            },
+            "source_ref": {
+              "repoURL": "https://github.com/org/gitops.git",
+              "path": "payment-api",
+              "targetRevision": "HEAD"
+            },
+            "images": ["myregistry.io/payment-api"]
+          }
+        ]
+      }
+    }
+  }

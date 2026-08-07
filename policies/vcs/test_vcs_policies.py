@@ -114,9 +114,12 @@ class TestBranchProtectionEnabled(unittest.TestCase):
         self.assertIn("not enabled", check.failure_reasons[0])
 
     def test_missing_data_fails(self):
-        """Missing VCS data should fail with clear message."""
+        """Missing VCS data should fail once collection has finished."""
         data = {}
-        node = Node.from_component_json(data)
+        # workflows_finished=True models completed collection, where absent data
+        # is a genuine violation (FAIL). During the interim it (correctly) PENDs
+        # — see TestInterimPending below.
+        node = Node.from_component_json(data, bundle_info={"workflows_finished": True})
         check = check_branch_protection_enabled(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("VCS data not found", check.failure_reasons[0])
@@ -386,9 +389,9 @@ class TestRequirePrivate(unittest.TestCase):
         self.assertIn("private", check.failure_reasons[0])
 
     def test_missing_visibility_fails(self):
-        """Missing visibility data should fail."""
+        """Missing visibility data should fail once collection has finished."""
         data = {}
-        node = Node.from_component_json(data)
+        node = Node.from_component_json(data, bundle_info={"workflows_finished": True})
         check = check_require_private(node)
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("VCS data not found", check.failure_reasons[0])
@@ -641,6 +644,96 @@ class TestRulesetsDerivedData(unittest.TestCase):
         self.assertEqual(
             check_require_pull_request(node).status, CheckStatus.PASS
         )
+
+
+class TestInterimPending(unittest.TestCase):
+    """ENG-1114: absent VCS data during the collection interim must PEND, not FAIL.
+
+    The github collector may not have reported yet when a policy first runs.
+    With workflows_finished=False the checks must render PENDING (⏳), only
+    resolving to FAIL once collection has finished (see test_missing_data_fails).
+    """
+
+    def test_missing_data_pends_during_interim(self):
+        node = Node.from_component_json({}, bundle_info={"workflows_finished": False})
+        self.assertEqual(
+            check_branch_protection_enabled(node).status, CheckStatus.PENDING
+        )
+
+    def test_missing_visibility_pends_during_interim(self):
+        node = Node.from_component_json({}, bundle_info={"workflows_finished": False})
+        self.assertEqual(check_require_private(node).status, CheckStatus.PENDING)
+
+
+class TestGitLabNormalizedData(unittest.TestCase):
+    """ENG-1474: the gitlab collector normalizes GitLab settings into the same
+    .vcs.* schema as github, so these shared checks must evaluate GitLab-sourced
+    data identically. A well-protected GitLab repo should pass every check that
+    has a GitLab analog. (require-branches-up-to-date has no GitLab equivalent —
+    GitLab does not populate the field — so it is intentionally github-only.)
+    """
+
+    GITLAB_DATA = {
+        "vcs": {
+            "provider": "gitlab",
+            "visibility": "private",
+            "default_branch": "main",
+            "merge_strategies": {
+                "allow_merge_commit": False,
+                "allow_squash_merge": True,
+                "allow_rebase_merge": True,
+            },
+            "branch_protection": {
+                "enabled": True,
+                "source": "gitlab",
+                "branch": "main",
+                "require_pr": True,
+                "required_approvals": 2,
+                "require_codeowner_review": True,
+                "dismiss_stale_reviews": True,
+                "require_status_checks": True,
+                "required_checks": ["security-gate"],
+                "require_signed_commits": True,
+                "require_linear_history": True,
+                "allow_force_push": False,
+                "allow_deletions": False,
+                "restrictions": {
+                    "push_access_level": "maintainer",
+                    "merge_access_level": "developer",
+                },
+            },
+        }
+    }
+
+    def _node(self):
+        return Node.from_component_json(
+            self.GITLAB_DATA, bundle_info={"workflows_finished": True}
+        )
+
+    def test_analogous_checks_pass_on_gitlab_data(self):
+        cases = [
+            check_branch_protection_enabled(self._node()),
+            check_require_pull_request(self._node()),
+            check_minimum_approvals(self._node(), min_approvals_override="2"),
+            check_require_codeowner_review(self._node()),
+            check_dismiss_stale_reviews(self._node()),
+            check_require_status_checks(self._node()),
+            check_require_signed_commits(self._node()),
+            check_require_linear_history(self._node()),
+            check_disallow_force_push(self._node()),
+            check_disallow_branch_deletion(self._node()),
+            check_allowed_merge_strategies(
+                self._node(), allowed_strategies_override="squash,rebase"
+            ),
+            check_require_private(self._node()),
+            check_require_default_branch(self._node()),
+        ]
+        for check in cases:
+            self.assertEqual(
+                check.status, CheckStatus.PASS,
+                f"{check.name} should PASS on GitLab data, got {check.status.name}: "
+                f"{getattr(check, 'failure_reasons', None)}",
+            )
 
 
 if __name__ == "__main__":

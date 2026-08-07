@@ -8,10 +8,7 @@ def main(node=None):
         node=node,
     )
     with c:
-        attrs = (
-            c.get_node(".git.attributes").get_value_or_default(".", None)
-        )
-        if attrs is None:
+        if not c.get_node(".git.attributes").exists():
             c.fail(
                 "No `.gitattributes` file found. Add one — even a minimal "
                 "`* text=auto` rule prevents cross-platform line-ending "

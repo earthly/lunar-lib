@@ -1,7 +1,57 @@
 #!/bin/bash
 set -e
 
-# Resolve service_id: cataloger-set meta annotation first, then explicit input.
+# ---------------------------------------------------------------------------
+# Backstage discovery (opt-in). When the service ID isn't set via component
+# meta or the service_id input, and backstage_discovery is "true", read the
+# PagerDuty service ID straight off the component's own catalog-info.yaml —
+# no cataloger and no LUNAR_COMPONENT_META required. The cron hook runs with
+# clone-code: true, so the component's repo is checked out at the working
+# directory and the file is read locally — no GitHub token needed.
+#
+# Echoes the discovered service ID on stdout (empty if none); all diagnostics
+# go to stderr so the caller can capture the value cleanly. Never fails the
+# collector — every miss is a skip-safe `return 0`.
+# ---------------------------------------------------------------------------
+discover_service_id_from_backstage() {
+  local paths annotations yaml found p
+  local -a path_arr
+
+  paths="${LUNAR_VAR_BACKSTAGE_CATALOG_PATHS:-catalog-info.yaml,catalog-info.yml}"
+  annotations="${LUNAR_VAR_BACKSTAGE_ANNOTATIONS:-pagerduty.com/service-id,pagerduty/service-id}"
+
+  yaml=""
+  found=""
+  IFS=',' read -ra path_arr <<< "$paths"
+  for p in "${path_arr[@]}"; do
+    p="$(echo "$p" | xargs)"
+    [ -z "$p" ] && continue
+    if [ -f "./$p" ]; then
+      yaml="$(cat "./$p")"
+      found="$p"
+      break
+    fi
+  done
+
+  if [ -z "$yaml" ]; then
+    echo "backstage_discovery: no catalog-info.yaml at '$paths' in the checkout — skipping" >&2
+    return 0
+  fi
+  echo "backstage_discovery: read $found (${#yaml} bytes)" >&2
+
+  # Parse (multi-document), collect non-empty values for the configured
+  # annotation keys across all Component entities (keys tried in listed
+  # order), and take the first.
+  echo "$yaml" | yq ea '[.]' -o=json 2>/dev/null | jq -r --arg keys "$annotations" '
+    ($keys | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $ks
+    | [ .[] | select((.kind // "") == "Component") ] as $comps
+    | [ $ks[] as $k | $comps[] | (.metadata.annotations // {})[$k] // "" | select(. != "") ]
+    | (.[0] // "")
+  ' 2>/dev/null
+}
+
+# Resolve the service ID: component meta first, then the explicit input, then
+# optional Backstage discovery from the repo's checked-out catalog-info.yaml.
 SERVICE_ID=""
 if [ -n "${LUNAR_COMPONENT_META:-}" ]; then
   SERVICE_ID="$(echo "$LUNAR_COMPONENT_META" | jq -r '."pagerduty/service-id" // empty')"
@@ -11,8 +61,13 @@ if [ -z "$SERVICE_ID" ] && [ -n "${LUNAR_VAR_SERVICE_ID:-}" ]; then
   SERVICE_ID="$LUNAR_VAR_SERVICE_ID"
 fi
 
+if [ -z "$SERVICE_ID" ] && [ "${LUNAR_VAR_BACKSTAGE_DISCOVERY:-false}" = "true" ]; then
+  SERVICE_ID="$(discover_service_id_from_backstage | tr -d '[:space:]')"
+  [ -n "$SERVICE_ID" ] && echo "backstage_discovery: resolved service-id '$SERVICE_ID' from catalog-info.yaml"
+fi
+
 if [ -z "$SERVICE_ID" ]; then
-  echo "No PagerDuty service ID found. Set 'pagerduty/service-id' meta or the service_id input." >&2
+  echo "No PagerDuty service ID found. Set 'pagerduty/service-id' meta, the service_id input, or enable backstage_discovery." >&2
   exit 0
 fi
 

@@ -4,9 +4,7 @@ Augments existing Lunar components with metadata read from each repo's `catalog-
 
 ## Overview
 
-Augments existing Lunar components with owner, domain, and tag metadata from each repo's `catalog-info.yaml`. Runs per component via the [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) hook, fetches the file directly from the component's GitHub repo via the Contents API, picks the matching `Component` entity, and writes owner / domain / tags to that component's catalog entry.
-
-Because `component-cron` cannot create new components, pair this with a component-defining cataloger — typically [`github-org`](../github-org).
+Augments existing Lunar components with owner, domain, tag, and meta metadata read from each repo's `catalog-info.yaml` — it picks the matching `Component` entity and writes owner / domain / tags / meta to that component's catalog entry. The same augmentation runs in two trigger variants: `augment` refreshes the catalog on a daily schedule (fetching the file via the GitHub Contents API), while `augment-on-commit` updates a component the moment its repo is committed to (reading the file from the checkout, no token). Both only enrich components that already exist, so pair this with a component-defining cataloger such as [`github-org`](../github-org).
 
 ## Synced Data
 
@@ -15,11 +13,12 @@ This cataloger writes to the following Catalog JSON paths on each run:
 | Path | Type | Description |
 |------|------|-------------|
 | `.components["$LUNAR_COMPONENT_ID"].owner` | string | `spec.owner` of the matched Backstage Component (or `default_owner` fallback) |
-| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set |
+| `.components["$LUNAR_COMPONENT_ID"].domain` | string | `metadata.annotations[<domain_annotation>]` of the matched Component when `domain_annotation` is configured and the annotation is present; otherwise `spec.domain`, falling back to `spec.system`, then to the configured `default_domain` when none of those is set. When the file also declares the parent hierarchy (`Domain` entities with `spec.subdomainOf`, `System` entities with `spec.domain`), the resolved `spec.domain` / `spec.system` is expanded to its full nested dotted path — see [Nested Domain Hierarchy](#nested-domain-hierarchy-subdomains-and-systems) |
 | `.components["$LUNAR_COMPONENT_ID"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
-| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares a matching `kind: Domain` or `kind: System` entity, its `metadata.description` and `spec.owner` are propagated into the stub. |
+| `.components["$LUNAR_COMPONENT_ID"].meta` | object | Key/value meta sourced from annotations per the `meta_annotations` mapping. By default maps the `pagerduty.com/service-id` annotation onto `pagerduty/service-id`, which the [`pagerduty`](../../collectors/pagerduty) collector reads. Omitted entirely when no mapped annotation is present. |
+| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a component references. Hub catalog validation rejects components that reference unknown domains, so the cataloger writes the stub before the component entry. When the same `catalog-info.yaml` declares `kind: Domain` / `kind: System` entities, each is written under its nested dotted key (see [Nested Domain Hierarchy](#nested-domain-hierarchy-subdomains-and-systems)) with its `metadata.description` and `spec.owner` propagated. |
 
-This cataloger does **not** define new components — that's out of scope for `component-cron`. Pair with a component-defining cataloger (see [Layering](#layering-with-a-component-defining-cataloger)). Domain entries are written as stubs only; for a richer global domain catalog, layer with the [`backstage`](../backstage) cataloger.
+This cataloger does **not** define new components — both the `component-cron` and `component-repo` hooks augment existing components only. Pair with a component-defining cataloger (see [Layering](#layering-with-a-component-defining-cataloger)). Domain entries are written as stubs only; for a richer global domain catalog, layer with the [`backstage`](../backstage) cataloger.
 
 <details>
 <summary>Example Catalog JSON output (across multiple component runs)</summary>
@@ -30,7 +29,8 @@ This cataloger does **not** define new components — that's out of scope for `c
     "github.com/acme/payment-api": {
       "owner": "group:default/team-payments",
       "domain": "platform.payments",
-      "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"]
+      "tags": ["bs-payments", "bs-tier1", "bs-type-service", "bs-lifecycle-production"],
+      "meta": {"pagerduty/service-id": "PABC123"}
     },
     "github.com/acme/web-app": {
       "owner": "group:default/team-web",
@@ -54,40 +54,71 @@ This cataloger does **not** define new components — that's out of scope for `c
 
 | Cataloger | Description |
 |-----------|-------------|
-| `augment` | Fetches `catalog-info.yaml` from the current component's GitHub repo via the Contents API, parses the YAML (multi-document files supported), picks the matching `Component` entity, and writes its owner / domain / tags to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON |
+| `augment` | **Scheduled.** Fetches `catalog-info.yaml` from the current component's GitHub repo via the Contents API, parses the YAML (multi-document files supported), picks the matching `Component` entity, and writes its owner / domain / tags / meta to `.components["$LUNAR_COMPONENT_ID"]` in the Catalog JSON. Runs on a `component-cron` schedule. Requires `GH_TOKEN`. |
+| `augment-on-commit` | **Commit-triggered.** Same parsing, matching, and output as `augment`, but runs on the `component-repo` hook — it fires when the component's repo receives a commit and reads `catalog-info.yaml` from the checkout instead of the Contents API. No `GH_TOKEN` required. Use it for near-real-time updates; see [Choosing a variant](#choosing-a-variant). |
 
 ## Hook Type
 
-| Hook | Schedule | Description |
-|------|----------|-------------|
-| `component-cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per existing component |
+| Cataloger | Hook | Schedule / Trigger | Description |
+|-----------|------|--------------------|-------------|
+| `augment` | `component-cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per existing component |
+| `augment-on-commit` | `component-repo` | on commit to a component's repo | Runs whenever a component's repo receives a commit, once per affected component |
 
-`component-cron` invokes the cataloger separately for each Lunar component currently in the catalog, exposing the component identifier as `$LUNAR_COMPONENT_ID`. See the [cataloger-hooks reference](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) for the full contract.
+Both hooks invoke the cataloger separately for each Lunar component, exposing the component identifier as `$LUNAR_COMPONENT_ID`. The difference is *when* and *with what*: `component-cron` fires on a schedule with no repo checkout (so `augment` fetches the file over the API), while `component-repo` fires on a commit with the component's repo checked out (so `augment-on-commit` reads the file locally). See the cataloger-hooks reference for the full contract on [`component-cron`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-cron) and [`component-repo`](https://docs-lunar.earthly.dev/configuration/lunar-config/cataloger-hooks#component-repo).
 
-Daily at 03:00 is a conservative default — `catalog-info.yaml` changes typically land on the order of hours-to-days, and the schedule is offset by an hour from the standard `0 2 * * *` so it lands after component-defining catalogers populate the catalog. Tighten the cadence by overriding `hook.schedule` in a fork.
+Daily at 03:00 is a conservative default for `augment` — it's offset by an hour from the standard `0 2 * * *` so it lands after component-defining catalogers populate the catalog. Tighten the cadence by overriding `hook.schedule` in a fork.
+
+### Choosing a variant
+
+The two sub-catalogers produce identical catalog entries from the same `catalog-info.yaml`; pick by how fresh you need the data and whether a checkout is available:
+
+| | `augment` (`component-cron`) | `augment-on-commit` (`component-repo`) |
+|--|------------------------------|----------------------------------------|
+| **Freshness** | Up to a day stale (next cron) | Near-real-time — updates on the triggering commit |
+| **GitHub token** | Required (`GH_TOKEN`, Contents API) | Not required (reads the checkout) |
+| **Catches drift independent of commits** | Yes — re-reads every component each cron | No — only fires when a repo is committed to |
+| **Covers components whose repo is quiet** | Yes | No, until the next commit |
+
+They aren't mutually exclusive. Running **both** is a reasonable default: `augment-on-commit` keeps active repos current within seconds of a change, while the nightly `augment` backfills components that haven't seen a commit and re-asserts state. Selecting a subset is done with `include` / `exclude` (see [Installation](#installation)). When both run, they write the same keys with the same data, so there's no conflict — the later writer simply re-asserts the value.
 
 ## Installation
 
-Add to your `lunar-config.yml`:
+Add to your `lunar-config.yml`. With no `include` / `exclude`, both sub-catalogers run:
 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
-Set the GitHub token used to fetch `catalog-info.yaml` from each repo:
+Pick a single variant with `include` (see [Choosing a variant](#choosing-a-variant)):
+
+```yaml
+catalogers:
+  # Commit-triggered only — near-real-time, no GitHub token needed
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment-on-commit]
+```
+
+```yaml
+catalogers:
+  # Scheduled only — daily backfill via the GitHub Contents API
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment]
+```
+
+If you run the `augment` variant (scheduled / Contents API), set the GitHub token used to fetch `catalog-info.yaml` from each repo:
 
 ```sh
 lunar secret set GH_TOKEN <your-github-token>
 ```
 
-The token needs `Contents: Read` on every repo this cataloger will read (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or any of the GitHub-API collectors, this cataloger picks it up automatically.
+The token needs `Contents: Read` on every repo this cataloger will read (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or any of the GitHub-API collectors, this cataloger picks it up automatically. The `augment-on-commit` variant reads the file from the `component-repo` checkout, so it needs no token — if you run only that variant you can skip this step.
 
-Because `component-cron` only augments existing components, a component-defining cataloger must run first (see the [Layering](#layering-with-a-component-defining-cataloger) section below).
+Because both variants only augment existing components, a component-defining cataloger must run first (see the [Layering](#layering-with-a-component-defining-cataloger) section below).
 
 ### Layering with a Component-Defining Cataloger
 
-`component-cron` requires components to already exist. Run [`github-org`](../github-org) first so this cataloger has something to augment:
+Both variants augment existing components only — neither `component-cron` nor `component-repo` can create them. Run [`github-org`](../github-org) first so this cataloger has something to augment:
 
 ```yaml
 catalogers:
@@ -131,6 +162,26 @@ If the file has multiple `Component` entities and none are annotated, the catalo
 
 This cataloger only processes `kind: Component` entities. `Domain`, `System`, `API`, `Resource`, `User`, `Group`, `Location`, etc. are ignored — they're either container-level concepts (handled by a global cataloger like [`backstage`](../backstage)) or not Lunar catalog concerns.
 
+### Excluding Components from Augmentation
+
+Two inputs decide which components this cataloger skips, giving platform teams a choice between keeping control and delegating opt-out to dev teams:
+
+- **`ignore_components` (platform-controlled).** A comma-separated list of component ids to skip — matched by exact id or glob (e.g. `github.com/acme/legacy-*`). A matched component is skipped before its `catalog-info.yaml` is even fetched. Because the list lives in `lunar-config.yml`, dev teams can't override it — this is the "platform team keeps control" path.
+
+  ```yaml
+  with:
+    ignore_components: "github.com/acme/sandbox,github.com/acme/legacy-*"
+  ```
+
+- **`lunar.io/ignore` annotation (dev-delegated, gated).** When `allow_ignore_annotation: true`, any component whose matched `Component` carries `lunar.io/ignore: "true"` (values `true` / `yes` / `1`; key configurable via `ignore_annotation`) opts itself out of augmentation. This is the "platform team delegates opt-out to dev teams" path. It's **off by default** — until you enable the gate, the annotation is ignored and exclusion stays entirely platform-controlled.
+
+  ```yaml
+  with:
+    allow_ignore_annotation: true   # let repos self-exclude via lunar.io/ignore
+  ```
+
+The two compose: `ignore_components` is always enforced; the annotation only when its gate is on. Use the list alone for hard central control, the gate alone (or both) to let dev teams remove their own components.
+
 ### Sourcing the Domain from a Custom Annotation
 
 Some orgs model component domains via a custom annotation rather than the canonical Backstage `spec.domain` field — for example, to express a hierarchical name like `engineering.tooling.observability` that Backstage's flat `spec.domain` doesn't model well. Set `domain_annotation` to that key and the cataloger reads it from `metadata.annotations[<key>]`:
@@ -158,6 +209,69 @@ catalogers:
 The value is written verbatim, and a stub `.domains["<default_domain>"]` entry is written alongside it so the hub's domain validation accepts the reference (the same stub-write the cataloger does for any other domain). `default_domain` is purely a last-resort fallback — it never overrides a domain that the file already provides through any of the sources above. Leave it empty (the default) to keep domain-less components unset.
 
 This mirrors `default_owner` for ownership: use it to funnel otherwise-uncategorized repos into a sensible default domain rather than leaving them blank.
+
+### Nested Domain Hierarchy (subdomains and systems)
+
+Backstage models a nested taxonomy through references — a `Domain` points at its parent with `spec.subdomainOf`, and a `System` points at its domain with `spec.domain`. Lunar encodes hierarchy purely as dot-notation (`a.b.c` is a child of `a.b`), with no explicit parent field, so the dotted key *is* the hierarchy. When a repo's `catalog-info.yaml` **declares those parent entities in the file** — typically a monorepo file that ships its `Component` alongside the `System` and the `Domain` chain it belongs to — the cataloger walks the chain and expands the component's domain to the full dotted path:
+
+```yaml
+# catalog-info.yaml (one multi-document file)
+kind: Domain
+metadata: { name: engineering }
+---
+kind: Domain
+metadata: { name: platform }
+spec: { subdomainOf: engineering }
+---
+kind: Domain
+metadata: { name: observability }
+spec: { subdomainOf: platform }
+---
+kind: System
+metadata: { name: telemetry }
+spec: { domain: observability }
+---
+kind: Component
+metadata:
+  name: telemetry-api
+  annotations: { github.com/project-slug: acme/telemetry-api }
+spec: { system: telemetry }
+```
+
+resolves `telemetry-api`'s domain to `engineering.platform.observability.telemetry`, and writes a `.domains` row for each declared `Domain` / `System` keyed by its own nested path.
+
+Resolution only sees entities **in the same file**. A reference to a parent that isn't declared in the file contributes its bare name as a single segment and stops there — the per-repo cataloger sees one repo's file, not the whole Backstage catalog. For a catalog whose domain tree lives centrally (the common case), use the live-API [`backstage`](../backstage) cataloger, which fetches the entire catalog and resolves the full hierarchy. A file that declares only a `Component` has nothing to nest and behaves exactly as before — the bare `spec.domain` / `spec.system` name is used unchanged, so existing installs see byte-identical output.
+
+### Mapping Annotations to Component Meta (PagerDuty and others)
+
+Several lunar-lib collectors resolve their per-component target from the Lunar component **meta** field rather than from config — for example, the [`pagerduty`](../../collectors/pagerduty) collector reads `pagerduty/service-id` from `LUNAR_COMPONENT_META` to know which PagerDuty service to query. That meta value has to come from somewhere; this cataloger sources it from a `catalog-info.yaml` annotation.
+
+`meta_annotations` is a comma-separated list of `<annotation-key>=<meta-key>` pairs. For each pair, if the matched `Component` carries that annotation, its value is written to `.components["$LUNAR_COMPONENT_ID"].meta[<meta-key>]`. The default maps the annotation PagerDuty's [Backstage integration guide](https://support.pagerduty.com/main/docs/backstage-integration-guide) recommends:
+
+```yaml
+catalogers:
+  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    # default: meta_annotations: "pagerduty.com/service-id=pagerduty/service-id"
+```
+
+So a repo whose `catalog-info.yaml` has:
+
+```yaml
+metadata:
+  annotations:
+    pagerduty.com/service-id: PABC123
+```
+
+gets `meta: {"pagerduty/service-id": "PABC123"}`, and the `pagerduty` collector (and the `oncall` guardrails behind it) works with no further per-component config. Note the annotation namespace is `pagerduty.com/` (the Backstage/PagerDuty convention) while the Lunar meta key is `pagerduty/service-id` — the mapping bridges the two.
+
+Add pairs to feed other collectors:
+
+```yaml
+    with:
+      meta_annotations: "pagerduty.com/service-id=pagerduty/service-id,sonarqube.io/project-key=sonarqube/project-key"
+```
+
+Whitespace around each pair and its `=` is trimmed. Set `meta_annotations` to empty to write no meta at all. A pair whose annotation is absent on a given component is skipped, and `.meta` is omitted entirely when nothing matches (so it never clobbers meta set elsewhere with an empty object).
 
 ### Owner Format
 

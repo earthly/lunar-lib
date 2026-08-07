@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: payments-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: web-app
+  annotations:
+    pagerduty/service-id: PDEF456
+spec:
+  type: service
+  owner: team-web

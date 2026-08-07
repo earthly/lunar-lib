@@ -5,8 +5,7 @@ def main(node=None):
     c = Check("instruction-file-exists", "Agent instruction file should exist at repo root", node=node)
     with c:
         instructions = c.get_node(".ai.instructions")
-        instr_data = instructions.get_value_or_default(".", None)
-        if instr_data is None:
+        if not instructions.exists():
             c.fail(
                 "No instruction file data found — ensure the ai collector is enabled. "
                 "Exclude this policy if instruction files are not required for this component."

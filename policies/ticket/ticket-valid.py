@@ -13,8 +13,16 @@ def main(node=None):
 
         valid = c.get_value_or_default(".vcs.pr.ticket.valid", None)
         if valid is None:
-            c.fail(f"Ticket {ticket_id} could not be validated against Jira. "
-                   "The ticket may not exist or the Jira API may be unreachable.")
+            # tracker_error says why the collector could not confirm the
+            # ticket. Trackers that do not report one leave it unset.
+            tracker_error = c.get_value_or_default(".vcs.pr.ticket.tracker_error", None)
+            if tracker_error == "not_found":
+                c.fail(f"Ticket {ticket_id} does not exist in Jira.")
+            elif tracker_error == "unreachable":
+                c.fail(f"Ticket {ticket_id} could not be validated: Jira was unreachable.")
+            else:
+                c.fail(f"Ticket {ticket_id} could not be validated against Jira. "
+                       "The ticket may not exist or the Jira API may be unreachable.")
             return c
 
         c.assert_true(valid, f"Ticket {ticket_id} is not valid in Jira.")

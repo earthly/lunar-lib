@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck disable=SC1091  # helpers.sh is sourced at runtime from the script dir
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_rust_project; then
@@ -10,12 +11,12 @@ fi
 
 clippy_passed=false
 
-# Get optional extra args
-CLIPPY_ARGS="${LUNAR_INPUT_clippy_args:-}"
+# Get optional extra args (space-separated string → array, one element per arg)
+read -ra CLIPPY_ARGS <<< "${LUNAR_VAR_CLIPPY_ARGS:-}"
 
 # Run clippy with JSON message format
 set +e
-clippy_output=$(cargo clippy --message-format=json $CLIPPY_ARGS 2>/tmp/clippy-stderr)
+clippy_output=$(cargo clippy --message-format=json "${CLIPPY_ARGS[@]}" 2>/tmp/clippy-stderr)
 clippy_exit_code=$?
 set -e
 

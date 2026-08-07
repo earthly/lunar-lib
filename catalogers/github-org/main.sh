@@ -13,18 +13,27 @@ GITHUB_HOST=$(echo "$GITHUB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##;
 GITHUB_HOST="${GITHUB_HOST:-github.com}"
 export GH_HOST="$GITHUB_HOST"
 
-# Authenticate the gh CLI from the Lunar secret (falling back to a token already
-# in the environment). github.com reads GH_TOKEN; GitHub Enterprise Server hosts
-# read GH_ENTERPRISE_TOKEN — gh picks the right one by host, so route the token
-# to the matching variable.
-GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
-if [ -z "$GH_AUTH_TOKEN" ]; then
-    echo "Error: GH_TOKEN or LUNAR_SECRET_GH_TOKEN must be set" >&2
-    exit 1
-fi
+# Authenticate the gh CLI. github.com and a GitHub Enterprise Server are separate
+# hosts with separate credentials, so read separate secrets and route each to the
+# variable gh selects by host:
+#   - github.com        -> GH_TOKEN            from LUNAR_SECRET_GH_TOKEN
+#   - GitHub Enterprise -> GH_ENTERPRISE_TOKEN from LUNAR_SECRET_GH_ENTERPRISE_TOKEN,
+#                          falling back to LUNAR_SECRET_GH_TOKEN so single-token
+#                          setups that only ever set GH_TOKEN keep working.
+# A matching token already exported in the environment is honored as a last resort.
 if [ "$GITHUB_HOST" = "github.com" ]; then
+    GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
+    if [ -z "$GH_AUTH_TOKEN" ]; then
+        echo "Error: LUNAR_SECRET_GH_TOKEN (or GH_TOKEN) must be set for github.com" >&2
+        exit 1
+    fi
     export GH_TOKEN="$GH_AUTH_TOKEN"
 else
+    GH_AUTH_TOKEN="${LUNAR_SECRET_GH_ENTERPRISE_TOKEN:-${LUNAR_SECRET_GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-${GH_TOKEN:-}}}}"
+    if [ -z "$GH_AUTH_TOKEN" ]; then
+        echo "Error: LUNAR_SECRET_GH_ENTERPRISE_TOKEN (or LUNAR_SECRET_GH_TOKEN) must be set for GitHub Enterprise host $GITHUB_HOST" >&2
+        exit 1
+    fi
     export GH_ENTERPRISE_TOKEN="$GH_AUTH_TOKEN"
 fi
 
@@ -38,7 +47,14 @@ INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_REPOS="${LUNAR_VAR_INCLUDE_REPOS:-}"
 EXCLUDE_REPOS="${LUNAR_VAR_EXCLUDE_REPOS:-}"
-TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX:-gh-}"
+ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
+DISALLOWED_TOPICS="${LUNAR_VAR_DISALLOWED_TOPICS:-}"
+# `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+# prefixing (documented behavior). The hub always sets LUNAR_VAR_TAG_PREFIX —
+# to the manifest default `gh-` when unset in config, or to the user's value
+# (including "") when set — so `-gh-` only fires for a truly-unset var (direct
+# local invocation), not for a config-supplied empty string.
+TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
@@ -69,6 +85,8 @@ echo "Visibilities: ${VISIBILITIES[*]}"
 echo "Include archived: $INCLUDE_ARCHIVED"
 [ -n "$INCLUDE_REPOS" ] && echo "Include patterns: $INCLUDE_REPOS"
 [ -n "$EXCLUDE_REPOS" ] && echo "Exclude patterns: $EXCLUDE_REPOS"
+[ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
+[ -n "$DISALLOWED_TOPICS" ] && echo "Disallowed topics: $DISALLOWED_TOPICS"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
 
@@ -207,21 +225,41 @@ CATALOG_ENTRIES=$(jq \
     --arg domain "$DEFAULT_DOMAIN" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
+    --arg allowed_topics "$ALLOWED_TOPICS" \
+    --arg disallowed_topics "$DISALLOWED_TOPICS" \
     '
-    # Filter repos based on include/exclude patterns
-    [.[] | 
+    # Parse a comma-separated input into a trimmed, non-empty set of topics.
+    def csv_set($s): ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)));
+    (csv_set($allowed_topics)) as $allow |
+    (csv_set($disallowed_topics)) as $deny |
+
+    # Filter repos based on include/exclude patterns and topic allow/blocklists
+    [.[] |
         # Apply include filter (if specified, must match)
         select(
-            ($include_regex == "") or 
+            ($include_regex == "") or
             (.name | test($include_regex))
         ) |
         # Apply exclude filter (if specified, must not match)
         select(
-            ($exclude_regex == "") or 
+            ($exclude_regex == "") or
             (.name | test($exclude_regex) | not)
+        ) |
+        # Repo topics as a plain string array
+        ([(.repositoryTopics // [])[] | .name]) as $topics |
+        # Allowlist: if set, the repo must carry at least one allowed topic.
+        # ($allow - ($allow - $topics)) is the intersection (allow ∩ topics).
+        select(
+            ($allow | length) == 0 or
+            (($allow - ($allow - $topics)) | length) > 0
+        ) |
+        # Blocklist: if set, the repo must carry none of the disallowed topics.
+        select(
+            ($deny | length) == 0 or
+            (($deny - ($deny - $topics)) | length) == 0
         )
     ] |
-    
+
     # Transform to catalog format as array of entries (for batching)
     [.[] | {
         key: (.url | gsub("https://"; "")),

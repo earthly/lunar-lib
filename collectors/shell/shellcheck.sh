@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck disable=SC1091  # helpers.sh is sourced at runtime from the script dir
 source "$(dirname "$0")/helpers.sh"
 
 if ! is_shell_project; then
@@ -20,7 +21,7 @@ if [[ ${#scripts[@]} -eq 0 ]]; then
 fi
 
 # Determine severity level
-severity="${LUNAR_INPUT_SHELLCHECK_SEVERITY:-style}"
+severity="${LUNAR_VAR_SHELLCHECK_SEVERITY:-style}"
 
 # Get shellcheck version
 sc_version=$(shellcheck --version 2>/dev/null | sed -n 's/^version: //p' || echo "unknown")
@@ -28,7 +29,6 @@ sc_version=$(shellcheck --version 2>/dev/null | sed -n 's/^version: //p' || echo
 # Run shellcheck with JSON output on all scripts
 set +e
 sc_output=$(shellcheck -f json -S "$severity" "${scripts[@]}" 2>/dev/null)
-sc_exit=$?
 set -e
 
 # Parse results — shellcheck outputs a JSON array

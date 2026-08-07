@@ -1,7 +1,7 @@
 version: 0
 
 name: jira
-description: Collect Jira ticket metadata from PR titles and validate against Jira API
+description: Collect Jira ticket metadata from PR titles and descriptions and validate against Jira API
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -9,8 +9,9 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Jira Collector"
   long_description: |
-    Extract Jira ticket references from pull request titles, validate them
-    against the Jira REST API, and detect ticket reuse across PRs.
+    Extract Jira ticket references from pull request titles and descriptions,
+    validate them against the Jira REST API taking the best one that exists,
+    and detect ticket reuse across PRs.
   categories: ["vcs"]
   icon: "assets/jira.svg"
   status: "stable"
@@ -22,20 +23,39 @@ landing_page:
 collectors:
   - name: ticket
     description: |
-      Extracts Jira ticket ID from PR title, fetches issue metadata from
-      the Jira REST API, and writes normalized ticket data to
-      .vcs.pr.ticket and native Jira data to .vcs.pr.ticket.native.jira.
+      Extracts Jira ticket IDs from the PR title and description, takes the
+      best one the Jira REST API confirms exists, and writes normalized ticket
+      data to .vcs.pr.ticket and native Jira data to
+      .vcs.pr.ticket.native.jira.
     mainBash: ticket.sh
     runs_on: [prs]
     hook:
       type: code
     keywords: ["jira", "ticket", "pr", "issue tracking"]
 
+  - name: ticket-from-json
+    description: |
+      After-json variant of `ticket`: resolves the ticket from .vcs.pr (title
+      and description) in Component JSON (populated by the github or gitlab
+      collector) instead of calling the GitHub API, validates candidates against
+      the Jira REST API, and writes the same .vcs.pr.ticket (+ .vcs.pr.ticket.native.jira).
+      Works on any VCS provider that populates .vcs.pr and needs no GH_TOKEN.
+      Uses the experimental after-json hook; the code-hook `ticket` collector
+      above is kept for compatibility. Transitional: once after-json is no
+      longer experimental, this logic will be folded into the `ticket`
+      collector and `ticket-from-json` will be removed.
+    mainBash: ticket_from_json.sh
+    hook:
+      type: after-json
+      path: .vcs.pr.title
+    keywords: ["jira", "ticket", "after-json", "vcs.pr", "provider-agnostic"]
+
   - name: ticket-history
     description: |
       Queries the Lunar SQL database to count how many other PRs reference
-      the same ticket. Writes .vcs.pr.ticket.reuse_count for policy
-      evaluation. Detects ticket recycling abuse.
+      the same ticket. Resolves the ticket the same way the ticket collector
+      does, so both agree on which one the PR is for. Writes
+      .vcs.pr.ticket.reuse_count for policy evaluation.
     mainBash: ticket-history.sh
     runs_on: [prs]
     hook:
@@ -44,18 +64,45 @@ collectors:
 
 inputs:
   ticket_prefix:
-    description: Character(s) before the ticket ID in PR titles (empty = match anywhere)
+    description: Character(s) before the ticket ID in the PR title or description (empty = match anywhere)
     default: ""
   ticket_suffix:
-    description: Character(s) after the ticket ID in PR titles (empty = match anywhere)
+    description: Character(s) after the ticket ID in the PR title or description (empty = match anywhere)
     default: ""
   ticket_pattern:
-    description: Regex pattern for ticket ID (without prefix/suffix)
+    description: |
+      Regex pattern for ticket ID (without prefix/suffix). The default accepts
+      a project key of two or more characters, so XX-1 matches as well as
+      ABC-123. It is permissive enough to also match tokens like UTF-8 or
+      SHA-256; Jira does not know those, so they are skipped as candidates,
+      but narrowing it to your project keys (e.g. (ABC|OPS)-[0-9]+) saves the
+      lookups and is worth doing when Jira validation is not configured.
     default: "[A-Za-z][A-Za-z0-9]+-[0-9]+"
+  ticket_keywords:
+    description: |
+      Regex alternation of the keywords that mark a description reference as
+      this PR's own ticket ("Fixes ABC-123", "Ticket: ABC-123"). Matched
+      case-insensitively and ranked above any bare reference, so a dependency
+      or related ticket mentioned earlier in the body does not win. Only
+      applies to the description; the title is always matched bare.
+    default: "fixes|fixed|fix|closes|closed|close|resolves|resolved|resolve|ticket|issue"
+  max_ticket_candidates:
+    description: |
+      How many candidate keys to try against Jira before giving up. Candidates
+      are ordered best-first, and each one costs a Jira lookup per
+      sub-collector, so this bounds what a description full of key-shaped
+      tokens can cost.
+    default: "5"
   jira_base_url:
     description: Jira instance base URL (e.g. https://acme.atlassian.net)
   jira_user:
     description: Jira user email for API authentication
+  jira_retries:
+    description: |
+      How many times to retry a Jira lookup that fails transiently — connection
+      refused, timeout, 429, 5xx. A rejected credential or an unknown ticket is
+      not retried.
+    default: "3"
 
 secrets:
   JIRA_TOKEN:

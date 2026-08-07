@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: alpha
+spec:
+  owner: team-a
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: beta
+spec:
+  owner: team-b

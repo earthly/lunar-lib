@@ -2,7 +2,9 @@ VERSION 0.8
 
 test:
     FROM python:3.12-alpine
+    RUN apk add --no-cache bash jq git
     WORKDIR /workspace
-    COPY parse_codeowners.py .
+    COPY parse_codeowners.py codeowners.sh .
     COPY --dir test .
     RUN python -m unittest test/test_parse_codeowners.py -v
+    RUN bash test/test_codeowners_finder.sh

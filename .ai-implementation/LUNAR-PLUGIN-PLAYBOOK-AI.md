@@ -123,6 +123,7 @@ Find the most similar existing collector, policy, or probe and read every file. 
 | Issue tracker collector | `collectors/jira/` |
 | Security scanner collector | `collectors/semgrep/` or `collectors/snyk/` |
 | Language collector | `collectors/golang/` or `collectors/java/` |
+| Cross-component / out-of-band collector (writes onto *another* component's JSON) | `collectors/argocd/` (`link_push.sh`) — **read [`cross-component-collection.md`](cross-component-collection.md) first; it's a sharp tool with non-obvious failure modes** |
 | Repo/file check policy | `policies/repo/` |
 | Security policy | `policies/sast/` or `policies/sca/` |
 | Probe plugin | `probes/shell/` *(per-language probe bundle — see [`PROBE-PLAYBOOK-AI.md`](PROBE-PLAYBOOK-AI.md))* |
@@ -163,6 +164,22 @@ revisit it if a reviewer flags something you don't recognize.
 | Using `jq` in CI collectors | CI collectors run `native` on user CI runners. `jq` may not be installed. | Use `lunar collect` with multiple key-value pairs. See existing CI collectors for patterns. |
 | Exiting with `exit 1` on missing config | Fails the collector run. Users see errors for optional features. | `exit 0` with a stderr message explaining what's missing. |
 | Adding cleanup code (`trap`, `rm`, temp file management) | Code collectors run in disposable Docker containers. The filesystem is thrown away when the collector finishes. | Don't bother. Use fixed paths like `/tmp/output.json`. No `mktemp` needed either. |
+| Putting a Go template (`{{.X}}`) inside a bash `${VAR:-default}` expansion | Brace-matching eats one `}`, so the tool receives a malformed template (kubeconform fails registry init with `bad character U+007D`). | Build the default with a separate `if [ -z "$VAR" ]`, not a `:-` default. |
+| Pointing kubeconform at `-schema-location default` | That's a **remote** fetch; the collector runtime is network-restricted, so it hangs/fails. | Bake schemas into the image; point only at the local path. |
+
+### Cross-component / out-of-band writes
+
+Building a collector that writes onto **another** component's JSON
+(`lunar collect --component <other> --sha <sha>`, the `link-push` pattern)?
+**Read [`cross-component-collection.md`](cross-component-collection.md) first** —
+it's a sharp tool. The headline traps:
+
+| Mistake | Why it's wrong | Fix |
+|---------|---------------|-----|
+| Calling `lunar collect --component …` as-is in a collector | The runtime sets `LUNAR_COLLECT_STDOUT`, so `--component` is ignored and the write lands on the *current* component. | `env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX lunar collect --component …` |
+| Churning the cronos manifest while testing | `component_id = StableUUID(manifest_version, name)` — every manifest bump reassigns ids, splitting a component's code data and your external write across different ids (looks like the target's other data vanished). | Pin the manifest, let sources re-collect under it, *then* write. |
+| Assuming the write is idempotent | `CollectExternal` appends a new record each call and the hub re-runs collectors → arrays accumulate duplicates. | Skip the push if the target already carries your data — read it via `lunar component get-json` (NOT the lagging `components_latest` SQL view). |
+| Writing at a fabricated SHA | The hub skips a SHA it hasn't VCS-ingested — the write silently no-ops. | Resolve the source's default-branch HEAD SHA and confirm it's ingested. |
 
 ### SVG icons
 

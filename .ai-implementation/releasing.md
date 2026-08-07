@@ -202,22 +202,29 @@ After a successful release, update the cronos staging environment to reference t
    git checkout main && git pull origin main
    ```
 
-   The config is `lunar-config.yml` at the repo **root** (not under a `lunar/` subdirectory).
+   The config is split across the repo **root**: `lunar-config.yml` holds top-level
+   settings, while the plugin `uses:` pins live in the numbered files under
+   `lunar-config.d/` (e.g. `20-catalogers.yml`, `30-collectors.yml`,
+   `50-policies.yml`). The `@v<version>` refs you're bumping are in `lunar-config.d/`
+   — `lunar-config.yml` itself has none.
 
 2. **Update pinned version references:**
 
-   Replace all `@v<old-version>` references with `@vX.Y.Z`:
+   Replace all `@v<old-version>` references with `@vX.Y.Z`. The pins live under
+   `lunar-config.d/`, so run the sed over that directory:
 
    ```bash
-   sed -i 's|@v<old-version>|@vX.Y.Z|g' lunar-config.yml
+   sed -i 's|@v<old-version>|@vX.Y.Z|g' lunar-config.d/*.yml
+   # verify nothing on the old version is left behind (should print nothing):
+   grep -rn '@v<old-version>' lunar-config.d/ lunar-config.yml
    ```
 
-   This updates collectors and policies that were pinned to the previous release. Plugins still on `@main` are tracking the main branch and don't need changes.
+   This updates collectors, policies, and catalogers that were pinned to the previous release. Plugins still on `@main` are tracking the main branch and don't need changes.
 
 3. **Commit and push:**
 
    ```bash
-   git add lunar-config.yml
+   git add lunar-config.d/ lunar-config.yml
    git commit -m "Pin cronos lunar config to vX.Y.Z"
    git push origin HEAD:main
    ```
@@ -226,7 +233,7 @@ After a successful release, update the cronos staging environment to reference t
 
    > **Transient failures:** the `lunar hub pull` step intermittently dies with `failed to receive server stream: rpc error: code = Unavailable ... connection reset by peer`. If the log shows every plugin resolved (`fetching remote plugin: ...`) and only the hub stream errored, it's a transient infra blip — **not** a bad config — so just re-run it: `GH_TOKEN=$(bender-gh-token pantalasa-cronos) gh run rerun <run-id> --repo pantalasa-cronos/lunar --failed`.
 
-**Note:** Only update `@v<old>` → `@vX.Y.Z`. Do not change `@main` references — those are either development plugins being tested or plugins that intentionally track latest.
+**Note:** Only update `@v<old>` → `@vX.Y.Z`. Leave two other ref kinds untouched: `@main` refs (development plugins being tested, or plugins that intentionally track latest) and any commit-SHA pins (`@<40-char-sha>`, e.g. a plugin held at a specific fix). The `@v<old>`-only sed already skips both — but eyeball the diff to confirm it moved only the version pins you expected.
 
 ---
 
