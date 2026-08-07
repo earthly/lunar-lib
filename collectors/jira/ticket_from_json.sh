@@ -6,70 +6,61 @@ set -e
 # shellcheck disable=SC1091
 source "$(dirname "$0")/helpers.sh"
 
-# After-json variant of ticket.sh. Reads the PR/MR title from .vcs.pr.title in
-# Component JSON (populated by the github/gitlab collector) instead of calling
-# the GitHub API, so it needs no GH_TOKEN and works on any VCS provider.
-# Transitional: folds into the `ticket` collector once after-json is stable.
+# After-json variant of ticket.sh. Instead of fetching PR metadata from the
+# GitHub API, it reads the PR/MR title and description from .vcs.pr in Component
+# JSON (populated by the github/gitlab collector), then resolves and validates
+# the ticket with the same shared logic. Needs no GH_TOKEN and works on any VCS
+# provider. Transitional: folds into `ticket` once after-json is stable.
 
 COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
 PR_TITLE=$(echo "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty' 2>/dev/null)
+# PR_BODY is consumed by resolve_ticket/list_ticket_candidates in helpers.sh.
+# shellcheck disable=SC2034
+PR_BODY=$(echo "$COMPONENT_JSON" | jq -r '.vcs.pr.description // empty' 2>/dev/null)
 
 if [ -z "$PR_TITLE" ]; then
   echo "No .vcs.pr.title in Component JSON (PR-metadata collector not run yet?), skipping." >&2
   exit 0
 fi
 
-# Extract ticket ID from the title (shared logic with the code-hook collector).
-TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
-if [ -z "$TICKET_KEY" ]; then
-  exit 0
-fi
+# Resolve the ticket the same way the `ticket` sub-collector does — from the
+# title and description — validating candidates against Jira in order.
+RESOLVE_STATUS=0
+resolve_ticket || RESOLVE_STATUS=$?
 
-# Write the ticket ID and source regardless of Jira API result.
-JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
-TICKET_URL=""
-if [ -n "$JIRA_BASE_URL" ]; then
-  TICKET_URL="${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
-fi
+case $RESOLVE_STATUS in
+  1)
+    echo "PR references no ticket." >&2
+    exit 0
+    ;;
+  2)
+    # Exit 1: rejected credentials are an operator misconfiguration, not a
+    # property of this PR, so the run itself has to show as failed.
+    echo "Jira rejected the credentials for ${LUNAR_VAR_JIRA_USER}." >&2
+    exit 1
+    ;;
+esac
 
+# Write the ticket reference even when Jira could not confirm it, so an outage
+# does not make the PR look ticket-less.
 lunar collect ".vcs.pr.ticket.id" "$TICKET_KEY"
 jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j ".vcs.pr.ticket.source" -
 
-if [ -n "$TICKET_URL" ]; then
-  lunar collect ".vcs.pr.ticket.url" "$TICKET_URL"
+JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
+if [ -n "$JIRA_BASE_URL" ]; then
+  lunar collect ".vcs.pr.ticket.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
 fi
 
-# Validate required Jira API configuration (degrade gracefully otherwise).
-if [ -z "$JIRA_BASE_URL" ]; then
-  echo "jira_base_url input not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-JIRA_USER="${LUNAR_VAR_JIRA_USER:-}"
-if [ -z "$JIRA_USER" ]; then
-  echo "jira_user input not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-if [ -z "${LUNAR_SECRET_JIRA_TOKEN:-}" ]; then
-  echo "JIRA_TOKEN secret not set, skipping Jira API validation." >&2
-  exit 0
-fi
-
-# Fetch ticket from Jira REST API using classic API token + HTTP Basic auth.
-JIRA_API_URL="${JIRA_BASE_URL%/}/rest/api/3/issue/${TICKET_KEY}"
-set +e
-JIRA_RESPONSE="$(curl -fsS \
-  -u "${JIRA_USER}:${LUNAR_SECRET_JIRA_TOKEN}" \
-  -H 'Accept: application/json' \
-  "$JIRA_API_URL")"
-CURL_STATUS=$?
-set -e
-
-if [ $CURL_STATUS -ne 0 ] || [ -z "$JIRA_RESPONSE" ]; then
-  # Exit 0, not 1: a non-zero exit makes the Hub discard every value this run
-  # collected, erasing the ticket reference written above.
-  echo "Unable to fetch Jira issue ${TICKET_KEY} from ${JIRA_API_URL}." >&2
+if [ -z "$TICKET_VALID" ]; then
+  # Exit 0, not 1: a non-zero exit makes the Hub discard every value collected
+  # this run, erasing the ticket reference written above. tracker_error tells
+  # the ticket-valid policy why .valid is missing; unset means validation was
+  # never configured.
+  if [ -n "$TICKET_ERROR" ]; then
+    lunar collect ".vcs.pr.ticket.tracker_error" "$TICKET_ERROR"
+  else
+    echo "Jira API validation not configured, skipping." >&2
+  fi
   exit 0
 fi
 

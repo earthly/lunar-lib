@@ -9,21 +9,32 @@ if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
   exit 0
 fi
 
-# Require GH_TOKEN to fetch PR title.
+# Require GH_TOKEN to fetch PR metadata.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "ticket-history requires GH_TOKEN secret to query GitHub." >&2
   exit 1
 fi
 
-# Fetch PR title from GitHub.
-PR_TITLE="$(fetch_pr_title)" || exit 1
+# Fetch PR title and description from GitHub.
+fetch_pr_metadata || exit 1
 
-# Extract ticket ID from PR title.
-TICKET_KEY="$(extract_ticket_id "$PR_TITLE")" || exit 0
+# Resolve the ticket the same way the ticket sub-collector does, validating
+# candidates against Jira. Resolving independently but unvalidated would count
+# reuse for a different key than the one ticket collected whenever the first
+# candidate turns out not to exist.
+RESOLVE_STATUS=0
+resolve_ticket || RESOLVE_STATUS=$?
 
-if [ -z "$TICKET_KEY" ]; then
-  exit 0
-fi
+case $RESOLVE_STATUS in
+  1)
+    echo "PR references no ticket." >&2
+    exit 0
+    ;;
+  2)
+    echo "Jira rejected the credentials for ${LUNAR_VAR_JIRA_USER}." >&2
+    exit 1
+    ;;
+esac
 
 # Get database connection string.
 CONN_STRING=$(lunar sql connection-string 2>/dev/null) || true
