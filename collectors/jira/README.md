@@ -8,6 +8,8 @@ This collector finds Jira ticket references in the PR title and description (e.g
 
 The normalized `.vcs.pr.ticket` paths match the Linear collector's shape, so the shared `ticket` policy works regardless of which issue tracker provided the data.
 
+The `ticket-from-json` variant reads the title + description from `.vcs.pr` in Component JSON instead of the GitHub API — provider-agnostic, no `GH_TOKEN`.
+
 ## Collected Data
 
 This collector writes to the following Component JSON paths:
@@ -33,7 +35,10 @@ This integration provides the following collectors (use `include` to select a su
 | Collector | Description |
 |-----------|-------------|
 | `ticket` | Resolves the ticket from the PR title or description and fetches its metadata via the Jira REST API |
+| `ticket-from-json` | Same as `ticket`, but resolves the ticket from `.vcs.pr` (title + description) in Component JSON via the after-json hook instead of calling the GitHub API — provider-agnostic (GitHub or GitLab), needs no `GH_TOKEN` |
 | `ticket-history` | Queries Lunar SQL for ticket reuse count across PRs, resolving the ticket the same way `ticket` does |
+
+> **Note:** `ticket-from-json` is transitional. Once the after-json hook is no longer experimental, its logic will be folded into the main `ticket` collector (which will resolve the ticket from `.vcs.pr` in Component JSON instead of calling the GitHub API) and `ticket-from-json` will be removed.
 
 ## Installation
 

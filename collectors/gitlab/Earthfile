@@ -1,0 +1,11 @@
+VERSION 0.8
+
+test:
+    FROM python:3.12-alpine
+    # The collector scripts are bash and shell out to jq; the tests stub curl
+    # and lunar on PATH and drive the real scripts as subprocesses.
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY merge_request.sh repository.sh branch_protection.sh access_permissions.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v

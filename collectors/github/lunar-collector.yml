@@ -19,6 +19,21 @@ landing_page:
       reason: "Enforces branch protection and merge strategy standards"
 
 collectors:
+  - name: pull-request
+    description: |
+      Fetches pull-request metadata from the GitHub API for the PR being
+      evaluated and writes it under .vcs.pr — title, description, source and
+      target branch, author, labels, draft flag, state, URL, and number. This
+      is the GitHub source of .vcs.pr.* that the ticket collectors (jira,
+      linear) read via their after-json variants, so ticket and change-management
+      checks work without each ticket collector calling the GitHub API itself.
+      Runs only in PR context.
+    mainBash: pull_request.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["github", "pull request", "pr", "vcs.pr", "ticket", "change management"]
+
   - name: repository
     description: |
       Fetches basic repository settings from the GitHub API including visibility
@@ -70,6 +85,18 @@ example_component_json: |
         "allow_merge_commit": true,
         "allow_squash_merge": true,
         "allow_rebase_merge": false
+      },
+      "pr": {
+        "number": 123,
+        "title": "[ABC-456] Add payment validation",
+        "description": "Implements server-side validation. Closes ABC-456.",
+        "url": "https://github.com/acme/payments/pull/123",
+        "source_branch": "abc-456-payment-validation",
+        "target_branch": "main",
+        "author": "jdoe",
+        "labels": ["enhancement", "payments"],
+        "draft": false,
+        "state": "open"
       },
       "branch_protection": {
         "enabled": true,
