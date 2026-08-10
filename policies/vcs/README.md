@@ -4,7 +4,7 @@ Version control system (VCS) best practices and security policies for repositori
 
 ## Overview
 
-This policy plugin enforces version control system security standards, focusing on branch protection rules that prevent unauthorized or risky changes to critical branches. Branch protection is a fundamental security control that ensures code review, testing, and approval processes are followed before changes reach production. Development teams using GitHub (or similar VCS platforms) should use this policy to enforce consistent protection rules across repositories.
+This policy plugin enforces version control system security standards, focusing on branch protection rules that prevent unauthorized or risky changes to critical branches. Branch protection is a fundamental security control that ensures code review, testing, and approval processes are followed before changes reach production. Development teams using any supported version control system (such as GitHub or GitLab) should use this policy to enforce consistent protection rules across repositories.
 
 ## Policies
 
@@ -59,7 +59,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.merge_strategies.allow_squash_merge` | boolean | Whether squash merges are allowed |
 | `.vcs.merge_strategies.allow_rebase_merge` | boolean | Whether rebase merges are allowed |
 
-**Note:** This policy requires a VCS collector (such as `github`) that populates the `.vcs` data.
+**Note:** This policy requires a VCS collector (such as `github` or `gitlab`) that populates the `.vcs` data.
 
 ## Installation
 
@@ -224,9 +224,9 @@ with:
 
 When branch protection policies fail, configure branch protection rules in your repository settings:
 
-1. **GitHub:** Navigate to your repository → Settings → Branches → Branch protection rules
+1. In your VCS provider, open the repository's branch protection settings (e.g. GitHub: Settings → Branches → Branch protection rules; GitLab: Settings → Repository → Protected branches and Merge request approvals)
 2. Select your default branch (typically `main` or `master`) or create a new rule
-3. Enable the required protection settings based on the policy failures:
+3. Enable the required protection settings based on the policy failures (setting names vary by provider):
    - **Require pull request reviews before merging** - Set the number of required approvals
    - **Require review from Code Owners** - Enable if codeowner review is required
    - **Dismiss stale pull request approvals when new commits are pushed** - Enable if required
@@ -242,14 +242,14 @@ When branch protection policies fail, configure branch protection rules in your 
 
 When repository settings policies fail, update repository settings:
 
-1. **GitHub:** Navigate to your repository → Settings
+1. In your VCS provider, open the repository's settings (e.g. GitHub: Settings → General; GitLab: Settings → General and Repository)
 2. Update the relevant settings based on the policy failures:
    - **Repository visibility** (General section):
      - Change visibility to match policy requirements (Private or Public)
      - Note: Changing visibility may have security implications - consult your security team
    - **Default branch** (General section):
      - Rename your default branch if required (e.g., from `master` to `main`)
-     - GitHub provides a "Rename branch" button in the repository settings
+     - Most providers offer a default-branch rename control (e.g. GitHub's "Rename branch" button)
      - Update local clones and CI/CD configurations after renaming
    - **Merge button** (Pull Requests section):
      - Enable only the merge strategies listed in `allowed_merge_strategies`
