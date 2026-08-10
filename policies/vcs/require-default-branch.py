@@ -5,7 +5,7 @@ def main(node=None):
     c = Check("require-default-branch", "Default branch should match required name", node=node)
     with c:
         if not c.get_node(".vcs").exists():
-            c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            c.fail("VCS data not found. Ensure a VCS collector is configured and has run.")
             return c
 
         required_default_branch = variable_or_default("required_default_branch", "main")

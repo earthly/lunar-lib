@@ -5,7 +5,7 @@ def main(node=None):
     c = Check("require-private", "Repository must be private", node=node)
     with c:
         if not c.get_node(".vcs").exists():
-            c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            c.fail("VCS data not found. Ensure a VCS collector is configured and has run.")
             return c
 
         visibility = c.get_value(".vcs.visibility")
