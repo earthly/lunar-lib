@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# LUNAR_COMPONENT_ID / LUNAR_COMPONENT_PR are injected by the Lunar runtime —
+# they are not local assignments or typos of each other.
+# shellcheck disable=SC2153
 set -e
 
 # helpers.sh sits alongside this script in the collector dir at runtime.
@@ -12,7 +15,16 @@ source "$(dirname "$0")/helpers.sh"
 # the ticket with the same shared logic. Needs no GH_TOKEN and works on any VCS
 # provider. Transitional: folds into `ticket` once after-json is stable.
 
-COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
+# In PR context the runtime sets LUNAR_COMPONENT_PR. Pass it through so
+# get-json returns the PR-scoped Component JSON (which carries .vcs.pr.*)
+# rather than the main-branch JSON. `lunar component get-json` does not default
+# --pr from the environment (unlike the component id, which falls back to
+# LUNAR_COMPONENT_ID), so without this the PR title is never seen and the
+# collector skips. Empty array when unset → no --pr, same as before.
+pr_arg=()
+[ -n "${LUNAR_COMPONENT_PR:-}" ] && pr_arg=(--pr "$LUNAR_COMPONENT_PR")
+
+COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>/dev/null || echo "")
 PR_TITLE=$(echo "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty' 2>/dev/null)
 # PR_BODY is consumed by resolve_ticket/list_ticket_candidates in helpers.sh.
 # shellcheck disable=SC2034
