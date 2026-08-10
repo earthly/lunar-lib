@@ -1,9 +1,13 @@
 #!/bin/bash
 #
-# Local offline test for the Backstage collector's referential-integrity
-# feature. Mocks `curl` (against the Backstage catalog by-name API) and
-# `lunar` (capturing the collected `.catalog.native.backstage` write) so the
-# collector can be exercised end-to-end without network access.
+# Local offline test for the Backstage collector. Mocks `curl` (against the
+# Backstage catalog by-name API) and `lunar` (capturing the collected
+# `.catalog.native.backstage` write) so the collector can be exercised
+# end-to-end — through the real `yq`/`python3` pipeline — without network
+# access. Covers two things:
+#   1. Multi-document parsing/linting (multiple entities separated by `---`).
+#      This is the path the alpine CI unit tests can't reach (no yq there).
+#   2. The optional referential-integrity feature.
 #
 # The mock curl returns an HTTP status keyed off the requested entity name:
 #   typo*  -> 404 (definitive miss)      five -> 502 (transient 5xx)
@@ -62,6 +66,20 @@ run() {
        bash "$SCRIPT_DIR/main.sh" ) | jq -c '.refs'
 }
 
+# Run main.sh against a catalog-info.yaml whose contents are supplied on stdin
+# (no backstage_url, so no network / .refs), echoing the full collected
+# `.catalog.native.backstage` object.
+run_collect() {
+  local wd="$TEST_DIR/wd"
+  rm -rf "$wd"; mkdir -p "$wd"
+  cat > "$wd/catalog-info.yaml"
+  ( cd "$wd" \
+    && PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="" \
+       bash "$SCRIPT_DIR/main.sh" )
+}
+
 FAILS=0
 assert_eq() {
   local desc="$1" got="$2" want="$3"
@@ -74,6 +92,40 @@ assert_eq() {
     FAILS=$((FAILS + 1))
   fi
 }
+
+echo "Backstage collector multi-document parse/lint tests:"
+
+# A legal Component + API file (the reported bug) must parse cleanly: valid,
+# both entities captured, and the Component hoisted as the primary so the
+# owner/lifecycle/system policies read its spec.
+MULTI=$(run_collect < "$SCRIPT_DIR/test/fixtures/multi-doc-catalog-info.yaml")
+assert_eq "multi-doc valid overall" \
+  "$(echo "$MULTI" | jq -c '.valid')" 'true'
+assert_eq "multi-doc captures every entity" \
+  "$(echo "$MULTI" | jq -c '[.entities[].kind]')" '["Component","API"]'
+assert_eq "multi-doc hoists the Component as primary" \
+  "$(echo "$MULTI" | jq -c '{kind, owner:.spec.owner, system:.spec.system}')" \
+  '{"kind":"Component","owner":"team-payments","system":"payment-platform"}'
+
+# One invalid entity fails the whole file, and the error names which document.
+BAD=$(run_collect <<'EOF'
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata: {name: good-comp}
+spec: {owner: t, lifecycle: production}
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: bad-api
+  tags: ["hosting/internal"]
+spec: {owner: t}
+EOF
+)
+assert_eq "multi-doc with a bad entity is invalid" \
+  "$(echo "$BAD" | jq -c '.valid')" 'false'
+assert_eq "error locates the offending document" \
+  "$(echo "$BAD" | jq -r '.errors[0].message' | grep -c "document 2 (API 'bad-api')")" '1'
 
 echo "Backstage collector referential-integrity tests:"
 
