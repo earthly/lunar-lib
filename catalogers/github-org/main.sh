@@ -58,6 +58,14 @@ TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
+# Ceiling on repositories fetched per visibility level. `gh repo list` paginates
+# through the GitHub GraphQL API (100 repos/page, cursor-based — this is NOT the
+# Search API, so the 1000-result search cap does not apply); `--limit` is simply
+# where it stops paginating. The default comfortably covers orgs with thousands
+# of repos — raise it for a larger org. If a fetch comes back at exactly this
+# ceiling the result may be truncated, and we warn (see the fetch loop below).
+MAX_REPOS_PER_VISIBILITY="${LUNAR_VAR_MAX_REPOS_PER_VISIBILITY:-10000}"
+
 # Rate limit / retry settings
 MAX_RETRIES=5
 INITIAL_BACKOFF=5  # seconds
@@ -133,8 +141,9 @@ fetch_repos_with_retry() {
     local backoff=$INITIAL_BACKOFF
     
     while [ $attempt -le $MAX_RETRIES ]; do
-        # Build gh command
-        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit 10000)
+        # Build gh command. --limit sets how far gh paginates (100/page via
+        # GraphQL cursor); MAX_REPOS_PER_VISIBILITY is the configurable ceiling.
+        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$MAX_REPOS_PER_VISIBILITY")
         GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
         
         if [ "$INCLUDE_ARCHIVED" = "false" ]; then
@@ -203,7 +212,15 @@ for visibility in "${VISIBILITIES[@]}"; do
     
     REPO_COUNT=$(echo "$REPOS" | jq 'length')
     echo "Found $REPO_COUNT $visibility repos"
-    
+
+    # Truncation guard: gh stops paginating at --limit, so a fetch that comes
+    # back at exactly the ceiling almost certainly means the org has more repos
+    # we didn't retrieve. Warn loudly rather than silently cataloging a partial
+    # org — the operator should raise max_repos_per_visibility.
+    if [ "$REPO_COUNT" -ge "$MAX_REPOS_PER_VISIBILITY" ]; then
+        echo "WARNING: reached the fetch ceiling of $MAX_REPOS_PER_VISIBILITY $visibility repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos_per_visibility' input to catalog them all." >&2
+    fi
+
     # Merge into temp file (single jq call, not accumulating in memory)
     echo "$REPOS" > "${TEMP_FILE}.chunk"
     jq -s 'add' "$TEMP_FILE" "${TEMP_FILE}.chunk" > "${TEMP_FILE}.new"
