@@ -231,8 +231,13 @@ done
 TOTAL_COUNT=$(jq 'length' "$TEMP_FILE")
 echo "Total repos fetched: $TOTAL_COUNT"
 
-# Batch size for lunar catalog calls
-BATCH_SIZE=1000
+# Max bytes of component JSON per `lunar catalog raw` call. Each call writes ONE
+# line to stdout, and in production the operator streams a cataloger's stdout
+# line-by-line through its sidecar — a container runtime chops any log line
+# longer than ~16 KB (16384 bytes), which truncates an oversized catalog line
+# and silently drops repos. Packing entries up to this budget keeps every
+# emitted line well under that boundary. See README "Scale and rate limits".
+MAX_LINE_BYTES=12000
 
 # Filter and transform all repos in a single jq call
 # Output as array of {key, value} pairs for easier batching
@@ -292,6 +297,11 @@ CATALOG_ENTRIES=$(jq \
               + (if $domain != "" then {domain: $domain} else {} end)
         )
     }]
+    # Emit in a stable, deterministic order (by component id) so the same set of
+    # repos is written on every run. gh repo list returns repos in pushed-time
+    # order, which shifts as repos are pushed; sorting removes that run-to-run
+    # variance from the catalog output.
+    | sort_by(.key)
     ' "$TEMP_FILE")
 
 # Get total count
@@ -321,45 +331,59 @@ if [ -n "$DEFAULT_DOMAIN" ]; then
     fi
 fi
 
-# Process in batches
+# Emit components in byte-bounded batches. Each `lunar catalog raw` call writes
+# ONE line to stdout; keeping every line under MAX_LINE_BYTES ensures the
+# operator/sidecar log stream captures it intact rather than truncating an
+# oversized line (which silently dropped repos — see MAX_LINE_BYTES above).
 BATCH_NUM=0
 SUCCESS_COUNT=0
 FAIL_COUNT=0
 
-while true; do
-    START=$((BATCH_NUM * BATCH_SIZE))
-    
-    # Check if we've processed all entries
-    if [ "$START" -ge "$TOTAL_ENTRIES" ]; then
-        break
-    fi
-    
-    END=$((START + BATCH_SIZE))
-    if [ "$END" -gt "$TOTAL_ENTRIES" ]; then
-        END=$TOTAL_ENTRIES
-    fi
-    
+BATCH_FILE=$(mktemp)
+trap 'rm -f "$TEMP_FILE" "${TEMP_FILE}.chunk" "${TEMP_FILE}.new" "$BATCH_FILE"' EXIT
+
+# emit_batch turns the accumulated {key,value} lines in $BATCH_FILE into a
+# .components object and writes it with a single `lunar catalog raw` call.
+emit_batch() {
+    local count="$1"
     BATCH_NUM=$((BATCH_NUM + 1))
-    BATCH_COUNT=$((END - START))
-    
-    echo "Processing batch $BATCH_NUM: components $((START + 1))-$END of $TOTAL_ENTRIES"
-    
-    # Extract batch and convert to object format for lunar catalog
-    BATCH_COMPONENTS=$(echo "$CATALOG_ENTRIES" | jq \
-        --argjson start "$START" \
-        --argjson count "$BATCH_COUNT" \
-        '.[$start:$start + $count] | from_entries')
-    
-    # Write batch to catalog
-    if echo "$BATCH_COMPONENTS" | lunar catalog raw --json '.components' -; then
-        SUCCESS_COUNT=$((SUCCESS_COUNT + BATCH_COUNT))
-        echo "Batch $BATCH_NUM: successfully cataloged $BATCH_COUNT components"
+    echo "Processing batch $BATCH_NUM: $count components"
+    if jq -s 'from_entries' "$BATCH_FILE" | lunar catalog raw --json '.components' -; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + count))
+        echo "Batch $BATCH_NUM: successfully cataloged $count components"
     else
-        FAIL_COUNT=$((FAIL_COUNT + BATCH_COUNT))
-        echo "Batch $BATCH_NUM: FAILED to catalog $BATCH_COUNT components" >&2
-        # Continue with next batch instead of aborting
+        FAIL_COUNT=$((FAIL_COUNT + count))
+        echo "Batch $BATCH_NUM: FAILED to catalog $count components" >&2
+        # Continue with the next batch instead of aborting.
     fi
-done
+}
+
+cur_count=0
+cur_bytes=0
+: > "$BATCH_FILE"
+
+# Stream entries (already sorted by key) as one compact JSON object per line and
+# greedily pack them until adding the next would exceed MAX_LINE_BYTES. ${#entry}
+# is a byte-approximate length; the {"key":,"value":} line wrappers over-count
+# the final .components object, so the emitted line stays comfortably under the
+# budget (and MAX_LINE_BYTES itself leaves generous margin below the 16 KB cap).
+while IFS= read -r entry; do
+    elen=${#entry}
+    if [ "$cur_count" -gt 0 ] && [ $((cur_bytes + elen)) -gt "$MAX_LINE_BYTES" ]; then
+        emit_batch "$cur_count"
+        : > "$BATCH_FILE"
+        cur_count=0
+        cur_bytes=0
+    fi
+    printf '%s\n' "$entry" >> "$BATCH_FILE"
+    cur_count=$((cur_count + 1))
+    cur_bytes=$((cur_bytes + elen + 1))
+done < <(printf '%s' "$CATALOG_ENTRIES" | jq -c '.[] | {key, value}')
+
+# Flush the final partial batch.
+if [ "$cur_count" -gt 0 ]; then
+    emit_batch "$cur_count"
+fi
 
 # Summary
 echo ""

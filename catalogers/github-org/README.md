@@ -197,9 +197,13 @@ This cataloger is built for large organizations (thousands of repositories):
   budget of 5,000 points/hour — a full run uses a small fraction of the quota.
   Listing calls retry with exponential backoff on primary/secondary rate-limit
   and transient errors.
-- **Catalog writes are batched.** Components are written to the Lunar hub in
-  batches of 1,000, so the number of hub writes scales linearly with the org
-  (e.g. 10 writes for 10,000 repos) rather than one write per repository.
+- **Catalog output is written in small, byte-bounded batches.** Each discovered
+  repo is emitted via `lunar catalog raw`, which the operator captures from the
+  cataloger's stdout one line at a time. Components are packed into batches kept
+  well under the container log-line size limit (~16 KB) so every batch is
+  captured intact — an oversized line would be truncated by the log stream and
+  silently drop repos. Repos are emitted in a stable, sorted order, so the
+  catalog is deterministic run to run.
 
 > **Note:** this covers *listing and cataloging* repositories. If you also run
 > the companion `github` **collector** to gather per-repo settings, that makes
