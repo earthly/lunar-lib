@@ -62,15 +62,15 @@ DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 MAX_RETRIES=5
 INITIAL_BACKOFF=5  # seconds
 
-# How many repos to fetch per visibility level. `gh repo list` requires a
-# --limit (it defaults to 30) and paginates up to this number via GitHub's
-# GraphQL API — cursor-based, so there is NO 1000-result Search-API cap; it
-# keeps paging until the org is exhausted or this ceiling is reached. 100000 is
-# far above any real org, so it's effectively "all repos": an org with tens of
-# thousands of repos is fully cataloged rather than truncated at the ceiling.
-# If a fetch ever comes back at exactly this ceiling we warn instead of silently
+# How many repos to fetch per visibility level, from the max_repos_per_visibility
+# input (default 10000). `gh repo list` requires a --limit (it defaults to 30)
+# and paginates up to this number via GitHub's GraphQL repositories connection —
+# cursor-based, so there is NO 1000-result Search-API cap; it keeps paging until
+# the org is exhausted or this ceiling is reached. The default covers most orgs;
+# raise the input for an org with more repos than this in a single visibility. If
+# a fetch comes back at exactly this ceiling we warn instead of silently
 # cataloging a partial org.
-FETCH_LIMIT=100000
+FETCH_LIMIT="${LUNAR_VAR_MAX_REPOS_PER_VISIBILITY:-10000}"
 
 # Build list of visibilities to fetch
 VISIBILITIES=()
@@ -215,11 +215,11 @@ for visibility in "${VISIBILITIES[@]}"; do
     echo "Found $REPO_COUNT $visibility repos"
 
     # gh stops paginating at --limit, so a fetch that returns exactly FETCH_LIMIT
-    # almost certainly means the org has more repos we didn't retrieve. That is
-    # not expected for any real org, so warn loudly instead of silently
-    # cataloging a partial org.
+    # almost certainly means the org has more repos than the configured ceiling.
+    # Warn loudly (pointing at the input to raise) instead of silently cataloging
+    # a partial org.
     if [ "$REPO_COUNT" -ge "$FETCH_LIMIT" ]; then
-        echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT $visibility repos — results may be TRUNCATED and some repositories not cataloged." >&2
+        echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT $visibility repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos_per_visibility' input to catalog them all." >&2
     fi
 
     # Merge into temp file (single jq call, not accumulating in memory)
