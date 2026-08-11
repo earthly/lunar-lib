@@ -25,8 +25,15 @@ PATH_NORMALIZED="${CATALOG_FILE#./}"
 YQ_ERR=$(mktemp)
 trap 'rm -f "$YQ_ERR"' EXIT
 
+# `catalog-info.yaml` may declare multiple entities separated by `---`. Use
+# `yq ea` (eval-all) with `[.]` to collect every document into a single JSON
+# array: a plain `yq -o=json '.'` emits the docs as concatenated objects, which
+# is not valid JSON and makes the linter choke ("Invalid parser output"),
+# false-failing every downstream policy. A single-document file yields a
+# one-element array, so the linter's aggregate shape is uniform. Truly malformed
+# YAML still exits non-zero and drops to the parse-error branch below.
 PARSE_OK=false
-if PARSED_JSON=$(yq -o=json '.' "$CATALOG_FILE" 2>"$YQ_ERR"); then
+if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
   RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED")
   PARSE_OK=true
 else
@@ -50,10 +57,15 @@ fi
 # failure is recorded as {name, error} (rather than omitted) so an outage stays
 # distinguishable from a real miss. When backstage_url is unset, nothing is
 # written and behavior is identical to a plain parse-and-lint run.
+#
+# References are resolved from the *primary* entity (the first Component, else
+# the first document), which the linter hoists to the top level of $RESULT as
+# .spec/.metadata — so we read those here rather than $PARSED_JSON, which is now
+# a JSON array of all documents.
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:-}"
 if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   BASE_URL="${BACKSTAGE_URL%/}"
-  DEFAULT_NS=$(echo "$PARSED_JSON" | jq -r '.metadata.namespace // "default"')
+  DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
 
   resolve_ref() {
     # $1 = Backstage kind (domain|system); $2 = declared reference value.
@@ -96,13 +108,13 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
 
   REFS='{"checked":true}'
 
-  DOMAIN_REF=$(echo "$PARSED_JSON" | jq -r '.spec.domain // empty')
+  DOMAIN_REF=$(echo "$RESULT" | jq -r '.spec.domain // empty')
   if [ -n "$DOMAIN_REF" ]; then
     DOMAIN_ENTRY=$(resolve_ref domain "$DOMAIN_REF")
     REFS=$(echo "$REFS" | jq --argjson d "$DOMAIN_ENTRY" '. + {domain: $d}')
   fi
 
-  SYSTEM_REF=$(echo "$PARSED_JSON" | jq -r '.spec.system // empty')
+  SYSTEM_REF=$(echo "$RESULT" | jq -r '.spec.system // empty')
   if [ -n "$SYSTEM_REF" ]; then
     SYSTEM_ENTRY=$(resolve_ref system "$SYSTEM_REF")
     REFS=$(echo "$REFS" | jq --argjson s "$SYSTEM_ENTRY" '. + {system: $s}')
