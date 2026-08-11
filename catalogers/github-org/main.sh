@@ -58,17 +58,16 @@ TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 
-# Ceiling on repositories fetched per visibility level. `gh repo list` paginates
-# through the GitHub GraphQL API (100 repos/page, cursor-based — this is NOT the
-# Search API, so the 1000-result search cap does not apply); `--limit` is simply
-# where it stops paginating. The default comfortably covers orgs with thousands
-# of repos — raise it for a larger org. If a fetch comes back at exactly this
-# ceiling the result may be truncated, and we warn (see the fetch loop below).
-MAX_REPOS_PER_VISIBILITY="${LUNAR_VAR_MAX_REPOS_PER_VISIBILITY:-10000}"
-
 # Rate limit / retry settings
 MAX_RETRIES=5
 INITIAL_BACKOFF=5  # seconds
+
+# How many repos to fetch per visibility level. `gh repo list` requires a
+# --limit (it defaults to 30) and paginates up to this number via GitHub's
+# GraphQL API. 10000 is far above any real org (the largest are single-digit
+# thousands), so it's effectively "all repos" — but if a fetch ever comes back
+# at exactly this ceiling we warn instead of silently cataloging a partial org.
+FETCH_LIMIT=10000
 
 # Build list of visibilities to fetch
 VISIBILITIES=()
@@ -141,9 +140,8 @@ fetch_repos_with_retry() {
     local backoff=$INITIAL_BACKOFF
     
     while [ $attempt -le $MAX_RETRIES ]; do
-        # Build gh command. --limit sets how far gh paginates (100/page via
-        # GraphQL cursor); MAX_REPOS_PER_VISIBILITY is the configurable ceiling.
-        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$MAX_REPOS_PER_VISIBILITY")
+        # Build gh command
+        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$FETCH_LIMIT")
         GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
         
         if [ "$INCLUDE_ARCHIVED" = "false" ]; then
@@ -213,12 +211,12 @@ for visibility in "${VISIBILITIES[@]}"; do
     REPO_COUNT=$(echo "$REPOS" | jq 'length')
     echo "Found $REPO_COUNT $visibility repos"
 
-    # Truncation guard: gh stops paginating at --limit, so a fetch that comes
-    # back at exactly the ceiling almost certainly means the org has more repos
-    # we didn't retrieve. Warn loudly rather than silently cataloging a partial
-    # org — the operator should raise max_repos_per_visibility.
-    if [ "$REPO_COUNT" -ge "$MAX_REPOS_PER_VISIBILITY" ]; then
-        echo "WARNING: reached the fetch ceiling of $MAX_REPOS_PER_VISIBILITY $visibility repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos_per_visibility' input to catalog them all." >&2
+    # gh stops paginating at --limit, so a fetch that returns exactly FETCH_LIMIT
+    # almost certainly means the org has more repos we didn't retrieve. That is
+    # not expected for any real org, so warn loudly instead of silently
+    # cataloging a partial org.
+    if [ "$REPO_COUNT" -ge "$FETCH_LIMIT" ]; then
+        echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT $visibility repos — results may be TRUNCATED and some repositories not cataloged." >&2
     fi
 
     # Merge into temp file (single jq call, not accumulating in memory)
@@ -231,13 +229,8 @@ done
 TOTAL_COUNT=$(jq 'length' "$TEMP_FILE")
 echo "Total repos fetched: $TOTAL_COUNT"
 
-# Max bytes of component JSON per `lunar catalog raw` call. Each call writes ONE
-# line to stdout, and in production the operator streams a cataloger's stdout
-# line-by-line through its sidecar — a container runtime chops any log line
-# longer than ~16 KB (16384 bytes), which truncates an oversized catalog line
-# and silently drops repos. Packing entries up to this budget keeps every
-# emitted line well under that boundary. See README "Scale and rate limits".
-MAX_LINE_BYTES=12000
+# Batch size for lunar catalog calls
+BATCH_SIZE=1000
 
 # Filter and transform all repos in a single jq call
 # Output as array of {key, value} pairs for easier batching
@@ -297,11 +290,6 @@ CATALOG_ENTRIES=$(jq \
               + (if $domain != "" then {domain: $domain} else {} end)
         )
     }]
-    # Emit in a stable, deterministic order (by component id) so the same set of
-    # repos is written on every run. gh repo list returns repos in pushed-time
-    # order, which shifts as repos are pushed; sorting removes that run-to-run
-    # variance from the catalog output.
-    | sort_by(.key)
     ' "$TEMP_FILE")
 
 # Get total count
@@ -331,59 +319,45 @@ if [ -n "$DEFAULT_DOMAIN" ]; then
     fi
 fi
 
-# Emit components in byte-bounded batches. Each `lunar catalog raw` call writes
-# ONE line to stdout; keeping every line under MAX_LINE_BYTES ensures the
-# operator/sidecar log stream captures it intact rather than truncating an
-# oversized line (which silently dropped repos — see MAX_LINE_BYTES above).
+# Process in batches
 BATCH_NUM=0
 SUCCESS_COUNT=0
 FAIL_COUNT=0
 
-BATCH_FILE=$(mktemp)
-trap 'rm -f "$TEMP_FILE" "${TEMP_FILE}.chunk" "${TEMP_FILE}.new" "$BATCH_FILE"' EXIT
-
-# emit_batch turns the accumulated {key,value} lines in $BATCH_FILE into a
-# .components object and writes it with a single `lunar catalog raw` call.
-emit_batch() {
-    local count="$1"
+while true; do
+    START=$((BATCH_NUM * BATCH_SIZE))
+    
+    # Check if we've processed all entries
+    if [ "$START" -ge "$TOTAL_ENTRIES" ]; then
+        break
+    fi
+    
+    END=$((START + BATCH_SIZE))
+    if [ "$END" -gt "$TOTAL_ENTRIES" ]; then
+        END=$TOTAL_ENTRIES
+    fi
+    
     BATCH_NUM=$((BATCH_NUM + 1))
-    echo "Processing batch $BATCH_NUM: $count components"
-    if jq -s 'from_entries' "$BATCH_FILE" | lunar catalog raw --json '.components' -; then
-        SUCCESS_COUNT=$((SUCCESS_COUNT + count))
-        echo "Batch $BATCH_NUM: successfully cataloged $count components"
+    BATCH_COUNT=$((END - START))
+    
+    echo "Processing batch $BATCH_NUM: components $((START + 1))-$END of $TOTAL_ENTRIES"
+    
+    # Extract batch and convert to object format for lunar catalog
+    BATCH_COMPONENTS=$(echo "$CATALOG_ENTRIES" | jq \
+        --argjson start "$START" \
+        --argjson count "$BATCH_COUNT" \
+        '.[$start:$start + $count] | from_entries')
+    
+    # Write batch to catalog
+    if echo "$BATCH_COMPONENTS" | lunar catalog raw --json '.components' -; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + BATCH_COUNT))
+        echo "Batch $BATCH_NUM: successfully cataloged $BATCH_COUNT components"
     else
-        FAIL_COUNT=$((FAIL_COUNT + count))
-        echo "Batch $BATCH_NUM: FAILED to catalog $count components" >&2
-        # Continue with the next batch instead of aborting.
+        FAIL_COUNT=$((FAIL_COUNT + BATCH_COUNT))
+        echo "Batch $BATCH_NUM: FAILED to catalog $BATCH_COUNT components" >&2
+        # Continue with next batch instead of aborting
     fi
-}
-
-cur_count=0
-cur_bytes=0
-: > "$BATCH_FILE"
-
-# Stream entries (already sorted by key) as one compact JSON object per line and
-# greedily pack them until adding the next would exceed MAX_LINE_BYTES. ${#entry}
-# is a byte-approximate length; the {"key":,"value":} line wrappers over-count
-# the final .components object, so the emitted line stays comfortably under the
-# budget (and MAX_LINE_BYTES itself leaves generous margin below the 16 KB cap).
-while IFS= read -r entry; do
-    elen=${#entry}
-    if [ "$cur_count" -gt 0 ] && [ $((cur_bytes + elen)) -gt "$MAX_LINE_BYTES" ]; then
-        emit_batch "$cur_count"
-        : > "$BATCH_FILE"
-        cur_count=0
-        cur_bytes=0
-    fi
-    printf '%s\n' "$entry" >> "$BATCH_FILE"
-    cur_count=$((cur_count + 1))
-    cur_bytes=$((cur_bytes + elen + 1))
-done < <(printf '%s' "$CATALOG_ENTRIES" | jq -c '.[] | {key, value}')
-
-# Flush the final partial batch.
-if [ "$cur_count" -gt 0 ]; then
-    emit_batch "$cur_count"
-fi
+done
 
 # Summary
 echo ""

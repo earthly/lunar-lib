@@ -98,7 +98,6 @@ catalogers:
       tag_prefix: "gh-"
       default_owner: "platform-team@acme.com"
       default_domain: "platform"
-      max_repos_per_visibility: "10000"
 ```
 
 When `default_domain` is set, every discovered component gets that domain on its
@@ -177,36 +176,4 @@ This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:
    CLI as `GH_ENTERPRISE_TOKEN`. If that secret is unset it falls back to
    `LUNAR_SECRET_GH_TOKEN`, so existing single-token setups keep working.
 
-The cataloger makes API calls to list repositories and their topics.
-
-### Scale and rate limits
-
-This cataloger is built for large organizations (thousands of repositories):
-
-- **Listing paginates through the GitHub GraphQL API** (100 repositories per
-  page, cursor-based). This is *not* the GitHub Search API, so the well-known
-  1,000-result search cap does **not** apply — the cataloger lists every repo in
-  the org, well past 1,000.
-- **Fetch ceiling.** Listing stops at `max_repos_per_visibility` repositories per
-  visibility level (default `10000`). The default comfortably covers orgs with
-  thousands of repos; raise it for a larger org. If a fetch returns exactly the
-  ceiling, the cataloger logs a truncation warning so a partial catalog never
-  goes unnoticed.
-- **API cost is low.** Listing costs roughly one GraphQL rate-limit point per 100
-  repositories (about 100 points to list 10,000 repos), against GitHub's default
-  budget of 5,000 points/hour — a full run uses a small fraction of the quota.
-  Listing calls retry with exponential backoff on primary/secondary rate-limit
-  and transient errors.
-- **Catalog output is written in small, byte-bounded batches.** Each discovered
-  repo is emitted via `lunar catalog raw`, which the operator captures from the
-  cataloger's stdout one line at a time. Components are packed into batches kept
-  well under the container log-line size limit (~16 KB) so every batch is
-  captured intact — an oversized line would be truncated by the log stream and
-  silently drop repos. Repos are emitted in a stable, sorted order, so the
-  catalog is deterministic run to run.
-
-> **Note:** this covers *listing and cataloging* repositories. If you also run
-> the companion `github` **collector** to gather per-repo settings, that makes
-> API calls per repository — for a very large org, plan its schedule and
-> concurrency accordingly, since per-repo work is where GitHub REST rate limits
-> are more likely to matter.
+The cataloger makes API calls to list repositories and their topics. For large organizations, it fetches up to 10,000 repositories per visibility level.
