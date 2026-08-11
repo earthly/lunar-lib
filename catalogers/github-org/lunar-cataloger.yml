@@ -141,3 +141,13 @@ inputs:
       domain-reference validation. A higher-precedence domain definition in
       lunar-config.yml still wins on merge.
     default: ""
+
+  max_repos_per_visibility:
+    description: |
+      Maximum repositories to fetch per visibility level (public / private /
+      internal). Repository listing paginates through GitHub's GraphQL API, so
+      this is the ceiling at which paging stops. The default covers most
+      organizations; raise it for an organization with more repositories than
+      this in a single visibility. If a fetch returns exactly this many
+      repositories, the cataloger warns that results may be truncated.
+    default: "10000"

@@ -62,6 +62,16 @@ DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 MAX_RETRIES=5
 INITIAL_BACKOFF=5  # seconds
 
+# How many repos to fetch per visibility level, from the max_repos_per_visibility
+# input (default 10000). `gh repo list` requires a --limit (it defaults to 30)
+# and paginates up to this number via GitHub's GraphQL repositories connection —
+# cursor-based, so there is NO 1000-result Search-API cap; it keeps paging until
+# the org is exhausted or this ceiling is reached. The default covers most orgs;
+# raise the input for an org with more repos than this in a single visibility. If
+# a fetch comes back at exactly this ceiling we warn instead of silently
+# cataloging a partial org.
+FETCH_LIMIT="${LUNAR_VAR_MAX_REPOS_PER_VISIBILITY:-10000}"
+
 # Build list of visibilities to fetch
 VISIBILITIES=()
 if [ "$INCLUDE_PUBLIC" = "true" ]; then
@@ -134,7 +144,7 @@ fetch_repos_with_retry() {
     
     while [ $attempt -le $MAX_RETRIES ]; do
         # Build gh command
-        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit 10000)
+        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$FETCH_LIMIT")
         GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
         
         if [ "$INCLUDE_ARCHIVED" = "false" ]; then
@@ -203,7 +213,15 @@ for visibility in "${VISIBILITIES[@]}"; do
     
     REPO_COUNT=$(echo "$REPOS" | jq 'length')
     echo "Found $REPO_COUNT $visibility repos"
-    
+
+    # gh stops paginating at --limit, so a fetch that returns exactly FETCH_LIMIT
+    # almost certainly means the org has more repos than the configured ceiling.
+    # Warn loudly (pointing at the input to raise) instead of silently cataloging
+    # a partial org.
+    if [ "$REPO_COUNT" -ge "$FETCH_LIMIT" ]; then
+        echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT $visibility repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos_per_visibility' input to catalog them all." >&2
+    fi
+
     # Merge into temp file (single jq call, not accumulating in memory)
     echo "$REPOS" > "${TEMP_FILE}.chunk"
     jq -s 'add' "$TEMP_FILE" "${TEMP_FILE}.chunk" > "${TEMP_FILE}.new"
