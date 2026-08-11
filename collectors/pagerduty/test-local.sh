@@ -28,23 +28,35 @@ cat > "$TEST_DIR/curl" << 'EOF'
 set -uo pipefail
 D="${MOCK_DIR:?}"
 URL=""
+OUT=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    -H|-w|-o) shift 2 ;;
+    -o) OUT="$2"; shift 2 ;;
+    -H|-w) shift 2 ;;
     http://*|https://*) URL="$1"; shift ;;
     -*) shift ;;
     *) shift ;;
   esac
 done
+
+# pd_get calls curl with `-o <file> -w '%{http_code}'`: the body goes to the
+# -o file and stdout carries only the status code. Mirror that — write the body
+# to $OUT (falling back to stdout if unset) and print the code on stdout.
+emit() {
+  if [ -n "$OUT" ]; then printf '%s' "$1" > "$OUT"; else printf '%s' "$1"; fi
+}
+
 case "$URL" in
   */services/P*)
     sid="${URL##*/services/}"; sid="${sid%%\?*}"
     printf '%s' "$sid" > "$D/requested_service"
-    printf '{"service":{"name":"Test Service","status":"active"}}'
+    emit '{"service":{"name":"Test Service","status":"active"}}'
+    printf '200'
     exit 0
     ;;
   *)
     echo "mock curl: unhandled URL: $URL" >&2
+    printf '000'
     exit 1
     ;;
 esac
