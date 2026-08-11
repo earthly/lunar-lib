@@ -64,10 +64,13 @@ INITIAL_BACKOFF=5  # seconds
 
 # How many repos to fetch per visibility level. `gh repo list` requires a
 # --limit (it defaults to 30) and paginates up to this number via GitHub's
-# GraphQL API. 10000 is far above any real org (the largest are single-digit
-# thousands), so it's effectively "all repos" — but if a fetch ever comes back
-# at exactly this ceiling we warn instead of silently cataloging a partial org.
-FETCH_LIMIT=10000
+# GraphQL API — cursor-based, so there is NO 1000-result Search-API cap; it
+# keeps paging until the org is exhausted or this ceiling is reached. 100000 is
+# far above any real org, so it's effectively "all repos": an org with tens of
+# thousands of repos is fully cataloged rather than truncated at the ceiling.
+# If a fetch ever comes back at exactly this ceiling we warn instead of silently
+# cataloging a partial org.
+FETCH_LIMIT=100000
 
 # Build list of visibilities to fetch
 VISIBILITIES=()
