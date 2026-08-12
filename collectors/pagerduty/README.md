@@ -4,17 +4,15 @@ Collect on-call schedule and escalation data from the PagerDuty API.
 
 ## Overview
 
-This collector queries the PagerDuty REST API on a daily cron schedule to
-gather on-call schedule, escalation policy, and service data. It discovers
-the PagerDuty service ID from the component's `pagerduty/service-id` meta
-annotation (set via `lunar catalog component --meta pagerduty/service-id
-<id>`, typically by a company-specific cataloger), accepts an explicit
-`service_id` input for static org-wide cases, or — with `backstage_discovery`
-enabled — reads the service ID straight from the repo's `catalog-info.yaml`
-annotation. Results are written to the
-`.oncall` category in a tool-agnostic format, so the same `oncall` policy
-works regardless of whether the data comes from PagerDuty, OpsGenie, or
-another provider.
+This collector queries the PagerDuty REST API to gather on-call schedule,
+escalation policy, and service data, writing normalized results to the
+`.oncall` category in a tool-agnostic format so the same `oncall` policy works
+for PagerDuty, OpsGenie, or any other provider. It ships two trigger variants
+that run the same query and write the same data — `oncall` (daily cron) and
+`oncall-on-push` (code hook, on PRs and the default branch); pick whichever
+fits (see Collectors below). The service ID is discovered from the component's
+`pagerduty/service-id` meta annotation, an explicit `service_id` input, or —
+with `backstage_discovery` enabled — the repo's `catalog-info.yaml` annotation.
 
 ## Collected Data
 
@@ -31,19 +29,23 @@ This collector writes to the following Component JSON paths:
 
 ## Collectors
 
-This integration provides the following collectors:
+This integration provides the following collectors — use `include` to select
+one (or include both to collect on both triggers). Both run the same query and
+write the same `.oncall` data; they differ only in **when** they run.
 
 | Collector | Description |
 |-----------|-------------|
-| `oncall` | Fetches service, schedule, and escalation data from PagerDuty API |
+| `oncall` | Cron hook — queries PagerDuty daily (02:00 UTC) and refreshes `.oncall` so the data stays current as schedules rotate, independent of code changes |
+| `oncall-on-push` | Code hook — queries PagerDuty on pushes to PRs and the default branch, so the on-call guardrail is evaluated as part of a commit/PR check |
 
 ## Installation
 
-Add to your `lunar-config.yml`:
+Add to your `lunar-config.yml` (use `include` to pick a trigger variant):
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/pagerduty@v1.0.0
+    include: [oncall]          # daily cron; use [oncall-on-push] for the code/on-push variant
     on: ["domain:your-domain"]
     # with:
     #   service_id: "PXXXXXX"  # Optional — falls back to catalog meta annotation

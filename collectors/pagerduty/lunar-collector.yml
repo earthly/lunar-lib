@@ -42,6 +42,26 @@ collectors:
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
 
+  - name: oncall-on-push
+    description: |
+      Same PagerDuty query as `oncall`, but on a code hook — it runs when
+      commits are pushed (PRs and the default branch) rather than on the daily
+      cron. Resolves the service ID identically (the component's
+      `pagerduty/service-id` meta annotation, the `service_id` input, or — when
+      `backstage_discovery` is enabled — the component's own `catalog-info.yaml`,
+      read from the fresh checkout the code hook already provides, so no
+      `clone-code` is needed), fetches service, on-call schedule, and escalation
+      data, and writes the same normalized .oncall.service, .oncall.schedule,
+      .oncall.escalation, and .oncall.summary (raw responses under
+      .oncall.native.pagerduty). Use this variant to evaluate the on-call
+      guardrail as part of a PR/commit check; use `oncall` (cron) to keep the
+      data fresh between commits as schedules rotate on their own clock. Include
+      one or the other — including both collects on both triggers.
+    mainBash: oncall.sh
+    hook:
+      type: code
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "on-push", "code hook"]
+
 inputs:
   service_id:
     description: >
