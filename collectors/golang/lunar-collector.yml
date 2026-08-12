@@ -79,6 +79,13 @@ collectors:
       Parses each issue into file, line, column, message, and linter name. Writes
       normalized warnings to .lang.go.lint and raw output to .lang.go.native.golangci_lint.
     mainBash: golangci-lint.sh
+    # golangci-lint downloads the module graph and type-checks every package, so
+    # its peak memory scales with the repo and overruns the default (medium) 512Mi
+    # limit on larger Go projects — the container is OOMKilled (exit 137) and the
+    # run is lost. large raises the memory limit to 2Gi. Mirrors the sibling
+    # grype/trivy collectors, which declare large for the same reason. Requires a
+    # Hub honoring size (ENG-983).
+    size: large
     hook:
       type: code
     keywords: ["golangci-lint", "go linting", "static analysis", "code quality"]
