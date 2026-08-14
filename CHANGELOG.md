@@ -56,6 +56,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `trivy` and `grype` collectors (`container-scan`): image scans no longer skip
+  on every pull request. The image to scan is resolved from the docker
+  collector's pushed-image record via `lunar component get-json`, but the lookup
+  was unqualified — the Hub resolves that to the default-branch snapshot
+  (`WHERE pr IS NULL`), so a PR run read main's Component JSON, never saw the
+  image the PR had just pushed, and skipped with "No pushed container image to
+  scan" (which in turn made the `container-scan` policy report no scan data). In
+  PR context the lookup is now pinned to the commit being scanned (`--pr`, plus
+  `--git-sha` to select the exact commit rather than the PR's latest). The
+  default-branch lookup is deliberately unchanged: the `container-rescan` cron
+  is given the latest *ingested* main commit, which may not have been collected
+  yet, so pinning there would resolve nothing and silently stop the re-scan
+  (#284).
 - `nodejs` policy (`engines-pinned`): a project that correctly pins
   `engines.node` no longer false-fails. `lunar_policy`'s `assert_true` is a
   strict identity check (`v is True`), and the check passed it the truthy
