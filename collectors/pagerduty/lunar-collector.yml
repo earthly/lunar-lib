@@ -23,44 +23,41 @@ landing_page:
 collectors:
   - name: oncall
     description: |
-      Queries the PagerDuty REST API for the component's service. Resolves
+      Queries the PagerDuty REST API for the component's service on a code hook
+      — it runs when commits are pushed (PRs and the default branch). Resolves
       the service ID in order: the component's `pagerduty/service-id` meta
       annotation (set by a cataloger via
       `lunar catalog component --meta pagerduty/service-id <id>`), then the
       explicit service_id input, then — when `backstage_discovery` is enabled
-      — the component's own `catalog-info.yaml` (read from the checked-out
-      repo; the cron hook clones the code), reading the service ID directly
-      from a `pagerduty.com/service-id` / `pagerduty/service-id` annotation.
-      Fetches service details, on-call schedule participants, and escalation
-      policy. Writes normalized data to .oncall.service, .oncall.schedule,
-      .oncall.escalation, and .oncall.summary. Stores the raw API response
-      under .oncall.native.pagerduty.
+      — the component's own `catalog-info.yaml` (read from the fresh checkout
+      the code hook provides, so no `clone-code` is needed), reading the service
+      ID directly from a `pagerduty.com/service-id` / `pagerduty/service-id`
+      annotation. Fetches service details, on-call schedule participants, and
+      escalation policy. Writes normalized data to .oncall.service,
+      .oncall.schedule, .oncall.escalation, and .oncall.summary. Stores the raw
+      API response under .oncall.native.pagerduty.
+    mainBash: oncall.sh
+    hook:
+      type: code
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
+
+  - name: oncall-cron
+    description: |
+      Same PagerDuty query as `oncall`, but on a daily cron instead of on push —
+      it re-collects on a schedule so `.oncall` stays fresh as on-call schedules
+      and escalation policies rotate between commits (they change on their own
+      clock, independent of code). Resolves the service ID identically and writes
+      the same normalized .oncall.service, .oncall.schedule, .oncall.escalation,
+      and .oncall.summary (raw responses under .oncall.native.pagerduty).
+      `clone-code` gives it the checkout so `backstage_discovery` can still read
+      `catalog-info.yaml`. Include `oncall` for on-push evaluation, `oncall-cron`
+      for always-fresh scheduled refresh, or both.
     mainBash: oncall.sh
     hook:
       type: cron
       schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
-    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
-
-  - name: oncall-on-push
-    description: |
-      Same PagerDuty query as `oncall`, but on a code hook — it runs when
-      commits are pushed (PRs and the default branch) rather than on the daily
-      cron. Resolves the service ID identically (the component's
-      `pagerduty/service-id` meta annotation, the `service_id` input, or — when
-      `backstage_discovery` is enabled — the component's own `catalog-info.yaml`,
-      read from the fresh checkout the code hook already provides, so no
-      `clone-code` is needed), fetches service, on-call schedule, and escalation
-      data, and writes the same normalized .oncall.service, .oncall.schedule,
-      .oncall.escalation, and .oncall.summary (raw responses under
-      .oncall.native.pagerduty). Use this variant to evaluate the on-call
-      guardrail as part of a PR/commit check; use `oncall` (cron) to keep the
-      data fresh between commits as schedules rotate on their own clock. Include
-      one or the other — including both collects on both triggers.
-    mainBash: oncall.sh
-    hook:
-      type: code
-    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "on-push", "code hook"]
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "cron", "scheduled"]
 
 inputs:
   service_id:
