@@ -81,6 +81,7 @@ test:
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
     BUILD ./policies/repo-boilerplate+test
+    BUILD ./policies/oncall+test
 
 lint:
     FROM python:3.12-alpine
