@@ -10,14 +10,16 @@ landing_page:
   long_description: |
     Validates Backstage catalog-info.yaml entries for completeness and
     compliance. Checks that the catalog file exists and is valid, owner
-    is set, lifecycle stage is defined, and system grouping is assigned.
+    is set, lifecycle stage is defined, system grouping is assigned, and
+    that entity references tagged onto infrastructure resources resolve
+    in the catalog.
   category: "repository-and-ownership"
   icon: "assets/backstage.svg"
   status: "beta"
   requires:
     - slug: "backstage"
       type: "collector"
-      reason: "Provides parsed Backstage catalog metadata at .catalog.native.backstage"
+      reason: "Provides .catalog.native.backstage metadata and resolved .catalog.entity_refs"
 
 policies:
   - name: catalog-info-exists
@@ -93,6 +95,28 @@ policies:
     mainPython: ./system-exists.py
     keywords: ["backstage", "system", "referential integrity", "catalog", "cross-reference"]
 
+  - name: entity-ref-valid
+    description: |
+      Verifies that the Backstage entity references tagged onto infrastructure
+      resources are well-formed and actually exist in the Backstage catalog.
+      Reads `.catalog.entity_refs`, written by the `backstage` collector's
+      `entity-refs` sub-collector from the tags an IaC collector recorded.
+      Validates each distinct reference against the Backstage form
+      `[<kind>:][<namespace>/]<name>` and, since the collector already resolved
+      it, fails when the referenced entity is absent (`exists: false`), naming
+      the offending resources. Optionally requires a specific kind (e.g.
+      `component`) via `entity_ref_kind`. Skips (passes) when resolution was not
+      performed — the collector has no `backstage_url`, or there is no IaC tag
+      data (no `.catalog.entity_refs.checked`) — and skips an individual
+      reference the collector could not resolve due to a transient Backstage
+      error, so neither an unconfigured collector nor an outage turns this red.
+      Unresolved Terraform expressions (`${var.x}`) are reported as skipped, not
+      failed: without `terraform plan` there is no concrete value to verify.
+      Whether a resource carries the tag at all is a separate concern owned by
+      the `terraform` policy's `aws-resources-tagged` check.
+    mainPython: ./entity-ref-valid.py
+    keywords: ["backstage", "entity_ref", "referential integrity", "terraform", "iac", "tags", "catalog"]
+
   - name: required-annotations
     description: |
       Verifies that catalog-info.yaml declares a configurable set of
@@ -137,6 +161,13 @@ policies:
     keywords: ["backstage", "tags", "tag patterns", "glob", "disallowed", "forbidden"]
 
 inputs:
+  entity_ref_kind:
+    description: |
+      When set, `entity-ref-valid` requires each infrastructure entity-reference
+      tag to name this Backstage kind (e.g. `component`). A reference may state
+      its kind explicitly (`component:default/foo`) or omit it; when omitted this
+      expected kind is assumed. Empty (the default) accepts any kind.
+    default: ""
   required_annotations:
     description: |
       Annotation keys that must be present (and non-empty) in

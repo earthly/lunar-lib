@@ -17,7 +17,6 @@ This collector writes to the following Component JSON paths:
 | `.iac.modules[]` | array | Normalized modules: `{path, resources[], default_tags?, analysis}` |
 | `.iac.modules[].resources[]` | array | Normalized resources (see below) |
 | `.iac.modules[].default_tags` | object | Provider-level default tags for the module (present only if a `provider` block sets `default_tags`) |
-| `.iac.refs` | object | Backstage referential-integrity results (present only when `backstage_url` is configured) |
 | `.iac.native.terraform.files[]` | array | Full parsed HCL per file: `{path, hcl}` |
 | `.iac.native.terraform.cicd` | object | CI command tracking: `{cmds[], source}` |
 
@@ -44,30 +43,11 @@ Each `.iac.modules[].resources[]` entry:
 - **Interpolated values arrive as literal strings.** `tags = { "k" = var.v }` comes through as `"k": "${var.v}"`, and `tags = merge(...)` comes through as the whole value being a string. The collector flags these (`tags_unresolved`, `tags_expression`) so value-level checks skip/warn instead of mis-verifying.
 - **Module-provisioned resources aren't in the HCL.** Resources created inside a called module are module inputs, not `resource` blocks, so they don't appear in `.iac.modules[].resources[]` at all.
 
-### Backstage referential integrity (`.iac.refs`)
+### Interpreting tag values
 
-When `backstage_url` is configured, the collector resolves each distinct concrete value of the `entity_ref_tag_key` tag against the Backstage catalog API and records the outcome under `.iac.refs`:
+Tags are collected **generically** — this collector records the tag keys and values a resource declares and assigns **no meaning to any particular key**. It knows nothing about service catalogs, cost-allocation schemes, or any other tagging convention.
 
-```json
-{
-  "iac": {
-    "refs": {
-      "checked": true,
-      "entity_refs": [
-        {"name": "component:default/payment-api", "exists": true},
-        {"name": "component:default/legacy-svc", "exists": false},
-        {"name": "component:default/flaky-lookup", "error": "HTTP 503"}
-      ]
-    }
-  }
-}
-```
-
-- `.iac.refs.checked: true` is always written when `backstage_url` is set — the "referential integrity ran" signal, so a policy can tell "configured" from "not configured".
-- Each distinct concrete `entity_ref_tag_key` value records `{name, exists}` on a definitive lookup (`exists: true` on 200, `false` on 404), or `{name, error}` on a transient failure (timeout / 5xx) so an outage stays distinguishable from a real miss.
-- Values that are unresolved expressions (`${...}`) are **not** looked up (there is nothing concrete to resolve).
-- The namespace is derived from the ref itself — a qualified ref (`ns/name`) carries its own, a bare ref uses `default` — mirroring Backstage's own reference resolution.
-- When `backstage_url` is empty (the default), no lookups run and `.iac.refs` is not written at all.
+Interpreting a tag *value* is a separate concern owned by the collector for that system. For example, resolving a Backstage entity-reference tag (`[<kind>:][<namespace>/]<name>`) against a live Backstage catalog is done by the [`backstage` collector](../backstage/README.md)'s `entity-refs` sub-collector, which reads the tags this collector wrote and records the lookup results under `.catalog.entity_refs`. That keeps Terraform parsing and catalog resolution independently useful and independently configurable.
 
 ## Collectors
 
@@ -88,15 +68,6 @@ collectors:
     on: ["domain:your-domain"]  # Or use tags like [infra, terraform]
 ```
 
-To enable Backstage referential integrity for `entity_ref` tags:
-
-```yaml
-collectors:
-  - uses: github://earthly/lunar-lib/collectors/terraform@main
-    on: ["domain:your-domain"]
-    with:
-      entity_ref_tag_key: "backstage.com/entity_ref"
-      backstage_url: "https://backstage.example.com"
-    secrets:
-      BACKSTAGE_TOKEN: "backstage-api-token"
-```
+To also resolve a service-catalog entity-reference tag against Backstage, add the
+[`backstage` collector](../backstage/README.md) — it picks up the tags this
+collector writes; no extra configuration is needed here.

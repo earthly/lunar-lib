@@ -4,7 +4,7 @@ Enforces Terraform-specific configuration best practices.
 
 ## Overview
 
-This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It also bundles a set of AWS resource security checks relevant to SOC 2 — such as encryption at rest, logging, public-access blocking, and network ingress limits — each individually includable, plus resource-tagging governance checks. Most checks read from `.iac.native.terraform.files[]` and analyze the parsed HCL; the tagging checks read the normalized `.iac.modules[]` view. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
+This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It also bundles a set of AWS resource security checks relevant to SOC 2 — such as encryption at rest, logging, public-access blocking, and network ingress limits — each individually includable, plus a resource-tagging governance check. Most checks read from `.iac.native.terraform.files[]` and analyze the parsed HCL; the tagging check reads the normalized `.iac.modules[]` view. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
 
 ## Policies
 
@@ -51,21 +51,21 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-cloudtrail-log-file-validation` | CloudTrail validates log-file integrity | Trail without `enable_log_file_validation = true` |
 | `aws-cloudtrail-kms-encryption` | CloudTrail logs encrypted with KMS | Trail without `kms_key_id` |
 
-The checks below govern **resource tagging**. They read the normalized `.iac.modules[]` view (not raw HCL) and are opt-in via inputs:
+The check below governs **resource tagging**. It reads the normalized `.iac.modules[]` view (not raw HCL) and is opt-in via an input:
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `aws-resources-tagged` | Every taggable AWS resource carries the required tag key(s) | A non-exempt resource is missing a `required_tags` key (on neither its own `tags` nor the module's `default_tags`) |
-| `entity-ref-valid` | The `entity_ref` tag value is a well-formed Backstage entity ref (and exists, when referential integrity is configured) | A resource's `entity_ref` tag value is malformed, the wrong kind, or resolved `exists: false` in Backstage |
 
-### How the tagging checks handle unresolvable data
+This check is about tag **presence** only — it assigns no meaning to any tag value. Validating what a tag *value* means (for example that a service-catalog entity reference resolves) belongs to the policy for that system: see the `backstage` policy's `entity-ref-valid` check.
 
-`hcl2json` never runs `terraform plan`, so the collector flags values it cannot resolve and these checks **skip rather than mis-verify** them:
+### How `aws-resources-tagged` handles unresolvable data
 
-- A resource whose `tags` attribute is an expression (`tags = merge(...)`, flagged `tags_expression`) is skipped by `aws-resources-tagged` (its keys can't be listed).
-- A tag key present but with an interpolated value (`${var.x}`, listed in `tags_unresolved`) is treated as **present** by `aws-resources-tagged` (the key exists) but its value is **skipped** by `entity-ref-valid` (the value can't be verified).
-- Provider-level `default_tags` (`.iac.modules[].default_tags`) count toward `aws-resources-tagged`, so a repo that tags everything via `default_tags` is not flagged.
-- `entity-ref-valid` performs the existence check only when the `terraform` collector is configured with `backstage_url` (signalled by `.iac.refs.checked`); otherwise it does format validation only. A value the collector could not resolve due to a transient Backstage error is skipped, so an outage never turns the check red.
+`hcl2json` never runs `terraform plan`, so the collector flags values it cannot resolve and this check **skips rather than mis-verifies** them:
+
+- A resource whose `tags` attribute is an expression (`tags = merge(...)`, flagged `tags_expression`) is skipped — its keys can't be listed, so it can't be judged missing.
+- A tag key present but with an interpolated value (`${var.x}`, listed in `tags_unresolved`) counts as **present**: this check tests presence, and the key is genuinely there.
+- Provider-level `default_tags` (`.iac.modules[].default_tags`) count toward the requirement, so a repo that tags everything via `default_tags` is not flagged.
 
 ## Required Data
 
@@ -73,11 +73,10 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.iac.native.terraform.files[]` | array | `terraform` collector (all checks except the tagging checks) |
-| `.iac.modules[]` | array | `terraform` collector (`aws-resources-tagged`, `entity-ref-valid`) |
-| `.iac.refs` | object | `terraform` collector, only when `backstage_url` is set (`entity-ref-valid` referential integrity) |
+| `.iac.native.terraform.files[]` | array | `terraform` collector (all checks except `aws-resources-tagged`) |
+| `.iac.modules[]` | array | `terraform` collector (`aws-resources-tagged`) |
 
-**Note:** Ensure the `terraform` collector is configured before enabling this policy. For `entity-ref-valid`'s existence check, also set the collector's `backstage_url` (and `BACKSTAGE_TOKEN` if required). All inputs (including the tagging inputs `required_tags`, `entity_ref_tag_key`, `entity_ref_kind`, and `exempt_resource_types`) are documented in `lunar-policy.yml`.
+**Note:** Ensure the `terraform` collector is configured before enabling this policy. All inputs (including the tagging inputs `required_tags` and `exempt_resource_types`) are documented in `lunar-policy.yml`.
 
 ## Installation
 
@@ -98,35 +97,29 @@ policies:
     #   min_provider_versions: '{"aws": "5.0", "random": "3.0"}'  # Enforce minimum versions
 ```
 
-### Require an `entity_ref` tag on every resource, verified against Backstage
+### Require a tag on every resource
 
-Block a PR (or score a component) when any AWS resource is missing a
-`backstage.com/entity_ref` tag, and validate that the value resolves in the
-Backstage catalog:
+Block a PR (or score a component) when any AWS resource is missing a required tag:
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
-    with:
-      entity_ref_tag_key: "backstage.com/entity_ref"
-      backstage_url: "https://backstage.example.com"   # enables referential integrity
-    secrets:
-      BACKSTAGE_TOKEN: "backstage-api-token"
 
 policies:
   - uses: github://earthly/lunar-lib/policies/terraform@main
     on: [infra]
     enforcement: report-pr          # or score
-    include: [aws-resources-tagged, entity-ref-valid]
+    include: [aws-resources-tagged]
     with:
-      required_tags: "backstage.com/entity_ref"
-      entity_ref_tag_key: "backstage.com/entity_ref"
-      entity_ref_kind: "component"  # optional: require a component ref
+      required_tags: "backstage.com/entity_ref,cost-center"
 ```
 
-Leave `backstage_url` unset to keep `entity-ref-valid` as a format-only check
-(no catalog lookups).
+To additionally verify that a service-catalog entity-reference tag *resolves* in
+Backstage, add the `backstage` collector (with `backstage_url`) and enable the
+`backstage` policy's `entity-ref-valid` check — see the
+[`backstage` policy](../backstage/README.md). Presence and value-validity are
+deliberately separate checks in separate plugins.
 
 ## Examples
 
@@ -209,7 +202,7 @@ A component with unpinned providers, unversioned modules, and no backend:
 - `Modules without pinned versions: vpc, rds. Add version constraints or use ?ref= to pin module sources.`
 - `No backend configured. Terraform state is stored locally, which is fragile and cannot be shared across teams.`
 
-### Tagging example (`aws-resources-tagged` + `entity-ref-valid`)
+### Tagging example (`aws-resources-tagged`)
 
 With `required_tags: backstage.com/entity_ref`, given the normalized module view:
 
@@ -227,18 +220,17 @@ With `required_tags: backstage.com/entity_ref`, given the normalized module view
         ],
         "default_tags": {}
       }
-    ],
-    "refs": {
-      "checked": true,
-      "entity_refs": [{"name": "component:default/payment-api", "exists": true}]
-    }
+    ]
   }
 }
 ```
 
-- `aws_db_instance.main` — **passes** both checks (tag present, value resolves in Backstage).
-- `aws_s3_bucket.logs` — **fails** `aws-resources-tagged` (no `backstage.com/entity_ref`, and none via `default_tags`).
-- `aws_lb.api` — **skipped** by `aws-resources-tagged` (`tags_expression`: keys can't be extracted from `merge(...)`).
+- `aws_db_instance.main` — **passes** (required tag key present).
+- `aws_s3_bucket.logs` — **fails** (no `backstage.com/entity_ref`, and none via `default_tags`).
+- `aws_lb.api` — **skipped** (`tags_expression`: keys can't be extracted from `merge(...)`).
+
+Whether `component:default/payment-api` actually exists in Backstage is checked
+separately by the `backstage` policy's `entity-ref-valid`.
 
 ## Remediation
 
@@ -291,4 +283,3 @@ When this policy fails, resolve it by:
      }
    }
    ```
-5. **For `entity-ref-valid` failures:** Make the tag value a well-formed Backstage entity reference (`[<kind>:][<namespace>/]<name>`, e.g. `component:default/payment-api`) that names an entity registered in the Backstage catalog.

@@ -285,7 +285,7 @@ policies:
   - name: aws-resources-tagged
     description: |
       Requires every taggable AWS resource to carry a configurable set of tag
-      keys (e.g. backstage.com/entity_ref). Reads the normalized
+      keys (e.g. a cost-centre or service-catalog tag). Reads the normalized
       .iac.modules[].resources[] view and is `default_tags`-aware: a resource is
       considered to carry a key if the key is on its own `tags` map OR on the
       module's provider-level `default_tags`, so a repo that tags everything via
@@ -298,26 +298,7 @@ policies:
       shapes) are ignored. Fails when a non-exempt resource is missing a required
       tag key.
     mainPython: aws_resources_tagged.py
-    keywords: ["aws", "tags", "resource tagging", "default_tags", "backstage", "entity_ref", "governance"]
-
-  - name: entity-ref-valid
-    description: |
-      Validates that the `entity_ref_tag_key` tag value on each AWS resource is a
-      well-formed Backstage entity reference of the form
-      `[<kind>:][<namespace>/]<name>`, and — when the collector is configured with
-      `backstage_url` (referential integrity, signalled by `.iac.refs.checked`) —
-      that the referenced entity actually exists in the Backstage catalog. Reads
-      the normalized `.iac.modules[].resources[]` tags and the collector's lookup
-      results at `.iac.refs`. Only validates resources that carry a concrete
-      entity-ref tag value: a resource without the tag is left to
-      `aws-resources-tagged`, and an unresolved value (`${...}`) is skipped
-      (it can't be verified without `terraform plan`). Optionally require a
-      specific kind (e.g. `component`) via `entity_ref_kind`. Fails on a
-      malformed value, a wrong kind, or a value the collector resolved to
-      `exists: false`; skips (passes) a value the collector could not resolve due
-      to a transient Backstage error, so an outage never turns this red.
-    mainPython: entity_ref_valid.py
-    keywords: ["backstage", "entity_ref", "referential integrity", "tags", "aws", "catalog"]
+    keywords: ["aws", "tags", "resource tagging", "default_tags", "required tags", "governance", "cost allocation"]
 
 inputs:
   required_backend_types:
@@ -351,19 +332,6 @@ inputs:
       key is on its own `tags` map or on the module's provider `default_tags`.
       Example: `backstage.com/entity_ref,cost-center`. Empty (the default)
       disables the aws-resources-tagged check.
-    default: ""
-  entity_ref_tag_key:
-    description: |
-      The tag key whose value entity-ref-valid validates as a Backstage entity
-      reference. Should match the collector's `entity_ref_tag_key` input so
-      referential-integrity results line up.
-    default: "backstage.com/entity_ref"
-  entity_ref_kind:
-    description: |
-      When set, entity-ref-valid requires the entity_ref tag value to name this
-      Backstage kind (e.g. `component`). A ref may state the kind explicitly
-      (`component:default/foo`) or omit it; when omitted this expected kind is
-      assumed. Empty (the default) accepts any kind.
     default: ""
   exempt_resource_types:
     description: |
