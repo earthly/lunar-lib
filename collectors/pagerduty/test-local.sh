@@ -2,7 +2,8 @@
 #
 # Local offline test for the pagerduty collector's Backstage-discovery mode.
 #
-# The cron hook runs with clone-code: true, so the collector reads
+# Both hooks give the collector a checkout (`oncall` is a code hook, which
+# always clones; `oncall-cron` sets clone-code: true), so it reads
 # catalog-info.yaml from the checked-out repo (its working directory). This
 # test stages a catalog-info.yaml in a per-case dir, runs oncall.sh from
 # there, and mocks:

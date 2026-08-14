@@ -5,9 +5,10 @@ set -e
 # Backstage discovery (opt-in). When the service ID isn't set via component
 # meta or the service_id input, and backstage_discovery is "true", read the
 # PagerDuty service ID straight off the component's own catalog-info.yaml —
-# no cataloger and no LUNAR_COMPONENT_META required. The cron hook runs with
-# clone-code: true, so the component's repo is checked out at the working
-# directory and the file is read locally — no GitHub token needed.
+# no cataloger and no LUNAR_COMPONENT_META required. Either hook gives us the
+# checkout — `oncall` runs on a code hook, which always clones, and
+# `oncall-cron` sets clone-code: true — so the component's repo is at the
+# working directory and the file is read locally, no GitHub token needed.
 #
 # Echoes the discovered service ID on stdout (empty if none); all diagnostics
 # go to stderr so the caller can capture the value cleanly. Never fails the
