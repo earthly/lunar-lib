@@ -4,9 +4,9 @@ Parses and lints Backstage `catalog-info.yaml` files.
 
 ## Overview
 
-This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. The raw Backstage descriptor (apiVersion, kind, metadata, spec) is written to the `.catalog.native.backstage` Component JSON path as-is — annotations keep their original `backstage.io/` or vendor prefixes. The search paths are configurable via the `paths` input.
+This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. The raw Backstage descriptor (apiVersion, kind, metadata, spec) is written to the `.catalog.native.backstage` Component JSON path as-is — annotations keep their original `backstage.io/` or vendor prefixes. Files that declare [multiple entities](#multiple-entities) separated by `---` are fully supported. The search paths are configurable via the `paths` input.
 
-Optionally, when a `backstage_url` is configured, it also cross-checks the domain and system referenced in `catalog-info.yaml` against the live Backstage catalog and records whether those entities exist under `.catalog.native.backstage.refs`, and resolves Backstage entity-reference tags found on infrastructure resources into `.catalog.entity_refs`.
+Optionally, when a `backstage_url` is configured, it cross-checks the referenced domain and system against the live catalog under `.catalog.native.backstage.refs`, and resolves entity-reference tags on infrastructure into `.catalog.entity_refs`.
 
 ## Collected Data
 
@@ -17,10 +17,11 @@ When a catalog-info file is found, this collector writes to the following Compon
 | `.catalog.native.backstage.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
 | `.catalog.native.backstage.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
 | `.catalog.native.backstage.path` | string | Relative path to the file that was parsed |
-| `.catalog.native.backstage.apiVersion` | string | Backstage API version (e.g. `backstage.io/v1alpha1`) |
-| `.catalog.native.backstage.kind` | string | Entity kind (e.g. `Component`, `System`, `API`) |
-| `.catalog.native.backstage.metadata` | object | Raw `metadata` block (`name`, `description`, `annotations`, `tags`, etc.) |
-| `.catalog.native.backstage.spec` | object | Raw `spec` block (`type`, `owner`, `lifecycle`, `system`, `providesApis`, `consumesApis`, `dependsOn`, etc.) |
+| `.catalog.native.backstage.apiVersion` | string | Backstage API version of the [primary entity](#multiple-entities) (e.g. `backstage.io/v1alpha1`) |
+| `.catalog.native.backstage.kind` | string | Kind of the [primary entity](#multiple-entities) (e.g. `Component`, `System`, `API`) |
+| `.catalog.native.backstage.metadata` | object | Raw `metadata` block of the primary entity (`name`, `description`, `annotations`, `tags`, etc.) |
+| `.catalog.native.backstage.spec` | object | Raw `spec` block of the primary entity (`type`, `owner`, `lifecycle`, `system`, `providesApis`, `consumesApis`, `dependsOn`, etc.) |
+| `.catalog.native.backstage.entities[]` | array | Every entity declared in the file (each with its own `valid`, `errors`, `apiVersion`, `kind`, `metadata`, `spec`). A single-entity file yields one element |
 | `.catalog.native.backstage.refs` | object | Referential-integrity results; written (as an object) only when `backstage_url` is configured |
 | `.catalog.native.backstage.refs.checked` | boolean | `true` whenever `backstage_url` is set — the "referential integrity ran" signal the policy keys off to distinguish *configured* from *not configured* |
 | `.catalog.native.backstage.refs.domain` | object | For the declared `spec.domain`: `{ name, exists }` when the lookup resolved (200/404), or `{ name, error }` on a transient failure. Absent when no domain is declared |
@@ -59,6 +60,24 @@ How it works:
 - When `backstage_url` is unset, or the component has no IaC tag data, nothing is written and the policy's `entity-ref-valid` check skips (passes).
 
 > **Why `.catalog.entity_refs` and not `.catalog.native.backstage.*`?** The presence of `.catalog.native.backstage` is the "a `catalog-info.yaml` exists" signal that several checks (`catalog-info-exists`, `owner-set`, `lifecycle-set`, …) key off. Writing entity-ref results under it would make that object exist on a repo with no catalog file, silently flipping those checks. `.catalog.entity_refs` sits at the normalized category level alongside `.catalog.entity` and `.catalog.annotations`, so the two concerns stay independent.
+
+### Multiple entities
+
+A single `catalog-info.yaml` may declare several Backstage entities separated by `---` — most commonly a `Component` plus the `API`s it provides, or a `System` and its `Component`s. The collector parses **every** document in the file:
+
+- **`valid` / `errors[]` aggregate across all entities.** The file is `valid` only when every entity passes lint; each error message in a multi-entity file is prefixed with a `document N (Kind 'name')` locator (and carries an `entity` index into `entities[]`) so you can tell which document is at fault.
+- **`entities[]` lists all of them,** each with its own `valid`/`errors`/`apiVersion`/`kind`/`metadata`/`spec`.
+- **The primary entity is hoisted to the top level.** `.apiVersion`, `.kind`, `.metadata`, and `.spec` mirror the first `Component` in the file (or the first document when there is no `Component`). The single-entity policies — `owner-set`, `lifecycle-set`, `system-set`, `required-annotations`, the tag-pattern checks, and the referential-integrity lookups — read these paths, so they operate on that primary `Component` (owner, lifecycle, and system are `Component`-level fields in Backstage). A single-entity file behaves exactly as before: one element in `entities[]`, that entity hoisted.
+
+### Lint checks
+
+The `valid` / `errors[]` fields above come from a lint that mirrors the rules the Backstage **server** enforces on ingest, so violations surface in CI (via the `backstage` policy's `catalog-info-valid` check) instead of failing silently at registration. It reports:
+
+- `apiVersion` present, a string, and starting with `backstage.io/`
+- `kind` present, a string, and a known entity kind
+- `metadata.name` present, a string, and DNS-compatible
+- **`metadata.tags` — each tag valid.** Backstage requires each tag to be lowercase `[a-z0-9+#]` segments joined by single dashes, at most 63 characters (`Validators.isValidTag`). The `catalog-info.yaml` schema itself accepts any string, so a tag like `hosting/internal` parses fine but the Backstage server **rejects the whole entity** at ingest (`"tags.0" is not valid; expected a string that is sequences of [a-z0-9+#] separated by [-]`). The lint flags such tags as errors — use dashes instead (e.g. `hosting-internal`).
+- `spec` present (a mapping) for non-`Location` kinds
 
 ## Collectors
 

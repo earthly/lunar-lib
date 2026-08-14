@@ -87,7 +87,7 @@ Add to your `lunar-config.yml`. With no `include` / `exclude`, both sub-cataloge
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
 Pick a single variant with `include` (see [Choosing a variant](#choosing-a-variant)):
@@ -95,14 +95,14 @@ Pick a single variant with `include` (see [Choosing a variant](#choosing-a-varia
 ```yaml
 catalogers:
   # Commit-triggered only — near-real-time, no GitHub token needed
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment-on-commit]
 ```
 
 ```yaml
 catalogers:
   # Scheduled only — daily backfill via the GitHub Contents API
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     include: [augment]
 ```
 
@@ -122,11 +122,11 @@ Both variants augment existing components only — neither `component-cron` nor 
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme"
 
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
 ```
 
 ### Pick This or the Live Backstage Cataloger — Not Both
@@ -188,7 +188,7 @@ Some orgs model component domains via a custom annotation rather than the canoni
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     with:
       domain_annotation: "yourorg.example.com/domain"
 ```
@@ -201,7 +201,7 @@ Not every `catalog-info.yaml` sets a domain. When a matched Component resolves t
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     with:
       default_domain: "engineering"
 ```
@@ -250,7 +250,7 @@ Several lunar-lib collectors resolve their per-component target from the Lunar c
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
     # default: meta_annotations: "pagerduty.com/service-id=pagerduty/service-id"
 ```
 

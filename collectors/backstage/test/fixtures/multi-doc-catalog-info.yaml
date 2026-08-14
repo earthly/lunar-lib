@@ -1,0 +1,27 @@
+# A legal multi-document catalog-info.yaml: one Component plus the API it
+# provides, separated by `---`. Backstage accepts several entities in a single
+# descriptor file; the collector must parse every one of them rather than
+# choking on the concatenated documents. Used by test-local.sh.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  description: Payment processing API
+  tags: [payments, api]
+spec:
+  type: service
+  owner: team-payments
+  lifecycle: production
+  system: payment-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payment-api-grpc
+spec:
+  type: grpc
+  owner: team-payments
+  lifecycle: production
+  definition: |
+    syntax = "proto3";
+    service Payments {}

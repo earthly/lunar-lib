@@ -38,7 +38,10 @@ collectors:
       Scans the repository for a CODEOWNERS file in standard locations
       (CODEOWNERS, .github/CODEOWNERS, docs/CODEOWNERS) and parses its contents.
       Extracts ownership rules, validates syntax, classifies owners as teams vs
-      individuals, and detects catch-all rules. Writes to `.ownership.codeowners`.
+      individuals, and detects catch-all rules. In a monorepo, where each
+      component is a subdirectory but the CODEOWNERS file lives once at the
+      repository root, it falls back to that global file (configurable via
+      `codeowners_scope`). Writes to `.ownership.codeowners`.
     mainBash: codeowners.sh
     hook:
       type: code
@@ -110,6 +113,15 @@ inputs:
   codeowners_paths:
     description: Comma-separated list of CODEOWNERS file paths to check (first match wins)
     default: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"
+  codeowners_scope:
+    description: |
+      Where to look for the CODEOWNERS file. "auto" (default) checks the
+      component's own directory first, then falls back to the repository root,
+      so a single global CODEOWNERS at the repo root is used for every component
+      in a monorepo (its subdirectory has no CODEOWNERS of its own). "repo-root"
+      only uses the global repo-root file; "component-dir" only uses the
+      component's own directory (the pre-monorepo behavior).
+    default: "auto"
   changelog_paths:
     description: Comma-separated list of CHANGELOG paths to check (first match wins)
     default: "CHANGELOG.md,CHANGELOG,CHANGES.md,HISTORY.md,RELEASES.md"
@@ -182,6 +194,7 @@ example_component_json: |
         "exists": true,
         "valid": true,
         "path": ".github/CODEOWNERS",
+        "scope": "repo",
         "errors": [],
         "owners": ["@acme/backend-team", "@acme/platform-team", "@jdoe"],
         "team_owners": ["@acme/backend-team", "@acme/platform-team"],

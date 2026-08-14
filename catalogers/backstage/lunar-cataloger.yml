@@ -161,12 +161,69 @@ inputs:
       set in Backstage.
     default: ""
 
+  # Structured include/exclude filters. Empty = off; `include_*` are
+  # allowlists, `exclude_*` are denylists, and exclude wins over include.
+  # Full semantics (kind-awareness, why they run client-side) live in the
+  # README "Filtering Entities" section.
+
+  # -- type / lifecycle --
+  include_types:
+    description: |
+      Only sync entities whose Backstage `spec.type` is in this
+      comma-separated list (e.g. `service,website`). Empty syncs all types.
+      Case-insensitive.
+    default: ""
+
+  exclude_types:
+    description: |
+      Skip entities whose `spec.type` is in this comma-separated list. Wins
+      over `include_types`. Empty excludes nothing.
+    default: ""
+
+  include_lifecycles:
+    description: |
+      Only sync entities whose `spec.lifecycle` is in this comma-separated
+      list (e.g. `production`). Empty syncs all lifecycles. Case-insensitive.
+    default: ""
+
+  exclude_lifecycles:
+    description: |
+      Skip entities whose `spec.lifecycle` is in this comma-separated list.
+      Wins over `include_lifecycles`. Empty excludes nothing.
+    default: ""
+
+  # -- domain / system (phased onboarding) --
+  include_domains:
+    description: |
+      Only sync components under these domains (comma-separated, e.g.
+      `platform-engineering`) — bring one domain live at a time. Matches the
+      resolved domain path, so a value also matches its nested subdomains.
+      Empty syncs all domains. Case-insensitive.
+    default: ""
+
+  exclude_domains:
+    description: |
+      Skip components under these domains (comma-separated; also matches
+      nested subdomains). Wins over `include_domains`. Empty excludes nothing.
+    default: ""
+
+  include_systems:
+    description: |
+      Only sync components in these Backstage systems (comma-separated, by
+      name). Empty syncs all systems. Case-insensitive.
+    default: ""
+
+  exclude_systems:
+    description: |
+      Skip components in these Backstage systems (comma-separated, by name).
+      Wins over `include_systems`. Empty excludes nothing.
+    default: ""
+
   filter:
     description: |
-      Additional raw Backstage filter expression (passed through to the
-      `?filter=` query parameter). Use to restrict the sync to a subset
-      of entities (e.g. `metadata.annotations.team=platform`). Empty
-      means no extra filter.
+      Raw Backstage filter expression for cases the structured filters above
+      don't cover (e.g. `metadata.annotations.team=platform`). Applied
+      server-side, so it also trims the fetch. Empty means no extra filter.
     default: ""
 
   auth_mode:

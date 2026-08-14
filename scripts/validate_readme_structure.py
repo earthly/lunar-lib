@@ -82,7 +82,7 @@ PLUGIN_CONFIGS = {
         "directory": "catalogers",
         "yaml_file": "lunar-cataloger.yml",
         "title_suffix": "Cataloger",
-        "uses_path": "github.com/earthly/lunar-lib/catalogers",
+        "uses_path": "github://earthly/lunar-lib/catalogers",
         "item_list_name": "catalogers",
         "item_section_name": "Catalogers",
         "data_section_name": "Synced Data",

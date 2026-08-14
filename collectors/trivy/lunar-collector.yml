@@ -93,9 +93,6 @@ collectors:
       the docker collector's record (.containers.native.docker.cicd.cmds[]) and
       scans it with Trivy into .container_scan.
     mainBash: container-rescan.sh
-    # Fires at the doneness gate once .containers.native.docker.cicd.cmds is
-    # present. Runs in the collector image (not native), reads merged Component JSON.
-    runs_on: [default-branch]
     hook:
       type: after-json
       path: .containers.native.docker.cicd.cmds

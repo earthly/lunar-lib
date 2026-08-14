@@ -16,11 +16,23 @@ def main(node=None):
             c.skip("No issues data available yet")
             return c
 
-        issues = issues_node.get_value()
-        c.assert_true(
-            len(issues) == 0,
-            f"Hardcoded secrets detected: {len(issues)} finding(s) in source code",
-        )
+        # One failure per finding so each secret is reported with its location.
+        for issue in issues_node:
+            file = issue.get_value_or_default(".file", None)
+            line = issue.get_value_or_default(".line", None)
+            rule = issue.get_value_or_default(".rule", None)
+            description = issue.get_value_or_default(".secret_type", None)
+
+            location = file or "<unknown file>"
+            if line is not None:
+                location = f"{location}:{line}"
+
+            message = f"Hardcoded secret detected at {location}"
+            if rule:
+                message += f" ({rule})"
+            if description:
+                message += f": {description}"
+            c.fail(message)
     return c
 
 

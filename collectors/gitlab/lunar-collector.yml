@@ -1,0 +1,139 @@
+version: 0
+
+name: gitlab
+description: Collect GitLab project settings, protected-branch rules, and merge-request metadata
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "GitLab Collector"
+  long_description: |
+    Collect GitLab project settings, protected-branch and approval rules,
+    access permissions, and merge-request metadata. Populates the same
+    .vcs.* schema as the GitHub collector so VCS and ticket policies work
+    on GitLab-hosted repositories.
+  categories: ["vcs"]
+  icon: "assets/gitlab.svg"
+  status: "experimental"
+  related:
+    - slug: "vcs"
+      type: "policy"
+      reason: "Enforces branch protection and merge strategy standards"
+
+collectors:
+  - name: merge-request
+    description: |
+      Fetches merge-request metadata from the GitLab API for the MR being
+      evaluated and writes it under .vcs.pr — title, description, source and
+      target branch, author, labels, draft flag, state, URL, and number.
+      This is the GitLab source of .vcs.pr.* that the ticket collectors
+      (jira, linear) and change-management / change-to-ticket checks read.
+      Runs only in merge-request context.
+    mainBash: merge_request.sh
+    runs_on: [prs]
+    hook:
+      type: code
+    keywords: ["gitlab", "merge request", "pr", "vcs.pr", "ticket", "change management"]
+
+  - name: repository
+    description: |
+      Fetches basic project settings from the GitLab API including visibility
+      (public/internal/private), default branch, topics, and the configured
+      merge method (merge commit, rebase, fast-forward) plus squash options.
+      Writes to .vcs.provider, .vcs.visibility, .vcs.default_branch,
+      .vcs.topics, and .vcs.merge_strategies.
+    mainBash: repository.sh
+    hook:
+      type: code
+    keywords: ["gitlab settings", "project visibility", "merge method"]
+
+  - name: branch-protection
+    description: |
+      Fetches protected-branch config, MR approval rules, external status
+      checks, and push rules for the default branch from the GitLab API,
+      normalizing them into the shared .vcs.branch_protection shape with a
+      .source field of "gitlab". Collects required approvals (from approval
+      rules), code-owner approval, reset-on-push (dismiss stale reviews),
+      required status checks (pipeline-success and/or external status checks,
+      with their names in required_checks), signed-commit and linear-history
+      enforcement, allowed force push, and push/merge access levels. Licensed-
+      only signals degrade gracefully to their safe defaults on CE/unlicensed.
+    mainBash: branch_protection.sh
+    hook:
+      type: code
+    keywords: ["protected branches", "approval rules", "code review", "gitlab security"]
+
+  - name: access-permissions
+    description: |
+      Fetches project access permissions from the GitLab API with pagination.
+      Collects direct project members (username, access level, type) and
+      shared groups (path, name, access level). Does not expand group
+      memberships. Writes to .vcs.access.collaborators and .vcs.access.teams.
+    mainBash: access_permissions.sh
+    hook:
+      type: code
+    keywords: ["access control", "members", "groups", "audit", "least privilege"]
+
+inputs:
+  gitlab_host:
+    description: GitLab host for self-managed instances (e.g. gitlab.example.com)
+    default: "gitlab.com"
+
+secrets:
+  GL_TOKEN:
+    description: GitLab personal or project access token with `read_api` scope for API authentication
+
+example_component_json: |
+  {
+    "vcs": {
+      "provider": "gitlab",
+      "default_branch": "main",
+      "visibility": "private",
+      "topics": ["backend", "api", "microservice"],
+      "merge_strategies": {
+        "allow_merge_commit": false,
+        "allow_squash_merge": true,
+        "allow_rebase_merge": true
+      },
+      "pr": {
+        "number": 42,
+        "title": "[ENG-123] Add rate limiting to the auth service",
+        "description": "Implements a token-bucket limiter. Closes ENG-123.",
+        "url": "https://gitlab.com/acme/auth-service/-/merge_requests/42",
+        "source_branch": "eng-123-rate-limiting",
+        "target_branch": "main",
+        "author": "alice",
+        "labels": ["backend", "security"],
+        "draft": false,
+        "state": "open"
+      },
+      "branch_protection": {
+        "enabled": true,
+        "source": "gitlab",
+        "branch": "main",
+        "require_pr": true,
+        "required_approvals": 2,
+        "require_codeowner_review": true,
+        "dismiss_stale_reviews": true,
+        "require_status_checks": true,
+        "required_checks": ["security-gate"],
+        "require_signed_commits": false,
+        "require_linear_history": false,
+        "allow_force_push": false,
+        "allow_deletions": false,
+        "restrictions": {
+          "push_access_level": "maintainer",
+          "merge_access_level": "developer"
+        }
+      },
+      "access": {
+        "collaborators": [
+          {"username": "alice", "permission": "owner", "type": "User"},
+          {"username": "deploy-bot", "permission": "developer", "type": "Bot"}
+        ],
+        "teams": [
+          {"slug": "platform", "name": "Platform Team", "permission": "maintainer"}
+        ]
+      }
+    }
+  }

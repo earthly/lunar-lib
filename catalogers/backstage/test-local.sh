@@ -206,9 +206,89 @@ FULFILL_DOMAIN=$(echo "$CAPTURED_COMPONENTS" | jq -r '.["github.com/acme/fulfill
 [ "$FULFILL_DOMAIN" = "commerce.checkout.orders.fulfillment" ] || \
     fail "fulfillment-api domain: expected 'commerce.checkout.orders.fulfillment', got '$FULFILL_DOMAIN'"
 
+# --- 6. Structured include/exclude filters -------------------------------
+# Re-run the cataloger against the same fixture with each filter set and assert
+# the resulting component key set (github.com/ prefix stripped, sorted, joined).
+# The 5 baseline annotated components and their relevant fields:
+#   acme/payment-api        type=service  lifecycle=production  system=payments   -> platform.payments.payments
+#   acme/web-app            type=website  lifecycle=production  system=storefront -> storefront
+#   acme/payment-api-proto  type=grpc     lifecycle=production  (no system/domain)-> ""
+#   acme/payments-db-iac    type=database (NO lifecycle)        system=payments   -> platform.payments.payments
+#   acme/fulfillment-api    type=service  lifecycle=production  system=fulfillment-> commerce.checkout.orders.fulfillment
+echo ""
+echo "=== Filter scenarios ==="
+
+# filter_keys inc_types exc_types inc_life exc_life inc_dom exc_dom inc_sys exc_sys
+# -> echoes sorted, comma-joined component keys with the github.com/ prefix stripped.
+filter_keys() {
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    if ! LUNAR_VAR_INCLUDE_TYPES="$1" LUNAR_VAR_EXCLUDE_TYPES="$2" \
+         LUNAR_VAR_INCLUDE_LIFECYCLES="$3" LUNAR_VAR_EXCLUDE_LIFECYCLES="$4" \
+         LUNAR_VAR_INCLUDE_DOMAINS="$5" LUNAR_VAR_EXCLUDE_DOMAINS="$6" \
+         LUNAR_VAR_INCLUDE_SYSTEMS="$7" LUNAR_VAR_EXCLUDE_SYSTEMS="$8" \
+         "$SCRIPT_DIR/main.sh" > "$TEST_DIR/filter.out" 2>&1; then
+        echo "__MAINSH_FAILED__"; return
+    fi
+    jq -rs 'add // {} | keys | map(sub("^github.com/"; "")) | sort | join(",")' "$COMPONENTS_OUT"
+}
+
+check_filter() { # $1=label $2=expected $3=got
+    if [ "$3" = "$2" ]; then
+        echo "  ok: $1 -> {$3}"
+    else
+        fail "[$1] expected components {$2}, got {$3}"
+    fi
+}
+
+check_filter "include_types=service" \
+    "acme/fulfillment-api,acme/payment-api" \
+    "$(filter_keys service '' '' '' '' '' '' '')"
+
+check_filter "exclude_types=database" \
+    "acme/fulfillment-api,acme/payment-api,acme/payment-api-proto,acme/web-app" \
+    "$(filter_keys '' database '' '' '' '' '' '')"
+
+# exclude wins over include: database is in BOTH lists -> dropped.
+check_filter "include=service,database + exclude=database (exclude wins)" \
+    "acme/fulfillment-api,acme/payment-api" \
+    "$(filter_keys 'service,database' database '' '' '' '' '' '')"
+
+# attribute-absent passes: payments-db-iac (Resource, no lifecycle) survives a
+# lifecycle allowlist -> all 5 remain.
+check_filter "include_lifecycles=production (Resource w/o lifecycle passes)" \
+    "acme/fulfillment-api,acme/payment-api,acme/payment-api-proto,acme/payments-db-iac,acme/web-app" \
+    "$(filter_keys '' '' production '' '' '' '' '')"
+
+check_filter "include_types=SERVICE (case-insensitive)" \
+    "acme/fulfillment-api,acme/payment-api" \
+    "$(filter_keys SERVICE '' '' '' '' '' '' '')"
+
+# domain membership + dotted-prefix: only the commerce subtree; the no-domain
+# grpc API is not a member -> excluded.
+check_filter "include_domains=commerce (prefix match, no-domain excluded)" \
+    "acme/fulfillment-api" \
+    "$(filter_keys '' '' '' '' commerce '' '' '')"
+
+# exclude_domains drops the platform.payments subtree; no-domain component is
+# unaffected by an exclude (kept).
+check_filter "exclude_domains=platform.payments" \
+    "acme/fulfillment-api,acme/payment-api-proto,acme/web-app" \
+    "$(filter_keys '' '' '' '' '' platform.payments '' '')"
+
+check_filter "include_systems=payments (exact bare-name match)" \
+    "acme/payment-api,acme/payments-db-iac" \
+    "$(filter_keys '' '' '' '' '' '' payments '')"
+
+# Domains are never touched by component filters — still all 7 under a filter.
+: > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+LUNAR_VAR_INCLUDE_TYPES="service" "$SCRIPT_DIR/main.sh" >/dev/null 2>&1 || true
+DOMAINS_UNDER_FILTER=$(jq -s 'add // {} | keys | length' "$DOMAINS_OUT")
+[ "$DOMAINS_UNDER_FILTER" -eq "$EXPECTED_DOMAINS" ] || \
+    fail "domains must be unaffected by component filters: expected $EXPECTED_DOMAINS, got $DOMAINS_UNDER_FILTER"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths verified"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, and include/exclude filters (type/lifecycle/domain/system) verified"
 else
     echo "TEST FAILED" >&2
     exit 1
