@@ -55,7 +55,12 @@ collectors:
     mainBash: oncall.sh
     hook:
       type: cron
-      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
+      # Daily at 04:00 UTC (9pm PDT / 8pm PST the previous day). Deliberately
+      # staggered off 02:00 UTC, where the cataloger wave and the trivy/grype
+      # SCA re-scans already land, and off 03:00 UTC (the container re-scans +
+      # catalog-info catalogers) — spreads external-API load instead of piling
+      # every scheduled job onto one tick.
+      schedule: "0 4 * * *"
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "cron", "scheduled"]
 
