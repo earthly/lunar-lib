@@ -77,8 +77,9 @@ inputs:
     description: >
       When "true", and no service ID is found via component meta or the
       service_id input, discover it from the component's own
-      catalog-info.yaml: the collector reads the file from the checked-out
-      repo (the cron hook clones the code) and takes the PagerDuty service ID
+      catalog-info.yaml: the collector reads the file from the runner's
+      checkout (oncall runs on a code hook, which clones; oncall-cron sets
+      clone-code) and takes the PagerDuty service ID
       from the annotation keys listed in backstage_annotations. Opt-in, and
       needs no extra secret — the runner's checkout is used, not a token.
       Lets the oncall guardrails work off the standard PagerDuty Backstage
