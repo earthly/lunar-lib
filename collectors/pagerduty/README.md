@@ -38,6 +38,12 @@ write the same `.oncall` data; they differ only in **when** they run.
 | `oncall` | Code hook — queries PagerDuty on pushes to PRs and the default branch, so the on-call guardrail is evaluated as part of a commit/PR check |
 | `oncall-cron` | Cron hook — queries PagerDuty daily (04:00 UTC, staggered off the 02:00/03:00 scheduled jobs) and refreshes `.oncall` so the data stays current as schedules rotate, independent of code changes |
 
+Most setups want one or the other. Including **both** is supported and the
+normalized `.oncall` data stays correct either way — but be aware the raw arrays
+under `.oncall.native.pagerduty` will carry duplicate entries, because Lunar
+concatenates arrays written to the same path by different collectors. Guardrail
+results are unaffected: the `oncall` policy reads only the normalized scalars.
+
 ## Installation
 
 Add to your `lunar-config.yml` (use `include` to pick a trigger variant):
