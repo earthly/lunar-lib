@@ -23,24 +23,46 @@ landing_page:
 collectors:
   - name: oncall
     description: |
-      Queries the PagerDuty REST API for the component's service. Resolves
+      Queries the PagerDuty REST API for the component's service on a code hook
+      — it runs when commits are pushed (PRs and the default branch). Resolves
       the service ID in order: the component's `pagerduty/service-id` meta
       annotation (set by a cataloger via
       `lunar catalog component --meta pagerduty/service-id <id>`), then the
       explicit service_id input, then — when `backstage_discovery` is enabled
-      — the component's own `catalog-info.yaml` (read from the checked-out
-      repo; the cron hook clones the code), reading the service ID directly
-      from a `pagerduty.com/service-id` / `pagerduty/service-id` annotation.
-      Fetches service details, on-call schedule participants, and escalation
-      policy. Writes normalized data to .oncall.service, .oncall.schedule,
-      .oncall.escalation, and .oncall.summary. Stores the raw API response
-      under .oncall.native.pagerduty.
+      — the component's own `catalog-info.yaml` (read from the fresh checkout
+      the code hook provides, so no `clone-code` is needed), reading the service
+      ID directly from a `pagerduty.com/service-id` / `pagerduty/service-id`
+      annotation. Fetches service details, on-call schedule participants, and
+      escalation policy. Writes normalized data to .oncall.service,
+      .oncall.schedule, .oncall.escalation, and .oncall.summary. Stores the raw
+      API response under .oncall.native.pagerduty.
+    mainBash: oncall.sh
+    hook:
+      type: code
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
+
+  - name: oncall-cron
+    description: |
+      Same PagerDuty query as `oncall`, but on a daily cron instead of on push —
+      it re-collects on a schedule so `.oncall` stays fresh as on-call schedules
+      and escalation policies rotate between commits (they change on their own
+      clock, independent of code). Resolves the service ID identically and writes
+      the same normalized .oncall.service, .oncall.schedule, .oncall.escalation,
+      and .oncall.summary (raw responses under .oncall.native.pagerduty).
+      `clone-code` gives it the checkout so `backstage_discovery` can still read
+      `catalog-info.yaml`. Include `oncall` for on-push evaluation, `oncall-cron`
+      for always-fresh scheduled refresh, or both.
     mainBash: oncall.sh
     hook:
       type: cron
-      schedule: "0 2 * * *"  # Human-readable: daily at 02:00 UTC
+      # Daily at 04:00 UTC (9pm PDT / 8pm PST the previous day). Deliberately
+      # staggered off 02:00 UTC, where the cataloger wave and the trivy/grype
+      # SCA re-scans already land, and off 03:00 UTC (the container re-scans +
+      # catalog-info catalogers) — spreads external-API load instead of piling
+      # every scheduled job onto one tick.
+      schedule: "0 4 * * *"
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
-    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "cron", "scheduled"]
 
 inputs:
   service_id:
@@ -55,8 +77,9 @@ inputs:
     description: >
       When "true", and no service ID is found via component meta or the
       service_id input, discover it from the component's own
-      catalog-info.yaml: the collector reads the file from the checked-out
-      repo (the cron hook clones the code) and takes the PagerDuty service ID
+      catalog-info.yaml: the collector reads the file from the runner's
+      checkout (oncall runs on a code hook, which clones; oncall-cron sets
+      clone-code) and takes the PagerDuty service ID
       from the annotation keys listed in backstage_annotations. Opt-in, and
       needs no extra secret — the runner's checkout is used, not a token.
       Lets the oncall guardrails work off the standard PagerDuty Backstage
