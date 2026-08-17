@@ -1,0 +1,106 @@
+version: 0
+
+name: package-registries
+description: Parse package-manager configuration to record which package registries a repository resolves dependencies from
+
+author: earthly
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Package Registries Collector"
+  long_description: |
+    Record which package registries a repository resolves dependencies from — npm, pip, Maven,
+    Gradle, RubyGems and NuGet. Reads explicit registry overrides and falls back to each
+    ecosystem's public default, so implicit public-index use stays visible.
+  categories: ["build"]
+  icon: "assets/package-registries.svg"
+  status: "beta"
+  related:
+    - slug: "dependencies"
+      type: "policy"
+      reason: "Enforces an approved-registry allowlist using this collector's data"
+    - slug: "docker"
+      type: "collector"
+      reason: "Covers container image registries, not package registries"
+    - slug: "syft"
+      type: "collector"
+      reason: "Inventories the packages themselves rather than their sources"
+
+collectors:
+  - name: scan
+    description: |
+      Finds package-manager configuration in the repository and records the registries each
+      ecosystem resolves dependencies from:
+      - npm: `.npmrc` (`registry=`, `@scope:registry=`)
+      - pip: `pip.conf` / `pip.ini`, `requirements*.txt` (`--index-url`, `--extra-index-url`),
+        `pyproject.toml` (Poetry / uv / PDM sources)
+      - Maven: `pom.xml` (`<repositories>`, `<pluginRepositories>`, `<distributionManagement>`)
+        and `settings.xml` (`<mirrors>`, `<repositories>`)
+      - Gradle: `build.gradle(.kts)` / `settings.gradle(.kts)` (`maven { url ... }`)
+      - RubyGems: `Gemfile` (`source`)
+      - NuGet: `nuget.config` (`<packageSources>`)
+      When an ecosystem's manifest is present but declares no registry, the entry records that
+      ecosystem's public default (for example `registry.npmjs.org`) with `is_default: true`, so
+      a repository that silently resolves from a public index is still reported.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords:
+      ["package registry", "npmrc", "index-url", "pip.conf", "maven repositories", "settings.xml",
+       "nuget.config", "gemfile source", "artifact repository", "registry provenance",
+       "approved registry", "supply chain", "cloudsmith", "artifactory", "nexus"]
+
+inputs:
+  find_command:
+    description: Command to find package-manager config and manifest files (must output one file path per line)
+    default: "find . -type f \\( -name '.npmrc' -o -name 'package.json' -o -name 'pip.conf' -o -name 'pip.ini' -o -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'pom.xml' -o -name 'settings.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' -o -name 'Gemfile' -o -iname 'nuget.config' \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
+  ecosystems:
+    description: Comma-separated ecosystems to scan (npm, pip, maven, gradle, rubygems, nuget). Empty scans all.
+    default: ""
+
+example_component_json: |
+  {
+    "dependencies": {
+      "source": {
+        "tool": "package-registries",
+        "integration": "code"
+      },
+      "ecosystems": ["npm", "maven"],
+      "registries": [
+        {
+          "ecosystem": "npm",
+          "host": "dl.cloudsmith.io",
+          "url": "https://dl.cloudsmith.io/basic/acme/npm/",
+          "path": ".npmrc",
+          "kind": "primary",
+          "is_default": false,
+          "is_public": false
+        },
+        {
+          "ecosystem": "npm",
+          "host": "registry.npmjs.org",
+          "url": "https://registry.npmjs.org/",
+          "path": ".npmrc",
+          "name": "@acme",
+          "kind": "primary",
+          "is_default": false,
+          "is_public": true
+        },
+        {
+          "ecosystem": "maven",
+          "host": "repo.maven.apache.org",
+          "url": "https://repo.maven.apache.org/maven2",
+          "path": "pom.xml",
+          "name": "central",
+          "kind": "primary",
+          "is_default": true,
+          "is_public": true
+        }
+      ],
+      "registries_used": ["dl.cloudsmith.io", "registry.npmjs.org", "repo.maven.apache.org"],
+      "summary": {
+        "has_public": true
+      }
+    }
+  }
