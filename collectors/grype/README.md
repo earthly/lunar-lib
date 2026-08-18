@@ -113,7 +113,7 @@ maintains history — the on-push `auto` scan ignores these inputs.
 **Container image scanning.** Beyond source dependencies, this collector scans **built container images** into the normalized `.container_scan` path (consumed by the [`container-scan`](../../policies/container-scan) policy). Three sub-collectors feed it, **none installing Grype (or its ~1.7GB DB) in your pipeline**:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `grype <image>` itself, that scan is captured to `.container_scan` automatically. A `grype dir:`/`sbom:` scan still routes to `.sca`. No install, no extra config.
-- **`container-scan`** *(on-push)* — automatically scans the image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag.
+- **`container-scan`** *(on-push)* — automatically scans the image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag. On a pull request it scans the image *that* commit pushed, so PR-time scanning needs your pipeline to push an image on PR builds; otherwise there is nothing to scan until the merge.
 - **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that image, catching CVEs **disclosed after it was built**.
 
 All three scan the shipped image *itself* in the Grype collector image (DB baked in) — no install on your side. Enable the [`docker`](../docker) collector alongside this one so its `docker push` commands are recorded:
