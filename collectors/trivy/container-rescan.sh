@@ -33,7 +33,31 @@ if [ -z "$IMAGE_REF" ]; then
   # .containers.builds[] is "what was built" (test/dry-run builds that never
   # shipped land there too, and a push in a separate job isn't reflected), so
   # it's the wrong source for "what shipped". (Per Fry review on #221.)
-  COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
+  #
+  # In PR context, pin the lookup to the commit being scanned. get-json does not
+  # default these from the environment: with neither flag it resolves the
+  # default-branch snapshot (`WHERE pr IS NULL`), so on a PR it returns main's
+  # Component JSON — a different commit, whose docker record does not carry this
+  # PR's pushed image — and the scan below skips. --git-sha alongside --pr
+  # narrows to the exact commit instead of the PR's latest, so the results
+  # describe the image this commit actually shipped.
+  #
+  # Only in PR context. On the default branch — the cron `container-rescan`, and
+  # an after-json run on a push to main — the unpinned default-branch lookup is
+  # already the right one, so it is left untouched. It is also the more robust
+  # one there: the cron's head_sha is the latest *ingested* main commit, which
+  # may not have been collected yet, and pinning to it would resolve nothing and
+  # silently stop the re-scan.
+  json_args=()
+  if [ -n "${LUNAR_COMPONENT_PR:-}" ]; then
+    json_args=(--pr "$LUNAR_COMPONENT_PR")
+    [ -n "${LUNAR_COMPONENT_GIT_SHA:-}" ] && json_args+=(--git-sha "$LUNAR_COMPONENT_GIT_SHA")
+  fi
+
+  # LUNAR_COMPONENT_ID and LUNAR_COMPONENT_PR are both injected by the Lunar
+  # runtime — neither is a misspelling of the other.
+  # shellcheck disable=SC2153
+  COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${json_args[@]}" 2>/dev/null || echo "")
   if [ -n "$COMPONENT_JSON" ]; then
     IMAGE_REF=$(echo "$COMPONENT_JSON" | jq -r '
       def ref_if_pushed:
