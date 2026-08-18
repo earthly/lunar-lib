@@ -138,6 +138,77 @@ class TestPip(unittest.TestCase):
         self.assertEqual(hosts(r, "pip"), ["dl.cloudsmith.io"])
 
 
+class TestOddPyproject(unittest.TestCase):
+    """A pyproject.toml is valid TOML of arbitrary shape.
+
+    `[tool]` with `poetry = "1.9.0"` is legal and just declares no sources.
+    Traversing it with plain .get() chains raised AttributeError, which escaped
+    the backstop and killed the whole collector — every ecosystem at once, over
+    one odd file. Worst on a monorepo walking many pyproject files.
+    """
+
+    SHAPES = {
+        "scalar tool.poetry": '[tool]\npoetry = "1.9.0"\n',
+        "scalar top-level tool": 'tool = "x"\n',
+        "source is not a list": '[tool.poetry]\nsource = "notalist"\n',
+        "uv index is a number": "[tool.uv]\nindex = 42\n",
+        "poetry is a list": "[[tool.poetry]]\nname = 'x'\n",
+    }
+
+    def test_odd_shapes_do_not_break_collection(self):
+        for label, content in self.SHAPES.items():
+            with self.subTest(shape=label):
+                r = run({"pyproject.toml": content, "package.json": "{}"})
+                # npm must not become collateral damage
+                self.assertEqual(r["ecosystems"], ["npm", "pip"])
+                # pip declared no source, so its public default applies
+                pip = [e for e in r["registries"] if e["ecosystem"] == "pip"]
+                self.assertEqual([e["host"] for e in pip], ["pypi.org"])
+                self.assertTrue(pip[0]["is_default"])
+                # valid TOML that declares no sources is not an error
+                self.assertEqual(r.get("errors", []), [])
+
+    def test_real_sources_still_parsed(self):
+        """The hardening must not stop valid tables from being read."""
+        r = run({"pyproject.toml": '[[tool.poetry.source]]\nname = "acme"\n'
+                                   'url = "https://dl.cloudsmith.io/x/py/simple"\n'})
+        self.assertEqual(hosts(r, "pip"), ["dl.cloudsmith.io"])
+
+
+class TestBackstop(unittest.TestCase):
+    """An unanticipated parser failure must be recorded, never fatal."""
+
+    def _module(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("parse_registries", PARSER)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_unexpected_exception_is_recorded_not_raised(self):
+        mod = self._module()
+        original = mod.parse_pyproject
+
+        def boom(*_args, **_kwargs):
+            raise AttributeError("'str' object has no attribute 'get'")
+
+        mod.parse_pyproject = boom
+        try:
+            reg = mod.Registries(mod.ALL_ECOSYSTEMS)
+            errors = []
+            with tempfile.TemporaryDirectory() as tmp:
+                p = os.path.join(tmp, "pyproject.toml")
+                with open(p, "w", encoding="utf-8") as fh:
+                    fh.write("[tool.poetry]\n")
+                mod.handle(reg, p, "pyproject", errors)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("AttributeError", errors[0]["error"])
+            # ecosystem still detected, so the default is still reported
+            self.assertIn("pip", reg.detected)
+        finally:
+            mod.parse_pyproject = original
+
+
 class TestMaven(unittest.TestCase):
     POM = """<?xml version="1.0"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">

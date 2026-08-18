@@ -210,22 +210,39 @@ def parse_requirements(reg, path, text):
         reg.add("pip", url, path, kind=kind)
 
 
+def _table(obj, key):
+    """`obj[key]` when it is a table, otherwise an empty one.
+
+    A pyproject.toml is valid TOML but arbitrary shape — `[tool]` with
+    `poetry = "1.9.0"` is legal and simply declares no sources. Traversing it
+    with plain `.get()` chains would raise on the scalar.
+    """
+    value = obj.get(key) if isinstance(obj, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+def _array(obj, key):
+    """`obj[key]` when it is an array, otherwise an empty one."""
+    value = obj.get(key) if isinstance(obj, dict) else None
+    return value if isinstance(value, list) else []
+
+
 def parse_pyproject(reg, path, data):
-    tool = data.get("tool", {}) if isinstance(data, dict) else {}
+    tool = _table(data, "tool")
     # Poetry: [[tool.poetry.source]] with an optional priority
-    for src in tool.get("poetry", {}).get("source", []) or []:
+    for src in _array(_table(tool, "poetry"), "source"):
         if not isinstance(src, dict):
             continue
         priority = str(src.get("priority", "")).lower()
         kind = "extra" if priority in ("supplemental", "explicit") else "primary"
         reg.add("pip", src.get("url"), path, kind=kind, name=src.get("name"))
     # uv: [[tool.uv.index]]
-    for src in tool.get("uv", {}).get("index", []) or []:
+    for src in _array(_table(tool, "uv"), "index"):
         if isinstance(src, dict):
             kind = "primary" if src.get("default") else "extra"
             reg.add("pip", src.get("url"), path, kind=kind, name=src.get("name"))
     # PDM: [[tool.pdm.source]]
-    for src in tool.get("pdm", {}).get("source", []) or []:
+    for src in _array(_table(tool, "pdm"), "source"):
         if isinstance(src, dict):
             reg.add("pip", src.get("url"), path, name=src.get("name"))
 
@@ -393,7 +410,12 @@ def handle(reg, path, kind, errors):
             reg.detect("nuget")
         elif kind == "package_json":
             reg.detect("npm")
-    except (ET.ParseError, ValueError, TypeError) as exc:
+    except Exception as exc:  # noqa: BLE001 — see below
+        # These are arbitrary files from someone else's repository, so the set
+        # of ways one can break a parser is not enumerable. Record the failure
+        # against the file and carry on: one odd file must not take down the
+        # other ecosystems in the same repo. Nothing is swallowed silently —
+        # the exception type lands in .dependencies.errors[].
         errors.append({"path": path, "error": f"{type(exc).__name__}: {exc}"})
 
 
