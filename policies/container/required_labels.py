@@ -10,19 +10,29 @@ def _normalize_path(path):
     return path
 
 
-def main():
-    with Check("required-labels", "Containers should have required labels") as c:
+def main(node=None):
+    c = Check(
+        "required-labels",
+        "Containers should have required labels",
+        node=node,
+    )
+    with c:
         required_str = variable_or_default("required_labels", "")
         required = [label.strip() for label in required_str.split(",") if label.strip()]
 
         if not required:
-            return
+            c.skip(
+                "No required labels configured. Set the `required_labels` "
+                "variable to a comma-separated list to enforce this check."
+            )
+            return c
 
         definitions = c.get_node(".containers.definitions")
         builds = c.get_node(".containers.builds")
 
         if not definitions.exists() and not builds.exists():
-            return
+            c.skip("No Dockerfiles or container builds found in this component")
+            return c
 
         # Index build labels by dockerfile path
         build_labels_by_dockerfile = {}
@@ -73,6 +83,7 @@ def main():
                         f"Build for '{df_path}' missing required labels: "
                         f"{', '.join(missing)}"
                     )
+    return c
 
 
 if __name__ == "__main__":
