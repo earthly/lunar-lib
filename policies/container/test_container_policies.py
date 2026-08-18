@@ -130,6 +130,18 @@ class TestDockerfileLintClean(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("DL3006", check.failure_reasons[0])
 
+    def test_hadolint_error_skips_with_accurate_reason(self):
+        """hadolint crashing also leaves lint_results unset — don't blame Dockerfiles."""
+        data = {"containers": {
+            "definitions": [definition()],
+            "native": {"hadolint": {"error": "hadolint exited unexpectedly", "exit_code": 2}},
+        }}
+        check = check_dockerfile_lint_clean(finished_node(data))
+        self.assertTrue(is_skipped(check))
+        reason = check._results[0].failure_message
+        self.assertIn("hadolint exited unexpectedly", reason)
+        self.assertNotIn("No Dockerfiles", reason)
+
     def test_warning_below_default_threshold_passes(self):
         data = {"containers": {"lint_results": [{
             "path": "Dockerfile",

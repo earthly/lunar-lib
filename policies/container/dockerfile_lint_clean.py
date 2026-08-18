@@ -15,11 +15,21 @@ def main(node=None):
     with c:
         lint_results = c.get_node(".containers.lint_results")
         if not lint_results.exists():
-            # The hadolint sub-collector writes nothing when the component has
-            # no Dockerfiles, so there is nothing to lint. An *empty* array is
-            # a different signal — hadolint ran and found no issues — and it
-            # falls through to a genuine pass below.
-            c.skip("No Dockerfiles found in this component")
+            # Two different reasons lint_results can be absent, and the skip
+            # reason has to name the right one. Normally it means the component
+            # has no Dockerfiles, so the hadolint sub-collector wrote nothing.
+            # But hadolint exiting unexpectedly also leaves lint_results unset —
+            # it records the failure under .native.hadolint.error instead. Skip
+            # either way (a broken tool shouldn't false-fail the component), but
+            # don't claim "no Dockerfiles" when there are Dockerfiles.
+            #
+            # An *empty* array is a third, distinct signal — hadolint ran and
+            # found no issues — and falls through to a genuine pass below.
+            error = c.get_value_or_default(".containers.native.hadolint.error", None)
+            if error is not None:
+                c.skip(f"hadolint did not produce lint results: {error}")
+            else:
+                c.skip("No Dockerfiles found in this component")
             return c
 
         threshold_name = variable_or_default("hadolint_severity", "error").lower()
