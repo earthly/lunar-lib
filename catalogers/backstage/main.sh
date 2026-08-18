@@ -22,6 +22,13 @@
 #   default_owner             (default empty)
 #   domain_default_description (default empty)
 #   filter                    (default empty) Raw Backstage filter clause
+#   include_types / exclude_types            (default empty) spec.type allow/deny
+#   include_lifecycles / exclude_lifecycles  (default empty) spec.lifecycle allow/deny
+#   include_domains / exclude_domains        (default empty) resolved-domain-path allow/deny
+#   include_systems / exclude_systems        (default empty) spec.system allow/deny
+#     Structured filters run client-side: empty=off, exclude wins over include,
+#     case-insensitive. type/lifecycle pass entities lacking the field;
+#     domain/system include is membership (no value = not a member = excluded).
 #   auth_mode                 (default bearer) bearer | sigv4
 #   aws_region                (sigv4 only; falls back to AWS_REGION env)
 #   aws_service               (sigv4 only; default execute-api)
@@ -68,6 +75,19 @@ OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DOMAIN_DEFAULT_DESCRIPTION="${LUNAR_VAR_DOMAIN_DEFAULT_DESCRIPTION:-}"
 USER_FILTER="${LUNAR_VAR_FILTER:-}"
+
+# Structured client-side include/exclude filters (comma-separated; empty = off).
+# Applied after the fetch during the component transform: exclude wins over
+# include, matching is case-insensitive. See the "Client-side filtering" block
+# below the fetch for the exact semantics.
+INCLUDE_TYPES="${LUNAR_VAR_INCLUDE_TYPES:-}"
+EXCLUDE_TYPES="${LUNAR_VAR_EXCLUDE_TYPES:-}"
+INCLUDE_LIFECYCLES="${LUNAR_VAR_INCLUDE_LIFECYCLES:-}"
+EXCLUDE_LIFECYCLES="${LUNAR_VAR_EXCLUDE_LIFECYCLES:-}"
+INCLUDE_DOMAINS="${LUNAR_VAR_INCLUDE_DOMAINS:-}"
+EXCLUDE_DOMAINS="${LUNAR_VAR_EXCLUDE_DOMAINS:-}"
+INCLUDE_SYSTEMS="${LUNAR_VAR_INCLUDE_SYSTEMS:-}"
+EXCLUDE_SYSTEMS="${LUNAR_VAR_EXCLUDE_SYSTEMS:-}"
 
 PAGE_SIZE="${PAGE_SIZE:-200}"
 MAX_RETRIES="${MAX_RETRIES:-5}"
@@ -246,6 +266,14 @@ echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$USER_FILTER" ] && echo "Extra filter: $USER_FILTER"
+[ -n "$INCLUDE_TYPES" ]      && echo "include_types: $INCLUDE_TYPES"
+[ -n "$EXCLUDE_TYPES" ]      && echo "exclude_types: $EXCLUDE_TYPES"
+[ -n "$INCLUDE_LIFECYCLES" ] && echo "include_lifecycles: $INCLUDE_LIFECYCLES"
+[ -n "$EXCLUDE_LIFECYCLES" ] && echo "exclude_lifecycles: $EXCLUDE_LIFECYCLES"
+[ -n "$INCLUDE_DOMAINS" ]    && echo "include_domains: $INCLUDE_DOMAINS"
+[ -n "$EXCLUDE_DOMAINS" ]    && echo "exclude_domains: $EXCLUDE_DOMAINS"
+[ -n "$INCLUDE_SYSTEMS" ]    && echo "include_systems: $INCLUDE_SYSTEMS"
+[ -n "$EXCLUDE_SYSTEMS" ]    && echo "exclude_systems: $EXCLUDE_SYSTEMS"
 
 # --- Build filter query --------------------------------------------------
 # Backstage semantics: multiple ?filter= params are OR'd; commas within a
@@ -401,6 +429,10 @@ COMPONENTS=$(jq \
     --arg include_derived "$INCLUDE_DERIVED_TAGS" \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
+    --arg inc_types "$INCLUDE_TYPES" --arg exc_types "$EXCLUDE_TYPES" \
+    --arg inc_lifecycles "$INCLUDE_LIFECYCLES" --arg exc_lifecycles "$EXCLUDE_LIFECYCLES" \
+    --arg inc_domains "$INCLUDE_DOMAINS" --arg exc_domains "$EXCLUDE_DOMAINS" \
+    --arg inc_systems "$INCLUDE_SYSTEMS" --arg exc_systems "$EXCLUDE_SYSTEMS" \
     '
     def bare(s):
         if (s | type) != "string" or s == "" then s
@@ -421,6 +453,44 @@ COMPONENTS=$(jq \
           else ""
           end;
 
+    # --- Structured include/exclude filters (client-side) ---
+    # empty list = off; exclude wins over include; matching is case-insensitive.
+    def toset($csv):
+        [ $csv | split(",")[] | gsub("^[ \t]+|[ \t]+$"; "") | select(length > 0) | ascii_downcase ];
+
+    # Attribute filter (type / lifecycle): an entity with NO value for the field
+    # is unaffected (passes) — this kind-awareness keeps a lifecycle filter from
+    # dropping a Resource, and type/lifecycle filters from touching kinds that
+    # lack those fields.
+    def keep_attr($v; $inc; $exc):
+        ($v // "" | tostring) as $s
+        | if ($s | length) == 0 then true
+          else ($s | ascii_downcase) as $n
+            | if   ($exc | length) > 0 and ((toset($exc) | index($n)) != null) then false
+              elif ($inc | length) > 0 and ((toset($inc) | index($n)) == null) then false
+              else true end
+          end;
+
+    # Domain membership filter: match the resolved dotted path exactly or as a
+    # dotted-prefix ancestor (commerce matches commerce.checkout.orders...). For
+    # INCLUDE, a component with no resolved domain is not a member -> excluded.
+    def dom_hit($p; $csv):
+        (toset($csv)) as $set
+        | ($set | length) > 0 and ($set | any(. as $v | $p == $v or ($p | startswith($v + "."))));
+    def keep_domain($path; $inc; $exc):
+        ($path // "" | tostring | ascii_downcase) as $p
+        | if   ($exc | length) > 0 and ($p | length) > 0 and dom_hit($p; $exc) then false
+          elif ($inc | length) > 0 and (($p | length) == 0 or (dom_hit($p; $inc) | not)) then false
+          else true end;
+
+    # System membership filter: exact match on the bare system name. For
+    # INCLUDE, a component with no system is not a member -> excluded.
+    def keep_system($sys; $inc; $exc):
+        (bare($sys // "" | tostring) | ascii_downcase) as $s
+        | if   ($exc | length) > 0 and ($s | length) > 0 and ((toset($exc) | index($s)) != null) then false
+          elif ($inc | length) > 0 and (($s | length) == 0 or ((toset($inc) | index($s)) == null)) then false
+          else true end;
+
     [.[]
      | select(.kind == "Component" or .kind == "API" or .kind == "Resource")
      | . as $e
@@ -440,6 +510,10 @@ COMPONENTS=$(jq \
         else []
         end) as $derived
      | domain_ref($e) as $domain
+     | select(keep_attr(.spec.type;      $inc_types;      $exc_types))
+     | select(keep_attr(.spec.lifecycle; $inc_lifecycles; $exc_lifecycles))
+     | select(keep_domain($domain;       $inc_domains;    $exc_domains))
+     | select(keep_system(.spec.system;  $inc_systems;    $exc_systems))
      | {key: $id, value:
          ({tags: ($prefixed + $derived)}
           + (if $owner != "" then {owner: $owner} else {} end)
@@ -480,6 +554,18 @@ DOMAINS=$(jq \
 
 COMPONENT_COUNT=$(echo "$COMPONENTS" | jq 'length')
 DOMAIN_COUNT=$(echo "$DOMAINS" | jq 'length')
+
+# When any structured filter is active, report how many annotated candidate
+# components were dropped by include/exclude — gives operators visibility into
+# what the filters removed rather than silently shrinking the catalog.
+if [ -n "$INCLUDE_TYPES$EXCLUDE_TYPES$INCLUDE_LIFECYCLES$EXCLUDE_LIFECYCLES$INCLUDE_DOMAINS$EXCLUDE_DOMAINS$INCLUDE_SYSTEMS$EXCLUDE_SYSTEMS" ]; then
+    CANDIDATE_COUNT=$(jq --arg annotation "$COMPONENT_ID_ANNOTATION" '
+        [ .[]
+          | select(.kind == "Component" or .kind == "API" or .kind == "Resource")
+          | (((.metadata.annotations // {})[$annotation]) // "" | tostring)
+          | select(length > 0) ] | length' "$ALL_ENTITIES")
+    echo "Filters dropped $((CANDIDATE_COUNT - COMPONENT_COUNT)) of $CANDIDATE_COUNT candidate component(s)"
+fi
 
 echo "Components to write: $COMPONENT_COUNT"
 echo "Domains to write:    $DOMAIN_COUNT"

@@ -72,7 +72,7 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -93,7 +93,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.1.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -142,7 +142,7 @@ By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching 
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
       api_path_prefix: ""   # gateway is mounted at root — no /api hop
@@ -156,11 +156,11 @@ For organisations that already run [`github-org`](../github-org) to enumerate re
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/github-org@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
     with:
       org_name: "acme"
 
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -173,7 +173,7 @@ Backstage components are matched to Lunar components by reading an annotation on
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.0.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
     with:
       backstage_url: "https://backstage.example.com"
       component_id_annotation: "github.com/project-slug"  # value: "acme/payment-api"
@@ -215,7 +215,7 @@ A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdo
 
 ```yaml
 catalogers:
-  - uses: github.com/earthly/lunar-lib/catalogers/backstage@v1.2.0
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.2.0
     with:
       backstage_url: "https://backstage.example.com"
       entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain
@@ -263,12 +263,64 @@ The same component synced from a catalog with no `subdomainOf` / system links wo
 
 ### Filtering Entities
 
-Pass a raw [Backstage filter expression](https://backstage.io/docs/features/software-catalog/software-catalog-api/#get-entities) through `filter`:
+Most of the time you'll want your whole catalog in Lunar. But there are cases where you don't need *everything* at once — two common ones:
+
+- **Onboard incrementally** — bring one domain live today (say `platform-engineering`), the next tomorrow, instead of syncing thousands of components in one shot.
+- **Cut noise** — sync only production services, not experimental libraries; or exclude a single problem component while you sort it out.
+
+The cataloger exposes structured `include_*` / `exclude_*` inputs for exactly this, plus a raw-expression escape hatch.
+
+#### By type and lifecycle
+
+Filter on the Backstage `spec.type` and `spec.lifecycle` fields:
+
+```yaml
+with:
+  include_types: "service"                 # only services — drop libraries, websites, …
+  include_lifecycles: "production"         # only production — drop experimental / deprecated
+  exclude_types: "library"                 # or start from "everything" and subtract
+```
+
+- `include_types` / `include_lifecycles` are **allowlists** — non-empty means "sync only these values".
+- `exclude_types` / `exclude_lifecycles` are **denylists** — "sync everything except these".
+- All are comma-separated and **case-insensitive**; empty (the default) disables the filter.
+- An entity with **no value** for the field is left alone — a `Resource` (which has no `spec.lifecycle`) is never dropped by a lifecycle filter, and non-component kinds are untouched. See [Semantics](#semantics-all-structured-filters).
+
+#### By domain and system (phased onboarding)
+
+```yaml
+with:
+  include_domains: "platform-engineering"  # go-live one domain at a time
+```
+
+`include_domains` / `exclude_domains` match each component's **resolved** domain path — the same dotted value written to `.components[*].domain` (see [Domain Hierarchy](#domain-hierarchy-subdomainof--systems)). A filter value matches exactly **or** as a dotted-prefix ancestor: `commerce` matches `commerce`, `commerce.payments`, and everything nested beneath. `include_systems` / `exclude_systems` match a component's `spec.system` by bare name.
+
+These are **membership** filters: a component with no resolved domain (or no system) isn't a member of anything, so an `include_domains` / `include_systems` allowlist excludes it. (An `exclude_*` denylist leaves it alone — there's nothing to match.)
+
+The referenced `Domain` and `System` entities are always synced regardless of these filters, so the components that *do* pass still resolve their domain refs (the hub's `validateDomainRefs` stays satisfied). Onboarding one domain therefore leaves the *other* domains present but empty — harmless catalog structure, not dangling refs.
+
+#### Semantics (all structured filters)
+
+| Rule | Behavior |
+|------|----------|
+| **Empty = disabled** | An unset `include_*`/`exclude_*` never filters anything. |
+| **Exclude wins over include** | An entity matching both an allowlist and a denylist is **dropped** — same precedence as github-org's `allowed_topics` / `disallowed_topics`. |
+| **Type/lifecycle — absence passes** | Attribute filters. An entity with no value for the field isn't judged by it: a `Resource` (no `spec.lifecycle`) survives a lifecycle filter, and `Domain`/`System` are never touched — so the hierarchy always survives even when components are filtered down. |
+| **Domain/system — absence = non-member** | Membership filters. For an `include_*`, a component with no resolved domain/system is excluded (it's in no group). An `exclude_*` leaves it alone (nothing to match). |
+| **Client-side** | Applied after the fetch. Backstage's `?filter=` supports equality/existence but **no negation**, so exclude can't be pushed server-side; for consistency include isn't either. The run logs how many candidate components the filters dropped. |
+
+> **Scale caveat.** Structured filters run **after** the full catalog walk — they shrink what's *written to Lunar*, not what's *fetched from Backstage*. On a very large instance the paginated fetch still pulls every entity before filtering. To also trim the API payload, add a server-side `filter` (below) or a `namespace`. Pushing `include_types` down to the server is a candidate optimization, but it can't be applied naively to a multi-kind sync (it would also drop the `Domain`/`System` entities that carry no `spec.type`), so it's deferred.
+
+#### Raw filter escape hatch
+
+For anything the structured inputs don't cover, pass a raw [Backstage filter expression](https://backstage.io/docs/features/software-catalog/software-catalog-api/#get-entities) through `filter`. Unlike the structured filters this runs **server-side**, so it also trims the fetch:
 
 ```yaml
 with:
   filter: "metadata.annotations.team=platform"
 ```
+
+The raw `filter` and the structured filters compose: the raw filter narrows the fetch, the structured filters refine the result.
 
 ### Owner Format
 

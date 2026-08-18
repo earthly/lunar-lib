@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `jira` collector: ticket references are now detected in the PR description as
+  well as the title, and checked against Jira before one is collected. `ticket`
+  and `ticket-history` read both fields from the same GitHub PR fetch and build
+  a candidate list, best first — every bare reference in the title, then every
+  keyword-anchored reference in the description (`Fixes ABC-123`,
+  `Ticket: ABC-123`), then every bare reference in the description — and
+  collect the first candidate Jira confirms exists. A title reference still
+  wins, and PRs that keep their ticket in the body now collect
+  `.vcs.pr.ticket` instead of nothing. Keyword anchoring matters because a
+  description usually names several tickets and the first to appear is often a
+  dependency rather than the PR's own; the new `ticket_keywords` input sets the
+  vocabulary (GitHub's closing keywords plus `ticket`/`issue` by default).
+  Skipping candidates Jira does not know keeps the permissive default
+  `ticket_pattern` from collecting a token like `UTF-8` as the ticket, and the
+  new `max_ticket_candidates` (default 5) bounds the lookups that costs. Both
+  sub-collectors resolve through the same validated path, so the reuse count
+  keys off the ticket that was actually collected. Only one ticket is
+  collected — `.vcs.pr.ticket.id` is single-valued (#271).
+- `jira` collector: Jira lookups now tell their failure modes apart. A
+  transient failure — connection refused, timeout, `429`, `5xx` — is retried
+  `jira_retries` times (default 3); if Jira is still unreachable the run keeps
+  the ticket reference and records `.vcs.pr.ticket.tracker_error` =
+  `unreachable`, so an outage does not misreport the PR as ticket-less. When
+  every candidate is checked and none exists, that is recorded as `not_found`.
+  Rejected credentials (`401`/`403`) are not retried and fail the run, since a
+  bad token is a misconfiguration an operator has to fix rather than a property
+  of the PR. The `ticket-valid` policy reads `tracker_error` and names the
+  actual cause instead of guessing between them (#271).
+- `container` policy (`stable-tags`): a base image tag is now considered stable
+  when it *contains* a full `major.minor.patch` semantic version anywhere in the
+  tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
+  `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`, `26.0.1_8-jre-alpine`). Previously the
+  tag had to be *exactly* a semver (optionally `v`-prefixed / `-`-suffixed),
+  which flagged these pinned, immutable tags as unstable. Partial versions like
+  `20` or `16.1` still fail (#270).
+- `jira` collector: errors now fail the run with a non-zero exit code instead
+  of silently exiting 0 — a missing `GH_TOKEN` secret, a failed GitHub
+  PR-metadata fetch (both sub-collectors), a missing `psql` client, and a
+  failed reuse-count query (`ticket-history`) all surface as failed runs.
+  Normal-outcome skips (not in PR context, no ticket reference found, optional
+  Jira validation not configured, no SQL API in hub-less dev) still exit 0. A
+  failed Jira issue lookup also still exits 0, deliberately: the Hub discards a
+  failed run's collected values, and that path must preserve the already
+  collected ticket reference (#269).
+
+### Fixed
+
+- `trivy` and `grype` collectors (`container-scan`): image scans no longer skip
+  on every pull request. The image to scan is resolved from the docker
+  collector's pushed-image record via `lunar component get-json`, but the lookup
+  was unqualified — the Hub resolves that to the default-branch snapshot
+  (`WHERE pr IS NULL`), so a PR run read main's Component JSON, never saw the
+  image the PR had just pushed, and skipped with "No pushed container image to
+  scan" (which in turn made the `container-scan` policy report no scan data). In
+  PR context the lookup is now pinned to the commit being scanned (`--pr`, plus
+  `--git-sha` to select the exact commit rather than the PR's latest). The
+  default-branch lookup is deliberately unchanged: the `container-rescan` cron
+  is given the latest *ingested* main commit, which may not have been collected
+  yet, so pinning there would resolve nothing and silently stop the re-scan
+  (#284).
+- `nodejs` policy (`engines-pinned`): a project that correctly pins
+  `engines.node` no longer false-fails. `lunar_policy`'s `assert_true` is a
+  strict identity check (`v is True`), and the check passed it the truthy
+  `engines.node` string (e.g. `">=18"`) instead of a bool, so the assertion
+  could never pass on a real version constraint — it only ever "passed" by
+  taking the missing-data path. The value is now coerced to a bool (#273).
+- `jira` collector: the PR-metadata fetch built an invalid GitHub API URL for
+  monorepo sub-path components (`github.com/<owner>/<repo>/<path>`), so
+  `ticket` and `ticket-history` collected nothing for them. The component ID is
+  now parsed as `<host>/<owner>/<repository>[/<subpath>...]`, and the API base
+  URL is derived from the host, so GHES components work too (#269).
+- `secrets` policy (`no-hardcoded-secrets`): report each finding individually
+  with its file, line, and rule instead of a single aggregate count, so PR
+  comments and dashboards show exactly where each secret is (#268).
+
 ## [1.10.1] — 2026-07-21
 
 ### Changed

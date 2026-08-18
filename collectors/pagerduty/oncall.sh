@@ -5,9 +5,10 @@ set -e
 # Backstage discovery (opt-in). When the service ID isn't set via component
 # meta or the service_id input, and backstage_discovery is "true", read the
 # PagerDuty service ID straight off the component's own catalog-info.yaml —
-# no cataloger and no LUNAR_COMPONENT_META required. The cron hook runs with
-# clone-code: true, so the component's repo is checked out at the working
-# directory and the file is read locally — no GitHub token needed.
+# no cataloger and no LUNAR_COMPONENT_META required. Either hook gives us the
+# checkout — `oncall` runs on a code hook, which always clones, and
+# `oncall-cron` sets clone-code: true — so the component's repo is at the
+# working directory and the file is read locally, no GitHub token needed.
 #
 # Echoes the discovered service ID on stdout (empty if none); all diagnostics
 # go to stderr so the caller can capture the value cleanly. Never fails the
@@ -81,17 +82,62 @@ BASE_URL="${BASE_URL%/}"
 AUTH="Authorization: Token token=${LUNAR_SECRET_PAGERDUTY_API_KEY}"
 ACCEPT="Accept: application/vnd.pagerduty+json;version=2"
 
+# pd_get <path> — GET a PagerDuty API path. Echoes the response body on stdout
+# and returns 0 on success; returns 1 on any failure.
+#
+# curl retries the transient failures itself — connection refused, timeouts,
+# 429 and 5xx — with backoff between attempts, and honors a Retry-After header
+# when PagerDuty sends one (its usual response when a burst of requests trips
+# the account-wide rate limit). --retry-all-errors is deliberately NOT used: a
+# 401/403/404 is a definitive answer we don't want to sit and retry. This
+# mirrors the jira collector's jira_validate_ticket.
+#
+# The response code is captured separately so a failure can name the HTTP
+# status (a 429 rate-limit reads very differently from a 403 bad-token or a
+# 404 wrong-service-id when someone is debugging a flaky check).
+#
+# NOTE: a transient failure that outlives every retry still surfaces here as a
+# plain `return 1`, exactly as before — the caller decides what that means.
+# Stopping the caller from recording a bogus `exists:false` on such a failure
+# is a separate, larger change (see the PR description); it is intentionally
+# out of scope here.
 pd_get() {
   local path="$1"
+  local body_file http_code status response
+  body_file="$(mktemp)"
   set +e
-  local response
-  response="$(curl -fsS -H "$AUTH" -H "$ACCEPT" "${BASE_URL}${path}")"
-  local status=$?
+  http_code="$(curl -sS \
+    --retry 3 \
+    --retry-delay 2 \
+    --retry-max-time 60 \
+    --retry-connrefused \
+    --max-time 30 \
+    -o "$body_file" \
+    -w '%{http_code}' \
+    -H "$AUTH" -H "$ACCEPT" \
+    "${BASE_URL}${path}")"
+  status=$?
   set -e
-  if [ $status -ne 0 ] || [ -z "$response" ]; then
+  response="$(cat "$body_file")"
+  rm -f "$body_file"
+
+  if [ "$status" -ne 0 ]; then
+    echo "PagerDuty request to ${path} failed after retries (curl exit ${status})." >&2
     return 1
   fi
-  echo "$response"
+  case "$http_code" in
+    2??)
+      if [ -z "$response" ]; then
+        echo "PagerDuty request to ${path} returned an empty body (HTTP ${http_code})." >&2
+        return 1
+      fi
+      echo "$response"
+      ;;
+    *)
+      echo "PagerDuty request to ${path} returned HTTP ${http_code}." >&2
+      return 1
+      ;;
+  esac
 }
 
 # Always write source metadata.

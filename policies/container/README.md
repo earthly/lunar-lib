@@ -13,7 +13,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
-| `stable-tags` | Tags must be digests or full semver (e.g., `1.2.3`) | Image uses unstable tag (partial version, branch name, etc.) |
+| `stable-tags` | Tags must be a digest or contain a full semver (e.g., `1.2.3`, `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`) | Image uses unstable tag (partial version, branch name, etc.) |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
 | `required-labels` | Required labels must be present (Dockerfile or build command) | Missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
@@ -30,6 +30,18 @@ This policy reads from the following Component JSON paths:
 | `.containers.definitions[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (dockerfile sub-collector) |
 | `.containers.builds[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (cicd sub-collector) |
 | `.containers.lint_results[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (hadolint sub-collector) |
+
+Each check **skips** when the data it reads is absent, rather than reporting a
+pass it didn't earn. On a repository with no Dockerfiles, the `docker` collector
+writes no `.containers` data at all, so every definition-based check
+(`no-latest`, `stable-tags`, `allowed-registries`, `healthcheck`, `user`,
+`dockerfile-lint-clean`) skips; `build-tagged` skips independently when no
+container build ran in CI. `required-labels` also skips when its
+`required_labels` variable is unset, since there is nothing to require.
+
+Note that an *empty* `.containers.lint_results` is not the same as an absent
+one: it means hadolint ran and found no issues, so `dockerfile-lint-clean`
+passes on it.
 
 ## Installation
 
@@ -132,12 +144,15 @@ policies:
 
 Replace unstable tags with:
 - **Digest** (most stable): `alpine@sha256:abc123...`
-- **Full semver** (stable): `alpine:3.18.4`
+- **Full semver** (stable): `alpine:3.18.4`. A tag that *contains* a full
+  `major.minor.patch` version is accepted too, so registry- or vendor-specific
+  prefixes and suffixes are fine (e.g. `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`,
+  `26.0.1_8-jre-alpine`).
 
 Avoid:
 - Implicit latest: `FROM alpine`
 - Explicit latest: `FROM alpine:latest`
-- Partial versions: `FROM node:20` or `FROM node:20-alpine`
+- Partial versions: `FROM node:20` or `FROM node:16.1` (no patch component)
 
 ### allowed-registries
 

@@ -18,7 +18,10 @@ landing_page:
   requires:
     - slug: "github"
       type: "collector"
-      reason: "Provides GitHub repository and branch protection data"
+      reason: "Provides repository and branch protection data"
+    - slug: "gitlab"
+      type: "collector"
+      reason: "Provides repository and branch protection data"
   related: []
 
 policies:
@@ -27,7 +30,7 @@ policies:
       Requires branch protection rules to be enabled on the default branch.
       Branch protection is the foundation for all other VCS security controls.
     mainPython: ./branch-protection-enabled.py
-    keywords: ["branch protection", "github security"]
+    keywords: ["branch protection", "vcs security"]
 
   - name: require-pull-request
     description: |

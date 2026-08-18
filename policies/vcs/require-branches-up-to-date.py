@@ -5,7 +5,7 @@ def main(node=None):
     c = Check("require-branches-up-to-date", "Branches should be required to be up to date", node=node)
     with c:
         if not c.get_node(".vcs.branch_protection").exists():
-            c.fail("VCS data not found. Ensure the github collector is configured and has run.")
+            c.fail("VCS data not found. Ensure a VCS collector is configured and has run.")
             return c
 
         enabled = c.get_value(".vcs.branch_protection.enabled")

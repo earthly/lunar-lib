@@ -1,5 +1,15 @@
 VERSION 0.8
 
+test:
+    FROM python:3.12-alpine
+    # hadolint.sh is bash and shells out to jq. The tests stub `lunar` and
+    # `hadolint` on PATH and drive the real script as a subprocess.
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY hadolint.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v
+
 image:
     FROM --pass-args ../../+base-image
 
