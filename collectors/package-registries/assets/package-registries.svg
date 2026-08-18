@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- Registry: stacked storage tiers on the left -->
+  <ellipse cx="16" cy="12" rx="12" ry="4.5" fill="black"/>
+  <path d="M4 12v8c0 2.485 5.373 4.5 12 4.5s12-2.015 12-4.5v-8c0 2.485-5.373 4.5-12 4.5S4 14.485 4 12z" fill="black"/>
+  <path d="M4 24v8c0 2.485 5.373 4.5 12 4.5s12-2.015 12-4.5v-8c0 2.485-5.373 4.5-12 4.5S4 26.485 4 24z" fill="black"/>
+  <path d="M4 36v8c0 2.485 5.373 4.5 12 4.5s12-2.015 12-4.5v-8c0 2.485-5.373 4.5-12 4.5S4 38.485 4 36z" fill="black"/>
+  <!-- Resolution arrow: registry feeds the package -->
+  <path d="M32 30h12v-4l8 6-8 6v-4H32z" fill="black"/>
+  <!-- Package: box being pulled from the registry -->
+  <path d="M44 8h16v6H44z" fill="black"/>
+  <path d="M46 16h12v8H46z" fill="black"/>
+  <path d="M44 48h16v6H44z" fill="black"/>
+  <path d="M46 56h12v4H46z" fill="black"/>
+</svg>

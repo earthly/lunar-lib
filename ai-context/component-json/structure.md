@@ -61,6 +61,11 @@ This table lists important sub-objects within each category. For full details, s
 | `.testing.failures[]` | Failure details (`name`, `file`, `line`, `message`) |
 | `.testing.coverage` | Coverage data (`percentage`, `lines`, `files[]`) |
 | `.testing.coverage.lines` | Line coverage (`covered`, `total`) |
+| **[`.dependencies`](cat-dependencies.md)** | **Where dependencies are resolved from (package registries)** |
+| `.dependencies.registries[]` | Registry declarations (`ecosystem`, `host`, `url`, `path`, `kind`, `is_default`, `is_public`) |
+| `.dependencies.registries_used` | Deduplicated registry hostnames across ecosystems |
+| `.dependencies.ecosystems` | Package ecosystems detected (`npm`, `maven`, ...) |
+| `.dependencies.summary` | Aggregated checks (`has_public`) |
 | **[`.sca`](cat-sca.md)** | **Software Composition Analysis (dependency vulnerabilities)** |
 | `.sca.source` | Tool source (`tool`, `version`, `integration`) |
 | `.sca.vulnerabilities` | Vuln counts (`critical`, `high`, `medium`, `low`, `total`) |
@@ -158,6 +163,7 @@ Each category has its own detailed documentation:
 - [`.iac`](cat-iac.md) — Infrastructure as Code (Terraform, Pulumi, etc.)
 - [`.ci`](cat-ci.md) — CI/CD pipeline execution and configuration
 - [`.testing`](cat-testing.md) — Test execution results and code coverage
+- [`.dependencies`](cat-dependencies.md) — Where dependencies are resolved from (package registries)
 - [`.sca`](cat-sca.md) — Software Composition Analysis (dependency vulnerabilities)
 - [`.sast`](cat-sast.md) — Static Application Security Testing
 - [`.secrets`](cat-secrets.md) — Secret/credential scanning

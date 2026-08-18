@@ -9,3 +9,11 @@ image:
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:policy-dependencies-$VERSION
+
+test:
+    FROM python:3.12-alpine
+    WORKDIR /work
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    COPY *.py .
+    RUN python -m unittest test_dependency_versions test_registry_policies -v

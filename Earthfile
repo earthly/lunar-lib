@@ -72,6 +72,7 @@ test:
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
+    BUILD ./collectors/package-registries+test
     BUILD ./collectors/trivy+test
     BUILD ./collectors/grype+test
     BUILD ./collectors/docker+test
@@ -84,6 +85,7 @@ test:
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
     BUILD ./policies/repo-boilerplate+test
+    BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
 
 lint:

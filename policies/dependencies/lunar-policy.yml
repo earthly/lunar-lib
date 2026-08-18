@@ -1,7 +1,7 @@
 version: 0
 
 name: dependencies
-description: Dependency version and security policies
+description: Dependency version, registry provenance, and security policies
 author: earthly
 
 default_image: earthly/lunar-lib:policy-dependencies-main
@@ -9,9 +9,9 @@ default_image: earthly/lunar-lib:policy-dependencies-main
 landing_page:
   display_name: "Dependency Guardrails"
   long_description: |
-    Enforce dependency version requirements across your codebase. Ensure libraries
-    meet minimum safe versions to address security vulnerabilities and maintain
-    compatibility standards.
+    Enforce dependency version requirements and registry provenance. Ensure libraries meet
+    minimum safe versions, and that packages resolve only from registries you approve rather
+    than straight from public indexes.
   category: "security-and-compliance"
   icon: "assets/dependencies.svg"
   status: "stable"
@@ -19,6 +19,9 @@ landing_page:
     - slug: "golang"
       type: "collector"
       reason: "Provides Go module dependency data"
+    - slug: "package-registries"
+      type: "collector"
+      reason: "Provides the resolved package registries per ecosystem"
   related: []
 
 policies:
@@ -30,6 +33,22 @@ policies:
     mainPython: ./min_versions.py
     keywords: ["dependency versions", "minimum version", "security", "semver"]
 
+  - name: approved-registries
+    description: |
+      Restricts dependency resolution to an approved list of package registries.
+      Catches projects that pull from a public index instead of the organization's
+      registry, including projects that never configured a registry at all.
+    mainPython: ./approved_registries.py
+    keywords: ["package registry", "approved registry", "registry allowlist", "supply chain security", "registry provenance"]
+
+  - name: no-public-registries
+    description: |
+      Requires that no dependency resolves from a well-known public package index
+      (npm, PyPI, Maven Central, RubyGems, NuGet). Needs no configuration — use it
+      when every package must come through an internal registry or proxy.
+    mainPython: ./no_public_registries.py
+    keywords: ["public registry", "npmjs", "pypi", "maven central", "registry proxy", "supply chain security"]
+
 inputs:
   language:
     description: Programming language to check (e.g., "go", "java", "python", "nodejs")
@@ -40,3 +59,6 @@ inputs:
   include_indirect:
     description: 'Whether to also check indirect (transitive) dependencies'
     default: "false"
+  allowed_registries:
+    description: Comma-separated list of allowed package registry hosts (e.g. "dl.cloudsmith.io")
+    default: ""
