@@ -72,6 +72,19 @@ internal registry. This mirrors how the `container` guardrails default a bare im
 Absence of the whole `.dependencies` object means no package ecosystem was detected — guardrails
 should skip, not fail.
 
+## `registries[]` Is an Object Array
+
+`.dependencies.registries[]` is the rich per-declaration array; `.dependencies.registries_used`
+is the flat list of hostnames. This mirrors `.containers`, which pairs a rich `definitions[]` with
+a flat `registries_used`.
+
+Two guardrail specs describe this same guardrail — `sec-deps-approved-registries`
+(`guardrail-specs/security-and-compliance.md`) and `deps-approved-registries`
+(`guardrail-specs/devex-build-and-ci.md`). The latter originally reserved `.dependencies.registries`
+as a flat array of registry strings. That flat meaning is **retired**: `registries` is the object
+array everywhere, and anything wanting a plain host list reads `registries_used`. Both spec entries
+have been updated to match, so the path has one meaning across the tree.
+
 ## Allowlists Live in Policy, Not Here
 
 Collectors record which registries are configured; whether a registry is *approved* is policy

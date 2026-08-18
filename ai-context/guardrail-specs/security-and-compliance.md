@@ -511,14 +511,17 @@ This document specifies possible policies for the **Security and Compliance** ca
   * Strategy: Strategy 12 (Dependency Manifest Analysis)
 
 * `sec-deps-approved-registries` **Dependencies come from approved registries only**: Packages must only be pulled from organization-approved registries.
+  * **Implemented** by the `package-registries` collector and the `dependencies` policy's `approved-registries` check. Also specified as `deps-approved-registries` in `devex-build-and-ci.md` — same guardrail, one implementation.
   * Collector(s): Parse dependency manifests and package manager configs for registry URLs
   * Component JSON:
-    * `.dependencies.registries_used` - Array of registry URLs referenced
-    * `.dependencies.unapproved_registries` - Array of registries not on approved list
-    * `.dependencies.all_approved_registries` - Boolean indicating all registries approved
+    * `.dependencies.registries[]` - Registry declarations (`ecosystem`, `host`, `url`, `path`, `kind`, `is_default`, `is_public`)
+    * `.dependencies.registries_used` - Deduplicated registry hostnames
+    * `.dependencies.summary.has_public` - Boolean indicating any registry is a public index
   * Policy: Assert that only approved registries are used
-  * Configuration: List of approved registry URLs per ecosystem
+  * Configuration: `allowed_registries` — comma-separated approved hosts, held in policy config
   * Strategy: Strategy 12 (Dependency Manifest Analysis)
+  * Note: whether a registry is *approved* is policy configuration, so the allow-list is not collected. Keeping it in policy lets one collection serve consumers with different allow-lists, and an allow-list change re-evaluates policy without waiting for re-collection.
+  * Note: an ecosystem in use that declares no registry still resolves from its public default, so that default is recorded with `is_default: true` rather than omitted. Otherwise a project that was never pointed at an internal registry produces no data and silently passes.
 
 * `sec-artifact-signatures-verified` **Artifact signatures are verified during build**: Build processes must verify signatures of downloaded dependencies.
   * Collector(s): Detect signature verification configuration in build tools (e.g., Maven, npm, pip)
