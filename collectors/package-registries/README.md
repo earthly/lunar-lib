@@ -47,6 +47,16 @@ config file.
 Only the registry location is collected. Auth tokens in `.npmrc`, `settings.xml` or `nuget.config`
 are never read or written to Component JSON.
 
+### Configured, not resolved
+
+This collector reports which registry a repository is *configured* to resolve from. It does not
+verify where each installed package actually came from — a repository whose `.npmrc` points at an
+internal registry can still have a `package-lock.json` full of packages `resolved` from
+`registry.npmjs.org`, if the lockfile predates the config change. Lockfiles do record that per
+package (npm and yarn `resolved` URLs, `Gemfile.lock` `remote:`), so per-dependency provenance is
+a viable follow-up, but Maven, Gradle and NuGet lockfiles don't record a source repository, so it
+cannot replace this config-level check.
+
 ### Not covered
 
 Container image registries are collected by the [`docker`](../docker) collector and enforced by the
