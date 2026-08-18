@@ -72,6 +72,7 @@ test:
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
+    BUILD ./collectors/package-registries+test
     BUILD ./catalogers/backstage+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
@@ -81,6 +82,7 @@ test:
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
     BUILD ./policies/repo-boilerplate+test
+    BUILD ./policies/dependencies+test
 
 lint:
     FROM python:3.12-alpine

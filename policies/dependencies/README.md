@@ -36,6 +36,11 @@ collector for `min-versions`, and the `package-registries` collector for the reg
 registry policies skip components with no `.dependencies` data, so a repository with no package
 manager is not penalized.
 
+Both registry policies ignore entries with `kind: publish` (a Maven `<distributionManagement>`
+target, for example). Publishing to a public registry is a separate concern from pulling
+dependencies out of one — an internal service that consumes from Cloudsmith may still legitimately
+publish an open-source artifact to Maven Central.
+
 ## Installation
 
 Add to your `lunar-config.yml`:

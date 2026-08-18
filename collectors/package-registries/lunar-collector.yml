@@ -54,7 +54,7 @@ collectors:
 inputs:
   find_command:
     description: Command to find package-manager config and manifest files (must output one file path per line)
-    default: "find . -type f \\( -name '.npmrc' -o -name 'package.json' -o -name 'pip.conf' -o -name 'pip.ini' -o -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'pom.xml' -o -name 'settings.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' -o -name 'Gemfile' -o -iname 'nuget.config' \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
+    default: "find . -type f \\( -name '.npmrc' -o -name 'package.json' -o -name 'pip.conf' -o -name 'pip.ini' -o -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'pom.xml' -o -name 'settings.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' -o -name 'Gemfile' -o -name 'packages.config' -o -name '*.csproj' -o -iname 'nuget.config' \\) -not -path '*/node_modules/*' -not -path '*/.git/*'"
   ecosystems:
     description: Comma-separated ecosystems to scan (npm, pip, maven, gradle, rubygems, nuget). Empty scans all.
     default: ""
