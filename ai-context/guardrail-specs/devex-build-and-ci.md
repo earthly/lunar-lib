@@ -271,7 +271,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
   * Policy: Assert that all dependencies come from approved registries
   * Configuration: `allowed_registries` — comma-separated approved hosts, held in policy config
   * Strategy: Strategy 12 (Dependency Manifest Analysis)
-  * Note: the allow-list is policy config and is deliberately not collected, so one collection serves consumers with different allow-lists. See `component-json/cat-dependencies.md`.
+  * Note: the allow-list is policy config and is deliberately not collected, so one collection serves consumers with different allow-lists. See `ai-context/component-json/cat-dependencies.md`.
   * Note: lock-file registry provenance (which registry each installed package actually resolved from) is **not** covered — the implementation reads configuration only. npm/yarn/RubyGems lock files record it, Maven/Gradle/NuGet do not.
 
 * `deps-internal-registry` **Private dependencies reference internal registry**: Internal/private packages must be resolved from internal registries, not public mirrors.
