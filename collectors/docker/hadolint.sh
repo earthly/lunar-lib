@@ -8,9 +8,12 @@ FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name Dockerfile -o -name 
 # Find all Dockerfiles
 DOCKERFILES=$(eval "$FIND_CMD" 2>/dev/null | sed 's|^\./||' || true)
 
+# No Dockerfiles at all — the technology isn't present, so write nothing and
+# exit cleanly. Emitting an empty `lint_results` here would materialize a
+# `.containers` object on every component that has never built a container,
+# and object presence in the Component JSON IS the detection signal.
 if [ -z "$DOCKERFILES" ]; then
     echo "No Dockerfiles found — nothing to lint" >&2
-    echo "[]" | lunar collect -j ".containers.lint_results" -
     exit 0
 fi
 
@@ -60,6 +63,7 @@ LINT_RESULTS=$(echo "$RAW_OUTPUT" | jq '
     })
 ')
 
-# Always collect lint_results — even when empty — so the policy can
-# distinguish "ran clean" (pass) from "never ran" (pending).
+# Dockerfiles exist, so always collect lint_results — even when empty. Here an
+# empty array is real signal ("hadolint ran and found nothing"), which is what
+# lets the policy tell "ran clean" (pass) apart from "never ran" (pending).
 echo "$LINT_RESULTS" | lunar collect -j ".containers.lint_results" -

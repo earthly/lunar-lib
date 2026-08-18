@@ -482,6 +482,11 @@ with Check("optional-coverage") as c:
     # If .coverage doesn't exist: check passes (no assertions made)
 ```
 
+A check that makes no assertions resolves to `PASS`, which is indistinguishable
+from one that ran and succeeded. When the reason nothing was checked is that the
+check doesn't *apply* to this component, say so with `c.skip(reason)` instead —
+see [Technology Detection: Skip vs Fail](#technology-detection-skip-vs-fail).
+
 ### Pattern: Required Data with assert_exists()
 
 ```python
@@ -549,9 +554,12 @@ The choice between skip and fail depends on whether the policy is **universal** 
 | Wrong tech stack entirely | `c.skip(reason)` | Go policy on a Python repo |
 | Technology confirmed present, required sub-data missing | `c.fail(reason)` | Go project with no test coverage data |
 | Required artifact should exist for all components | `c.assert_exists(path, msg)` | SAST scanner should run in every CI pipeline |
-| Nothing to check, absence is acceptable | `return c` (pass) | No containers found — pass, not skip |
+| Technology-specific policy, technology not present | `c.skip(reason)` | Container policies on a repo with no Dockerfiles |
+| Opt-in check, its configuration variable unset | `c.skip(reason)` | `container/required-labels` with no `required_labels` set |
 
 **Rule of thumb:** Skip = "this check doesn't apply to this component" (applicability). Fail = "this check applies and the component doesn't meet it" (violation). When in doubt: if the user has to explicitly opt into the policy, absent data is a fail. If the policy is auto-applied broadly, absent data for a specific tool is a skip.
+
+**Don't pass silently when you checked nothing.** A check that returns without making any assertion resolves to `PASS`, which renders identically to a check that ran and genuinely succeeded. That's a false green: it tells the user "your Dockerfiles are fine" on a repo that has no Dockerfiles. Prefer `c.skip(reason)` — it's a terminal state, it doesn't fail enforcement, and it says *why* the check didn't apply.
 
 ### Examples from Existing Policies
 
@@ -589,12 +597,17 @@ if not c.get_node(".lang").exists():
 c.assert_exists(".sast", "No SAST scanning data found. Ensure a scanner is configured.")
 ```
 
-**Pass — absence is acceptable:**
+**Skip — technology-specific, technology not present:**
 ```python
 # From: policies/container/no_latest.py
+# The docker collector writes nothing when the repo has no Dockerfiles, so
+# absent `.containers.definitions` means "not a container component". Skipping
+# says that; returning here would report a green pass on a repo with no
+# Dockerfiles at all.
 definitions = c.get_node(".containers.definitions")
 if not definitions.exists():
-    return  # No containers — nothing to check, passes silently
+    c.skip("No Dockerfiles found in this component")
+    return c
 ```
 
 ## Environment Variables
