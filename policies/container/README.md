@@ -31,6 +31,18 @@ This policy reads from the following Component JSON paths:
 | `.containers.builds[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (cicd sub-collector) |
 | `.containers.lint_results[]` | array | [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector (hadolint sub-collector) |
 
+Each check **skips** when the data it reads is absent, rather than reporting a
+pass it didn't earn. On a repository with no Dockerfiles, the `docker` collector
+writes no `.containers` data at all, so every definition-based check
+(`no-latest`, `stable-tags`, `allowed-registries`, `healthcheck`, `user`,
+`dockerfile-lint-clean`) skips; `build-tagged` skips independently when no
+container build ran in CI. `required-labels` also skips when its
+`required_labels` variable is unset, since there is nothing to require.
+
+Note that an *empty* `.containers.lint_results` is not the same as an absent
+one: it means hadolint ran and found no issues, so `dockerfile-lint-clean`
+passes on it.
+
 ## Installation
 
 Add to your `lunar-config.yml`:

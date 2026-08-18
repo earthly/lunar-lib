@@ -1,0 +1,13 @@
+VERSION 0.8
+
+# Unit tests for the container policy checks, covering the applicability
+# boundary: a component with no containers must skip rather than report a
+# silent green pass. Wired into the root +test target.
+# (No image: target — the container policy runs on the shared base image.)
+test:
+    FROM python:3.12-alpine
+    WORKDIR /workspace
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    COPY *.py .
+    RUN python -m unittest test_container_policies -v
