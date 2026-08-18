@@ -163,13 +163,13 @@ the findings as normal and the delivery failure is logged to stderr.
 - `executed`: "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured."
 - `max-total`: "Total vulnerability findings (25) exceeds threshold (10)"
 
-`max-severity` lists the offending findings (most severe first) as a sub-list, which renders in the GitHub PR comment as:
+`max-severity` fails with one assertion per offending finding (most severe first), which the hub renders as a sub-list under the check in the GitHub PR comment:
 
-> Critical vulnerability findings detected:
-> - critical: lodash — CVE-2021-23337 (fix: 4.17.21)
-> - high: axios — CVE-2023-45857 (no fix available)
+> ❌ **max-severity**
+>   * critical: lodash — CVE-2021-23337 (fix: 4.17.21)
+>   * high: axios — CVE-2023-45857 (no fix available)
 
-Up to the first 10 are shown, with a `+N more (see component JSON for full list)` tail when there are more (the full set is always in the component JSON). If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form.
+There's no policy-side cap — every in-scope finding is its own assertion. The hub truncates the *display* (it shows the first few, then `N more assertions weren't shown`), while the Grafana dashboard and the component JSON carry the complete list. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the check fails with the severity headline alone (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` is that same headline; the full findings ride in its structured `findings` array.
 
 ## Remediation
 
