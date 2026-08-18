@@ -1,0 +1,68 @@
+version: 0
+
+name: ticket-adoption
+
+description: Record what share of a component's recent pull requests referenced an issue-tracker ticket
+
+author: support@earthly.dev
+
+default_image_non_ci_collectors: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Ticket Adoption Collector"
+  long_description: |
+    Record what share of a component's recent pull requests referenced an issue-tracker
+    ticket. Runs on the default branch over Lunar's own history, so change-management
+    adoption reads as a trend on the component rather than only as a verdict on each
+    individual pull request.
+  categories: ["vcs"]
+  icon: "assets/ticket-adoption.svg"
+  status: "beta"
+  related:
+    - slug: "ticket-adoption"
+      type: "policy"
+      reason: "Scores the percentage this collector records"
+    - slug: "jira"
+      type: "collector"
+      reason: "Populates the per-PR ticket data this metric aggregates"
+    - slug: "ticket"
+      type: "policy"
+      reason: "Checks one pull request; this reports the trend across many"
+
+collectors:
+  - name: ticket-adoption
+    description: |
+      Runs on the default branch. Queries Lunar's SQL API for the pull requests recorded
+      against this component within a trailing window, counts how many carried a resolved
+      ticket id at `.vcs.pr.ticket.id`, and writes the totals and percentage to
+      `.vcs.ticket_adoption`.
+      Default-branch by design: every Lunar rollup reads default-branch state only, so
+      per-PR ticket results never reach an initiative score. This turns that history into
+      a default-branch fact, so ticket adoption can be scored.
+      Reads only Lunar's own data — no issue-tracker or Git-platform API call and no
+      token, so it behaves the same on any Git platform. Skips rather than fails when it
+      cannot produce a number: in PR context, or when the SQL API is unreachable.
+    mainBash: main.sh
+    hook:
+      type: code
+    keywords: ["ticket", "change management", "adoption", "trend", "default branch"]
+
+inputs:
+  window_days:
+    description: >-
+      Trailing window, in days, over which to measure ticket adoption. A window shorter
+      than the component's release cadence will often contain no pull requests, and the
+      metric skips rather than reporting a misleading zero.
+    default: "30"
+
+example_component_json: |
+  {
+    "vcs": {
+      "ticket_adoption": {
+        "window_days": 30,
+        "prs_total": 24,
+        "prs_with_ticket": 21,
+        "percentage": 87.5
+      }
+    }
+  }
