@@ -234,6 +234,24 @@ class WebhookHelperTests(unittest.TestCase):
         self.assertNotEqual(p1["timestamp"], p2["timestamp"])
         self.assertEqual(p1["dedupe_key"], p2["dedupe_key"])
 
+    def test_build_payload_projects_findings_to_the_published_keys(self):
+        """Extra keys a policy carries must not widen the versioned schema.
+
+        `max_severity` tracks `fixable` on each normalized finding to drive the
+        `ignore_unfixable` filter. That is internal bookkeeping — leaking it into
+        the payload would silently change schema v1 for every consumer.
+        """
+        payload = webhook.build_payload(
+            "sca",
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0",
+              "fixable": True, "some_future_field": "x"}],
+            component="c", git_sha="sha",
+        )
+        self.assertEqual(
+            payload["findings"],
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0"}],
+        )
+
     def test_build_payload_pr_from_env(self):
         with lunar_env(LUNAR_COMPONENT_PR="7"):
             self.assertEqual(webhook.build_payload("sca", [])["pr"], 7)
