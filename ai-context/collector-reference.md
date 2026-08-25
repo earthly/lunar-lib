@@ -281,6 +281,13 @@ collectors:
 
 Default is `[prs, default-branch]`. Use `runs_on: [prs]` to run only on PRs, or `runs_on: [default-branch]` to run only on the main branch.
 
+> **`runs_on` is a sub-collector key, not a hook key.** Note the indentation
+> above: it sits beside `name:`, not inside `hook:`. Plugin manifests are not
+> decoded with unknown-key rejection, so a `runs_on` nested under `hook:` is
+> dropped silently and the default `[prs, default-branch]` applies instead —
+> the collector runs everywhere while the manifest claims otherwise.
+> `scripts/validate_manifest_schema.py` fails `+lint` on this.
+
 ## Environment Variables
 
 Collectors have access to these environment variables:

@@ -105,6 +105,11 @@ policies:
 
 Default is `[prs, default-branch]`. Use `runs_on: [prs]` to run only on PRs, or `runs_on: [default-branch]` to run only on the main branch.
 
+> **`runs_on` is a policy key, not a hook key.** Plugin manifests are not
+> decoded with unknown-key rejection, so a `runs_on` nested under `hook:` is
+> dropped silently and the default `[prs, default-branch]` applies instead.
+> `scripts/validate_manifest_schema.py` fails `+lint` on this.
+
 #### `initiative`
 
 Groups related policies for management and reporting:
