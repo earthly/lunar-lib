@@ -104,6 +104,9 @@ lint:
     RUN python scripts/validate_earthfile_wiring.py
     # Validate earthly/lunar-lib image tags are canonical (-main / -vX.Y.Z), not dev/personal builds
     RUN python scripts/validate_image_tags.py
+    # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
+    RUN python scripts/validate_manifest_schema.py --self-test
+    RUN python scripts/validate_manifest_schema.py
 
 ai-context:
     COPY --dir ai-context .
