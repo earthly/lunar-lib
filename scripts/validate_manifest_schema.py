@@ -20,9 +20,10 @@ snippet-level value with the `[prs, default-branch]` default, and the
 sub-collector runs in *both* contexts while the manifest claims otherwise. Five
 sub-collectors across three plugins were wrong this way before anyone noticed.
 
-This validator closes that gap: for every collector / policy / cataloger entry
-it fails on any key outside the snippet allow-list, and for every `hook:` /
-`hooks[]` mapping on any key outside the hook allow-list.
+This validator closes that gap. Across every file the hub decodes into
+`manifest.Snippet` — the plugin manifests and the starter-pack consumer configs
+— it fails on any snippet key outside the snippet allow-list, and on any key of
+a `hook:` / `hooks[]` mapping outside the hook allow-list.
 
 Scope is deliberately narrow — unknown keys only. Required-key and value-shape
 validation is ENG-757, which will extend this same script rather than add a
