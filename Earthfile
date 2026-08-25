@@ -92,7 +92,7 @@ lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
-    COPY --dir catalogers collectors policies scripts .
+    COPY --dir catalogers collectors policies scripts starter-packs .
     COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py

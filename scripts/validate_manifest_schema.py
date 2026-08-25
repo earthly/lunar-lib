@@ -47,6 +47,11 @@ MANIFEST_GLOBS = [
     "collectors/*/lunar-collector.yml",
     "policies/*/lunar-policy.yml",
     "catalogers/*/lunar-cataloger.yml",
+    # Starter-pack consumer configs. Their `collectors:` / `policies:` entries are
+    # import sites rather than definitions, but the hub decodes them into the same
+    # manifest.Snippet, so the same keys are legal and the same typo is possible —
+    # and these are the files users copy.
+    "starter-packs/*/*/lunar-config.yml",
 ]
 
 # Top-level keys holding a list of snippets, per manifest.{Collector,Policy,
@@ -127,10 +132,14 @@ def sequence_items(node):
 
 
 def snippet_name(snippet_node):
+    """Best identifier for a snippet: its `name`, or the `uses` it imports."""
+    found = {}
     for key, value_node, _ in mapping_items(snippet_node):
-        if key == "name" and isinstance(value_node, yaml.ScalarNode):
-            return value_node.value
-    return "<unnamed>"
+        if key in ("name", "uses") and isinstance(value_node, yaml.ScalarNode):
+            found[key] = value_node.value
+    # Plugin manifests define snippets and always carry `name`; consumer configs
+    # import them and carry only `uses`.
+    return found.get("name") or found.get("uses") or "<unnamed>"
 
 
 def check_keys(node, allowed, where, errors):
@@ -214,6 +223,18 @@ catalogers:
     keywords: ["example"]
 """
 
+# A consumer-config import site: no `name:`, so the error has to identify the
+# snippet by `uses:` instead.
+BAD_IMPORT_SITE = """
+version: 1
+policies:
+  - uses: github://earthly/lunar-lib/policies/sast
+    enforcement: block-pr
+    hook:
+      type: code
+      runs_on: [prs]
+"""
+
 GOOD_MANIFEST = """
 name: example
 collectors:
@@ -248,6 +269,11 @@ def self_test():
         ),
         ("unknown key in hooks[]", BAD_HOOKS_LIST, ["bogus_key", "check-it", "hooks[0]"]),
         ("typo'd snippet key", BAD_SNIPPET_KEY, ["run_on", "discover"]),
+        (
+            "import site with no name:",
+            BAD_IMPORT_SITE,
+            ["runs_on", "policies/sast", "snippet-level"],
+        ),
     ]
 
     failures = []
@@ -288,11 +314,22 @@ def main():
     if "--self-test" in sys.argv[1:]:
         return self_test()
 
-    manifests = sorted(path for pattern in MANIFEST_GLOBS for path in glob.glob(pattern))
+    # A glob that matches nothing means this validator is silently checking less
+    # than it claims — the exact failure mode it exists to catch. The `+lint`
+    # target only COPYs the directories it knows about, so a new glob without a
+    # matching COPY would otherwise pass by scanning zero files.
+    empty = [pattern for pattern in MANIFEST_GLOBS if not glob.glob(pattern)]
+    if empty:
+        print("Manifest schema validation failed.")
+        for pattern in empty:
+            print(f"  No files matched '{pattern}' — nothing was checked.")
+        print(
+            "Either the glob is stale, or the directory was not COPYed into the "
+            "+lint target in the Earthfile."
+        )
+        return 1
 
-    if not manifests:
-        print("No plugin manifests found.")
-        return 0
+    manifests = sorted(path for pattern in MANIFEST_GLOBS for path in glob.glob(pattern))
 
     failed = False
     for path in manifests:
