@@ -112,9 +112,14 @@ def build_payload(
 ):
     """Build the standard alert payload.
 
-    ``findings`` is a list of dicts already normalized to
-    ``{id, severity, package, fix_version}``. ``component`` / ``git_sha`` / ``pr``
-    default to the ``LUNAR_*`` runtime environment variables when not provided.
+    ``findings`` is a list of dicts normalized to at least
+    ``{id, severity, package, fix_version}``. Each is projected down to exactly
+    those keys, so bookkeeping a policy carries alongside a finding (``fixable``,
+    for instance) cannot silently widen this published, versioned schema. Add a
+    field here deliberately, and bump ``SCHEMA_VERSION`` along with it.
+
+    ``component`` / ``git_sha`` / ``pr`` default to the ``LUNAR_*`` runtime
+    environment variables when not provided.
     """
     if component is None:
         component = os.environ.get("LUNAR_COMPONENT_ID", "")
@@ -123,6 +128,9 @@ def build_payload(
     if pr is None:
         pr = _env_pr()
 
+    findings = [
+        {k: f.get(k) for k in ("id", "severity", "package", "fix_version")} for f in findings
+    ]
     finding_ids = [f.get("id") for f in findings if f.get("id")]
     payload = {
         "schema_version": SCHEMA_VERSION,
