@@ -94,7 +94,7 @@ lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
-    COPY --dir catalogers collectors policies scripts .
+    COPY --dir catalogers collectors policies scripts starter-packs .
     COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py
@@ -106,6 +106,9 @@ lint:
     RUN python scripts/validate_earthfile_wiring.py
     # Validate earthly/lunar-lib image tags are canonical (-main / -vX.Y.Z), not dev/personal builds
     RUN python scripts/validate_image_tags.py
+    # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
+    RUN python scripts/validate_manifest_schema.py --self-test
+    RUN python scripts/validate_manifest_schema.py
 
 ai-context:
     COPY --dir ai-context .

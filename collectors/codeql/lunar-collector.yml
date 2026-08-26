@@ -30,7 +30,6 @@ collectors:
     mainBash: github-app.sh
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["codeql", "github code scanning", "sast", "code analysis", "security"]
 
   - name: running-in-prs
@@ -41,7 +40,6 @@ collectors:
     mainBash: running-in-prs.sh
     hook:
       type: code
-      runs_on: [default-branch]
     keywords: ["codeql", "pr scanning", "compliance proof", "default branch"]
 
   - name: cicd
