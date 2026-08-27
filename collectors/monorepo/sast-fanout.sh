@@ -94,11 +94,28 @@ MAX_TARGETS="${LUNAR_VAR_MAX_SUBCOMPONENTS:-50}"
 
 log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 
+# Hub reads are retried, and a persistent failure is FATAL rather than a quiet
+# exit 0. The after-json wave is fire-once per (component, sha, pr) — forever —
+# so a single transient read loses this commit's fan-out permanently and no
+# re-run can recover it. Failing loudly puts it in the run listing instead.
+# (Observed live: a `get-json` that returned NotFound for ~seconds around a
+# manifest publish, which re-keys the component's serving row.)
+retry_read() {
+  local out attempt
+  for attempt in 1 2 3 4 5; do
+    if out=$("$@" 2>/dev/null) && [ -n "$out" ]; then
+      printf '%s' "$out"
+      return 0
+    fi
+    [ "$attempt" -lt 5 ] && sleep $((attempt * 2))
+  done
+  return 1
+}
+
 # --- 1. Read the repo-wide findings ------------------------------------------
-ROOT_JSON=$(lunar component get-json "$ROOT" "${read_dims[@]}" 2>/dev/null || echo "")
-if [ -z "$ROOT_JSON" ]; then
-  log "could not read own Component JSON at this commit — nothing to fan out"
-  exit 0
+if ! ROOT_JSON=$(retry_read lunar component get-json "$ROOT" "${read_dims[@]}"); then
+  log "ERROR: could not read own Component JSON at this commit after 5 attempts — the fan-out for this commit is lost (the wave is fire-once), so failing loudly"
+  exit 1
 fi
 
 # Absent .sast.issues means no scanner produced a path-tagged finding list for
@@ -121,12 +138,9 @@ if [ -n "${LUNAR_VAR_SUBCOMPONENTS:-}" ]; then
     jq -R 'sub("^ +";"") | sub(" +$";"") | select(length > 0)' |
     jq -s -c '{components: (map({key: ., value: {}}) | from_entries)}')
   log "using the explicit subcomponent list from the subcomponents input"
-else
-  CATALOG=$(lunar cataloger get-json 2>/dev/null || echo "")
-  if [ -z "$CATALOG" ]; then
-    log "could not read the catalog — cannot discover subcomponents"
-    exit 0
-  fi
+elif ! CATALOG=$(retry_read lunar cataloger get-json); then
+  log "ERROR: could not read the catalog after 5 attempts — cannot discover subcomponents, and the wave will not fire again for this commit"
+  exit 1
 fi
 
 # --- 3. Attribute each finding to the subcomponents that own its file --------

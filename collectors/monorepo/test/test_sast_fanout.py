@@ -107,6 +107,14 @@ class Base(unittest.TestCase):
 
                     if argv[:2] == ["component", "get-json"]:
                         name = argv[2]
+                        fail = os.environ.get("FAIL_GETJSON")
+                        if fail and name == os.environ["ROOT_NAME"]:
+                            n = int(open(fail).read() or "0")
+                            if n != 0:
+                                if n > 0:
+                                    open(fail, "w").write(str(n - 1))
+                                sys.stderr.write("transient\\n")
+                                sys.exit(1)
                         path = os.path.join(fixtures, name.replace("/", "_") + ".json")
                         if not os.path.exists(path):
                             sys.stderr.write("component not found\\n")
@@ -142,6 +150,7 @@ class Base(unittest.TestCase):
         env["CAPTURE"] = self.capture
         env["FIXTURES"] = self.fixtures
         env["LUNAR_COMPONENT_ID"] = component
+        env["ROOT_NAME"] = ROOT
         env["LUNAR_COMPONENT_GIT_SHA"] = sha
         # The runtime always sets this for a collector; the script must unset it
         # for the cross-component writes or they land back on the root.
@@ -290,6 +299,34 @@ class TestPayload(Base):
         self.run_script(env_overrides={"LUNAR_COMPONENT_PR": "43"})
         argv = self.writes()[API]["argv"]
         self.assertEqual(argv[argv.index("--pr") + 1], "43")
+
+
+class TestReadRetries(Base):
+    """The wave is fire-once per (component, sha, pr), forever — a transient hub
+    read must not be mistaken for "nothing to fan out", because no re-run can
+    ever recover that commit. Observed live on cronos: `get-json` returned
+    NotFound for a few seconds around a manifest publish (which re-keys the
+    component's serving row), the collector exited 0, and the fan-out for that
+    commit was permanently lost."""
+
+    def _countdown(self, n):
+        path = os.path.join(self.tmp, "fail_count")
+        with open(path, "w") as f:
+            f.write(str(n))
+        return path
+
+    def test_transient_read_failure_is_retried(self):
+        proc = self.run_script(env_overrides={"FAIL_GETJSON": self._countdown(2)})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(set(self.writes()), {API, WEB, JOB})
+
+    def test_persistent_read_failure_fails_loudly(self):
+        # -1 = fail forever. Exiting 0 here would look identical to "no data".
+        proc = self.run_script(env_overrides={"FAIL_GETJSON": self._countdown(-1)})
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("fire-once", proc.stderr)
+        self.assertEqual(self.writes(), {})
+        self.assertEqual(self.self_writes(), [])
 
 
 class TestGuardrails(Base):
