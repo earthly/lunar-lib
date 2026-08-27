@@ -37,12 +37,21 @@ This integration provides the following collectors (use `include` to select a su
 
 ## Installation
 
-Add to your `lunar-config.yml`. Two things have to be true first: the monorepo's
-**root** needs a component of its own, and a scanner that writes `.sast.issues`
-has to be enabled on that root — the `codeql` collector's `cicd` sub-collector
-does this from the SARIF that `codeql database interpret-results` leaves on
-disk, so enabling `collectors/codeql` on the same root component is the usual
-pairing.
+Add to your `lunar-config.yml`. Three things have to be true first:
+
+1. the monorepo's **root** needs a component of its own;
+2. a scanner that writes `.sast.issues` has to be enabled on that root — the
+   `codeql` collector's `cicd` sub-collector does this from the SARIF that
+   `codeql database interpret-results` leaves on disk, so enabling
+   `collectors/codeql` on the same root is the usual pairing;
+3. **at least one policy must also evaluate the root.** An `after-json`
+   collector is dispatched by the Hub's doneness gate, and that gate is only
+   consulted while bundling a component's policies — so a component that no
+   policy evaluates never fires its after-json collectors at all. Watch out for
+   the interaction with domains: a policy declared with no `on:` resolves to
+   `domain:other`, so putting the root in a dedicated domain (sensible, and
+   recommended below) can silently take it out of every fleet policy's scope
+   and leave it with none.
 
 ```yaml
 components:
@@ -68,4 +77,12 @@ collectors:
     # with:
     #   subcomponents: ""      # pin the target list, skipping catalog discovery
     #   max_subcomponents: "50"
+
+policies:
+  # Point 3 above: the root needs a policy of its own, or its after-json
+  # collectors are never dispatched. `sast.executed` is the natural one — it
+  # asserts the repo-wide scan actually ran.
+  - uses: github://earthly/lunar-lib/policies/sast@v1.13.0
+    on: ["component:github.com/acme/repo"]
+    include: [executed]
 ```

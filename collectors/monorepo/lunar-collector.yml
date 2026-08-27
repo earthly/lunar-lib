@@ -43,7 +43,11 @@ collectors:
       because the CodeQL CLI collector writes .sast.native.codeql.cicd for every
       codeql exec (database init, resolve languages, bundle, cleanup), so .sast
       is present long before any findings are; .sast.issues appears only once a
-      SARIF report has been parsed. See the README for the full walkthrough.
+      SARIF report has been parsed. Note that the root component also needs at
+      least one POLICY: an after-json collector is dispatched by the Hub's
+      doneness gate, which is only consulted while bundling a component's
+      policies, so a component no policy evaluates never fires them. See the
+      README for the full walkthrough.
     mainBash: sast-fanout.sh
     hook:
       type: after-json
