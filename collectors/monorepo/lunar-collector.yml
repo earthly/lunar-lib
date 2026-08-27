@@ -1,0 +1,108 @@
+version: 0
+
+name: monorepo
+description: Distributes repo-scoped scan results to a monorepo's subcomponents
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Monorepo Collector"
+  long_description: |
+    A repo-wide scanner like CodeQL default setup reports findings against the
+    repository, so in a monorepo they land on the repo-root component and every
+    subdirectory component reads as unscanned. Enabled on the root, this
+    collector redistributes those findings to the subcomponents by file path.
+  category: "security"
+  icon: "assets/monorepo.svg"
+  status: "beta"
+  related:
+    - slug: "codeql"
+      type: "collector"
+      reason: "Produces the repo-wide SAST findings this collector redistributes"
+    - slug: "sast"
+      type: "policy"
+      reason: "Evaluates the per-subcomponent findings this collector writes"
+
+collectors:
+  - name: sast-fanout
+    description: |
+      Redistributes a monorepo's repo-wide SAST findings to its subcomponents.
+      Runs on the repository ROOT component once its collection settles, reads
+      the path-tagged findings a scanner already produced (.sast.issues), and
+      writes each subcomponent's own slice onto that subcomponent's Component
+      JSON at the same commit. Subcomponents are discovered from the catalog
+      (every component whose name is prefixed by the root's) or pinned with the
+      `subcomponents` input, and a finding is attributed to a subcomponent when
+      its file matches that subcomponent's path patterns — the explicit `paths:`
+      plus the implicit "<subdir>/*" its name implies — so attribution follows
+      the same rule the Hub uses for change detection. Findings matching no
+      subcomponent stay on the root, and a subcomponent that already has SAST
+      data of its own is never overwritten, since a per-service scan is more
+      precise than a repo-wide one. Hooked on .sast.issues rather than .sast
+      because the CodeQL CLI collector writes .sast.native.codeql.cicd for every
+      codeql exec (database init, resolve languages, bundle, cleanup), so .sast
+      is present long before any findings are; .sast.issues appears only once a
+      SARIF report has been parsed. See the README for the full walkthrough.
+    mainBash: sast-fanout.sh
+    hook:
+      type: after-json
+      path: .sast.issues
+    keywords: ["monorepo", "sast", "codeql", "fan-out", "after-json", "subcomponent", "cross-component"]
+
+inputs:
+  subcomponents:
+    description: |
+      Comma-separated list of subcomponent names to fan out to, e.g.
+      "github.com/acme/repo/services/api,github.com/acme/repo/services/web".
+      Skips catalog discovery entirely — useful on a Hub with a very large
+      merged catalog, or to restrict the fan-out to a subset. Default (empty)
+      discovers every catalog component whose name is prefixed by the root's.
+    default: ""
+  max_subcomponents:
+    description: |
+      Upper bound on how many subcomponents a single run will write to, as a
+      guard against a mis-scoped root component fanning out across an entire
+      org. Targets beyond the limit are skipped and logged as a warning (never
+      silently dropped).
+    default: "50"
+
+example_component_json: |
+  {
+    "sast": {
+      "source": {
+        "tool": "codeql",
+        "version": "2.26.3",
+        "integration": "monorepo-fanout"
+      },
+      "findings": {
+        "critical": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 0,
+        "total": 3
+      },
+      "issues": [
+        {
+          "severity": "high",
+          "rule": "java/sql-injection",
+          "file": "services/payments-api/src/main/kotlin/com/acme/Payments.kt",
+          "line": 88,
+          "message": "Query built from user-controlled sources"
+        }
+      ],
+      "summary": {
+        "has_critical": false,
+        "has_high": true
+      },
+      "native": {
+        "monorepo_fanout": {
+          "root_component": "github.com/acme/repo",
+          "root_git_sha": "9dd3cf6a1b2c3d4e5f60718293a4b5c6d7e8f900",
+          "paths": ["services/payments-api/*", ".github/workflows/ci.yml"],
+          "matched": 3,
+          "fingerprint": "3f1c9a04d7b25e68c1a04f9b2d6e7810"
+        }
+      }
+    }
+  }
