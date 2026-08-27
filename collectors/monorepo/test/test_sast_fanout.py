@@ -342,6 +342,18 @@ class TestGuardrails(Base):
         self.assertIn(API, self.writes(), "a changed finding set must not be treated as unchanged")
         self.assertEqual(self.writes()[API]["stdin"]["findings"]["total"], 4)
 
+    def test_target_with_no_blob_at_this_sha_is_still_written(self):
+        # A subcomponent is only evaluated at a commit whose changed paths
+        # intersect its own, so a monorepo commit that touched nothing it owns
+        # leaves it with no Component JSON to read back. That must not stop the
+        # fan-out: the guard read is best-effort, and the write still has to
+        # land (the sha is ingested for the repo either way).
+        os.remove(self._fixture_path(JOB))
+        proc = self.run_script()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn(JOB, self.writes())
+        self.assertEqual(self.writes()[JOB]["stdin"]["findings"]["total"], 0)
+
     def test_empty_self_reference_writes_nothing(self):
         proc = self.run_script(env_overrides={"LUNAR_COMPONENT_ID": ""})
         self.assertEqual(proc.returncode, 0)
