@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `backstage` collector: AWS SigV4 authentication for the referential-integrity
+  lookups, for Backstage APIs fronted by AWS IAM auth (e.g. Amazon API Gateway)
+  that reject Bearer tokens. Set `auth_mode: sigv4` plus `aws_region` (and
+  `aws_service`, default `execute-api`); credentials resolve at runtime from the
+  standard AWS chain — IRSA, EKS Pod Identity / ECS, EC2 instance profile, then
+  the optional static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets — so
+  they self-refresh with nothing to rotate. Brings the collector to parity with
+  the `backstage` cataloger (#232); both run in the same snippet pods, so a
+  single service-account role annotation covers both. An auth or
+  credential-resolution failure never discards the parse and lint results — it
+  is recorded as a per-reference `{name, error}` (ENG-1621).
+
 ### Changed
 
 - `jira` collector: ticket references are now detected in the PR description as
