@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single service-account role annotation covers both. An auth or
   credential-resolution failure never discards the parse and lint results — it
   is recorded as a per-reference `{name, error}` (ENG-1621).
+- `backstage` collector: `api_path_prefix` input (default `/api`) — set it to an
+  empty string when the Backstage catalog API is mounted at the root, e.g. behind
+  an API gateway that strips the `/api` hop and returns 403/404 for
+  `/api/catalog/entities`. Matches the same input on the `backstage` cataloger.
+  This pairs with `auth_mode: sigv4` above: an IAM-fronted Backstage is usually
+  behind Amazon API Gateway, which is exactly the shape that strips the hop, so
+  the instances needing SigV4 are often the ones needing an empty prefix
+  (ENG-1621).
 
 ### Changed
 

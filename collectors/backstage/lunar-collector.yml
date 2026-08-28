@@ -38,7 +38,8 @@ collectors:
       When `backstage_url` is configured, it additionally performs a
       referential-integrity check: for each grouping reference declared in the
       file (`spec.domain`, `spec.system`) it queries the Backstage catalog API
-      (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and
+      (`GET <api_path_prefix>/catalog/entities/by-name/<kind>/<namespace>/<name>`,
+      where `api_path_prefix` defaults to `/api`) and
       records the outcome under `.catalog.native.backstage.refs`. Whenever
       `backstage_url` is set the collector writes `.refs.checked: true` as the
       "referential integrity ran" signal, plus a per-reference entry: a
@@ -76,6 +77,21 @@ inputs:
       referential-integrity lookups — the collector only parses and lints the
       local file, exactly as before.
     default: ""
+  api_path_prefix:
+    description: |
+      Path prefix prepended before `/catalog/entities` when calling the
+      Backstage catalog API. Defaults to `/api`, matching the standard
+      Backstage layout (`<backstage_url>/api/catalog/entities`). Set to an
+      empty string (`""`) when the catalog API is mounted at the root — e.g.
+      behind an API gateway that already strips the `/api` hop, where
+      `<backstage_url>/catalog/entities` is the live endpoint and
+      `/api/catalog/entities` returns 403/404. A leading slash is optional and
+      any trailing slash is ignored (`api`, `/api`, `/api/` are equivalent).
+      Especially relevant with `auth_mode: sigv4`: an IAM-fronted Backstage is
+      usually behind Amazon API Gateway, which is exactly the deployment shape
+      that strips the `/api` hop — so a correct SigV4 setup can still 403 on
+      every lookup if this is left at the default.
+    default: "/api"
   auth_mode:
     description: |
       How the collector authenticates to the Backstage catalog API. Only

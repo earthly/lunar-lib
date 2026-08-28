@@ -191,6 +191,26 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   BASE_URL="${BACKSTAGE_URL%/}"
   DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
 
+  # Path prefix before /catalog/entities — `/api` for a standard Backstage
+  # layout, "" for an instance whose catalog API is mounted at the root (e.g.
+  # behind an API gateway that strips the `/api` hop, where /api/catalog/…
+  # returns 403/404). This matters most under auth_mode: sigv4, since an
+  # IAM-fronted Backstage is usually behind Amazon API Gateway — exactly the
+  # shape that strips the hop — so leaving this at the default there can 403 on
+  # every lookup despite perfectly correct signing.
+  # `-` not `:-`: an explicit empty value must survive so it can disable the
+  # prefix. The hub always sets LUNAR_VAR_API_PATH_PREFIX — to the manifest
+  # default `/api` when unset in config, or the user's value (including "")
+  # when set — so `-/api` only fires for a truly-unset var (direct local
+  # invocation), not a config-supplied "".
+  API_PATH_PREFIX="${LUNAR_VAR_API_PATH_PREFIX-/api}"
+  # Normalize: drop any trailing slash, and ensure a non-empty value leads with
+  # a slash — so `api`, `/api`, and `/api/` all resolve to `/api`, and "" stays "".
+  API_PATH_PREFIX="${API_PATH_PREFIX%/}"
+  if [ -n "$API_PATH_PREFIX" ] && [ "${API_PATH_PREFIX#/}" = "$API_PATH_PREFIX" ]; then
+    API_PATH_PREFIX="/$API_PATH_PREFIX"
+  fi
+
   # --- Authentication ---
   # AUTH_ARGS holds the curl arguments used for every lookup: a Bearer header
   # (bearer mode) or the SigV4 signing flags + session-token header (sigv4).
@@ -268,7 +288,7 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     set +e
     http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
       "${AUTH_ARGS[@]}" \
-      "${BASE_URL}/api/catalog/entities/by-name/${kind}/${ns}/${name}")
+      "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-name/${kind}/${ns}/${name}")
     curl_status=$?
     set -e
 

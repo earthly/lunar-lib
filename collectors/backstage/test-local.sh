@@ -186,9 +186,50 @@ assert_eq "unconfigured (no backstage_url) writes no .refs" \
   "$(run payments payment-platform '')" \
   'null'
 
-echo "Backstage collector auth-mode (bearer / sigv4) tests:"
-
 STATIC_KEYS="LUNAR_SECRET_AWS_ACCESS_KEY_ID=AKIATEST LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=secret123"
+
+echo "Backstage collector api_path_prefix tests:"
+
+# Default is the standard Backstage layout.
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t" payments '' http://fake:7007 >/dev/null
+assert_eq "default prefix hits /api/catalog/entities" \
+  "$(grep -c 'http://fake:7007/api/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+
+# The case that matters for sigv4: an API gateway that strips the /api hop.
+# `-` vs `:-` — an explicitly empty value must survive, not fall back to /api.
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_API_PATH_PREFIX=" payments '' http://fake:7007 >/dev/null
+assert_eq "empty prefix mounts the catalog API at the root" \
+  "$(grep -c 'http://fake:7007/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+assert_eq "empty prefix does NOT fall back to /api" \
+  "$(grep -c '/api/catalog' "$CURL_LOG" || true)" '0'
+
+# Normalization: `api`, `/api/` and `/api` are equivalent.
+for form in "api" "/api/"; do
+  : > "$CURL_LOG"
+  run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_API_PATH_PREFIX=$form" payments '' http://fake:7007 >/dev/null
+  assert_eq "prefix '$form' normalizes to /api" \
+    "$(grep -c 'http://fake:7007/api/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+done
+
+# A custom gateway stage prefix passes through.
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_API_PATH_PREFIX=/prod/api" payments '' http://fake:7007 >/dev/null
+assert_eq "custom prefix is used verbatim" \
+  "$(grep -c 'http://fake:7007/prod/api/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+
+# The gateway case end-to-end: sigv4 + a root-mounted catalog API must sign the
+# *rewritten* path, not the /api one. This is the combination Fry flagged.
+: > "$CURL_LOG"
+SIGV4_ROOT=$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 LUNAR_VAR_API_PATH_PREFIX= $STATIC_KEYS" \
+  payments '' http://fake:7007 | jq -c '.refs.domain')
+assert_eq "sigv4 + root-mounted API resolves the ref" \
+  "$SIGV4_ROOT" '{"name":"payments","exists":true}'
+assert_eq "sigv4 + root-mounted API signs the root path" \
+  "$(grep -c 'http://fake:7007/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+
+echo "Backstage collector auth-mode (bearer / sigv4) tests:"
 
 # Negative control: the default bearer path must be untouched by the sigv4
 # work — the token still goes out as an Authorization header, and NO SigV4

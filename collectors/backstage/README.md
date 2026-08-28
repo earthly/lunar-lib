@@ -95,6 +95,20 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 
 The collector reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed. Pair this with the `backstage` policy's `domain-exists` / `system-exists` checks to enforce the results. With `backstage_url` unset (the default), the collector makes no network calls and behaves exactly as the parse-and-lint default above.
 
+### API Path Prefix
+
+The lookups call `<backstage_url><api_path_prefix>/catalog/entities/by-name/...`. `api_path_prefix` defaults to `/api`, which matches the standard Backstage layout. Set it to an empty string when the catalog API is mounted at the root — typically behind an API gateway that already strips the `/api` hop, where `/catalog/entities` is live and `/api/catalog/entities` returns 403/404:
+
+```yaml
+with:
+  backstage_url: "https://backstage.example.com"
+  api_path_prefix: ""      # catalog API mounted at the root
+```
+
+A leading slash is optional and a trailing slash is ignored, so `api`, `/api`, and `/api/` are equivalent. A custom gateway stage works too (e.g. `/prod/api`).
+
+> **Read this before configuring `auth_mode: sigv4`.** An IAM-fronted Backstage is almost always behind Amazon API Gateway — which is exactly the deployment shape that strips the `/api` hop. So the instances that need SigV4 are the same ones that often need `api_path_prefix: ""`. If you leave the default in that setup, every lookup 403s *despite completely correct signing*, and (per [Failure modes](#failure-modes)) it is recorded as `{name, error}` — which reads like an outage rather than a misconfiguration. If SigV4 is set up correctly and every reference still errors, check this input first.
+
 ### AWS SigV4 Authentication (IAM-role-signed)
 
 Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gateway) and reject Bearer tokens — every request must carry an AWS Signature V4. Set `auth_mode: sigv4` to sign the referential-integrity lookups instead of sending a Bearer token:
@@ -108,6 +122,7 @@ collectors:
       auth_mode: "sigv4"
       aws_region: "us-east-1"
       aws_service: "execute-api"   # default; API Gateway. Override for other fronting.
+      # api_path_prefix: ""        # if your gateway strips the /api hop — see above
 ```
 
 **No credentials are configured as Lunar secrets, and nothing needs manual rotation.** In `sigv4` mode the collector resolves AWS credentials at runtime from the standard AWS credential provider chain and re-resolves them on every run, so short-lived IAM-role credentials always sign with a fresh, valid signature. The chain is tried in this order:
@@ -134,7 +149,7 @@ The role's trust policy must allow the snippet-pod service account to assume it,
 
 #### Failure modes
 
-Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
+Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
 
 ```json
 "refs": {
