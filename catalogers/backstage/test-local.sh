@@ -22,6 +22,8 @@ COMPONENTS_OUT="$TEST_DIR/components.json"
 DOMAINS_OUT="$TEST_DIR/domains.json"
 CURL_CALLS="$TEST_DIR/curl-calls"
 CURL_URLS="$TEST_DIR/curl-urls"
+GQL_URLS="$TEST_DIR/gql-urls"
+GQL_BATCHES="$TEST_DIR/gql-batches"
 RUN_OUT="$TEST_DIR/run.out"
 
 trap 'rm -rf "$TEST_DIR"' EXIT
@@ -29,10 +31,76 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 echo "Test directory: $TEST_DIR"
 
 # --- Mock curl ------------------------------------------------------------
-# Returns by-query envelopes: page 1 = items[0:5] + pageInfo.nextCursor, page 2
-# (only when the URL contains cursor=CURSOR_P2) = items[5:] with no nextCursor.
-# A safety valve returns an empty page after several calls so a pagination
-# regression fails an assertion instead of hanging CI.
+# Serves two endpoints:
+#
+# 1. The Backstage by-query catalog. Returns by-query envelopes: page 1 =
+#    items[0:5] + pageInfo.nextCursor, page 2 (only when the URL contains
+#    cursor=CURSOR_P2) = items[5:] with no nextCursor. A safety valve returns an
+#    empty page after several calls so a pagination regression fails an
+#    assertion instead of hanging CI.
+#
+# 2. The GitHub GraphQL repo-existence check (URL ending /graphql). Reads the
+#    posted query from stdin, extracts each `rN: repository(owner: "o", name:
+#    "r")` alias, and answers non-null for every slug EXCEPT those listed in
+#    $MOCK_MISSING_REPOS — mirroring the real API, which returns HTTP 200 with
+#    `data.rN: null` plus a NOT_FOUND entry in `errors` for a repo it can't
+#    resolve. $MOCK_GRAPHQL_HTTP forces a non-200 to exercise the fail-open path.
+#    GraphQL requests are logged to their own file so the pagination-call
+#    assertions stay independent of verification.
+# gql-respond <response-file> <batch-log> — reads the posted GraphQL body on
+# stdin and writes the mock response. Quoted heredoc: the jq program below is
+# verbatim, so its regex escaping is not filtered through shell expansion.
+cat > "$TEST_DIR/gql-respond" << 'RESPOND'
+#!/bin/bash
+set -euo pipefail
+OUT="$1"
+BATCH_LOG="$2"
+REQ_URL="${3:-}"
+BODY=$(cat)
+# A host named in MOCK_UNSUPPORTED_HOSTS answers like a forge that isn't GitHub
+# (a GitLab instance serves /api/graphql but has no `repository(owner:,name:)`
+# field): HTTP 200, errors, no data. Nothing resolves for that host.
+for _h in $(printf '%s' "${MOCK_UNSUPPORTED_HOSTS:-}" | tr ',' ' '); do
+    [ -z "$_h" ] && continue
+    case "$REQ_URL" in
+        *"$_h"*)
+            echo '{"errors":[{"message":"Field '"'"'repository'"'"' doesn'"'"'t exist on type '"'"'Query'"'"'"}]}' > "$OUT"
+            echo 0 >> "$BATCH_LOG"
+            exit 0
+            ;;
+    esac
+done
+# Pull every `rN: repository(owner: "o", name: "r")` alias out of the query and
+# answer non-null for each, except the slugs named in MOCK_MISSING_REPOS. This
+# mirrors the real API: HTTP 200, `data.rN: null`, and a NOT_FOUND entry in
+# `errors` for anything it cannot resolve.
+printf '%s' "$BODY" | jq -r --arg missing "${MOCK_MISSING_REPOS:-}" \
+                            --arg forbidden "${MOCK_FORBIDDEN_REPOS:-}" '
+    ($missing | split(",") | map(select(length > 0))) as $gone
+    | ($forbidden | split(",") | map(select(length > 0))) as $denied
+    | [ .query
+        | scan("(r[0-9]+): repository\\(owner: \"([^\"]*)\", name: \"([^\"]*)\"\\)")
+        | {alias: .[0], slug: (.[1] + "/" + .[2])} ] as $fields
+    | ( { data: ( [ $fields[]
+                    | {key: .alias,
+                       value: (if (.slug | IN($gone[])) or (.slug | IN($denied[])) then null
+                               else {id: ("R_" + .slug)} end)} ] | from_entries ),
+          errors: ( [ $fields[] | select(.slug | IN($gone[]))
+                      | {type: "NOT_FOUND", path: [.alias],
+                         message: ("Could not resolve to a Repository with the name " + .slug)} ]
+                    + [ $fields[] | select(.slug | IN($denied[]))
+                        | {type: "FORBIDDEN", path: [.alias],
+                           message: ("Resource protected by organization SAML enforcement " + .slug)} ] ) }
+        | if (.errors | length) == 0 then del(.errors) else . end
+        | @json )
+      + "\n" + ($fields | length | tostring)
+' > "$OUT.raw"
+head -1 "$OUT.raw" > "$OUT"
+sed -n '2p' "$OUT.raw" >> "$BATCH_LOG"
+rm -f "$OUT.raw"
+RESPOND
+chmod +x "$TEST_DIR/gql-respond"
+
 cat > "$TEST_DIR/curl" << EOF
 #!/bin/bash
 WRITE_FILE=""
@@ -41,21 +109,46 @@ while [ \$# -gt 0 ]; do
     case "\$1" in
         -o) WRITE_FILE="\$2"; shift 2 ;;
         -w) shift 2 ;;
+        --data|--data-binary|--data-raw) shift 2 ;;
         -sS|-H|-X) shift 1; [ \$# -gt 0 ] && case "\$1" in -*) ;; *) shift 1 ;; esac ;;
         *) REQ_URL="\$1"; shift 1 ;;
     esac
 done
-echo "\$REQ_URL" >> "$CURL_URLS"
-CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
-echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
-if [ "\$CALL_NUM" -ge 4 ]; then
-    echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
-elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
-    jq -c '{items: .items[5:], pageInfo: {}}' "$FIXTURE" > "\$WRITE_FILE"
-else
-    jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "$FIXTURE" > "\$WRITE_FILE"
-fi
-echo "200"
+
+case "\$REQ_URL" in
+*/graphql)
+    BODY=\$(cat)
+    echo "\$REQ_URL" >> "$GQL_URLS"
+    if [ -n "\${MOCK_GRAPHQL_HTTP:-}" ] && [ "\$MOCK_GRAPHQL_HTTP" != "200" ]; then
+        echo '{"message":"mock failure"}' > "\$WRITE_FILE"
+        echo "\$MOCK_GRAPHQL_HTTP"
+        exit 0
+    fi
+    # A 200 carrying a non-JSON body — what a proxy/WAF error page looks like.
+    if [ -n "\${MOCK_GRAPHQL_JUNK_BODY:-}" ]; then
+        printf '<html><body>403 Forbidden</body></html>' > "\$WRITE_FILE"
+        echo "200"
+        exit 0
+    fi
+    # Delegate the response shaping to gql-respond (its own file, so its jq
+    # program isn't run through this heredoc's escaping).
+    printf '%s' "\$BODY" | "$TEST_DIR/gql-respond" "\$WRITE_FILE" "$GQL_BATCHES" "\$REQ_URL"
+    echo "200"
+    ;;
+*)
+    echo "\$REQ_URL" >> "$CURL_URLS"
+    CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
+    echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
+    if [ "\$CALL_NUM" -ge 4 ]; then
+        echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
+    elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
+        jq -c '{items: .items[5:], pageInfo: {}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
+    else
+        jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
+    fi
+    echo "200"
+    ;;
+esac
 EOF
 chmod +x "$TEST_DIR/curl"
 
@@ -115,6 +208,8 @@ echo ""
 : > "$DOMAINS_OUT"
 : > "$CURL_CALLS"
 : > "$CURL_URLS"
+: > "$GQL_URLS"
+: > "$GQL_BATCHES"
 
 echo "=== Cataloger output ==="
 "$SCRIPT_DIR/main.sh" 2>&1 | tee "$RUN_OUT"
@@ -286,9 +381,200 @@ DOMAINS_UNDER_FILTER=$(jq -s 'add // {} | keys | length' "$DOMAINS_OUT")
 [ "$DOMAINS_UNDER_FILTER" -eq "$EXPECTED_DOMAINS" ] || \
     fail "domains must be unaffected by component filters: expected $EXPECTED_DOMAINS, got $DOMAINS_UNDER_FILTER"
 
+# --- 7. Repo-existence verification (verify_repos) ------------------------
+# The fixture's 5 annotated components resolve to 5 distinct acme/* repos. Each
+# scenario re-runs the cataloger and reports the surviving component keys plus
+# how many GraphQL requests were issued, so both the filtering and the request
+# batching are asserted.
+echo ""
+echo "=== verify_repos scenarios ==="
+
+# verify_run <verify_repos> <gh_token> <missing_csv> <batch_size> <http_code> [extra VAR=val...]
+# -> sets VR_KEYS (sorted component keys, prefix stripped), VR_GQL (request count),
+#    VR_OUT (path to the run log).
+verify_run() {
+    local verify="$1" token="$2" missing="$3" batch="$4" http="$5"; shift 5
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    : > "$GQL_URLS"; : > "$GQL_BATCHES"
+    VR_OUT="$TEST_DIR/verify.out"
+    env "$@" \
+        LUNAR_VAR_VERIFY_REPOS="$verify" \
+        LUNAR_SECRET_GH_TOKEN="$token" \
+        MOCK_MISSING_REPOS="$missing" \
+        MOCK_GRAPHQL_HTTP="$http" \
+        VERIFY_BATCH_SIZE="$batch" \
+        "$SCRIPT_DIR/main.sh" > "$VR_OUT" 2>&1 || true
+    VR_KEYS=$(jq -rs 'add // {} | keys | map(sub("^github.com/"; "")) | sort | join(",")' "$COMPONENTS_OUT")
+    VR_GQL=$(grep -c . "$GQL_URLS" || true)
+}
+
+ALL_FIVE="acme/fulfillment-api,acme/payment-api,acme/payment-api-proto,acme/payments-db-iac,acme/web-app"
+
+check_verify() { # $1=label $2=expected keys $3=got keys
+    if [ "$3" = "$2" ]; then
+        echo "  ok: $1"
+    else
+        fail "[$1] expected components {$2}, got {$3}"
+    fi
+}
+
+# (a) A repo that doesn't exist is dropped; the rest are written untouched.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200
+check_verify "missing repo dropped" \
+    "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$VR_KEYS"
+[ "$VR_GQL" -eq 1 ] || fail "expected 1 GraphQL request for 5 repos at batch=100, got $VR_GQL"
+grep -q "github.com/acme/payment-api-proto" "$VR_OUT" || \
+    fail "the dropped component id must be named in the log (operator fixes it in Backstage)"
+grep -q "Repo verification dropped 1 of 5 component(s)" "$VR_OUT" || \
+    fail "expected a 'dropped 1 of 5' summary line; got: $(grep -i 'verification' "$VR_OUT" | tr '\n' '|')"
+
+# Negative control: with nothing missing, the same run keeps all five. Without
+# this, (a) would also pass if the code dropped components for the wrong reason.
+verify_run true mock-gh-token "" 100 200
+check_verify "nothing missing -> all kept" "$ALL_FIVE" "$VR_KEYS"
+
+# (b) No GH_TOKEN: unchanged output, no GraphQL call, and a warning that says so.
+verify_run true "" "acme/payment-api-proto" 100 200
+check_verify "no token -> writes everything (fail open)" "$ALL_FIVE" "$VR_KEYS"
+[ "$VR_GQL" -eq 0 ] || fail "expected no GraphQL request without a token, got $VR_GQL"
+grep -q "no GH_TOKEN secret is set" "$VR_OUT" || \
+    fail "expected a warning naming the missing GH_TOKEN secret"
+
+# (c) verify_repos off: no verification at all, even with a token.
+verify_run false mock-gh-token "acme/payment-api-proto" 100 200
+check_verify "verify_repos=false -> no filtering" "$ALL_FIVE" "$VR_KEYS"
+[ "$VR_GQL" -eq 0 ] || fail "expected no GraphQL request when verify_repos=false, got $VR_GQL"
+
+# (d) Every repo missing is a token/host misconfiguration, not a catalog where
+#     every entry is stale — must not empty the catalog.
+verify_run true mock-gh-token "$ALL_FIVE" 100 200
+check_verify "all missing -> inconclusive, nothing dropped" "$ALL_FIVE" "$VR_KEYS"
+grep -q "inconclusive" "$VR_OUT" || fail "expected an 'inconclusive' warning when no repo resolves"
+
+# (e) A non-200 from GitHub must not shrink the catalog either.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 503
+check_verify "HTTP 503 -> fail open" "$ALL_FIVE" "$VR_KEYS"
+grep -q "verification request failed (HTTP 503)" "$VR_OUT" || \
+    fail "expected the HTTP failure to be reported"
+
+# (e2) A 200 with a non-JSON body (proxy/WAF error page) must fail open too, not
+#      abort the run — jq exits non-zero on it and `set -e` would kill the whole
+#      cataloger. This is the regression that shipped in the first cut.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 MOCK_GRAPHQL_JUNK_BODY=1
+check_verify "200 + junk body -> fail open" "$ALL_FIVE" "$VR_KEYS"
+grep -q "could not parse .* response" "$VR_OUT" || \
+    fail "expected the unparseable-response warning"
+grep -q "Backstage sync complete" "$VR_OUT" || \
+    fail "an unparseable verification response must not abort the run"
+
+# (e3) A null that is NOT a NOT_FOUND must be kept. GitHub nulls a field for
+#      FORBIDDEN too (a classic PAT not SSO-authorized for a SAML org — the repo
+#      exists, the token just can't see it). Other repos in the batch resolve, so
+#      the "nothing resolved" guard does NOT fire; keying the drop off `null`
+#      instead of the error would silently delete a real component here.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 MOCK_FORBIDDEN_REPOS="acme/web-app"
+check_verify "FORBIDDEN null kept, NOT_FOUND null dropped" \
+    "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$VR_KEYS"
+grep -q "acme/payment-api-proto" "$VR_OUT" || fail "the NOT_FOUND repo should still be reported skipped"
+if grep -q "acme/web-app" "$VR_OUT"; then
+    fail "a FORBIDDEN repo must never be reported missing — the token can't see it, it still exists"
+fi
+
+# (f) Batching: 5 repos at batch=2 is 3 requests. This is the assertion that
+#     keeps the check from regressing to one request per component — at a large
+#     catalog that difference is the whole GitHub rate-limit budget.
+verify_run true mock-gh-token "acme/payment-api-proto" 2 200
+check_verify "batch=2 still drops only the missing repo" \
+    "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$VR_KEYS"
+[ "$VR_GQL" -eq 3 ] || fail "expected ceil(5/2)=3 GraphQL requests at batch=2, got $VR_GQL"
+BATCH_SIZES=$(sort "$GQL_BATCHES" | tr '\n' ',')
+[ "$BATCH_SIZES" = "1,2,2," ] || \
+    fail "expected batches of 2,2,1 repos per request; got sizes {$BATCH_SIZES}"
+
+# (g) Host comes from the component id, with NO extra config: a GHES-prefixed
+#     catalog is checked against https://<host>/api/graphql, not github.com.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 LUNAR_VAR_COMPONENT_ID_PREFIX="ghes.example.com/"
+GHES_KEYS=$(jq -rs 'add // {} | keys | map(sub("^ghes.example.com/"; "")) | sort | join(",")' "$COMPONENTS_OUT")
+check_verify "GHES id -> verified, zero config" \
+    "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$GHES_KEYS"
+[ "$(head -1 "$GQL_URLS")" = "https://ghes.example.com/api/graphql" ] || \
+    fail "GHES endpoint should be derived from the id as https://ghes.example.com/api/graphql, got '$(head -1 "$GQL_URLS")'"
+
+# --- Multi-host: one catalog spanning github.com and a GHES host -------------
+# Uses its own fixture whose annotation values already carry the host, with an
+# empty component_id_prefix, so the ids are genuinely mixed-host.
+MULTI_FIXTURE="$SCRIPT_DIR/sample-catalog-multihost.json"
+
+multi_run() { # $1=missing csv  $2=unsupported hosts csv
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    : > "$GQL_URLS"; : > "$GQL_BATCHES"
+    VR_OUT="$TEST_DIR/multi.out"
+    env MOCK_FIXTURE="$MULTI_FIXTURE" \
+        MOCK_MISSING_REPOS="$1" \
+        MOCK_UNSUPPORTED_HOSTS="$2" \
+        LUNAR_VAR_VERIFY_REPOS=true \
+        LUNAR_SECRET_GH_TOKEN=mock-gh-token \
+        LUNAR_VAR_COMPONENT_ID_PREFIX="" \
+        "$SCRIPT_DIR/main.sh" > "$VR_OUT" 2>&1 || true
+    MULTI_KEYS=$(jq -rs 'add // {} | keys | sort | join(",")' "$COMPONENTS_OUT")
+    MULTI_HOSTS=$(sort -u "$GQL_URLS" | tr '\n' ',')
+}
+
+ALL_FOUR="github.com/acme/payments,github.com/acme/retired,ghes.example.com/corp/billing,ghes.example.com/corp/ghost"
+ALL_FOUR=$(printf '%s' "$ALL_FOUR" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,$//')
+
+# (h) Both hosts get verified, each at its own endpoint, and the absent repo on
+#     EACH host is dropped independently.
+multi_run "acme/retired,corp/ghost" ""
+check_verify "multi-host: both hosts filtered" \
+    "ghes.example.com/corp/billing,github.com/acme/payments" "$MULTI_KEYS"
+[ "$MULTI_HOSTS" = "https://api.github.com/graphql,https://ghes.example.com/api/graphql," ] || \
+    fail "expected both host endpoints to be hit; got {$MULTI_HOSTS}"
+
+# (i) Per-host isolation — the point of deriving the host per component. A host
+#     that isn't GitHub (GitLab serves /api/graphql but has no repository()
+#     field) resolves nothing, so ITS components are left alone while github.com
+#     is still filtered normally. Without isolation this would either drop every
+#     GHES component or fail open across the whole catalog.
+multi_run "acme/retired,corp/ghost" "ghes.example.com"
+check_verify "non-GitHub host isolated: its components kept, github.com still filtered" \
+    "ghes.example.com/corp/billing,ghes.example.com/corp/ghost,github.com/acme/payments" "$MULTI_KEYS"
+grep -q "ghes.example.com is inconclusive" "$VR_OUT" || \
+    fail "expected an inconclusive warning naming the unsupported host"
+grep -q "verification supports GitHub hosts only" "$VR_OUT" || \
+    fail "the inconclusive warning should say verification is GitHub-only"
+
+# (j) An id with no host segment (empty prefix + bare owner/repo) is not
+#     addressable, so it is left alone rather than guessed at.
+NOHOST_KEPT=$(echo '{"acme/payments":{"tags":[]},"github.com/acme/payments":{"tags":[]}}' | jq \
+    --rawfile present <(printf 'github.com/acme/payments\n') \
+    --rawfile checked <(printf 'github.com\n') '
+    ($present | split("\n") | map(select(length > 0))) as $ok
+    | ($checked | split("\n") | map(select(length > 0))) as $hosts
+    | with_entries((.key | split("/")) as $p
+        | select(($p|length) < 3 or $p[0]=="" or $p[1]=="" or $p[2]==""
+                 or (($p[0] | IN($hosts[])) | not)
+                 or (($p[0:3] | join("/")) | IN($ok[]))))' | jq -r 'keys | sort | join(",")')
+[ "$NOHOST_KEPT" = "acme/payments,github.com/acme/payments" ] || \
+    fail "a hostless id must be left alone, not dropped; got {$NOHOST_KEPT}"
+
+# (i) Monorepo-style ids (<owner>/<repo>/<subdir>) resolve to their backing repo,
+#     so a subcomponent follows its repo's verdict rather than being treated as
+#     an unverifiable id.
+: > "$COMPONENTS_OUT"; : > "$GQL_URLS"
+SUBDIR_IN='{"github.com/acme/payment-api":{"tags":[]},"github.com/acme/payment-api/services/billing":{"tags":[]},"github.com/acme/gone/services/void":{"tags":[]}}'
+SUBDIR_KEPT=$(echo "$SUBDIR_IN" | jq --arg prefix "github.com/" --rawfile present <(printf 'acme/payment-api\n') '
+    ($present | split("\n") | map(select(length > 0))) as $ok
+    | with_entries(
+        (.key | ltrimstr($prefix) | split("/")) as $parts
+        | select(($parts | length) < 2 or $parts[0] == "" or $parts[1] == ""
+                 or (($parts[0] + "/" + $parts[1]) | IN($ok[]))))' | jq -r 'keys | sort | join(",")')
+[ "$SUBDIR_KEPT" = "github.com/acme/payment-api,github.com/acme/payment-api/services/billing" ] || \
+    fail "monorepo subcomponent should follow its backing repo's verdict; got {$SUBDIR_KEPT}"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, and include/exclude filters (type/lifecycle/domain/system) verified"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), and verify_repos (drop/keep, fail-open paths, GHES endpoint, batching) verified"
 else
     echo "TEST FAILED" >&2
     exit 1

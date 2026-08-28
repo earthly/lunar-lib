@@ -261,7 +261,31 @@ inputs:
       Ignored for `auth_mode: bearer`.
     default: "execute-api"
 
+  verify_repos:
+    description: |
+      Skip components whose git repository does not exist, instead of
+      cataloging them. A Backstage annotation naming a renamed, deleted or
+      typo'd repo would otherwise create a component with nothing behind it,
+      which no collector or policy can ever run against. Skipped components
+      are named in the run log.
+
+      Not enabled by default in practice: it requires the `GH_TOKEN` secret,
+      and without one the cataloger logs a line and writes every component as
+      before. The host is read from each component id, so a catalog spanning
+      github.com and GitHub Enterprise Server needs no extra configuration.
+      Only GitHub hosts are supported — components on any other forge are
+      left unverified.
+    default: "true"
+
 secrets:
+  GH_TOKEN:
+    description: |
+      Optional; enables `verify_repos`. Needs only repository metadata read
+      access (`Metadata: Read` on a fine-grained PAT / GitHub App
+      installation token, `repo` on a classic PAT) on every org the catalog
+      references — a repo the token cannot see reads the same as one that
+      does not exist. Leave unset to skip verification.
+
   BACKSTAGE_TOKEN:
     description: |
       Bearer token for the Backstage API. Used when `auth_mode: bearer`

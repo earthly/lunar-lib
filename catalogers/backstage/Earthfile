@@ -8,5 +8,5 @@ test:
     FROM alpine:3.21
     RUN apk add --no-cache bash jq
     WORKDIR /workspace
-    COPY main.sh test-local.sh sample-catalog.json .
+    COPY main.sh test-local.sh sample-catalog.json sample-catalog-multihost.json .
     RUN ./test-local.sh

@@ -1,0 +1,44 @@
+{
+  "items": [
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "cloud-payments",
+        "namespace": "default",
+        "annotations": { "github.com/project-slug": "github.com/acme/payments" }
+      },
+      "spec": { "type": "service", "lifecycle": "production", "owner": "group:default/team-payments" }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "cloud-retired",
+        "namespace": "default",
+        "annotations": { "github.com/project-slug": "github.com/acme/retired" }
+      },
+      "spec": { "type": "service", "lifecycle": "production", "owner": "group:default/team-payments" }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "ghes-billing",
+        "namespace": "default",
+        "annotations": { "github.com/project-slug": "ghes.example.com/corp/billing" }
+      },
+      "spec": { "type": "service", "lifecycle": "production", "owner": "group:default/team-billing" }
+    },
+    {
+      "apiVersion": "backstage.io/v1alpha1",
+      "kind": "Component",
+      "metadata": {
+        "name": "ghes-ghost",
+        "namespace": "default",
+        "annotations": { "github.com/project-slug": "ghes.example.com/corp/ghost" }
+      },
+      "spec": { "type": "service", "lifecycle": "production", "owner": "group:default/team-billing" }
+    }
+  ]
+}

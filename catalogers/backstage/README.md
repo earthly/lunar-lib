@@ -188,6 +188,54 @@ with:
   component_id_prefix: "gitlab.com/"
 ```
 
+### Verifying Repos Exist (`verify_repos`)
+
+That annotation is a *claim* about a repo, not a fact. Backstage catalogs are maintained by hand, so renamed, deleted and typo'd slugs are routine — and Lunar doesn't validate repo existence when the catalog is saved, so the component gets created anyway and then sits there with nothing behind it: no collector and no policy can ever run against it.
+
+`verify_repos` (on by default) checks each component's repo before writing it and skips the ones that don't exist, naming them in the run log:
+
+```text
+github.com: 411/412 repo(s) exist (5 request(s))
+Repo does not exist (or GH_TOKEN cannot see it) — skipping:
+  github.com/acme/retired-service
+Repo verification dropped 1 of 415 component(s)
+```
+
+**In practice it's off until you set `GH_TOKEN`** — without the secret the cataloger logs one line and writes every component exactly as before, so upgrading changes nothing until you opt in:
+
+```sh
+lunar secret set GH_TOKEN <your-github-token>
+```
+
+`Metadata: Read` on a fine-grained PAT or GitHub App installation token is enough (`repo` on a classic PAT). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you already set it for `github-org` or the GitHub-API collectors this picks it up automatically. Lookups are batched ~100 repos per GraphQL request, so a few thousand components cost a few hundred requests per run rather than one per component.
+
+#### Multiple hosts
+
+The host is read from each component id (`<host>/<owner>/<repo>`), so a catalog spanning github.com and one or more GitHub Enterprise Server hosts needs **no extra configuration** — each host is checked against its own API (`https://<host>/api/graphql`, or `api.github.com` for the public one).
+
+To mix hosts in one catalog, leave `component_id_prefix` empty and let the annotation value carry the host:
+
+```yaml
+with:
+  component_id_prefix: ""      # annotation value is already ghes.example.com/org/repo
+```
+
+#### What happens when it can't tell
+
+Verification is **fail-open, per host**. The catalog only ever shrinks on a repo GitHub positively reports as absent; every "we don't know" leaves things alone:
+
+| Situation | Behaviour |
+|---|---|
+| No `GH_TOKEN` | Writes everything, logs one line |
+| Request fails, or a 200 with an unparseable body | That host's components all kept |
+| Nothing resolves for a host | That host's components all kept |
+
+Because hosts are independent, one bad host never affects the others.
+
+**Only GitHub hosts are supported.** Components on any other forge — GitLab, Bitbucket — are left unverified: that host resolves nothing, so it's treated as inconclusive and its components pass through untouched. GitHub components in the same catalog are still verified normally. Note also that a repo the token *cannot see* reads the same as one that doesn't exist, so scope `GH_TOKEN` to every org the catalog references.
+
+Verification covers this cataloger only. The file-based siblings don't need it: [`backstage-catalog-info-monorepo`](../backstage-catalog-info-monorepo) derives ids from repos it enumerated through the GitHub API, and [`backstage-catalog-info`](../backstage-catalog-info) only augments components Lunar already has.
+
 ### Restricting Synced Kinds
 
 By default, `Component` and `Domain` entities are synced. Include other kinds explicitly:
@@ -339,3 +387,10 @@ This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/
 3. **Read access** to the kinds configured in `entity_kinds`
 
 Pagination is handled automatically; the cataloger streams pages until all matching entities are fetched.
+
+When `verify_repos` is on (the default) it additionally calls the [GitHub GraphQL API](https://docs.github.com/en/graphql) — one batched query per ~100 repos, resolving each candidate component's `<owner>/<repo>` — and needs:
+
+- **`GH_TOKEN` secret** with repository metadata read access on every org the Backstage catalog references. A repo the token cannot see is reported as absent, so an under-scoped token drops real components.
+- **Network reach** from the Lunar Runner to each host in the catalog (`api.github.com`, plus `https://<host>/api/graphql` for any GitHub Enterprise Server host).
+
+See [Verifying Repos Exist](#verifying-repos-exist-verify_repos) for the fail-open behaviour when either is missing.
