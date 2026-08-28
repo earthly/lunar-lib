@@ -145,15 +145,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    # 1.1.6+ is REQUIRED, not cosmetic: the `lunar` CLI in 1.1.5 predates
-    # ENG-1231 (earthly/lunar#2150), which raised the gRPC client message cap
-    # from the 4 MiB default to 16 MiB. Any collector that fetches the whole
-    # catalog (`lunar cataloger get-json`) therefore dies with
-    # `ResourceExhausted: received message larger than max` on a Hub with more
-    # than ~4 MiB of catalog. Verified against cronos (~30k components,
-    # 6,264,485-byte catalog): 1.1.5-alpine fails, 1.1.6-alpine and main-alpine
-    # both return it in full.
-    ARG SCRIPTS_VERSION=1.1.6-alpine
+    ARG SCRIPTS_VERSION=1.1.5-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client

@@ -21,11 +21,16 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.sast.issues[]` | array | *(on each subcomponent)* The repo-wide findings whose file belongs to that subcomponent |
-| `.sast.findings` | object | *(on each subcomponent)* Severity counts recomputed for that subset |
-| `.sast.summary` | object | *(on each subcomponent)* Summary booleans (has_critical, has_high) for that subset |
-| `.sast.source` | object | *(on each subcomponent)* The root's scanner metadata, stamped `integration: "monorepo-fanout"` |
-| `.sast.native.monorepo_fanout` | object | Provenance — on a subcomponent: root component, root SHA, paths used, matched count, fingerprint. On the root: the per-target written/skipped breadcrumb |
+| `.sast.findings` | object | *(on each subcomponent)* Severity counts recomputed for that subcomponent's slice |
+| `.sast.summary` | object | *(on each subcomponent)* Summary booleans (has_critical, has_high) for that slice |
+| `.sast.source` | object | *(on each subcomponent)* The root's scanner metadata, stamped `integration: "monorepo-fanout"`, plus `.fanout` provenance (root component, root SHA, paths used, matched count, fingerprint) |
+| `.sast.issues[]` | array | *(on each subcomponent, opt-in)* The findings that subcomponent owns. Off unless `include_issues: "true"` — no SAST policy reads it |
+| `.sast.native.monorepo_fanout` | object | *(on the ROOT only)* The per-target written/skipped breadcrumb |
+
+**`.sast.native` is never written to a subcomponent.** The raw SARIF under
+`.sast.native.<tool>` describes the whole repository, so copying it onto a
+subcomponent would be both wrong and by far the largest thing transferred. It
+stays on the root; subcomponents get the derived numbers.
 
 ## Collectors
 
@@ -75,9 +80,13 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/monorepo@v1.13.0
     on: ["component:github.com/acme/repo"]
     # with:
-    #   # Pins the target list AND skips reading their explicit `paths:` (those
-    #   # live in the catalog), so attribution degrades to the implicit
-    #   # "<subdir>/*" each name implies. Prefer catalog discovery.
+    #   # Off by default: no SAST policy reads .sast.issues, so the per-finding
+    #   # array is not shipped to every subcomponent unless you want the detail
+    #   # visible per service.
+    #   include_issues: "false"
+    #   # Pins the target list AND skips reading their explicit `paths:`, so
+    #   # attribution degrades to the implicit "<subdir>/*" each name implies.
+    #   # Prefer automatic discovery.
     #   subcomponents: ""
     #   max_subcomponents: "50"
 

@@ -20,9 +20,11 @@ Plus the cross-component-write guardrails that are easy to regress:
 that already has its own scan is never overwritten, and a re-fire that would
 duplicate an identical payload is skipped.
 
-The `lunar` stub serves `component get-json` / `cataloger get-json` from
-fixtures and logs every `collect` call with its piped stdin to $CAPTURE, so a
-test can assert both *which* component was written and *what* was written.
+The `lunar` stub serves `component get-json` and `sql connection-string`, a
+`psql` stub stands in for the Hub's SQL API (applying the LIKE prefix itself so
+discovery is exercised as a genuinely scoped read), and every `collect` call is
+logged with its piped stdin to $CAPTURE — so a test can assert both *which*
+component was written and *what* was written.
 """
 
 import json
@@ -72,6 +74,7 @@ class Base(unittest.TestCase):
         self.bin = os.path.join(self.tmp, "bin")
         os.makedirs(self.bin)
         self.capture = os.path.join(self.tmp, "collect.log")
+        self.sql_log = os.path.join(self.tmp, "sql.log")
         self.fixtures = os.path.join(self.tmp, "fixtures")
         os.makedirs(self.fixtures)
         self.set_component_json(ROOT, {"sast": {"issues": ISSUES, "source": {"tool": "codeql", "version": "2.26.3"}}})
@@ -122,8 +125,10 @@ class Base(unittest.TestCase):
                         sys.stdout.write(open(path).read())
                         sys.exit(0)
 
-                    if argv[:2] == ["cataloger", "get-json"]:
-                        sys.stdout.write(open(os.path.join(fixtures, "_catalog.json")).read())
+                    if argv[:2] == ["sql", "connection-string"]:
+                        if os.environ.get("FAIL_SQL"):
+                            sys.exit(1)
+                        sys.stdout.write("postgres://stub/lunar")
                         sys.exit(0)
 
                     if argv[0] == "collect":
@@ -141,6 +146,38 @@ class Base(unittest.TestCase):
                 )
             )
         os.chmod(os.path.join(self.bin, "lunar"), 0o755)
+
+        # Stands in for the Hub's SQL API. It applies the LIKE prefix itself,
+        # exactly as Postgres would, so these tests exercise a genuinely SCOPED
+        # read rather than "fetch the whole catalog and filter client-side" —
+        # which is the thing that blew the gRPC message cap (ENG-1648).
+        with open(os.path.join(self.bin, "psql"), "w") as f:
+            f.write(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env python3
+                    import json, os, re, sys
+                    if os.environ.get("FAIL_PSQL"):
+                        sys.stderr.write("connection refused\\n")
+                        sys.exit(2)
+                    q = sys.argv[-1]
+                    if os.environ.get("SQL_LOG"):
+                        with open(os.environ["SQL_LOG"], "a") as lg:
+                            lg.write(" ".join(q.split()) + "\\n")
+                    m = re.search(r"LIKE '(.+?)%'", q)
+                    prefix = m.group(1) if m else ""
+                    cat = json.load(open(os.path.join(os.environ["FIXTURES"], "_catalog.json")))
+                    rows = []
+                    for name, v in sorted((cat.get("components") or {}).items()):
+                        if prefix and not name.startswith(prefix):
+                            continue
+                        rows.append(name + "\\t" + json.dumps(v.get("paths") or []))
+                    sys.stdout.write("\\n".join(rows) + ("\\n" if rows else ""))
+                    """
+                )
+            )
+        os.chmod(os.path.join(self.bin, "psql"), 0o755)
+
         with open(os.path.join(self.fixtures, "_catalog.json"), "w") as f:
             json.dump(CATALOG, f)
 
@@ -148,6 +185,7 @@ class Base(unittest.TestCase):
         env = dict(os.environ)
         env["PATH"] = self.bin + os.pathsep + env["PATH"]
         env["CAPTURE"] = self.capture
+        env["SQL_LOG"] = self.sql_log
         env["FIXTURES"] = self.fixtures
         env["LUNAR_COMPONENT_ID"] = component
         env["ROOT_NAME"] = ROOT
@@ -195,7 +233,9 @@ class Base(unittest.TestCase):
 
 class TestAttribution(Base):
     def test_findings_route_to_the_owning_subcomponent(self):
-        proc = self.run_script()
+        # Inspecting individual findings means opting the slice back in; the
+        # default payload carries only the counts (see TestPayload).
+        proc = self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
         self.assertEqual(proc.returncode, 0, proc.stderr)
         writes = self.writes()
         self.assertEqual(set(writes), {API, WEB, JOB})
@@ -210,7 +250,7 @@ class TestAttribution(Base):
         self.assertCountEqual(web_files, ["services/web/app/page.tsx", ".github/workflows/ci.yml"])
 
     def test_shared_claimed_file_reaches_every_claimant_and_no_one_else(self):
-        self.run_script()
+        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
         writes = self.writes()
         for name in (API, WEB):
             files = [i["file"] for i in writes[name]["stdin"]["issues"]]
@@ -220,7 +260,7 @@ class TestAttribution(Base):
         self.assertNotIn(".github/workflows/ci.yml", job_files)
 
     def test_unclaimed_finding_reaches_no_subcomponent(self):
-        self.run_script()
+        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
         for name, rec in self.writes().items():
             files = [i["file"] for i in rec["stdin"]["issues"]]
             self.assertNotIn("tools/generate.py", files, f"{name} should not own a repo-root file")
@@ -232,7 +272,7 @@ class TestAttribution(Base):
         self.set_component_json(ROOT, {"sast": {"issues": [
             {"severity": "low", "rule": "j/x", "file": "services/job/main.rs", "line": 1, "message": "x"},
         ]}})
-        self.run_script()
+        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
         writes = self.writes()
         self.assertEqual([i["file"] for i in writes[JOB]["stdin"]["issues"]], ["services/job/main.rs"])
         self.assertEqual(writes[API]["stdin"]["findings"]["total"], 0)
@@ -248,6 +288,8 @@ class TestAttribution(Base):
 
 class TestPayload(Base):
     def test_counts_and_summary_are_recomputed_per_subcomponent(self):
+        # This is the attribution proof now that .issues is opt-in: the COUNTS
+        # themselves differ per subcomponent, derived from path matching.
         self.run_script()
         api = self.writes()[API]["stdin"]
         # api owns: 1 high, 1 critical, 1 low (the shared workflow finding)
@@ -262,7 +304,7 @@ class TestPayload(Base):
         # "scanned and clean" is a real result: it is what turns the SAST policy
         # from "No SAST scanning data found" into a pass. Dropping the write
         # would leave exactly the gap this collector exists to close.
-        self.run_script()
+        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
         job = self.writes()[JOB]["stdin"]
         self.assertEqual(job["issues"], [])
         self.assertEqual(job["findings"]["total"], 0)
@@ -275,9 +317,53 @@ class TestPayload(Base):
         self.assertEqual(src["version"], "2.26.3")
         self.assertEqual(src["integration"], "monorepo-fanout")
 
+    def test_native_is_never_written_to_a_subcomponent(self):
+        # The raw SARIF under .sast.native describes the WHOLE repository, so it
+        # belongs to the root and nowhere else. Provenance lives under
+        # .sast.source.fanout instead of inventing a .native entry on the target.
+        self.run_script()
+
+        def find_native(node, path="sast"):
+            """Anywhere in the payload, not just the top level — the point is
+            that no .native ever reaches a subcomponent, however it is nested."""
+            hits = []
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    if k == "native":
+                        hits.append(f"{path}.{k}")
+                    hits += find_native(v, f"{path}.{k}")
+            elif isinstance(node, list):
+                for i, v in enumerate(node):
+                    hits += find_native(v, f"{path}[{i}]")
+            return hits
+
+        for name, rec in self.writes().items():
+            hits = find_native(rec["stdin"])
+            self.assertEqual(hits, [], f"{name} must not receive .native; found {hits}")
+
+    def test_issues_are_omitted_by_default(self):
+        # policies/sast reads .sast.summary.has_<sev> then .sast.findings.<sev>;
+        # max_total reads .sast.findings.total. None read .sast.issues, so the
+        # per-finding array is not shipped to every subcomponent by default.
+        self.run_script()
+        for name, rec in self.writes().items():
+            self.assertNotIn("issues", rec["stdin"], f"{name} got .sast.issues without opt-in")
+            self.assertIn("findings", rec["stdin"])
+            self.assertIn("summary", rec["stdin"])
+
+    def test_include_issues_opts_the_slice_back_in(self):
+        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        api = self.writes()[API]["stdin"]
+        self.assertCountEqual(
+            [i["file"] for i in api["issues"]],
+            ["services/api/src/db.go", "services/api/src/exec.go", ".github/workflows/ci.yml"],
+        )
+        # and the attributed slice is still per-subcomponent, not the whole set
+        self.assertNotIn("tools/generate.py", [i["file"] for i in api["issues"]])
+
     def test_provenance_records_root_sha_and_patterns(self):
         self.run_script()
-        native = self.writes()[API]["stdin"]["native"]["monorepo_fanout"]
+        native = self.writes()[API]["stdin"]["source"]["fanout"]
         self.assertEqual(native["root_component"], ROOT)
         self.assertEqual(native["root_git_sha"], SHA)
         self.assertEqual(native["matched"], 3)
@@ -303,6 +389,53 @@ class TestPayload(Base):
         self.run_script(env_overrides={"LUNAR_COMPONENT_PR": "43"})
         argv = self.writes()[API]["argv"]
         self.assertEqual(argv[argv.index("--pr") + 1], "43")
+
+
+class TestDiscovery(Base):
+    """Discovery must be a SCOPED read. Pulling the whole catalog to find a
+    handful of names is what blew the gRPC message cap on a real hub
+    (ResourceExhausted, 6264541 vs 4194304 — ENG-1648), and it wastes bandwidth
+    proportional to the entire fleet rather than to this one repo."""
+
+    def _queries(self):
+        if not os.path.exists(self.sql_log):
+            return []
+        with open(self.sql_log) as f:
+            return [l.strip() for l in f if l.strip()]
+
+    def test_discovery_pushes_the_prefix_filter_to_the_server(self):
+        self.run_script()
+        qs = self._queries()
+        self.assertTrue(qs, "no SQL query was issued — discovery did not use the SQL API")
+        self.assertTrue(
+            any(f"LIKE '{ROOT}/%'" in q for q in qs),
+            f"prefix filter not pushed down to Postgres; queries were: {qs}",
+        )
+
+    def test_discovery_never_calls_the_whole_catalog_rpc(self):
+        # `lunar cataloger get-json` returns the entire catalog in one gRPC
+        # message. The stub exits 2 on any unexpected invocation, so reaching
+        # for it would surface as a non-zero run.
+        proc = self.run_script()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertNotIn("cataloger", proc.stderr)
+
+    def test_sql_connection_string_failure_fails_loudly(self):
+        proc = self.run_script(env_overrides={"FAIL_SQL": "1"})
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("could not enumerate subcomponents", proc.stderr)
+        self.assertEqual(self.writes(), {})
+
+    def test_psql_failure_fails_loudly(self):
+        proc = self.run_script(env_overrides={"FAIL_PSQL": "1"})
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("could not enumerate subcomponents", proc.stderr)
+        self.assertEqual(self.writes(), {})
+
+    def test_explicit_subcomponents_input_skips_sql_entirely(self):
+        self.run_script(env_overrides={"LUNAR_VAR_SUBCOMPONENTS": f"{API}, {WEB}"})
+        self.assertEqual(self._queries(), [], "the input should short-circuit the SQL read")
+        self.assertEqual(set(self.writes()), {API, WEB})
 
 
 class TestReadRetries(Base):

@@ -91,6 +91,11 @@ if [ -n "$PR" ]; then
 fi
 
 MAX_TARGETS="${LUNAR_VAR_MAX_SUBCOMPONENTS:-50}"
+# jq needs a real boolean, and the input arrives as a string.
+case "${LUNAR_VAR_INCLUDE_ISSUES:-false}" in
+  true|True|TRUE|yes|1) INCLUDE_ISSUES=true ;;
+  *)                    INCLUDE_ISSUES=false ;;
+esac
 
 log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 
@@ -154,15 +159,40 @@ SOURCE=$(echo "$ROOT_JSON" | jq -c '.sast.source // {}')
 log "root carries $(echo "$ISSUES" | jq 'length') SAST issue(s)"
 
 # --- 2. Discover the subcomponents -------------------------------------------
-# The `subcomponents` input short-circuits catalog discovery, for hubs where the
-# merged catalog is large or the operator wants an explicit target list.
+# Scoped SQL query, NOT `lunar cataloger get-json`.
+#
+# The merged-catalog RPC returns the WHOLE catalog as one uncompressed gRPC
+# message — 6.2 MB / ~30k components on our own dogfood hub — to find the
+# handful of names under one repo. Two problems with that: it blows the gRPC
+# client message cap (`ResourceExhausted: received message larger than max
+# (6264541 vs 4194304)`, ENG-1648) and it is absurdly wasteful even when it
+# fits, since the size scales with the whole fleet rather than with this repo.
+#
+# `public.catalog_latest` is the SQL-API view over the same catalog, so Postgres
+# does the prefix filter server-side and only the matching rows cross the wire.
+# It also carries each component's explicit `paths:` (catalog_latest.sql builds
+# them into the document), which is what makes accurate attribution possible —
+# the `subcomponents` input cannot supply them.
+discover_subcomponents() {
+  local conn
+  conn=$(retry_read lunar sql connection-string) || return 1
+  psql "$conn" --no-align --tuples-only --quiet --field-separator=$'\t' -c "
+      SELECT c.key, COALESCE(c.value->'paths', '[]'::jsonb)::text
+      FROM public.catalog_latest, jsonb_each(catalog_json->'components') c
+      WHERE c.key LIKE '$(printf '%s' "$ROOT" | sed "s/'/''/g")/%'
+      ORDER BY c.key" 2>/dev/null |
+    jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t"))
+                 | map({key: .[0], value: {paths: (.[1] | fromjson)}})
+                 | {components: from_entries}'
+}
+
 if [ -n "${LUNAR_VAR_SUBCOMPONENTS:-}" ]; then
   CATALOG=$(echo "${LUNAR_VAR_SUBCOMPONENTS}" | tr ',' '\n' |
     jq -R 'sub("^ +";"") | sub(" +$";"") | select(length > 0)' |
     jq -s -c '{components: (map({key: ., value: {}}) | from_entries)}')
   log "using the explicit subcomponent list from the subcomponents input"
-elif ! CATALOG=$(retry_read lunar cataloger get-json); then
-  log "ERROR: could not read the catalog within ${READ_BUDGET_SECS}s — cannot discover subcomponents, and the wave will not fire again for this commit"
+elif ! CATALOG=$(discover_subcomponents) || [ -z "$CATALOG" ]; then
+  log "ERROR: could not enumerate subcomponents of $ROOT via the SQL API. The wave is fire-once, so this commit's fan-out is lost — pin the list with the subcomponents input, or check that the Hub's SQL API is reachable from collectors."
   exit 1
 fi
 
@@ -260,7 +290,7 @@ while [ "$i" -lt "$TARGET_COUNT" ]; do
       continue
     fi
 
-    PRIOR=$(echo "$TARGET_JSON" | jq -r '.sast.native.monorepo_fanout.fingerprint // ""')
+    PRIOR=$(echo "$TARGET_JSON" | jq -r '.sast.source.fanout.fingerprint // ""')
     if [ "$PRIOR" = "$FINGERPRINT" ]; then
       log "skip $NAME — already carries this exact fan-out (fingerprint $FINGERPRINT)"
       RESULTS=$(echo "$RESULTS" | jq -c --arg n "$NAME" '. + [{component: $n, status: "skipped", reason: "unchanged"}]')
@@ -268,18 +298,37 @@ while [ "$i" -lt "$TARGET_COUNT" ]; do
     fi
   fi
 
+  # What a subcomponent gets is deliberately SMALL: the counts its SAST policies
+  # actually evaluate, plus provenance. Two reasons.
+  #
+  # 1. `.native` stays on the ROOT only. The raw SARIF the scanner produced
+  #    (.sast.native.codeql.sarif) describes the whole repository, so copying it
+  #    onto a subcomponent would be both wrong (it is not that component's data)
+  #    and by far the largest thing here. The root keeps it; subcomponents get
+  #    the derived numbers. Provenance therefore lives under `.sast.source`,
+  #    which is the normalized "where did this come from" key, rather than
+  #    inventing a `.native` entry on the target.
+  # 2. `policies/sast` reads `.sast.summary.has_<sev>`, then falls back to
+  #    `.sast.findings.<sev>`, and `max_total` reads `.sast.findings.total`.
+  #    None of them read `.sast.issues`. Shipping the per-finding array to every
+  #    subcomponent is a write whose size scales with findings x subcomponents
+  #    for data no guardrail evaluates — so it is opt-in via `include_issues`
+  #    for operators who want the detail visible per service.
   PAYLOAD=$(echo "$TARGET" | jq -c \
-    --arg root "$ROOT" --arg sha "$SHA" --arg fp "$FINGERPRINT" --argjson source "$SOURCE" '
-    { issues: .issues,
-      findings: .findings,
-      summary: .summary,
-      source: ($source + {integration: "monorepo-fanout"}),
-      native: { monorepo_fanout: {
-        root_component: $root,
-        root_git_sha:   $sha,
-        paths:          .patterns,
-        matched:        (.issues | length),
-        fingerprint:    $fp } } }')
+    --arg root "$ROOT" --arg sha "$SHA" --arg fp "$FINGERPRINT" \
+    --argjson source "$SOURCE" --argjson with_issues "$INCLUDE_ISSUES" '
+    . as $t
+    | { findings: $t.findings,
+        summary:  $t.summary,
+        source: ($source + {
+          integration: "monorepo-fanout",
+          fanout: {
+            root_component: $root,
+            root_git_sha:   $sha,
+            paths:          $t.patterns,
+            matched:        ($t.issues | length),
+            fingerprint:    $fp } }) }
+    | if $with_issues then . + {issues: $t.issues} else . end')
 
   # `--component` is only honoured on a real hub submit. Inside a collector
   # runtime LUNAR_COLLECT_STDOUT makes `lunar collect` print instead, and the
