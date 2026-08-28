@@ -6,7 +6,7 @@ description: Score a component on the share of its recent pull requests that ref
 
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.14.0
 
 landing_page:
   display_name: "Ticket Coverage Guardrails"
