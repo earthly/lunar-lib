@@ -57,9 +57,17 @@ SAFE_COMPONENT_ID="${LUNAR_COMPONENT_ID//\'/\'\'}"
 # One row per pull request, newest first, so a PR counts once however many commits it
 # carried and its ticket reflects the latest state of the PR.
 #
-# materialized_components rather than components_latest: this needs the trailing-window
-# *history* of pull requests, and components_latest is filtered to the latest commits
-# per component, which would undercount.
+# public.components, not public.materialized_components. `components` is the supported SQL
+# API surface, and it is a serving switch on HUB_MAT_SERVING_ENABLED: with the flag on the
+# view reads mat.components, with it off it reads components_base UNION
+# materialized_components and prefers components_base. So materialized_components is either
+# not in the serving path at all, or only its stale arm -- reading it directly undercounts
+# recent pull requests, which for a trailing window is exactly the rows that matter. Both
+# branches of the switch are required to expose an identical column list, which is what
+# makes `components` safe to depend on across the flip.
+#
+# Not components_latest: this needs the trailing-window *history* of pull requests, and
+# components_latest is filtered to the latest commits per component.
 #
 # `timestamp` is `timestamp without time zone` holding UTC, so the window is anchored on
 # `now() AT TIME ZONE 'UTC'`. A bare now() is timestamptz and gets compared through the
@@ -69,7 +77,7 @@ QUERY="
     SELECT DISTINCT ON (pr)
            pr,
            component_json->'vcs'->'pr'->'ticket'->>'id' AS ticket_id
-    FROM materialized_components
+    FROM public.components
     WHERE component_id = '${SAFE_COMPONENT_ID}'
       AND pr IS NOT NULL
       AND timestamp > (now() AT TIME ZONE 'UTC') - interval '${WINDOW} days'
