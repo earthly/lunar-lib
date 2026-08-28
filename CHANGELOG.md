@@ -56,6 +56,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `claude`, `coderabbit` and `codeql` collectors: `runs_on` was nested under
+  `hook:` in five sub-collectors, where it does nothing. `runs_on` is a
+  snippet-level field; the hook mapping has no such key, and because plugin
+  manifests are not decoded with unknown-key rejection it was dropped silently
+  and then replaced by the `[prs, default-branch]` default. All five were
+  running in both contexts while the manifest said otherwise. `claude`
+  (`code-reviewer`, `run-code-review`) and `coderabbit` (`code-reviewer`) now
+  declare `runs_on: [prs]` at snippet level and **stop running on
+  default-branch commits** — they read pull request review data, and on a
+  default-branch commit there is no pull request. The two `codeql`
+  sub-collectors drop the key instead: GitHub Code Scanning covers the default
+  branch and `github-app.sh` queries check-runs for any commit, so both should
+  run in both contexts and the key was only ever a copy of the semgrep
+  pattern, whose PR-only reasoning does not apply. codeql behaviour is
+  therefore unchanged. A new `scripts/validate_manifest_schema.py` runs in
+  `+lint` and now fails the build on any key a plugin manifest puts outside
+  the snippet or hook schema, naming the file, sub-snippet, key and line
+  (#291).
 - `trivy` and `grype` collectors (`container-scan`): image scans no longer skip
   on every pull request. The image to scan is resolved from the docker
   collector's pushed-image record via `lunar component get-json`, but the lookup

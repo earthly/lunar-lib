@@ -32,7 +32,7 @@ This policy reads from the following Component JSON paths:
 | `.sca.summary.has_high` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_medium` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_low` | boolean | SCA collector (preferred) |
-| `.sca.findings[]` | array | SCA collector — used by the optional `max-severity` webhook alert (`cve`, `severity`, `package`, `fix_version`) |
+| `.sca.findings[]` | array | SCA collector — names the offending packages/CVEs in the `max-severity` failure, drives `ignore_unfixable`, and populates the optional webhook alert (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
@@ -49,9 +49,41 @@ policies:
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
+      # ignore_unfixable: "true"  # Optional: only fail on findings that have a fix
       # alert_url: "https://example.com/hook"  # Optional: webhook on max-severity failure
       # alert_timeout_sec: "2"                  # Optional: POST timeout (seconds)
 ```
+
+### Only failing on fixable findings
+
+By default `max-severity` fails on every finding at or above `min_severity`,
+whether or not a fix exists. That is the right default, but it means a single
+unfixable upstream advisory can hold a gate closed indefinitely — no change to
+your own code can clear it. Set `ignore_unfixable: "true"` to narrow the failure
+to findings that carry an upgrade target:
+
+```yaml
+    with:
+      min_severity: "high"
+      ignore_unfixable: "true"
+```
+
+Unfixable findings are **still collected and still visible** in the Component
+JSON and the dashboard — the option changes what the check *gates on*, never what
+is recorded. It can only turn a failure into a pass: it is applied after the
+threshold has already been crossed, so it never creates a failure the default
+would not have raised.
+
+Two behaviours worth knowing:
+
+- A finding counts as fixable when the scanner reported a fix version. Where two
+  scanners disagree, the one that found a fix wins — a fix that exists is
+  actionable.
+- If the collector reported only summary counts and no `.sca.findings[]`,
+  fixability cannot be evaluated per finding, so the check **fails as it would
+  with the option off** and says so in the failure message. `.sca.summary.all_fixable`
+  is not a substitute: it is a single boolean across *all* severities, so it
+  cannot answer whether the in-scope findings are fixable.
 
 ### Webhook Alerts
 
@@ -163,13 +195,14 @@ the findings as normal and the delivery failure is logged to stderr.
 - `executed`: "No SCA scanning data found. Ensure a scanner (Snyk, Semgrep, etc.) is configured."
 - `max-total`: "Total vulnerability findings (25) exceeds threshold (10)"
 
-`max-severity` lists the offending findings (most severe first) as a sub-list, which renders in the GitHub PR comment as:
+`max-severity` fails with a headline assertion plus one assertion per offending finding (most severe first), which the hub renders as a sub-list under the check in the GitHub PR comment:
 
-> Critical vulnerability findings detected:
-> - critical: lodash — CVE-2021-23337 (fix: 4.17.21)
-> - high: axios — CVE-2023-45857 (no fix available)
+> ❌ **max-severity**
+>   * Critical vulnerability findings detected
+>   * critical: lodash — CVE-2021-23337 (fix: 4.17.21)
+>   * high: axios — CVE-2023-45857 (no fix available)
 
-Up to the first 10 are shown, with a `+N more (see component JSON for full list)` tail when there are more (the full set is always in the component JSON). If the collector reports only summary counts with no per-finding `.sca.findings[]`, the message is just the headline (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` carries the same list in a compact single-line form.
+There's no policy-side cap — every in-scope finding is its own assertion. The hub truncates the *display* (it shows the first few, then `N more assertions weren't shown`), while the Grafana dashboard and the component JSON carry the complete list. If the collector reports only summary counts with no per-finding `.sca.findings[]`, the check fails with the headline alone (e.g. `Critical vulnerability findings detected`). The webhook payload's `message` is that same headline; the full findings ride in its structured `findings` array.
 
 ## Remediation
 

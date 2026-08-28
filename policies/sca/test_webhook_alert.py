@@ -181,9 +181,14 @@ def resolved_status(c):
 
 
 def failure_message(c):
-    """The single failure message a failed max-severity check emitted."""
-    reasons = c.failure_reasons
-    return reasons[0] if reasons else ""
+    """All failure messages a failed max-severity check emitted, joined.
+
+    max-severity emits multiple failing assertions on a single check — the
+    severity headline plus one per offending finding — so a test that looks for
+    a headline *or* a specific finding line needs the whole set, not just the
+    first reason.
+    """
+    return "\n".join(c.failure_reasons)
 
 
 # --------------------------------------------------------------------------- #
@@ -233,6 +238,24 @@ class WebhookHelperTests(unittest.TestCase):
         # Timestamp is informational; the dedupe key must be stable across runs.
         self.assertNotEqual(p1["timestamp"], p2["timestamp"])
         self.assertEqual(p1["dedupe_key"], p2["dedupe_key"])
+
+    def test_build_payload_projects_findings_to_the_published_keys(self):
+        """Extra keys a policy carries must not widen the versioned schema.
+
+        `max_severity` tracks `fixable` on each normalized finding to drive the
+        `ignore_unfixable` filter. That is internal bookkeeping — leaking it into
+        the payload would silently change schema v1 for every consumer.
+        """
+        payload = webhook.build_payload(
+            "sca",
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0",
+              "fixable": True, "some_future_field": "x"}],
+            component="c", git_sha="sha",
+        )
+        self.assertEqual(
+            payload["findings"],
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0"}],
+        )
 
     def test_build_payload_pr_from_env(self):
         with lunar_env(LUNAR_COMPONENT_PR="7"):
@@ -317,9 +340,10 @@ class MaxSeverityAlertTests(unittest.TestCase):
         self.assertIsNone(body["pr"])
         self.assertEqual(body["min_severity"], "high")
         self.assertIn("vulnerability findings detected", body["message"])
-        # Webhook message: compact single-line summary that names findings, no
-        # Markdown (the multi-line sub-list form is for the GitHub check only).
-        self.assertIn("golang.org/x/net", body["message"])
+        # Webhook message is the severity headline (single line); the offending
+        # packages/CVEs ride in the structured `findings` array below, not in
+        # the message text.
+        self.assertNotIn("golang.org/x/net", body["message"])
         self.assertNotIn("\n", body["message"])
         self.assertEqual(body["schema_version"], 1)
         self.assertIn("dedupe_key", body)
@@ -379,6 +403,22 @@ class MaxSeverityAlertTests(unittest.TestCase):
             headers, _ = r.requests[0]
         self.assertEqual(headers.get("Authorization"), "Bearer topsecret")
 
+    def test_webhook_message_is_headline_not_enumerated(self):
+        # The webhook `message` is the single-line severity headline; the full
+        # findings ride in the structured `findings` array, so the message never
+        # enumerates packages/CVEs, has no "+N more" tail, and stays single-line.
+        n = 15
+        with Receiver(status=200) as r:
+            run_check(node(sca=many_findings_sca(n)),
+                      LUNAR_VAR_alert_url=r.url, LUNAR_VAR_min_severity="critical")
+            _, body = r.requests[0]
+        msg = body["message"]
+        self.assertIn("vulnerability findings detected", msg)
+        self.assertNotIn("more", msg)                # no truncation tail
+        self.assertNotIn("JSON", msg)                # no jargon
+        self.assertNotIn("\n", msg)                  # single-line
+        self.assertEqual(len(body["findings"]), n)   # full set in the array
+
 
 # --------------------------------------------------------------------------- #
 # max-severity failure-message enumeration tests                               #
@@ -392,27 +432,33 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
     def test_failure_message_lists_findings(self):
         c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="high")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        msg = failure_message(c)
-        self.assertIn("High vulnerability findings detected", msg)
-        # Rendered as a Markdown sub-list: headline, then one indented bullet
-        # per finding (nests under the hub's failure bullet in the PR comment).
-        self.assertIn("High vulnerability findings detected:\n    * ", msg)
+        reasons = c.failure_reasons
+        # Headline assertion + one per in-scope finding — no manual enumeration
+        # into a single message, no truncation tail.
+        self.assertEqual(len(reasons), 3)   # headline + 2 HIGH (medium below)
+        self.assertEqual(reasons[0], "High vulnerability findings detected")
+        joined = "\n".join(reasons)
         # Both HIGH findings named, with package + CVE + fix status.
-        self.assertIn("golang.org/x/net", msg)
-        self.assertIn("CVE-2023-44487", msg)
-        self.assertIn("fix: 0.17.0", msg)
-        self.assertIn("github.com/foo/bar", msg)
-        self.assertIn("CVE-2024-0001", msg)
-        self.assertIn("no fix available", msg)
+        self.assertIn("golang.org/x/net", joined)
+        self.assertIn("CVE-2023-44487", joined)
+        self.assertIn("fix: 0.17.0", joined)
+        self.assertIn("github.com/foo/bar", joined)
+        self.assertIn("CVE-2024-0001", joined)
+        self.assertIn("no fix available", joined)
         # The MEDIUM finding is below the threshold -> excluded.
-        self.assertNotIn("baz", msg)
-        self.assertNotIn("CVE-2024-0002", msg)
+        self.assertNotIn("baz", joined)
+        self.assertNotIn("CVE-2024-0002", joined)
+        # No hand-built sub-list and no jargon tail.
+        self.assertNotIn("JSON", joined)
+        self.assertNotIn("more (", joined)
 
     def test_failure_message_widens_with_min_severity(self):
         c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="medium")
-        msg = failure_message(c)
-        self.assertIn("baz", msg)            # medium finding now in scope
-        self.assertIn("CVE-2024-0002", msg)
+        reasons = c.failure_reasons
+        joined = "\n".join(reasons)
+        self.assertIn("baz", joined)            # medium finding now in scope
+        self.assertIn("CVE-2024-0002", joined)
+        self.assertEqual(len(reasons), 4)       # headline + 2 high + 1 medium
 
     def test_summary_only_has_no_enumeration(self):
         # No `.findings` detail -> headline only, nothing to enumerate.
@@ -423,16 +469,20 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         self.assertNotIn("—", msg)
         self.assertNotIn("CVE", msg)
 
-    def test_long_finding_list_is_capped(self):
-        n = max_severity.MAX_LISTED_FINDINGS + 5
+    def test_long_finding_list_emits_all_as_assertions(self):
+        # No policy-side cap: every in-scope finding is its own failing
+        # assertion. The hub truncates the *display* (hub/poster
+        # maxAssertionListSize); the policy emits the complete set with no
+        # "+N more" / "JSON" tail and no manual multiline sub-list.
+        n = 15
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        msg = failure_message(c)
-        self.assertIn("+5 more (see component JSON for full list)", msg)
-        # MAX_LISTED_FINDINGS enumerated findings + one "+N more ..." line, each
-        # a 4-space-indented Markdown sub-bullet under the headline.
-        bullets = [ln for ln in msg.split("\n") if ln.startswith("    * ")]
-        self.assertEqual(len(bullets), max_severity.MAX_LISTED_FINDINGS + 1)
+        reasons = c.failure_reasons
+        self.assertEqual(len(reasons), n + 1)   # headline + all 15, uncapped
+        joined = "\n".join(reasons)
+        self.assertNotIn("more (", joined)          # no truncation tail
+        self.assertNotIn("JSON", joined)            # no jargon pointer
+        self.assertNotIn("\n    * ", joined)        # no manual sub-list
 
 
 if __name__ == "__main__":

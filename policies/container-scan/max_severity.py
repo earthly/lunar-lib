@@ -1,20 +1,23 @@
 """Ensure no findings at or above the configured severity threshold.
 
-When findings cross the threshold the check fails, listing the offending
-packages/CVEs in the failure message (when the collector emitted per-finding
-detail in `.container_scan.findings[]`). This mirrors the `sca` policy's
-`max-severity` output so a container-image scan and a code-level SCA scan read
-identically in the GitHub check / PR comment.
+When findings cross the threshold the check fails with one assertion per
+offending package/CVE (when the collector emitted per-finding detail in
+`.container_scan.findings[]`), so the hub renders and truncates the list. This
+mirrors the `sca` policy's `max-severity` output so a container-image scan and
+a code-level SCA scan read identically in the GitHub check / PR comment.
+
+Set `ignore_unfixable: "true"` to narrow the failure to findings that carry an
+upgrade target, so an unfixable base-image CVE cannot hold a gate closed
+indefinitely. The default (`"false"`) fails on every finding at or above the
+threshold, fixable or not. Unfixable findings are always still recorded in the
+component JSON — the option changes the *verdict*, never what is collected.
 """
+
+import sys
 
 from lunar_policy import Check, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
-
-# Cap on how many individual findings to enumerate in the failure message: a
-# GitHub check / PR comment listing more than this is a wall of text, and the
-# full set is always in the component JSON.
-MAX_LISTED_FINDINGS = 10
 
 
 def _severities_in_scope(min_severity):
@@ -37,6 +40,38 @@ def finding_text(finding):
     return head + (f" (fix: {fix})" if fix else " (no fix available)")
 
 
+def _dedupe_findings(findings):
+    """Collapse the same vulnerability reported by more than one scanner.
+
+    trivy and grype both write `.container_scan` for the same image, and the hub
+    concatenates their `findings[]` while keeping a single writer's counts — so
+    one vulnerability appears once per scanner. Enumerating those raw repeats
+    identical lines in the PR comment and inflates the "+N more" tail.
+
+    The CVE id *is* the identity, so a finding without one is never merged: a
+    scanner may report an advisory it has no CVE for, and collapsing those on
+    package and severity alone would discard genuinely distinct vulnerabilities.
+
+    On a collision the *fixable* entry wins, along with its `fix_version`: if any
+    scanner knows of a fix then a fix genuinely exists, and preferring it keeps
+    the `ignore_unfixable` filter on the safe side — it can only leave a finding
+    in scope, never drop one. First-seen order is preserved.
+    """
+    out = []
+    at = {}
+    for finding in findings:
+        if not finding["id"]:
+            out.append(finding)
+            continue
+        key = (finding["severity"], finding["package"], finding["id"])
+        if key not in at:
+            at[key] = len(out)
+            out.append(finding)
+        elif finding["fixable"] and not out[at[key]]["fixable"]:
+            out[at[key]] = finding
+    return out
+
+
 def _collect_findings(scan_node, in_scope):
     """Return findings at/above threshold from `.container_scan.findings[]`.
 
@@ -52,46 +87,41 @@ def _collect_findings(scan_node, in_scope):
         severity = (finding.get_value_or_default(".severity", "") or "").lower()
         if severity not in in_scope:
             continue
+        fix_version = finding.get_value_or_default(".fix_version", None)
+        fixable = finding.get_value_or_default(".fixable", None)
+        if fixable is None:
+            # Older blobs may omit the flag; a reported fix version is the best
+            # available proxy. It is exactly how trivy computes it, and grype
+            # only carries a fix version for findings it marks fixed.
+            fixable = bool(fix_version)
         out.append(
             {
                 "id": finding.get_value_or_default(".cve", None),
                 "severity": severity,
                 "package": finding.get_value_or_default(".package", None),
-                "fix_version": finding.get_value_or_default(".fix_version", None),
+                "fix_version": fix_version,
+                "fixable": bool(fixable),
             }
         )
-    return out
+    return _dedupe_findings(out)
 
 
-def _with_findings(headline, findings, multiline=False):
-    """Append the offending findings to the failure headline (most severe first).
+def _most_severe(findings):
+    """Return the most severe severity present in `findings` (None when empty)."""
+    for severity in SEVERITY_ORDER:
+        if any(f.get("severity") == severity for f in findings):
+            return severity
+    return None
 
-    Summary-only scans (no `.findings`) return the headline unchanged. The list
-    is capped at MAX_LISTED_FINDINGS; any remainder is summarized as a
-    "+N more (see component JSON for full list)" tail. `multiline=True` renders
-    the findings as a Markdown sub-list — one per line, indented 4 spaces so
-    they nest under the failure bullet the hub emits (`  * <message>`) and show
-    as a tidy nested list in the GitHub PR comment.
-    """
-    if not findings:
-        return headline
 
-    def _rank(finding):
-        severity = finding.get("severity")
-        return (
-            SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER),
-            finding.get("package") or "",
-            finding.get("id") or "",
-        )
-
-    ordered = sorted(findings, key=_rank)
-    lines = [finding_text(f) for f in ordered[:MAX_LISTED_FINDINGS]]
-    hidden = len(ordered) - len(lines)
-    if hidden > 0:
-        lines.append(f"+{hidden} more (see component JSON for full list)")
-    if multiline:
-        return f"{headline}:\n" + "\n".join(f"    * {line}" for line in lines)
-    return f"{headline}: " + "; ".join(lines)
+def _rank(finding):
+    """Sort key: most-severe first, then package, then CVE id (stable order)."""
+    severity = finding.get("severity")
+    return (
+        SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else len(SEVERITY_ORDER),
+        finding.get("package") or "",
+        finding.get("id") or "",
+    )
 
 
 def main(node=None):
@@ -113,6 +143,9 @@ def main(node=None):
             return c
 
         in_scope = _severities_in_scope(min_severity)
+        ignore_unfixable = (
+            variable_or_default("ignore_unfixable", "false").strip().lower() == "true"
+        )
 
         # Determine the failing severity: summary booleans first (preferred),
         # then counts. Build the same human-readable headline we fail with.
@@ -133,11 +166,51 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            # Name the offending packages/CVEs, not just that the threshold was
-            # crossed — same treatment as the `sca` policy. Renders as a Markdown
-            # sub-list so it nests tidily in the GitHub PR comment.
             findings = _collect_findings(scan_node, set(in_scope))
-            c.fail(_with_findings(fail_message, findings, multiline=True))
+            if ignore_unfixable:
+                # Narrow the failure to findings that carry an upgrade target, so
+                # an unfixable base-image CVE cannot hold a release gate closed
+                # forever. Deliberately applied *after* the summary/count path has
+                # already decided this is a failure: the option can only suppress
+                # a failure, never create one.
+                if not findings:
+                    # Summary-only scan: fixability is not knowable per finding.
+                    # `.container_scan.summary.all_fixable` cannot answer this —
+                    # it is a single boolean across *all* severities, not the
+                    # in-scope ones. Fail as if the option were off, and say why
+                    # rather than passing on data we do not have.
+                    fail_message += (
+                        " (ignore_unfixable is set, but the scanner reported no per-finding "
+                        "detail, so fixability could not be verified)"
+                    )
+                else:
+                    fixable = [f for f in findings if f["fixable"]]
+                    if not fixable:
+                        # Every in-scope finding is unfixable — nothing actionable
+                        # to gate on. They remain in the component JSON.
+                        print(
+                            f"[ignore_unfixable] passing: all {len(findings)} finding(s) at or "
+                            f"above '{min_severity}' have no fix available",
+                            file=sys.stderr,
+                        )
+                        return c
+                    findings = fixable
+                    severity = _most_severe(findings)
+                    fail_message = (
+                        f"{severity.capitalize()} container vulnerabilities with an available fix "
+                        f"detected (findings with no available fix ignored)"
+                    )
+
+            # Multiple failing assertions on a single check — same treatment as
+            # the `sca` policy: the headline first (the threshold that tripped
+            # plus any `ignore_unfixable` narrowing), then one assertion per
+            # offending package/CVE, most severe first. The hub renders each as
+            # its own line and truncates the *display* (hub/poster
+            # maxAssertionListSize); no policy-side cap or "+N more" tail. A
+            # summary-only scan emits the headline alone.
+            c.fail(fail_message)
+            for finding in sorted(findings, key=_rank):
+                c.fail(finding_text(finding))
             return c
 
         # Scan data exists but reports no findings/summary — that's a collector
