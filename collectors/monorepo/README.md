@@ -75,7 +75,10 @@ collectors:
   - uses: github://earthly/lunar-lib/collectors/monorepo@v1.13.0
     on: ["component:github.com/acme/repo"]
     # with:
-    #   subcomponents: ""      # pin the target list, skipping catalog discovery
+    #   # Pins the target list AND skips reading their explicit `paths:` (those
+    #   # live in the catalog), so attribution degrades to the implicit
+    #   # "<subdir>/*" each name implies. Prefer catalog discovery.
+    #   subcomponents: ""
     #   max_subcomponents: "50"
 
 policies:

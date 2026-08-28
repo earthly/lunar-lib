@@ -62,6 +62,12 @@ inputs:
       Skips catalog discovery entirely — useful on a Hub with a very large
       merged catalog, or to restrict the fan-out to a subset. Default (empty)
       discovers every catalog component whose name is prefixed by the root's.
+      NOTE: it also skips reading each target's explicit `paths:`, which only
+      exist in the catalog. Attribution then falls back to the implicit
+      "<subdir>/*" a component's name implies, so a subcomponent that claims
+      files outside its own directory (a shared `.github/workflows/ci.yml`, a
+      root `CODEOWNERS`) will NOT receive findings from them. Prefer catalog
+      discovery unless you have a reason not to.
     default: ""
   max_subcomponents:
     description: |
