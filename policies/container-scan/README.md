@@ -119,11 +119,12 @@ Two behaviours worth knowing:
 
 **Failure messages:**
 - `executed`: "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured."
-- `max-severity`: names the offending packages/CVEs (most severe first, capped at 10 with a `+N more` tail), the same format the `sca` policy uses. When the scanner emits per-finding detail it renders as a nested list:
+- `max-severity`: fails with a headline assertion plus one assertion per offending package/CVE (most severe first), the same format the `sca` policy uses — no policy-side cap; the hub truncates the display. When the scanner emits per-finding detail it renders as a nested list under the check:
   ```
-  Critical container vulnerabilities detected:
-      * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
-      * high: libcurl — CVE-2026-5678 (no fix available)
+  ❌ max-severity
+    * Critical container vulnerabilities detected
+    * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
+    * high: libcurl — CVE-2026-5678 (no fix available)
   ```
   A summary-only scanner (no `.container_scan.findings[]`) falls back to the headline alone (e.g. `Critical container vulnerabilities detected`).
 - `max-total`: "Total container vulnerability findings (40) exceeds threshold (10)"

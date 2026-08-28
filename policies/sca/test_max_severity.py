@@ -146,8 +146,14 @@ def resolved_status(c):
 
 
 def failure_message(c):
-    reasons = c.failure_reasons
-    return reasons[0] if reasons else ""
+    """All failure messages a failed max-severity check emitted, joined.
+
+    max-severity emits multiple failing assertions on a single check — the
+    severity headline plus one per offending finding — so a test that looks for
+    a headline *or* a specific finding line needs the whole set, not just the
+    first reason.
+    """
+    return "\n".join(c.failure_reasons)
 
 
 class DedupeTests(unittest.TestCase):
