@@ -688,11 +688,11 @@ verify_component_repos() {
         # `errors` — a 200 with partial data, not an error response. Anything
         # that did resolve is present.
         #
-        # `|| hard_failure=1` is load-bearing: a 200 carrying a non-JSON body (a
+        # Guarding this jq is load-bearing: a 200 carrying a non-JSON body (a
         # proxy or WAF error page, a truncated response) makes jq exit non-zero,
-        # and under `set -e` that would kill the whole cataloger run — turning a
-        # "we don't know" into a hard failure, the exact opposite of the
-        # fail-open contract. Treat it as inconclusive instead.
+        # and under `set -e` an unguarded call would kill the whole cataloger
+        # run — turning a "we don't know" into a hard failure, the exact
+        # opposite of the fail-open contract. Treat it as inconclusive instead.
         if ! jq -r --slurpfile batch "$batch_file" '
             (.data // {})
             | to_entries[]
