@@ -120,14 +120,21 @@ log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 # (component, sha, pr) forever, so a swallowed read permanently loses this
 # commit's fan-out and no re-run can recover it. exit 1 puts it in the run
 # listing where an operator can see it and push a new commit.
-# Not an input. 300s is comfortable on every hub measured so far (195s and 285s
-# on a hub carrying a ~2.4k-job repo_sync backlog), and the timeout message below
-# names this constant explicitly — so if it ever does need tuning, the run log
-# says so rather than leaving someone guessing.
+# Not an input, one default, chosen from measurement rather than taste. Observed
+# lag between the wave firing and the SHA-pinned read resolving, on a hub with a
+# repo_sync backlog starving the mat drain: 195s, 255s, 285s, and one run that
+# was still not ready at 292s and failed. 300s is therefore the BOUNDARY, not a
+# comfortable default — so this is 900s, which clears the worst observation by
+# 3x. It costs nothing on a healthy hub (the read returns in ~200s and the loop
+# exits immediately); it only ever spends the extra time where the alternative
+# is losing the commit's fan-out outright, since the wave is fire-once.
+#
+# The timeout message names this constant explicitly, so if it ever does need
+# revisiting the run log says which number to look at.
 # The _TEST_ overrides are a test seam, deliberately NOT declared in `inputs:` —
 # they are not part of the plugin's config surface and cannot be set via `with:`.
 # The suite would otherwise sit here for the full budget on the timeout cases.
-READ_BUDGET_SECS="${LUNAR_FANOUT_TEST_READ_BUDGET:-300}"
+READ_BUDGET_SECS="${LUNAR_FANOUT_TEST_READ_BUDGET:-900}"
 # Targets are read once each, so they get a much shorter budget than the single
 # root read; see the note where it is used.
 TARGET_READ_BUDGET_SECS="${LUNAR_FANOUT_TEST_TARGET_BUDGET:-30}"
