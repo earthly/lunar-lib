@@ -32,7 +32,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_high` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
-| `.container_scan.findings[]` | array | Container scanner collector — used to list the offending packages/CVEs in the `max-severity` failure message (`cve`, `severity`, `package`, `fix_version`) |
+| `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
@@ -49,7 +49,43 @@ policies:
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
+      # ignore_unfixable: "true"  # Optional: only fail on findings that have a fix
 ```
+
+### Only failing on fixable findings
+
+By default `max-severity` fails on every finding at or above `min_severity`,
+whether or not a fix exists. That is the right default, but base images routinely
+carry criticals that the upstream distro has not fixed — so a release gate on
+`critical` can end up permanently closed on findings no change to your own image
+can clear. Set `ignore_unfixable: "true"` to narrow the failure to findings that
+carry an upgrade target, which is what makes a `block-pr-and-release` gate
+practical:
+
+```yaml
+    enforcement: block-pr-and-release
+    with:
+      min_severity: "critical"
+      ignore_unfixable: "true"
+```
+
+Unfixable findings are **still collected and still visible** in the Component
+JSON and the dashboard — the option changes what the check *gates on*, never what
+is recorded. It can only turn a failure into a pass: it is applied after the
+threshold has already been crossed, so it never creates a failure the default
+would not have raised.
+
+Two behaviours worth knowing:
+
+- A finding counts as fixable when the scanner reported a fix version. Trivy and
+  Grype can both scan the same image; where they disagree, the one that found a
+  fix wins — a fix that exists is actionable.
+- If the scanner reported only summary counts and no `.container_scan.findings[]`,
+  fixability cannot be evaluated per finding, so the check **fails as it would
+  with the option off** and says so in the failure message.
+  `.container_scan.summary.all_fixable` is not a substitute: it is a single
+  boolean across *all* severities, so it cannot answer whether the in-scope
+  findings are fixable.
 
 ## Examples
 
@@ -83,13 +119,14 @@ policies:
 
 **Failure messages:**
 - `executed`: "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured."
-- `max-severity`: fails with one assertion per offending package/CVE (most severe first), the same format the `sca` policy uses — no policy-side cap; the hub truncates the display. When the scanner emits per-finding detail it renders as a nested list under the check:
+- `max-severity`: fails with a headline assertion plus one assertion per offending package/CVE (most severe first), the same format the `sca` policy uses — no policy-side cap; the hub truncates the display. When the scanner emits per-finding detail it renders as a nested list under the check:
   ```
   ❌ max-severity
+    * Critical container vulnerabilities detected
     * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
     * high: libcurl — CVE-2026-5678 (no fix available)
   ```
-  A summary-only scanner (no `.container_scan.findings[]`) falls back to a headline-only failure (e.g. `Critical container vulnerabilities detected`).
+  A summary-only scanner (no `.container_scan.findings[]`) falls back to the headline alone (e.g. `Critical container vulnerabilities detected`).
 - `max-total`: "Total container vulnerability findings (40) exceeds threshold (10)"
 
 ## Remediation

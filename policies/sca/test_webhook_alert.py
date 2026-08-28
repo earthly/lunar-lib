@@ -181,9 +181,14 @@ def resolved_status(c):
 
 
 def failure_message(c):
-    """The single failure message a failed max-severity check emitted."""
-    reasons = c.failure_reasons
-    return reasons[0] if reasons else ""
+    """All failure messages a failed max-severity check emitted, joined.
+
+    max-severity emits multiple failing assertions on a single check — the
+    severity headline plus one per offending finding — so a test that looks for
+    a headline *or* a specific finding line needs the whole set, not just the
+    first reason.
+    """
+    return "\n".join(c.failure_reasons)
 
 
 # --------------------------------------------------------------------------- #
@@ -233,6 +238,24 @@ class WebhookHelperTests(unittest.TestCase):
         # Timestamp is informational; the dedupe key must be stable across runs.
         self.assertNotEqual(p1["timestamp"], p2["timestamp"])
         self.assertEqual(p1["dedupe_key"], p2["dedupe_key"])
+
+    def test_build_payload_projects_findings_to_the_published_keys(self):
+        """Extra keys a policy carries must not widen the versioned schema.
+
+        `max_severity` tracks `fixable` on each normalized finding to drive the
+        `ignore_unfixable` filter. That is internal bookkeeping — leaking it into
+        the payload would silently change schema v1 for every consumer.
+        """
+        payload = webhook.build_payload(
+            "sca",
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0",
+              "fixable": True, "some_future_field": "x"}],
+            component="c", git_sha="sha",
+        )
+        self.assertEqual(
+            payload["findings"],
+            [{"id": "CVE-1", "severity": "high", "package": "p", "fix_version": "1.0"}],
+        )
 
     def test_build_payload_pr_from_env(self):
         with lunar_env(LUNAR_COMPONENT_PR="7"):
@@ -410,9 +433,10 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="high")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         reasons = c.failure_reasons
-        # One failing assertion per in-scope finding — no manual enumeration,
-        # no headline reason, no truncation tail.
-        self.assertEqual(len(reasons), 2)   # 2 HIGH; medium below threshold
+        # Headline assertion + one per in-scope finding — no manual enumeration
+        # into a single message, no truncation tail.
+        self.assertEqual(len(reasons), 3)   # headline + 2 HIGH (medium below)
+        self.assertEqual(reasons[0], "High vulnerability findings detected")
         joined = "\n".join(reasons)
         # Both HIGH findings named, with package + CVE + fix status.
         self.assertIn("golang.org/x/net", joined)
@@ -424,9 +448,9 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         # The MEDIUM finding is below the threshold -> excluded.
         self.assertNotIn("baz", joined)
         self.assertNotIn("CVE-2024-0002", joined)
-        # No enumerated headline reason, no jargon tail.
-        self.assertNotIn("findings detected", joined)
+        # No hand-built sub-list and no jargon tail.
         self.assertNotIn("JSON", joined)
+        self.assertNotIn("more (", joined)
 
     def test_failure_message_widens_with_min_severity(self):
         c = run_check(node(sca=SCA_WITH_HIGH), LUNAR_VAR_min_severity="medium")
@@ -434,7 +458,7 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         joined = "\n".join(reasons)
         self.assertIn("baz", joined)            # medium finding now in scope
         self.assertIn("CVE-2024-0002", joined)
-        self.assertEqual(len(reasons), 3)       # 2 high + 1 medium
+        self.assertEqual(len(reasons), 4)       # headline + 2 high + 1 medium
 
     def test_summary_only_has_no_enumeration(self):
         # No `.findings` detail -> headline only, nothing to enumerate.
@@ -454,9 +478,9 @@ class MaxSeverityFailureMessageTests(unittest.TestCase):
         c = run_check(node(sca=many_findings_sca(n)), LUNAR_VAR_min_severity="critical")
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         reasons = c.failure_reasons
-        self.assertEqual(len(reasons), n)   # all 15, one assertion each
+        self.assertEqual(len(reasons), n + 1)   # headline + all 15, uncapped
         joined = "\n".join(reasons)
-        self.assertNotIn("more", joined)            # no truncation tail
+        self.assertNotIn("more (", joined)          # no truncation tail
         self.assertNotIn("JSON", joined)            # no jargon pointer
         self.assertNotIn("\n    * ", joined)        # no manual sub-list
 
