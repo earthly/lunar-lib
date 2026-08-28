@@ -140,7 +140,49 @@ retry_read() {
   done
 }
 
-# --- 1. Read the repo-wide findings ------------------------------------------
+# --- 1. Discover the subcomponents -------------------------------------------
+# Deliberately BEFORE reading our own Component JSON, so a component that is not
+# a monorepo root costs one cheap scoped query and exits — rather than a
+# (retried, up to READ_BUDGET_SECS) get-json for data it will never use. This
+# collector is meant to be targeted at monorepo roots via `on:`; the early exit
+# is the safety net, not the intended configuration.
+#
+# Scoped SQL query, NOT `lunar cataloger get-json`. The merged-catalog RPC
+# returns the WHOLE catalog as one uncompressed gRPC message — 6.2 MB / ~30k
+# components on our own dogfood hub — to find the handful of names under one
+# repo. It blows the gRPC client message cap (`ResourceExhausted: received
+# message larger than max (6264541 vs 4194304)`, ENG-1648) and is wasteful even
+# when it fits, since the size scales with the whole fleet rather than this repo.
+#
+# `public.catalog_latest` is the SQL-API view over the same catalog, so Postgres
+# does the prefix filter server-side and only the matching rows cross the wire.
+# It also carries each component's explicit `paths:` (catalog_latest.sql builds
+# them into the document), which is what makes accurate attribution possible.
+discover_subcomponents() {
+  local conn
+  conn=$(retry_read lunar sql connection-string) || return 1
+  psql "$conn" --no-align --tuples-only --quiet --field-separator=$'\t' -c "
+      SELECT c.key, COALESCE(c.value->'paths', '[]'::jsonb)::text
+      FROM public.catalog_latest, jsonb_each(catalog_json->'components') c
+      WHERE c.key LIKE '$(printf '%s' "$ROOT" | sed "s/'/''/g")/%'
+      ORDER BY c.key" 2>/dev/null |
+    jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t"))
+                 | map({key: .[0], value: {paths: (.[1] | fromjson)}})
+                 | {components: from_entries}'
+}
+
+if ! CATALOG=$(discover_subcomponents) || [ -z "$CATALOG" ]; then
+  log "ERROR: could not enumerate subcomponents of $ROOT via the SQL API. The wave is fire-once, so this commit's fan-out is lost — check that the Hub's SQL API is reachable from collectors."
+  exit 1
+fi
+
+SUBCOMPONENT_COUNT=$(echo "$CATALOG" | jq '.components | length')
+if [ "$SUBCOMPONENT_COUNT" -eq 0 ]; then
+  log "$ROOT has no subcomponents — not a monorepo root, nothing to fan out. Target this collector at monorepo roots with \`on:\` to avoid running it here at all."
+  exit 0
+fi
+
+# --- 2. Read the repo-wide findings ------------------------------------------
 if ! ROOT_JSON=$(retry_read lunar component get-json "$ROOT" "${read_dims[@]}"); then
   log "ERROR: could not read own Component JSON at ${SHA:0:8} within ${READ_BUDGET_SECS}s. This commit's row is most likely not yet materialized (mat.components / mat.component_json drain asynchronously, so a SHA-pinned read lags collection). The wave is fire-once, so this commit's fan-out is lost — push a new commit once ingestion catches up."
   exit 1
@@ -156,48 +198,9 @@ fi
 
 ISSUES=$(echo "$ROOT_JSON" | jq -c '.sast.issues // []')
 SOURCE=$(echo "$ROOT_JSON" | jq -c '.sast.source // {}')
-log "root carries $(echo "$ISSUES" | jq 'length') SAST issue(s)"
-
-# --- 2. Discover the subcomponents -------------------------------------------
-# Scoped SQL query, NOT `lunar cataloger get-json`.
-#
-# The merged-catalog RPC returns the WHOLE catalog as one uncompressed gRPC
-# message — 6.2 MB / ~30k components on our own dogfood hub — to find the
-# handful of names under one repo. Two problems with that: it blows the gRPC
-# client message cap (`ResourceExhausted: received message larger than max
-# (6264541 vs 4194304)`, ENG-1648) and it is absurdly wasteful even when it
-# fits, since the size scales with the whole fleet rather than with this repo.
-#
-# `public.catalog_latest` is the SQL-API view over the same catalog, so Postgres
-# does the prefix filter server-side and only the matching rows cross the wire.
-# It also carries each component's explicit `paths:` (catalog_latest.sql builds
-# them into the document), which is what makes accurate attribution possible —
-# the `subcomponents` input cannot supply them.
-discover_subcomponents() {
-  local conn
-  conn=$(retry_read lunar sql connection-string) || return 1
-  psql "$conn" --no-align --tuples-only --quiet --field-separator=$'\t' -c "
-      SELECT c.key, COALESCE(c.value->'paths', '[]'::jsonb)::text
-      FROM public.catalog_latest, jsonb_each(catalog_json->'components') c
-      WHERE c.key LIKE '$(printf '%s' "$ROOT" | sed "s/'/''/g")/%'
-      ORDER BY c.key" 2>/dev/null |
-    jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t"))
-                 | map({key: .[0], value: {paths: (.[1] | fromjson)}})
-                 | {components: from_entries}'
-}
-
-if [ -n "${LUNAR_VAR_SUBCOMPONENTS:-}" ]; then
-  CATALOG=$(echo "${LUNAR_VAR_SUBCOMPONENTS}" | tr ',' '\n' |
-    jq -R 'sub("^ +";"") | sub(" +$";"") | select(length > 0)' |
-    jq -s -c '{components: (map({key: ., value: {}}) | from_entries)}')
-  log "using the explicit subcomponent list from the subcomponents input"
-elif ! CATALOG=$(discover_subcomponents) || [ -z "$CATALOG" ]; then
-  log "ERROR: could not enumerate subcomponents of $ROOT via the SQL API. The wave is fire-once, so this commit's fan-out is lost — pin the list with the subcomponents input, or check that the Hub's SQL API is reachable from collectors."
-  exit 1
-fi
+log "root carries $(echo "$ISSUES" | jq 'length') SAST issue(s), $SUBCOMPONENT_COUNT subcomponent(s) discovered"
 
 # --- 3. Attribute each finding to the subcomponents that own its file --------
-# Mirrors util/git.ComponentPathPatterns + util/str.MatchStar.
 TARGETS=$(jq -n -c \
   --arg root "$ROOT" \
   --argjson issues "$ISSUES" \
@@ -245,7 +248,10 @@ TARGETS=$(jq -n -c \
 
 TARGET_COUNT=$(echo "$TARGETS" | jq 'length')
 if [ "$TARGET_COUNT" -eq 0 ]; then
-  log "no subcomponents found under $ROOT — nothing to fan out"
+  # Distinct from the "no subcomponents" exit above: those exist, but every one
+  # of them was dropped for having no usable path pattern, so there is nothing
+  # to attribute findings against.
+  log "all $SUBCOMPONENT_COUNT subcomponent(s) of $ROOT were dropped for having no path patterns — nothing to fan out"
   exit 0
 fi
 

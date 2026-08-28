@@ -75,6 +75,7 @@ class Base(unittest.TestCase):
         os.makedirs(self.bin)
         self.capture = os.path.join(self.tmp, "collect.log")
         self.sql_log = os.path.join(self.tmp, "sql.log")
+        self.getjson_log = os.path.join(self.tmp, "getjson.log")
         self.fixtures = os.path.join(self.tmp, "fixtures")
         os.makedirs(self.fixtures)
         self.set_component_json(ROOT, {"sast": {"issues": ISSUES, "source": {"tool": "codeql", "version": "2.26.3"}}})
@@ -118,6 +119,9 @@ class Base(unittest.TestCase):
                                     open(fail, "w").write(str(n - 1))
                                 sys.stderr.write("transient\\n")
                                 sys.exit(1)
+                        if os.environ.get("GETJSON_LOG"):
+                            with open(os.environ["GETJSON_LOG"], "a") as g:
+                                g.write(name + "\\n")
                         path = os.path.join(fixtures, name.replace("/", "_") + ".json")
                         if not os.path.exists(path):
                             sys.stderr.write("component not found\\n")
@@ -186,6 +190,7 @@ class Base(unittest.TestCase):
         env["PATH"] = self.bin + os.pathsep + env["PATH"]
         env["CAPTURE"] = self.capture
         env["SQL_LOG"] = self.sql_log
+        env["GETJSON_LOG"] = self.getjson_log
         env["FIXTURES"] = self.fixtures
         env["LUNAR_COMPONENT_ID"] = component
         env["ROOT_NAME"] = ROOT
@@ -432,10 +437,19 @@ class TestDiscovery(Base):
         self.assertIn("could not enumerate subcomponents", proc.stderr)
         self.assertEqual(self.writes(), {})
 
-    def test_explicit_subcomponents_input_skips_sql_entirely(self):
-        self.run_script(env_overrides={"LUNAR_VAR_SUBCOMPONENTS": f"{API}, {WEB}"})
-        self.assertEqual(self._queries(), [], "the input should short-circuit the SQL read")
-        self.assertEqual(set(self.writes()), {API, WEB})
+    def test_non_monorepo_component_exits_without_reading_its_own_json(self):
+        """Targeting a component with no subcomponents must be CHEAP. Discovery
+        runs first precisely so this costs one scoped query and an exit, not a
+        get-json that can retry for READ_BUDGET_SECS before being thrown away."""
+        proc = self.run_script(component="github.com/acme/other-repo")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.writes(), {})
+        self.assertIn("no subcomponents", proc.stderr)
+        self.assertNotIn("root carries", proc.stderr)
+        # one scoped query, and no Component JSON read at all
+        self.assertEqual(len(self._queries()), 1)
+        self.assertFalse(os.path.exists(self.getjson_log),
+                         "no Component JSON read should happen before discovery rules the component out")
 
 
 class TestReadRetries(Base):
@@ -555,10 +569,6 @@ class TestGuardrails(Base):
         writes = self.writes()
         self.assertEqual(set(writes), {API, WEB, JOB})
         self.assertEqual(writes[API]["stdin"]["findings"]["total"], 0)
-
-    def test_explicit_subcomponents_input_bypasses_the_catalog(self):
-        self.run_script(env_overrides={"LUNAR_VAR_SUBCOMPONENTS": f"{API}, {WEB}"})
-        self.assertEqual(set(self.writes()), {API, WEB})
 
     def test_max_subcomponents_truncates_loudly(self):
         proc = self.run_script(env_overrides={"LUNAR_VAR_MAX_SUBCOMPONENTS": "2"})

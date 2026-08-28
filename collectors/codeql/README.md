@@ -61,7 +61,10 @@ data found" despite having been scanned. `monorepo-fanout` closes that gap.
 Three things have to be true:
 
 1. the monorepo's **root** needs a component of its own — it is where the
-   repo-wide scan lands and where the fan-out runs;
+   repo-wide scan lands and where the fan-out runs. Target the sub-collector at
+   that root with `on: ["component:<repo>"]`; subcomponents are then found
+   automatically. Pointing it at a broad domain selector just makes it do
+   useless work on every non-monorepo component;
 2. `cicd` has to be enabled on that root, since it is what writes the
    `.sast.issues` the fan-out reads;
 3. **at least one policy must also evaluate the root.** An `after-json`
