@@ -57,14 +57,13 @@ SAFE_COMPONENT_ID="${LUNAR_COMPONENT_ID//\'/\'\'}"
 # One row per pull request, newest first, so a PR counts once however many commits it
 # carried and its ticket reflects the latest state of the PR.
 #
-# public.components, not public.materialized_components. `components` is the supported SQL
-# API surface, and it is a serving switch on HUB_MAT_SERVING_ENABLED: with the flag on the
-# view reads mat.components, with it off it reads components_base UNION
-# materialized_components and prefers components_base. So materialized_components is either
-# not in the serving path at all, or only its stale arm -- reading it directly undercounts
-# recent pull requests, which for a trailing window is exactly the rows that matter. Both
-# branches of the switch are required to expose an identical column list, which is what
-# makes `components` safe to depend on across the flip.
+# public.components, not materialized_components. `components` is the serving view, so it
+# stays correct whichever way the hub's mat-serving switch is set; materialized_components
+# is one arm's backing table and is not read at all when serving is on. It also lags: on
+# the hub this was tested against, `components` was current to 18:24 while
+# materialized_components stopped at 17:50. That 34 minutes had not yet cost a whole pull
+# request -- every (component, pr) in `components` was also in materialized_components --
+# but a trailing window is exactly where the newest rows matter, so prefer the view.
 #
 # Not components_latest: this needs the trailing-window *history* of pull requests, and
 # components_latest is filtered to the latest commits per component.
