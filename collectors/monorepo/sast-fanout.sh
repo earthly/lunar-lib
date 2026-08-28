@@ -94,27 +94,50 @@ MAX_TARGETS="${LUNAR_VAR_MAX_SUBCOMPONENTS:-50}"
 
 log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 
-# Hub reads are retried, and a persistent failure is FATAL rather than a quiet
-# exit 0. The after-json wave is fire-once per (component, sha, pr) — forever —
-# so a single transient read loses this commit's fan-out permanently and no
-# re-run can recover it. Failing loudly puts it in the run listing instead.
-# (Observed live: a `get-json` that returned NotFound for ~seconds around a
-# manifest publish, which re-keys the component's serving row.)
+# Hub reads are retried for several MINUTES, and a persistent failure is FATAL
+# rather than a quiet exit 0.
+#
+# Why so long: the wave fires when COLLECTION settles, but `lunar component
+# get-json --git-sha <sha>` resolves through `public.components`, which is
+# gated on `hub.latest_commits` — a table fed by the repo_sync worker. Commit
+# ingestion and collection are independent, so a just-settled commit is
+# routinely not yet resolvable by SHA. Measured on cronos: the pinned read
+# returned NotFound for 210s after the wave had already fired and failed
+# (repo_sync backlog ~4.7k jobs draining at ~2/s). A 20s budget was nowhere
+# near enough.
+#
+# Falling back to the UNPINNED read would be wrong, not merely lax: without a
+# SHA the query hits `public.components_latest ... WHERE pr IS NULL`, i.e. the
+# latest *ingested* commit — which during that same window was the PREVIOUS
+# DAY's commit. It would silently fan out stale findings under this commit's
+# SHA. Pinning is correct; waiting is the price.
+#
+# And the failure has to be loud: the after-json wave is fire-once per
+# (component, sha, pr) forever, so a swallowed read permanently loses this
+# commit's fan-out and no re-run can recover it. exit 1 puts it in the run
+# listing where an operator can see it and push a new commit.
+READ_BUDGET_SECS="${LUNAR_VAR_READ_RETRY_SECONDS:-300}"
+
 retry_read() {
-  local out attempt
-  for attempt in 1 2 3 4 5; do
+  local out attempt=0 waited=0 backoff
+  while :; do
+    attempt=$((attempt + 1))
     if out=$("$@" 2>/dev/null) && [ -n "$out" ]; then
+      [ "$attempt" -gt 1 ] && log "read succeeded on attempt $attempt after ${waited}s"
       printf '%s' "$out"
       return 0
     fi
-    [ "$attempt" -lt 5 ] && sleep $((attempt * 2))
+    backoff=$((attempt * 5))
+    [ "$backoff" -gt 30 ] && backoff=30
+    [ $((waited + backoff)) -gt "$READ_BUDGET_SECS" ] && return 1
+    sleep "$backoff"
+    waited=$((waited + backoff))
   done
-  return 1
 }
 
 # --- 1. Read the repo-wide findings ------------------------------------------
 if ! ROOT_JSON=$(retry_read lunar component get-json "$ROOT" "${read_dims[@]}"); then
-  log "ERROR: could not read own Component JSON at this commit after 5 attempts — the fan-out for this commit is lost (the wave is fire-once), so failing loudly"
+  log "ERROR: could not read own Component JSON at ${SHA:0:8} within ${READ_BUDGET_SECS}s. The commit is most likely not yet resolvable by SHA (hub.latest_commits lags behind collection when repo_sync is backed up). The wave is fire-once, so this commit's fan-out is lost — push a new commit once ingestion catches up."
   exit 1
 fi
 
@@ -139,7 +162,7 @@ if [ -n "${LUNAR_VAR_SUBCOMPONENTS:-}" ]; then
     jq -s -c '{components: (map({key: ., value: {}}) | from_entries)}')
   log "using the explicit subcomponent list from the subcomponents input"
 elif ! CATALOG=$(retry_read lunar cataloger get-json); then
-  log "ERROR: could not read the catalog after 5 attempts — cannot discover subcomponents, and the wave will not fire again for this commit"
+  log "ERROR: could not read the catalog within ${READ_BUDGET_SECS}s — cannot discover subcomponents, and the wave will not fire again for this commit"
   exit 1
 fi
 

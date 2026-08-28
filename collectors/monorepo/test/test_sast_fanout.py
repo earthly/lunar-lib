@@ -158,6 +158,10 @@ class Base(unittest.TestCase):
         env.pop("LUNAR_COMPONENT_PR", None)
         for k in ("LUNAR_VAR_SUBCOMPONENTS", "LUNAR_VAR_MAX_SUBCOMPONENTS"):
             env.pop(k, None)
+        # Production default is 300s; the suite would take that long on the
+        # persistent-failure case. The retry BEHAVIOUR is what's under test, not
+        # the wall-clock budget.
+        env["LUNAR_VAR_READ_RETRY_SECONDS"] = "20"
         if env_overrides:
             for k, v in env_overrides.items():
                 if v is None:
@@ -325,6 +329,7 @@ class TestReadRetries(Base):
         proc = self.run_script(env_overrides={"FAIL_GETJSON": self._countdown(-1)})
         self.assertEqual(proc.returncode, 1)
         self.assertIn("fire-once", proc.stderr)
+        self.assertIn("not yet resolvable by SHA", proc.stderr)
         self.assertEqual(self.writes(), {})
         self.assertEqual(self.self_writes(), [])
 

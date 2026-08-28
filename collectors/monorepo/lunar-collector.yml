@@ -69,6 +69,19 @@ inputs:
       root `CODEOWNERS`) will NOT receive findings from them. Prefer catalog
       discovery unless you have a reason not to.
     default: ""
+  read_retry_seconds:
+    description: |
+      How long to keep retrying the Hub reads before failing the run, in
+      seconds. The after-json wave fires when COLLECTION settles, but a
+      SHA-pinned `lunar component get-json` resolves through
+      `public.components`, which is gated on `hub.latest_commits` — fed
+      independently by the repo_sync worker. So a just-settled commit is often
+      not yet resolvable by SHA, and on a Hub with a repo_sync backlog that gap
+      is minutes (measured at 210s on a busy Hub). Raise it if your Hub ingests
+      slowly; the run holds a wave slot while it waits. On expiry the collector
+      exits non-zero rather than silently writing nothing, because the wave is
+      fire-once and a swallowed read loses that commit's fan-out permanently.
+    default: "300"
   max_subcomponents:
     description: |
       Upper bound on how many subcomponents a single run will write to, as a
