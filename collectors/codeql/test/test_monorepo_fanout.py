@@ -514,6 +514,28 @@ class TestGuardrails(Base):
         self.assertNotIn(API, self.writes())
         self.assertIn(WEB, self.writes())
 
+    def test_carried_forward_fanout_from_another_commit_does_not_count_as_written(self):
+        """A SHA-pinned get-json is not SHA-exact: with no collection of its own
+        at this commit, the Hub carries the previous commit's blob forward — so
+        the guard can read an OLDER commit's fan-out, fingerprint and all.
+        Observed live on cronos (sha f50924dc skipped every target against
+        provenance written at e3dd3d09, with no merged blob at f50924dc)."""
+        self.run_script()
+        landed = self.writes()[API]["stdin"]
+        self.assertEqual(landed["source"]["fanout"]["root_git_sha"], SHA)
+
+        # Same payload, but stamped with a DIFFERENT commit — i.e. carried
+        # forward. This commit has never actually been written.
+        carried = json.loads(json.dumps(landed))
+        carried["source"]["fanout"]["root_git_sha"] = "0" * 40
+        self.set_component_json(API, {"lang": {"go": {}}, "sast": carried})
+        os.remove(self.capture)
+
+        self.run_script()
+        self.assertIn(API, self.writes(),
+                      "a fan-out carried forward from another commit must not be treated as this commit's")
+        self.assertEqual(self.writes()[API]["stdin"]["source"]["fanout"]["root_git_sha"], SHA)
+
     def test_changed_findings_do_rewrite(self):
         # The skip-guard must key on the payload, not merely on "a fan-out has
         # happened here" — a second language job landing late genuinely changes

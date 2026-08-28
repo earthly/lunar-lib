@@ -296,9 +296,22 @@ while [ "$i" -lt "$TARGET_COUNT" ]; do
       continue
     fi
 
+    # The fingerprint alone is NOT enough to conclude "already written for this
+    # commit". A SHA-pinned `get-json` is not SHA-exact: when a component has no
+    # collection of its own at that SHA the Hub carries the previous commit's
+    # blob forward, so the read happily returns an OLDER commit's fan-out —
+    # matching fingerprint and all. Observed on cronos: at sha f50924dc every
+    # target was skipped as "unchanged" against provenance written at e3dd3d09,
+    # and `hub.merged_collection_blobs` had no row at f50924dc at all.
+    #
+    # Provenance already records which commit produced it, so require that too.
+    # Same payload for the SAME commit is a genuine no-op worth skipping (the
+    # wave can re-fire); same payload carried forward from a DIFFERENT commit is
+    # this commit never having been written.
     PRIOR=$(echo "$TARGET_JSON" | jq -r '.sast.source.fanout.fingerprint // ""')
-    if [ "$PRIOR" = "$FINGERPRINT" ]; then
-      log "skip $NAME — already carries this exact fan-out (fingerprint $FINGERPRINT)"
+    PRIOR_SHA=$(echo "$TARGET_JSON" | jq -r '.sast.source.fanout.root_git_sha // ""')
+    if [ "$PRIOR" = "$FINGERPRINT" ] && [ "$PRIOR_SHA" = "$SHA" ]; then
+      log "skip $NAME — already carries this exact fan-out for ${SHA:0:8} (fingerprint $FINGERPRINT)"
       RESULTS=$(echo "$RESULTS" | jq -c --arg n "$NAME" '. + [{component: $n, status: "skipped", reason: "unchanged"}]')
       continue
     fi
