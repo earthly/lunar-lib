@@ -679,8 +679,14 @@ verify_component_repos() {
                 | "query { " + join(" ") + " }"
             ' "$batch_file")
 
+            # Bounded, because the host is derived from catalog DATA rather than
+            # config: a typo'd or hostile annotation can name a host that
+            # black-holes the connection instead of refusing it, and an unbounded
+            # curl would hang the whole cataloger run on it. A timeout surfaces as
+            # 000, which is just another inconclusive answer for that host.
             local code
             code=$(jq -n --arg q "$query" '{query: $q}' | curl -sS -o "$resp_file" -w '%{http_code}' \
+                --connect-timeout 10 --max-time 60 \
                 -X POST \
                 -H "Authorization: Bearer $LUNAR_SECRET_GH_TOKEN" \
                 -H "Content-Type: application/json" \
