@@ -8,11 +8,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Backstage Collector"
   long_description: |
-    Parses and lints Backstage catalog-info.yaml files. Writes the raw
-    Backstage descriptor (apiVersion, kind, metadata, spec) to
-    .catalog.native.backstage, preserving annotations as-is. Optionally
-    verifies the referenced domain and system exist in a live Backstage
-    catalog.
+    Parses and lints Backstage catalog-info.yaml, writing the raw
+    descriptor to .catalog.native.backstage with annotations preserved.
+    Optionally verifies the referenced domain and system exist in a live
+    catalog, and resolves entity-reference tags on infrastructure into
+    .catalog.entity_refs.
   categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "beta"
@@ -20,6 +20,9 @@ landing_page:
     - slug: "backstage"
       type: "policy"
       reason: "Enforces Backstage catalog standards based on collected metadata"
+    - slug: "terraform"
+      type: "collector"
+      reason: "Records the infrastructure resource tags that entity-refs resolves"
 
 collectors:
   - name: catalog-info
@@ -57,6 +60,36 @@ collectors:
       type: code
     keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity"]
 
+  - name: entity-refs
+    description: |
+      Resolves Backstage entity references that other collectors recorded as
+      infrastructure resource tags. Fires via the `after-json` hook once
+      `.iac.modules` is present, reads the merged Component JSON with
+      `lunar component get-json`, and collects every distinct concrete value of
+      the `entity_ref_tag_key` tag across `.iac.modules[].resources[].tags` and
+      `.iac.modules[].default_tags`. Each distinct value is resolved against the
+      Backstage catalog API
+      (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and the
+      outcome is written to `.catalog.entity_refs`. This is the Backstage-specific
+      half of resource tagging: the `terraform` collector records tags generically
+      and knows nothing of Backstage; this sub-collector assigns the meaning.
+      `.catalog.entity_refs.checked: true` is the "resolution ran" signal, so a
+      policy can distinguish "configured" from "not configured". Each ref records
+      `{name, exists}` on a definitive 200/404, or `{name, error}` on a transient
+      failure (timeout/5xx) so an outage stays distinguishable from a real miss;
+      `resources` lists the `<type>.<name>` resources carrying that ref so a
+      policy can attribute a failure. Values that are unresolved Terraform
+      expressions (`${var.x}`) are skipped — there is nothing concrete to resolve
+      — and reported under `unresolved`. Requires `backstage_url`; when it is
+      unset (the default) this sub-collector writes nothing. Note it writes
+      `.catalog.entity_refs`, deliberately NOT `.catalog.native.backstage`, whose
+      presence is the "catalog-info.yaml exists" signal for several policies.
+    mainBash: entity_refs.sh
+    hook:
+      type: after-json
+      path: .iac.modules
+    keywords: ["backstage", "entity_ref", "referential integrity", "service catalog", "after-json", "terraform", "tags", "iac"]
+
 inputs:
   paths:
     description: Comma-separated list of catalog file paths to check (first match wins)
@@ -64,12 +97,22 @@ inputs:
   backstage_url:
     description: |
       Base URL of the Backstage instance (e.g. https://backstage.example.com).
-      When set, the collector cross-checks each declared spec.domain and
+      When set, `catalog-info` cross-checks each declared spec.domain and
       spec.system against the Backstage catalog API and records the result
-      under `.catalog.native.backstage.refs`. Empty (the default) disables
-      referential-integrity lookups — the collector only parses and lints the
-      local file, exactly as before.
+      under `.catalog.native.backstage.refs`, and `entity-refs` resolves the
+      entity-reference tags found on infrastructure resources into
+      `.catalog.entity_refs`. Empty (the default) disables all catalog lookups —
+      `catalog-info` only parses and lints the local file, exactly as before, and
+      `entity-refs` writes nothing.
     default: ""
+  entity_ref_tag_key:
+    description: |
+      The infrastructure resource tag key whose value the `entity-refs`
+      sub-collector treats as a Backstage entity reference (of the form
+      `[<kind>:][<namespace>/]<name>`). Read from the tags recorded by an IaC
+      collector at `.iac.modules[].resources[].tags` and
+      `.iac.modules[].default_tags`. Only used when `backstage_url` is set.
+    default: "backstage.com/entity_ref"
 
 secrets:
   BACKSTAGE_TOKEN:
@@ -155,6 +198,25 @@ example_component_json: |
             "system": { "name": "payment-platform", "exists": true }
           }
         }
+      },
+      "entity_refs": {
+        "checked": true,
+        "source": { "tool": "backstage", "integration": "api" },
+        "refs": [
+          {
+            "name": "component:default/payment-api",
+            "exists": true,
+            "resources": ["aws_db_instance.main", "aws_s3_bucket.logs"]
+          },
+          {
+            "name": "component:default/legacy-svc",
+            "exists": false,
+            "resources": ["aws_instance.web"]
+          }
+        ],
+        "unresolved": [
+          { "value": "${var.entity_ref}", "resources": ["aws_sqs_queue.jobs"] }
+        ]
       }
     }
   }
