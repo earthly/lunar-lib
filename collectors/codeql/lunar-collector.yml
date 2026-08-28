@@ -88,7 +88,7 @@ collectors:
     keywords: ["monorepo", "sast", "fan-out", "after-json", "subcomponent", "cross-component"]
 
 inputs:
-  include_issues:
+  monorepo_fanout_include_issues:
     description: |
       Also write the per-finding array (`.sast.issues`) to each subcomponent,
       sliced to the findings that component owns. Off by default: `policies/sast`
@@ -96,31 +96,8 @@ inputs:
       reads `.sast.findings.total` — none of them read `.sast.issues`, so
       shipping it multiplies write size by findings x subcomponents for data no
       guardrail evaluates. Turn it on if you want the per-finding detail visible
-      on each service in the UI. Only used by `monorepo-fanout`.
+      on each service in the UI.
     default: "false"
-  read_retry_seconds:
-    description: |
-      How long `monorepo-fanout` keeps retrying its Hub reads before failing the
-      run, in seconds. The after-json wave fires when COLLECTION settles, but
-      `lunar component get-json` reads through views over `mat.components` /
-      `mat.component_json`, which the Hub drains asynchronously. A SHA-pinned
-      read therefore returns NotFound until this commit's row has drained —
-      measured at 285s on a busy Hub. Raise it if your Hub materializes slowly;
-      the run holds a wave slot while it waits. On expiry the collector exits
-      non-zero rather than silently writing nothing, because the wave is
-      fire-once and a swallowed read loses that commit's fan-out permanently.
-    default: "300"
-  max_subcomponents:
-    description: |
-      Upper bound on how many subcomponents `monorepo-fanout` will write to in a
-      single run, as a guard against a mis-scoped root component fanning out
-      across an entire org. Targets beyond the limit are skipped and logged as a
-      warning (never silently dropped).
-    default: "50"
-
-secrets:
-  GH_TOKEN:
-    description: GitHub token for API access (required for github-app collector)
 
 example_component_json: |
   {

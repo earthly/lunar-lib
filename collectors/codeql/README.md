@@ -99,10 +99,7 @@ collectors:
     #   # Off by default: no SAST policy reads .sast.issues, so the per-finding
     #   # array is not shipped to every subcomponent unless you want the detail
     #   # visible per service.
-    #   include_issues: "false"
-    #   # Raise on a Hub that materializes slowly (a repo_sync backlog starves
-    #   # the mat drain, and a SHA-pinned read waits on it).
-    #   read_retry_seconds: "300"
+    #   monorepo_fanout_include_issues: "false"
 
 policies:
   # Point 3 above — without a policy on the root, the fan-out never dispatches.

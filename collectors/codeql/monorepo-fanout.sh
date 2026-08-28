@@ -90,9 +90,8 @@ if [ -n "$PR" ]; then
   write_dims+=(--pr "$PR")
 fi
 
-MAX_TARGETS="${LUNAR_VAR_MAX_SUBCOMPONENTS:-50}"
 # jq needs a real boolean, and the input arrives as a string.
-case "${LUNAR_VAR_INCLUDE_ISSUES:-false}" in
+case "${LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES:-false}" in
   true|True|TRUE|yes|1) INCLUDE_ISSUES=true ;;
   *)                    INCLUDE_ISSUES=false ;;
 esac
@@ -121,9 +120,20 @@ log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 # (component, sha, pr) forever, so a swallowed read permanently loses this
 # commit's fan-out and no re-run can recover it. exit 1 puts it in the run
 # listing where an operator can see it and push a new commit.
-READ_BUDGET_SECS="${LUNAR_VAR_READ_RETRY_SECONDS:-300}"
+# Not an input. 300s is comfortable on every hub measured so far (195s and 285s
+# on a hub carrying a ~2.4k-job repo_sync backlog), and the timeout message below
+# names this constant explicitly — so if it ever does need tuning, the run log
+# says so rather than leaving someone guessing.
+# The _TEST_ overrides are a test seam, deliberately NOT declared in `inputs:` —
+# they are not part of the plugin's config surface and cannot be set via `with:`.
+# The suite would otherwise sit here for the full budget on the timeout cases.
+READ_BUDGET_SECS="${LUNAR_FANOUT_TEST_READ_BUDGET:-300}"
+# Targets are read once each, so they get a much shorter budget than the single
+# root read; see the note where it is used.
+TARGET_READ_BUDGET_SECS="${LUNAR_FANOUT_TEST_TARGET_BUDGET:-30}"
 
 retry_read() {
+  local budget="$1"; shift
   local out attempt=0 waited=0 backoff
   while :; do
     attempt=$((attempt + 1))
@@ -134,7 +144,7 @@ retry_read() {
     fi
     backoff=$((attempt * 5))
     [ "$backoff" -gt 30 ] && backoff=30
-    [ $((waited + backoff)) -gt "$READ_BUDGET_SECS" ] && return 1
+    [ $((waited + backoff)) -gt "$budget" ] && return 1
     sleep "$backoff"
     waited=$((waited + backoff))
   done
@@ -160,7 +170,7 @@ retry_read() {
 # them into the document), which is what makes accurate attribution possible.
 discover_subcomponents() {
   local conn
-  conn=$(retry_read lunar sql connection-string) || return 1
+  conn=$(retry_read "$READ_BUDGET_SECS" lunar sql connection-string) || return 1
   psql "$conn" --no-align --tuples-only --quiet --field-separator=$'\t' -c "
       SELECT c.key, COALESCE(c.value->'paths', '[]'::jsonb)::text
       FROM public.catalog_latest, jsonb_each(catalog_json->'components') c
@@ -171,6 +181,12 @@ discover_subcomponents() {
                  | {components: from_entries}'
 }
 
+# `set -o pipefail` at the top is load-bearing here: it is what makes a psql
+# FAILURE (non-zero, so the pipeline is non-zero) distinguishable from a psql
+# SUCCESS returning zero rows (exit 0, jq emits an empty components map). The
+# first is an error worth failing the run over; the second just means this is
+# not a monorepo root. Without pipefail the jq exit code would mask the psql
+# one and an unreachable SQL API would masquerade as "no subcomponents".
 if ! CATALOG=$(discover_subcomponents) || [ -z "$CATALOG" ]; then
   log "ERROR: could not enumerate subcomponents of $ROOT via the SQL API. The wave is fire-once, so this commit's fan-out is lost — check that the Hub's SQL API is reachable from collectors."
   exit 1
@@ -183,7 +199,7 @@ if [ "$SUBCOMPONENT_COUNT" -eq 0 ]; then
 fi
 
 # --- 2. Read the repo-wide findings ------------------------------------------
-if ! ROOT_JSON=$(retry_read lunar component get-json "$ROOT" "${read_dims[@]}"); then
+if ! ROOT_JSON=$(retry_read "$READ_BUDGET_SECS" lunar component get-json "$ROOT" "${read_dims[@]}"); then
   log "ERROR: could not read own Component JSON at ${SHA:0:8} within ${READ_BUDGET_SECS}s. This commit's row is most likely not yet materialized (mat.components / mat.component_json drain asynchronously, so a SHA-pinned read lags collection). The wave is fire-once, so this commit's fan-out is lost — push a new commit once ingestion catches up."
   exit 1
 fi
@@ -255,13 +271,6 @@ if [ "$TARGET_COUNT" -eq 0 ]; then
   exit 0
 fi
 
-# Bound the blast radius, and say so out loud rather than truncating silently.
-if [ "$TARGET_COUNT" -gt "$MAX_TARGETS" ]; then
-  log "WARNING: $TARGET_COUNT subcomponents exceeds max_subcomponents=$MAX_TARGETS — fanning out to the first $MAX_TARGETS by name and SKIPPING the rest"
-  TARGETS=$(echo "$TARGETS" | jq -c ".[:$MAX_TARGETS]")
-  TARGET_COUNT="$MAX_TARGETS"
-fi
-
 log "discovered $TARGET_COUNT subcomponent(s)"
 
 # --- 4. Write each subcomponent's slice --------------------------------------
@@ -283,7 +292,26 @@ while [ "$i" -lt "$TARGET_COUNT" ]; do
   # records, so an unguarded re-run would duplicate every issue.
   FINGERPRINT=$(echo "$TARGET" | jq -c '{issues, findings}' | sha256sum | cut -c1-32)
 
-  TARGET_JSON=$(lunar component get-json "$NAME" "${read_dims[@]}" 2>/dev/null || echo "")
+  # Retried, not single-shot. An empty read is indistinguishable from "this
+  # component genuinely has no data at this commit", and an empty read skips the
+  # whole guard block below — so BOTH the never-overwrite-an-own-scan guard and
+  # the duplicate-write guard silently stop applying. That is worst exactly when
+  # the hub is slow, i.e. the same condition the long root retry exists for: a
+  # subcomponent that DOES have its own per-service scan would read empty and get
+  # clobbered, and a re-fired wave would double-append (CollectExternal appends
+  # rather than upserts).
+  #
+  # A short budget rather than the root's: this is per-target, the root read
+  # already succeeded so materialization is broadly current, and the legitimate
+  # empty case (a commit touching nothing this subcomponent owns) must stay fast.
+  TARGET_JSON=$(retry_read "$TARGET_READ_BUDGET_SECS" lunar component get-json "$NAME" "${read_dims[@]}") || TARGET_JSON=""
+
+  if [ -z "$TARGET_JSON" ]; then
+    # Say so out loud. Writing blind is the right default — the common cause is
+    # a subcomponent with no collection of its own at this commit — but it means
+    # the two guards below did not run, so make that visible rather than silent.
+    log "note: could not read $NAME within ${TARGET_READ_BUDGET_SECS}s — writing without the own-scan and duplicate guards"
+  fi
 
   if [ -n "$TARGET_JSON" ]; then
     # Never overwrite a subcomponent's OWN scan. A per-service scan is more
@@ -297,17 +325,23 @@ while [ "$i" -lt "$TARGET_COUNT" ]; do
     fi
 
     # The fingerprint alone is NOT enough to conclude "already written for this
-    # commit". A SHA-pinned `get-json` is not SHA-exact: when a component has no
-    # collection of its own at that SHA the Hub carries the previous commit's
-    # blob forward, so the read happily returns an OLDER commit's fan-out —
-    # matching fingerprint and all. Observed on cronos: at sha f50924dc every
-    # target was skipped as "unchanged" against provenance written at e3dd3d09,
-    # and `hub.merged_collection_blobs` had no row at f50924dc at all.
+    # commit", because a SHA-pinned `get-json` can hand back another commit's
+    # fan-out. Observed and reproduced on cronos:
+    #
+    #   get-json <sub> --git-sha f50924dc  ->  .sast.source.fanout.root_git_sha
+    #                                          = e3dd3d09  (a DIFFERENT commit)
+    #
+    # and on that basis every target was skipped as "unchanged" at f50924dc, so
+    # that commit received no fan-out at all. I have NOT established why the
+    # read behaves this way — querying public.components directly at the same
+    # (name, sha) shows no fanout key, so it is not simply that view — and the
+    # guard should not depend on the answer.
     #
     # Provenance already records which commit produced it, so require that too.
     # Same payload for the SAME commit is a genuine no-op worth skipping (the
-    # wave can re-fire); same payload carried forward from a DIFFERENT commit is
-    # this commit never having been written.
+    # wave can re-fire, and CollectExternal appends rather than upserts); the
+    # same payload stamped with a DIFFERENT commit means this commit has not
+    # been written, whatever the read is doing.
     PRIOR=$(echo "$TARGET_JSON" | jq -r '.sast.source.fanout.fingerprint // ""')
     PRIOR_SHA=$(echo "$TARGET_JSON" | jq -r '.sast.source.fanout.root_git_sha // ""')
     if [ "$PRIOR" = "$FINGERPRINT" ] && [ "$PRIOR_SHA" = "$SHA" ]; then

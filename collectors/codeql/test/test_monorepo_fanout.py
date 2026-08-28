@@ -199,12 +199,12 @@ class Base(unittest.TestCase):
         # for the cross-component writes or they land back on the root.
         env["LUNAR_COLLECT_STDOUT"] = "1"
         env.pop("LUNAR_COMPONENT_PR", None)
-        for k in ("LUNAR_VAR_SUBCOMPONENTS", "LUNAR_VAR_MAX_SUBCOMPONENTS"):
-            env.pop(k, None)
-        # Production default is 300s; the suite would take that long on the
-        # persistent-failure case. The retry BEHAVIOUR is what's under test, not
-        # the wall-clock budget.
-        env["LUNAR_VAR_READ_RETRY_SECONDS"] = "20"
+        env.pop("LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES", None)
+        # Production budgets are 300s/30s; the suite would sit there for the full
+        # budget on every timeout case. These are the script's test seam, NOT
+        # plugin inputs — the retry BEHAVIOUR is under test, not the wall clock.
+        env["LUNAR_FANOUT_TEST_READ_BUDGET"] = "20"
+        env["LUNAR_FANOUT_TEST_TARGET_BUDGET"] = "6"
         if env_overrides:
             for k, v in env_overrides.items():
                 if v is None:
@@ -240,7 +240,7 @@ class TestAttribution(Base):
     def test_findings_route_to_the_owning_subcomponent(self):
         # Inspecting individual findings means opting the slice back in; the
         # default payload carries only the counts (see TestPayload).
-        proc = self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        proc = self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         self.assertEqual(proc.returncode, 0, proc.stderr)
         writes = self.writes()
         self.assertEqual(set(writes), {API, WEB, JOB})
@@ -255,7 +255,7 @@ class TestAttribution(Base):
         self.assertCountEqual(web_files, ["services/web/app/page.tsx", ".github/workflows/ci.yml"])
 
     def test_shared_claimed_file_reaches_every_claimant_and_no_one_else(self):
-        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         writes = self.writes()
         for name in (API, WEB):
             files = [i["file"] for i in writes[name]["stdin"]["issues"]]
@@ -265,7 +265,7 @@ class TestAttribution(Base):
         self.assertNotIn(".github/workflows/ci.yml", job_files)
 
     def test_unclaimed_finding_reaches_no_subcomponent(self):
-        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         for name, rec in self.writes().items():
             files = [i["file"] for i in rec["stdin"]["issues"]]
             self.assertNotIn("tools/generate.py", files, f"{name} should not own a repo-root file")
@@ -277,7 +277,7 @@ class TestAttribution(Base):
         self.set_component_json(ROOT, {"sast": {"issues": [
             {"severity": "low", "rule": "j/x", "file": "services/job/main.rs", "line": 1, "message": "x"},
         ]}})
-        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         writes = self.writes()
         self.assertEqual([i["file"] for i in writes[JOB]["stdin"]["issues"]], ["services/job/main.rs"])
         self.assertEqual(writes[API]["stdin"]["findings"]["total"], 0)
@@ -309,7 +309,7 @@ class TestPayload(Base):
         # "scanned and clean" is a real result: it is what turns the SAST policy
         # from "No SAST scanning data found" into a pass. Dropping the write
         # would leave exactly the gap this collector exists to close.
-        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         job = self.writes()[JOB]["stdin"]
         self.assertEqual(job["issues"], [])
         self.assertEqual(job["findings"]["total"], 0)
@@ -357,7 +357,7 @@ class TestPayload(Base):
             self.assertIn("summary", rec["stdin"])
 
     def test_include_issues_opts_the_slice_back_in(self):
-        self.run_script(env_overrides={"LUNAR_VAR_INCLUDE_ISSUES": "true"})
+        self.run_script(env_overrides={"LUNAR_VAR_MONOREPO_FANOUT_INCLUDE_ISSUES": "true"})
         api = self.writes()[API]["stdin"]
         self.assertCountEqual(
             [i["file"] for i in api["issues"]],
@@ -592,11 +592,3 @@ class TestGuardrails(Base):
         self.assertEqual(set(writes), {API, WEB, JOB})
         self.assertEqual(writes[API]["stdin"]["findings"]["total"], 0)
 
-    def test_max_subcomponents_truncates_loudly(self):
-        proc = self.run_script(env_overrides={"LUNAR_VAR_MAX_SUBCOMPONENTS": "2"})
-        self.assertEqual(len(self.writes()), 2)
-        self.assertIn("SKIPPING the rest", proc.stderr)
-
-
-if __name__ == "__main__":
-    unittest.main()
