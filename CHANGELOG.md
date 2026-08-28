@@ -9,27 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `backstage` cataloger: component repos are now verified to exist before the
-  component is written, via the new `verify_repos` input (default `true`). The
-  id annotation on a Backstage entity is a *claim* about a repo, not a fact —
-  a hand-maintained catalog accumulates renamed, deleted and typo'd slugs — and
-  nothing downstream catches one: Lunar does not validate repo existence when
-  the catalog is saved, so the component is created either way and then sits
-  there with no repository behind it, so no collection and no check ever runs
-  against it. Candidate `<owner>/<repo>` pairs are resolved in batches of ~100
-  per GitHub GraphQL request (not one request per component, which would put a
-  large catalog's verification cost on the same order as its size), and any
-  component whose repo GitHub reports absent is skipped and named in the run
-  log. Verification needs the new optional `GH_TOKEN` secret and is
-  deliberately **fail-open**: no token, an unaddressable host (a
-  non-`github.com/` `component_id_prefix` while `github_api_url` is still the
-  public default), a non-200, or a "nothing resolved at all" answer all leave
-  the catalog untouched, so it only ever shrinks on a positively-absent repo.
-  The new `github_api_url` input (default `https://api.github.com`) points
-  verification at a GitHub Enterprise Server REST base. The file-based siblings
-  are unaffected — `backstage-catalog-info-monorepo` derives ids from repos it
-  enumerated through the GitHub API, and `backstage-catalog-info` only augments
-  components Lunar already has (ENG-1640).
+- `backstage` cataloger: components whose git repository does not exist are now
+  skipped instead of catalogued, via the new `verify_repos` input (default
+  `true`). A Backstage id annotation is a claim about a repo, not a fact, and
+  Lunar does not validate repo existence when the catalog is saved — so a
+  renamed, deleted or typo'd slug created a component with nothing behind it,
+  which no collector or policy could ever run against. Skipped components are
+  named in the run log. In practice this stays off until the new optional
+  `GH_TOKEN` secret is set: without it the cataloger logs one line and writes
+  every component as before, so upgrading changes nothing until you opt in.
+  The host is read from each component id, so a catalog spanning github.com and
+  any number of GitHub Enterprise Server hosts needs no extra configuration, and
+  each host is verified independently — a host that can't be checked (bad
+  credentials, unreachable, or a forge that isn't GitHub) leaves its own
+  components untouched without affecting the rest. Lookups are batched ~100
+  repos per GraphQL request rather than one request per component (ENG-1640).
+- `backstage` cataloger: an explicit empty `component_id_prefix` is no longer
+  clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
+  to `""` silently kept the default and double-prefixed ids whose annotation
+  value already carried a host — which made a multi-host catalog impossible to
+  express. Same bug ENG-1105 fixed for `tag_prefix` (ENG-1640).
 - `jira` collector: ticket references are now detected in the PR description as
   well as the title, and checked against Jira before one is collected. `ticket`
   and `ticket-history` read both fields from the same GitHub PR fetch and build

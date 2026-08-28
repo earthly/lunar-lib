@@ -55,7 +55,21 @@ cat > "$TEST_DIR/gql-respond" << 'RESPOND'
 set -euo pipefail
 OUT="$1"
 BATCH_LOG="$2"
+REQ_URL="${3:-}"
 BODY=$(cat)
+# A host named in MOCK_UNSUPPORTED_HOSTS answers like a forge that isn't GitHub
+# (a GitLab instance serves /api/graphql but has no `repository(owner:,name:)`
+# field): HTTP 200, errors, no data. Nothing resolves for that host.
+for _h in $(printf '%s' "${MOCK_UNSUPPORTED_HOSTS:-}" | tr ',' ' '); do
+    [ -z "$_h" ] && continue
+    case "$REQ_URL" in
+        *"$_h"*)
+            echo '{"errors":[{"message":"Field '"'"'repository'"'"' doesn'"'"'t exist on type '"'"'Query'"'"'"}]}' > "$OUT"
+            echo 0 >> "$BATCH_LOG"
+            exit 0
+            ;;
+    esac
+done
 # Pull every `rN: repository(owner: "o", name: "r")` alias out of the query and
 # answer non-null for each, except the slugs named in MOCK_MISSING_REPOS. This
 # mirrors the real API: HTTP 200, `data.rN: null`, and a NOT_FOUND entry in
@@ -113,7 +127,7 @@ case "\$REQ_URL" in
     fi
     # Delegate the response shaping to gql-respond (its own file, so its jq
     # program isn't run through this heredoc's escaping).
-    printf '%s' "\$BODY" | "$TEST_DIR/gql-respond" "\$WRITE_FILE" "$GQL_BATCHES"
+    printf '%s' "\$BODY" | "$TEST_DIR/gql-respond" "\$WRITE_FILE" "$GQL_BATCHES" "\$REQ_URL"
     echo "200"
     ;;
 *)
@@ -123,9 +137,9 @@ case "\$REQ_URL" in
     if [ "\$CALL_NUM" -ge 4 ]; then
         echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
     elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
-        jq -c '{items: .items[5:], pageInfo: {}}' "$FIXTURE" > "\$WRITE_FILE"
+        jq -c '{items: .items[5:], pageInfo: {}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     else
-        jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "$FIXTURE" > "\$WRITE_FILE"
+        jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     fi
     echo "200"
     ;;
@@ -418,7 +432,7 @@ check_verify "nothing missing -> all kept" "$ALL_FIVE" "$VR_KEYS"
 verify_run true "" "acme/payment-api-proto" 100 200
 check_verify "no token -> writes everything (fail open)" "$ALL_FIVE" "$VR_KEYS"
 [ "$VR_GQL" -eq 0 ] || fail "expected no GraphQL request without a token, got $VR_GQL"
-grep -q "no GH_TOKEN secret is configured" "$VR_OUT" || \
+grep -q "no GH_TOKEN secret is set" "$VR_OUT" || \
     fail "expected a warning naming the missing GH_TOKEN secret"
 
 # (c) verify_repos off: no verification at all, even with a token.
@@ -443,7 +457,7 @@ grep -q "verification request failed (HTTP 503)" "$VR_OUT" || \
 #      cataloger. This is the regression that shipped in the first cut.
 verify_run true mock-gh-token "acme/payment-api-proto" 100 200 MOCK_GRAPHQL_JUNK_BODY=1
 check_verify "200 + junk body -> fail open" "$ALL_FIVE" "$VR_KEYS"
-grep -q "could not parse the GitHub GraphQL response" "$VR_OUT" || \
+grep -q "could not parse .* response" "$VR_OUT" || \
     fail "expected the unparseable-response warning"
 grep -q "Backstage sync complete" "$VR_OUT" || \
     fail "an unparseable verification response must not abort the run"
@@ -459,25 +473,72 @@ BATCH_SIZES=$(sort "$GQL_BATCHES" | tr '\n' ',')
 [ "$BATCH_SIZES" = "1,2,2," ] || \
     fail "expected batches of 2,2,1 repos per request; got sizes {$BATCH_SIZES}"
 
-# (g) A GHES-style prefix with the default github.com API base must skip
-#     verification rather than check the wrong host (which reports all missing).
-verify_run true mock-gh-token "" 100 200 LUNAR_VAR_COMPONENT_ID_PREFIX="ghes.example.com/"
+# (g) Host comes from the component id, with NO extra config: a GHES-prefixed
+#     catalog is checked against https://<host>/api/graphql, not github.com.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 LUNAR_VAR_COMPONENT_ID_PREFIX="ghes.example.com/"
 GHES_KEYS=$(jq -rs 'add // {} | keys | map(sub("^ghes.example.com/"; "")) | sort | join(",")' "$COMPONENTS_OUT")
-check_verify "GHES prefix + default api url -> skipped" "$ALL_FIVE" "$GHES_KEYS"
-[ "$VR_GQL" -eq 0 ] || fail "expected no GraphQL request for an unaddressable host, got $VR_GQL"
-grep -q "github_api_url is still" "$VR_OUT" || \
-    fail "expected a warning telling the operator to set github_api_url"
-
-# (h) With github_api_url pointed at the GHES REST base, verification runs again
-#     and targets /api/graphql (not the REST base + /graphql).
-verify_run true mock-gh-token "acme/payment-api-proto" 100 200 \
-    LUNAR_VAR_COMPONENT_ID_PREFIX="ghes.example.com/" \
-    LUNAR_VAR_GITHUB_API_URL="https://ghes.example.com/api/v3"
-GHES_KEYS=$(jq -rs 'add // {} | keys | map(sub("^ghes.example.com/"; "")) | sort | join(",")' "$COMPONENTS_OUT")
-check_verify "GHES prefix + api url -> verifies" \
+check_verify "GHES id -> verified, zero config" \
     "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$GHES_KEYS"
 [ "$(head -1 "$GQL_URLS")" = "https://ghes.example.com/api/graphql" ] || \
-    fail "GHES GraphQL endpoint should be https://ghes.example.com/api/graphql, got '$(head -1 "$GQL_URLS")'"
+    fail "GHES endpoint should be derived from the id as https://ghes.example.com/api/graphql, got '$(head -1 "$GQL_URLS")'"
+
+# --- Multi-host: one catalog spanning github.com and a GHES host -------------
+# Uses its own fixture whose annotation values already carry the host, with an
+# empty component_id_prefix, so the ids are genuinely mixed-host.
+MULTI_FIXTURE="$SCRIPT_DIR/sample-catalog-multihost.json"
+
+multi_run() { # $1=missing csv  $2=unsupported hosts csv
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    : > "$GQL_URLS"; : > "$GQL_BATCHES"
+    VR_OUT="$TEST_DIR/multi.out"
+    env MOCK_FIXTURE="$MULTI_FIXTURE" \
+        MOCK_MISSING_REPOS="$1" \
+        MOCK_UNSUPPORTED_HOSTS="$2" \
+        LUNAR_VAR_VERIFY_REPOS=true \
+        LUNAR_SECRET_GH_TOKEN=mock-gh-token \
+        LUNAR_VAR_COMPONENT_ID_PREFIX="" \
+        "$SCRIPT_DIR/main.sh" > "$VR_OUT" 2>&1 || true
+    MULTI_KEYS=$(jq -rs 'add // {} | keys | sort | join(",")' "$COMPONENTS_OUT")
+    MULTI_HOSTS=$(sort -u "$GQL_URLS" | tr '\n' ',')
+}
+
+ALL_FOUR="github.com/acme/payments,github.com/acme/retired,ghes.example.com/corp/billing,ghes.example.com/corp/ghost"
+ALL_FOUR=$(printf '%s' "$ALL_FOUR" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,$//')
+
+# (h) Both hosts get verified, each at its own endpoint, and the absent repo on
+#     EACH host is dropped independently.
+multi_run "acme/retired,corp/ghost" ""
+check_verify "multi-host: both hosts filtered" \
+    "ghes.example.com/corp/billing,github.com/acme/payments" "$MULTI_KEYS"
+[ "$MULTI_HOSTS" = "https://api.github.com/graphql,https://ghes.example.com/api/graphql," ] || \
+    fail "expected both host endpoints to be hit; got {$MULTI_HOSTS}"
+
+# (i) Per-host isolation — the point of deriving the host per component. A host
+#     that isn't GitHub (GitLab serves /api/graphql but has no repository()
+#     field) resolves nothing, so ITS components are left alone while github.com
+#     is still filtered normally. Without isolation this would either drop every
+#     GHES component or fail open across the whole catalog.
+multi_run "acme/retired,corp/ghost" "ghes.example.com"
+check_verify "non-GitHub host isolated: its components kept, github.com still filtered" \
+    "ghes.example.com/corp/billing,ghes.example.com/corp/ghost,github.com/acme/payments" "$MULTI_KEYS"
+grep -q "ghes.example.com is inconclusive" "$VR_OUT" || \
+    fail "expected an inconclusive warning naming the unsupported host"
+grep -q "verification supports GitHub hosts only" "$VR_OUT" || \
+    fail "the inconclusive warning should say verification is GitHub-only"
+
+# (j) An id with no host segment (empty prefix + bare owner/repo) is not
+#     addressable, so it is left alone rather than guessed at.
+NOHOST_KEPT=$(echo '{"acme/payments":{"tags":[]},"github.com/acme/payments":{"tags":[]}}' | jq \
+    --rawfile present <(printf 'github.com/acme/payments\n') \
+    --rawfile checked <(printf 'github.com\n') '
+    ($present | split("\n") | map(select(length > 0))) as $ok
+    | ($checked | split("\n") | map(select(length > 0))) as $hosts
+    | with_entries((.key | split("/")) as $p
+        | select(($p|length) < 3 or $p[0]=="" or $p[1]=="" or $p[2]==""
+                 or (($p[0] | IN($hosts[])) | not)
+                 or (($p[0:3] | join("/")) | IN($ok[]))))' | jq -r 'keys | sort | join(",")')
+[ "$NOHOST_KEPT" = "acme/payments,github.com/acme/payments" ] || \
+    fail "a hostless id must be left alone, not dropped; got {$NOHOST_KEPT}"
 
 # (i) Monorepo-style ids (<owner>/<repo>/<subdir>) resolve to their backing repo,
 #     so a subcomponent follows its repo's verdict rather than being treated as
