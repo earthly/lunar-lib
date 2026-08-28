@@ -25,7 +25,7 @@ and no token — so it behaves the same on any Git platform.
 
 | Collector | Description |
 |---|---|
-| `ticket-coverage` | Runs on the default branch. Queries the SQL API for the component's pull requests in the trailing window and writes the coverage totals and percentage. Skips in pull-request context, when the SQL API is unreachable, or when the window holds no pull requests. |
+| `ticket-coverage` | Runs on the default branch. Queries the SQL API for the component's pull requests in the trailing window and writes the coverage totals and percentage. Skips in pull-request context and when the SQL API is unreachable. An empty window is *recorded* with a `null` percentage rather than skipped, so "no pull requests in the window" stays distinguishable from "this collector never ran" — the policy skips on it either way. |
 
 ## Installation
 
