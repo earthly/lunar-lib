@@ -1,4 +1,4 @@
-# Ticket Adoption Collector
+# Ticket Coverage Collector
 
 Record what share of a component's recent pull requests referenced an issue-tracker ticket.
 
@@ -16,22 +16,22 @@ and no token — so it behaves the same on any Git platform.
 
 | Path | Type | Description |
 |---|---|---|
-| `.vcs.ticket_adoption.window_days` | number | Trailing window the metric was computed over, in days |
-| `.vcs.ticket_adoption.prs_total` | number | Distinct pull requests recorded for this component in the window |
-| `.vcs.ticket_adoption.prs_with_ticket` | number | How many of those carried a resolved ticket id |
-| `.vcs.ticket_adoption.percentage` | number \| null | `prs_with_ticket / prs_total` as a percentage; `null` when the window holds no pull requests |
+| `.vcs.ticket_coverage.window_days` | number | Trailing window the metric was computed over, in days |
+| `.vcs.ticket_coverage.prs_total` | number | Distinct pull requests recorded for this component in the window |
+| `.vcs.ticket_coverage.prs_with_ticket` | number | How many of those carried a resolved ticket id |
+| `.vcs.ticket_coverage.percentage` | number \| null | `prs_with_ticket / prs_total` as a percentage; `null` when the window holds no pull requests |
 
 ## Collectors
 
 | Collector | Description |
 |---|---|
-| `ticket-adoption` | Runs on the default branch. Queries the SQL API for the component's pull requests in the trailing window and writes the adoption totals and percentage. Skips in pull-request context, when the SQL API is unreachable, or when the window holds no pull requests. |
+| `ticket-coverage` | Runs on the default branch. Queries the SQL API for the component's pull requests in the trailing window and writes the coverage totals and percentage. Skips in pull-request context, when the SQL API is unreachable, or when the window holds no pull requests. |
 
 ## Installation
 
 ```yaml
 collectors:
-  - uses: github://earthly/lunar-lib/collectors/ticket-adoption@main
+  - uses: github://earthly/lunar-lib/collectors/ticket-coverage@main
     with:
       window_days: "30"
 ```

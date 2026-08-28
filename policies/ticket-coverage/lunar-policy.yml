@@ -1,6 +1,6 @@
 version: 0
 
-name: ticket-adoption
+name: ticket-coverage
 
 description: Score a component on the share of its recent pull requests that referenced a ticket
 
@@ -9,17 +9,17 @@ author: support@earthly.dev
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "Ticket Adoption Guardrails"
+  display_name: "Ticket Coverage Guardrails"
   long_description: |
     Score a component on the share of its recent pull requests that referenced an
-    issue-tracker ticket. Evaluated on the default branch, so change-management adoption
+    issue-tracker ticket. Evaluated on the default branch, so change-management coverage
     counts toward initiative and domain scores instead of only appearing on individual
     pull requests.
   category: "security-and-compliance"
-  icon: "assets/ticket-adoption.svg"
+  icon: "assets/ticket-coverage.svg"
   status: "beta"
   requires:
-    - slug: "ticket-adoption"
+    - slug: "ticket-coverage"
       type: "collector"
       reason: "Records the percentage this policy scores"
 
@@ -29,16 +29,16 @@ landing_page:
       reason: "Checks one pull request; this scores the trend across many"
 
 policies:
-  - name: ticket-adoption
+  - name: ticket-coverage
     description: |
       Asserts that at least `min_percentage` of the component's pull requests in the
-      trailing window referenced a ticket, reading `.vcs.ticket_adoption` from the
-      ticket-adoption collector.
-      Skips when there is no adoption data yet, and when the window contains no pull
+      trailing window referenced a ticket, reading `.vcs.ticket_coverage` from the
+      ticket-coverage collector.
+      Skips when there is no coverage data yet, and when the window contains no pull
       requests at all — a component with no recent change should not be reported as
       failing a change-management control.
-    mainPython: ./ticket_adoption.py
-    keywords: ["ticket", "change management", "adoption", "jsox", "sox"]
+    mainPython: ./ticket_coverage.py
+    keywords: ["ticket", "change management", "coverage", "adoption", "jsox", "sox"]
 
 inputs:
   min_percentage:
