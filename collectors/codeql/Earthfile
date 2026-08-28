@@ -1,0 +1,13 @@
+VERSION 0.8
+
+test:
+    FROM python:3.12-alpine
+    # monorepo-fanout.sh is bash and shells out to jq + sha256sum. The tests stub
+    # `lunar` and `psql` on PATH (the psql stub applies the LIKE prefix itself, so
+    # discovery is exercised as a genuinely scoped read) and drive the real script
+    # as a subprocess.
+    RUN apk add --no-cache bash jq coreutils
+    WORKDIR /workspace
+    COPY monorepo-fanout.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v

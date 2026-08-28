@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the monorepo collector's sast-fanout sub-collector.
+"""Tests for the codeql collector's monorepo-fanout sub-collector.
 
 The whole value of this collector is the *attribution* step — which repo-wide
 finding ends up on which subcomponent — so that is what these lock in:
@@ -207,7 +207,7 @@ class Base(unittest.TestCase):
                 else:
                     env[k] = v
         proc = subprocess.run(
-            ["bash", os.path.join(COLLECTOR, "sast-fanout.sh")],
+            ["bash", os.path.join(COLLECTOR, "monorepo-fanout.sh")],
             env=env, capture_output=True, text=True,
         )
         return proc

@@ -58,6 +58,84 @@ collectors:
           name: codeql-runner
     keywords: ["codeql cli", "codeql-runner", "ci integration", "sast", "code scanning"]
 
+  - name: monorepo-fanout
+    description: |
+      Redistributes a monorepo's repo-wide CodeQL findings to its subcomponents.
+      CodeQL analyses a whole repository, and the traced scan resolves to the
+      repository, so in a monorepo the findings land on the repo-root component
+      while the real components are the subdirectories — every one of which then
+      reads as "No SAST scanning data found" despite having been scanned.
+      Enabled on the repository ROOT alongside `cicd`, this runs once the root's
+      collection settles and writes each subcomponent's severity counts onto that
+      subcomponent's Component JSON at the same commit. `.sast.native` is never
+      copied — the raw SARIF describes the whole repository, so it stays on the
+      root and each subcomponent gets only the derived numbers its policies read,
+      plus provenance under `.sast.source.fanout`. Subcomponents are discovered
+      with a prefix-scoped query against the Hub's SQL API, so only the matching
+      rows cross the wire rather than the entire catalog. A finding is attributed
+      to a subcomponent when its file matches that subcomponent's path patterns —
+      the explicit `paths:` plus the implicit "<subdir>/*" its name implies — so
+      attribution follows the same rule the Hub uses for change detection.
+      Findings matching no subcomponent stay on the root, and a subcomponent that
+      already has SAST data of its own is never overwritten. Hooked on
+      .sast.issues rather than .sast because cli.sh writes
+      .sast.native.codeql.cicd for every codeql exec (database init, resolve
+      languages, bundle, cleanup), so .sast is present long before any findings
+      are; .sast.issues appears only once a SARIF report has been parsed. The
+      root component also needs at least one POLICY: an after-json collector is
+      dispatched by the Hub's doneness gate, which is only consulted while
+      bundling a component's policies, so a component no policy evaluates never
+      fires them.
+    mainBash: monorepo-fanout.sh
+    hook:
+      type: after-json
+      path: .sast.issues
+    keywords: ["monorepo", "sast", "fan-out", "after-json", "subcomponent", "cross-component"]
+
+inputs:
+  include_issues:
+    description: |
+      Also write the per-finding array (`.sast.issues`) to each subcomponent,
+      sliced to the findings that component owns. Off by default: `policies/sast`
+      reads `.sast.summary.has_<sev>` and `.sast.findings.<sev>`, and `max-total`
+      reads `.sast.findings.total` — none of them read `.sast.issues`, so
+      shipping it multiplies write size by findings x subcomponents for data no
+      guardrail evaluates. Turn it on if you want the per-finding detail visible
+      on each service in the UI. Only used by `monorepo-fanout`.
+    default: "false"
+  subcomponents:
+    description: |
+      Comma-separated list of subcomponent names for `monorepo-fanout` to write
+      to, e.g. "github.com/acme/repo/services/api,github.com/acme/repo/services/web".
+      Skips SQL discovery entirely — useful when collectors cannot reach the
+      Hub's SQL API, or to restrict the fan-out to a subset. Default (empty)
+      discovers every component whose name is prefixed by the root's.
+      NOTE: it also skips reading each target's explicit `paths:`. Attribution
+      then falls back to the implicit "<subdir>/*" a component's name implies, so
+      a subcomponent that claims files outside its own directory (a shared
+      `.github/workflows/ci.yml`, a root `CODEOWNERS`) will NOT receive findings
+      from them. Prefer automatic discovery unless you have a reason not to.
+    default: ""
+  read_retry_seconds:
+    description: |
+      How long `monorepo-fanout` keeps retrying its Hub reads before failing the
+      run, in seconds. The after-json wave fires when COLLECTION settles, but
+      `lunar component get-json` reads through views over `mat.components` /
+      `mat.component_json`, which the Hub drains asynchronously. A SHA-pinned
+      read therefore returns NotFound until this commit's row has drained —
+      measured at 285s on a busy Hub. Raise it if your Hub materializes slowly;
+      the run holds a wave slot while it waits. On expiry the collector exits
+      non-zero rather than silently writing nothing, because the wave is
+      fire-once and a swallowed read loses that commit's fan-out permanently.
+    default: "300"
+  max_subcomponents:
+    description: |
+      Upper bound on how many subcomponents `monorepo-fanout` will write to in a
+      single run, as a guard against a mis-scoped root component fanning out
+      across an entire org. Targets beyond the limit are skipped and logged as a
+      warning (never silently dropped).
+    default: "50"
+
 secrets:
   GH_TOKEN:
     description: GitHub token for API access (required for github-app collector)

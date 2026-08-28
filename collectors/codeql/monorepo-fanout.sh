@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # =============================================================================
-# Monorepo SAST fan-out
+# CodeQL monorepo fan-out
 # =============================================================================
 #
 # PROBLEM
@@ -53,7 +53,7 @@ set -eo pipefail
 # self-reference is fatal rather than something to run through.
 # =============================================================================
 
-log() { echo "monorepo.sast-fanout: $*" >&2; }
+log() { echo "codeql.monorepo-fanout: $*" >&2; }
 
 # --- 0. Self-reference and dimensions ----------------------------------------
 # A cross-component writer keys every decision off its own component name. If
