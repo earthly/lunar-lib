@@ -687,12 +687,22 @@ verify_component_repos() {
         # A missing repo comes back as `data.rN: null` plus a NOT_FOUND entry in
         # `errors` — a 200 with partial data, not an error response. Anything
         # that did resolve is present.
-        jq -r --slurpfile batch "$batch_file" '
+        #
+        # `|| hard_failure=1` is load-bearing: a 200 carrying a non-JSON body (a
+        # proxy or WAF error page, a truncated response) makes jq exit non-zero,
+        # and under `set -e` that would kill the whole cataloger run — turning a
+        # "we don't know" into a hard failure, the exact opposite of the
+        # fail-open contract. Treat it as inconclusive instead.
+        if ! jq -r --slurpfile batch "$batch_file" '
             (.data // {})
             | to_entries[]
             | select(.value != null)
             | $batch[0][(.key | ltrimstr("r") | tonumber)]
-        ' "$resp_file" >> "$present_file"
+        ' "$resp_file" >> "$present_file" 2>/dev/null; then
+            echo "WARNING: could not parse the GitHub GraphQL response (HTTP 200, body head: $(head -c 120 "$resp_file" 2>/dev/null))" >&2
+            hard_failure=1
+            break
+        fi
 
         offset=$((offset + VERIFY_BATCH_SIZE))
     done

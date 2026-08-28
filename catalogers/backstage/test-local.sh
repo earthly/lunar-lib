@@ -105,6 +105,12 @@ case "\$REQ_URL" in
         echo "\$MOCK_GRAPHQL_HTTP"
         exit 0
     fi
+    # A 200 carrying a non-JSON body — what a proxy/WAF error page looks like.
+    if [ -n "\${MOCK_GRAPHQL_JUNK_BODY:-}" ]; then
+        printf '<html><body>403 Forbidden</body></html>' > "\$WRITE_FILE"
+        echo "200"
+        exit 0
+    fi
     # Delegate the response shaping to gql-respond (its own file, so its jq
     # program isn't run through this heredoc's escaping).
     printf '%s' "\$BODY" | "$TEST_DIR/gql-respond" "\$WRITE_FILE" "$GQL_BATCHES"
@@ -431,6 +437,16 @@ verify_run true mock-gh-token "acme/payment-api-proto" 100 503
 check_verify "HTTP 503 -> fail open" "$ALL_FIVE" "$VR_KEYS"
 grep -q "verification request failed (HTTP 503)" "$VR_OUT" || \
     fail "expected the HTTP failure to be reported"
+
+# (e2) A 200 with a non-JSON body (proxy/WAF error page) must fail open too, not
+#      abort the run — jq exits non-zero on it and `set -e` would kill the whole
+#      cataloger. This is the regression that shipped in the first cut.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 MOCK_GRAPHQL_JUNK_BODY=1
+check_verify "200 + junk body -> fail open" "$ALL_FIVE" "$VR_KEYS"
+grep -q "could not parse the GitHub GraphQL response" "$VR_OUT" || \
+    fail "expected the unparseable-response warning"
+grep -q "Backstage sync complete" "$VR_OUT" || \
+    fail "an unparseable verification response must not abort the run"
 
 # (f) Batching: 5 repos at batch=2 is 3 requests. This is the assertion that
 #     keeps the check from regressing to one request per component — at a large
