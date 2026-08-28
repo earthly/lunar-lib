@@ -74,18 +74,23 @@ done
 # answer non-null for each, except the slugs named in MOCK_MISSING_REPOS. This
 # mirrors the real API: HTTP 200, `data.rN: null`, and a NOT_FOUND entry in
 # `errors` for anything it cannot resolve.
-printf '%s' "$BODY" | jq -r --arg missing "${MOCK_MISSING_REPOS:-}" '
+printf '%s' "$BODY" | jq -r --arg missing "${MOCK_MISSING_REPOS:-}" \
+                            --arg forbidden "${MOCK_FORBIDDEN_REPOS:-}" '
     ($missing | split(",") | map(select(length > 0))) as $gone
+    | ($forbidden | split(",") | map(select(length > 0))) as $denied
     | [ .query
         | scan("(r[0-9]+): repository\\(owner: \"([^\"]*)\", name: \"([^\"]*)\"\\)")
         | {alias: .[0], slug: (.[1] + "/" + .[2])} ] as $fields
     | ( { data: ( [ $fields[]
                     | {key: .alias,
-                       value: (if (.slug | IN($gone[])) then null
+                       value: (if (.slug | IN($gone[])) or (.slug | IN($denied[])) then null
                                else {id: ("R_" + .slug)} end)} ] | from_entries ),
-          errors: [ $fields[] | select(.slug | IN($gone[]))
-                    | {type: "NOT_FOUND", path: [.alias],
-                       message: ("Could not resolve to a Repository with the name " + .slug)} ] }
+          errors: ( [ $fields[] | select(.slug | IN($gone[]))
+                      | {type: "NOT_FOUND", path: [.alias],
+                         message: ("Could not resolve to a Repository with the name " + .slug)} ]
+                    + [ $fields[] | select(.slug | IN($denied[]))
+                        | {type: "FORBIDDEN", path: [.alias],
+                           message: ("Resource protected by organization SAML enforcement " + .slug)} ] ) }
         | if (.errors | length) == 0 then del(.errors) else . end
         | @json )
       + "\n" + ($fields | length | tostring)
@@ -461,6 +466,19 @@ grep -q "could not parse .* response" "$VR_OUT" || \
     fail "expected the unparseable-response warning"
 grep -q "Backstage sync complete" "$VR_OUT" || \
     fail "an unparseable verification response must not abort the run"
+
+# (e3) A null that is NOT a NOT_FOUND must be kept. GitHub nulls a field for
+#      FORBIDDEN too (a classic PAT not SSO-authorized for a SAML org — the repo
+#      exists, the token just can't see it). Other repos in the batch resolve, so
+#      the "nothing resolved" guard does NOT fire; keying the drop off `null`
+#      instead of the error would silently delete a real component here.
+verify_run true mock-gh-token "acme/payment-api-proto" 100 200 MOCK_FORBIDDEN_REPOS="acme/web-app"
+check_verify "FORBIDDEN null kept, NOT_FOUND null dropped" \
+    "acme/fulfillment-api,acme/payment-api,acme/payments-db-iac,acme/web-app" "$VR_KEYS"
+grep -q "acme/payment-api-proto" "$VR_OUT" || fail "the NOT_FOUND repo should still be reported skipped"
+if grep -q "acme/web-app" "$VR_OUT"; then
+    fail "a FORBIDDEN repo must never be reported missing — the token can't see it, it still exists"
+fi
 
 # (f) Batching: 5 repos at batch=2 is 3 requests. This is the assertion that
 #     keeps the check from regressing to one request per component — at a large

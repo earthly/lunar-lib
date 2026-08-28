@@ -23,7 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each host is verified independently — a host that can't be checked (bad
   credentials, unreachable, or a forge that isn't GitHub) leaves its own
   components untouched without affecting the rest. Lookups are batched ~100
-  repos per GraphQL request rather than one request per component (ENG-1640).
+  repos per GraphQL request rather than one request per component. A component
+  is dropped only on an explicit `NOT_FOUND` from GitHub, never on a null
+  `data` field alone — GitHub also nulls a field for `FORBIDDEN` (a classic PAT
+  not SSO-authorized for a SAML org, where the repo exists and the token simply
+  cannot see it) and for a partial `SERVICE_UNAVAILABLE` (ENG-1640).
 - `backstage` cataloger: an explicit empty `component_id_prefix` is no longer
   clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
   to `""` silently kept the default and double-prefixed ids whose annotation

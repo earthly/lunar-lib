@@ -618,8 +618,8 @@ verify_component_repos() {
         return 0
     fi
 
-    local slugs_file present_file hosts_file done_file batch_file resp_file
-    slugs_file=$(mktemp); present_file=$(mktemp); hosts_file=$(mktemp)
+    local slugs_file absent_file hosts_file done_file batch_file resp_file
+    slugs_file=$(mktemp); absent_file=$(mktemp); hosts_file=$(mktemp)
     done_file=$(mktemp); batch_file=$(mktemp); resp_file=$(mktemp)
 
     # `<host>/<owner>/<repo>` per component id. Keeping the first three segments
@@ -636,7 +636,7 @@ verify_component_repos() {
     slug_total=$(grep -c . "$slugs_file" || true)
     if [ "$slug_total" -eq 0 ]; then
         echo "No component id resolved to a <host>/<owner>/<repo> triple — skipping repo verification"
-        rm -f "$slugs_file" "$present_file" "$hosts_file" "$done_file" "$batch_file" "$resp_file"
+        rm -f "$slugs_file" "$absent_file" "$hosts_file" "$done_file" "$batch_file" "$resp_file"
         return 0
     fi
 
@@ -656,8 +656,8 @@ verify_component_repos() {
             graphql_url="https://$vhost/api/graphql"
         fi
 
-        local host_slugs_file host_present_file
-        host_slugs_file=$(mktemp); host_present_file=$(mktemp)
+        local host_slugs_file host_present_file host_absent_file
+        host_slugs_file=$(mktemp); host_present_file=$(mktemp); host_absent_file=$(mktemp)
         grep "^$vhost/" "$slugs_file" > "$host_slugs_file" || true
         local host_total
         host_total=$(grep -c . "$host_slugs_file" || true)
@@ -699,8 +699,26 @@ verify_component_repos() {
                 break
             fi
 
-            # A missing repo comes back as `data.rN: null` plus a NOT_FOUND entry
-            # in `errors` — a 200 with partial data, not an error response.
+            # A missing repo comes back as `data.rN: null` PLUS an
+            # `errors[] {type: NOT_FOUND, path: [rN]}` entry — a 200 with partial
+            # data, not an error response.
+            #
+            # Only an explicit NOT_FOUND marks a repo absent. `data.rN: null` on
+            # its own must NOT: GitHub also nulls a field for FORBIDDEN (a classic
+            # PAT that hasn't been SSO-authorized for a SAML org — the repo exists,
+            # the token just can't see it) and for a partial SERVICE_UNAVAILABLE.
+            # In both cases other repos in the batch still resolve, so the
+            # "nothing resolved" guard below would NOT fire, and keying the drop
+            # off null would delete real components while telling the operator to
+            # go fix Backstage. That is the catalog shrinking on a "we don't
+            # know", which the header comment forbids.
+            #
+            # Two separate signals, deliberately:
+            #   present -> aliases GitHub positively resolved. Only used to decide
+            #              whether this host answered like GitHub at all.
+            #   absent  -> aliases GitHub explicitly reported NOT_FOUND. The only
+            #              thing that ever causes a component to be dropped.
+            # Anything null for any other reason lands in neither, and is kept.
             #
             # Guarding this jq is load-bearing: a 200 carrying a non-JSON body (a
             # proxy or WAF error page, a truncated response) makes jq exit
@@ -714,6 +732,18 @@ verify_component_repos() {
                 | $batch[0][(.key | ltrimstr("r") | tonumber)]
             ' "$resp_file" >> "$host_present_file" 2>/dev/null; then
                 echo "WARNING: could not parse $vhost's response (HTTP 200, body head: $(head -c 120 "$resp_file" 2>/dev/null))" >&2
+                hard_failure=1
+                break
+            fi
+            if ! jq -r --slurpfile batch "$batch_file" '
+                (.errors // [])[]
+                | select(.type == "NOT_FOUND")
+                | (.path[0]? // "" | tostring)
+                | select(startswith("r"))
+                | $batch[0][(ltrimstr("r") | tonumber)]
+                | select(. != null)
+            ' "$resp_file" >> "$host_absent_file" 2>/dev/null; then
+                echo "WARNING: could not parse $vhost's errors (HTTP 200, body head: $(head -c 120 "$resp_file" 2>/dev/null))" >&2
                 hard_failure=1
                 break
             fi
@@ -733,26 +763,27 @@ verify_component_repos() {
             echo "  — leaving its components unfiltered. Check GH_TOKEN covers $vhost, and note that" >&2
             echo "  verification supports GitHub hosts only (github.com and GitHub Enterprise Server)." >&2
         else
-            echo "$vhost: $host_present/$host_total repo(s) exist ($requests request(s))"
-            cat "$host_present_file" >> "$present_file"
+            local host_absent
+            host_absent=$(sort -u "$host_absent_file" | grep -c . || true)
+            echo "$vhost: $host_present/$host_total repo(s) resolved, $host_absent reported missing ($requests request(s))"
+            cat "$host_absent_file" >> "$absent_file"
             echo "$vhost" >> "$done_file"
         fi
-        rm -f "$host_slugs_file" "$host_present_file"
+        rm -f "$host_slugs_file" "$host_present_file" "$host_absent_file"
     done < "$hosts_file"
 
-    # Keep a component when its id has no host, when its host never gave a
-    # conclusive answer, or when its repo is in the resolved set.
+    # Drop ONLY what GitHub explicitly reported missing on a host that answered.
+    # Everything else is kept: an id with no host, a host that was inconclusive,
+    # and — the point of keying off the error rather than the null — a repo that
+    # came back null for any reason other than NOT_FOUND.
     VERIFIED_COMPONENTS=$(echo "$components" | jq \
-        --rawfile present "$present_file" \
-        --rawfile checked "$done_file" '
-        ($present | split("\n") | map(select(length > 0))) as $ok
-        | ($checked | split("\n") | map(select(length > 0))) as $hosts
+        --rawfile absent "$absent_file" '
+        ($absent | split("\n") | map(select(length > 0))) as $gone
         | with_entries(
             (.key | split("/")) as $p
             | select(
-                ($p | length) < 3 or $p[0] == "" or $p[1] == "" or $p[2] == ""
-                or (($p[0] | IN($hosts[])) | not)
-                or (($p[0:3] | join("/")) | IN($ok[]))
+                ($p | length) < 3
+                or ((($p[0:3] | join("/")) | IN($gone[])) | not)
               )
           )')
 
@@ -767,7 +798,7 @@ verify_component_repos() {
     fi
     echo "Repo verification: $total_requests GraphQL request(s)"
 
-    rm -f "$slugs_file" "$present_file" "$hosts_file" "$done_file" "$batch_file" "$resp_file"
+    rm -f "$slugs_file" "$absent_file" "$hosts_file" "$done_file" "$batch_file" "$resp_file"
 }
 
 verify_component_repos "$COMPONENTS"
