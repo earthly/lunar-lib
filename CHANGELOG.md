@@ -52,7 +52,7 @@ _Nothing yet._
   the `backstage` cataloger (#232); both run in the same snippet pods, so a
   single service-account role annotation covers both. An auth or
   credential-resolution failure never discards the parse and lint results — it
-  is recorded as a per-reference `{name, error}` (ENG-1621).
+  is recorded as a per-reference `{name, error}` (#294).
 
 - `backstage` collector: `api_path_prefix` input (default `/api`) — set it to an
   empty string when the Backstage catalog API is mounted at the root, e.g. behind
@@ -60,8 +60,7 @@ _Nothing yet._
   `/api/catalog/entities`. Matches the same input on the `backstage` cataloger.
   This pairs with `auth_mode: sigv4` above: an IAM-fronted Backstage is usually
   behind Amazon API Gateway, which is exactly the shape that strips the hop, so
-  the instances needing SigV4 are often the ones needing an empty prefix
-  (ENG-1621).
+  the instances needing SigV4 are often the ones needing an empty prefix (#294).
 
 - `sca` and `container-scan` policies (`max-severity`): new `ignore_unfixable`
   input (default `false`) narrows the failure to findings that carry an upgrade
@@ -103,13 +102,13 @@ _Nothing yet._
   is dropped only on an explicit `NOT_FOUND` from GitHub, never on a null
   `data` field alone — GitHub also nulls a field for `FORBIDDEN` (a classic PAT
   not SSO-authorized for a SAML org, where the repo exists and the token simply
-  cannot see it) and for a partial `SERVICE_UNAVAILABLE` (ENG-1640).
+  cannot see it) and for a partial `SERVICE_UNAVAILABLE` (#295).
 
 - `backstage` cataloger: an explicit empty `component_id_prefix` is no longer
   clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
   to `""` silently kept the default and double-prefixed ids whose annotation
   value already carried a host — which made a multi-host catalog impossible to
-  express. Same bug ENG-1105 fixed for `tag_prefix` (ENG-1640).
+  express. Same bug ENG-1105 fixed for `tag_prefix` (#295).
 
 - `sca` and `container-scan` policies (`max-severity`): a failing check now
   emits the severity headline plus one assertion per offending finding, most
