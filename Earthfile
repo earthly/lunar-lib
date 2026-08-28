@@ -69,6 +69,7 @@ plugin-source:
 test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
+    BUILD --pass-args ./collectors/backstage+test-offline
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test

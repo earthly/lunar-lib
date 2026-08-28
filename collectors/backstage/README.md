@@ -94,3 +94,70 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 ```
 
 The collector reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed. Pair this with the `backstage` policy's `domain-exists` / `system-exists` checks to enforce the results. With `backstage_url` unset (the default), the collector makes no network calls and behaves exactly as the parse-and-lint default above.
+
+### API Path Prefix
+
+The lookups call `<backstage_url><api_path_prefix>/catalog/entities/by-name/...`. `api_path_prefix` defaults to `/api`, which matches the standard Backstage layout. Set it to an empty string when the catalog API is mounted at the root — typically behind an API gateway that already strips the `/api` hop, where `/catalog/entities` is live and `/api/catalog/entities` returns 403/404:
+
+```yaml
+with:
+  backstage_url: "https://backstage.example.com"
+  api_path_prefix: ""      # catalog API mounted at the root
+```
+
+A leading slash is optional and a trailing slash is ignored, so `api`, `/api`, and `/api/` are equivalent. A custom gateway stage works too (e.g. `/prod/api`).
+
+> **Read this before configuring `auth_mode: sigv4`.** An IAM-fronted Backstage is almost always behind Amazon API Gateway — which is exactly the deployment shape that strips the `/api` hop. So the instances that need SigV4 are the same ones that often need `api_path_prefix: ""`. If you leave the default in that setup, every lookup 403s *despite completely correct signing*, and (per [Failure modes](#failure-modes)) it is recorded as `{name, error}` — which reads like an outage rather than a misconfiguration. If SigV4 is set up correctly and every reference still errors, check this input first.
+
+### AWS SigV4 Authentication (IAM-role-signed)
+
+Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gateway) and reject Bearer tokens — every request must carry an AWS Signature V4. Set `auth_mode: sigv4` to sign the referential-integrity lookups instead of sending a Bearer token:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    on: ["domain:your-domain"]
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-east-1"
+      aws_service: "execute-api"   # default; API Gateway. Override for other fronting.
+      # api_path_prefix: ""        # if your gateway strips the /api hop — see above
+```
+
+**No credentials are configured as Lunar secrets, and nothing needs manual rotation.** In `sigv4` mode the collector resolves AWS credentials at runtime from the standard AWS credential provider chain and re-resolves them on every run, so short-lived IAM-role credentials always sign with a fresh, valid signature. The chain is tried in this order:
+
+1. **IRSA (EKS) — recommended.** The pod runs under a service account annotated with an IAM role; EKS injects a web-identity token, which the collector exchanges for temporary credentials via STS. The projected token rotates automatically and each run re-exchanges it — zero human involvement.
+2. **EKS Pod Identity / ECS task role** — the container credentials endpoint (`AWS_CONTAINER_CREDENTIALS_*`).
+3. **EC2 instance profile** — IMDSv2 on the node.
+4. **Static keys** — only if the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (/ `AWS_SESSION_TOKEN`) secrets are set. This is an escape hatch for runners with no attached IAM identity; static keys do **not** self-refresh, so prefer one of the role-based sources above.
+
+#### One-time setup: attach the role to the snippet pod's service account
+
+`catalog-info` is a **`code`-hook** collector, so it executes on a Lunar Runner in **operator-spawned snippet pods** — not in your CI pipeline, and not under the Lunar hub's service account. Those pods run under `OPERATOR_POD_SERVICE_ACCOUNT` (the Lunar chart's `<release>-script-pod`), so annotate **that** service account with the role allowed to invoke your Backstage API:
+
+```yaml
+# service account used by cataloger/collector/policy snippet pods
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/lunar-backstage-sigv4
+```
+
+The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
+
+> **Already using SigV4 with the [Backstage cataloger](../../catalogers/backstage/README.md)?** Then this is already done. Both plugins run in the same snippet pods under the same service account, so one role annotation covers both — set `auth_mode: sigv4` here and it just works.
+
+#### Failure modes
+
+Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
+
+```json
+"refs": {
+  "checked": true,
+  "domain": { "name": "payments", "error": "aws_region required for sigv4" }
+}
+```
+
+The `backstage` policy treats `{name, error}` as "couldn't determine" rather than "doesn't exist", so a misconfiguration shows up as an unresolved check rather than a false `domain-exists` failure. The underlying error is also logged to the collector's stderr.
+
+> A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.

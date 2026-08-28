@@ -6,3 +6,17 @@ test:
     COPY lint_backstage.py .
     COPY --dir test .
     RUN python -m unittest test/test_lint_backstage.py -v
+
+# Offline end-to-end test for the collector. test-local.sh stubs curl and lunar
+# on PATH and drives main.sh as a subprocess, so no network access, no AWS and
+# no Lunar Hub are required. Runs on +base-image (the collector's real runtime
+# image) because main.sh needs the same bash/jq/yq/python3 it has in production
+# — the `test` target above is python-only and cannot reach the yq path.
+# Covers multi-document parsing, referential integrity, and both auth modes
+# (bearer / sigv4, including the degrade-not-fail branches).
+test-offline:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY main.sh test-local.sh lint_backstage.py .
+    COPY --dir test .
+    RUN ./test-local.sh
