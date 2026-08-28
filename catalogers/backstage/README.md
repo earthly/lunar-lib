@@ -188,6 +188,45 @@ with:
   component_id_prefix: "gitlab.com/"
 ```
 
+### Verifying Repos Exist (`verify_repos`)
+
+That annotation is a *claim* about a repo, not a fact. A Backstage catalog is maintained by hand, so renamed, deleted and typo'd slugs are routine — and nothing downstream catches one. Lunar does not validate repo existence when the catalog is saved, so the component is created regardless and then sits there with no repository behind it: no collections run, no checks run, and it never resolves on its own.
+
+`verify_repos` is on by default and closes that gap — each component's repo is checked before the write, and the ones that don't exist are skipped and named in the run log:
+
+```text
+Verifying 412 repo(s) exist via https://api.github.com/graphql (batches of 100)
+Repo does not exist (or GH_TOKEN cannot see it) — skipping:
+  github.com/acme/retired-service
+Repo verification: 411/412 repo(s) exist, 5 GraphQL request(s)
+Repo verification dropped 1 of 415 component(s)
+```
+
+It needs the `GH_TOKEN` secret, with repository **metadata** read access across every org the catalog references:
+
+```sh
+lunar secret set GH_TOKEN <your-github-token>
+```
+
+`Metadata: Read` on a fine-grained PAT or GitHub App installation token is enough (`repo` scope on a classic PAT). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically — no extra `with:` is needed.
+
+Lookups are batched ~100 repos per GraphQL request, so a catalog of several thousand components costs a few hundred requests per run rather than one per component.
+
+**Verification fails open.** A transient GitHub error, an unaddressable host, or a "nothing resolved at all" answer leaves the catalog untouched — the catalog only ever shrinks on a repo GitHub positively reports as absent. Two consequences worth planning for:
+
+- **With no `GH_TOKEN` configured**, every component is written as before and a warning is logged. Set `verify_repos: "false"` to silence it.
+- **A repo the token cannot see is indistinguishable from one that does not exist**, so an under-scoped token drops real components. Scope the token to every org in the catalog. (If *nothing* resolves, that is treated as a misconfiguration rather than truth, and no component is dropped.)
+
+For GitHub Enterprise Server, set the REST base — `component_id_prefix` is the SCM host, and pointing verification at the wrong host would report every repo missing, so a non-`github.com/` prefix with the default API URL skips verification and warns instead:
+
+```yaml
+with:
+  component_id_prefix: "ghes.example.com/"
+  github_api_url: "https://ghes.example.com/api/v3"
+```
+
+Verification covers this cataloger only. The file-based siblings don't need it: [`backstage-catalog-info-monorepo`](../backstage-catalog-info-monorepo) derives ids from repos it enumerated through the GitHub API, and [`backstage-catalog-info`](../backstage-catalog-info) only augments components Lunar already has.
+
 ### Restricting Synced Kinds
 
 By default, `Component` and `Domain` entities are synced. Include other kinds explicitly:
@@ -339,3 +378,10 @@ This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/
 3. **Read access** to the kinds configured in `entity_kinds`
 
 Pagination is handled automatically; the cataloger streams pages until all matching entities are fetched.
+
+When `verify_repos` is on (the default) it additionally calls the [GitHub GraphQL API](https://docs.github.com/en/graphql) — one batched query per ~100 repos, resolving each candidate component's `<owner>/<repo>` — and needs:
+
+- **`GH_TOKEN` secret** with repository metadata read access on every org the Backstage catalog references. A repo the token cannot see is reported as absent, so an under-scoped token drops real components.
+- **Network reach** from the Lunar Runner to `github_api_url` (`https://api.github.com` by default; set the `/api/v3` REST base for GitHub Enterprise Server).
+
+See [Verifying Repos Exist](#verifying-repos-exist-verify_repos) for the fail-open behaviour when either is missing.

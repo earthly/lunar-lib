@@ -261,7 +261,60 @@ inputs:
       Ignored for `auth_mode: bearer`.
     default: "execute-api"
 
+  verify_repos:
+    description: |
+      When `true` (the default), check that each component's git repository
+      actually exists before writing it, and skip the ones that don't.
+
+      A Backstage catalog is a hand-maintained document, so the id annotation
+      is a *claim* about a repo rather than a fact — renamed, deleted and
+      typo'd slugs are routine. Nothing downstream catches one: Lunar does not
+      validate repo existence when the catalog is saved, so the component is
+      created either way, and it then sits in the catalog with no repository
+      behind it — no collections and no checks ever run against it.
+
+      Requires the `GH_TOKEN` secret. With no token configured this logs a
+      warning and writes every component (the pre-existing behavior), so
+      enabling verification is never a hard new credential requirement.
+      Skipped components are listed individually in the run log, since the
+      fix belongs in Backstage.
+
+      Verification is **fail-open** by design: a transient GitHub error, an
+      unaddressable host, or a "nothing resolved at all" answer leaves the
+      catalog untouched. Only a repo GitHub positively reports as absent is
+      dropped. Note that a repo the token cannot *see* is indistinguishable
+      from one that does not exist, so scope `GH_TOKEN` to cover every org
+      your catalog references.
+    default: "true"
+
+  github_api_url:
+    description: |
+      GitHub API base used for `verify_repos`. Defaults to the public
+      `https://api.github.com`. For GitHub Enterprise Server set the REST
+      base (e.g. `https://ghes.example.com/api/v3`) — the GraphQL endpoint
+      used for the lookups is derived from it.
+
+      `component_id_prefix` is the SCM host, so when it is anything other
+      than `github.com/` and this input is still the public default,
+      verification is skipped with a warning rather than checking the wrong
+      host (which would report every repo missing).
+    default: "https://api.github.com"
+
 secrets:
+  GH_TOKEN:
+    description: |
+      Optional. GitHub token used by `verify_repos` to confirm each
+      component's repository exists. Needs only repository *metadata* read
+      access (`Metadata: Read` on a fine-grained PAT / GitHub App
+      installation token, or `repo` on a classic PAT) across every org your
+      Backstage catalog references — a repo the token cannot see is
+      indistinguishable from one that does not exist.
+
+      Lookups are batched ~100 repos per GraphQL request, so a large catalog
+      costs a few hundred requests per run rather than one per component.
+
+      Leave unset to skip verification (a warning is logged).
+
   BACKSTAGE_TOKEN:
     description: |
       Bearer token for the Backstage API. Used when `auth_mode: bearer`

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `backstage` cataloger: component repos are now verified to exist before the
+  component is written, via the new `verify_repos` input (default `true`). The
+  id annotation on a Backstage entity is a *claim* about a repo, not a fact —
+  a hand-maintained catalog accumulates renamed, deleted and typo'd slugs — and
+  nothing downstream catches one: Lunar does not validate repo existence when
+  the catalog is saved, so the component is created either way and then sits
+  there with no repository behind it, so no collection and no check ever runs
+  against it. Candidate `<owner>/<repo>` pairs are resolved in batches of ~100
+  per GitHub GraphQL request (not one request per component, which would put a
+  large catalog's verification cost on the same order as its size), and any
+  component whose repo GitHub reports absent is skipped and named in the run
+  log. Verification needs the new optional `GH_TOKEN` secret and is
+  deliberately **fail-open**: no token, an unaddressable host (a
+  non-`github.com/` `component_id_prefix` while `github_api_url` is still the
+  public default), a non-200, or a "nothing resolved at all" answer all leave
+  the catalog untouched, so it only ever shrinks on a positively-absent repo.
+  The new `github_api_url` input (default `https://api.github.com`) points
+  verification at a GitHub Enterprise Server REST base. The file-based siblings
+  are unaffected — `backstage-catalog-info-monorepo` derives ids from repos it
+  enumerated through the GitHub API, and `backstage-catalog-info` only augments
+  components Lunar already has (ENG-1640).
 - `jira` collector: ticket references are now detected in the PR description as
   well as the title, and checked against Jira before one is collected. `ticket`
   and `ticket-history` read both fields from the same GitHub PR fetch and build

@@ -32,9 +32,12 @@
 #   auth_mode                 (default bearer) bearer | sigv4
 #   aws_region                (sigv4 only; falls back to AWS_REGION env)
 #   aws_service               (sigv4 only; default execute-api)
+#   verify_repos              (default true) drop components whose repo does not exist
+#   github_api_url            (default https://api.github.com) REST base for verification
 #
 # Secrets:
 #   LUNAR_SECRET_BACKSTAGE_TOKEN   (bearer mode; sent as Bearer if present)
+#   LUNAR_SECRET_GH_TOKEN          (optional; enables repo-existence verification)
 #   LUNAR_SECRET_AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY / _SESSION_TOKEN
 #     (sigv4 mode; optional static-key escape hatch, tried LAST — role-based
 #      creds (IRSA / Pod Identity / ECS / EC2) are preferred and self-refresh)
@@ -89,10 +92,18 @@ EXCLUDE_DOMAINS="${LUNAR_VAR_EXCLUDE_DOMAINS:-}"
 INCLUDE_SYSTEMS="${LUNAR_VAR_INCLUDE_SYSTEMS:-}"
 EXCLUDE_SYSTEMS="${LUNAR_VAR_EXCLUDE_SYSTEMS:-}"
 
+VERIFY_REPOS="${LUNAR_VAR_VERIFY_REPOS:-true}"
+GITHUB_API_URL="${LUNAR_VAR_GITHUB_API_URL:-https://api.github.com}"
+GITHUB_API_URL="${GITHUB_API_URL%/}"
+
 PAGE_SIZE="${PAGE_SIZE:-200}"
 MAX_RETRIES="${MAX_RETRIES:-5}"
 INITIAL_BACKOFF="${INITIAL_BACKOFF:-5}"
 BATCH_SIZE="${BATCH_SIZE:-1000}"
+# Repos checked per GraphQL request. One aliased `repository(owner:,name:)` field
+# per repo; GitHub prices a query by nodes returned, so 100 repos cost ~1 rate
+# limit point instead of the 100 REST calls the same check would take.
+VERIFY_BATCH_SIZE="${VERIFY_BATCH_SIZE:-100}"
 
 AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
 
@@ -565,6 +576,172 @@ if [ -n "$INCLUDE_TYPES$EXCLUDE_TYPES$INCLUDE_LIFECYCLES$EXCLUDE_LIFECYCLES$INCL
           | (((.metadata.annotations // {})[$annotation]) // "" | tostring)
           | select(length > 0) ] | length' "$ALL_ENTITIES")
     echo "Filters dropped $((CANDIDATE_COUNT - COMPONENT_COUNT)) of $CANDIDATE_COUNT candidate component(s)"
+fi
+
+# --- Verify the component repos exist ------------------------------------
+# A Backstage catalog is a hand-maintained document, so the id annotation is a
+# *claim* about a repo, not a fact: renamed, deleted and typo'd slugs are normal.
+# Nothing downstream catches one — the hub's catalog merge does not validate repo
+# existence, and the association job that would notice the 404 fails and retries
+# to exhaustion — so each bad annotation leaves a component with no repo behind
+# it: no collections, no checks, forever. Verify before writing instead.
+#
+# Deliberately fails OPEN. A transient GitHub error, a missing token, a
+# host we can't address or a wholesale "nothing exists" answer all mean
+# "we don't know", and the catalog must not shrink on "we don't know" —
+# only on a specific repo GitHub positively reports as absent.
+# Sets VERIFIED_COMPONENTS rather than echoing it, so the progress/warning
+# logging below can't end up captured as part of the JSON payload.
+verify_component_repos() {
+    local components="$1"
+    VERIFIED_COMPONENTS="$components"
+
+    if [ "$VERIFY_REPOS" != "true" ]; then
+        echo "verify_repos is off — writing components without checking their repos exist"
+        return 0
+    fi
+
+    if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
+        echo "WARNING: verify_repos is on but no GH_TOKEN secret is configured — components" >&2
+        echo "  whose Backstage annotation names a non-existent repo will still be written." >&2
+        echo "  Set the GH_TOKEN secret (Metadata: Read on the orgs in your catalog) to enable" >&2
+        echo "  verification, or set verify_repos: \"false\" to silence this warning." >&2
+        return 0
+    fi
+
+    # The id prefix is the SCM host, so a non-github.com prefix means the repos
+    # live on GHES and github_api_url must point at it. Querying api.github.com
+    # for GHES repos would report every one of them missing, so refuse to guess.
+    local host="${COMPONENT_ID_PREFIX%/}"
+    if [ "$host" != "github.com" ] && [ "$GITHUB_API_URL" = "https://api.github.com" ]; then
+        echo "WARNING: component_id_prefix is '$COMPONENT_ID_PREFIX' but github_api_url is still" >&2
+        echo "  the github.com default — skipping repo verification rather than checking the" >&2
+        echo "  wrong host. Set github_api_url to your GitHub Enterprise API base (e.g." >&2
+        echo "  https://$host/api/v3) to enable it." >&2
+        return 0
+    fi
+
+    # GHES serves GraphQL at /api/graphql, not under the /api/v3 REST base.
+    local graphql_url
+    case "$GITHUB_API_URL" in
+        */api/v3) graphql_url="${GITHUB_API_URL%/api/v3}/api/graphql" ;;
+        *)        graphql_url="$GITHUB_API_URL/graphql" ;;
+    esac
+
+    # Distinct owner/repo pairs behind the component ids. Strip the id prefix,
+    # then keep the first two path segments so monorepo-style
+    # `<owner>/<repo>/<subdir>` ids resolve to their backing repo.
+    local slugs_file present_file batch_file resp_file
+    slugs_file=$(mktemp); present_file=$(mktemp)
+    batch_file=$(mktemp); resp_file=$(mktemp)
+
+    echo "$components" | jq -r --arg prefix "$COMPONENT_ID_PREFIX" '
+        keys[]
+        | ltrimstr($prefix)
+        | split("/")
+        | select(length >= 2 and .[0] != "" and .[1] != "")
+        | .[0] + "/" + .[1]
+    ' | sort -u > "$slugs_file"
+
+    local slug_total
+    slug_total=$(grep -c . "$slugs_file" || true)
+    if [ "$slug_total" -eq 0 ]; then
+        echo "No component id resolved to an <owner>/<repo> pair — skipping repo verification"
+        rm -f "$slugs_file" "$present_file" "$batch_file" "$resp_file"
+        return 0
+    fi
+
+    echo "Verifying $slug_total repo(s) exist via $graphql_url (batches of $VERIFY_BATCH_SIZE)"
+
+    local offset=0 requests=0 hard_failure=0
+    while [ "$offset" -lt "$slug_total" ]; do
+        # Aliases are positional (r0, r1, ...) so the response maps back to the
+        # slug we ASKED for. Keying off the returned nameWithOwner instead would
+        # mis-drop a renamed repo, which resolves under its new name.
+        jq -R -s -c --argjson off "$offset" --argjson n "$VERIFY_BATCH_SIZE" \
+            'split("\n") | map(select(length > 0)) | .[$off:$off+$n]' \
+            "$slugs_file" > "$batch_file"
+
+        local query
+        query=$(jq -r '
+            to_entries
+            | map("r\(.key): repository(owner: \(.value | split("/")[0] | @json), "
+                  + "name: \(.value | split("/")[1] | @json)) { id }")
+            | "query { " + join(" ") + " }"
+        ' "$batch_file")
+
+        local code
+        code=$(jq -n --arg q "$query" '{query: $q}' | curl -sS -o "$resp_file" -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $LUNAR_SECRET_GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @- "$graphql_url" 2>/dev/null || echo "000")
+        requests=$((requests + 1))
+
+        if [ "$code" != "200" ]; then
+            echo "WARNING: repo verification request failed (HTTP $code): $(head -c 200 "$resp_file" 2>/dev/null)" >&2
+            hard_failure=1
+            break
+        fi
+
+        # A missing repo comes back as `data.rN: null` plus a NOT_FOUND entry in
+        # `errors` — a 200 with partial data, not an error response. Anything
+        # that did resolve is present.
+        jq -r --slurpfile batch "$batch_file" '
+            (.data // {})
+            | to_entries[]
+            | select(.value != null)
+            | $batch[0][(.key | ltrimstr("r") | tonumber)]
+        ' "$resp_file" >> "$present_file"
+
+        offset=$((offset + VERIFY_BATCH_SIZE))
+    done
+
+    local present_total
+    present_total=$(sort -u "$present_file" | grep -c . || true)
+
+    # "Nothing at all exists" is a misconfiguration (wrong host, unscoped or
+    # expired token), not a catalog where every entry is stale. Don't act on it.
+    if [ "$hard_failure" -eq 1 ] || [ "$present_total" -eq 0 ]; then
+        echo "WARNING: repo verification is inconclusive ($present_total/$slug_total repos resolved" >&2
+        echo "  over $requests request(s)) — writing all components unfiltered. Check that" >&2
+        echo "  GH_TOKEN is valid and covers every org in the Backstage catalog." >&2
+        rm -f "$slugs_file" "$present_file" "$batch_file" "$resp_file"
+        return 0
+    fi
+
+    VERIFIED_COMPONENTS=$(echo "$components" | jq \
+        --arg prefix "$COMPONENT_ID_PREFIX" \
+        --rawfile present "$present_file" '
+        ($present | split("\n") | map(select(length > 0))) as $ok
+        | with_entries(
+            (.key | ltrimstr($prefix) | split("/")) as $parts
+            | select(
+                ($parts | length) < 2 or $parts[0] == "" or $parts[1] == ""
+                or (($parts[0] + "/" + $parts[1]) | IN($ok[]))
+              )
+          )')
+
+    # Name every dropped component: the fix is in Backstage, so the operator
+    # needs the ids, not just a count.
+    local dropped_ids
+    dropped_ids=$(jq -rn --argjson before "$components" --argjson after "$VERIFIED_COMPONENTS" \
+        '($before | keys) - ($after | keys) | .[] | "  " + .')
+    if [ -n "$dropped_ids" ]; then
+        echo "Repo does not exist (or GH_TOKEN cannot see it) — skipping:"
+        printf '%s\n' "$dropped_ids"
+    fi
+    echo "Repo verification: $present_total/$slug_total repo(s) exist, $requests GraphQL request(s)"
+
+    rm -f "$slugs_file" "$present_file" "$batch_file" "$resp_file"
+}
+
+verify_component_repos "$COMPONENTS"
+COMPONENTS="$VERIFIED_COMPONENTS"
+VERIFIED_COUNT=$(echo "$COMPONENTS" | jq 'length')
+if [ "$VERIFIED_COUNT" -ne "$COMPONENT_COUNT" ]; then
+    echo "Repo verification dropped $((COMPONENT_COUNT - VERIFIED_COUNT)) of $COMPONENT_COUNT component(s)"
+    COMPONENT_COUNT=$VERIFIED_COUNT
 fi
 
 echo "Components to write: $COMPONENT_COUNT"
