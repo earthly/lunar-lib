@@ -58,9 +58,46 @@ collectors:
           name: codeql-runner
     keywords: ["codeql cli", "codeql-runner", "ci integration", "sast", "code scanning"]
 
-secrets:
-  GH_TOKEN:
-    description: GitHub token for API access (required for github-app collector)
+  - name: monorepo-fanout
+    description: |
+      Redistributes a monorepo's repo-wide CodeQL findings to its subdirectory
+      components, so each one gets the findings under its own paths instead of
+      reading as unscanned.
+
+      ONLY for monorepos, and target it at the repository ROOT — the component
+      whose name is the repo itself. Point it at anything else and it does
+      useless work on every commit: a component with no subcomponents has
+      nothing to fan out. Scope it with `on: ["component:<repo>"]`, not a broad
+      domain selector.
+
+      Enable alongside `cicd` on that root: `cicd` writes the findings, this
+      distributes them. A finding reaches a subcomponent when its file matches
+      that subcomponent's `paths:` (plus the implicit "<subdir>/*"), the same
+      rule the Hub uses for change detection. `.sast.native` stays on the root;
+      subcomponents get the severity counts their policies read plus provenance
+      under `.sast.source.fanout`. One that already has its own SAST scan is
+      never overwritten.
+
+      Requires Hub v3.3.0+. The root also needs at least one policy — an
+      after-json collector is dispatched by the doneness gate, which is only
+      consulted while bundling a component's policies.
+    mainBash: monorepo-fanout.sh
+    hook:
+      type: after-json
+      path: .sast.issues
+    keywords: ["monorepo", "sast", "fan-out", "after-json", "subcomponent", "cross-component"]
+
+inputs:
+  monorepo_fanout_include_issues:
+    description: |
+      Also write the per-finding array (`.sast.issues`) to each subcomponent,
+      sliced to the findings that component owns. Off by default: `policies/sast`
+      reads `.sast.summary.has_<sev>` and `.sast.findings.<sev>`, and `max-total`
+      reads `.sast.findings.total` — none of them read `.sast.issues`, so
+      shipping it multiplies write size by findings x subcomponents for data no
+      guardrail evaluates. Turn it on if you want the per-finding detail visible
+      on each service in the UI.
+    default: "false"
 
 example_component_json: |
   {
