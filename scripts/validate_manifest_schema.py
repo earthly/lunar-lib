@@ -29,6 +29,22 @@ Scope is deliberately narrow — unknown keys only. Required-key and value-shape
 validation is ENG-757, which will extend this same script rather than add a
 second one.
 
+Keeping the allow-lists in sync
+-------------------------------
+They are a hand-transcribed copy of Go structs in a *different* repository, so
+they drift on their own: `meta` and `failureText` were added to the hub partway
+through the PR that introduced this validator, and the list shipped without
+them. A stale allow-list rejects a key the hub decodes perfectly well, which is
+worse than the bug this catches — the author is told to delete something that
+works. Hence `SCHEMA_SOURCE` (which commit the lists were taken from) and the
+failure epilogue that names the allow-list as a suspect. When touching either
+list, scrape the tags rather than reading the struct by eye — several fields sit
+inside long doc-comment blocks:
+
+    git show origin/main:hub/manifest/manifest.go \
+      | awk '/^type Snippet struct/,/^}/' \
+      | grep -oE 'yaml:"[^",]+' | sed 's/yaml:"//'
+
 Probe manifests (`probes/*/lunar-probe.yml`) are intentionally excluded: they
 are consumed by lunar-probe, not by the hub's `manifest` package, and have a
 different schema (`check`, `message`, `requires`, snippet-level `inputs`, and
@@ -59,9 +75,14 @@ MANIFEST_GLOBS = [
 # Cataloger}Plugin in earthly/lunar.
 SNIPPET_LIST_KEYS = ("collectors", "policies", "catalogers")
 
-# Every yaml tag on manifest.Snippet (hub/manifest/manifest.go). Fields tagged
-# `yaml:"-"` (SourceFile, Line) are provenance stamped by the loader, not
-# decoded, so they are not accepted here.
+# These two sets are a hand-transcribed copy of structs that live in a DIFFERENT
+# repository, so they go stale on their own — see SCHEMA_SOURCE below and the
+# "keeping this in sync" note in the module docstring before editing either.
+SCHEMA_SOURCE = "earthly/lunar hub/manifest/manifest.go @ 7a2dfa83 (2026-08-25)"
+
+# Every yaml tag on manifest.Snippet. Fields tagged `yaml:"-"` (SourceFile,
+# Line, ...) are provenance stamped by the loader, not decoded, so they are not
+# accepted here.
 SNIPPET_KEYS = {
     "name",
     "description",
@@ -76,6 +97,12 @@ SNIPPET_KEYS = {
     "hook",
     "hooks",
     "initiative",
+    # `meta` and `failureText` landed in 7a2dfa83 (#2152) partway through the
+    # PR that added this validator — the drift SCHEMA_SOURCE exists to make
+    # auditable. Both sit inside doc-comment blocks between Initiative and
+    # Image, which is why the docstring says to scrape tags, not read the struct.
+    "meta",
+    "failureText",
     "image",
     "runs_on",
     "size",
@@ -148,7 +175,7 @@ def check_keys(node, allowed, where, errors):
     for key, _, line in mapping_items(node):
         if key in allowed:
             continue
-        error = f"  {where}.{key} (line {line}): unknown key — the hub silently ignores it"
+        error = f"  {where}.{key} (line {line}): not a known key"
         hint = MISPLACED_HINTS.get(key)
         if hint:
             error += f"\n      {hint}"
@@ -257,11 +284,25 @@ collectors:
     keywords: ["example"]
 """
 
+# The two fields that shipped missing from the allow-list. Pinned separately so
+# a future re-derivation that drops them fails loudly instead of silently
+# rejecting manifests the hub decodes fine.
+LATE_HUB_FIELDS = """
+name: example
+policies:
+  - name: check-it
+    mainPython: check.py
+    meta:
+      enforces-control: CONTROL123
+    failureText: "{{ .check.failure }} — see the runbook"
+    keywords: ["example"]
+"""
+
 
 def self_test():
     cases = [
         # The `snippet-level` token pins the MISPLACED_HINTS text specifically:
-        # without it the assertion passes on the generic "unknown key" line
+        # without it the assertion passes on the generic "not a known key" line
         # alone, which already contains the word `runs_on`.
         (
             "runs_on under hook:",
@@ -296,6 +337,16 @@ def self_test():
     else:
         print("  OK  accepts: valid snippet-level runs_on, hook, hooks[], size")
 
+    late_errors = validate_source(LATE_HUB_FIELDS)
+    if late_errors:
+        failures.append(
+            "  late hub fields: `meta` / `failureText` are decoded by the hub but were "
+            "rejected — the allow-list has gone stale against\n"
+            f"  {SCHEMA_SOURCE}\n" + "\n".join(late_errors)
+        )
+    else:
+        print("  OK  accepts: meta, failureText (added to the hub after this list was written)")
+
     # `keywords` is hub-ignored but required by the landing-page validator — a
     # future tightening of the allow-list must not start rejecting it.
     if validate_source(GOOD_MANIFEST.replace('    keywords: ["example"]\n', "")):
@@ -307,7 +358,7 @@ def self_test():
             print(f)
         return 1
 
-    print(f"Self-test passed ({len(cases)} rejected, 1 accepted).")
+    print(f"Self-test passed ({len(cases)} rejected, 2 accepted).")
     return 0
 
 
@@ -345,9 +396,16 @@ def main():
     if failed:
         print("Manifest schema validation failed.")
         print(
-            "The hub does not decode plugin manifests with KnownFields(true), so an "
-            "unknown key is dropped silently rather than rejected. Remove it, or move "
-            "it to the level the hub reads it from."
+            "Usually this means the key is a typo or sits at the wrong nesting level. "
+            "The hub does not decode plugin manifests with KnownFields(true), so it "
+            "would drop the key silently rather than reject it — remove it, or move it "
+            "to the level the hub reads it from."
+        )
+        print(
+            "But if the hub genuinely added this field, the allow-list in this script "
+            "is the stale thing, not your manifest. It is a hand-copy of\n"
+            f"  {SCHEMA_SOURCE}\n"
+            "so re-derive it from the struct before deleting a key that works."
         )
         return 1
 
