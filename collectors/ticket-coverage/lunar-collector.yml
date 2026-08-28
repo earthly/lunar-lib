@@ -17,7 +17,7 @@ landing_page:
     individual pull request.
   categories: ["vcs"]
   icon: "assets/ticket-coverage.svg"
-  status: "beta"
+  status: "experimental"
   related:
     - slug: "ticket-coverage"
       type: "policy"

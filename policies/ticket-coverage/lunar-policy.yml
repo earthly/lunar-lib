@@ -17,7 +17,7 @@ landing_page:
     pull requests.
   category: "security-and-compliance"
   icon: "assets/ticket-coverage.svg"
-  status: "beta"
+  status: "experimental"
   requires:
     - slug: "ticket-coverage"
       type: "collector"
