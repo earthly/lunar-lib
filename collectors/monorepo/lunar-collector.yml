@@ -72,14 +72,13 @@ inputs:
   read_retry_seconds:
     description: |
       How long to keep retrying the Hub reads before failing the run, in
-      seconds. The after-json wave fires when COLLECTION settles, but a
-      SHA-pinned `lunar component get-json` resolves through
-      `public.components`, which is gated on `hub.latest_commits` — fed
-      independently by the repo_sync worker. So a just-settled commit is often
-      not yet resolvable by SHA, and on a Hub with a repo_sync backlog that gap
-      is minutes (measured at 210s on a busy Hub). Raise it if your Hub ingests
-      slowly; the run holds a wave slot while it waits. On expiry the collector
-      exits non-zero rather than silently writing nothing, because the wave is
+      seconds. The after-json wave fires when COLLECTION settles, but
+      `lunar component get-json` reads through views over `mat.components` /
+      `mat.component_json`, which the Hub drains asynchronously. A SHA-pinned
+      read therefore returns NotFound until this commit's row has drained —
+      measured at 210s on a busy Hub. Raise it if your Hub materializes slowly;
+      the run holds a wave slot while it waits. On expiry the collector exits
+      non-zero rather than silently writing nothing, because the wave is
       fire-once and a swallowed read loses that commit's fan-out permanently.
     default: "300"
   max_subcomponents:

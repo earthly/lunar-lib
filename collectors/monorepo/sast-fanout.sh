@@ -98,19 +98,19 @@ log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 # rather than a quiet exit 0.
 #
 # Why so long: the wave fires when COLLECTION settles, but `lunar component
-# get-json --git-sha <sha>` resolves through `public.components`, which is
-# gated on `hub.latest_commits` — a table fed by the repo_sync worker. Commit
-# ingestion and collection are independent, so a just-settled commit is
-# routinely not yet resolvable by SHA. Measured on cronos: the pinned read
-# returned NotFound for 210s after the wave had already fired and failed
-# (repo_sync backlog ~4.7k jobs draining at ~2/s). A 20s budget was nowhere
-# near enough.
+# get-json` reads through `public.components` / `public.components_latest`,
+# and both are views over `mat.components` + `mat.component_json` — BASE TABLES
+# drained asynchronously by the hub's mat workers. A SHA-pinned read needs THIS
+# commit's row to have drained; until it does the lookup simply returns
+# NotFound. Measured on cronos: 210s of NotFound after the wave had already
+# fired and failed. A 20s budget was nowhere near enough.
 #
-# Falling back to the UNPINNED read would be wrong, not merely lax: without a
-# SHA the query hits `public.components_latest ... WHERE pr IS NULL`, i.e. the
-# latest *ingested* commit — which during that same window was the PREVIOUS
-# DAY's commit. It would silently fan out stale findings under this commit's
-# SHA. Pinning is correct; waiting is the price.
+# Falling back to the UNPINNED read would be wrong, not merely lax. It resolves
+# `components_latest ... WHERE pr IS NULL`, which succeeds immediately — but by
+# returning whichever older commit HAS drained. During that same window it
+# returned the PREVIOUS DAY's commit. The fan-out would then have written those
+# stale findings under this commit's SHA. Pinning is correct; waiting is the
+# price.
 #
 # And the failure has to be loud: the after-json wave is fire-once per
 # (component, sha, pr) forever, so a swallowed read permanently loses this
@@ -137,7 +137,7 @@ retry_read() {
 
 # --- 1. Read the repo-wide findings ------------------------------------------
 if ! ROOT_JSON=$(retry_read lunar component get-json "$ROOT" "${read_dims[@]}"); then
-  log "ERROR: could not read own Component JSON at ${SHA:0:8} within ${READ_BUDGET_SECS}s. The commit is most likely not yet resolvable by SHA (hub.latest_commits lags behind collection when repo_sync is backed up). The wave is fire-once, so this commit's fan-out is lost — push a new commit once ingestion catches up."
+  log "ERROR: could not read own Component JSON at ${SHA:0:8} within ${READ_BUDGET_SECS}s. This commit's row is most likely not yet materialized (mat.components / mat.component_json drain asynchronously, so a SHA-pinned read lags collection). The wave is fire-once, so this commit's fan-out is lost — push a new commit once ingestion catches up."
   exit 1
 fi
 

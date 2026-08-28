@@ -329,7 +329,7 @@ class TestReadRetries(Base):
         proc = self.run_script(env_overrides={"FAIL_GETJSON": self._countdown(-1)})
         self.assertEqual(proc.returncode, 1)
         self.assertIn("fire-once", proc.stderr)
-        self.assertIn("not yet resolvable by SHA", proc.stderr)
+        self.assertIn("not yet materialized", proc.stderr)
         self.assertEqual(self.writes(), {})
         self.assertEqual(self.self_writes(), [])
 
