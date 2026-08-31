@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.14.1] — 2026-08-31
+
 ### Added
 
 - `backstage` collector: `ref_lookup` input selects which catalog endpoint
@@ -817,7 +821,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.0...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.1...HEAD
+[1.14.1]: https://github.com/earthly/lunar-lib/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/earthly/lunar-lib/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/earthly/lunar-lib/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/earthly/lunar-lib/compare/v1.12.1...v1.12.2
