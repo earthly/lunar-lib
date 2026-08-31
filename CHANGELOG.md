@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- `backstage` collector: `ref_lookup` input selects which catalog endpoint
+  resolves each declared `spec.domain` / `spec.system` reference — `by-name`
+  (default, unchanged behavior) or `by-query`. Some deployments authorize only
+  the catalog search endpoint: a gateway in front of Backstage can expose
+  `/catalog/entities/by-query` while rejecting `/catalog/entities/by-name/...`
+  outright, and then every reference lookup fails however correct the auth is,
+  recording an `error` per reference that reads like an outage rather than a
+  misconfiguration. `by-query` is the same endpoint the `backstage` *cataloger*
+  already uses, so an instance the cataloger can read supports it. Both modes
+  write an identical `.refs` shape, so no policy changes are needed, and
+  `ref_lookup` composes with `auth_mode` and `api_path_prefix`. Because
+  `by-query` reports "no match" as an empty result set, a `200` whose body is
+  not parseable JSON records `{name, error}` rather than collapsing into
+  `exists: false` — a gateway login page must not read as a missing domain.
 
 ## [1.14.0] — 2026-08-28
 
