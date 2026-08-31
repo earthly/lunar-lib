@@ -211,12 +211,28 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     API_PATH_PREFIX="/$API_PATH_PREFIX"
   fi
 
+  # Which catalog endpoint resolves each reference. Both modes produce an
+  # identical `.refs` shape, so no policy changes with this input.
+  #   by-name  (default) — GET /catalog/entities/by-name/<kind>/<ns>/<name>.
+  #                        A direct key lookup whose status IS the answer:
+  #                        200 = exists, 404 = miss.
+  #   by-query           — GET /catalog/entities/by-query?limit=1&filter=…
+  #                        A search, so existence lives in the body rather than
+  #                        the status: a 200 with a non-empty `.items` = exists,
+  #                        an empty `.items` = miss.
+  # by-query is for an instance that only authorizes that endpoint. A gateway in
+  # front of Backstage can expose the catalog search API and reject by-name
+  # outright, in which case every by-name lookup fails no matter how correct the
+  # auth is — the failure mode looks identical to an outage. It is the same
+  # endpoint the backstage *cataloger* has always used.
+  REF_LOOKUP="${LUNAR_VAR_REF_LOOKUP:-by-name}"
+
   # --- Authentication ---
   # AUTH_ARGS holds the curl arguments used for every lookup: a Bearer header
   # (bearer mode) or the SigV4 signing flags + session-token header (sigv4).
   # Credentials are resolved ONCE here and reused across both lookups.
   #
-  # AUTH_ERROR is the degrade-not-fail channel, and the one deliberate divergence
+  # SETUP_ERROR is the degrade-not-fail channel, and the one deliberate divergence
   # from the cataloger. For the cataloger, fetching the catalog IS the job, so it
   # exits non-zero when credentials can't be resolved. Here, referential integrity
   # is an optional add-on layered on parse-and-lint: discarding valid lint results
@@ -225,7 +241,7 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   # as {name, error} — which the policy already reads as "couldn't determine"
   # rather than "doesn't exist" — and the parse/lint output is always written.
   AUTH_ARGS=()
-  AUTH_ERROR=""
+  SETUP_ERROR=""
   AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
 
   case "$AUTH_MODE" in
@@ -238,10 +254,10 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       AWS_SIGV4_REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
       AWS_SIGV4_SERVICE="${LUNAR_VAR_AWS_SERVICE:-execute-api}"
       if [ -z "$AWS_SIGV4_REGION" ]; then
-        AUTH_ERROR="aws_region required for sigv4"
-        echo "ERROR: $AUTH_ERROR (set the aws_region input or the AWS_REGION env var)" >&2
+        SETUP_ERROR="aws_region required for sigv4"
+        echo "ERROR: $SETUP_ERROR (set the aws_region input or the AWS_REGION env var)" >&2
       elif ! resolve_aws_credentials; then
-        AUTH_ERROR="sigv4 credential resolution failed"
+        SETUP_ERROR="sigv4 credential resolution failed"
       else
         AUTH_ARGS=(--aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:${AWS_SIGV4_SERVICE}" \
                    --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}")
@@ -252,24 +268,49 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       fi
       ;;
     *)
-      AUTH_ERROR="invalid auth_mode '$AUTH_MODE' (expected 'bearer' or 'sigv4')"
-      echo "ERROR: $AUTH_ERROR" >&2
+      SETUP_ERROR="invalid auth_mode '$AUTH_MODE' (expected 'bearer' or 'sigv4')"
+      echo "ERROR: $SETUP_ERROR" >&2
       ;;
   esac
 
+  # Validated after auth so that when both are misconfigured the auth problem —
+  # the more fundamental one — keeps its more specific message.
+  if [ -z "$SETUP_ERROR" ]; then
+    case "$REF_LOOKUP" in
+      by-name|by-query) ;;
+      *)
+        SETUP_ERROR="invalid ref_lookup '$REF_LOOKUP' (expected 'by-name' or 'by-query')"
+        echo "ERROR: $SETUP_ERROR" >&2
+        ;;
+    esac
+  fi
+
+  # Percent-encode one by-query filter value. A valid Backstage name or
+  # namespace (`[A-Za-z0-9][A-Za-z0-9._-]*`) contains nothing @uri escapes, so a
+  # legitimate reference goes on the wire byte-for-byte as written. It matters
+  # for the illegitimate ones, which is exactly what this feature is asked to
+  # detect: a hand-written catalog-info.yaml can declare
+  # `spec.domain: "a&filter=kind=system"`, and unencoded that would inject a
+  # second filter parameter — Backstage ORs filter params, so a miss could come
+  # back as a hit on an unrelated entity. Encoding keeps a bogus reference a
+  # miss (or, under sigv4, a signature rejection recorded as {name, error});
+  # either way never a false `exists: true`.
+  url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
+
   resolve_ref() {
     # $1 = Backstage kind (domain|system); $2 = declared reference value.
-    # Emits a JSON object: {name, exists} on a definitive 200/404, or
+    # Emits a JSON object: {name, exists} on a definitive answer, or
     # {name, error} on a non-definitive outcome — a transient failure
-    # (connection error / 5xx) or an auth problem that stopped us signing the
-    # request at all (see AUTH_ERROR above).
-    local kind="$1" value="$2" ref ns name http_code curl_status
+    # (connection error / 5xx) or a config problem that stopped us issuing a
+    # meaningful request at all (see SETUP_ERROR above).
+    local kind="$1" value="$2" ref ns name http_code curl_status response body item_count
 
-    # Auth never got set up (bad auth_mode, missing aws_region, unresolvable
-    # credentials). Report it per-reference instead of firing a request we know
-    # cannot succeed — and without discarding the parse/lint results.
-    if [ -n "$AUTH_ERROR" ]; then
-      jq -n --arg name "$value" --arg err "$AUTH_ERROR" '{name: $name, error: $err}'
+    # Setup never completed (bad auth_mode or ref_lookup, missing aws_region,
+    # unresolvable credentials). Report it per-reference instead of firing a
+    # request we know cannot succeed — and without discarding the parse/lint
+    # results.
+    if [ -n "$SETUP_ERROR" ]; then
+      jq -n --arg name "$value" --arg err "$SETUP_ERROR" '{name: $name, error: $err}'
       return 0
     fi
 
@@ -286,15 +327,47 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     fi
 
     set +e
-    http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
-      "${AUTH_ARGS[@]}" \
-      "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-name/${kind}/${ns}/${name}")
-    curl_status=$?
+    if [ "$REF_LOOKUP" = "by-query" ]; then
+      # by-query needs the response *body* (existence is `.items`, not the
+      # status), so `-w '\n%{http_code}'` appends the status after it and one
+      # request yields both. `limit=1` — we only ask whether anything matches.
+      # Commas and `=` stay literal: they are this endpoint's own filter
+      # grammar (comma = AND), and it is the wire form the cataloger has always
+      # sent. Only the two interpolated values are escaped.
+      response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
+        "${AUTH_ARGS[@]}" \
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=kind=${kind},metadata.namespace=$(url_escape "$ns"),metadata.name=$(url_escape "$name")")
+      curl_status=$?
+      http_code="${response##*$'\n'}"
+      body="${response%$'\n'*}"
+    else
+      http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+        "${AUTH_ARGS[@]}" \
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-name/${kind}/${ns}/${name}")
+      curl_status=$?
+    fi
     set -e
 
     if [ "$curl_status" -ne 0 ]; then
       jq -n --arg name "$value" --arg err "request failed (curl exit ${curl_status})" \
         '{name: $name, error: $err}'
+    elif [ "$REF_LOOKUP" = "by-query" ]; then
+      # A search reports "no match" as an empty result set, so only a 200 is
+      # meaningful and the body decides. A 200 we cannot parse (an HTML login
+      # page from a gateway, a truncated response) is NOT a miss: inferring
+      # "doesn't exist" from a response we couldn't read would turn our own
+      # misconfiguration into a policy failure against the user's file.
+      if [ "$http_code" != "200" ]; then
+        jq -n --arg name "$value" --arg err "HTTP ${http_code}" '{name: $name, error: $err}'
+      elif ! item_count=$(printf '%s' "$body" \
+             | jq -e 'if (.items | type) == "array" then (.items | length) else null end' 2>/dev/null); then
+        jq -n --arg name "$value" --arg err "unparseable by-query response" \
+          '{name: $name, error: $err}'
+      elif [ "$item_count" -gt 0 ]; then
+        jq -n --arg name "$value" '{name: $name, exists: true}'
+      else
+        jq -n --arg name "$value" '{name: $name, exists: false}'
+      fi
     elif [ "$http_code" = "200" ]; then
       jq -n --arg name "$value" '{name: $name, exists: true}'
     elif [ "$http_code" = "404" ]; then

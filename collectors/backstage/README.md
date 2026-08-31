@@ -35,6 +35,8 @@ When a catalog-info file is found, this collector writes to the following Compon
 
 `exists` is `true` on a `200` (the entity was found) and `false` on a `404` (declared but missing). A per-reference entry is written only when that reference is **declared**; an undeclared ref has no entry. On a transient error (timeout, `5xx`) the entry is written with an `error` field instead of `exists`, so a Backstage outage stays distinguishable from a real miss — the policy skips (passes) an errored ref rather than failing it. When `backstage_url` is unset, `.refs` is not written at all (no `checked` marker), and the policy's referential-integrity checks skip (pass) because there is nothing to verify. The `backstage` policy's `domain-exists` and `system-exists` checks consume these fields.
 
+By default the lookup is a direct `by-name` fetch, whose HTTP status is the answer. An instance that only authorizes the catalog *search* endpoint needs [`ref_lookup: by-query`](#lookup-endpoint-ref_lookup) instead; the recorded `.refs` shape is identical either way.
+
 > **Backstage entity model.** In Backstage, `spec.system` lives on `Component` entities (a component belongs to a system) while `spec.domain` lives on `System` entities (a system belongs to a domain). So `system-exists` is the check that fires for the common one-`Component`-per-repo case, and `domain-exists` applies to repos whose `catalog-info.yaml` is itself a `kind: System` (or a `Component` that carries a custom `spec.domain`). Each check only does work when its reference is actually declared.
 
 ### Multiple entities
@@ -95,9 +97,35 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 
 The collector reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed. Pair this with the `backstage` policy's `domain-exists` / `system-exists` checks to enforce the results. With `backstage_url` unset (the default), the collector makes no network calls and behaves exactly as the parse-and-lint default above.
 
+### Lookup Endpoint (`ref_lookup`)
+
+Some Backstage deployments authorize only the catalog **search** endpoint. A gateway in front of Backstage can expose `/catalog/entities/by-query` while rejecting `/catalog/entities/by-name/...` outright — and then every reference lookup fails however correct your token or signature is, recording `{name, error}` on each one, which reads like an outage rather than a misconfiguration. Set `ref_lookup: by-query` for those instances:
+
+```yaml
+collectors:
+  - uses: earthly/lunar-lib/collectors/backstage@v1.14.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      ref_lookup: "by-query"
+```
+
+| `ref_lookup` | Request | `exists` comes from |
+|---|---|---|
+| `by-name` (default) | `GET <api_path_prefix>/catalog/entities/by-name/<kind>/<ns>/<name>` | the HTTP status — `200` = exists, `404` = miss |
+| `by-query` | `GET <api_path_prefix>/catalog/entities/by-query?limit=1&filter=kind=<kind>,metadata.namespace=<ns>,metadata.name=<name>` | the body — a `200` whose `items` array is non-empty = exists, empty = miss |
+
+Both modes write an **identical `.refs` shape**, so switching requires no policy changes. `ref_lookup` is independent of `auth_mode` and `api_path_prefix` — combine them freely.
+
+Two `by-query` behaviors worth knowing:
+
+- **A `200` that isn't parseable JSON is recorded as an `error`, not a miss.** Because `by-query` reports "no match" as an empty result set, a response we can't read (an SSO login page served as `200`, a truncated body) would otherwise collapse into `exists: false` and fail your policy over our own inability to parse it. Those record `{name, error: "unparseable by-query response"}` instead.
+- **The reference value is percent-encoded** before it goes into the filter. Valid Backstage names contain nothing that needs escaping, so a legitimate reference goes on the wire verbatim; the encoding is there so a malformed reference (say `spec.domain: "a&filter=kind=system"`) can't append a second `filter` parameter — Backstage ORs repeated filters — and turn a miss into a false hit on an unrelated entity.
+
+> **Which one does your instance need?** If the [Backstage cataloger](../../catalogers/backstage/README.md) can already read your catalog, `by-query` will work — that plugin uses the same endpoint. If `by-name` is erroring on *every* reference, check `api_path_prefix` (below) first, then try `ref_lookup: by-query`.
+
 ### API Path Prefix
 
-The lookups call `<backstage_url><api_path_prefix>/catalog/entities/by-name/...`. `api_path_prefix` defaults to `/api`, which matches the standard Backstage layout. Set it to an empty string when the catalog API is mounted at the root — typically behind an API gateway that already strips the `/api` hop, where `/catalog/entities` is live and `/api/catalog/entities` returns 403/404:
+The lookups call `<backstage_url><api_path_prefix>/catalog/entities/by-name/...` (or `.../by-query` — see above). `api_path_prefix` defaults to `/api`, which matches the standard Backstage layout. Set it to an empty string when the catalog API is mounted at the root — typically behind an API gateway that already strips the `/api` hop, where `/catalog/entities` is live and `/api/catalog/entities` returns 403/404:
 
 ```yaml
 with:

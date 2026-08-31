@@ -52,6 +52,28 @@ case "$args" in
 esac
 
 url="${@: -1}"
+
+# by-query: existence lives in the body, so answer with a real by-query
+# envelope plus the trailing http_code that `-w '\n%{http_code}'` appends.
+# The name is read back out of the filter, which is also how the tests assert
+# the filter was built (and escaped) correctly.
+case "$url" in
+  */catalog/entities/by-query\?*)
+    qname="${url##*metadata.name=}"
+    qname="${qname%%&*}"
+    case "$qname" in
+      boom)  exit 7 ;;
+      five)  printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
+      # A gateway answering 200 with an SSO login page instead of JSON. Must
+      # NOT be read as "the entity does not exist".
+      login) printf '%s\n200' '<html><body>SSO login</body></html>'; exit 0 ;;
+      # A 200 of the wrong shape (no .items array) — also not a miss.
+      noitems) printf '%s\n200' '{"totalItems":0}'; exit 0 ;;
+      typo*) printf '%s\n200' '{"items":[],"totalItems":0,"pageInfo":{}}'; exit 0 ;;
+      *)     printf '%s\n200' '{"items":[{"kind":"Domain","metadata":{"name":"x"}}],"totalItems":1,"pageInfo":{}}'; exit 0 ;;
+    esac ;;
+esac
+
 name="${url##*/}"
 case "$name" in
   boom)  exit 7 ;;
@@ -281,6 +303,85 @@ assert_eq "IRSA web-identity creds take precedence over static keys" \
 assert_eq "IRSA session token is sent" \
   "$(grep -c 'x-amz-security-token: mocksessiontoken' "$CURL_LOG")" '1'
 
+echo "Backstage collector ref_lookup (by-name / by-query) tests:"
+
+# Negative control first: an unset ref_lookup must keep hitting by-name and
+# must NOT start sending by-query traffic. Without this a by-query regression
+# could hide behind green by-query tests.
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t" payments '' http://fake:7007 >/dev/null
+assert_eq "default ref_lookup still uses by-name" \
+  "$(grep -c '/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
+assert_eq "default ref_lookup sends no by-query request" \
+  "$(grep -c 'by-query' "$CURL_LOG" || true)" '0'
+
+# by-query resolves both outcomes from the BODY, not the status: the mock
+# answers 200 for every by-query request, so a miss can only come from an
+# empty `.items`. Same `.refs` shape as by-name — policies are unaffected.
+: > "$CURL_LOG"
+BQ_REFS=$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" \
+  payments typo-platform http://fake:7007 | jq -c '.refs')
+assert_eq "by-query resolves exists (non-empty .items) + miss (empty .items)" \
+  "$BQ_REFS" \
+  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+assert_eq "by-query calls the by-query endpoint with the entity filter" \
+  "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind=domain,metadata.namespace=default,metadata.name=payments' "$CURL_LOG")" '1'
+assert_eq "by-query filters on each reference's own kind" \
+  "$(grep -c 'filter=kind=system,metadata.namespace=default,metadata.name=typo-platform' "$CURL_LOG")" '1'
+assert_eq "by-query sends no by-name request" \
+  "$(grep -c 'by-name' "$CURL_LOG" || true)" '0'
+
+# A qualified ns/name ref carries its own namespace into the filter.
+: > "$CURL_LOG"
+assert_eq "by-query keeps a qualified ref's own namespace" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" prod/payments '' http://fake:7007 compns | jq -c '.refs.domain')" \
+  '{"name":"prod/payments","exists":true}'
+assert_eq "by-query puts that namespace in the filter, not the component's" \
+  "$(grep -c 'metadata.namespace=prod,metadata.name=payments' "$CURL_LOG")" '1'
+
+# Non-definitive outcomes degrade exactly as they do under by-name.
+assert_eq "by-query transient 5xx -> error marker, not exists" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" '' five http://fake:7007 | jq -c '.refs.system')" \
+  '{"name":"five","error":"HTTP 502"}'
+assert_eq "by-query connection error -> error marker" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" boom '' http://fake:7007 | jq -c '.refs.domain')" \
+  '{"name":"boom","error":"request failed (curl exit 7)"}'
+
+# The one that matters most. by-query reports "no match" as an empty result
+# set, so a 200 we cannot read must NOT collapse to that: recording
+# `exists: false` here would fail the user's policy over OUR inability to
+# parse the response — a gateway login page would read as a missing domain.
+assert_eq "by-query 200 with a non-JSON body -> error, NOT exists:false" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" login '' http://fake:7007 | jq -c '.refs.domain')" \
+  '{"name":"login","error":"unparseable by-query response"}'
+assert_eq "by-query 200 with no .items array -> error, NOT exists:false" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" noitems '' http://fake:7007 | jq -c '.refs.domain')" \
+  '{"name":"noitems","error":"unparseable by-query response"}'
+
+# Query injection. Backstage ORs repeated `filter` params, so an unescaped `&`
+# in a declared reference could append a second filter and turn a miss into a
+# hit on an unrelated entity. The interpolated value must arrive encoded.
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" 'a&filter=kind=system' '' http://fake:7007 >/dev/null
+assert_eq "by-query percent-encodes the interpolated ref value" \
+  "$(grep -c 'metadata.name=a%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
+assert_eq "by-query does not inject a second filter param" \
+  "$(grep -c '&filter=kind=system' "$CURL_LOG" || true)" '0'
+
+# by-query composes with the other two deployment-shape inputs: sigv4 signing
+# and a gateway that strips the /api hop.
+: > "$CURL_LOG"
+assert_eq "by-query + sigv4 + root-mounted API resolves the ref" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 LUNAR_VAR_REF_LOOKUP=by-query LUNAR_VAR_API_PATH_PREFIX= $STATIC_KEYS" \
+     payments '' http://fake:7007 | jq -c '.refs.domain')" \
+  '{"name":"payments","exists":true}'
+assert_eq "by-query + sigv4 signs the by-query URL at the root path" \
+  "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind=domain' "$CURL_LOG")" '1'
+assert_eq "by-query + sigv4 passes the signing flags" \
+  "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '1'
+assert_eq "by-query + sigv4 sends no Bearer header" \
+  "$(grep -c 'Authorization: Bearer' "$CURL_LOG" || true)" '0'
+
 # --- Degrade, don't fail --------------------------------------------------
 # The whole point of the collector-vs-cataloger divergence: an auth problem
 # must never cost us the parse/lint results. Each case asserts BOTH that the
@@ -309,10 +410,25 @@ assert_degraded "invalid auth_mode" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=oauth2" payments '' http://fake:7007)" \
   "invalid auth_mode 'oauth2' (expected 'bearer' or 'sigv4')"
 
+assert_degraded "invalid ref_lookup" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-id" payments '' http://fake:7007)" \
+  "invalid ref_lookup 'by-id' (expected 'by-name' or 'by-query')"
+
+# Both misconfigured: the auth message wins, since an unresolvable credential
+# is the more fundamental fault and naming it first is the more useful hint.
+assert_degraded "invalid auth_mode outranks invalid ref_lookup" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=oauth2 LUNAR_VAR_REF_LOOKUP=by-id" payments '' http://fake:7007)" \
+  "invalid auth_mode 'oauth2' (expected 'bearer' or 'sigv4')"
+
 # A degraded run must not fire the request it knows cannot succeed.
 : > "$CURL_LOG"
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 $STATIC_KEYS" payments '' http://fake:7007 >/dev/null
 assert_eq "degraded run makes no Backstage request" \
+  "$(grep -c 'fake:7007' "$CURL_LOG" || true)" '0'
+
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-id" payments '' http://fake:7007 >/dev/null
+assert_eq "invalid ref_lookup makes no Backstage request" \
   "$(grep -c 'fake:7007' "$CURL_LOG" || true)" '0'
 
 # aws_region falls back to the ambient AWS_REGION (IRSA sets it in-cluster).
