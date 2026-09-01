@@ -28,6 +28,7 @@ check_disallowed_annotations = load_policy("disallowed-annotations")
 check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
 check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
+check_system_domain_exists = load_policy("system-domain-exists")
 
 from constraints import (
     parse_required_annotations,
@@ -342,6 +343,114 @@ class TestSystemExists(unittest.TestCase):
                     refs_node({"checked": True, "system": {"name": "payment-platform", "error": "timeout"}})
                 )
             )
+        )
+
+
+class TestSystemDomainExists(unittest.TestCase):
+    """Transitive RI: component -> its system -> that system's domain."""
+
+    def test_unconfigured_skips(self):
+        # Collector parsed catalog-info but backstage_url is not set: no .refs.
+        self.assertTrue(is_skipped(check_system_domain_exists(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_exists(finished_node({}))))
+
+    def test_no_system_declared_passes(self):
+        # Configured, but this component declares no spec.system, so the
+        # collector never reached a system_domain.
+        self.assertEqual(
+            check_system_domain_exists(refs_node({"checked": True})).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_missing_passes_here(self):
+        # An unresolvable system is `system-exists`'s failure to report. This
+        # check must not pile a second failure onto the same root cause.
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_without_domain_passes(self):
+        # A System that belongs to no domain is legitimate — not a violation.
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({"checked": True, "system": {"name": "standalone", "exists": True}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_exists_passes(self):
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True},
+                    "system_domain": {
+                        "name": "payments",
+                        "exists": True,
+                        "via_system": "payment-platform",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_missing_domain_fails_and_names_domain_and_system(self):
+        check = check_system_domain_exists(
+            refs_node({
+                "checked": True,
+                "system": {"name": "orphan-system", "exists": True},
+                "system_domain": {
+                    "name": "ghost-domain",
+                    "exists": False,
+                    "via_system": "orphan-system",
+                },
+            })
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        # Both halves matter: the domain that is missing, and the system that
+        # points at it — the latter is where the fix actually goes.
+        self.assertIn("ghost-domain", reason)
+        self.assertIn("orphan-system", reason)
+
+    def test_transient_error_skips(self):
+        self.assertTrue(
+            is_skipped(
+                check_system_domain_exists(
+                    refs_node({
+                        "checked": True,
+                        "system": {"name": "payment-platform", "exists": True},
+                        "system_domain": {
+                            "name": "payments",
+                            "error": "HTTP 502",
+                            "via_system": "payment-platform",
+                        },
+                    })
+                )
+            )
+        )
+
+    def test_domain_exists_ignores_system_domain(self):
+        # The two checks must stay independent: a dangling *transitive* domain
+        # is not `domain-exists`'s business (this component declares no
+        # spec.domain of its own).
+        self.assertEqual(
+            check_domain_exists(
+                refs_node({
+                    "checked": True,
+                    "system_domain": {
+                        "name": "ghost-domain",
+                        "exists": False,
+                        "via_system": "orphan-system",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
         )
 
 

@@ -53,6 +53,33 @@ esac
 
 url="${@: -1}"
 
+# Body of a resolved entity. A System carries `spec.domain`, so the
+# component -> system -> that system's domain hop has something to follow. The
+# domain it names is keyed off the system name, mirroring the status convention
+# above, and is then resolved through the same mock:
+#   *-nodomain -> System belonging to no domain (no spec.domain at all)
+#   dangling*  -> spec.domain: typo-domain, which resolves 404 -> exists:false
+#   else       -> spec.domain: payments, which resolves 200 -> exists:true
+# `namespace` is echoed back from the request so a cross-namespace hop (a bare
+# spec.domain on a System in another namespace) can be asserted.
+mock_entity() {
+  local kind="$1" ns="$2" ename="$3" dom=""
+  if [ "$kind" = "system" ]; then
+    case "$ename" in
+      *-nodomain) dom="" ;;
+      dangling*)  dom="typo-domain" ;;
+      *)          dom="payments" ;;
+    esac
+  fi
+  if [ -n "$dom" ]; then
+    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"},"spec":{"domain":"%s"}}' \
+      "$kind" "$ename" "$ns" "$dom"
+  else
+    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"},"spec":{}}' \
+      "$kind" "$ename" "$ns"
+  fi
+}
+
 # by-query: existence lives in the body, so answer with a real by-query
 # envelope plus the trailing http_code that `-w '\n%{http_code}'` appends.
 # The name is read back out of the filter, which is also how the tests assert
@@ -61,6 +88,10 @@ case "$url" in
   */catalog/entities/by-query\?*)
     qname="${url##*metadata.name=}"
     qname="${qname%%&*}"
+    qkind="${url##*filter=kind=}"
+    qkind="${qkind%%,*}"
+    qns="${url##*metadata.namespace=}"
+    qns="${qns%%,*}"
     case "$qname" in
       boom)  exit 7 ;;
       five)  printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
@@ -70,16 +101,23 @@ case "$url" in
       # A 200 of the wrong shape (no .items array) — also not a miss.
       noitems) printf '%s\n200' '{"totalItems":0}'; exit 0 ;;
       typo*) printf '%s\n200' '{"items":[],"totalItems":0,"pageInfo":{}}'; exit 0 ;;
-      *)     printf '%s\n200' '{"items":[{"kind":"Domain","metadata":{"name":"x"}}],"totalItems":1,"pageInfo":{}}'; exit 0 ;;
+      *)     printf '%s\n200' "{\"items\":[$(mock_entity "$qkind" "$qns" "$qname")],\"totalItems\":1,\"pageInfo\":{}}"; exit 0 ;;
     esac ;;
 esac
 
-name="${url##*/}"
+# by-name: the status is the existence answer, but the collector also reads the
+# body off this endpoint (for the system -> domain hop), so emit both in the
+# `<body>\n<http_code>` shape that `-w '\n%{http_code}'` actually produces.
+rest="${url##*/by-name/}"
+kind="${rest%%/*}"
+nsname="${rest#*/}"
+ns="${nsname%%/*}"
+name="${nsname#*/}"
 case "$name" in
   boom)  exit 7 ;;
-  five)  echo -n "502"; exit 0 ;;
-  typo*) echo -n "404"; exit 0 ;;
-  *)     echo -n "200"; exit 0 ;;
+  five)  printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
+  typo*) printf '%s\n404' '{}'; exit 0 ;;
+  *)     printf '%s\n200' "$(mock_entity "$kind" "$ns" "$name")"; exit 0 ;;
 esac
 EOF
 chmod +x "$MOCK/curl"
@@ -136,6 +174,22 @@ run_collect() {
     && PATH="$MOCK:$PATH" \
        LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
        LUNAR_VAR_BACKSTAGE_URL="" \
+       bash "$SCRIPT_DIR/main.sh" )
+}
+
+# Same as run_collect, but with referential integrity enabled against $1 — for
+# catalog files whose shape run_full can't express (it always writes a
+# `kind: Component`).
+run_collect_url() {
+  local url="$1"
+  local wd="$TEST_DIR/wd"
+  rm -rf "$wd"; mkdir -p "$wd"
+  cat > "$wd/catalog-info.yaml"
+  ( cd "$wd" \
+    && PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="$url" \
+       LUNAR_SECRET_BACKSTAGE_TOKEN="test-token" \
        bash "$SCRIPT_DIR/main.sh" )
 }
 
@@ -444,6 +498,69 @@ assert_eq "sigv4 with no backstage_url writes no .refs" \
   'null'
 assert_eq "sigv4 with no backstage_url makes no requests at all" \
   "$(wc -l < "$CURL_LOG" | tr -d ' ')" '0'
+
+# --- Transitive domain: component -> its system -> that system's domain ----
+# A Component has no domain of its own in the Backstage model, so this is the
+# only way to answer "is my domain real?" for an ordinary Component file.
+echo
+echo "Transitive system -> domain tests:"
+
+for mode in by-name by-query; do
+  MODE_ENV="LUNAR_SECRET_BACKSTAGE_TOKEN=test-token LUNAR_VAR_REF_LOOKUP=$mode"
+
+  # The customer case: the system resolves, but the domain IT belongs to does
+  # not. `system-exists` is happy; only the transitive entry catches this.
+  DANGLING=$(run_full "$MODE_ENV" '' dangling-system http://fake:7007 | jq -c '.refs')
+  assert_eq "[$mode] system resolves but its domain is missing -> exists:false" \
+    "$(echo "$DANGLING" | jq -c '.system_domain')" \
+    '{"name":"typo-domain","exists":false,"via_system":"dangling-system"}'
+  assert_eq "[$mode] a dangling system domain leaves system-exists passing" \
+    "$(echo "$DANGLING" | jq -c '.system.exists')" 'true'
+  assert_eq "[$mode] the component declares no spec.domain, so .refs.domain stays absent" \
+    "$(echo "$DANGLING" | jq -c 'has("domain")')" 'false'
+
+  # Healthy chain.
+  assert_eq "[$mode] healthy chain -> exists:true" \
+    "$(run_full "$MODE_ENV" '' payment-platform http://fake:7007 | jq -c '.refs.system_domain')" \
+    '{"name":"payments","exists":true,"via_system":"payment-platform"}'
+
+  # A System that belongs to no domain is legitimate: no entry, no false fail.
+  assert_eq "[$mode] system belonging to no domain writes no system_domain" \
+    "$(run_full "$MODE_ENV" '' team-nodomain http://fake:7007 | jq -c 'has("system_domain")')" \
+    'false'
+
+  # An unresolvable system has no entity to read a domain off, and the failure
+  # is already `system-exists`'s to report — don't double-report it.
+  assert_eq "[$mode] missing system writes no system_domain" \
+    "$(run_full "$MODE_ENV" '' typo-system http://fake:7007 | jq -c '.refs | has("system_domain")')" \
+    'false'
+
+  # A transient failure resolving the system stops the hop too.
+  assert_eq "[$mode] errored system lookup writes no system_domain" \
+    "$(run_full "$MODE_ENV" '' five http://fake:7007 | jq -c '.refs | has("system_domain")')" \
+    'false'
+
+  # A bare spec.domain on the System resolves against the SYSTEM's namespace,
+  # not the component's — they can differ.
+  : > "$CURL_LOG"
+  run_full "$MODE_ENV" '' other-ns/remote-system http://fake:7007 comp-ns >/dev/null
+  assert_eq "[$mode] the domain hop uses the system's namespace, not the component's" \
+    "$(grep -c 'other-ns' "$CURL_LOG")" '2'
+  assert_eq "[$mode] and never looks the domain up in the component's namespace" \
+    "$(grep -c 'domain/comp-ns/' "$CURL_LOG" || true)" '0'
+done
+
+# The transitive entry is additive: a `kind: System` catalog file still gets its
+# own `.refs.domain` from spec.domain, unchanged by any of the above.
+assert_eq "kind:System file still reports its own dangling spec.domain" \
+  "$(run_collect_url http://fake:7007 <<'EOF' | jq -c '.refs'
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata: {name: orphan-system}
+spec: {owner: team-demo, domain: typo-domain}
+EOF
+)" \
+  '{"checked":true,"domain":{"name":"typo-domain","exists":false}}'
 
 if [ "$FAILS" -eq 0 ]; then
   echo "All referential-integrity and auth-mode tests passed."
