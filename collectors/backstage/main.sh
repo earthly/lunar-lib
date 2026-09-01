@@ -303,7 +303,18 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     # {name, error} on a non-definitive outcome — a transient failure
     # (connection error / 5xx) or a config problem that stopped us issuing a
     # meaningful request at all (see SETUP_ERROR above).
+    #
+    # Side effect: on a definitive hit the resolved entity's JSON is written to
+    # $ENTITY_BODY_FILE, so the caller can read fields off the entity it just
+    # confirmed (the system -> spec.domain hop below). A *file* is the channel
+    # because resolve_ref is always invoked as `$(resolve_ref ...)` — a command
+    # substitution runs in a subshell, so a variable assigned here would be
+    # discarded on return and the hop would silently never fire. The file is
+    # truncated on entry so a previous lookup's entity can never be misread as
+    # this one's.
     local kind="$1" value="$2" ref ns name http_code curl_status response body item_count
+
+    : > "$ENTITY_BODY_FILE"
 
     # Setup never completed (bad auth_mode or ref_lookup, missing aws_region,
     # unresolvable credentials). Report it per-reference instead of firing a
@@ -341,10 +352,16 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       http_code="${response##*$'\n'}"
       body="${response%$'\n'*}"
     else
-      http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+      # by-name's status alone is the existence answer, but the body carries the
+      # resolved entity — which the system -> spec.domain hop needs — so keep it
+      # instead of discarding it to /dev/null. Same `-w '\n%{http_code}'` shape
+      # as the by-query branch, so one request still yields body and status.
+      response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
         "${AUTH_ARGS[@]}" \
         "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-name/${kind}/${ns}/${name}")
       curl_status=$?
+      http_code="${response##*$'\n'}"
+      body="${response%$'\n'*}"
     fi
     set -e
 
@@ -364,11 +381,13 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
         jq -n --arg name "$value" --arg err "unparseable by-query response" \
           '{name: $name, error: $err}'
       elif [ "$item_count" -gt 0 ]; then
+        printf '%s' "$body" | jq -c '.items[0]' > "$ENTITY_BODY_FILE" 2>/dev/null || :
         jq -n --arg name "$value" '{name: $name, exists: true}'
       else
         jq -n --arg name "$value" '{name: $name, exists: false}'
       fi
     elif [ "$http_code" = "200" ]; then
+      printf '%s' "$body" > "$ENTITY_BODY_FILE"
       jq -n --arg name "$value" '{name: $name, exists: true}'
     elif [ "$http_code" = "404" ]; then
       jq -n --arg name "$value" '{name: $name, exists: false}'
@@ -378,6 +397,11 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   }
 
   REFS='{"checked":true}'
+
+  # Scratch file resolve_ref writes the resolved entity to; see the note there
+  # for why this can't be a variable.
+  ENTITY_BODY_FILE=$(mktemp)
+  trap 'rm -f "$YQ_ERR" "$ENTITY_BODY_FILE"' EXIT
 
   DOMAIN_REF=$(echo "$RESULT" | jq -r '.spec.domain // empty')
   if [ -n "$DOMAIN_REF" ]; then
@@ -389,6 +413,47 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   if [ -n "$SYSTEM_REF" ]; then
     SYSTEM_ENTRY=$(resolve_ref system "$SYSTEM_REF")
     REFS=$(echo "$REFS" | jq --argjson s "$SYSTEM_ENTRY" '. + {system: $s}')
+
+    # Transitive hop: component -> its system -> that system's domain.
+    #
+    # A Component has no domain of its own in the Backstage model — domain
+    # membership is a property of the System it belongs to (`System.spec.domain`
+    # is what produces the `partOf -> domain:...` relation; a `spec.domain`
+    # written on a Component is inert and Backstage generates nothing from it).
+    # So for the ordinary one-Component-per-repo file, "is my domain real?"
+    # can only be answered through the system, which is what this records at
+    # `.refs.system_domain`. `.refs.domain` keeps its existing meaning: the
+    # domain THIS entity declares directly (a `kind: System` catalog file).
+    #
+    # Only hop on a confirmed system: if the system is missing or its lookup
+    # errored there is no entity to read a domain off, and reporting a second
+    # failure for the same root cause would just double the noise.
+    #
+    # Belt-and-braces: resolve_ref only writes the body on a definitive hit and
+    # truncates on entry, so today a non-existent system already leaves the file
+    # empty and the hop would no-op anyway. The explicit guard states the
+    # invariant so that stays true if resolve_ref ever starts capturing error
+    # bodies too.
+    if [ "$(echo "$SYSTEM_ENTRY" | jq -r '.exists // false')" = "true" ]; then
+      SYSTEM_DOMAIN_REF=$(jq -r '.spec.domain // empty' "$ENTITY_BODY_FILE" 2>/dev/null || :)
+      if [ -n "$SYSTEM_DOMAIN_REF" ]; then
+        # A bare reference on the System resolves against the SYSTEM's namespace,
+        # not the component's — they can differ — so borrow it for this lookup.
+        # (Backstage normalizes metadata.namespace on read, so it is present;
+        # fall back to the component's namespace if an instance ever omits it.)
+        SYSTEM_NS=$(jq -r '.metadata.namespace // empty' "$ENTITY_BODY_FILE" 2>/dev/null || :)
+        SAVED_DEFAULT_NS="$DEFAULT_NS"
+        DEFAULT_NS="${SYSTEM_NS:-$DEFAULT_NS}"
+        SYSTEM_DOMAIN_ENTRY=$(resolve_ref domain "$SYSTEM_DOMAIN_REF")
+        DEFAULT_NS="$SAVED_DEFAULT_NS"
+        # Carry the system that pointed here: the entity to fix lives in the
+        # System's own catalog file, which is usually another team's repo, so a
+        # bare domain name would not tell anyone where to go.
+        SYSTEM_DOMAIN_ENTRY=$(echo "$SYSTEM_DOMAIN_ENTRY" \
+          | jq --arg via "$SYSTEM_REF" '. + {via_system: $via}')
+        REFS=$(echo "$REFS" | jq --argjson sd "$SYSTEM_DOMAIN_ENTRY" '. + {system_domain: $sd}')
+      fi
+    fi
   fi
 
   RESULT=$(echo "$RESULT" | jq --argjson refs "$REFS" '. + {refs: $refs}')
