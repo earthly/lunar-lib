@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
-## [1.14.1] — 2026-08-31
+## [1.14.2] — 2026-09-01
 
 ### Added
 
@@ -33,7 +33,13 @@ _Nothing yet._
   miss and names the offending System, since the entity to fix is that System's
   own catalog file rather than the component's; it passes when the system is
   absent (that is `system-exists`'s failure to report) or belongs to no domain,
-  and skips when the collector has no `backstage_url` or the lookup errors.
+  and skips when the collector has no `backstage_url` or the lookup errors
+  (#299).
+
+## [1.14.1] — 2026-08-31
+
+### Added
+
 - `backstage` collector: `ref_lookup` input selects which catalog endpoint
   resolves each declared `spec.domain` / `spec.system` reference — `by-name`
   (default, unchanged behavior) or `by-query`. Some deployments authorize only
@@ -47,7 +53,8 @@ _Nothing yet._
   `ref_lookup` composes with `auth_mode` and `api_path_prefix`. Because
   `by-query` reports "no match" as an empty result set, a `200` whose body is
   not parseable JSON records `{name, error}` rather than collapsing into
-  `exists: false` — a gateway login page must not read as a missing domain.
+  `exists: false` — a gateway login page must not read as a missing domain
+  (#297).
 
 ## [1.14.0] — 2026-08-28
 
@@ -842,7 +849,8 @@ _Nothing yet._
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.1...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.2...HEAD
+[1.14.2]: https://github.com/earthly/lunar-lib/compare/v1.14.1...v1.14.2
 [1.14.1]: https://github.com/earthly/lunar-lib/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/earthly/lunar-lib/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/earthly/lunar-lib/compare/v1.12.2...v1.13.0
