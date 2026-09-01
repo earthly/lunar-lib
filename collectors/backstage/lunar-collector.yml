@@ -48,7 +48,14 @@ collectors:
       definitive lookup records `.refs.<kind> = {name, exists}` (`exists: true`
       on a 200, `false` on a 404), while a transient failure (timeout/5xx)
       records `.refs.<kind> = {name, error}` so an outage stays distinguishable
-      from a real miss. The `<namespace>` is derived from the reference itself —
+      from a real miss. Because a Component has no domain of its own in the
+      Backstage model — domain membership belongs to its System — a confirmed
+      `spec.system` is followed one hop further: that System's own `spec.domain`
+      is resolved and recorded at `.refs.system_domain = {name, exists,
+      via_system}`, which is what makes the domain check meaningful for an
+      ordinary `kind: Component` file. The hop reuses the System entity the
+      system lookup already returned, so it costs one extra request and only
+      when the system both resolves and declares a domain. The `<namespace>` is derived from the reference itself —
       a qualified ref (`ns/name`) carries its own, otherwise the component's own
       `metadata.namespace` is used, falling back to `default` — so no namespace
       configuration is required. When `backstage_url` is empty (the default) no
