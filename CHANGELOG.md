@@ -13,28 +13,15 @@ _Nothing yet._
 
 ### Added
 
-- `backstage` collector + policy: transitive domain referential integrity —
-  `.catalog.native.backstage.refs.system_domain` and a new `system-domain-exists`
-  check. In the Backstage model a `Component` has no domain of its own: domain
-  membership belongs to its `System` (`System.spec.domain` is what produces the
-  `partOf -> domain:...` relation; a `spec.domain` written on a Component is
-  inert and Backstage generates nothing from it). The existing `domain-exists`
-  reads the domain an entity declares *directly*, so for the common
-  one-`Component`-per-repo file it had nothing to inspect and passed vacuously —
-  a component whose system pointed at a non-existent domain was indistinguishable
-  from a healthy one. The collector now follows a confirmed `spec.system` one hop
-  further and resolves that System's own `spec.domain`, recording
-  `{name, exists, via_system}`. The hop reuses the System entity the system
-  lookup already returned (previously discarded on the `by-name` path), so it
-  costs one extra request and only when the system both resolves and declares a
-  domain; a bare reference resolves against the *System's* namespace, which can
-  differ from the component's. `domain-exists` is unchanged and still covers a
-  `kind: System` catalog file. `system-domain-exists` fails only on a definitive
-  miss and names the offending System, since the entity to fix is that System's
-  own catalog file rather than the component's; it passes when the system is
-  absent (that is `system-exists`'s failure to report) or belongs to no domain,
-  and skips when the collector has no `backstage_url` or the lookup errors
-  (#299).
+- `backstage` collector + policy: transitive domain referential integrity. A
+  Backstage `Component` reaches a domain only through its `System`, so on the
+  usual one-`Component`-per-repo catalog file `domain-exists` had nothing to
+  read and passed vacuously — a component whose system pointed at a missing
+  domain was indistinguishable from a healthy one. The collector now follows
+  `spec.system` one hop further to that System's own `spec.domain` and records
+  `.refs.system_domain = {name, exists, via_system}`; the new
+  `system-domain-exists` check consumes it and names the offending System, since
+  that's whose catalog file needs fixing. `domain-exists` is unchanged (#299).
 
 ## [1.14.1] — 2026-08-31
 
