@@ -154,7 +154,12 @@ base-image:
     # openssl 3.5.7-r0 with two fixable criticals while 3.5.8-r0 was already in
     # the 3.24 repo. Upgrading here is what keeps that out of every image built
     # on this base (21 of the 27 published images).
-    RUN apk upgrade --no-cache
+    # RUN --no-cache: re-run the upgrade on every build. Without it the layer is
+    # served from the inline cache (--ci imports it from the previously pushed
+    # base-<tag>), so -main images would stay frozen at whatever the first build
+    # after a pin bump picked up. Release cuts and new branches never had a cache
+    # to hit, so they were always fresh; this makes main behave the same.
+    RUN --no-cache apk upgrade --no-cache
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     ARG VERSION=main

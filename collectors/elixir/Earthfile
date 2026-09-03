@@ -16,8 +16,9 @@ image:
     # Install Elixir (pulls in erlang/OTP as a dep).
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
     # pinned lunar-scripts base (it only installs, never upgrades — see the root
-    # Earthfile's base-image for the alpine twin of this).
-    RUN apt-get update \
+    # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
+    # upgrade re-runs every build instead of coming out of the layer cache.
+    RUN --no-cache apt-get update \
         && apt-get upgrade -y \
         && apt-get install -y --no-install-recommends erlang elixir \
         && rm -rf /var/lib/apt/lists/*

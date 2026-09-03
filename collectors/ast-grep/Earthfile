@@ -10,8 +10,9 @@ image:
     ARG AST_GREP_VERSION=0.40.5
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
     # pinned lunar-scripts base (it only installs, never upgrades — see the root
-    # Earthfile's base-image for the alpine twin of this).
-    RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends unzip && \
+    # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
+    # upgrade re-runs every build instead of coming out of the layer cache.
+    RUN --no-cache apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends unzip && \
         ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
         curl -sSL "https://github.com/ast-grep/ast-grep/releases/download/${AST_GREP_VERSION}/app-${ARCH}-unknown-linux-gnu.zip" -o /tmp/ast-grep.zip && \
         unzip -j /tmp/ast-grep.zip ast-grep -d /usr/local/bin/ && \

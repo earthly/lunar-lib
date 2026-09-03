@@ -7,8 +7,9 @@ image:
 
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
     # pinned lunar-scripts base (it only installs, never upgrades — see the root
-    # Earthfile's base-image for the alpine twin of this).
-    RUN apt-get update -qq && \
+    # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
+    # upgrade re-runs every build instead of coming out of the layer cache.
+    RUN --no-cache apt-get update -qq && \
         apt-get upgrade -y && \
         apt-get install -y --no-install-recommends postgresql-client gcc libc6-dev && \
         rm -rf /var/lib/apt/lists/*
