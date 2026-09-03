@@ -5,7 +5,8 @@ image:
 
     # Install Helm CLI
     ARG TARGETARCH
-    ARG HELM_VERSION=3.14.0
+    # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
+    ARG HELM_VERSION=3.21.4
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
         curl -sSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar xz && \
         mv "linux-${ARCH}/helm" /usr/local/bin/ && \

@@ -5,7 +5,8 @@ image:
 
     # Install istioctl for offline Istio config validation (istioctl analyze).
     ARG TARGETARCH
-    ARG ISTIO_VERSION=1.22.0
+    # renovate: datasource=github-releases depName=istio/istio
+    ARG ISTIO_VERSION=1.31.0
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
         curl -sSL "https://github.com/istio/istio/releases/download/${ISTIO_VERSION}/istioctl-${ISTIO_VERSION}-linux-${ARCH}.tar.gz" | tar xz && \
         mv istioctl /usr/local/bin/ && \

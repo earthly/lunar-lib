@@ -17,12 +17,14 @@ image:
     ARG TARGETARCH
 
     # Install Syft
-    ARG SYFT_VERSION=1.41.2
+    # renovate: datasource=github-releases depName=anchore/syft extractVersion=^v(?<version>.*)$
+    ARG SYFT_VERSION=1.51.1
     RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
         chmod +x /usr/local/bin/syft
 
     # Install Go
-    ARG GO_VERSION=1.23.4
+    # renovate: datasource=golang-version depName=golang
+    ARG GO_VERSION=1.27.1
     RUN wget -q "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
         tar -C /usr/local -xzf "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
         rm "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz"

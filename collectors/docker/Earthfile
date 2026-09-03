@@ -15,11 +15,10 @@ image:
 
     # Install dockerfile-json (no --version flag, so we write a marker file)
     ARG TARGETARCH
+    # renovate: datasource=github-releases depName=keilerkonzept/dockerfile-json extractVersion=^v(?<version>.*)$
     ARG DOCKERFILE_JSON_VERSION=1.2.2
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/') && \
-        curl -sSL "https://github.com/keilerkonzept/dockerfile-json/releases/download/v${DOCKERFILE_JSON_VERSION}/dockerfile-json_Linux_${ARCH}.tar.gz" | tar xz && \
-        mv dockerfile-json /usr/local/bin/ && \
-        echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
+    COPY (+dockerfile-json-bin/dockerfile-json --DOCKERFILE_JSON_VERSION=$DOCKERFILE_JSON_VERSION) /usr/local/bin/dockerfile-json
+    RUN echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
 
     # Install hadolint
     ARG HADOLINT_VERSION=2.12.0
@@ -30,3 +29,17 @@ image:
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:docker-$VERSION
+
+# dockerfile-json has had no release since 2025-02, so its prebuilt binary carries
+# a stale Go stdlib with fixable critical CVEs. Build it from source with a current Go.
+dockerfile-json-bin:
+    FROM golang:1.27-alpine
+    ARG --required DOCKERFILE_JSON_VERSION
+    # clone + build rather than `go install pkg@version`: the module's go.mod has
+    # replace directives, which `go install` refuses outside the main module.
+    # -tags=dfrunsecurity is what upstream's own Makefile builds with.
+    RUN apk add --no-cache git && \
+        git clone --quiet --depth 1 --branch "v${DOCKERFILE_JSON_VERSION}" https://github.com/keilerkonzept/dockerfile-json /src && \
+        cd /src && mkdir -p /out && \
+        CGO_ENABLED=0 go build -trimpath -tags=dfrunsecurity -ldflags "-s -w -X main.version=v${DOCKERFILE_JSON_VERSION}" -o /out/dockerfile-json .
+    SAVE ARTIFACT /out/dockerfile-json

@@ -14,7 +14,8 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install Trivy
-    ARG TRIVY_VERSION=0.69.3
+    # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
+    ARG TRIVY_VERSION=0.74.0
     ARG TARGETARCH
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/64bit/; s/arm64/ARM64/') && \
         curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz" | tar xz -C /usr/local/bin trivy && \
