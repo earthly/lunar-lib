@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
+  declare `size: large`, since pulling an image can exceed the default 1Gi
+  ephemeral-storage limit. `size:` on the `uses:` line does not reach a
+  plugin's sub-collectors yet (ENG-1695), so it lives in the manifest (#301).
+
 ### Security
 
 - All plugin images: OS packages are now upgraded at build time (`apk upgrade`

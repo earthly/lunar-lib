@@ -93,6 +93,8 @@ collectors:
       the docker collector's record (.containers.native.docker.cicd.cmds[]) and
       scans it with Trivy into .container_scan.
     mainBash: container-rescan.sh
+    # trivy can sometimes exceed the 1Gi default.
+    size: large
     hook:
       type: after-json
       path: .containers.native.docker.cicd.cmds
@@ -110,6 +112,8 @@ collectors:
       after it was built. Override with the `container_image` input. No code
       clone needed.
     mainBash: container-rescan.sh
+    # Same image pull + unpack as `container-scan`, so the same large profile.
+    size: large
     # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
     # the .sca `rescan` collector). Default-branch only — one re-scan per
     # component per tick. Offset to 03:00 so it doesn't pile onto the .sca

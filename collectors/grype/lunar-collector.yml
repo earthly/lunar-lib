@@ -95,6 +95,8 @@ collectors:
       the docker collector's record (.containers.native.docker.cicd.cmds[]) and
       scans it with Grype into .container_scan.
     mainBash: container-rescan.sh
+    # grype can sometimes exceed the 1Gi default.
+    size: large
     hook:
       type: after-json
       path: .containers.native.docker.cicd.cmds
@@ -113,6 +115,8 @@ collectors:
       clone needed; runs in the Grype collector image, so the baked-in
       vulnerability DB is reused.
     mainBash: container-rescan.sh
+    # Same image pull + unpack as `container-scan`, so the same large profile.
+    size: large
     # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
     # the .sca `rescan` collector). Default-branch only — one re-scan per
     # component per tick. Offset to 03:00 so it doesn't pile onto the .sca
