@@ -2,10 +2,14 @@ VERSION 0.8
 
 image:
     # Use Debian variant — PHP packages need apt-get
-    ARG SCRIPTS_VERSION=1.1.5-debian
+    ARG SCRIPTS_VERSION=1.1.6-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
+    # apt-get upgrade: pull in the OS security fixes Debian has published for the
+    # pinned lunar-scripts base (it only installs, never upgrades — see the root
+    # Earthfile's base-image for the alpine twin of this).
     RUN apt-get update -qq && \
+        apt-get upgrade -y && \
         apt-get install -y --no-install-recommends php-cli php-json php-xml && \
         rm -rf /var/lib/apt/lists/*
 
