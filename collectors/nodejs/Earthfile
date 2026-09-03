@@ -2,16 +2,27 @@ VERSION 0.8
 
 image:
     # Use Debian variant for glibc compatibility with Node.js binaries
-    ARG SCRIPTS_VERSION=1.1.5-debian
+    ARG SCRIPTS_VERSION=1.1.6-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
+    # apt-get upgrade: pull in the OS security fixes Debian has published for the
+    # pinned lunar-scripts base (it only installs, never upgrades — see the root
+    # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
+    # upgrade re-runs every build instead of coming out of the layer cache.
+    RUN --no-cache apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
     # Install Node.js (download from official source for latest LTS)
-    ARG NODE_VERSION=22.14.0
+    ARG NODE_VERSION=22.23.2
     ARG TARGETARCH
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x64/') && \
         wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz" -O node.tar.gz && \
         tar -xzf node.tar.gz -C /usr/local --strip-components=1 && \
         rm node.tar.gz
+
+    # The npm bundled with Node 22 (10.9.x) vendors tar < 7.5.19, which grype flags
+    # critical (GHSA-23hp-3jrh-7fpw); npm 12 depends on tar ^7.5.19.
+    ARG NPM_VERSION=12.0.2
+    RUN npm install -g "npm@${NPM_VERSION}"
 
     # Verify installation
     RUN node --version && npm --version

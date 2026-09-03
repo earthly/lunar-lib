@@ -146,8 +146,20 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.5-alpine
+    ARG SCRIPTS_VERSION=1.1.6-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+    # Pull in every OS-package security fix Alpine has published for the pinned
+    # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
+    # so its tags ship whatever package set that base had when it was cut — e.g.
+    # openssl 3.5.7-r0 with two fixable criticals while 3.5.8-r0 was already in
+    # the 3.24 repo. Upgrading here is what keeps that out of every image built
+    # on this base (21 of the 27 published images).
+    # RUN --no-cache: re-run the upgrade on every build. Without it the layer is
+    # served from the inline cache (--ci imports it from the previously pushed
+    # base-<tag>), so -main images would stay frozen at whatever the first build
+    # after a pin bump picked up. Release cuts and new branches never had a cache
+    # to hit, so they were always fresh; this makes main behave the same.
+    RUN --no-cache apk upgrade --no-cache
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     ARG VERSION=main

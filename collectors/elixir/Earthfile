@@ -10,11 +10,16 @@ VERSION 0.8
 # SCRIPTS_VERSION gets pinned to a released alpine tag, pin this to the matching
 # debian tag (same version, -debian suffix instead of -alpine).
 image:
-    ARG SCRIPTS_VERSION_DEBIAN=1.1.5-debian
+    ARG SCRIPTS_VERSION_DEBIAN=1.1.6-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION_DEBIAN
 
     # Install Elixir (pulls in erlang/OTP as a dep).
-    RUN apt-get update \
+    # apt-get upgrade: pull in the OS security fixes Debian has published for the
+    # pinned lunar-scripts base (it only installs, never upgrades — see the root
+    # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
+    # upgrade re-runs every build instead of coming out of the layer cache.
+    RUN --no-cache apt-get update \
+        && apt-get upgrade -y \
         && apt-get install -y --no-install-recommends erlang elixir \
         && rm -rf /var/lib/apt/lists/*
 
