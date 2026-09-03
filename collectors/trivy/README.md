@@ -132,4 +132,6 @@ collectors:
 
 **Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets. Trivy's vulnerability database is a modest download at scan time.
 
+**Resources:** `container-scan` and `container-rescan` declare `size: large`, because they pull and unpack the shipped image (and download the vulnerability database) inside the collector pod, and the default profile's 1Gi ephemeral-storage limit is too small for real-world images. The `cicd` sub-collector runs natively on your CI runner, so no pod size applies to it.
+
 > **Note:** If you already use the `snyk` collector, the `trivy` collector will overwrite `.sca` data since both write to the same paths. Use one SCA scanner per component, not both.

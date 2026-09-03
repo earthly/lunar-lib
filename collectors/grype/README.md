@@ -130,6 +130,8 @@ collectors:
 
 **Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
 
+**Resources:** `container-scan` and `container-rescan` declare `size: large`, because they pull and unpack the shipped image inside the collector pod and the default profile's 1Gi ephemeral-storage limit is too small for real-world images. The `cicd` sub-collector runs natively on your CI runner, so no pod size applies to it.
+
 > **Note:** The `grype` collector writes to the same `.sca` paths as the `snyk` and `trivy` collectors. Use one SCA scanner per component, not several, or they will overwrite each other's `.sca` data.
 
 > **Re-scan freshness:** By default (`db_auto_update: false`), each cron re-scan uses the DB baked into the collector image, so freshness is tied to the image rebuild cadence — bumping the pinned `grype` collector version (a newer image ships a newer DB) is what picks up new CVE data. Set `db_auto_update: true` (on a Hub that honors `size: large`) to have each re-scan fetch the latest vulnerability database instead, so CVEs published since the last scan surface on the next tick.
