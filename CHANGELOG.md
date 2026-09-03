@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ephemeral-storage limit. `size:` on the `uses:` line does not reach a
   plugin's sub-collectors yet (ENG-1695), so it lives in the manifest (#301).
 
+## [1.14.3] — 2026-09-03
+
 ### Security
 
 - All plugin images: OS packages are now upgraded at build time (`apk upgrade`
@@ -851,7 +853,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.2...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.3...HEAD
+[1.14.3]: https://github.com/earthly/lunar-lib/compare/v1.14.2...v1.14.3
 [1.14.2]: https://github.com/earthly/lunar-lib/compare/v1.14.1...v1.14.2
 [1.14.1]: https://github.com/earthly/lunar-lib/compare/v1.14.0...v1.14.1
 [1.14.0]: https://github.com/earthly/lunar-lib/compare/v1.13.0...v1.14.0
