@@ -7,10 +7,16 @@ image:
     ARG TARGETARCH
     # renovate: datasource=github-releases depName=tmccombs/hcl2json extractVersion=^v(?<version>.*)$
     ARG HCL2JSON_VERSION=0.6.9
-    RUN curl -fsSL -o /usr/local/bin/hcl2json \
-        "https://github.com/tmccombs/hcl2json/releases/download/v${HCL2JSON_VERSION}/hcl2json_linux_${TARGETARCH}" && \
-        chmod +x /usr/local/bin/hcl2json && \
-        echo "${HCL2JSON_VERSION}" > /usr/local/bin/hcl2json.version
+    COPY (+hcl2json-bin/hcl2json --HCL2JSON_VERSION=$HCL2JSON_VERSION) /usr/local/bin/hcl2json
+    RUN echo "${HCL2JSON_VERSION}" > /usr/local/bin/hcl2json.version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:terraform-$VERSION
+
+# Built from source so the binary carries a current Go stdlib; upstream's prebuilt
+# release binaries lag the Go patch releases that fix stdlib CVEs.
+hcl2json-bin:
+    FROM golang:1.27-alpine
+    ARG --required HCL2JSON_VERSION
+    RUN CGO_ENABLED=0 go install "github.com/tmccombs/hcl2json@v${HCL2JSON_VERSION}"
+    SAVE ARTIFACT /go/bin/hcl2json

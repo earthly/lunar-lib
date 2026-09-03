@@ -8,10 +8,7 @@ image:
     # Install actionlint
     # renovate: datasource=github-releases depName=rhysd/actionlint extractVersion=^v(?<version>.*)$
     ARG ACTIONLINT_VERSION=1.7.12
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
-        curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ARCH}.tar.gz" | tar xz && \
-        mv actionlint /usr/local/bin/ && \
-        chmod +x /usr/local/bin/actionlint
+    COPY (+actionlint-bin/actionlint --ACTIONLINT_VERSION=$ACTIONLINT_VERSION) /usr/local/bin/actionlint
 
     # Install yq for YAML parsing
     # renovate: datasource=github-releases depName=mikefarah/yq extractVersion=^v(?<version>.*)$
@@ -22,3 +19,11 @@ image:
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:github-actions-$VERSION
+
+# Built from source so the binary carries a current Go stdlib; upstream's prebuilt
+# release binaries lag the Go patch releases that fix stdlib CVEs.
+actionlint-bin:
+    FROM golang:1.27-alpine
+    ARG --required ACTIONLINT_VERSION
+    RUN CGO_ENABLED=0 go install "github.com/rhysd/actionlint/cmd/actionlint@v${ACTIONLINT_VERSION}"
+    SAVE ARTIFACT /go/bin/actionlint
