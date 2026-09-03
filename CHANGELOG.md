@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- `grype` and `trivy` collectors: the `container-scan` (after-json) and
+  `container-rescan` (cron) sub-collectors now declare `size: large`. Both pull
+  and unpack the shipped image inside the collector pod, and the default
+  (medium) profile's 1Gi ephemeral-storage limit is too small for real-world
+  images, so the scan died before it wrote `.container_scan`. `large` raises
+  the pod to 2Gi/4Gi ephemeral storage and 1Gi/2Gi memory — the profile
+  `auto`/`rescan` already declared (#235). It has to live in the plugin
+  manifest: a `size:` on the consumer's `uses:` line is dropped for a plugin's
+  sub-collectors today (ENG-1695 in lunar core). The `cicd` sub-collector stays
+  unsized — a `ci-after-command` hook runs natively on the CI runner, not in a
+  Lunar script pod (#301).
 
 ## [1.14.2] — 2026-09-01
 

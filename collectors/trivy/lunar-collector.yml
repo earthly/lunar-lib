@@ -102,7 +102,7 @@ collectors:
     # real-world images, so the scan dies before it writes .container_scan.
     # large = 2Gi/4Gi ephemeral, 1Gi/2Gi memory. Declared here because a `size:`
     # on the consumer's `uses:` line does not reach a plugin's sub-collectors
-    # today (tracked in lunar core).
+    # today (ENG-1695).
     size: large
     hook:
       type: after-json
