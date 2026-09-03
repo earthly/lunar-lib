@@ -82,9 +82,6 @@ collectors:
       already running in your pipeline is collected automatically with no
       extra configuration.
     mainBash: cicd.sh
-    # No size: ci-after-command runs natively on the CI runner (see
-    # default_image_ci_collectors), not in a Lunar script pod, so the pod
-    # resource profile never applies to it.
     hook:
       type: ci-after-command
       binary:
@@ -98,12 +95,7 @@ collectors:
       the docker collector's record (.containers.native.docker.cicd.cmds[]) and
       scans it with Grype into .container_scan.
     mainBash: container-rescan.sh
-    # Pulls and unpacks the shipped image inside the pod: the layers land on the
-    # container's ephemeral storage, and the default (medium) profile's 1Gi limit
-    # is too small for real-world images, so the scan dies before it writes
-    # .container_scan. large = 2Gi/4Gi ephemeral, 1Gi/2Gi memory. Declared here
-    # because a `size:` on the consumer's `uses:` line does not reach a plugin's
-    # sub-collectors today (ENG-1695).
+    # grype can sometimes exceed the 1Gi default.
     size: large
     hook:
       type: after-json
