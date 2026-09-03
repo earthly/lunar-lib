@@ -18,6 +18,11 @@ image:
         tar -xzf node.tar.gz -C /usr/local --strip-components=1 && \
         rm node.tar.gz
 
+    # The npm bundled with Node 22 (10.9.x) vendors tar < 7.5.19, which grype flags
+    # critical (GHSA-23hp-3jrh-7fpw); npm 12 depends on tar ^7.5.19.
+    ARG NPM_VERSION=12.0.2
+    RUN npm install -g "npm@${NPM_VERSION}"
+
     # Verify installation
     RUN node --version && npm --version
 
