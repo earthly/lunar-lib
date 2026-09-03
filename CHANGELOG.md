@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every image the component pushed, not just the last one. `.container_scan`
   gains `images[]` (per-image counts), `findings[].image` and `errors[]`;
   `container_image` accepts a comma-separated list. The `container-scan`
-  `max-severity` check names the image(s) on each failing line.
+  `max-severity` check names the image(s) on each failing line (#305).
 
 - `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
   declare `size: large`, since pulling an image can exceed the default 1Gi
