@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Security
+
+- All plugin images: OS packages are now upgraded at build time (`apk upgrade`
+  on the shared alpine base image, `apt-get upgrade` on the five debian-based
+  images), clearing the fixable critical OpenSSL CVEs (CVE-2026-63073,
+  CVE-2026-75803) every published image carried, and the lunar-scripts base is
+  pinned to 1.1.6 (lunar CLI 2.10.0, which raises the gRPC message cap to
+  16 MiB). `nodejs` and `license-origins` move to Node 22.23.2 and npm 12.0.2
+  for the fixable criticals in Node and in npm's vendored `tar` (#300).
 
 ## [1.14.2] — 2026-09-01
 
