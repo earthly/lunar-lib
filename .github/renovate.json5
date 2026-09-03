@@ -1,0 +1,51 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  // Same shape as earthly/actions-setup, earthly/earthly and earthly/dind.
+  extends: ['config:recommended'],
+  configMigration: true,
+  prHourlyLimit: 2,
+  schedule: ['after 6am on monday'], // utc
+  labels: ['renovate'],
+  // Earthfiles are Dockerfiles for FROM purposes: golang:/python:/alpine: builder
+  // images and the earthly/lunar-scripts:$SCRIPTS_VERSION base (ARG-resolved).
+  dockerfile: {
+    managerFilePatterns: ['/(^|/)Earthfile$/'],
+  },
+  customManagers: [
+    {
+      // Every bundled tool is an `ARG <TOOL>_VERSION=<x>` pin in an Earthfile.
+      // Tag it with `# renovate: datasource=<ds> depName=<name> [extractVersion=…]`
+      // on the line above and Renovate keeps it current.
+      customType: 'regex',
+      managerFilePatterns: ['/(^|/)Earthfile$/'],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+ARG [A-Z0-9_]+=(?<currentValue>[^\\s]+)',
+      ],
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver-coerced{{/if}}',
+    },
+  ],
+  packageRules: [
+    {
+      // The helm collector is validated on Helm 3; Helm 4 is a deliberate migration.
+      matchDepNames: ['helm/helm'],
+      allowedVersions: '<4',
+    },
+    {
+      // All six lunar-scripts references (alpine base + five debian images) move together.
+      matchDepNames: ['earthly/lunar-scripts'],
+      groupName: 'lunar-scripts base',
+    },
+    {
+      // alpine:/python: only appear in +test / +lint / artifact targets, never in a
+      // shipped image; leave them alone so the queue stays about what we publish.
+      matchManagers: ['dockerfile'],
+      matchDepNames: ['alpine', 'python'],
+      enabled: false,
+    },
+    {
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['minor', 'patch'],
+      groupName: 'github-actions (non-major)',
+    },
+  ],
+}

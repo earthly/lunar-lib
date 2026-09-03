@@ -36,6 +36,7 @@ image:
         sh -s -- -y --default-toolchain stable --profile minimal
 
     # Install Node.js (amd64 -> x64 for Node naming, arm64 stays arm64)
+    # renovate: datasource=node-version depName=node
     ARG NODE_VERSION=22.23.2
     RUN case "${TARGETARCH}" in amd64) ARCH=x64;; *) ARCH="${TARGETARCH}";; esac && \
         wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.gz" -O node.tar.gz && \
@@ -44,6 +45,7 @@ image:
 
     # The npm bundled with Node 22 (10.9.x) vendors tar < 7.5.19, which grype flags
     # critical (GHSA-23hp-3jrh-7fpw); npm 12 depends on tar ^7.5.19.
+    # renovate: datasource=npm depName=npm
     ARG NPM_VERSION=12.0.2
     RUN npm install -g "npm@${NPM_VERSION}"
 
