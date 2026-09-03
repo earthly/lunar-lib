@@ -3,8 +3,13 @@ VERSION 0.8
 image:
     FROM --pass-args ../../+base-image
 
-    # Install Node.js and npm
-    RUN apk add --no-cache nodejs npm
+    # Node from apk. apk's npm 10.x vendors tar < 7.5.19 (a fixable critical), so
+    # install npm 12 with it and then drop the apk copy.
+    # renovate: datasource=npm depName=npm
+    ARG NPM_VERSION=12.0.2
+    RUN apk add --no-cache nodejs npm && \
+        npm install -g "npm@${NPM_VERSION}" && \
+        apk del npm
 
     # Install HTMLHint, Stylelint, and PostCSS syntaxes for SCSS/LESS
     RUN npm install -g htmlhint stylelint stylelint-config-standard postcss-scss postcss-less
