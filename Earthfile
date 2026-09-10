@@ -162,5 +162,10 @@ base-image:
     RUN --no-cache apk upgrade --no-cache
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
+    # git: a dozen collectors shell out to it (diff, log, ls-files) and their
+    # call sites swallow the failure, so without it they silently write nothing.
+    # safe.directory: the snippet checkout is owned by a different uid than the
+    # process running the script, which git otherwise refuses to read.
+    RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION

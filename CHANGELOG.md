@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- All plugin images built on `base-image`: `git` is now installed, with
+  `safe.directory '*'` set system-wide. Collectors that shell out to git
+  (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
+  empty data because the binary was absent and their call sites swallow the
+  failure (ENG-1762).
 
 ## [1.14.4] — 2026-09-03
 
