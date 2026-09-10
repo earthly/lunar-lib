@@ -1,19 +1,19 @@
 version: 0
 
-name: gitlab-group
-description: Catalogs GitLab group projects as Lunar components
+name: gitlab
+description: Discovers GitLab groups and catalogs their projects as Lunar components
 author: earthly
 default_image: earthly/lunar-lib:base-main
 
 landing_page:
-  display_name: "GitLab Group Cataloger"
+  display_name: "GitLab Cataloger"
   long_description: |
-    Sync projects from GitLab groups and their subgroups into your Lunar catalog.
-    Maps project topics to Lunar tags, filters by visibility, name and topic, and
-    keeps the catalog current as projects are archived, renamed or deleted.
+    Discover every GitLab group a service account can see and sync their projects
+    into your Lunar catalog. Maps project topics to Lunar tags, filters by visibility,
+    path and topic, and keeps the catalog current as projects are archived or deleted.
   categories: ["vcs", "service-catalog"]
-  icon: "assets/gitlab-group.svg"
-  status: "experimental"
+  icon: "assets/gitlab.svg"
+  status: "beta"
   related:
     - slug: "gitlab"
       type: "collector"
@@ -30,30 +30,34 @@ example_catalog_json: |
           "visibility": "private",
           "archived": "false",
           "default_branch": "main",
-          "project_id": "4218771"
+          "project_id": "4218771",
+          "group": "acme",
+          "topics": "backend,go"
         }
       },
-      "gitlab.com/acme/web/frontend-app": {
-        "owner": "platform-team@acme.com",
-        "tags": ["gl-react", "gl-typescript", "gitlab-visibility-internal"],
+      "gitlab.com/globex/web/frontend-app": {
+        "owner": "platform-team@globex.com",
+        "tags": ["gl-react", "gitlab-visibility-internal"],
         "meta": {
           "description": "Customer-facing web application",
           "visibility": "internal",
           "archived": "false",
           "default_branch": "main",
-          "project_id": "4218903"
+          "project_id": "4218903",
+          "group": "globex",
+          "topics": "React"
         }
       }
     }
   }
 
 catalogers:
-  - name: projects
+  - name: groups
     description: |
-      Syncs every project under the configured GitLab groups, including
-      subgroups, as components.
+      Discovers every top-level GitLab group the token's account belongs to and
+      catalogs each group's projects, including subgroups, as components.
+      - Requires no list of groups: inviting the service account to a group onboards it
       - Maps GitLab project topics to Lunar tags with a configurable prefix
-      - Discovers every top-level group the token can see when no group is configured
       - Supports filtering by visibility (public, internal, private)
       - Supports include/exclude glob patterns on the project path
       - Supports topic allow/blocklists (allowed_topics / disallowed_topics)
@@ -62,18 +66,9 @@ catalogers:
     hook:
       type: cron
       schedule: "0 3 * * *"
-    keywords: ["service catalog", "auto-discovery", "gitlab", "project sync", "subgroups"]
+    keywords: ["service catalog", "auto-discovery", "gitlab", "group discovery", "subgroups"]
 
 inputs:
-  groups:
-    description: |
-      Comma-separated GitLab group paths to catalog, each including its
-      subgroups — for example "acme,globex/platform". Leave empty (the
-      default) to catalog every top-level group the token can see, which is
-      what an instance service account on self-managed or Dedicated wants.
-      Paths are the group's URL slug, not its display name.
-    default: ""
-
   gitlab_host:
     description: |
       GitLab hostname to catalog from. Defaults to gitlab.com; set it to your
@@ -95,9 +90,9 @@ inputs:
     description: |
       Minimum access level the token's account must hold on a group for that
       group to be discovered, using GitLab's numeric levels (30 developer,
-      40 maintainer, 50 owner). Only applies when groups is empty. The default
-      matches the maintainer role Lunar's service account needs to serve a
-      group.
+      40 maintainer, 50 owner). The default matches the maintainer role
+      Lunar's service account needs to serve a group. Groups the account can
+      see but does not hold this level on are skipped, and each one is logged.
     default: "40"
 
   include_public:
@@ -124,7 +119,9 @@ inputs:
     description: |
       Comma-separated list of glob patterns for projects to include, matched
       against the project's full path within its host (e.g.
-      "acme/payments/api-*"). Empty means include all.
+      "acme/payments/api-*"). Empty means include all. Because discovery is
+      automatic, this and exclude_projects are how you narrow the catalog —
+      a pattern like "acme/*" restricts it to one group.
     default: ""
 
   exclude_projects:
@@ -139,17 +136,19 @@ inputs:
       Comma-separated list of GitLab project topics used as an allowlist. When
       set, only projects carrying at least one of these topics are cataloged;
       empty (the default) disables the allowlist so every project passes.
-      Matched against a project's topics exactly (case-sensitive). Lets you opt
-      projects into the catalog by tagging them instead of maintaining a path
-      list. Examples: "lunar,catalog"
+      Compared against a project's topics after both sides are normalized the
+      same way tags are (lowercased, whitespace collapsed to a dash), so
+      "Infra Managed" and "infra-managed" are the same topic. Examples:
+      "lunar,catalog"
     default: ""
 
   disallowed_topics:
     description: |
       Comma-separated list of GitLab project topics used as a blocklist. A
       project carrying any of these topics is excluded, even when it also
-      matches allowed_topics (block wins over allow). Empty (the default)
-      disables the blocklist. Examples: "archived,no-catalog"
+      matches allowed_topics (block wins over allow). Normalized the same way
+      as allowed_topics. Empty (the default) disables the blocklist. Examples:
+      "archived,no-catalog"
     default: ""
 
   tag_prefix:
@@ -175,6 +174,6 @@ inputs:
 secrets:
   GL_TOKEN:
     description: |
-      GitLab access token with the `api` scope, belonging to an account that is
-      a member of the groups to catalog. Set it at cataloger scope:
-      `lunar secret set GL_TOKEN --scope cataloger`.
+      GitLab access token with the `api` scope, belonging to the service
+      account whose group memberships define what gets cataloged. Set it at
+      cataloger scope: `lunar secret set GL_TOKEN --scope cataloger`.
