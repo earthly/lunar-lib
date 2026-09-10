@@ -22,6 +22,7 @@ image:
         echo "${DOCKERFILE_JSON_VERSION}" > /usr/local/bin/dockerfile-json.version
 
     # Install hadolint
+    # renovate: datasource=github-releases depName=hadolint/hadolint extractVersion=^v(?<version>.*)$
     ARG HADOLINT_VERSION=2.12.0
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/') && \
         curl -sSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${ARCH}" -o /usr/local/bin/hadolint && \
