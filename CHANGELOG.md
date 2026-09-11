@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `github-actions` collector: repo-sized values now reach `jq` on stdin or via
+  files instead of `--argjson`, which the kernel caps at 128 KiB per argument.
+  On a large monorepo the collector died with `Argument list too long` and wrote
+  no workflow or dependency data at all, which left the `dependencies-pinned`
+  and `no-mutable-refs` checks reporting "skipped" rather than flagging unpinned
+  actions.
 - All plugin images built on `base-image`: `git` is now installed, with
   `safe.directory '*'` set system-wide. Collectors that shell out to git
   (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
