@@ -1,10 +1,10 @@
 # GitLab Cataloger
 
-Discovers the GitLab groups a service account can see and catalogs their projects as Lunar components.
+Discovers the GitLab groups a service account maintains and catalogs their projects as Lunar components.
 
 ## Overview
 
-This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account belongs to, then enumerates each group's projects including subgroups. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
+This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account is a maintainer of, then enumerates each group's projects including subgroups. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
 
 ## Synced Data
 
@@ -100,7 +100,7 @@ This plugin provides the following catalogers:
 
 | Cataloger | Description |
 |-----------|-------------|
-| `groups` | Discovers every top-level group the token can see and catalogs their projects, including subgroups |
+| `groups` | Discovers every top-level group the token's account maintains and catalogs their projects, including subgroups |
 
 ## Hook Type
 
@@ -157,7 +157,6 @@ catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
     with:
       gitlab_host: "gitlab.acme.com"
-      min_access_level: "40"
       include_public: "true"
       include_internal: "true"
       include_private: "true"
@@ -193,7 +192,7 @@ This cataloger reads the GitLab REST API (`/api/v4`) with `curl`, authenticating
 
 ### Discovery and scale
 
-Two steps per run. First, `/groups?top_level_only=true&min_access_level=<level>` lists the top-level groups the account belongs to — this returns only groups it is a member of, not every group on the instance. Then each group's projects are listed from `/groups/:id/projects?include_subgroups=true`, which covers the whole subtree in one pass, so subgroups are never enumerated separately.
+Two steps per run. First, `/groups?top_level_only=true&min_access_level=40` lists the top-level groups where the account holds at least the maintainer role — only groups it is a member of, not every group on the instance. That level is fixed rather than configurable on purpose: maintainer is what the Hub itself requires of the GitLab service account, and group membership at that level is how the Hub decides what to serve, so the cataloger discovers exactly the groups the Hub can work with. Cataloging a group below it would create components whose webhooks can never be registered, which show up and then sit at zero checks forever. Then each group's projects are listed from `/groups/:id/projects?include_subgroups=true`, which covers the whole subtree in one pass, so subgroups are never enumerated separately.
 
 Project listing uses **keyset pagination** (`order_by=id&sort=asc` plus `id_after`), walking until a page comes back empty. There is no configured ceiling on the number of projects or groups: a cap that silences itself is worse than a long run, so the cataloger pages until GitLab says there are no more.
 

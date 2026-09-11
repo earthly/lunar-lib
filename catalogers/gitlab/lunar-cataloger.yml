@@ -8,7 +8,7 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "GitLab Cataloger"
   long_description: |
-    Discover every GitLab group a service account can see and sync their projects
+    Discover every GitLab group a service account maintains and sync their projects
     into your Lunar catalog. Maps project topics to Lunar tags, filters by visibility,
     path and topic, and keeps the catalog current as projects are archived or deleted.
   categories: ["vcs", "service-catalog"]
@@ -54,8 +54,8 @@ example_catalog_json: |
 catalogers:
   - name: groups
     description: |
-      Discovers every top-level GitLab group the token's account belongs to and
-      catalogs each group's projects, including subgroups, as components.
+      Discovers every top-level GitLab group the token's account is a maintainer
+      of and catalogs each group's projects, including subgroups, as components.
       - Requires no list of groups: inviting the service account to a group onboards it
       - Maps GitLab project topics to Lunar tags with a configurable prefix
       - Supports filtering by visibility (public, internal, private)
@@ -85,15 +85,6 @@ inputs:
       from gitlab_host as https://<host>/api/v4. Set it only when your
       instance serves the API somewhere else.
     default: ""
-
-  min_access_level:
-    description: |
-      Minimum access level the token's account must hold on a group for that
-      group to be discovered, using GitLab's numeric levels (30 developer,
-      40 maintainer, 50 owner). The default matches the maintainer role
-      Lunar's service account needs to serve a group. Groups the account can
-      see but does not hold this level on are skipped, and each one is logged.
-    default: "40"
 
   include_public:
     description: Include public projects
