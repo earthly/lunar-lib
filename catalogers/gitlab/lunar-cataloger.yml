@@ -131,15 +131,25 @@ inputs:
       "acme/sandbox/*,*/deprecated-*"
     default: ""
 
+  tag_prefix:
+    description: |
+      Prefix applied to each GitLab topic when it becomes a Lunar tag. Every
+      topic on a project becomes one tag, trimmed, lowercased and with internal
+      whitespace collapsed to a dash before the prefix — the topic
+      "Infra Managed" becomes the tag "gl-infra-managed". Lunar tags cannot
+      contain spaces and are matched case-sensitively, so that normalization
+      always applies; the raw topics are kept in meta.topics. An empty string
+      disables the prefix only, not the normalization.
+    default: "gl-"
+
   allowed_topics:
     description: |
       Comma-separated list of GitLab project topics used as an allowlist. When
       set, only projects carrying at least one of these topics are cataloged;
       empty (the default) disables the allowlist so every project passes.
-      Compared against a project's topics after both sides are normalized the
-      same way tags are (lowercased, whitespace collapsed to a dash), so
-      "Infra Managed" and "infra-managed" are the same topic. Examples:
-      "lunar,catalog"
+      Both sides are normalized as described under tag_prefix before being
+      compared, so "Infra Managed" and "infra-managed" are the same topic and
+      either spelling works here. Examples: "lunar,catalog"
     default: ""
 
   disallowed_topics:
@@ -150,12 +160,6 @@ inputs:
       as allowed_topics. Empty (the default) disables the blocklist. Examples:
       "archived,no-catalog"
     default: ""
-
-  tag_prefix:
-    description: |
-      Prefix for GitLab topics when converting to Lunar tags. Empty string
-      disables the prefix.
-    default: "gl-"
 
   default_owner:
     description: |
