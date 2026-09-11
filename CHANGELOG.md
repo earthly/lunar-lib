@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gitlab` cataloger: discovers every top-level GitLab group the service
+  account maintains and catalogs each group's projects, including subgroups, as
+  components. No group list to maintain — inviting the account to a group
+  onboards it. Project topics become Lunar tags (normalized, since GitLab
+  topics allow spaces and mixed case), with visibility, archived state and the
+  numeric project ID in `meta`. Archived projects are excluded by default
+  (#306).
+
 ### Fixed
 
 - `github-actions` collector: repo-sized values now reach `jq` on stdin or via
