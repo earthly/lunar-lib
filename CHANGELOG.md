@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty data because the binary was absent and their call sites swallow the
   failure.
 
+### Security
+
+- Bundled tool binaries across the plugin images are updated to current
+  releases (Go toolchain, `helm`, `istioctl`, `gh`, `kubeconform`, `syft`,
+  `trivy`, `gitleaks`, `actionlint`, `yq`, `hcl2json`, `dockerfile-json`, npm),
+  clearing the fixable critical CVEs their old builds carried. `actionlint`,
+  `hcl2json` and `dockerfile-json` are built from source — their latest release
+  binaries still ship a stale Go stdlib (#304).
+
 ## [1.14.4] — 2026-09-03
 
 ### Changed
