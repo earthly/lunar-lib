@@ -11,12 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ai` collector: `ai-authorship` no longer dies with `invalid JSON text passed
   to --argjson` on commits that carry no AI trailer — a jq `select` in an
-  object-value position produced an empty entry (ENG-1767).
+  object-value position produced an empty entry.
 - All plugin images built on `base-image`: `git` is now installed, with
   `safe.directory '*'` set system-wide. Collectors that shell out to git
   (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
   empty data because the binary was absent and their call sites swallow the
-  failure (ENG-1762).
+  failure.
 
 ## [1.14.4] — 2026-09-03
 
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
   declare `size: large`, since pulling an image can exceed the default 1Gi
   ephemeral-storage limit. `size:` on the `uses:` line does not reach a
-  plugin's sub-collectors yet (ENG-1695), so it lives in the manifest (#301).
+  plugin's sub-collectors yet, so it lives in the manifest (#301).
 
 ## [1.14.3] — 2026-09-03
 
@@ -172,7 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
   to `""` silently kept the default and double-prefixed ids whose annotation
   value already carried a host — which made a multi-host catalog impossible to
-  express. Same bug ENG-1105 fixed for `tag_prefix` (#295).
+  express. Same bug previously fixed for `tag_prefix` (#295).
 
 - `sca` and `container-scan` policies (`max-severity`): a failing check now
   emits the severity headline plus one assertion per offending finding, most
