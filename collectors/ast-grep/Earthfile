@@ -7,6 +7,7 @@ image:
 
     # Install ast-grep CLI
     ARG TARGETARCH
+    # renovate: datasource=github-releases depName=ast-grep/ast-grep
     ARG AST_GREP_VERSION=0.40.5
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
     # pinned lunar-scripts base (it only installs, never upgrades — see the root
