@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ai` collector: `ai-authorship` no longer dies with `invalid JSON text passed
+  to --argjson` on commits that carry no AI trailer — a jq `select` in an
+  object-value position produced an empty entry (ENG-1767).
 - All plugin images built on `base-image`: `git` is now installed, with
   `safe.directory '*'` set system-wide. Collectors that shell out to git
   (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
