@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- `github-actions` collector: repo-sized values now reach `jq` on stdin or via
+  files instead of `--argjson`, which the kernel caps at 128 KiB per argument.
+  On a large monorepo the collector died with `Argument list too long` and wrote
+  no workflow or dependency data at all, which left the `dependencies-pinned`
+  and `no-mutable-refs` checks reporting "skipped" rather than flagging unpinned
+  actions (#310).
+- `ai` collector: `ai-authorship` no longer dies with `invalid JSON text passed
+  to --argjson` on commits that carry no AI trailer — a jq `select` in an
+  object-value position produced an empty entry.
+- All plugin images built on `base-image`: `git` is now installed, with
+  `safe.directory '*'` set system-wide. Collectors that shell out to git
+  (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
+  empty data because the binary was absent and their call sites swallow the
+  failure.
+
+### Security
+
+- Bundled tool binaries across the plugin images are updated to current
+  releases (Go toolchain, `helm`, `istioctl`, `gh`, `kubeconform`, `syft`,
+  `trivy`, `gitleaks`, `actionlint`, `yq`, `hcl2json`, `dockerfile-json`, npm),
+  clearing the fixable critical CVEs their old builds carried. `actionlint`,
+  `hcl2json` and `dockerfile-json` are built from source — their latest release
+  binaries still ship a stale Go stdlib (#304).
 
 ## [1.14.4] — 2026-09-03
 
@@ -16,7 +40,7 @@ _Nothing yet._
 - `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
   declare `size: large`, since pulling an image can exceed the default 1Gi
   ephemeral-storage limit. `size:` on the `uses:` line does not reach a
-  plugin's sub-collectors yet (ENG-1695), so it lives in the manifest (#301).
+  plugin's sub-collectors yet, so it lives in the manifest (#301).
 
 ## [1.14.3] — 2026-09-03
 
@@ -163,7 +187,7 @@ _Nothing yet._
   clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
   to `""` silently kept the default and double-prefixed ids whose annotation
   value already carried a host — which made a multi-host catalog impossible to
-  express. Same bug ENG-1105 fixed for `tag_prefix` (#295).
+  express. Same bug previously fixed for `tag_prefix` (#295).
 
 - `sca` and `container-scan` policies (`max-severity`): a failing check now
   emits the severity headline plus one assertion per offending finding, most
