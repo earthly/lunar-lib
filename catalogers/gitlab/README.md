@@ -13,7 +13,7 @@ This cataloger writes to the following Catalog JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.components[*].owner` | string | Default owner (if `default_owner` is configured) |
-| `.components[*].domain` | string | Default domain (if `default_domain` is configured) |
+| `.components[*].domain` | string | Domain, from the group path with `domain_from_group_path` or from `default_domain` |
 | `.components[*].tags[]` | array | Project topics, normalized and prefixed (e.g. `gl-backend`), plus `gitlab-visibility-<visibility>` and `gitlab-archived` on archived projects |
 | `.components[*].meta.description` | string | Project description |
 | `.components[*].meta.visibility` | string | Project visibility (`public`, `internal`, `private`) |
@@ -22,7 +22,7 @@ This cataloger writes to the following Catalog JSON paths:
 | `.components[*].meta.project_id` | string | GitLab numeric project ID, stable across renames |
 | `.components[*].meta.group` | string | Top-level group the project was discovered under |
 | `.components[*].meta.topics` | string | Raw GitLab topics, comma-separated, before tag normalization |
-| `.domains[*]` | object | Registers the `default_domain` (if configured) so the catalog passes the hub's domain-reference validation |
+| `.domains[*]` | object | Registers every domain the run emits, so the catalog passes the hub's domain-reference validation |
 
 Component IDs are `<host>/<project path>`, using GitLab's canonical `path_with_namespace` — so a project in a subgroup is keyed as `gitlab.com/acme/payments/payment-api`, subgroups included. Taking the path from the API rather than from configuration is what keeps the casing canonical: Lunar's component identity is case-sensitive, so a hand-written group spelling that differs from GitLab's slug creates a second, dead identity for the same group.
 
@@ -169,6 +169,22 @@ catalogers:
 ```
 
 When `default_domain` is set, every discovered component gets that domain on its `.domain` field, and the domain is registered under `.domains` so the catalog passes the Hub's domain-reference validation. A domain definition in `lunar-config.yml` (or a later cataloger) takes precedence on merge, so you can set a richer description and owner there without this cataloger clobbering it.
+
+### Domains from the group hierarchy
+
+GitLab groups already encode a hierarchy, and Lunar domains are dotted paths, so the two map onto each other directly. Set `domain_from_group_path: "true"` and each component lands in a domain named after the group path that contains it:
+
+```
+acme/payments/payment-api   ->  domain  acme.payments
+acme/web/frontend-app       ->  domain  acme.web
+globex/checkout             ->  domain  globex
+```
+
+`default_domain` then becomes the root the hierarchy hangs under rather than a flat value — with `default_domain: "eng"` those become `eng.acme.payments`, `eng.acme.web`, `eng.globex`. That is how you keep a whole GitLab estate beneath one top-level domain.
+
+Two details worth knowing. Every domain the run derives is registered under `.domains` in the same run, before the components that reference it — the Hub drops a component whose domain it cannot resolve, so for derived domains this is load-bearing rather than a formality. And a `.` inside a group path segment is folded to `-` (`acme/v1.2/svc` → `acme.v1-2`), because the dot is the domain separator and would otherwise invent a hierarchy level that does not exist in GitLab.
+
+Leave it off (the default) and nothing changes: domains come only from `default_domain`, and with that empty the cataloger writes no domain at all, so components fall into the Hub's reserved `other`.
 
 ### Filter by topic (allowlist / blocklist)
 

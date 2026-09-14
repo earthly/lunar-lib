@@ -26,6 +26,7 @@ DISALLOWED_TOPICS="${LUNAR_VAR_DISALLOWED_TOPICS:-}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gl-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+DOMAIN_FROM_GROUP_PATH="${LUNAR_VAR_DOMAIN_FROM_GROUP_PATH:-false}"
 
 # Maintainer. Fixed, not an input: this is the Hub's own scope signal, and a
 # lower level would onboard groups whose webhooks can never be registered.
@@ -60,6 +61,7 @@ echo "Include archived: $INCLUDE_ARCHIVED"
 [ -n "$DISALLOWED_TOPICS" ] && echo "Disallowed topics: $DISALLOWED_TOPICS"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
+[ "$DOMAIN_FROM_GROUP_PATH" = "true" ] && echo "Domain from group path: enabled"
 
 # --- HTTP -------------------------------------------------------------------
 
@@ -222,6 +224,7 @@ jq -s \
     --arg prefix "$TAG_PREFIX" \
     --arg owner "$DEFAULT_OWNER" \
     --arg domain "$DEFAULT_DOMAIN" \
+    --arg domain_from_path "$DOMAIN_FROM_GROUP_PATH" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     --arg visibilities "$VISIBILITIES" \
@@ -248,6 +251,18 @@ jq -s \
       | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)
       | select(($deny  | length) == 0 or (($deny  - ($deny  - .norm_topics)) | length) == 0)
     ]
+    # Domain from the group path: the namespace containing the project becomes
+    # a dotted domain, with default_domain as the root when both are set. A dot
+    # inside a GitLab path segment would invent a hierarchy level that is not
+    # there, so it is folded to a dash.
+    | [ .[] | . + {derived_domain: (
+          if $domain_from_path != "true" then $domain
+          else
+            ((.path_with_namespace | split("/") | .[:-1] | map(gsub("\\."; "-")))
+             | (if $domain != "" then [$domain] + . else . end)
+             | join("."))
+          end
+        )} ]
     | [ .[] | {
         key: "\($host)/\(.path_with_namespace)",
         value: (
@@ -271,8 +286,8 @@ jq -s \
               + (if (.topics // []) != [] then {topics: (.topics | join(","))} else {} end)
             )
           }
-          + (if $owner  != "" then {owner: $owner}   else {} end)
-          + (if $domain != "" then {domain: $domain} else {} end)
+          + (if $owner != "" then {owner: $owner} else {} end)
+          + (if .derived_domain != "" then {domain: .derived_domain} else {} end)
         )
       } ]
     ' "$WORK/projects.ndjson" > "$WORK/entries.json"
@@ -290,12 +305,17 @@ fi
 
 # --- write ------------------------------------------------------------------
 
-# Register the domain BEFORE the components that reference it: the hub's
-# domain-reference validation drops any component pointing at a domain absent
-# from .domains, and batches are saved as they are written.
-if [ -n "$DEFAULT_DOMAIN" ]; then
-    echo "Registering domain '$DEFAULT_DOMAIN'"
-    jq -n --arg d "$DEFAULT_DOMAIN" '{($d): {description: "Created by the gitlab cataloger"}}' \
+# Register domains BEFORE the components that reference them: the hub resolves
+# a component's domain against the declared set and DROPS the component when it
+# is missing, and batches are saved as they are written. Derived domains make
+# this load-bearing rather than a formality — there is one per group path.
+jq -r '[.[].value.domain // empty] | unique | .[]' "$WORK/entries.json" > "$WORK/domains.txt"
+DOMAIN_COUNT=$(wc -l < "$WORK/domains.txt" | tr -d ' ')
+if [ "$DOMAIN_COUNT" -gt 0 ]; then
+    echo "Registering $DOMAIN_COUNT domain(s): $(tr '\n' ' ' < "$WORK/domains.txt")"
+    jq -R -s 'split("\n") | map(select(length > 0))
+              | map({(.): {description: "Created by the gitlab cataloger"}}) | add' \
+        "$WORK/domains.txt" \
         | lunar catalog raw --json '.domains' -
 fi
 

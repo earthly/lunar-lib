@@ -158,12 +158,27 @@ inputs:
       Default owner email for all components. Leave empty to not set owner.
     default: ""
 
+  domain_from_group_path:
+    description: |
+      Derive each component's domain from the GitLab group path that contains
+      it, instead of giving every component the same domain. The project's
+      namespace becomes a dotted domain — a project at
+      acme/payments/payment-api lands in the domain "acme.payments" — so the
+      catalog mirrors the group hierarchy without listing a single domain by
+      hand. Every derived domain is registered under `.domains`, which the hub
+      requires: a component pointing at an undeclared domain is dropped. Off by
+      default; with it off, domains come only from default_domain.
+    default: "false"
+
   default_domain:
     description: |
-      Default domain for all components. Leave empty to not set a domain. When
-      set, the domain is stamped on every component's `.domain` field and also
-      registered under `.domains` so the catalog passes the hub's
-      domain-reference validation. A higher-precedence domain definition in
+      Domain for all components. Leave empty to not set a domain. The domain is
+      stamped on every component's `.domain` field and registered under
+      `.domains` so the catalog passes the hub's domain-reference validation.
+      With domain_from_group_path enabled this becomes the root the derived
+      hierarchy hangs under instead — acme/payments/payment-api with
+      default_domain "eng" lands in "eng.acme.payments" — which is how you keep
+      a GitLab estate under one top-level domain. A domain definition in
       lunar-config.yml still wins on merge.
     default: ""
 
