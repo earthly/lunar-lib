@@ -228,11 +228,11 @@ jq -s \
     --arg allowed_topics "$ALLOWED_TOPICS" \
     --arg disallowed_topics "$DISALLOWED_TOPICS" \
     '
-    # GitLab topics are free text. A Lunar tag containing a space cannot be
-    # referenced from an on: expression at all (the expression is tokenized on
-    # whitespace, so it becomes a parse error) and tag matching is
-    # case-sensitive, so normalize before a topic becomes a tag.
-    def norm: ascii_downcase | gsub("^\\s+|\\s+$"; "") | gsub("\\s+"; "-");
+    # GitLab topics are free text (any ASCII bar linebreaks). Whitespace and
+    # parens are exactly the token boundaries in the boolexpr lexer, so a tag
+    # containing either makes the whole on: expression a parse error, not just
+    # that term; matching is also case-sensitive. Other punctuation lexes fine.
+    def norm: ascii_downcase | gsub("[\\s()]+"; "-") | gsub("-+"; "-") | gsub("^-+|-+$"; "");
     def csv_set($s): ($s | split(",") | map(norm) | map(select(length > 0)));
 
     (csv_set($allowed_topics)) as $allow |

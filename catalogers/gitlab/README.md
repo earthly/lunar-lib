@@ -65,12 +65,13 @@ Component IDs are `<host>/<project path>`, using GitLab's canonical `path_with_n
 
 ### Topics become tags, normalized
 
-GitLab topics are free text: they may contain spaces and uppercase letters, unlike GitHub's, which are already slug-shaped. Passed through verbatim, both break selection downstream:
+GitLab topics are free text — any ASCII bar linebreaks — unlike GitHub's, which are already slug-shaped. Passed through verbatim, three things break selection downstream:
 
 - A tag containing a space cannot be referenced from an `on:` expression at all. The expression is tokenized on whitespace, so `on: "gl-infra-mgmt Managed"` is a parse error — and it takes the whole expression with it, not just that one term.
+- Parens do the same thing: they are token delimiters in the expression grammar, so a topic like `Managed (Internal)` would yield a tag no `on:` can reference. Other punctuation (`&`, `,`, `.`) lexes fine and is left alone.
 - Tag matching is case-sensitive, so the tag `gl-Canonical` is silently not matched by the natural `on: [gl-canonical]`.
 
-So topics are normalized before they become tags: trimmed, lowercased, and internal whitespace runs collapsed to a single `-`. The GitLab topic `Infra Managed` becomes the tag `gl-infra-managed`. The raw topics are preserved verbatim in `meta.topics` so nothing is lost. `allowed_topics` and `disallowed_topics` normalize both sides before comparing, so you can write either spelling in your config.
+So topics are normalized before they become tags: lowercased, with runs of whitespace and parens collapsed to a single `-` and any leading or trailing `-` trimmed. `Infra Managed` becomes `gl-infra-managed`; `Managed (Internal)` becomes `gl-managed-internal`. The raw topics are preserved verbatim in `meta.topics` so nothing is lost. `allowed_topics` and `disallowed_topics` normalize both sides before comparing, so you can write either spelling in your config.
 
 ### Project lifecycle
 

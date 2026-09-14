@@ -125,10 +125,11 @@ inputs:
   tag_prefix:
     description: |
       Prefix applied to each GitLab topic when it becomes a Lunar tag. Every
-      topic on a project becomes one tag, trimmed, lowercased and with internal
-      whitespace collapsed to a dash before the prefix — the topic
-      "Infra Managed" becomes the tag "gl-infra-managed". Lunar tags cannot
-      contain spaces and are matched case-sensitively, so that normalization
+      topic on a project becomes one tag, lowercased and with runs of
+      whitespace and parens collapsed to a dash before the prefix — the topic
+      "Managed (Internal)" becomes the tag "gl-managed-internal". Lunar tags
+      cannot contain whitespace or parens (both are delimiters in a policy's
+      on: expression) and are matched case-sensitively, so that normalization
       always applies; the raw topics are kept in meta.topics. An empty string
       disables the prefix only, not the normalization.
     default: "gl-"
