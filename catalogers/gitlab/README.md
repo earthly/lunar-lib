@@ -14,13 +14,15 @@ This cataloger writes to the following Catalog JSON paths:
 |------|------|-------------|
 | `.components[*].owner` | string | Default owner (if `default_owner` is configured) |
 | `.components[*].domain` | string | Domain, from the group path with `domain_from_group_path` or from `default_domain` |
-| `.components[*].tags[]` | array | Project topics, normalized and prefixed (e.g. `gl-backend`), plus `gitlab-visibility-<visibility>` and `gitlab-archived` on archived projects |
+| `.components[*].tags[]` | array | Project topics, normalized and prefixed (e.g. `gl-backend`), plus `gitlab-visibility-<visibility>`, `gitlab-archived` on archived projects and `gitlab-fork` on forks |
 | `.components[*].meta.description` | string | Project description |
 | `.components[*].meta.visibility` | string | Project visibility (`public`, `internal`, `private`) |
 | `.components[*].meta.archived` | string | Whether the project is archived (`"true"`/`"false"`) |
 | `.components[*].meta.default_branch` | string | Project default branch, omitted for a project with no commits |
 | `.components[*].meta.project_id` | string | GitLab numeric project ID, stable across renames |
 | `.components[*].meta.group` | string | Top-level group the project was discovered under |
+| `.components[*].meta.fork` | string | Whether the project is a fork (`"true"`/`"false"`) |
+| `.components[*].meta.forked_from` | string | Path of the project this was forked from, absent when it is not a fork |
 | `.components[*].meta.topics` | string | Raw GitLab topics, comma-separated, before tag normalization |
 | `.domains[*]` | object | Registers every domain the run emits, so the catalog passes the hub's domain-reference validation |
 
@@ -73,6 +75,21 @@ GitLab topics are free text — any ASCII bar linebreaks — unlike GitHub's, wh
 
 So topics are normalized before they become tags: lowercased, with runs of whitespace and parens collapsed to a single `-` and any leading or trailing `-` trimmed. `Infra Managed` becomes `gl-infra-managed`; `Managed (Internal)` becomes `gl-managed-internal`. The raw topics are preserved verbatim in `meta.topics` so nothing is lost. `allowed_topics` and `disallowed_topics` normalize both sides before comparing, so you can write either spelling in your config.
 
+### Forks and archived projects
+
+Both states are filterable and both become tags, so they work as selectors in a policy's `on:` expression:
+
+| State | Filter | Tag |
+|---|---|---|
+| Archived | `include_archived` (off by default) | `gitlab-archived` |
+| Fork | `include_forks` (on by default) | `gitlab-fork` |
+
+The tags are emitted on the projects that *are* in that state, not on both sides, because `on:` supports negation — `on: "gitlab-fork"` and `on: "NOT gitlab-fork"` both select, and a tag per project per state would double the tag count on every component for nothing. A fork also carries `meta.forked_from` naming the project it came from.
+
+Fork detection costs no extra requests: GitLab returns `forked_from_project` in the group project listing, present only on actual forks, so there is no per-project lookup.
+
+**Namespace type is deliberately absent.** A project's namespace can be a group or a personal user namespace, but this cataloger discovers through `/groups/:id/projects`, which only ever returns group-namespaced projects — across the estate it was verified on, all 416 came back `namespace.kind: "group"`. A filter on it would be a no-op and a tag would be the same constant on every component. Cataloging personal-namespace projects needs a different enumeration (`/projects?membership=true`), which is a scope change rather than a filter.
+
 ### Project lifecycle
 
 Each run reports the projects that exist **now**; the catalog is not additive. The Hub replaces this cataloger's previous contribution with the latest one and retires components that no longer appear, so the catalog tracks the estate rather than accumulating everything ever seen.
@@ -84,6 +101,7 @@ Each run reports the projects that exist **now**; the catalog is not additive. T
 | Project archived | Excluded by default, so its component is retired on the next run. With `include_archived: "true"` it stays, tagged `gitlab-archived` and with `meta.archived: "true"` |
 | Project unarchived | Returns on the next run |
 | Project renamed or moved between groups | Its path changes, so this is a retire plus a create: the old component is retired and a new one appears at the new path |
+| Project scheduled for deletion | GitLab renames it to `<path>-deletion_scheduled-<id>` and keeps listing it until the retention window expires, so it reads as a rename first and only retires for good once GitLab purges it |
 | Group created, service account invited | Discovered on the next run, with all its projects |
 | Service account removed from a group | The group's projects are retired on the next run |
 

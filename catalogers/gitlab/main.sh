@@ -17,6 +17,7 @@ INCLUDE_PUBLIC="${LUNAR_VAR_INCLUDE_PUBLIC:-true}"
 INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
+INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
 INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
 EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -55,6 +56,7 @@ rm -rf "$WORK"; mkdir -p "$WORK"
 echo "Cataloging GitLab projects from $GITLAB_HOST"
 echo "API base: $API_BASE"
 echo "Include archived: $INCLUDE_ARCHIVED"
+echo "Include forks: $INCLUDE_FORKS"
 [ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
 [ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -205,7 +207,7 @@ while IFS= read -r group; do
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
-        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g}' \
+        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
         after=$(jq -r '.[-1].id' "$WORK/proj-page.json")
         pages=$((pages + 1))
@@ -228,6 +230,7 @@ jq -s \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     --arg visibilities "$VISIBILITIES" \
+    --arg include_forks "$INCLUDE_FORKS" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
     --arg disallowed_topics "$DISALLOWED_TOPICS" \
     '
@@ -246,6 +249,7 @@ jq -s \
       | select(.visibility as $v | $vis | index($v))
       | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
       | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
+      | select($include_forks == "true" or (.is_fork | not))
       | . + {norm_topics: [(.topics // [])[] | norm] }
       # allow ∩ topics, expressed as set difference twice
       | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)
@@ -271,6 +275,7 @@ jq -s \
               ([.norm_topics[] | "\($prefix)\(.)"] | unique)
               + ["gitlab-visibility-\(.visibility)"]
               + (if .archived then ["gitlab-archived"] else [] end)
+              + (if .is_fork  then ["gitlab-fork"]     else [] end)
             ),
             meta: (
               {
@@ -278,12 +283,14 @@ jq -s \
                 archived: (if .archived then "true" else "false" end),
                 project_id: (.id | tostring),
                 group: .group,
+                fork: (if .is_fork then "true" else "false" end),
               }
               # Absent rather than empty: a project with no commits has no
               # default branch, and an undescribed project has no description.
               + (if (.description // "") != "" then {description: .description} else {} end)
               + (if (.default_branch // "") != "" then {default_branch: .default_branch} else {} end)
               + (if (.topics // []) != [] then {topics: (.topics | join(","))} else {} end)
+              + (if .forked_from != null then {forked_from: .forked_from} else {} end)
             )
           }
           + (if $owner != "" then {owner: $owner} else {} end)

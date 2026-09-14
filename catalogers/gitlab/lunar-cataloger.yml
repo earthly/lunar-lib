@@ -106,6 +106,15 @@ inputs:
       meta.archived = "true".
     default: "false"
 
+  include_forks:
+    description: |
+      Include projects that are forks of another project. On by default. Set to
+      "false" to catalog only projects that originate in the group, which is
+      usually what you want when forks are working copies rather than services.
+      A fork is tagged gitlab-fork and carries meta.fork plus meta.forked_from
+      naming the project it came from.
+    default: "true"
+
   include_projects:
     description: |
       Comma-separated list of glob patterns for projects to include, matched
