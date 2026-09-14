@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.14.5] — 2026-09-14
+
+### Changed
+
+- `grype` and `trivy` collectors: `container-scan` and `container-rescan` scan
+  every image the component pushed, not just the last one. `.container_scan`
+  gains `images[]` (per-image counts), `findings[].image` and `errors[]`;
+  `container_image` accepts a comma-separated list. The `container-scan`
+  `max-severity` check names the image(s) on each failing line (#305).
+
 ### Fixed
 
 - `github-actions` collector: repo-sized values now reach `jq` on stdin or via
@@ -17,12 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   actions (#310).
 - `ai` collector: `ai-authorship` no longer dies with `invalid JSON text passed
   to --argjson` on commits that carry no AI trailer — a jq `select` in an
-  object-value position produced an empty entry.
+  object-value position produced an empty entry (#309).
 - All plugin images built on `base-image`: `git` is now installed, with
   `safe.directory '*'` set system-wide. Collectors that shell out to git
-  (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
-  empty data because the binary was absent and their call sites swallow the
-  failure.
+  (`ai` authorship, `claude` code review) were writing empty data because the
+  binary was absent and their call sites swallow the failure (#307).
 
 ### Security
 
@@ -36,12 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.14.4] — 2026-09-03
 
 ### Changed
-
-- `grype` and `trivy` collectors: `container-scan` and `container-rescan` scan
-  every image the component pushed, not just the last one. `.container_scan`
-  gains `images[]` (per-image counts), `findings[].image` and `errors[]`;
-  `container_image` accepts a comma-separated list. The `container-scan`
-  `max-severity` check names the image(s) on each failing line (#305).
 
 - `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
   declare `size: large`, since pulling an image can exceed the default 1Gi
@@ -887,7 +892,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.4...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.14.5...HEAD
+[1.14.5]: https://github.com/earthly/lunar-lib/compare/v1.14.4...v1.14.5
 [1.14.4]: https://github.com/earthly/lunar-lib/compare/v1.14.3...v1.14.4
 [1.14.3]: https://github.com/earthly/lunar-lib/compare/v1.14.2...v1.14.3
 [1.14.2]: https://github.com/earthly/lunar-lib/compare/v1.14.1...v1.14.2
