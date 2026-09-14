@@ -419,5 +419,70 @@ class IgnoreUnfixableTests(unittest.TestCase):
                 self.assertEqual(resolved_status(c), expected)
 
 
+# Multi-image scan (grype/trivy container-scan over several pushed images): each
+# finding names the image it was seen in; the same CVE in two images is one line.
+CS_MULTI_IMAGE = {
+    "source": {"tool": "grype", "integration": "after-json"},
+    "image": "registry.example.com/worker:1.2.3",
+    "images": [
+        {"image": "registry.example.com/app:1.2.3", "tool": "grype",
+         "vulnerabilities": {"critical": 1, "high": 0, "medium": 0, "low": 0, "total": 1},
+         "summary": {"has_critical": True, "has_high": False, "all_fixable": True}},
+        {"image": "registry.example.com/worker:1.2.3", "tool": "grype",
+         "vulnerabilities": {"critical": 2, "high": 0, "medium": 0, "low": 0, "total": 2},
+         "summary": {"has_critical": True, "has_high": False, "all_fixable": True}},
+    ],
+    "vulnerabilities": {"critical": 3, "high": 0, "medium": 0, "low": 0, "total": 3},
+    "findings": [
+        {"severity": "critical", "package": "libssl3", "version": "3.5.7-r0", "ecosystem": "apk",
+         "cve": "CVE-2026-63073", "fix_version": "3.5.8-r0", "fixable": True,
+         "image": "registry.example.com/app:1.2.3"},
+        {"severity": "critical", "package": "libssl3", "version": "3.5.7-r0", "ecosystem": "apk",
+         "cve": "CVE-2026-63073", "fix_version": "3.5.8-r0", "fixable": True,
+         "image": "registry.example.com/worker:1.2.3"},
+        {"severity": "critical", "package": "curl", "version": "8.20.0-r0", "ecosystem": "apk",
+         "cve": "CVE-2026-8924", "fix_version": None, "fixable": False,
+         "image": "registry.example.com/worker:1.2.3"},
+    ],
+    "summary": {"has_critical": True, "has_high": False, "all_fixable": False},
+}
+
+
+class MultiImageTests(unittest.TestCase):
+    def test_lines_name_the_images_a_finding_was_seen_in(self):
+        c = run_check(node(container_scan=CS_MULTI_IMAGE), LUNAR_VAR_min_severity="critical")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        msg = failure_message(c)
+        # Shared CVE: one line, both images, first-seen order.
+        self.assertEqual(msg.count("CVE-2026-63073"), 1)
+        self.assertIn(
+            "critical: libssl3 — CVE-2026-63073 (fix: 3.5.8-r0) "
+            "[registry.example.com/app:1.2.3, registry.example.com/worker:1.2.3]",
+            msg,
+        )
+        # Image-specific finding names just its image.
+        self.assertIn(
+            "critical: curl — CVE-2026-8924 (no fix available) [registry.example.com/worker:1.2.3]",
+            msg,
+        )
+
+    def test_ignore_unfixable_keeps_image_attribution(self):
+        c = run_check(
+            node(container_scan=CS_MULTI_IMAGE),
+            LUNAR_VAR_min_severity="critical",
+            LUNAR_VAR_ignore_unfixable="true",
+        )
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        msg = failure_message(c)
+        self.assertIn("[registry.example.com/app:1.2.3, registry.example.com/worker:1.2.3]", msg)
+        self.assertNotIn("CVE-2026-8924", msg)
+
+    def test_single_image_blobs_render_unchanged(self):
+        # No `image` on the findings (pre-multi-image collector): no suffix.
+        c = run_check(node(container_scan=CS_WITH_HIGH), LUNAR_VAR_min_severity="high")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertNotIn("[", failure_message(c))
+
+
 if __name__ == "__main__":
     unittest.main()

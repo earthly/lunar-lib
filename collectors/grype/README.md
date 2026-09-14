@@ -20,12 +20,14 @@ This collector writes to the following Component JSON paths:
 | `.sca.rescan_count` | number | *(opt-in)* Monotonic tally of completed re-scans, used to enforce `max_rescans` independently of the (capped) `.sca.history[]` length. Present when scan history or `max_rescans` is enabled |
 | `.sca.native.grype` | object | Raw Grype match output and CI command detection data |
 | `.container_scan.source` | object | Source metadata for the container image scan (tool, version, integration) |
-| `.container_scan.image` | string | The scanned image reference (e.g. `registry/app:tag`) |
-| `.container_scan.vulnerabilities` | object | Severity counts for the image scan (critical, high, medium, low, total) |
-| `.container_scan.findings[]` | array | Individual image findings (OS and application packages) |
-| `.container_scan.os` | object | Detected base-image OS family and version |
-| `.container_scan.summary` | object | Summary booleans (has_critical, has_high, all_fixable) |
-| `.container_scan.native.grype` | object | Raw Grype match output for the image scan |
+| `.container_scan.image` | string | The primary (most recently pushed) scanned image reference (e.g. `registry/app:tag`) |
+| `.container_scan.vulnerabilities` | object | Severity counts across every scanned image (critical, high, medium, low, total) |
+| `.container_scan.findings[]` | array | Individual image findings (OS and application packages), each with the `image` it was found in |
+| `.container_scan.images[]` | array | Per-image breakdown: `image`, `tool`, `os`, `vulnerabilities`, `summary` |
+| `.container_scan.errors[]` | array | Pushed images that could not be pulled or scanned (`image`, `error`) |
+| `.container_scan.os` | object | Detected base-image OS family and version of the primary image |
+| `.container_scan.summary` | object | Summary booleans across every scanned image (has_critical, has_high, all_fixable) |
+| `.container_scan.native.grype` | object | Raw Grype match output for the primary image |
 
 ## Collectors
 
@@ -36,8 +38,8 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Grype executions in CI; routes image scans (`grype <image>`) to `.container_scan` and dir/SBOM scans to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
-| `container-scan` | after-json | Automatically scans the image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as it's published; writes `.container_scan` |
-| `container-rescan` | cron | Re-scans the most recently **pushed** image on a schedule, catching CVEs disclosed since it was built |
+| `container-scan` | after-json | Automatically scans every image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as they're published; writes `.container_scan` |
+| `container-rescan` | cron | Re-scans every **pushed** image on a schedule, catching CVEs disclosed since they were built |
 
 ## Installation
 
@@ -113,8 +115,8 @@ maintains history — the on-push `auto` scan ignores these inputs.
 **Container image scanning.** Beyond source dependencies, this collector scans **built container images** into the normalized `.container_scan` path (consumed by the [`container-scan`](../../policies/container-scan) policy). Three sub-collectors feed it, **none installing Grype (or its ~1.7GB DB) in your pipeline**:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `grype <image>` itself, that scan is captured to `.container_scan` automatically. A `grype dir:`/`sbom:` scan still routes to `.sca`. No install, no extra config.
-- **`container-scan`** *(on-push)* — automatically scans the image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag. On a pull request it scans the image *that* commit pushed, so PR-time scanning needs your pipeline to push an image on PR builds; otherwise there is nothing to scan until the merge.
-- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that image, catching CVEs **disclosed after it was built**.
+- **`container-scan`** *(on-push)* — automatically scans every image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag. A pipeline that pushes several images (an app and its migrator, say) gets them all scanned into one `.container_scan`: `image` / `os` describe the most recently pushed one, `images[]` breaks the counts down per image and every `findings[]` entry names its `image`. On a pull request it scans the images *that* commit pushed, so PR-time scanning needs your pipeline to push on PR builds; otherwise there is nothing to scan until the merge.
+- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans those images, catching CVEs **disclosed after they were built**.
 
 All three scan the shipped image *itself* in the Grype collector image (DB baked in) — no install on your side. Enable the [`docker`](../docker) collector alongside this one so its `docker push` commands are recorded:
 
@@ -128,7 +130,7 @@ collectors:
 
 > **`container-scan` needs a Hub with the `after-json` hook.** Without it, `exclude: [container-scan]` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
 
-**Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
+**Private registries:** the `container-rescan` cron pulls the images, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
 
 **Resources:** `container-scan` and `container-rescan` declare `size: large`, because they pull and unpack the shipped image inside the collector pod and the default profile's 1Gi ephemeral-storage limit is too small for real-world images. The `cicd` sub-collector runs natively on your CI runner, so no pod size applies to it.
 

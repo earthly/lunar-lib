@@ -4,7 +4,9 @@ When findings cross the threshold the check fails with one assertion per
 offending package/CVE (when the collector emitted per-finding detail in
 `.container_scan.findings[]`), so the hub renders and truncates the list. This
 mirrors the `sca` policy's `max-severity` output so a container-image scan and
-a code-level SCA scan read identically in the GitHub check / PR comment.
+a code-level SCA scan read identically in the GitHub check / PR comment. When
+the scan covered several images, each line names the image(s) the finding was
+seen in.
 
 Set `ignore_unfixable: "true"` to narrow the failure to findings that carry an
 upgrade target, so an unfixable base-image CVE cannot hold a gate closed
@@ -37,7 +39,13 @@ def finding_text(finding):
     if cve:
         head += f" — {cve}"
     fix = finding.get("fix_version")
-    return head + (f" (fix: {fix})" if fix else " (no fix available)")
+    text = head + (f" (fix: {fix})" if fix else " (no fix available)")
+    images = finding.get("images") or []
+    if images:
+        # Multi-image scans tag each finding with the image it was found in; a
+        # vulnerability shared by several images renders once, naming them all.
+        text += " [" + ", ".join(images) + "]"
+    return text
 
 
 def _dedupe_findings(findings):
@@ -67,8 +75,16 @@ def _dedupe_findings(findings):
         if key not in at:
             at[key] = len(out)
             out.append(finding)
-        elif finding["fixable"] and not out[at[key]]["fixable"]:
-            out[at[key]] = finding
+            continue
+        kept = out[at[key]]
+        # The same vulnerability in several images (or from both scanners) is one
+        # line; keep every image it was seen in, in first-seen order.
+        images = list(kept["images"])
+        images += [i for i in finding["images"] if i not in images]
+        if finding["fixable"] and not kept["fixable"]:
+            kept = dict(finding)
+        kept["images"] = images
+        out[at[key]] = kept
     return out
 
 
@@ -101,6 +117,8 @@ def _collect_findings(scan_node, in_scope):
                 "package": finding.get_value_or_default(".package", None),
                 "fix_version": fix_version,
                 "fixable": bool(fixable),
+                # Set by multi-image scans; absent on single-image blobs.
+                "images": [i for i in [finding.get_value_or_default(".image", None)] if i],
             }
         )
     return _dedupe_findings(out)
