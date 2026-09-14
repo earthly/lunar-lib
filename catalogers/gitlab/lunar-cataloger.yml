@@ -115,6 +115,18 @@ inputs:
       naming the project it came from.
     default: "true"
 
+  include_personal_namespaces:
+    description: |
+      Also catalog projects in personal (user) namespaces that the token's
+      account is a member of. Off by default, because group discovery cannot
+      see a personal namespace at all — it is not a group — so these need a
+      second pass over the account's own memberships. Projects found this way
+      are tagged gitlab-personal-namespace. The sweep is deliberately scoped to
+      memberships: an instance-admin token listing projects unscoped would
+      return every project on the instance, including every user's scratch
+      repositories.
+    default: "false"
+
   include_projects:
     description: |
       Comma-separated list of glob patterns for projects to include, matched

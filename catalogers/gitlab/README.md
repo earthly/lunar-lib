@@ -22,6 +22,7 @@ This cataloger writes to the following Catalog JSON paths:
 | `.components[*].meta.project_id` | string | GitLab numeric project ID, stable across renames |
 | `.components[*].meta.group` | string | Top-level group the project was discovered under |
 | `.components[*].meta.fork` | string | Whether the project is a fork (`"true"`/`"false"`) |
+| `.components[*].meta.namespace_kind` | string | Namespace the project lives in (`group` or `user`) |
 | `.components[*].meta.forked_from` | string | Path of the project this was forked from, absent when it is not a fork |
 | `.components[*].meta.topics` | string | Raw GitLab topics, comma-separated, before tag normalization |
 | `.domains[*]` | object | Registers every domain the run emits, so the catalog passes the hub's domain-reference validation |
@@ -83,12 +84,15 @@ Both states are filterable and both become tags, so they work as selectors in a 
 |---|---|---|
 | Archived | `include_archived` (off by default) | `gitlab-archived` |
 | Fork | `include_forks` (on by default) | `gitlab-fork` |
+| Personal namespace | `include_personal_namespaces` (off by default) | `gitlab-personal-namespace` |
 
 The tags are emitted on the projects that *are* in that state, not on both sides, because `on:` supports negation — `on: "gitlab-fork"` and `on: "NOT gitlab-fork"` both select, and a tag per project per state would double the tag count on every component for nothing. A fork also carries `meta.forked_from` naming the project it came from.
 
 Fork detection costs no extra requests: GitLab returns `forked_from_project` in the group project listing, present only on actual forks, so there is no per-project lookup.
 
-**Namespace type is deliberately absent.** A project's namespace can be a group or a personal user namespace, but this cataloger discovers through `/groups/:id/projects`, which only ever returns group-namespaced projects — across the estate it was verified on, all 416 came back `namespace.kind: "group"`. A filter on it would be a no-op and a tag would be the same constant on every component. Cataloging personal-namespace projects needs a different enumeration (`/projects?membership=true`), which is a scope change rather than a filter.
+Personal namespaces need the extra pass because group discovery cannot see them — a personal namespace is not a group, so `/groups/:id/projects` never returns one no matter how privileged the token is. With `include_personal_namespaces` on, a second keyset sweep runs over `/projects?membership=true` and keeps only `namespace.kind: "user"`; the group projects in that listing are the ones the group sweep already has, so filtering on the namespace kind is also what stops the two passes duplicating each other.
+
+That sweep is scoped to the account's **memberships** on purpose. An instance-admin token listing projects unscoped returns every project on the instance, every user's scratch repositories included — a blast radius nobody wants from a config flag. If the service account should see a particular personal namespace, add it to that project; blanket admin-wide discovery is out of scope here.
 
 ### Project lifecycle
 

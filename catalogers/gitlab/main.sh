@@ -18,6 +18,7 @@ INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
+INCLUDE_PERSONAL_NAMESPACES="${LUNAR_VAR_INCLUDE_PERSONAL_NAMESPACES:-false}"
 INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
 EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -57,6 +58,7 @@ echo "Cataloging GitLab projects from $GITLAB_HOST"
 echo "API base: $API_BASE"
 echo "Include archived: $INCLUDE_ARCHIVED"
 echo "Include forks: $INCLUDE_FORKS"
+echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
 [ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
 [ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -207,7 +209,7 @@ while IFS= read -r group; do
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
-        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
         after=$(jq -r '.[-1].id' "$WORK/proj-page.json")
         pages=$((pages + 1))
@@ -215,6 +217,32 @@ while IFS= read -r group; do
     now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     echo "  $group: $((now - before)) project(s) over $pages page(s)"
 done < "$WORK/groups.txt"
+
+# Personal (user) namespaces are invisible to the group sweep by construction —
+# a personal namespace is not a group — so they need their own pass. Scoped with
+# membership=true on purpose: plain /projects on an instance-admin token returns
+# every project on the instance, including every user's scratch repos.
+if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
+    echo "Sweeping personal namespaces the account is a member of..."
+    after=0
+    pages=0
+    before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    while :; do
+        gl_api "/projects?membership=true&per_page=${PER_PAGE}&order_by=id&sort=asc&id_after=${after}${ARCHIVED_PARAM}" \
+            "$WORK/personal-page.json"
+        n=$(jq 'length' "$WORK/personal-page.json")
+        [ "$n" -eq 0 ] && break
+        # Keep only user namespaces: the group projects in this listing are the
+        # ones the group sweep already has, and re-adding them would duplicate.
+        jq -c '.[] | select(.namespace.kind == "user")
+               | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: .namespace.full_path, namespace_kind: .namespace.kind, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+            "$WORK/personal-page.json" >> "$WORK/projects.ndjson"
+        after=$(jq -r '.[-1].id' "$WORK/personal-page.json")
+        pages=$((pages + 1))
+    done
+    now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    echo "  personal namespaces: $((now - before)) project(s) over $pages page(s)"
+fi
 
 TOTAL_FETCHED=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
 echo "Total projects fetched: $TOTAL_FETCHED"
@@ -276,6 +304,7 @@ jq -s \
               + ["gitlab-visibility-\(.visibility)"]
               + (if .archived then ["gitlab-archived"] else [] end)
               + (if .is_fork  then ["gitlab-fork"]     else [] end)
+              + (if .namespace_kind == "user" then ["gitlab-personal-namespace"] else [] end)
             ),
             meta: (
               {
@@ -284,6 +313,7 @@ jq -s \
                 project_id: (.id | tostring),
                 group: .group,
                 fork: (if .is_fork then "true" else "false" end),
+                namespace_kind: .namespace_kind,
               }
               # Absent rather than empty: a project with no commits has no
               # default branch, and an undescribed project has no description.
