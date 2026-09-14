@@ -32,9 +32,8 @@ _Nothing yet._
   object-value position produced an empty entry (#309).
 - All plugin images built on `base-image`: `git` is now installed, with
   `safe.directory '*'` set system-wide. Collectors that shell out to git
-  (`ai` authorship, `claude` code review, the e2e-coverage judge) were writing
-  empty data because the binary was absent and their call sites swallow the
-  failure (#307).
+  (`ai` authorship, `claude` code review) were writing empty data because the
+  binary was absent and their call sites swallow the failure (#307).
 
 ### Security
 
