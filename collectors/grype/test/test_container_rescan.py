@@ -262,5 +262,103 @@ class SkipSafetyTest(Base):
         self.assertIn("Scanning image: ghcr.io/acme/api:v1", result.stderr)
 
 
+class MultiImageTest(Base):
+    """Every distinct pushed ref is scanned; the blob keeps its single-image
+    fields for the primary (last pushed) image and adds per-image detail."""
+
+    IMAGES = [
+        "earthly/lunar-hub:abc12345",
+        "earthly/lunar-dashboards:abc12345",
+        "earthly/lunar-snippet-init:abc12345",
+    ]
+    MULTI_JSON = json.dumps(
+        {"containers": {"native": {"docker": {"cicd": {"cmds": [
+            {"cmd": f"docker build -t {IMAGES[0]} ."},
+            {"cmd": f"docker push {IMAGES[0]}"},
+            {"cmd": f"docker push {IMAGES[1]}"},
+            {"cmd": f"docker push {IMAGES[0]}"},  # same ref pushed twice: one scan
+            {"cmd": f"docker buildx build --push -t {IMAGES[2]} ."},
+        ]}}}}}
+    )
+
+    @staticmethod
+    def scanned_refs(log):
+        return [ln.split()[1] for ln in log.splitlines() if ln.startswith("GRYPE:")]
+
+    def failing_scanner(self, bad_ref):
+        self._stub(
+            "grype",
+            "#!/bin/sh\n"
+            "printf 'GRYPE: %s\\n' \"$*\" >> \"$CAPTURE\"\n"
+            f"if [ \"$1\" = \"{bad_ref}\" ]; then echo \"failed to pull image: unauthorized\" >&2; exit 1; fi\n"
+            "cat \"$MOCK_DIR/grype-results.json\"\n",
+        )
+
+    def test_scans_every_pushed_image_once_in_push_order(self):
+        self.fixture("main.json", self.MULTI_JSON)
+        result, log = self.run_script(dict(self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(self.scanned_refs(log), self.IMAGES)
+        for ref in self.IMAGES:
+            self.assertIn(f"Scanning image: {ref}", result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertIsNotNone(scan, msg=log)
+        # Primary = the most recently pushed image, exactly what `| last` picked before.
+        self.assertEqual(scan["image"], self.IMAGES[2])
+        self.assertEqual(scan["os"], {"family": "debian", "version": "12"})
+        self.assertEqual([i["image"] for i in scan["images"]], self.IMAGES)
+        self.assertTrue(all(i["tool"] == "grype" for i in scan["images"]))
+        self.assertEqual(scan["images"][0]["vulnerabilities"]["total"], 1)
+        # Counts, findings and summary span every image.
+        self.assertEqual(scan["vulnerabilities"], {"critical": 0, "high": 3, "medium": 0, "low": 0, "total": 3})
+        self.assertEqual([f["image"] for f in scan["findings"]], self.IMAGES)
+        self.assertTrue(scan["summary"]["has_high"])
+        self.assertNotIn("errors", scan)
+        # Raw native output is kept for the primary image only.
+        self.assertEqual(len(self.collected(log, ".container_scan.native.grype.matches")), 1)
+
+    def test_single_image_blob_keeps_its_shape(self):
+        # One pushed image: the same top-level fields as before, plus images[].
+        result, log = self.run_script(dict(self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual(scan["image"], self.MAIN_IMAGE)
+        self.assertEqual(scan["vulnerabilities"], {"critical": 0, "high": 1, "medium": 0, "low": 0, "total": 1})
+        self.assertEqual(scan["summary"], {"has_critical": False, "has_high": True, "all_fixable": True})
+        self.assertEqual([i["image"] for i in scan["images"]], [self.MAIN_IMAGE])
+        self.assertEqual(scan["findings"][0]["image"], self.MAIN_IMAGE)
+        self.assertEqual(scan["findings"][0]["cve"], "CVE-2026-0001")
+
+    def test_one_failing_image_is_recorded_and_the_rest_still_scan(self):
+        self.fixture("main.json", self.MULTI_JSON)
+        self.failing_scanner(self.IMAGES[1])
+        result, log = self.run_script(dict(self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn(f"Grype image scan failed for {self.IMAGES[1]}", result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual([i["image"] for i in scan["images"]], [self.IMAGES[0], self.IMAGES[2]])
+        self.assertEqual(scan["errors"], [{"image": self.IMAGES[1], "error": "failed to pull image: unauthorized"}])
+        self.assertEqual(scan["vulnerabilities"]["total"], 2)
+        self.assertEqual(scan["image"], self.IMAGES[2])
+        self.assertIn("2 scanned image(s); 1 could not be scanned", result.stderr)
+
+    def test_nothing_is_written_when_no_image_could_be_scanned(self):
+        self.failing_scanner(self.MAIN_IMAGE)
+        result, log = self.run_script(dict(self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("could not scan any", result.stderr)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+
+    def test_container_image_input_accepts_a_list(self):
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_IMAGE="ghcr.io/acme/api:v1, ghcr.io/acme/worker:v1")
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(self.getjson_calls(log), [])
+        self.assertEqual(self.scanned_refs(log), ["ghcr.io/acme/api:v1", "ghcr.io/acme/worker:v1"])
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual(scan["image"], "ghcr.io/acme/worker:v1")
+        self.assertEqual([i["image"] for i in scan["images"]], ["ghcr.io/acme/api:v1", "ghcr.io/acme/worker:v1"])
+
+
 if __name__ == "__main__":
     unittest.main()
