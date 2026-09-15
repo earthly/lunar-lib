@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<path>-deletion_scheduled-<id>` and keeps appearing in the project listing,
   with `archived` still false — so a deleted project lingered as a component
   for the whole retention window instead of dropping out on the next run
-  (#311).
+  (#313).
 
 ### Added
 
