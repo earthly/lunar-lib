@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- `gitlab` cataloger: discovers every top-level GitLab group the service
+  account maintains and catalogs each group's projects, including subgroups, as
+  components. No group list to maintain — inviting the account to a group
+  onboards it. Project topics become Lunar tags (normalized, since GitLab
+  topics are free text and a tag containing whitespace or parens cannot be
+  referenced from a policy's `on:` expression), with visibility, archived state
+  and the numeric project ID in `meta`. Archived projects are excluded by
+  default and forks can be excluded with `include_forks`; personal-namespace
+  projects can be swept in with `include_personal_namespaces`. All three
+  states become tags (`gitlab-archived`, `gitlab-fork`,
+  `gitlab-personal-namespace`). `domain_from_group_path`
+  optionally derives each component's domain from the group path that
+  contains it, so the catalog mirrors the GitLab hierarchy (#306).
 
 ## [1.14.5] — 2026-09-14
 

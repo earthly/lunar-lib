@@ -1,0 +1,211 @@
+version: 0
+
+name: gitlab
+description: Discovers GitLab groups and catalogs their projects as Lunar components
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "GitLab Cataloger"
+  long_description: |
+    Discover every GitLab group a service account maintains and sync their projects
+    into your Lunar catalog. Maps project topics to Lunar tags, filters by visibility,
+    path and topic, and keeps the catalog current as projects are archived or deleted.
+  categories: ["vcs", "service-catalog"]
+  icon: "assets/gitlab.svg"
+  status: "beta"
+  related:
+    - slug: "gitlab"
+      type: "collector"
+      reason: "Collects project settings for each discovered project"
+
+example_catalog_json: |
+  {
+    "components": {
+      "gitlab.com/acme/payments/payment-api": {
+        "owner": "platform-team@acme.com",
+        "tags": ["gl-backend", "gl-go", "gitlab-visibility-private"],
+        "meta": {
+          "description": "Payment processing API service",
+          "visibility": "private",
+          "archived": "false",
+          "default_branch": "main",
+          "project_id": "4218771",
+          "group": "acme",
+          "topics": "backend,go"
+        }
+      },
+      "gitlab.com/globex/web/frontend-app": {
+        "owner": "platform-team@globex.com",
+        "tags": ["gl-react", "gitlab-visibility-internal"],
+        "meta": {
+          "description": "Customer-facing web application",
+          "visibility": "internal",
+          "archived": "false",
+          "default_branch": "main",
+          "project_id": "4218903",
+          "group": "globex",
+          "topics": "React"
+        }
+      }
+    }
+  }
+
+catalogers:
+  - name: groups
+    description: |
+      Discovers every top-level GitLab group the token's account is a maintainer
+      of and catalogs each group's projects, including subgroups, as components.
+      - Requires no list of groups: inviting the service account to a group onboards it
+      - Maps GitLab project topics to Lunar tags with a configurable prefix
+      - Supports filtering by visibility (public, internal, private)
+      - Supports include/exclude glob patterns on the project path
+      - Supports topic allow/blocklists (allowed_topics / disallowed_topics)
+      - Excludes archived projects by default; opt in to catalog them
+    mainBash: main.sh
+    hook:
+      type: cron
+      schedule: "0 3 * * *"
+    keywords: ["service catalog", "auto-discovery", "gitlab", "group discovery", "subgroups"]
+
+inputs:
+  gitlab_host:
+    description: |
+      GitLab hostname to catalog from. Defaults to gitlab.com; set it to your
+      instance hostname (e.g. gitlab.acme.com) for self-managed or Dedicated.
+      A full URL such as "https://gitlab.acme.com" is also accepted — the
+      scheme and any trailing path are stripped. Component IDs carry the host,
+      so a project on a self-managed instance is keyed as
+      gitlab.acme.com/<group>/<project>.
+    default: "gitlab.com"
+
+  api_base_url:
+    description: |
+      Full base URL of the GitLab REST API. Empty (the default) derives it
+      from gitlab_host as https://<host>/api/v4. Set it only when your
+      instance serves the API somewhere else.
+    default: ""
+
+  include_public:
+    description: Include public projects
+    default: "true"
+
+  include_internal:
+    description: Include internal projects
+    default: "true"
+
+  include_private:
+    description: Include private projects
+    default: "true"
+
+  include_archived:
+    description: |
+      Include archived projects. Archived projects are excluded by default, so
+      archiving a project removes its component on the next run. Set to "true"
+      to keep cataloging them; they are then tagged archived and carry
+      meta.archived = "true".
+    default: "false"
+
+  include_forks:
+    description: |
+      Include projects that are forks of another project. On by default. Set to
+      "false" to catalog only projects that originate in the group, which is
+      usually what you want when forks are working copies rather than services.
+      A fork is tagged gitlab-fork and carries meta.fork plus meta.forked_from
+      naming the project it came from.
+    default: "true"
+
+  include_personal_namespaces:
+    description: |
+      Also catalog projects in personal (user) namespaces that the token's
+      account is a member of. Off by default, because group discovery cannot
+      see a personal namespace at all — it is not a group — so these need a
+      second pass over the account's own memberships. Projects found this way
+      are tagged gitlab-personal-namespace. The sweep is deliberately scoped to
+      memberships: an instance-admin token listing projects unscoped would
+      return every project on the instance, including every user's scratch
+      repositories.
+    default: "false"
+
+  include_projects:
+    description: |
+      Comma-separated list of glob patterns for projects to include, matched
+      against the project's full path within its host (e.g.
+      "acme/payments/api-*"). Empty means include all. Because discovery is
+      automatic, this and exclude_projects are how you narrow the catalog —
+      a pattern like "acme/*" restricts it to one group.
+    default: ""
+
+  exclude_projects:
+    description: |
+      Comma-separated list of glob patterns for projects to exclude, matched
+      against the project's full path within its host. Examples:
+      "acme/sandbox/*,*/deprecated-*"
+    default: ""
+
+  tag_prefix:
+    description: |
+      Prefix applied to each GitLab topic when it becomes a Lunar tag. Every
+      topic on a project becomes one tag, lowercased and with runs of
+      whitespace and parens collapsed to a dash before the prefix — the topic
+      "Managed (Internal)" becomes the tag "gl-managed-internal". Lunar tags
+      cannot contain whitespace or parens (both are delimiters in a policy's
+      on: expression) and are matched case-sensitively, so that normalization
+      always applies; the raw topics are kept in meta.topics. An empty string
+      disables the prefix only, not the normalization.
+    default: "gl-"
+
+  allowed_topics:
+    description: |
+      Comma-separated list of GitLab project topics used as an allowlist. When
+      set, only projects carrying at least one of these topics are cataloged;
+      empty (the default) disables the allowlist so every project passes.
+      Both sides are normalized as described under tag_prefix before being
+      compared, so "Infra Managed" and "infra-managed" are the same topic and
+      either spelling works here. Examples: "lunar,catalog"
+    default: ""
+
+  disallowed_topics:
+    description: |
+      Comma-separated list of GitLab project topics used as a blocklist. A
+      project carrying any of these topics is excluded, even when it also
+      matches allowed_topics (block wins over allow). Normalized the same way
+      as allowed_topics. Empty (the default) disables the blocklist. Examples:
+      "archived,no-catalog"
+    default: ""
+
+  default_owner:
+    description: |
+      Default owner email for all components. Leave empty to not set owner.
+    default: ""
+
+  domain_from_group_path:
+    description: |
+      Derive each component's domain from the GitLab group path that contains
+      it, instead of giving every component the same domain. The project's
+      namespace becomes a dotted domain — a project at
+      acme/payments/payment-api lands in the domain "acme.payments" — so the
+      catalog mirrors the group hierarchy without listing a single domain by
+      hand. Every derived domain is registered under `.domains`, which the hub
+      requires: a component pointing at an undeclared domain is dropped. Off by
+      default; with it off, domains come only from default_domain.
+    default: "false"
+
+  default_domain:
+    description: |
+      Domain for all components. Leave empty to not set a domain. The domain is
+      stamped on every component's `.domain` field and registered under
+      `.domains` so the catalog passes the hub's domain-reference validation.
+      With domain_from_group_path enabled this becomes the root the derived
+      hierarchy hangs under instead — acme/payments/payment-api with
+      default_domain "eng" lands in "eng.acme.payments" — which is how you keep
+      a GitLab estate under one top-level domain. A domain definition in
+      lunar-config.yml still wins on merge.
+    default: ""
+
+secrets:
+  GL_TOKEN:
+    description: |
+      GitLab access token with the `api` scope, belonging to the service
+      account whose group memberships define what gets cataloged. Set it at
+      cataloger scope: `lunar secret set GL_TOKEN --scope cataloger`.
