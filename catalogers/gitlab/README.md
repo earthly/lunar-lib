@@ -105,9 +105,11 @@ Each run reports the projects that exist **now**; the catalog is not additive. T
 | Project archived | Excluded by default, so its component is retired on the next run. With `include_archived: "true"` it stays, tagged `gitlab-archived` and with `meta.archived: "true"` |
 | Project unarchived | Returns on the next run |
 | Project renamed or moved between groups | Its path changes, so this is a retire plus a create: the old component is retired and a new one appears at the new path |
-| Project scheduled for deletion | GitLab renames it to `<path>-deletion_scheduled-<id>` and keeps listing it until the retention window expires, so it reads as a rename first and only retires for good once GitLab purges it |
+| Project scheduled for deletion | Excluded, so its component is retired on the next run rather than lingering for the retention window |
 | Group created, service account invited | Discovered on the next run, with all its projects |
 | Service account removed from a group | The group's projects are retired on the next run |
+
+A GitLab delete is delayed, and that is why scheduled-for-deletion projects are excluded outright. `DELETE` on a project returns `202`, renames it to `<path>-deletion_scheduled-<id>`, and keeps returning it from the project listing until the retention window expires — with `archived` still `false`, so the archived filter does not catch it. Cataloging those would keep a component alive under a mangled name for weeks after someone deleted the project, which is the opposite of what "deleted projects drop out on the next run" promises. `marked_for_deletion_on` comes back in the listing already, so the exclusion costs no extra requests.
 
 A rename does not carry component history across, because Lunar's component identity is the project path. `meta.project_id` carries GitLab's numeric project ID, which is stable across renames, so the two components can be correlated after the fact.
 

@@ -209,7 +209,7 @@ while IFS= read -r group; do
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
-        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
         after=$(jq -r '.[-1].id' "$WORK/proj-page.json")
         pages=$((pages + 1))
@@ -235,7 +235,7 @@ if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
         # Keep only user namespaces: the group projects in this listing are the
         # ones the group sweep already has, and re-adding them would duplicate.
         jq -c '.[] | select(.namespace.kind == "user")
-               | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: .namespace.full_path, namespace_kind: .namespace.kind, is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+               | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: .namespace.full_path, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/personal-page.json" >> "$WORK/projects.ndjson"
         after=$(jq -r '.[-1].id' "$WORK/personal-page.json")
         pages=$((pages + 1))
@@ -278,6 +278,14 @@ jq -s \
       | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
       | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
       | select($include_forks == "true" or (.is_fork | not))
+      # A GitLab delete is delayed: it renames the project to
+      # <path>-deletion_scheduled-<id> and keeps listing it, archived still
+      # false, until the retention window expires. Cataloging it would keep a
+      # component alive under a mangled name for weeks after the delete.
+      # Either field satisfies it: gitlab.com currently returns both
+      # marked_for_deletion_on and _at in agreement, and reading only one would
+      # silently stop filtering if that one is the half that goes away.
+      | select(.pending_deletion | not)
       | . + {norm_topics: [(.topics // [])[] | norm] }
       # allow ∩ topics, expressed as set difference twice
       | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)

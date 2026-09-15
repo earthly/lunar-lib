@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `gitlab` cataloger: projects GitLab has scheduled for deletion are no longer
+  cataloged. A GitLab delete is delayed — the project is renamed to
+  `<path>-deletion_scheduled-<id>` and keeps appearing in the project listing,
+  with `archived` still false — so a deleted project lingered as a component
+  for the whole retention window instead of dropping out on the next run
+  (#313).
+
 ## [1.15.0] — 2026-09-15
 
 ### Added
