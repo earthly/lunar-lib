@@ -209,6 +209,19 @@ run_scenario "disallow_beats_allow" \
     '(has("github.com/acme/payment-api") | not) and (has("github.com/acme/frontend-app"))'
 unset LUNAR_VAR_ALLOWED_TOPICS LUNAR_VAR_DISALLOWED_TOPICS
 
+# ── Repository glob filters ───────────────────────────────────────────────
+# BusyBox sed treats escaped `\?` as a repetition operator. The old converter
+# therefore failed every non-empty include/exclude pattern and returned `^$`.
+export LUNAR_VAR_EXCLUDE_REPOS="payment-api"
+run_scenario "exclude_exact_repo" \
+    '(has("github.com/acme/payment-api") | not) and has("github.com/acme/frontend-app")'
+unset LUNAR_VAR_EXCLUDE_REPOS
+
+export LUNAR_VAR_INCLUDE_REPOS="payment-ap?"
+run_scenario "include_question_glob" \
+    'has("github.com/acme/payment-api") and (has("github.com/acme/frontend-app") | not)'
+unset LUNAR_VAR_INCLUDE_REPOS
+
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"
 

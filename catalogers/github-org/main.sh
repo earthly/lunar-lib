@@ -108,7 +108,9 @@ glob_to_regex() {
     local escaped
     escaped=$(echo "$glob" | sed -E 's/([.+^${}()|\\])/\\\1/g')
     # Convert glob wildcards to regex
-    escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/\?/./g')
+    # `?` is literal in POSIX basic regex. Escaping it turns it into a
+    # repetition operator in BusyBox sed and makes every non-empty filter fail.
+    escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/?/./g')
     echo "^${escaped}$"
 }
 
