@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.1] — 2026-09-15
+
 ### Fixed
 
 - `container-scan` policy: `max-severity` and `max-total` skip a commit that
@@ -923,7 +925,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.15.0...HEAD
+[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.15.1...HEAD
+[1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/earthly/lunar-lib/compare/v1.14.5...v1.15.0
 [1.14.5]: https://github.com/earthly/lunar-lib/compare/v1.14.4...v1.14.5
 [1.14.4]: https://github.com/earthly/lunar-lib/compare/v1.14.3...v1.14.4
