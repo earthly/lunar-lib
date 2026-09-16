@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pushed no container image instead of failing it — a CI tracer materializes
   `.containers` with incidental `docker info` calls, so the old gate treated
   nearly every commit as owing a scan. A pushed image and no scan still fails;
-  `executed` is unchanged (#314).
+  `executed` is unchanged (#315).
 
 - `gitlab` cataloger: projects GitLab has scheduled for deletion are no longer
   cataloged. A GitLab delete is delayed — the project is renamed to
