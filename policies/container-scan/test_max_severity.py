@@ -24,13 +24,25 @@ from lunar_policy import Node, CheckStatus  # noqa: E402
 import max_severity  # noqa: E402
 
 
-def node(container_scan=None, containers=True):
+# The CI tracer records these on almost any build, so `.containers` exists
+# without an image ever shipping — that is why the applicability gate reads the
+# pushed refs, not the object.
+PLUMBING_CMDS = [
+    {"cmd": "docker info"},
+    {"cmd": "docker ps"},
+    {"cmd": "docker container inspect earthly-buildkitd"},
+]
+PUSH_CMDS = PLUMBING_CMDS + [{"cmd": "docker push registry.example.com/app:1.2.3"}]
+
+
+def node(container_scan=None, containers=True, cmds=None):
     """Build a policy node mirroring production policy-eval (workflows done)."""
     data = {}
     if containers:
-        # Presence of `.containers` is the applicability gate (written by the
-        # docker collector). The exact shape is irrelevant to this check.
-        data["containers"] = {"native": {"docker": {"cicd": {"cmds": []}}}}
+        # `.containers` is the first applicability gate (written by the docker
+        # collector); `cmds` carries the pushed-image evidence the checks gate
+        # on when there is no scan data.
+        data["containers"] = {"native": {"docker": {"cicd": {"cmds": cmds or []}}}}
     if container_scan is not None:
         data["container_scan"] = container_scan
     return Node.from_component_json(data, bundle_info={"workflows_finished": True})
@@ -282,10 +294,27 @@ class MaxSeverityTests(unittest.TestCase):
         self.assertNotIn("JSON", joined)
         self.assertNotIn("\n    * ", joined)
 
-    def test_no_scan_data_fails(self):
-        c = run_check(node(container_scan=None))
+    def test_no_scan_data_fails_when_an_image_was_pushed(self):
+        """An image shipped and nothing scanned it — that has to stay a failure."""
+        c = run_check(node(container_scan=None, cmds=PUSH_CMDS))
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
         self.assertIn("No container scan data found", failure_message(c))
+
+    def test_no_scan_data_skips_when_nothing_was_pushed(self):
+        """No pushed image means no image to carry CVEs — skip, don't fail.
+
+        `.containers` is present here (as it is on almost every commit, via the
+        CI tracer) with only plumbing commands in it: `docker info`, `docker
+        ps`, a buildkitd inspect. Failing this case is what made the gate
+        unusable at block level.
+        """
+        c = run_check(node(container_scan=None, cmds=PLUMBING_CMDS))
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+        self.assertIn("No container image was pushed", c._results[0].failure_message)
+
+    def test_no_scan_data_skips_when_the_cicd_record_is_empty(self):
+        c = run_check(node(container_scan=None, cmds=[]))
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
 
     def test_collapses_findings_double_written_by_two_scanners(self):
         """trivy + grype both writing the same CVE must list it once, not twice."""

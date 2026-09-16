@@ -32,9 +32,12 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_high` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
+| `.containers.native.docker.cicd.cmds[]` | array | `docker` collector, plus any CI step that records a pushed image — the pushed refs decide whether `max-severity` / `max-total` apply |
 | `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
+
+**Applicability.** `max-severity` and `max-total` skip a component with no `.containers`, and also skip a commit whose `.containers` record carries no pushed image ref — a CI tracer records `docker info` / `docker ps` there, so the object alone does not mean an image shipped. With a pushed ref and no `.container_scan` they fail: something shipped that nothing scanned. The pushed-ref resolution matches the one the Trivy and Grype container sub-collectors use to choose images, so these checks are applicable exactly when a scanner had a target. `executed` does not consult it — include it to require a scan whatever the CI record shows.
 
 ## Installation
 
