@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gh repo list`, which switches the listing to GitHub's search API and returns
   at most 1000 results, so a large org was silently truncated to a 1000-repo
   window that churned between runs. Archived repositories are filtered after
-  fetching instead (#PRNUM).
+  fetching instead (#318).
 
 ## [1.15.1] — 2026-09-15
 
