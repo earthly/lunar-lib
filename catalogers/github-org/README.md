@@ -176,8 +176,8 @@ This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:
    CLI as `GH_ENTERPRISE_TOKEN`. If that secret is unset it falls back to
    `LUNAR_SECRET_GH_TOKEN`, so existing single-token setups keep working.
 
-The cataloger lists repositories through GitHub's cursor-paginated GraphQL repositories
-connection, 100 per page, up to `max_repos_per_visibility` (default 10,000) per visibility
-level. Archived repositories are filtered after fetching rather than by the API: passing
-`gh repo list --no-archived` switches the listing to GitHub's search API, which returns at
-most 1000 results per visibility.
+The cataloger lists the organization's repositories in one unfiltered pass through GitHub's
+cursor-paginated GraphQL repositories connection, 100 per page, up to `max_repos` (default
+10,000). Visibility and archived state are filtered after fetching rather than by the API:
+`gh repo list` falls back to GitHub's search API — which returns at most 1000 results — if it
+is given `--no-archived`, `--visibility internal`, `--topic` or `--language`.
