@@ -96,6 +96,7 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Payment processing API",
     "repositoryTopics": [{"name": "backend"}, {"name": "go"}],
     "isArchived": false,
+    "isEmpty": false,
     "visibility": "public"
   },
   {
@@ -104,6 +105,16 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Customer-facing web app",
     "repositoryTopics": [{"name": "react"}],
     "isArchived": false,
+    "isEmpty": false,
+    "visibility": "public"
+  },
+  {
+    "name": "empty-placeholder",
+    "url": "https://github.com/acme/empty-placeholder",
+    "description": "Reserved repository name",
+    "repositoryTopics": [],
+    "isArchived": false,
+    "isEmpty": true,
     "visibility": "public"
   }
 ]
@@ -118,6 +129,7 @@ export LUNAR_VAR_INCLUDE_PUBLIC="true"
 export LUNAR_VAR_INCLUDE_PRIVATE="false"
 export LUNAR_VAR_INCLUDE_INTERNAL="false"
 export LUNAR_VAR_INCLUDE_ARCHIVED="false"
+export LUNAR_VAR_INCLUDE_EMPTY="false"
 export LUNAR_VAR_INCLUDE_REPOS=""
 export LUNAR_VAR_EXCLUDE_REPOS=""
 export LUNAR_VAR_DEFAULT_OWNER=""
@@ -221,6 +233,15 @@ export LUNAR_VAR_INCLUDE_REPOS="payment-ap?"
 run_scenario "include_question_glob" \
     'has("github.com/acme/payment-api") and (has("github.com/acme/frontend-app") | not)'
 unset LUNAR_VAR_INCLUDE_REPOS
+
+# ── Empty repositories ────────────────────────────────────────────────────
+run_scenario "empty_repos_excluded_by_default" \
+    '(has("github.com/acme/empty-placeholder") | not)'
+
+export LUNAR_VAR_INCLUDE_EMPTY="true"
+run_scenario "include_empty_opt_in" \
+    'has("github.com/acme/empty-placeholder")'
+export LUNAR_VAR_INCLUDE_EMPTY="false"
 
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"

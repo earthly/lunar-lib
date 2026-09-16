@@ -90,6 +90,12 @@ inputs:
     description: Include archived repositories
     default: "false"
 
+  include_empty:
+    description: |
+      Include repositories with no commits. Empty repositories are excluded by
+      default because Lunar has no commit to collect or evaluate.
+    default: "false"
+
   include_repos:
     description: |
       Comma-separated list of glob patterns for repos to include.

@@ -45,6 +45,7 @@ INCLUDE_PUBLIC="${LUNAR_VAR_INCLUDE_PUBLIC:-true}"
 INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
+INCLUDE_EMPTY="${LUNAR_VAR_INCLUDE_EMPTY:-false}"
 INCLUDE_REPOS="${LUNAR_VAR_INCLUDE_REPOS:-}"
 EXCLUDE_REPOS="${LUNAR_VAR_EXCLUDE_REPOS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -93,6 +94,7 @@ echo "Cataloging repos from GitHub org: $ORG_NAME"
 echo "GitHub host: $GITHUB_HOST"
 echo "Visibilities: ${VISIBILITIES[*]}"
 echo "Include archived: $INCLUDE_ARCHIVED"
+echo "Include empty: $INCLUDE_EMPTY"
 [ -n "$INCLUDE_REPOS" ] && echo "Include patterns: $INCLUDE_REPOS"
 [ -n "$EXCLUDE_REPOS" ] && echo "Exclude patterns: $EXCLUDE_REPOS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -147,7 +149,7 @@ fetch_repos_with_retry() {
     while [ $attempt -le $MAX_RETRIES ]; do
         # Build gh command
         local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$FETCH_LIMIT")
-        GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
+        GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,isEmpty,visibility")
         
         if [ "$INCLUDE_ARCHIVED" = "false" ]; then
             GH_ARGS+=(--no-archived)
@@ -243,6 +245,7 @@ CATALOG_ENTRIES=$(jq \
     --arg prefix "$TAG_PREFIX" \
     --arg owner "$DEFAULT_OWNER" \
     --arg domain "$DEFAULT_DOMAIN" \
+    --arg include_empty "$INCLUDE_EMPTY" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
@@ -253,8 +256,14 @@ CATALOG_ENTRIES=$(jq \
     (csv_set($allowed_topics)) as $allow |
     (csv_set($disallowed_topics)) as $deny |
 
-    # Filter repos based on include/exclude patterns and topic allow/blocklists
+    # Filter repos based on content, include/exclude patterns, and topic
+    # allow/blocklists. Empty repositories have no commit to collect or evaluate,
+    # so omit them unless the operator explicitly opts in.
     [.[] |
+        select(
+            ($include_empty == "true") or
+            (.isEmpty | not)
+        ) |
         # Apply include filter (if specified, must match)
         select(
             ($include_regex == "") or
