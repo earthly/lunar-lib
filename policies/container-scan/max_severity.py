@@ -17,6 +17,7 @@ component JSON — the option changes the *verdict*, never what is collected.
 
 import sys
 
+from helpers import pushed_image_refs
 from lunar_policy import Check, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
@@ -145,7 +146,8 @@ def _rank(finding):
 def main(node=None):
     c = Check("max-severity", "No findings at or above severity threshold", node=node)
     with c:
-        if not c.get_node(".containers").exists():
+        containers = c.get_node(".containers")
+        if not containers.exists():
             c.skip("No container definitions detected in this component")
 
         min_severity = variable_or_default("min_severity", "high").lower()
@@ -157,6 +159,12 @@ def main(node=None):
 
         scan_node = c.get_node(".container_scan")
         if not scan_node.exists():
+            # The CI tracer materializes `.containers` on almost any build — a
+            # bare `docker info` is enough — so its presence does not mean an
+            # image shipped. With no pushed ref there is no image to carry
+            # CVEs; `executed` is the check that gates whether a scan was owed.
+            if not pushed_image_refs(containers):
+                c.skip("No container image was pushed at this commit — nothing to scan")
             c.fail("No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
             return c
 

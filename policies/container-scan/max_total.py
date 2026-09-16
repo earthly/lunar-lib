@@ -1,12 +1,14 @@
 """Ensure total container vulnerabilities under threshold."""
 
+from helpers import pushed_image_refs
 from lunar_policy import Check, variable_or_default
 
 
 def main(node=None):
     c = Check("max-total", "Total container vulnerability findings within threshold", node=node)
     with c:
-        if not c.get_node(".containers").exists():
+        containers = c.get_node(".containers")
+        if not containers.exists():
             c.skip("No container definitions detected in this component")
 
         threshold_str = variable_or_default("max_total_threshold", "0")
@@ -24,6 +26,10 @@ def main(node=None):
 
         scan_node = c.get_node(".container_scan")
         if not scan_node.exists():
+            # Same applicability gate as max-severity: `.containers` alone is
+            # CI-tracer noise, a pushed ref is the image that could be scanned.
+            if not pushed_image_refs(containers):
+                c.skip("No container image was pushed at this commit — nothing to scan")
             c.fail("No container scanning data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
             return c
         total_node = scan_node.get_node(".vulnerabilities.total")

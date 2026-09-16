@@ -2,8 +2,9 @@ VERSION 0.8
 
 # Unit tests for the container-scan policy checks, covering the max-severity
 # verdict: severity filtering, the per-CVE failure enumeration, multi-scanner
-# finding dedup, and the `ignore_unfixable` narrowing (including the regression
-# guard that the default still fails on unfixable findings).
+# finding dedup, the `ignore_unfixable` narrowing (including the regression
+# guard that the default still fails on unfixable findings), and the
+# pushed-image applicability gate both max-severity and max-total share.
 # Wired into the root +test target.
 # (No image: target — the container-scan policy runs on the shared base image.)
 test:
@@ -13,3 +14,4 @@ test:
     RUN pip install --no-cache-dir -r requirements.txt
     COPY *.py .
     RUN python -m unittest test_max_severity -v
+    RUN python -m unittest test_helpers -v
