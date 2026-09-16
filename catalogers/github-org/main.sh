@@ -146,10 +146,11 @@ fetch_repos_with_retry() {
         # Build gh command
         local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$FETCH_LIMIT")
         GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
-        
-        if [ "$INCLUDE_ARCHIVED" = "false" ]; then
-            GH_ARGS+=(--no-archived)
-        fi
+        # Never pass --no-archived. It switches gh from the cursor-paginated
+        # RepositoryList query to RepositoryListSearch — GitHub's search API,
+        # hard-capped at 1000 results — so an org with more than 1000 repos in a
+        # visibility is silently truncated to a churning 1000-repo window.
+        # Archived repos are dropped in the jq filter below instead.
         
         # Try to fetch
         local output
@@ -245,6 +246,7 @@ CATALOG_ENTRIES=$(jq \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
     --arg disallowed_topics "$DISALLOWED_TOPICS" \
+    --arg include_archived "$INCLUDE_ARCHIVED" \
     '
     # Parse a comma-separated input into a trimmed, non-empty set of topics.
     def csv_set($s): ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)));
@@ -253,6 +255,9 @@ CATALOG_ENTRIES=$(jq \
 
     # Filter repos based on include/exclude patterns and topic allow/blocklists
     [.[] |
+        # Drop archived repos unless include_archived is set. Filtered here
+        # rather than with gh --no-archived — see fetch_repos_with_retry.
+        select($include_archived == "true" or (.isArchived | not)) |
         # Apply include filter (if specified, must match)
         select(
             ($include_regex == "") or

@@ -105,6 +105,14 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "repositoryTopics": [{"name": "react"}],
     "isArchived": false,
     "visibility": "public"
+  },
+  {
+    "name": "legacy-billing",
+    "url": "https://github.com/acme/legacy-billing",
+    "description": "Retired billing service",
+    "repositoryTopics": [],
+    "isArchived": true,
+    "visibility": "public"
   }
 ]
 EOF
@@ -208,6 +216,29 @@ export LUNAR_VAR_DISALLOWED_TOPICS="go"
 run_scenario "disallow_beats_allow" \
     '(has("github.com/acme/payment-api") | not) and (has("github.com/acme/frontend-app"))'
 unset LUNAR_VAR_ALLOWED_TOPICS LUNAR_VAR_DISALLOWED_TOPICS
+
+# ── ENG-1411 regression: archived repos are filtered client-side ──────────
+# main.sh must not pass `gh repo list --no-archived` — that flag switches gh to
+# the search API and caps the listing at 1000 repos per visibility. The mock gh
+# returns the archived repo regardless of flags, so these two scenarios only
+# hold if the jq pass is doing the filtering.
+run_scenario "archived_excluded_by_default" \
+    '(has("github.com/acme/legacy-billing") | not) and (has("github.com/acme/payment-api"))'
+
+export LUNAR_VAR_INCLUDE_ARCHIVED="true"
+run_scenario "archived_included_when_requested" \
+    '(has("github.com/acme/legacy-billing")) and (.["github.com/acme/legacy-billing"].meta.archived == "true")'
+export LUNAR_VAR_INCLUDE_ARCHIVED="false"
+
+# The flag itself is the bug — assert it is not in the source at all.
+echo "── scenario: no_search_api_flag ──"
+if grep -v '^[[:space:]]*#' "$SCRIPT_DIR/main.sh" | grep -q -- "--no-archived"; then
+    echo "  FAIL: main.sh still passes --no-archived (caps gh at 1000 repos/visibility)"
+    FAILED=$((FAILED + 1))
+else
+    echo "  PASS"
+    PASSED=$((PASSED + 1))
+fi
 
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"

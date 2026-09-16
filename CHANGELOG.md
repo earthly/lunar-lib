@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `github-org` cataloger: organizations with more than 1000 repositories in a
+  visibility are now cataloged in full. The cataloger passed `--no-archived` to
+  `gh repo list`, which switches the listing to GitHub's search API and returns
+  at most 1000 results, so a large org was silently truncated to a 1000-repo
+  window that churned between runs. Archived repositories are filtered after
+  fetching instead (#PRNUM).
+
 ## [1.15.1] — 2026-09-15
 
 ### Fixed
