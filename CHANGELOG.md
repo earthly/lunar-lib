@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `grype` and `trivy` collectors: container scans now record their provenance.
+  `.container_scan.source` carries `collected_at` (when the scan ran) and
+  `collected_sha` (the commit the run was bound to), and the resolved registry
+  digest of each scanned image lands in `.container_scan.digest` and its
+  `images[]` entry. The recorded image reference is usually a floating tag, so
+  a consumer that needs to know a scan covers the artifact it is promoting can
+  compare digests instead of trusting the count. A digest the registry does not
+  report is left absent (#320).
+
+- `grype` and `trivy` collectors: new `container_scan_history_size` input keeps
+  a bounded `.container_scan.history[]` of prior container scans on the cron
+  re-scan, so the scan a release shipped with stays readable after later
+  re-scans overwrite the live counts. Entries hold source, image, digest,
+  counts and summary, oldest first. Defaults to `0` — no history, no change for
+  existing installs (#320).
+
 ## [1.15.1] — 2026-09-15
 
 ### Fixed
