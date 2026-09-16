@@ -147,7 +147,7 @@ collectors:
       container_scan_history_size: "30"
 ```
 
-Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only — `findings[]`, `images[]` and `native` are concatenated across collectors by the Hub, so snapshotting them would double them. At the cap the oldest entry is kept and the second-oldest dropped. Only the `container-rescan` cron maintains history; the on-push `container-scan` ignores the input. If the re-scan cannot read the current Component JSON it skips that tick rather than write a record without history.
+Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only — `findings[]`, `images[]` and `native` are concatenated across collectors by the Hub, so snapshotting them would double them. At the cap the oldest entry is kept and the second-oldest dropped. Only the `container-rescan` cron maintains history; the on-push `container-scan` ignores the input. If the re-scan cannot read the current Component JSON it skips that tick rather than write a record without history. Running two scanners' crons on one component concatenates their histories, as it does `images[]` and `findings[]` — tell them apart by `source.tool`.
 
 **Private registries:** the `container-rescan` cron pulls the images, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
 

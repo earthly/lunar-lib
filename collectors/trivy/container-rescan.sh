@@ -229,12 +229,18 @@ SOURCE_JSON=$(jq -n --arg version "$TRIVY_VERSION" --arg integration "$INTEGRATI
 # findings[]/images[]/native — the hub concatenates those across the code+cron
 # records, so snapshotting them would double them (same reason .sca.history
 # omits them). At the cap the oldest entry stays and the second-oldest drops.
+#
+# Carried-forward entries are de-duplicated in place. A component running both
+# scanners' crons has two cron records, so each reads a merged history holding
+# the other's entries too; without the dedupe each record would re-absorb and
+# re-emit them every tick.
 HISTORY_JSON="{}"
 if [ "$HIST_SIZE" -gt 0 ]; then
   HISTORY_JSON=$(printf '%s' "$CUR_SCAN" | jq -c --argjson size "$HIST_SIZE" '
     (.history // []) as $hist
     | ({source, image, digest, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
-    | (if $snap != {} then ($hist + [$snap]) else $hist end) as $all
+    | (if $snap != {} then ($hist + [$snap]) else $hist end)
+    | (reduce .[] as $e ([]; if index([$e]) == null then . + [$e] else . end)) as $all
     | ($all | length) as $len
     | if $len == 0 then {}
       else {history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end)}

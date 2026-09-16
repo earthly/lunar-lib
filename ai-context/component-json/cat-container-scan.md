@@ -75,7 +75,10 @@ necessarily the commit that built the image.
 `history[]` is written only by the cron re-scan, only when the collector's
 `container_scan_history_size` input is above `0`. Entries are oldest-first and
 hold `source` / `image` / `digest` / `vulnerabilities` / `summary` — never
-`findings[]`, `images[]` or `native`, which the hub concatenates.
+`findings[]`, `images[]` or `native`, which the hub concatenates. A component
+running two scanners' crons has two cron records, so `history[]` is
+concatenated across them like `images[]` and `findings[]`; each entry names its
+scanner in `source.tool`, and each record stays within its own cap.
 
 ## Key Policy Paths
 

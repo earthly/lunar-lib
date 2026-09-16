@@ -566,6 +566,21 @@ class ScanHistoryTest(Base):
         # It bails before paying for the scan, too.
         self.assertNotIn("Scanning image:", result.stderr)
 
+    def test_carried_forward_duplicates_are_collapsed(self):
+        # A component running both scanners' crons has two cron records, so the
+        # merged history each one reads holds the other's entries as well.
+        # Without the dedupe every record would re-absorb and re-emit them.
+        dup = {"source": {"tool": "other", "integration": "cron",
+                          "collected_at": "2026-09-02T03:00:00Z"}}
+        prior = dict(self.PRIOR_SCAN, history=[dup, dup, dup])
+        self.main_with_scan(prior)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5")
+        _, log = self.run_ok(env)
+        history = self.collected(log, ".container_scan")["history"]
+        self.assertEqual(len(history), 2, msg=history)
+        self.assertEqual(history[0], dup)
+        self.assertEqual(history[1]["image"], "earthly/lunar-hub:main-old")
+
     def test_a_non_numeric_history_size_is_treated_as_off(self):
         self.main_with_scan(self.PRIOR_SCAN)
         env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="lots")
