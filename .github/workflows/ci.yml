@@ -51,14 +51,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set branch name
+        # Via env, not ${{ }} interpolated into the script: a branch name is
+        # attacker-controlled text.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |-
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            RAW_BRANCH="${{ github.head_ref }}"
+            RAW_BRANCH="$HEAD_REF"
           else
-            RAW_BRANCH="${{ github.ref_name }}"
+            RAW_BRANCH="$REF_NAME"
           fi
-          NORMALIZED_BRANCH=$(echo "$RAW_BRANCH" | tr '/' '-')
-          echo "BRANCH_NAME=$NORMALIZED_BRANCH" >> $GITHUB_ENV
+          echo "BRANCH_NAME=${RAW_BRANCH//\//-}" >> "$GITHUB_ENV"
       - name: Setup Earthly
         uses: earthly/actions-setup@v1
       - name: Login
@@ -72,3 +76,101 @@ jobs:
         run: |-
           earthly --ci --push +all --VERSION "${GITHUB_SHA::8}"
 
+  # WORKAROUND — remove this job once the Lunar CI tracer can trace an Earthly
+  # build. We build and push with `earthly --push +all`, and the tracer doesn't
+  # see inside Earthly yet, so it never observes the `docker push` for any of
+  # our images. `.containers.native.docker.cicd.cmds[]` therefore stays empty,
+  # the trivy/grype container-scan collectors resolve zero image refs and exit
+  # 0, and the image-cve gate has nothing to scan. Recording the refs by hand
+  # here stands in for the tracing we can't do yet — it is not how this is
+  # meant to work.
+  #
+  # Gated on the LUNAR_HUB_HOST repo *variable*: the host is not hardcoded in
+  # this public file, and until an admin sets the variable plus the
+  # LUNAR_INTERNAL_HUB_TOKEN secret the job is skipped rather than failing every
+  # build. Once configured it fails red — a swallowed error here is how images
+  # ship unscanned.
+  record-pushed-images:
+    name: record pushed images for CVE scan
+    needs: [build-and-push]
+    if: vars.LUNAR_HUB_HOST != ''
+    runs-on: ubuntu-latest
+    env:
+      LUNAR_HUB_HOST: ${{ vars.LUNAR_HUB_HOST }}
+      LUNAR_HUB_GRPC_PORT: "443"
+      LUNAR_HUB_HTTP_PORT: "443"
+      LUNAR_HUB_TOKEN: ${{ secrets.LUNAR_INTERNAL_HUB_TOKEN }}
+      # On pull_request, GITHUB_SHA is the merge commit — NOT the component's git_sha.
+      SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Via env, not ${{ }} interpolated into the script: a branch name is
+      # attacker-controlled text.
+      HEAD_REF: ${{ github.head_ref }}
+      REF_NAME: ${{ github.ref_name }}
+      IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Lunar CLI
+        env:
+          # Authenticated so the release lookup doesn't share the runner IP's
+          # 60/hour unauthenticated API budget. earthly/lunar-dist is public.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |-
+          asset_url=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/earthly/lunar-dist/releases/latest \
+            | jq -r '.assets[] | select(.name == "lunar-linux-amd64") | .url')
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "$asset_url" -o "$RUNNER_TEMP/lunar"
+          chmod +x "$RUNNER_TEMP/lunar"
+      - name: Record pushed images for CVE scanning
+        run: |-
+          if [ -z "$LUNAR_HUB_TOKEN" ]; then
+            echo "::error::LUNAR_HUB_HOST is set but the LUNAR_INTERNAL_HUB_TOKEN secret is empty — the container scan for this commit would be missing" >&2
+            exit 1
+          fi
+          # main pushes a second, immutable set tagged with the short sha
+          # (+all runs twice); everything else is scanned at its branch tag.
+          if [ "$IS_MAIN" = "true" ]; then
+            tag="${SHA::8}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            tag="${HEAD_REF//\//-}"
+          else
+            tag="${REF_NAME//\//-}"
+          fi
+          # Into a variable first, not a process substitution: `run:` shells
+          # get `bash -e`, which fails the step on a failed assignment but
+          # ignores a failed `< <(...)`. Recording nothing has to be red, not
+          # an empty append that succeeds.
+          refs=$(scripts/pushed-image-refs.sh "$tag")
+          args=()
+          while read -r ref; do
+            # A herestring of "" still yields one empty line, so an empty $refs
+            # would otherwise record `docker push ` and defeat the guard below.
+            [ -n "$ref" ] || continue
+            args+=('.containers.native.docker.cicd.cmds' "$(jq -nc --arg cmd "docker push $ref" '{cmd: $cmd}')")
+          done <<< "$refs"
+          if [ "${#args[@]}" -eq 0 ]; then
+            echo "::error::resolved no pushed images to record — the container scan for this commit would be missing" >&2
+            exit 1
+          fi
+          echo "Recording $(( ${#args[@]} / 2 )) pushed images at :$tag"
+          pr_args=()
+          if [ -n "$PR_NUMBER" ]; then
+            pr_args=(--pr "$PR_NUMBER")
+          fi
+          for attempt in 1 2 3; do
+            if "$RUNNER_TEMP/lunar" collect \
+                --component github.com/earthly/lunar-lib \
+                --sha "$SHA" \
+                "${pr_args[@]}" \
+                --json --array-append "${args[@]}"; then
+              echo "Recorded for container CVE scan (sha $SHA${PR_NUMBER:+, pr $PR_NUMBER})"
+              exit 0
+            fi
+            echo "lunar collect failed (attempt $attempt/3), retrying in 30s" >&2
+            sleep 30
+          done
+          echo "::error::could not record the pushed images with the Hub after 3 attempts — the container scan for this commit will be missing" >&2
+          exit 1

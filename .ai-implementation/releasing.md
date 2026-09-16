@@ -118,14 +118,18 @@ Read the logs, diagnose, and report to the human. **Do not attempt fixes on the 
 
 ### Step 4: Verify images exist
 
-After CI passes, confirm the images were published to Docker Hub. **Do not pull them** — just check they exist via the API (no auth needed for public images):
+After CI passes, confirm the images were published to Docker Hub. **Do not pull them** — just check each manifest exists:
 
 ```bash
-# List all tags matching this version
-curl -s "https://hub.docker.com/v2/repositories/earthly/lunar-lib/tags/?name=vX.Y.Z&page_size=100" | jq '.count, [.results[].name]'
+scripts/pushed-image-refs.sh vX.Y.Z | while read -r ref; do
+  docker manifest inspect "$ref" >/dev/null 2>&1 || echo "MISSING $ref"
+done
 ```
 
-Verify the count matches the number of `+image` targets in the root `Earthfile` `+all` target (base image + all plugins). If any are missing, check the CI build logs for that specific plugin.
+Silence means every image published. Ask the registry, not
+`hub.docker.com/v2/.../tags/?name=`: that API is a search index that lags, and
+at v1.14.5 it returned zero matches for a release whose 27 images had all
+published. If a ref really is missing, check the CI build logs for that plugin.
 
 ### Step 5: Create a GitHub Release with release notes
 
