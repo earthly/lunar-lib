@@ -24,6 +24,7 @@ esac
 # --- 1. Resolve the image references to scan ---
 # `container_image` pins one ref, or a comma/whitespace-separated list.
 IMAGE_REFS=()
+COMPONENT_JSON=""
 if [ -n "${LUNAR_VAR_CONTAINER_IMAGE:-}" ]; then
   # shellcheck disable=SC2206
   IMAGE_REFS=(${LUNAR_VAR_CONTAINER_IMAGE//,/ })
@@ -87,6 +88,30 @@ if [ "${#IMAGE_REFS[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# --- 1b. Scan history (cron re-scan only, opt-in) ---
+# Snapshot the current .container_scan into a bounded .container_scan.history[]
+# before overwriting it. Cron only: latest-cron-per-collector replaces that
+# record wholesale so the array cannot self-concatenate, whereas an after-json
+# record would grow it on every push. A failed read skips the re-scan — writing
+# a record without history would replace the last one and wipe the trail.
+HIST_SIZE="${LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE:-0}"
+case "$HIST_SIZE" in ''|*[!0-9]*) HIST_SIZE=0 ;; esac
+[ "$INTEGRATION" = "cron" ] || HIST_SIZE=0
+CUR_SCAN="{}"
+if [ "$HIST_SIZE" -gt 0 ]; then
+  # Reuse the blob already read to resolve the images; only a pinned
+  # container_image skips that read.
+  if [ -z "$COMPONENT_JSON" ] && [ -n "${LUNAR_COMPONENT_ID:-}" ]; then
+    COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
+  fi
+  if [ -n "$COMPONENT_JSON" ] && printf '%s' "$COMPONENT_JSON" | jq -e . >/dev/null 2>&1; then
+    CUR_SCAN=$(printf '%s' "$COMPONENT_JSON" | jq -c '.container_scan // {}')
+  else
+    echo "Scan history: could not read the current Component JSON — skipping this re-scan so the existing .container_scan.history is preserved" >&2
+    exit 0
+  fi
+fi
+
 echo "Resolved ${#IMAGE_REFS[@]} image(s) to scan: ${IMAGE_REFS[*]}" >&2
 
 # --- 2. Registry auth for private images (optional) ---
@@ -138,6 +163,15 @@ for IMAGE_REF in "${IMAGE_REFS[@]}"; do
   jq -c --arg image "$IMAGE_REF" '
     def matches: (.matches // []);
     def sev: (.vulnerability.severity // "Unknown") | ascii_downcase;
+    # Registry digest of what was scanned — the recorded ref is usually a
+    # floating tag. repoDigests only: manifestDigest is the platform manifest,
+    # not the index digest a registry promotes. Unresolvable stays absent.
+    def repo_of: split("@")[0] | split("/") as $p | (($p[:-1] + [($p[-1] | split(":")[0])]) | join("/"));
+    def pick_digest($ref; $d):
+      (if ($d | length) == 1 then $d[0]
+       else ($d | map(select(startswith(($ref | repo_of) + "@"))) | first) end)
+      | if . == null then null else (split("@") | last) end
+      | if . != null and test("^[a-z0-9]+:[0-9a-f]{32,}$") then . else null end;
     {
       image: $image,
       vulnerabilities: {
@@ -167,6 +201,8 @@ for IMAGE_REF in "${IMAGE_REFS[@]}"; do
     + (if (.distro.name // "") != "" then
          {os: ({family: .distro.name} + (if (.distro.version // "") != "" then {version: .distro.version} else {} end))}
        else {} end)
+    + (pick_digest($image; (.source.target.repoDigests // [])) as $dg
+       | if $dg then {digest: $dg} else {} end)
   ' "$RESULTS_FILE" >> "$IMAGES_FILE"
   echo "Found $(jq '(.matches // []) | length' "$RESULTS_FILE") vulnerabilities in $IMAGE_REF" >&2
   PRIMARY_REF="$IMAGE_REF"
@@ -185,17 +221,43 @@ GRYPE_VERSION=$(jq -r '.descriptor.version // empty' "$PRIMARY_RESULTS")
 jq -c '.matches // []' "$PRIMARY_RESULTS" | lunar collect -j ".container_scan.native.grype.matches" -
 
 # Source metadata (integration set above: after-json on-push, or cron re-scan).
-SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" --arg integration "$INTEGRATION" '{
+# collected_at dates the payload — without it a five-day-old count reads as
+# current. collected_sha is the commit the run was bound to, which on a cron
+# re-scan is the latest ingested default-branch commit, not necessarily the one
+# that built the image: provenance, not identity. The digest is the identity.
+COLLECTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" --arg integration "$INTEGRATION" \
+  --arg collected_at "$COLLECTED_AT" --arg sha "${LUNAR_COMPONENT_GIT_SHA:-}" '{
   tool: "grype",
-  integration: $integration
-} + (if $version != "" then {version: $version} else {} end)')
+  integration: $integration,
+  collected_at: $collected_at
+} + (if $version != "" then {version: $version} else {} end)
+  + (if $sha != "" then {collected_sha: $sha} else {} end)')
+
+# A compact entry: source, the ref and digest it described, counts, summary. No
+# findings[]/images[]/native — the hub concatenates those across the code+cron
+# records, so snapshotting them would double them (same reason .sca.history
+# omits them). At the cap the oldest entry stays and the second-oldest drops.
+HISTORY_JSON="{}"
+if [ "$HIST_SIZE" -gt 0 ]; then
+  HISTORY_JSON=$(printf '%s' "$CUR_SCAN" | jq -c --argjson size "$HIST_SIZE" '
+    (.history // []) as $hist
+    | ({source, image, digest, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
+    | (if $snap != {} then ($hist + [$snap]) else $hist end) as $all
+    | ($all | length) as $len
+    | if $len == 0 then {}
+      else {history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end)}
+      end' 2>/dev/null || echo "{}")
+  [ -n "$HISTORY_JSON" ] || HISTORY_JSON="{}"
+fi
 
 # --- 4. Aggregate ---
 # `image` / `os` / raw native output describe the primary image, so a component
 # that pushes one image sees exactly the shape it always did. Counts, summary and
 # findings span every scanned image; images[] is the per-image breakdown and
 # errors[] the refs that could not be pulled or scanned.
-jq -c -s --argjson source "$SOURCE_JSON" --arg primary "$PRIMARY_REF" --slurpfile errors "$ERRORS_FILE" '
+jq -c -s --argjson source "$SOURCE_JSON" --arg primary "$PRIMARY_REF" \
+   --slurpfile errors "$ERRORS_FILE" --argjson history "$HISTORY_JSON" '
   . as $imgs
   | ($imgs | map(select(.image == $primary)) | last) as $p
   | ($imgs | map(.findings) | add) as $findings
@@ -204,6 +266,7 @@ jq -c -s --argjson source "$SOURCE_JSON" --arg primary "$PRIMARY_REF" --slurpfil
       image: $primary,
       images: ($imgs | map(
         {image: .image, tool: "grype"}
+        + (if .digest then {digest: .digest} else {} end)
         + (if .os then {os: .os} else {} end)
         + {vulnerabilities: .vulnerabilities, summary: .summary})),
       vulnerabilities: {
@@ -220,8 +283,10 @@ jq -c -s --argjson source "$SOURCE_JSON" --arg primary "$PRIMARY_REF" --slurpfil
       }
     }
   + (if ($findings | length) > 0 then {findings: $findings} else {} end)
+  + (if $p.digest then {digest: $p.digest} else {} end)
   + (if $p.os then {os: $p.os} else {} end)
   + (if ($errors | length) > 0 then {errors: $errors} else {} end)
+  + $history
 ' "$IMAGES_FILE" | lunar collect -j ".container_scan" -
 
 TOTAL=$(jq -s 'map(.vulnerabilities.total) | add' "$IMAGES_FILE")

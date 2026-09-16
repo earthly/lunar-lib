@@ -360,5 +360,217 @@ class MultiImageTest(Base):
         self.assertEqual([i["image"] for i in scan["images"]], ["ghcr.io/acme/api:v1", "ghcr.io/acme/worker:v1"])
 
 
+class ProvenanceTest(Base):
+    """`.container_scan` must say WHEN it was collected and WHAT bytes it scanned.
+
+    Without those, a re-scan that never refreshed this commit is
+    indistinguishable from a fresh one: the release page renders a five-day-old
+    count as current (ENG-1811). `collected_at` dates the payload;
+    `collected_sha` names the commit the run was bound to; the resolved registry
+    digest is the only field that ties the numbers to an actual artifact — the
+    recorded ref is a floating tag.
+    """
+
+    DIGEST = "sha256:" + "a" * 64
+    OTHER_DIGEST = "sha256:" + "c" * 64
+
+    def with_repo_digests(self, repo_digests):
+        """Re-emit the canned scan results with the registry's repo digests."""
+        results = json.loads(self.GRYPE_RESULTS)
+        results["source"] = {"type": "image", "target": {
+            "userInput": self.MAIN_IMAGE, "repoDigests": repo_digests}}
+        self.fixture("grype-results.json", json.dumps(results))
+
+    def scan(self, env=None):
+        result, log = self.run_script(dict(env or self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertIsNotNone(scan, msg=log)
+        return scan
+
+    def test_source_is_dated_and_names_the_commit_it_ran_at(self):
+        source = self.scan()["source"]
+        self.assertRegex(source["collected_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        self.assertEqual(source["collected_sha"], "deadbeef")
+
+    def test_collected_sha_is_omitted_when_the_runtime_sets_none(self):
+        env = dict(self.CRON_ENV)
+        del env["LUNAR_COMPONENT_GIT_SHA"]
+        source = self.scan(env)["source"]
+        self.assertNotIn("collected_sha", source)
+        self.assertIn("collected_at", source)
+
+    def test_digest_is_recorded_for_the_primary_image_and_per_image(self):
+        self.with_repo_digests(["earthly/lunar-hub@" + self.DIGEST])
+        scan = self.scan()
+        self.assertEqual(scan["digest"], self.DIGEST)
+        self.assertEqual(scan["images"][0]["digest"], self.DIGEST)
+        # The floating ref is still recorded — the digest is added alongside it.
+        self.assertEqual(scan["image"], self.MAIN_IMAGE)
+
+    def test_the_digest_matching_the_scanned_repo_wins(self):
+        self.with_repo_digests(["someone/else@" + self.OTHER_DIGEST,
+                                "earthly/lunar-hub@" + self.DIGEST])
+        self.assertEqual(self.scan()["digest"], self.DIGEST)
+
+    def test_no_digest_is_invented_when_the_registry_reports_none(self):
+        # The stock fixture has no repo digests at all (a local-only image).
+        scan = self.scan()
+        self.assertNotIn("digest", scan)
+        self.assertNotIn("digest", scan["images"][0])
+
+    def test_ambiguous_repo_digests_are_left_unresolved(self):
+        # Several digests, none for the repo scanned: recording either would
+        # claim the scan covered bytes it never saw.
+        self.with_repo_digests(["someone/else@" + self.OTHER_DIGEST,
+                                "third/party@sha256:" + "d" * 64])
+        self.assertNotIn("digest", self.scan())
+
+    def test_a_malformed_repo_digest_is_rejected(self):
+        self.with_repo_digests(["earthly/lunar-hub@notadigest"])
+        self.assertNotIn("digest", self.scan())
+
+
+class ScanHistoryTest(Base):
+    """`container_scan_history_size` keeps a bounded audit trail of past scans.
+
+    Mirrors `.sca.history[]`: cron-only (its record is replaced wholesale, so
+    the array cannot self-concatenate), counts + provenance only, and a read
+    failure skips the re-scan rather than writing a record that would wipe the
+    trail.
+    """
+
+    PRIOR_DIGEST = "sha256:" + "b" * 64
+    PRIOR_SCAN = {
+        "source": {"tool": "grype", "integration": "after-json",
+                   "collected_at": "2026-09-10T03:00:00Z", "collected_sha": "cafe1234"},
+        "image": "earthly/lunar-hub:main-old",
+        "digest": PRIOR_DIGEST,
+        "vulnerabilities": {"critical": 1, "high": 2, "medium": 0, "low": 0, "total": 3},
+        "summary": {"has_critical": True, "has_high": True, "all_fixable": False},
+        # The arrays the hub concatenates across collectors — snapshotting these
+        # would double them on every re-scan.
+        "findings": [{"cve": "CVE-2026-OLD", "image": "earthly/lunar-hub:main-old"}],
+        "images": [{"image": "earthly/lunar-hub:main-old", "tool": "grype"}],
+        "native": {"grype": {"matches": [1, 2, 3]}},
+    }
+
+    def main_with_scan(self, scan):
+        self.fixture("main.json", json.dumps({
+            "containers": {"native": {"docker": {"cicd": {"cmds": [
+                {"cmd": f"docker push {self.MAIN_IMAGE}"}]}}}},
+            "container_scan": scan,
+        }))
+
+    def run_ok(self, env):
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        return result, log
+
+    def test_history_is_off_by_default(self):
+        self.main_with_scan(self.PRIOR_SCAN)
+        _, log = self.run_ok(dict(self.CRON_ENV))
+        self.assertNotIn("history", self.collected(log, ".container_scan"))
+
+    def test_the_previous_scan_is_snapshotted_with_its_provenance(self):
+        self.main_with_scan(self.PRIOR_SCAN)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5")
+        _, log = self.run_ok(env)
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual(scan["history"], [{
+            "source": self.PRIOR_SCAN["source"],
+            "image": "earthly/lunar-hub:main-old",
+            "digest": self.PRIOR_DIGEST,
+            "vulnerabilities": self.PRIOR_SCAN["vulnerabilities"],
+            "summary": self.PRIOR_SCAN["summary"],
+        }])
+        # The live fields are this run's, not the snapshot's.
+        self.assertEqual(scan["vulnerabilities"]["total"], 1)
+        self.assertEqual(scan["source"]["integration"], "cron")
+
+    def test_the_snapshot_omits_the_arrays_the_hub_concatenates(self):
+        self.main_with_scan(self.PRIOR_SCAN)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5")
+        _, log = self.run_ok(env)
+        entry = self.collected(log, ".container_scan")["history"][0]
+        for concatenated in ("findings", "images", "native", "history"):
+            self.assertNotIn(concatenated, entry)
+
+    def test_history_is_bounded_and_keeps_the_oldest_entry(self):
+        prior = dict(self.PRIOR_SCAN, history=[
+            {"source": {"integration": "code", "collected_at": f"2026-09-0{i}T03:00:00Z"}}
+            for i in range(1, 5)
+        ])
+        self.main_with_scan(prior)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="3")
+        _, log = self.run_ok(env)
+        history = self.collected(log, ".container_scan")["history"]
+        self.assertEqual(len(history), 3)
+        # The first scan on record (the release-time one) survives; the
+        # second-oldest is what gets dropped.
+        self.assertEqual(history[0]["source"]["collected_at"], "2026-09-01T03:00:00Z")
+        self.assertEqual(history[1]["source"]["collected_at"], "2026-09-04T03:00:00Z")
+        self.assertEqual(history[2]["image"], "earthly/lunar-hub:main-old")
+
+    def test_no_history_key_when_there_is_nothing_to_snapshot(self):
+        # First ever scan: an empty array would be noise.
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="3")
+        _, log = self.run_ok(env)
+        self.assertNotIn("history", self.collected(log, ".container_scan"))
+
+    def test_the_on_push_scan_never_writes_history(self):
+        # An after-json record is concatenated, not replaced, so a history[] on
+        # it would grow without bound on every push. Run it on the default
+        # branch, where it reads the very Component JSON the cron reads — then
+        # the cron-only fence is the only thing keeping history out of it. (A PR
+        # run would pass vacuously: its PR-scoped snapshot has no prior scan.)
+        self.main_with_scan(self.PRIOR_SCAN)
+        env = dict(
+            self.CRON_ENV,
+            LUNAR_COLLECTOR_NAME=self.CRON_ENV["LUNAR_COLLECTOR_NAME"].replace(
+                "container-rescan", "container-scan"),
+            LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5",
+        )
+        _, log = self.run_ok(env)
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual(scan["source"]["integration"], "after-json")
+        self.assertNotIn("history", scan)
+
+    def test_a_pinned_image_still_reads_the_component_json_for_history(self):
+        self.main_with_scan(self.PRIOR_SCAN)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_IMAGE="ghcr.io/acme/api:v1",
+                   LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5")
+        _, log = self.run_ok(env)
+        self.assertEqual(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertEqual(len(self.collected(log, ".container_scan")["history"]), 1)
+
+    def test_a_pinned_image_reads_nothing_when_history_is_off(self):
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_IMAGE="ghcr.io/acme/api:v1")
+        _, log = self.run_ok(env)
+        self.assertEqual(self.getjson_calls(log), [])
+
+    def test_an_unreadable_component_json_skips_instead_of_wiping_history(self):
+        # The cron record is replaced wholesale: writing one without history
+        # destroys the trail. Skip, keep the last good record, retry next tick.
+        self._stub(
+            "lunar",
+            "#!/bin/sh\n"
+            "if [ \"$1\" = \"component\" ]; then printf 'GETJSON: %s\\n' \"$*\" >> \"$CAPTURE\"; exit 1; fi\n"
+            "printf 'ARGS: %s\\n' \"$*\" >> \"$CAPTURE\"\n",
+        )
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_IMAGE="ghcr.io/acme/api:v1",
+                   LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="5")
+        result, log = self.run_ok(env)
+        self.assertIn("skipping this re-scan", result.stderr)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+        # It bails before paying for the scan, too.
+        self.assertNotIn("Scanning image:", result.stderr)
+
+    def test_a_non_numeric_history_size_is_treated_as_off(self):
+        self.main_with_scan(self.PRIOR_SCAN)
+        env = dict(self.CRON_ENV, LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE="lots")
+        _, log = self.run_ok(env)
+        self.assertNotIn("history", self.collected(log, ".container_scan"))
+
 if __name__ == "__main__":
     unittest.main()

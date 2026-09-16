@@ -19,14 +19,16 @@ This collector writes to the following Component JSON paths:
 | `.sca.history[]` | array | *(opt-in)* Bounded list of prior scan snapshots (source, counts, summary) for point-in-time audit; oldest first. `[0]` is the oldest retained scan — the release-time (`integration="code"`) scan when history is enabled from the first scan. Absent unless `scan_history_size > 0` |
 | `.sca.rescan_count` | number | *(opt-in)* Monotonic tally of completed re-scans, used to enforce `max_rescans` independently of the (capped) `.sca.history[]` length. Present when scan history or `max_rescans` is enabled |
 | `.sca.native.grype` | object | Raw Grype match output and CI command detection data |
-| `.container_scan.source` | object | Source metadata for the container image scan (tool, version, integration) |
+| `.container_scan.source` | object | Source metadata for the container image scan: `tool`, `version`, `integration`, `collected_at` (when the scan ran) and `collected_sha` (the commit the run was bound to) |
 | `.container_scan.image` | string | The primary (most recently pushed) scanned image reference (e.g. `registry/app:tag`) |
+| `.container_scan.digest` | string | Registry digest of the primary image, resolved at scan time. Absent when the registry reports none |
 | `.container_scan.vulnerabilities` | object | Severity counts across every scanned image (critical, high, medium, low, total) |
 | `.container_scan.findings[]` | array | Individual image findings (OS and application packages), each with the `image` it was found in |
-| `.container_scan.images[]` | array | Per-image breakdown: `image`, `tool`, `os`, `vulnerabilities`, `summary` |
+| `.container_scan.images[]` | array | Per-image breakdown: `image`, `digest`, `tool`, `os`, `vulnerabilities`, `summary` |
 | `.container_scan.errors[]` | array | Pushed images that could not be pulled or scanned (`image`, `error`) |
 | `.container_scan.os` | object | Detected base-image OS family and version of the primary image |
 | `.container_scan.summary` | object | Summary booleans across every scanned image (has_critical, has_high, all_fixable) |
+| `.container_scan.history[]` | array | *(opt-in)* Bounded list of prior container scans (`source`, `image`, `digest`, counts, summary), oldest first. Absent unless `container_scan_history_size > 0` |
 | `.container_scan.native.grype` | object | Raw Grype match output for the primary image |
 
 ## Collectors
@@ -39,7 +41,7 @@ This integration provides the following collectors (use `include` to select a su
 | `cicd` | ci-after-command | Detects Grype executions in CI; routes image scans (`grype <image>`) to `.container_scan` and dir/SBOM scans to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
 | `container-scan` | after-json | Automatically scans every image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as they're published; writes `.container_scan` |
-| `container-rescan` | cron | Re-scans every **pushed** image on a schedule, catching CVEs disclosed since they were built |
+| `container-rescan` | cron | Re-scans every **pushed** image on a schedule, catching CVEs disclosed since they were built; optionally snapshots prior scans into `.container_scan.history[]` (opt-in via `container_scan_history_size`) |
 
 ## Installation
 
@@ -108,6 +110,7 @@ policy evaluation — `.sca` behaves identically whether history is on or off.
 |-------|---------|--------|
 | `scan_history_size` | `0` | Max entries kept in `.sca.history[]`. `0` disables history (today's overwrite-only behavior). At the cap the oldest entry (`[0]`) is kept and the second-oldest is dropped. |
 | `max_rescans` | `0` | Stop re-scanning a component after this many re-scans (`0` = unlimited). Counted independently via `.sca.rescan_count`, so it stands alone — no dependency on `scan_history_size`. |
+| `container_scan_history_size` | `0` | Max entries kept in `.container_scan.history[]` by the `container-rescan` cron. `0` disables it. Independent of `scan_history_size`, which covers `.sca`. |
 
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
 maintains history — the on-push `auto` scan ignores these inputs.
@@ -129,6 +132,22 @@ collectors:
 ```
 
 > **`container-scan` needs a Hub with the `after-json` hook.** Without it, `exclude: [container-scan]` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
+
+**Scan provenance.** A container scan records what it scanned and when: `source.collected_at`, `source.collected_sha` (the commit the run was bound to) and the registry `digest` of each image, resolved from the scanner's own output. The digest is the field that matters — the recorded reference is usually a floating tag like `registry/app:main`, so counts alone cannot tell you whether a scan covers the artifact you are about to promote. Compare `digest` against the digest you are promoting; if they differ, the numbers describe different bytes. A digest the registry does not report is left absent rather than guessed.
+
+`collected_sha` is provenance, not identity: on a cron re-scan it is the latest ingested default-branch commit, which need not be the commit that built the image.
+
+**Container scan history.** Set `container_scan_history_size` above `0` and each cron re-scan snapshots the current `.container_scan` into a bounded `.container_scan.history[]` before overwriting it, so the scan a release shipped with stays readable after later re-scans replace the live counts:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/grype@main
+    on: ["domain:your-domain"]
+    with:
+      container_scan_history_size: "30"
+```
+
+Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only — `findings[]`, `images[]` and `native` are concatenated across collectors by the Hub, so snapshotting them would double them. At the cap the oldest entry is kept and the second-oldest dropped. Only the `container-rescan` cron maintains history; the on-push `container-scan` ignores the input. If the re-scan cannot read the current Component JSON it skips that tick rather than write a record without history.
 
 **Private registries:** the `container-rescan` cron pulls the images, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets.
 
