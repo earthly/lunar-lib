@@ -25,15 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counts and summary, oldest first. Defaults to `0` — no history, no change for
   existing installs (#320).
 
-## [1.15.1] — 2026-09-15
-
 ### Fixed
+
+- `github-org` cataloger: organizations with more than 1000 repositories are now
+  cataloged in full. The cataloger passed `--no-archived` and `--visibility` to
+  `gh repo list`, either of which can switch the listing to GitHub's search API
+  and return at most 1000 results, so a large org was silently truncated to a
+  1000-repo window that churned between runs. The org is now listed in one
+  unfiltered pass, with visibility and archived state applied afterwards. The
+  `max_repos_per_visibility` input is renamed `max_repos`, since the ceiling now
+  applies to the organization rather than to each visibility (#318).
 
 - `container-scan` policy: `max-severity` and `max-total` skip a commit that
   pushed no container image instead of failing it — a CI tracer materializes
   `.containers` with incidental `docker info` calls, so the old gate treated
   nearly every commit as owing a scan. A pushed image and no scan still fails;
   `executed` is unchanged (#315).
+
+## [1.15.1] — 2026-09-15
+
+### Fixed
 
 - `gitlab` cataloger: projects GitLab has scheduled for deletion are no longer
   cataloged. A GitLab delete is delayed — the project is renamed to
