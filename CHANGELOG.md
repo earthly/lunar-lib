@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.15.1] — 2026-09-15
-
 ### Fixed
 
 - `container-scan` policy: `max-severity` and `max-total` skip a commit that
@@ -16,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.containers` with incidental `docker info` calls, so the old gate treated
   nearly every commit as owing a scan. A pushed image and no scan still fails;
   `executed` is unchanged (#315).
+
+## [1.15.1] — 2026-09-15
+
+### Fixed
 
 - `gitlab` cataloger: projects GitLab has scheduled for deletion are no longer
   cataloged. A GitLab delete is delayed — the project is renamed to
