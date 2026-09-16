@@ -23,10 +23,13 @@ fi
 cd "$(dirname "$0")/.."
 
 # No `grep -r --include` — BusyBox grep (the base plugin image) has neither.
+# `|| true` because grep's no-match exit 1 propagates through `find -exec {} +`
+# and pipefail, so `set -e` would kill the script here and the check below
+# could never explain why (per Fry on #316).
 # shellcheck disable=SC2016  # $VERSION is literal Earthfile text, not an expansion
 refs=$(find . -name Earthfile -type f -exec \
          grep -hoE 'SAVE IMAGE --push earthly/lunar-lib:[a-z0-9-]+-\$VERSION' {} + \
-       | sed 's|^SAVE IMAGE --push ||' | sort -u)
+       | sed 's|^SAVE IMAGE --push ||' | sort -u || true)
 
 if [ -z "$refs" ]; then
   echo "no 'SAVE IMAGE --push earthly/lunar-lib:<name>-\$VERSION' lines in any Earthfile — has the format changed?" >&2
