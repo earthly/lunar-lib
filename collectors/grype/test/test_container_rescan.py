@@ -391,8 +391,6 @@ class MultiImageTest(Base):
         self.assertEqual([i["image"] for i in scan["images"]], ["ghcr.io/acme/api:v1", "ghcr.io/acme/worker:v1"])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class ResolveRaceTest(Base):
@@ -535,3 +533,6 @@ class ResolveRaceTest(Base):
         self.assertIn("get-json: Error: failed to fetch component JSON", result.stderr)
         self.assertNotIn("Usage:", result.stderr)
         self.assertNotIn("--git-sha string", result.stderr)
+
+if __name__ == "__main__":
+    unittest.main()
