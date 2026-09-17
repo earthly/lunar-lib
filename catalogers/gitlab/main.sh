@@ -237,11 +237,9 @@ else
     fi
 fi
 
-# Drop excluded groups before enumerating them — in discovery mode that keeps a
-# group out of the catalog without changing an invite, and either way it saves
-# the listing call. A subgroup of a tree still being enumerated cannot be skipped
-# here, because include_subgroups returns it regardless; those projects are
-# dropped in the transform below instead.
+# Drop excluded groups before enumerating them, so their listing call is never
+# made. A subgroup of a tree we still enumerate cannot be skipped here —
+# include_subgroups returns it regardless — so it is filtered in the transform.
 if [ -s "$WORK/exclude-groups.txt" ]; then
     kept=0
     : > "$WORK/groups-kept.txt"
@@ -358,10 +356,8 @@ jq -s \
       | select(.visibility as $v | $vis | index($v))
       | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
       | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
-      # An excluded subgroup inside an included tree survives the group filter,
-      # because include_subgroups returns the whole subtree in one call. Match on
-      # the namespace prefix so "acme/sandbox" drops acme/sandbox/**, and does
-      # not drop the unrelated acme/sandbox-tools/**.
+      # Prefix on "<group>/" not "<group>": "acme/sandbox" must drop
+      # acme/sandbox/** without touching acme/sandbox-tools/**.
       | select(.path_with_namespace as $p
                | ($exclude_groups | any(. as $g | ($p | startswith($g + "/")))) | not)
       | select($include_forks == "true" or (.is_fork | not))

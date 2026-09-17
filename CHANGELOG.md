@@ -9,19 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `gitlab` cataloger: new `include_groups` input names the groups to catalog and
-  skips group discovery entirely, so the token only needs access to those groups
-  rather than permission to list groups on the instance — which a group-scoped
-  token, or an account below maintainer, does not have. Each entry goes straight
-  to that group's project listing; subgroup paths work and overlapping entries
-  are de-duplicated. Empty by default, so discovery is unchanged (#323).
-
-- `gitlab` cataloger: new `exclude_groups` input drops a group and everything
-  beneath it from the catalog, under automatic discovery or alongside
-  `include_groups`. Paths match literally, so `acme/sandbox` excludes
-  `acme/sandbox/**` and leaves `acme/sandbox-tools/**` alone. A group excluded
-  in its own right is never listed; an excluded subgroup of a group still being
-  enumerated is filtered from its projects (#323).
+- `gitlab` cataloger: new `include_groups` input catalogs only the groups you
+  name and skips the instance-wide group listing, so the token needs access only
+  to those groups. New `exclude_groups` input drops a group and everything
+  beneath it, with or without `include_groups`. Both empty by default, so
+  automatic discovery is unchanged (#323).
 
 ### Fixed
 
