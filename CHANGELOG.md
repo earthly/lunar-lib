@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to that group's project listing; subgroup paths work and overlapping entries
   are de-duplicated. Empty by default, so discovery is unchanged (#323).
 
+- `gitlab` cataloger: new `exclude_groups` input drops a group and everything
+  beneath it from the catalog, under automatic discovery or alongside
+  `include_groups`. Paths match literally, so `acme/sandbox` excludes
+  `acme/sandbox/**` and leaves `acme/sandbox-tools/**` alone. A group excluded
+  in its own right is never listed; an excluded subgroup of a group still being
+  enumerated is filtered from its projects (#323).
+
 ### Fixed
 
 - `github-org` cataloger: organizations with more than 1000 repositories are now

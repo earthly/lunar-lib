@@ -58,6 +58,7 @@ catalogers:
       of and catalogs each group's projects, including subgroups, as components.
       - Requires no list of groups: inviting the service account to a group onboards it
       - Or name the groups with include_groups, for a token that cannot list groups
+      - Keeps groups and whole subgroup trees out with exclude_groups
       - Maps GitLab project topics to Lunar tags with a configurable prefix
       - Supports filtering by visibility (public, internal, private)
       - Supports include/exclude glob patterns on the project path
@@ -98,6 +99,19 @@ inputs:
       not applied to a group named here. A path that GitLab does not return
       aborts the run, because skipping it would retire that group's components.
       Empty (the default) keeps automatic discovery.
+    default: ""
+
+  exclude_groups:
+    description: |
+      Comma-separated list of GitLab group paths to keep out of the catalog,
+      for example "acme/sandbox,globex/archive". A path excludes that group and
+      everything beneath it, matched literally rather than as a glob — so
+      "acme/sandbox" drops acme/sandbox and its subgroups, and leaves the
+      unrelated acme/sandbox-tools alone. An excluded group is never listed at
+      all, which is how you drop a discovered group without changing a GitLab
+      invite; an excluded subgroup of a group you do catalog is filtered out of
+      that group's projects instead, because GitLab returns the whole subtree in
+      one call. Works with automatic discovery and with include_groups.
     default: ""
 
   include_public:

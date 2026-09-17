@@ -4,7 +4,7 @@ Discovers the GitLab groups a service account maintains and catalogs their proje
 
 ## Overview
 
-This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account is a maintainer of, then enumerates each group's projects including subgroups. Set `include_groups` and it skips that first step, which is what a token that cannot list groups instance-wide needs. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
+This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account is a maintainer of, then enumerates each group's projects including subgroups. Set `include_groups` and it skips that first step, which is what a token that cannot list groups instance-wide needs; `exclude_groups` drops groups and subgroup trees from either mode. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
 
 ## Synced Data
 
@@ -191,6 +191,23 @@ The difference is a permission, not a filter. With discovery the cataloger calls
 Entries are group paths as GitLab spells them, and may be subgroups (`acme/payments`). `include_subgroups` still applies, so naming a parent covers its whole subtree and nesting two entries from the same tree is redundant rather than harmful — the overlap is de-duplicated. The maintainer floor that discovery enforces does not apply here: a group you name is cataloged at whatever access the token has to it, which is the point, but a group below maintainer is also a group whose webhooks the Hub cannot register, so its components will sit at zero checks.
 
 A path GitLab does not return — a typo, or a group the token cannot see — aborts the run. That is deliberate and matches how the cataloger treats any other failed group: the alternative is quietly cataloging everything *except* that group, which retires every component under it.
+
+### Dropping groups and subgroups
+
+`exclude_groups` is the other half, and it works in both modes:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    with:
+      exclude_groups: "acme/sandbox,globex/archive"
+```
+
+Each entry excludes that group **and everything beneath it**, matched literally rather than as a glob — `acme/sandbox` drops `acme/sandbox` and every subgroup under it, and leaves the unrelated `acme/sandbox-tools` alone. Under automatic discovery this is how you keep a group out of the catalog without changing a GitLab invite; with `include_groups` it carves a subtree out of a group you otherwise want.
+
+Where it applies depends on what you excluded. A group that would have been enumerated in its own right is dropped before the listing call, so the request is never made. A subgroup of a group you *are* enumerating cannot be skipped that way — `include_subgroups` returns the whole subtree in one response — so its projects are filtered out afterwards. Same result either way; only the request count differs.
+
+It overlaps with `exclude_projects: "acme/sandbox/*"`, which also works. Reach for `exclude_groups` when you mean a group (it reads as one, it skips the listing call where it can, and it needs no glob), and `exclude_projects` when you mean a path pattern.
 
 ### Advanced configuration
 

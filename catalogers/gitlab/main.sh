@@ -20,6 +20,7 @@ INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
 INCLUDE_PERSONAL_NAMESPACES="${LUNAR_VAR_INCLUDE_PERSONAL_NAMESPACES:-false}"
 INCLUDE_GROUPS="${LUNAR_VAR_INCLUDE_GROUPS:-}"
+EXCLUDE_GROUPS="${LUNAR_VAR_EXCLUDE_GROUPS:-}"
 INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
 EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -62,6 +63,7 @@ echo "Include archived: $INCLUDE_ARCHIVED"
 echo "Include forks: $INCLUDE_FORKS"
 echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
 [ -n "$INCLUDE_GROUPS" ] && echo "Configured groups: $INCLUDE_GROUPS"
+[ -n "$EXCLUDE_GROUPS" ] && echo "Excluded groups: $EXCLUDE_GROUPS"
 [ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
 [ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -148,6 +150,38 @@ patterns_to_regex() {
     echo "${parts[*]}"
 }
 
+# Group paths are matched literally, not as globs: they name groups, and
+# exclude_projects already covers pattern matching on project paths.
+normalize_group_list() {
+    local csv="$1" out="$2" raw g
+    : > "$out"
+    [ -z "$csv" ] && return 0
+    local entries=()
+    IFS=',' read -ra entries <<< "$csv"
+    local -A seen=()
+    for raw in "${entries[@]}"; do
+        g=$(printf '%s' "$raw" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s#^/+|/+$##g')
+        [ -z "$g" ] && continue
+        [ -n "${seen[$g]:-}" ] && continue
+        seen[$g]=1
+        printf '%s\n' "$g" >> "$out"
+    done
+}
+
+# True when the group is excluded outright or sits under an excluded group.
+group_excluded() {
+    local path="$1" ex
+    while IFS= read -r ex; do
+        [ -z "$ex" ] && continue
+        [ "$path" = "$ex" ] && return 0
+        case "$path" in "$ex"/*) return 0 ;; esac
+    done < "$WORK/exclude-groups.txt"
+    return 1
+}
+
+normalize_group_list "$EXCLUDE_GROUPS" "$WORK/exclude-groups.txt"
+EXCLUDE_GROUPS_JSON=$(jq -R -s 'split("\n") | map(select(length > 0))' "$WORK/exclude-groups.txt")
+
 INCLUDE_REGEX=$(patterns_to_regex "$INCLUDE_PROJECTS")
 EXCLUDE_REGEX=$(patterns_to_regex "$EXCLUDE_PROJECTS")
 
@@ -168,15 +202,7 @@ if [ -n "$INCLUDE_GROUPS" ]; then
     # Named groups, so /groups is never called: a group-scoped token, or an
     # account below maintainer, cannot list groups instance-wide. GitLab takes a
     # URL-encoded path wherever it takes a group ID, so no lookup is needed.
-    IFS=',' read -ra CONFIGURED_GROUPS <<< "$INCLUDE_GROUPS"
-    declare -A SEEN_GROUP=()
-    for raw_group in "${CONFIGURED_GROUPS[@]}"; do
-        g=$(printf '%s' "$raw_group" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s#^/+|/+$##g')
-        [ -z "$g" ] && continue
-        [ -n "${SEEN_GROUP[$g]:-}" ] && continue
-        SEEN_GROUP[$g]=1
-        printf '%s\n' "$g" >> "$WORK/groups.txt"
-    done
+    normalize_group_list "$INCLUDE_GROUPS" "$WORK/groups.txt"
 
     GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
     if [ "$GROUP_COUNT" -eq 0 ]; then
@@ -209,6 +235,28 @@ else
         echo "Error: no top-level groups on $GITLAB_HOST are visible to the token at maintainer or above. Refusing to write an empty catalog. Set include_groups to name the groups if the token cannot list groups." >&2
         exit 1
     fi
+fi
+
+# Drop excluded groups before enumerating them — in discovery mode that keeps a
+# group out of the catalog without changing an invite, and either way it saves
+# the listing call. A subgroup of a tree still being enumerated cannot be skipped
+# here, because include_subgroups returns it regardless; those projects are
+# dropped in the transform below instead.
+if [ -s "$WORK/exclude-groups.txt" ]; then
+    kept=0
+    : > "$WORK/groups-kept.txt"
+    while IFS= read -r group; do
+        [ -z "$group" ] && continue
+        if group_excluded "$group"; then
+            echo "  excluding group: $group"
+            continue
+        fi
+        printf '%s\n' "$group" >> "$WORK/groups-kept.txt"
+        kept=$((kept + 1))
+    done < "$WORK/groups.txt"
+    mv "$WORK/groups-kept.txt" "$WORK/groups.txt"
+    GROUP_COUNT=$kept
+    echo "$GROUP_COUNT group(s) left to enumerate after exclusions"
 fi
 
 # --- project enumeration ----------------------------------------------------
@@ -289,6 +337,7 @@ jq -s \
     --arg domain_from_path "$DOMAIN_FROM_GROUP_PATH" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
+    --argjson exclude_groups "$EXCLUDE_GROUPS_JSON" \
     --arg visibilities "$VISIBILITIES" \
     --arg include_forks "$INCLUDE_FORKS" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
@@ -309,6 +358,12 @@ jq -s \
       | select(.visibility as $v | $vis | index($v))
       | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
       | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
+      # An excluded subgroup inside an included tree survives the group filter,
+      # because include_subgroups returns the whole subtree in one call. Match on
+      # the namespace prefix so "acme/sandbox" drops acme/sandbox/**, and does
+      # not drop the unrelated acme/sandbox-tools/**.
+      | select(.path_with_namespace as $p
+               | ($exclude_groups | any(. as $g | ($p | startswith($g + "/")))) | not)
       | select($include_forks == "true" or (.is_fork | not))
       # A GitLab delete is delayed: it renames the project to
       # <path>-deletion_scheduled-<id> and keeps listing it, archived still
