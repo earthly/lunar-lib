@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gitlab` cataloger: new `include_groups` input catalogs only the groups you
+  name and skips the instance-wide group listing, so the token needs access only
+  to those groups. New `exclude_groups` input drops a group and everything
+  beneath it, with or without `include_groups`. Both empty by default, so
+  automatic discovery is unchanged (#323).
+
 ### Fixed
 
 - `github-org` cataloger: organizations with more than 1000 repositories are now
