@@ -19,6 +19,7 @@ INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
 INCLUDE_PERSONAL_NAMESPACES="${LUNAR_VAR_INCLUDE_PERSONAL_NAMESPACES:-false}"
+INCLUDE_GROUPS="${LUNAR_VAR_INCLUDE_GROUPS:-}"
 INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
 EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -32,6 +33,7 @@ DOMAIN_FROM_GROUP_PATH="${LUNAR_VAR_DOMAIN_FROM_GROUP_PATH:-false}"
 
 # Maintainer. Fixed, not an input: this is the Hub's own scope signal, and a
 # lower level would onboard groups whose webhooks can never be registered.
+# Discovery only — a group named in include_groups is taken as given.
 MIN_ACCESS_LEVEL=40
 
 PER_PAGE=100
@@ -59,6 +61,7 @@ echo "API base: $API_BASE"
 echo "Include archived: $INCLUDE_ARCHIVED"
 echo "Include forks: $INCLUDE_FORKS"
 echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
+[ -n "$INCLUDE_GROUPS" ] && echo "Configured groups: $INCLUDE_GROUPS"
 [ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
 [ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -158,32 +161,54 @@ if [ -z "$VISIBILITIES" ]; then
 fi
 echo "Visibilities: $VISIBILITIES"
 
-# --- group discovery --------------------------------------------------------
+# --- group list -------------------------------------------------------------
 
-# /groups ignores id_after (verified against gitlab.com), so this endpoint is
-# offset-paginated. Bounded by group count rather than project count, so paging
-# by page=N is cheap here — but it is still walked to the end, never truncated.
-echo "Discovering top-level groups (maintainer or above)..."
 : > "$WORK/groups.txt"
-page=1
-while :; do
-    gl_api "/groups?top_level_only=true&min_access_level=${MIN_ACCESS_LEVEL}&per_page=${PER_PAGE}&page=${page}&order_by=id&sort=asc" \
-        "$WORK/groups-page.json"
-    n=$(jq 'length' "$WORK/groups-page.json")
-    [ "$n" -eq 0 ] && break
-    jq -r '.[].full_path' "$WORK/groups-page.json" >> "$WORK/groups.txt"
-    [ "$n" -lt "$PER_PAGE" ] && break
-    page=$((page + 1))
-done
+if [ -n "$INCLUDE_GROUPS" ]; then
+    # Named groups, so /groups is never called: a group-scoped token, or an
+    # account below maintainer, cannot list groups instance-wide. GitLab takes a
+    # URL-encoded path wherever it takes a group ID, so no lookup is needed.
+    IFS=',' read -ra CONFIGURED_GROUPS <<< "$INCLUDE_GROUPS"
+    declare -A SEEN_GROUP=()
+    for raw_group in "${CONFIGURED_GROUPS[@]}"; do
+        g=$(printf '%s' "$raw_group" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s#^/+|/+$##g')
+        [ -z "$g" ] && continue
+        [ -n "${SEEN_GROUP[$g]:-}" ] && continue
+        SEEN_GROUP[$g]=1
+        printf '%s\n' "$g" >> "$WORK/groups.txt"
+    done
 
-GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
-echo "Discovered $GROUP_COUNT top-level group(s): $(tr '\n' ' ' < "$WORK/groups.txt")"
-if [ "$GROUP_COUNT" -eq 0 ]; then
-    # Nothing to report is not the same as "the estate is empty" — the token may
-    # have lost its memberships. Writing an empty catalog here would retire
-    # every component, so refuse instead.
-    echo "Error: the token's account maintains no top-level groups on $GITLAB_HOST. Refusing to write an empty catalog." >&2
-    exit 1
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        echo "Error: include_groups is set but names no groups." >&2
+        exit 1
+    fi
+    echo "Using $GROUP_COUNT configured group(s), skipping discovery: $(tr '\n' ' ' < "$WORK/groups.txt")"
+else
+    # /groups ignores id_after (verified against gitlab.com), so this endpoint is
+    # offset-paginated. Bounded by group count rather than project count, so paging
+    # by page=N is cheap here — but it is still walked to the end, never truncated.
+    echo "Discovering top-level groups (maintainer or above)..."
+    page=1
+    while :; do
+        gl_api "/groups?top_level_only=true&min_access_level=${MIN_ACCESS_LEVEL}&per_page=${PER_PAGE}&page=${page}&order_by=id&sort=asc" \
+            "$WORK/groups-page.json"
+        n=$(jq 'length' "$WORK/groups-page.json")
+        [ "$n" -eq 0 ] && break
+        jq -r '.[].full_path' "$WORK/groups-page.json" >> "$WORK/groups.txt"
+        [ "$n" -lt "$PER_PAGE" ] && break
+        page=$((page + 1))
+    done
+
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    echo "Discovered $GROUP_COUNT top-level group(s): $(tr '\n' ' ' < "$WORK/groups.txt")"
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        # Nothing to report is not the same as "the estate is empty" — the token may
+        # have lost its memberships. Writing an empty catalog here would retire
+        # every component, so refuse instead.
+        echo "Error: no top-level groups on $GITLAB_HOST are visible to the token at maintainer or above. Refusing to write an empty catalog. Set include_groups to name the groups if the token cannot list groups." >&2
+        exit 1
+    fi
 fi
 
 # --- project enumeration ----------------------------------------------------
@@ -217,6 +242,13 @@ while IFS= read -r group; do
     now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     echo "  $group: $((now - before)) project(s) over $pages page(s)"
 done < "$WORK/groups.txt"
+
+# Configured paths may nest (acme and acme/payments), and include_subgroups then
+# returns the same project under both. Discovery's groups are disjoint.
+if [ -n "$INCLUDE_GROUPS" ] && [ -s "$WORK/projects.ndjson" ]; then
+    jq -s -c 'unique_by(.id) | .[]' "$WORK/projects.ndjson" > "$WORK/projects-unique.ndjson"
+    mv "$WORK/projects-unique.ndjson" "$WORK/projects.ndjson"
+fi
 
 # Personal (user) namespaces are invisible to the group sweep by construction —
 # a personal namespace is not a group — so they need their own pass. Scoped with

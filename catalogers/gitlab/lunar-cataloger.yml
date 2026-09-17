@@ -57,6 +57,7 @@ catalogers:
       Discovers every top-level GitLab group the token's account is a maintainer
       of and catalogs each group's projects, including subgroups, as components.
       - Requires no list of groups: inviting the service account to a group onboards it
+      - Or name the groups with include_groups, for a token that cannot list groups
       - Maps GitLab project topics to Lunar tags with a configurable prefix
       - Supports filtering by visibility (public, internal, private)
       - Supports include/exclude glob patterns on the project path
@@ -84,6 +85,19 @@ inputs:
       Full base URL of the GitLab REST API. Empty (the default) derives it
       from gitlab_host as https://<host>/api/v4. Set it only when your
       instance serves the API somewhere else.
+    default: ""
+
+  include_groups:
+    description: |
+      Comma-separated list of GitLab group paths to catalog, for example
+      "acme,globex/platform". When set, the cataloger skips group discovery
+      and lists projects directly under each path, so the token needs access
+      only to those groups rather than permission to list groups on the
+      instance. Subgroups are always included, so naming a parent covers its
+      whole subtree, and the maintainer requirement that discovery applies is
+      not applied to a group named here. A path that GitLab does not return
+      aborts the run, because skipping it would retire that group's components.
+      Empty (the default) keeps automatic discovery.
     default: ""
 
   include_public:
@@ -207,5 +221,6 @@ secrets:
   GL_TOKEN:
     description: |
       GitLab access token with the `api` scope, belonging to the service
-      account whose group memberships define what gets cataloged. Set it at
+      account whose group memberships define what gets cataloged — or, with
+      include_groups set, whose access to the named groups does. Set it at
       cataloger scope: `lunar secret set GL_TOKEN --scope cataloger`.
