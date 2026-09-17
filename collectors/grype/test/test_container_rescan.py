@@ -44,6 +44,7 @@ class Base(unittest.TestCase):
         # which JSON the script read is visible in the scanned ref.
         self.fixture("main.json", self.MAIN_JSON)
         self.fixture("pr.json", self.PR_JSON)
+        self.fixture("no-push.json", self.NO_PUSH_JSON)
         self.fixture("grype-results.json", self.GRYPE_RESULTS)
 
     def tearDown(self):
@@ -68,6 +69,28 @@ class Base(unittest.TestCase):
                 #!/bin/sh
                 if [ "$1" = "component" ] && [ "$2" = "get-json" ]; then
                   printf 'GETJSON: %s\\n' "$*" >> "$CAPTURE"
+                  # Test seams, both off by default. Each names a countdown file
+                  # holding the number of remaining calls that should misbehave;
+                  # -1 means forever. This is how the Hub's mat lag is modelled:
+                  # the read either fails outright (the sha's row has not
+                  # materialized) or succeeds while still missing the push
+                  # record that dispatched the wave.
+                  if [ -n "$GETJSON_FAIL" ] && [ -f "$GETJSON_FAIL" ]; then
+                    n=$(cat "$GETJSON_FAIL")
+                    if [ "$n" -ne 0 ]; then
+                      [ "$n" -gt 0 ] && echo $((n - 1)) > "$GETJSON_FAIL"
+                      echo "rpc error: code = NotFound desc = no component json for git_sha" >&2
+                      exit 1
+                    fi
+                  fi
+                  if [ -n "$GETJSON_STALE" ] && [ -f "$GETJSON_STALE" ]; then
+                    n=$(cat "$GETJSON_STALE")
+                    if [ "$n" -ne 0 ]; then
+                      [ "$n" -gt 0 ] && echo $((n - 1)) > "$GETJSON_STALE"
+                      cat "$MOCK_DIR/no-push.json"
+                      exit 0
+                    fi
+                  fi
                   for a in "$@"; do
                     if [ "$a" = "--pr" ]; then cat "$MOCK_DIR/pr.json"; exit 0; fi
                   done
@@ -247,11 +270,19 @@ class SkipSafetyTest(Base):
         self.assertIsNone(self.collected(log, ".container_scan"))
 
     def test_skips_cleanly_when_get_json_returns_nothing(self):
-        # get-json failing (or resolving no snapshot) must not fail the run.
+        # A failed read must not fail the cron run (it re-runs next tick) — but
+        # it is no longer reported as "no pushed container image", which is the
+        # conflation ENG-1831 fixes. See ResolveRaceTest for the after-json leg,
+        # where the same failure IS fatal because the wave is fire-once.
         self._stub("lunar", "#!/bin/sh\nexit 1\n")
-        result, _ = self.run_script(dict(self.CRON_ENV))
+        result, _ = self.run_script(dict(
+            self.CRON_ENV,
+            LUNAR_CONTAINER_SCAN_TEST_READ_BUDGET="2",
+            LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP="1",
+        ))
         self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertIn("No pushed container image to scan", result.stderr)
+        self.assertIn("Could not read Component JSON", result.stderr)
+        self.assertNotIn("No pushed container image to scan", result.stderr)
 
     def test_container_image_input_bypasses_get_json(self):
         # An explicitly pinned image needs no Component JSON lookup at all.
@@ -362,3 +393,145 @@ class MultiImageTest(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResolveRaceTest(Base):
+    """ENG-1831. The after-json wave is dispatched off the LIVE merged blob
+    (hub.merged_collection_blobs) the moment the push record lands, but
+    `lunar component get-json` reads through public.components[_latest] ->
+    mat.component_json, a copy the Hub drains asynchronously. So the collector
+    can be dispatched by a record it cannot yet read, and sha-pinning does not
+    help — a pinned read goes through the same mat copy.
+
+    Pre-fix the resolve was swallowed four ways on one line (`2>/dev/null`,
+    `|| echo ""`, a silenced jq, then the shared `exit 0`), so the run recorded
+    `finished, exit_code 0` and submitted an empty collection record. Because
+    the wave is fire-once per (component, sha), that commit was never scanned.
+
+    Measured on an internal Hub over 12 days (452 container-scan waves on one
+    component): 66 shas had a push record that landed BEFORE the run started
+    and still scanned nothing.
+    """
+
+    # Budgets/backoff shrunk via the script's test seam so the suite exercises
+    # the real retry loop without sleeping for real.
+    FAST = {
+        "LUNAR_CONTAINER_SCAN_TEST_READ_BUDGET": "4",
+        "LUNAR_CONTAINER_SCAN_TEST_RESOLVE_BUDGET": "4",
+        "LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP": "1",
+    }
+
+    def countdown(self, name, n):
+        path = os.path.join(self.tmp, name)
+        with open(path, "w") as f:
+            f.write(str(n))
+        return path
+
+    def test_stale_read_is_retried_until_the_push_record_appears(self):
+        # THE REGRESSION. The first two reads succeed but predate the push
+        # record (the mat copy has not drained), the third carries it. Pre-fix
+        # the first read won and the commit was never scanned.
+        env = dict(self.PR_ENV, **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", 2))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 3, msg=log)
+        self.assertIn(f"Scanning image: {self.PR_IMAGE}", result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertIsNotNone(scan, msg=log)
+        self.assertEqual(scan["image"], self.PR_IMAGE)
+
+    def test_failed_read_is_retried_until_the_row_materializes(self):
+        # The other shape: get-json returns NotFound until the sha's row drains.
+        env = dict(self.PR_ENV, **self.FAST,
+                   GETJSON_FAIL=self.countdown("fail", 2))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 3, msg=log)
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual(scan["image"], self.PR_IMAGE)
+
+    def test_happy_path_reads_once_and_never_sleeps(self):
+        # The retry must cost nothing when the record is already readable —
+        # otherwise every wave pays for the race. One call, no wait line.
+        result, log = self.run_script(dict(self.PR_ENV, **self.FAST))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertNotIn("Waited", result.stderr)
+
+    def test_persistent_read_failure_fails_the_after_json_run(self):
+        # Fire-once: a swallowed read loses this commit's scan forever, so the
+        # run has to show as failed rather than `finished, exit_code 0`.
+        env = dict(self.PR_ENV, **self.FAST,
+                   GETJSON_FAIL=self.countdown("fail", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 1, msg=result.stderr)
+        self.assertIn("Could not read Component JSON", result.stderr)
+        self.assertIn("fire-once", result.stderr)
+        # The CLI's own error reaches the run log instead of /dev/null.
+        self.assertIn("get-json: rpc error", result.stderr)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+        # ...and it is NOT reported as "nothing was pushed".
+        self.assertNotIn("No pushed container image to scan", result.stderr)
+
+    def test_persistent_no_push_ref_still_exits_zero_but_says_why(self):
+        # A read that keeps succeeding with no pushed ref is ambiguous: the hook
+        # fires on .containers.native.docker.cicd.cmds, which the docker
+        # collector writes for ANY traced docker command, so "docker ran" is
+        # enough to dispatch a wave (169 of those 452 waves never had a push
+        # record at all). Failing here would redden a legitimate state — so it
+        # waits out the resolve budget, then exits 0 saying the read SUCCEEDED.
+        env = dict(self.PR_ENV, **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("No pushed container image to scan", result.stderr)
+        self.assertIn("successfully", result.stderr)
+        self.assertIn("Waited", result.stderr)
+        self.assertGreater(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+
+    def test_cron_does_not_wait_for_a_push_ref_to_appear(self):
+        # The cron re-scan is not dispatched off a record, so it has no race to
+        # lose to and runs again on the next tick. Waiting on every tick across
+        # a fleet would be pure cost, so the resolve budget is zero there.
+        env = dict(self.CRON_ENV, **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertNotIn("Waited", result.stderr)
+
+    def test_cron_read_failure_skips_instead_of_failing(self):
+        # Not fire-once, so a persistent read failure stays skip-safe — but the
+        # message must no longer claim nothing was pushed.
+        env = dict(self.CRON_ENV, **self.FAST,
+                   GETJSON_FAIL=self.countdown("fail", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Could not read Component JSON", result.stderr)
+        self.assertIn("next scheduled run", result.stderr)
+        self.assertNotIn("No pushed container image to scan", result.stderr)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+
+    def test_cli_error_is_surfaced_without_cobras_usage_block(self):
+        # Dropping `2>/dev/null` is the point — the operator must see WHY the
+        # read failed. But the real CLI prints ~18 lines of flag usage after
+        # any error, so only the error itself is surfaced.
+        self._stub("lunar", textwrap.dedent("""\
+            #!/bin/sh
+            if [ "$1" = "component" ] && [ "$2" = "get-json" ]; then
+              printf 'GETJSON: %s\\n' "$*" >> "$CAPTURE"
+              echo "Error: failed to fetch component JSON: rpc error: code = NotFound" >&2
+              echo "Usage:" >&2
+              echo "  lunar component get-json [flags]" >&2
+              echo "      --git-sha string   The specific git SHA" >&2
+              exit 1
+            fi
+            """))
+        env = dict(self.CRON_ENV, **self.FAST)
+        result, _ = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("get-json: Error: failed to fetch component JSON", result.stderr)
+        self.assertNotIn("Usage:", result.stderr)
+        self.assertNotIn("--git-sha string", result.stderr)

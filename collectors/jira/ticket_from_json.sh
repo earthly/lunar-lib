@@ -24,14 +24,72 @@ source "$(dirname "$0")/helpers.sh"
 pr_arg=()
 [ -n "${LUNAR_COMPONENT_PR:-}" ] && pr_arg=(--pr "$LUNAR_COMPONENT_PR")
 
-COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>/dev/null || echo "")
-PR_TITLE=$(echo "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty' 2>/dev/null)
+# The read races the record that dispatched this run, so in PR context it is
+# RETRIED.
+#
+# The after-json wave fires off the LIVE merged blob the instant .vcs.pr.title
+# lands, but `lunar component get-json` resolves through a copy the Hub's mat
+# workers drain asynchronously — so this collector can be dispatched by a record
+# it cannot yet read.
+#
+# Here the trigger path IS the input: the hook is `after-json` on .vcs.pr.title,
+# and the Hub dispatches only collectors whose path is PRESENT in that live blob.
+# So in PR context a missing title cannot mean "this PR has no title" — it means
+# the read is behind the record that triggered the run. Retry it, and FAIL
+# rather than skip if it never arrives: the wave is fire-once per
+# (component, sha), so a swallowed read loses this PR's ticket permanently and
+# no re-run recovers it.
+#
+# Outside PR context nothing changes. A branch push has no .vcs.pr.title for the
+# hook to match, so the wave does not fire there at all — that path is only
+# reached by a manual/dev run, where an absent title is genuine and skipping is
+# right.
+#
+# The _TEST_ override is a test seam, deliberately NOT declared in `inputs:`.
+READ_BUDGET_SECS="${LUNAR_JIRA_TEST_READ_BUDGET:-900}"
+BACKOFF_STEP="${LUNAR_JIRA_TEST_BACKOFF_STEP:-5}"
+[ -n "${LUNAR_COMPONENT_PR:-}" ] || READ_BUDGET_SECS=0
+
+# Disposable container, so a fixed path needs no mktemp and no cleanup.
+GETJSON_ERR=/tmp/get-json.err
+ATTEMPT=0
+WAITED=0
+while :; do
+  ATTEMPT=$((ATTEMPT + 1))
+  if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>"$GETJSON_ERR"); then
+    PR_TITLE=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty')
+  else
+    COMPONENT_JSON=""
+    PR_TITLE=""
+    # Surface the CLI's own error instead of discarding it — `2>/dev/null ||
+    # echo ""` turned a broken read into a clean-looking skip. Once, not once
+    # per attempt; the error itself, not cobra's usage block.
+    if [ "$ATTEMPT" -eq 1 ] && [ -s "$GETJSON_ERR" ]; then
+      sed -n '/^Usage:/q;p' "$GETJSON_ERR" | head -c 500 | sed 's/^/  get-json: /' >&2
+    fi
+  fi
+  [ -n "$PR_TITLE" ] && break
+  BACKOFF=$((ATTEMPT * BACKOFF_STEP))
+  [ "$BACKOFF" -gt $((BACKOFF_STEP * 6)) ] && BACKOFF=$((BACKOFF_STEP * 6))
+  [ $((WAITED + BACKOFF)) -gt "$READ_BUDGET_SECS" ] && break
+  sleep "$BACKOFF"
+  WAITED=$((WAITED + BACKOFF))
+done
+if [ "$WAITED" -gt 0 ]; then
+  echo "Waited ${WAITED}s across ${ATTEMPT} attempt(s) for .vcs.pr.title to become readable." >&2
+fi
+
 # PR_BODY is consumed by resolve_ticket/list_ticket_candidates in helpers.sh.
 # shellcheck disable=SC2034
-PR_BODY=$(echo "$COMPONENT_JSON" | jq -r '.vcs.pr.description // empty' 2>/dev/null)
+PR_BODY=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.description // empty' 2>/dev/null)
 
 if [ -z "$PR_TITLE" ]; then
-  echo "No .vcs.pr.title in Component JSON (PR-metadata collector not run yet?), skipping." >&2
+  if [ -n "${LUNAR_COMPONENT_PR:-}" ]; then
+    echo "No .vcs.pr.title for ${LUNAR_COMPONENT_ID:-?} PR ${LUNAR_COMPONENT_PR} after ${WAITED}s across ${ATTEMPT} attempt(s). The after-json hook on .vcs.pr.title only fires when that path is present, so the read is behind the record that dispatched this run rather than the title being absent." >&2
+    echo "Failing the run: the wave is fire-once per (component, sha), so this PR's ticket is lost and no re-run recovers it." >&2
+    exit 1
+  fi
+  echo "No .vcs.pr.title in Component JSON and not a PR run (PR-metadata collector not run yet?), skipping." >&2
   exit 0
 fi
 
