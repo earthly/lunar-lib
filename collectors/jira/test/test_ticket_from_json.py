@@ -227,6 +227,20 @@ class ReadRaceTest(Base):
         self.assertNotIn("Waited", result.stderr)
         self.assertNotIn(".vcs.pr.ticket.id", log)
 
+    def test_unparseable_blob_retries_instead_of_aborting_on_jq(self):
+        # `set -e` with no pipefail: an assignment from a failing jq aborts the
+        # script on jq's bare exit status. So a malformed blob has to be routed
+        # into the retry (and its error surfaced), not allowed to kill the run
+        # with no explanation.
+        self.fixture("pr.json", "not json at all")
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST)
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 1, msg=result.stderr)
+        self.assertIn("jq: ", result.stderr)          # error surfaced, not hidden
+        self.assertIn("fire-once", result.stderr)     # reached the loud arm
+        self.assertGreater(len(self.getjson_calls(log)), 1, msg=log)  # retried
+        self.assertNotIn(".vcs.pr.ticket.id", log)
+
 
 if __name__ == "__main__":
     unittest.main()

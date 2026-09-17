@@ -52,12 +52,22 @@ BACKOFF_STEP="${LUNAR_JIRA_TEST_BACKOFF_STEP:-5}"
 
 # Disposable container, so a fixed path needs no mktemp and no cleanup.
 GETJSON_ERR=/tmp/get-json.err
+JQ_ERR=/tmp/jq.err
 ATTEMPT=0
 WAITED=0
 while :; do
   ATTEMPT=$((ATTEMPT + 1))
   if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>"$GETJSON_ERR"); then
-    PR_TITLE=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty')
+    # `set -e` is on and there is no pipefail, so an assignment from a failing
+    # jq would abort the script here on jq's bare exit status — no retry, no
+    # explanation. An unparseable blob is one of the shapes this fix exists to
+    # make visible, so surface jq's error and let the retry below decide.
+    if ! PR_TITLE=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.title // empty' 2>"$JQ_ERR"); then
+      PR_TITLE=""
+      if [ "$ATTEMPT" -eq 1 ] && [ -s "$JQ_ERR" ]; then
+        sed 's/^/  jq: /' "$JQ_ERR" >&2
+      fi
+    fi
   else
     COMPONENT_JSON=""
     PR_TITLE=""
@@ -80,8 +90,12 @@ if [ "$WAITED" -gt 0 ]; then
 fi
 
 # PR_BODY is consumed by resolve_ticket/list_ticket_candidates in helpers.sh.
+# The `|| PR_BODY=""` is load-bearing, not defensive noise: an unparseable blob
+# leaves PR_TITLE empty above without aborting, so this jq can still fail — and
+# under `set -e` an unhandled failing assignment would exit here on jq's bare
+# status, skipping the diagnosis below entirely.
 # shellcheck disable=SC2034
-PR_BODY=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.description // empty' 2>/dev/null)
+PR_BODY=$(printf '%s' "$COMPONENT_JSON" | jq -r '.vcs.pr.description // empty' 2>/dev/null) || PR_BODY=""
 
 if [ -z "$PR_TITLE" ]; then
   if [ -n "${LUNAR_COMPONENT_PR:-}" ]; then
