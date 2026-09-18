@@ -55,6 +55,19 @@ probes:
   # to the agent. Edit already happened, so this is a louder nudge, not a true
   # block; the agent should self-correct on its next turn.
 
+  - name: changelog-not-hand-edited
+    hook:
+      type: agent-before-file-edit
+      paths: "CHANGELOG.md"
+    message: >-
+      CHANGELOG.md is generated at release time by
+      scripts/gen-changelog-section.sh from the commits in the tag range. Don't
+      add an entry here -- your PR title becomes the entry when the next version
+      ships. Hand-appending is what put six entries under an already-released
+      heading: the version roll inserted a `## [X.Y.Z]` header directly above
+      the list an in-flight PR was written against, so it merged into the
+      shipped section with no conflict and nothing to flag it.
+
   - name: svg-black-fill
     hook:
       type: agent-after-file-edit
