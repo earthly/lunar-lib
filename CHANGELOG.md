@@ -5,59 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- `gitlab` cataloger: new `include_groups` input catalogs only the groups you
-  name and skips the instance-wide group listing, so the token needs access only
-  to those groups. New `exclude_groups` input drops a group and everything
-  beneath it, with or without `include_groups`. Both empty by default, so
-  automatic discovery is unchanged (#323).
-
-### Changed
-
-- `github-org` cataloger: repositories with no commits are no longer cataloged.
-  An empty repo has no commit for a collector to run against or a policy to
-  evaluate, so it only ever appeared in the catalog as a component that could
-  never report anything. Set `include_empty: "true"` to keep cataloging them
-  (#321).
-
-### Fixed
-
-- `github-org` cataloger: the `include_repos` and `exclude_repos` glob filters
-  now work. Converting a glob to a regex escaped `?`, which BusyBox sed — the
-  sed in the plugin image — reads as a repetition operator, so the conversion
-  errored and every pattern collapsed to `^$`: an org with `include_repos` set
-  cataloged nothing at all, and `exclude_repos` excluded nothing. Neither filter
-  has ever worked in a released image (#321).
-
-- `grype` / `trivy` `container-scan`: a commit's images are no longer left
-  unscanned when the scan starts before the pushed-image record is readable. The
-  on-push scan is dispatched the moment the record lands, but the collector reads
-  it back through a copy that lags slightly, so the lookup could miss the very
-  record that triggered it — and every way that could fail (a failed read, an
-  unparseable one, no image found) ended at the same silent skip, so the run
-  reported success having scanned nothing. On-push scans fire once per commit, so
-  nothing rescanned it. The lookup is now retried, its error is reported instead
-  of discarded, and an unreadable one fails the run; a commit that genuinely
-  pushed no image still skips, and now says so. The `jira` `ticket-from-json`
-  collector read the PR title back the same way and is fixed alongside it (#322).
-
-- `github-org` cataloger: organizations with more than 1000 repositories are now
-  cataloged in full. The cataloger passed `--no-archived` and `--visibility` to
-  `gh repo list`, either of which can switch the listing to GitHub's search API
-  and return at most 1000 results, so a large org was silently truncated to a
-  1000-repo window that churned between runs. The org is now listed in one
-  unfiltered pass, with visibility and archived state applied afterwards. The
-  `max_repos_per_visibility` input is renamed `max_repos`, since the ceiling now
-  applies to the organization rather than to each visibility (#318).
-
-- `container-scan` policy: `max-severity` and `max-total` skip a commit that
-  pushed no container image instead of failing it — a CI tracer materializes
-  `.containers` with incidental `docker info` calls, so the old gate treated
-  nearly every commit as owing a scan. A pushed image and no scan still fails;
-  `executed` is unchanged (#315).
+Sections are generated at release time by `scripts/gen-changelog-section.sh` from
+the commits in the tag range — don't hand-edit. A merged change appears here when
+the next version ships.
 
 ## [1.15.1] — 2026-09-15
 
@@ -971,7 +921,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.15.1...HEAD
 [1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/earthly/lunar-lib/compare/v1.14.5...v1.15.0
 [1.14.5]: https://github.com/earthly/lunar-lib/compare/v1.14.4...v1.14.5
