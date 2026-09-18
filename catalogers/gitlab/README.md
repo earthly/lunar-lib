@@ -4,7 +4,7 @@ Discovers the GitLab groups a service account maintains and catalogs their proje
 
 ## Overview
 
-This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account is a maintainer of, then enumerates each group's projects including subgroups. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
+This cataloger syncs GitLab projects into the Lunar catalog without being told which groups to look in: it lists every top-level group the token's account is a maintainer of, then enumerates each group's projects including subgroups. Or set `include_groups` to name the groups instead, which skips that first step. It maps project topics to Lunar tags and supports filtering by visibility, project path, and topic. Onboarding a new group is an invite on the GitLab side, with no configuration change here — which is the point on an instance with many root-level groups. It works against gitlab.com as well as self-managed and Dedicated hosts via the `gitlab_host` input.
 
 ## Synced Data
 
@@ -20,7 +20,7 @@ This cataloger writes to the following Catalog JSON paths:
 | `.components[*].meta.archived` | string | Whether the project is archived (`"true"`/`"false"`) |
 | `.components[*].meta.default_branch` | string | Project default branch, omitted for a project with no commits |
 | `.components[*].meta.project_id` | string | GitLab numeric project ID, stable across renames |
-| `.components[*].meta.group` | string | Top-level group the project was discovered under |
+| `.components[*].meta.group` | string | Group the project was listed under |
 | `.components[*].meta.fork` | string | Whether the project is a fork (`"true"`/`"false"`) |
 | `.components[*].meta.namespace_kind` | string | Namespace the project lives in (`group` or `user`) |
 | `.components[*].meta.forked_from` | string | Path of the project this was forked from, absent when it is not a fork |
@@ -175,6 +175,20 @@ catalogers:
       exclude_projects: "*/sandbox/*,*/deprecated-*" # never these
 ```
 
+### Naming the groups instead of discovering them
+
+`include_groups` catalogs only the groups you list and skips the `GET /groups` call, which is what a token that cannot list groups instance-wide needs. `exclude_groups` drops a group and everything beneath it, with or without `include_groups`.
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    with:
+      include_groups: "acme,globex/platform"
+      exclude_groups: "acme/sandbox"
+```
+
+Entries are group paths and may be subgroups; subgroups are always included, so naming a parent covers its subtree. Both match literally, not as globs, so `acme/sandbox` leaves `acme/sandbox-tools` alone. A path GitLab does not return aborts the run, like any other failed group — skipping it would retire every component under it.
+
 ### Advanced configuration
 
 ```yaml
@@ -233,7 +247,7 @@ This cataloger reads the GitLab REST API (`/api/v4`) with `curl`, authenticating
 
 ### Discovery and scale
 
-Two steps per run. First, `/groups?top_level_only=true&min_access_level=40` lists the top-level groups where the account holds at least the maintainer role — only groups it is a member of, not every group on the instance. That level is fixed rather than configurable on purpose: maintainer is what the Hub itself requires of the GitLab service account, and group membership at that level is how the Hub decides what to serve, so the cataloger discovers exactly the groups the Hub can work with. Cataloging a group below it would create components whose webhooks can never be registered, which show up and then sit at zero checks forever. Then each group's projects are listed from `/groups/:id/projects?include_subgroups=true`, which covers the whole subtree in one pass, so subgroups are never enumerated separately.
+Two steps per run. First, `/groups?top_level_only=true&min_access_level=40` lists the top-level groups where the account holds at least the maintainer role — only groups it is a member of, not every group on the instance. That level is fixed rather than configurable on purpose: maintainer is what the Hub itself requires of the GitLab service account, and group membership at that level is how the Hub decides what to serve, so the cataloger discovers exactly the groups the Hub can work with. Cataloging a group below it would create components whose webhooks can never be registered, which show up and then sit at zero checks forever. Then each group's projects are listed from `/groups/:id/projects?include_subgroups=true`, which covers the whole subtree in one pass, so subgroups are never enumerated separately. `include_groups` skips straight to that second step — GitLab takes a URL-encoded path wherever it takes a group ID.
 
 Project listing uses **keyset pagination** (`order_by=id&sort=asc` plus `id_after`), walking until a page comes back empty. There is no configured ceiling on the number of projects or groups: a cap that silences itself is worse than a long run, so the cataloger pages until GitLab says there are no more.
 

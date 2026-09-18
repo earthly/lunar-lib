@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gitlab` cataloger: new `include_groups` input catalogs only the groups you
+  name and skips the instance-wide group listing, so the token needs access only
+  to those groups. New `exclude_groups` input drops a group and everything
+  beneath it, with or without `include_groups`. Both empty by default, so
+  automatic discovery is unchanged (#323).
+
 ### Changed
 
 - `github-org` cataloger: repositories with no commits are no longer cataloged.
@@ -23,6 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errored and every pattern collapsed to `^$`: an org with `include_repos` set
   cataloged nothing at all, and `exclude_repos` excluded nothing. Neither filter
   has ever worked in a released image (#321).
+
+- `grype` / `trivy` `container-scan`: a commit's images are no longer left
+  unscanned when the scan starts before the pushed-image record is readable. The
+  on-push scan is dispatched the moment the record lands, but the collector reads
+  it back through a copy that lags slightly, so the lookup could miss the very
+  record that triggered it — and every way that could fail (a failed read, an
+  unparseable one, no image found) ended at the same silent skip, so the run
+  reported success having scanned nothing. On-push scans fire once per commit, so
+  nothing rescanned it. The lookup is now retried, its error is reported instead
+  of discarded, and an unreadable one fails the run; a commit that genuinely
+  pushed no image still skips, and now says so. The `jira` `ticket-from-json`
+  collector read the PR title back the same way and is fixed alongside it (#322).
 
 - `github-org` cataloger: organizations with more than 1000 repositories are now
   cataloged in full. The cataloger passed `--no-archived` and `--visibility` to
