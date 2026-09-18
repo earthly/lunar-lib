@@ -125,8 +125,9 @@ policies:
   - name: aws-imdsv2-required
     description: |
       Requires EC2 instances and launch templates to demand IMDSv2
-      (http_tokens = required) with a hop limit of 1, so a container or a
-      request-forging process cannot read the instance role's credentials.
+      (http_tokens = required, which defaults to optional) and objects to an
+      explicit hop limit above 1, so a container or a request-forging process
+      cannot read the instance role's credentials.
     mainPython: aws_imdsv2_required.py
     keywords: ["imdsv2", "instance metadata", "ssrf", "credential theft", "ec2", "soc2"]
 

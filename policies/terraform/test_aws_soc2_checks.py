@@ -706,9 +706,23 @@ class TestImdsv2Required(unittest.TestCase):
             {"http_tokens": "required", "http_put_response_hop_limit": 2}]}]}})
         self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
 
+    def test_pass_hop_limit_unset(self):
+        # The provider default is 1, which is already safe — requiring it to be
+        # written out would fail a hardened config on a wrong premise.
+        n = node({"aws_instance": {"i": [{"metadata_options": [
+            {"http_tokens": "required"}]}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.PASS)
+
     def test_fail_no_metadata_options(self):
-        # Defaults are IMDSv1-optional with hop limit 2, so absence is a fail.
+        # http_tokens defaults to "optional", so absence leaves IMDSv1 open.
         n = node({"aws_instance": {"i": [{"ami": "ami-1"}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
+
+    def test_fail_hop_limit_unresolved(self):
+        # Set but not a literal — unknown is not the same as unset.
+        n = node({"aws_instance": {"i": [{"metadata_options": [
+            {"http_tokens": "required",
+             "http_put_response_hop_limit": "${var.hops}"}]}]}})
         self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
 
     def test_skip_no_instances(self):

@@ -46,7 +46,7 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-iam-password-min-length` | IAM password policy enforces a minimum length | No `aws_iam_account_password_policy`, or length below the minimum |
 | `aws-iam-no-direct-user-policies` | No IAM policies attached directly to users | Inline/managed policy attached to a user instead of a group or role |
 | `aws-iam-role-permissions-boundary` | IAM roles set a permissions boundary | `aws_iam_role` without a non-empty `permissions_boundary` |
-| `aws-imdsv2-required` | EC2 metadata requires IMDSv2, hop limit 1 | `aws_instance`/`aws_launch_template` without `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }` |
+| `aws-imdsv2-required` | EC2 metadata requires IMDSv2, no extra hops | `aws_instance`/`aws_launch_template` without `http_tokens = "required"`, or with an explicit `http_put_response_hop_limit` above 1 |
 | `aws-acm-cert-dns-validation` | ACM certificates use DNS validation | `aws_acm_certificate` using EMAIL (or unset) validation |
 | `aws-eks-private-endpoint` | EKS clusters enable private endpoint access | Cluster without `endpoint_private_access` / `cluster_endpoint_private_access` |
 | `aws-dynamodb-encryption` | DynamoDB tables declare encryption at rest | Table without a `server_side_encryption { enabled = true }` block |
