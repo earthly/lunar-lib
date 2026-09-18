@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `container-scan` policy: `max-severity`, `max-total` and `executed` now name the pushed images
+  that have no scan results, instead of reporting "Ensure a scanner (Trivy, Grype, etc.) is
+  configured" — a configured scanner that ran and recorded nothing leaves the same empty
+  `.container_scan`, so the old line sent readers looking for a config gap that was not there
+  (#325).
+
 - `grype` / `trivy` `container-scan`: a commit's images are no longer left
   unscanned when the scan starts before the pushed-image record is readable. The
   on-push scan is dispatched the moment the record lands, but the collector reads

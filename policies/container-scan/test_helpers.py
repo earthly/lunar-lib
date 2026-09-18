@@ -17,8 +17,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lunar_policy import Node, CheckStatus  # noqa: E402
 
+import executed  # noqa: E402
 import max_total  # noqa: E402
-from helpers import pushed_image_refs, pushed_ref  # noqa: E402
+from helpers import (  # noqa: E402
+    no_scan_data_reasons,
+    pushed_image_refs,
+    pushed_ref,
+)
 
 
 def node(cmds=None, container_scan=None):
@@ -104,7 +109,65 @@ class MaxTotalApplicabilityTests(unittest.TestCase):
     def test_fails_when_an_image_was_pushed_and_not_scanned(self):
         c = self.run_check(node([{"cmd": "docker push example.com/a:1"}]))
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        self.assertIn("No container scanning data found", c.failure_reasons[0])
+        self.assertIn("No container scan results at this commit", c.failure_reasons[0])
+        self.assertEqual(c.failure_reasons[1], "not scanned: example.com/a:1")
+
+
+class NoScanDataMessageTests(unittest.TestCase):
+    """What the checks say when `.container_scan` is absent.
+
+    The line this replaced — "Ensure a scanner (Trivy, Grype, etc.) is
+    configured" — sent readers looking for a configuration gap on an install
+    where both scanners were configured, ran, and recorded nothing for the
+    commit. Neither reading is assumed now, and the images that have no results
+    are named.
+    """
+
+    def test_names_every_unscanned_image(self):
+        reasons = no_scan_data_reasons(["example.com/a:1", "example.com/b:1"])
+        self.assertIn("though it pushed 2 image(s)", reasons[0])
+        self.assertEqual(reasons[1:], ["not scanned: example.com/a:1", "not scanned: example.com/b:1"])
+
+    def test_does_not_blame_configuration_alone(self):
+        for reasons in (no_scan_data_reasons([]), no_scan_data_reasons(["example.com/a:1"])):
+            self.assertNotIn("Ensure a scanner", reasons[0])
+            self.assertIn("or a configured one recorded nothing here", reasons[0])
+
+    def test_says_nothing_about_pushes_when_there_were_none(self):
+        # `executed` fails a commit with no pushed image at all, so the headline
+        # has to read correctly with an empty list.
+        reasons = no_scan_data_reasons([])
+        self.assertEqual(len(reasons), 1)
+        self.assertNotIn("pushed", reasons[0])
+
+
+class ExecutedTests(unittest.TestCase):
+    """`executed` gates on `.containers` alone — it asks whether a scan was owed."""
+
+    def run_check(self, n):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return executed.main(node=n)
+
+    def test_skips_without_containers(self):
+        n = Node.from_component_json({}, bundle_info={"workflows_finished": True})
+        c = self.run_check(n)
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+
+    def test_fails_and_names_the_unscanned_image(self):
+        c = self.run_check(node([{"cmd": "docker push example.com/a:1"}]))
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(c.failure_reasons[1], "not scanned: example.com/a:1")
+
+    def test_still_fails_when_nothing_was_pushed(self):
+        # Unlike max-severity/max-total, a commit that pushed nothing but has a
+        # docker record still owes a scan here.
+        c = self.run_check(node([{"cmd": "docker info"}]))
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(len(c.failure_reasons), 1)
+
+    def test_passes_when_a_scan_exists(self):
+        c = self.run_check(node([{"cmd": "docker push example.com/a:1"}], container_scan={"image": "example.com/a:1"}))
+        self.assertEqual(resolved_status(c), CheckStatus.PASS)
 
 
 if __name__ == "__main__":
