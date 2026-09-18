@@ -44,6 +44,9 @@ import aws_dynamodb_encryption
 import aws_lambda_not_public
 import aws_cloudtrail_log_file_validation
 import aws_cloudtrail_kms_encryption
+import aws_iam_role_permissions_boundary
+import aws_imdsv2_required
+import opentofu_state_encryption
 
 
 def node(resource):
@@ -60,6 +63,15 @@ def node_module(module):
     return Node.from_component_json(
         {"iac": {"native": {"terraform": {"files": [
             {"path": "main.tf", "hcl": {"module": module}}
+        ]}}}}
+    )
+
+
+def node_terraform(tf):
+    """Build a node from a terraform {} block body (a list of block dicts)."""
+    return Node.from_component_json(
+        {"iac": {"native": {"terraform": {"files": [
+            {"path": "main.tf", "hcl": {"terraform": tf}}
         ]}}}}
     )
 
@@ -640,6 +652,98 @@ class TestCloudTrailKmsEncryption(unittest.TestCase):
     def test_skip_no_trail(self):
         n = node({"aws_s3_bucket": {"b": [{}]}})
         self.assertEqual(status(aws_cloudtrail_kms_encryption, n), CheckStatus.SKIPPED)
+
+
+
+class TestIamRolePermissionsBoundary(unittest.TestCase):
+    def test_pass(self):
+        n = node({"aws_iam_role": {"app": [
+            {"permissions_boundary": "arn:aws:iam::1:policy/boundary"}]}})
+        self.assertEqual(
+            status(aws_iam_role_permissions_boundary, n), CheckStatus.PASS)
+
+    def test_fail_absent(self):
+        n = node({"aws_iam_role": {"app": [{"name": "app"}]}})
+        self.assertEqual(
+            status(aws_iam_role_permissions_boundary, n), CheckStatus.FAIL)
+
+    def test_fail_empty_string(self):
+        # An empty boundary is as unbounded as no boundary.
+        n = node({"aws_iam_role": {"app": [{"permissions_boundary": "  "}]}})
+        self.assertEqual(
+            status(aws_iam_role_permissions_boundary, n), CheckStatus.FAIL)
+
+    def test_skip_no_roles(self):
+        n = node({"aws_s3_bucket": {"b": [{}]}})
+        self.assertEqual(
+            status(aws_iam_role_permissions_boundary, n), CheckStatus.SKIPPED)
+
+    def test_skip_no_terraform(self):
+        self.assertEqual(
+            status(aws_iam_role_permissions_boundary, EMPTY), CheckStatus.SKIPPED)
+
+
+class TestImdsv2Required(unittest.TestCase):
+    def test_pass(self):
+        n = node({"aws_launch_template": {"lt": [{"metadata_options": [
+            {"http_tokens": "required", "http_put_response_hop_limit": 1}]}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.PASS)
+
+    def test_pass_string_hop_limit(self):
+        # hcl2json renders numbers as strings in some shapes.
+        n = node({"aws_instance": {"i": [{"metadata_options": [
+            {"http_tokens": "required", "http_put_response_hop_limit": "1"}]}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.PASS)
+
+    def test_fail_optional_tokens(self):
+        n = node({"aws_instance": {"i": [{"metadata_options": [
+            {"http_tokens": "optional", "http_put_response_hop_limit": 1}]}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
+
+    def test_fail_hop_limit_two(self):
+        # The AWS default. A pod on the host can reach the node role at 2.
+        n = node({"aws_launch_template": {"lt": [{"metadata_options": [
+            {"http_tokens": "required", "http_put_response_hop_limit": 2}]}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
+
+    def test_fail_no_metadata_options(self):
+        # Defaults are IMDSv1-optional with hop limit 2, so absence is a fail.
+        n = node({"aws_instance": {"i": [{"ami": "ami-1"}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.FAIL)
+
+    def test_skip_no_instances(self):
+        n = node({"aws_s3_bucket": {"b": [{}]}})
+        self.assertEqual(status(aws_imdsv2_required, n), CheckStatus.SKIPPED)
+
+
+class TestOpenTofuStateEncryption(unittest.TestCase):
+    def test_pass(self):
+        n = node_terraform([{"encryption": [{
+            "key_provider": [{"aws_kms": [{"key": [{"kms_key_id": "k"}]}]}],
+            "state": [{"method": "${method.aes_gcm.m}", "enforced": True}],
+        }]}])
+        self.assertEqual(status(opentofu_state_encryption, n), CheckStatus.PASS)
+
+    def test_fail_no_encryption_block(self):
+        n = node_terraform([{"required_version": ">= 1.6"}])
+        self.assertEqual(status(opentofu_state_encryption, n), CheckStatus.FAIL)
+
+    def test_fail_not_enforced(self):
+        # Without enforced it falls back to plaintext instead of failing.
+        n = node_terraform([{"encryption": [{
+            "key_provider": [{"aws_kms": [{"key": [{}]}]}],
+            "state": [{"method": "${method.aes_gcm.m}", "enforced": False}],
+        }]}])
+        self.assertEqual(status(opentofu_state_encryption, n), CheckStatus.FAIL)
+
+    def test_fail_no_key_provider(self):
+        n = node_terraform([{"encryption": [{
+            "state": [{"method": "${method.aes_gcm.m}", "enforced": True}]}]}])
+        self.assertEqual(status(opentofu_state_encryption, n), CheckStatus.FAIL)
+
+    def test_skip_no_terraform(self):
+        self.assertEqual(
+            status(opentofu_state_encryption, EMPTY), CheckStatus.SKIPPED)
 
 
 if __name__ == "__main__":

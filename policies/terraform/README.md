@@ -15,6 +15,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `provider-versions-pinned` | Providers specify version constraints | Provider in `required_providers` has no `version` field |
 | `module-versions-pinned` | Modules use pinned versions | Module missing `version` or `?ref=` in source |
 | `remote-backend` | Remote backend configured | No `terraform { backend {} }` block found |
+| `opentofu-state-encryption` | OpenTofu state encryption configured and enforced | No `terraform { encryption {} }` block, or `state.enforced` is not `true` |
 | `min-provider-versions` | Providers meet minimum version requirements | Provider version constraint below required minimum |
 
 The checks below are AWS resource security guardrails relevant to SOC 2 (tagged with the `soc2` keyword). Each is individually includable — a future SOC 2 starter-pack can bundle them all:
@@ -44,6 +45,8 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-s3-no-public-acl` | S3 buckets do not grant public ACL access | Bucket with a `public-read`/`public-read-write` ACL or AllUsers grant |
 | `aws-iam-password-min-length` | IAM password policy enforces a minimum length | No `aws_iam_account_password_policy`, or length below the minimum |
 | `aws-iam-no-direct-user-policies` | No IAM policies attached directly to users | Inline/managed policy attached to a user instead of a group or role |
+| `aws-iam-role-permissions-boundary` | IAM roles set a permissions boundary | `aws_iam_role` without a non-empty `permissions_boundary` |
+| `aws-imdsv2-required` | EC2 metadata requires IMDSv2, hop limit 1 | `aws_instance`/`aws_launch_template` without `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }` |
 | `aws-acm-cert-dns-validation` | ACM certificates use DNS validation | `aws_acm_certificate` using EMAIL (or unset) validation |
 | `aws-eks-private-endpoint` | EKS clusters enable private endpoint access | Cluster without `endpoint_private_access` / `cluster_endpoint_private_access` |
 | `aws-dynamodb-encryption` | DynamoDB tables declare encryption at rest | Table without a `server_side_encryption { enabled = true }` block |

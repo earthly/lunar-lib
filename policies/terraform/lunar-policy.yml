@@ -114,6 +114,30 @@ policies:
     mainPython: aws_ebs_snapshot_encryption.py
     keywords: ["ebs snapshot", "encryption at rest", "kms", "data protection", "aws", "soc2"]
 
+  - name: aws-iam-role-permissions-boundary
+    description: |
+      Requires every IAM role to set a permissions boundary, capping the
+      maximum privilege the role can ever be granted regardless of the
+      policies later attached to it.
+    mainPython: aws_iam_role_permissions_boundary.py
+    keywords: ["iam role", "permissions boundary", "least privilege", "privilege escalation", "soc2"]
+
+  - name: aws-imdsv2-required
+    description: |
+      Requires EC2 instances and launch templates to demand IMDSv2
+      (http_tokens = required) with a hop limit of 1, so a container or a
+      request-forging process cannot read the instance role's credentials.
+    mainPython: aws_imdsv2_required.py
+    keywords: ["imdsv2", "instance metadata", "ssrf", "credential theft", "ec2", "soc2"]
+
+  - name: opentofu-state-encryption
+    description: |
+      Requires an OpenTofu encryption block with a key provider and
+      state.enforced = true. State holds every resource attribute in
+      plaintext, including generated secrets.
+    mainPython: opentofu_state_encryption.py
+    keywords: ["opentofu", "state encryption", "secrets", "terraform state", "soc2"]
+
   - name: aws-ebs-volume-encryption
     description: |
       Requires EBS volumes (standalone and instance block devices) to be
