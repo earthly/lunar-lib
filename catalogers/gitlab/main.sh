@@ -19,6 +19,8 @@ INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
 INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
 INCLUDE_PERSONAL_NAMESPACES="${LUNAR_VAR_INCLUDE_PERSONAL_NAMESPACES:-false}"
+INCLUDE_GROUPS="${LUNAR_VAR_INCLUDE_GROUPS:-}"
+EXCLUDE_GROUPS="${LUNAR_VAR_EXCLUDE_GROUPS:-}"
 INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
 EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -32,6 +34,7 @@ DOMAIN_FROM_GROUP_PATH="${LUNAR_VAR_DOMAIN_FROM_GROUP_PATH:-false}"
 
 # Maintainer. Fixed, not an input: this is the Hub's own scope signal, and a
 # lower level would onboard groups whose webhooks can never be registered.
+# Discovery only — a group named in include_groups is taken as given.
 MIN_ACCESS_LEVEL=40
 
 PER_PAGE=100
@@ -59,6 +62,8 @@ echo "API base: $API_BASE"
 echo "Include archived: $INCLUDE_ARCHIVED"
 echo "Include forks: $INCLUDE_FORKS"
 echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
+[ -n "$INCLUDE_GROUPS" ] && echo "Configured groups: $INCLUDE_GROUPS"
+[ -n "$EXCLUDE_GROUPS" ] && echo "Excluded groups: $EXCLUDE_GROUPS"
 [ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
 [ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -145,6 +150,38 @@ patterns_to_regex() {
     echo "${parts[*]}"
 }
 
+# Group paths are matched literally, not as globs: they name groups, and
+# exclude_projects already covers pattern matching on project paths.
+normalize_group_list() {
+    local csv="$1" out="$2" raw g
+    : > "$out"
+    [ -z "$csv" ] && return 0
+    local entries=()
+    IFS=',' read -ra entries <<< "$csv"
+    local -A seen=()
+    for raw in "${entries[@]}"; do
+        g=$(printf '%s' "$raw" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s#^/+|/+$##g')
+        [ -z "$g" ] && continue
+        [ -n "${seen[$g]:-}" ] && continue
+        seen[$g]=1
+        printf '%s\n' "$g" >> "$out"
+    done
+}
+
+# True when the group is excluded outright or sits under an excluded group.
+group_excluded() {
+    local path="$1" ex
+    while IFS= read -r ex; do
+        [ -z "$ex" ] && continue
+        [ "$path" = "$ex" ] && return 0
+        case "$path" in "$ex"/*) return 0 ;; esac
+    done < "$WORK/exclude-groups.txt"
+    return 1
+}
+
+normalize_group_list "$EXCLUDE_GROUPS" "$WORK/exclude-groups.txt"
+EXCLUDE_GROUPS_JSON=$(jq -R -s 'split("\n") | map(select(length > 0))' "$WORK/exclude-groups.txt")
+
 INCLUDE_REGEX=$(patterns_to_regex "$INCLUDE_PROJECTS")
 EXCLUDE_REGEX=$(patterns_to_regex "$EXCLUDE_PROJECTS")
 
@@ -158,32 +195,66 @@ if [ -z "$VISIBILITIES" ]; then
 fi
 echo "Visibilities: $VISIBILITIES"
 
-# --- group discovery --------------------------------------------------------
+# --- group list -------------------------------------------------------------
 
-# /groups ignores id_after (verified against gitlab.com), so this endpoint is
-# offset-paginated. Bounded by group count rather than project count, so paging
-# by page=N is cheap here — but it is still walked to the end, never truncated.
-echo "Discovering top-level groups (maintainer or above)..."
 : > "$WORK/groups.txt"
-page=1
-while :; do
-    gl_api "/groups?top_level_only=true&min_access_level=${MIN_ACCESS_LEVEL}&per_page=${PER_PAGE}&page=${page}&order_by=id&sort=asc" \
-        "$WORK/groups-page.json"
-    n=$(jq 'length' "$WORK/groups-page.json")
-    [ "$n" -eq 0 ] && break
-    jq -r '.[].full_path' "$WORK/groups-page.json" >> "$WORK/groups.txt"
-    [ "$n" -lt "$PER_PAGE" ] && break
-    page=$((page + 1))
-done
+if [ -n "$INCLUDE_GROUPS" ]; then
+    # Named groups, so /groups is never called: a group-scoped token, or an
+    # account below maintainer, cannot list groups instance-wide. GitLab takes a
+    # URL-encoded path wherever it takes a group ID, so no lookup is needed.
+    normalize_group_list "$INCLUDE_GROUPS" "$WORK/groups.txt"
 
-GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
-echo "Discovered $GROUP_COUNT top-level group(s): $(tr '\n' ' ' < "$WORK/groups.txt")"
-if [ "$GROUP_COUNT" -eq 0 ]; then
-    # Nothing to report is not the same as "the estate is empty" — the token may
-    # have lost its memberships. Writing an empty catalog here would retire
-    # every component, so refuse instead.
-    echo "Error: the token's account maintains no top-level groups on $GITLAB_HOST. Refusing to write an empty catalog." >&2
-    exit 1
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        echo "Error: include_groups is set but names no groups." >&2
+        exit 1
+    fi
+    echo "Using $GROUP_COUNT configured group(s), skipping discovery: $(tr '\n' ' ' < "$WORK/groups.txt")"
+else
+    # /groups ignores id_after (verified against gitlab.com), so this endpoint is
+    # offset-paginated. Bounded by group count rather than project count, so paging
+    # by page=N is cheap here — but it is still walked to the end, never truncated.
+    echo "Discovering top-level groups (maintainer or above)..."
+    page=1
+    while :; do
+        gl_api "/groups?top_level_only=true&min_access_level=${MIN_ACCESS_LEVEL}&per_page=${PER_PAGE}&page=${page}&order_by=id&sort=asc" \
+            "$WORK/groups-page.json"
+        n=$(jq 'length' "$WORK/groups-page.json")
+        [ "$n" -eq 0 ] && break
+        jq -r '.[].full_path' "$WORK/groups-page.json" >> "$WORK/groups.txt"
+        [ "$n" -lt "$PER_PAGE" ] && break
+        page=$((page + 1))
+    done
+
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    echo "Discovered $GROUP_COUNT top-level group(s): $(tr '\n' ' ' < "$WORK/groups.txt")"
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        # Nothing to report is not the same as "the estate is empty" — the token may
+        # have lost its memberships. Writing an empty catalog here would retire
+        # every component, so refuse instead.
+        echo "Error: no top-level groups on $GITLAB_HOST are visible to the token at maintainer or above. Refusing to write an empty catalog. Set include_groups to name the groups if the token cannot list groups." >&2
+        exit 1
+    fi
+fi
+
+# Drop excluded groups before enumerating them, so their listing call is never
+# made. A subgroup of a tree we still enumerate cannot be skipped here —
+# include_subgroups returns it regardless — so it is filtered in the transform.
+if [ -s "$WORK/exclude-groups.txt" ]; then
+    kept=0
+    : > "$WORK/groups-kept.txt"
+    while IFS= read -r group; do
+        [ -z "$group" ] && continue
+        if group_excluded "$group"; then
+            echo "  excluding group: $group"
+            continue
+        fi
+        printf '%s\n' "$group" >> "$WORK/groups-kept.txt"
+        kept=$((kept + 1))
+    done < "$WORK/groups.txt"
+    mv "$WORK/groups-kept.txt" "$WORK/groups.txt"
+    GROUP_COUNT=$kept
+    echo "$GROUP_COUNT group(s) left to enumerate after exclusions"
 fi
 
 # --- project enumeration ----------------------------------------------------
@@ -217,6 +288,13 @@ while IFS= read -r group; do
     now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     echo "  $group: $((now - before)) project(s) over $pages page(s)"
 done < "$WORK/groups.txt"
+
+# Configured paths may nest (acme and acme/payments), and include_subgroups then
+# returns the same project under both. Discovery's groups are disjoint.
+if [ -n "$INCLUDE_GROUPS" ] && [ -s "$WORK/projects.ndjson" ]; then
+    jq -s -c 'unique_by(.id) | .[]' "$WORK/projects.ndjson" > "$WORK/projects-unique.ndjson"
+    mv "$WORK/projects-unique.ndjson" "$WORK/projects.ndjson"
+fi
 
 # Personal (user) namespaces are invisible to the group sweep by construction —
 # a personal namespace is not a group — so they need their own pass. Scoped with
@@ -257,6 +335,7 @@ jq -s \
     --arg domain_from_path "$DOMAIN_FROM_GROUP_PATH" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
+    --argjson exclude_groups "$EXCLUDE_GROUPS_JSON" \
     --arg visibilities "$VISIBILITIES" \
     --arg include_forks "$INCLUDE_FORKS" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
@@ -277,6 +356,10 @@ jq -s \
       | select(.visibility as $v | $vis | index($v))
       | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
       | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
+      # Prefix on "<group>/" not "<group>": "acme/sandbox" must drop
+      # acme/sandbox/** without touching acme/sandbox-tools/**.
+      | select(.path_with_namespace as $p
+               | ($exclude_groups | any(. as $g | ($p | startswith($g + "/")))) | not)
       | select($include_forks == "true" or (.is_fork | not))
       # A GitLab delete is delayed: it renames the project to
       # <path>-deletion_scheduled-<id> and keeps listing it, archived still
