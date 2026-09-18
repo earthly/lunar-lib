@@ -295,10 +295,18 @@ class MaxSeverityTests(unittest.TestCase):
         self.assertNotIn("\n    * ", joined)
 
     def test_no_scan_data_fails_when_an_image_was_pushed(self):
-        """An image shipped and nothing scanned it — that has to stay a failure."""
+        """An image shipped and nothing scanned it — that has to stay a failure.
+
+        The message names the unscanned image and does not claim a scanner is
+        unconfigured: the common cause is a scanner that ran and recorded
+        nothing for this commit.
+        """
         c = run_check(node(container_scan=None, cmds=PUSH_CMDS))
         self.assertEqual(resolved_status(c), CheckStatus.FAIL)
-        self.assertIn("No container scan data found", failure_message(c))
+        reasons = c.failure_reasons
+        self.assertIn("No container scan results at this commit", reasons[0])
+        self.assertIn("though it pushed 1 image(s)", reasons[0])
+        self.assertEqual(reasons[1], "not scanned: registry.example.com/app:1.2.3")
 
     def test_no_scan_data_skips_when_nothing_was_pushed(self):
         """No pushed image means no image to carry CVEs — skip, don't fail.

@@ -40,3 +40,21 @@ def pushed_image_refs(containers_node):
         if ref and ref not in refs:
             refs.append(ref)
     return refs
+
+
+def no_scan_data_reasons(refs):
+    """Failure lines for a commit with no `.container_scan`, one per line.
+
+    The single line this replaced ("Ensure a scanner (Trivy, Grype, etc.) is
+    configured") reads as a configuration gap, and that is usually not what
+    happened: a scanner is configured, it ran, and it recorded nothing for this
+    commit. State what the Component JSON can actually answer — how many images
+    this commit pushed and which ones have no results — and leave both readings
+    open.
+    """
+    pushed = f", though it pushed {len(refs)} image(s)" if refs else ""
+    head = (
+        f"No container scan results at this commit{pushed} — either no scanner is "
+        "configured for this component, or a configured one recorded nothing here."
+    )
+    return [head] + [f"not scanned: {ref}" for ref in refs]

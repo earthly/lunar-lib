@@ -121,7 +121,10 @@ Two behaviours worth knowing:
 ```
 
 **Failure messages:**
-- `executed`: "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured."
+- `executed`: "No container scan results at this commit, though it pushed 2 image(s) — either no scanner
+  is configured for this component, or a configured one recorded nothing here.", followed by one
+  `not scanned: <image>` assertion per pushed image. `max-severity` and `max-total` say the same when
+  an image shipped and nothing scanned it; with no pushed image they skip instead.
 - `max-severity`: fails with a headline assertion plus one assertion per offending package/CVE (most severe first), the same format the `sca` policy uses — no policy-side cap; the hub truncates the display. When the scanner emits per-finding detail it renders as a nested list under the check:
   ```
   ❌ max-severity
@@ -137,5 +140,7 @@ Two behaviours worth knowing:
 When this policy fails, you can resolve it by:
 
 1. **`executed` failure:** Configure a container scanner (Trivy, Grype, Snyk Container) in your CI pipeline.
+   If one is already configured, check its run for this commit — a scanner that ran but recorded nothing
+   leaves the same empty `.container_scan`.
 2. **`max-severity` failure:** Review and remediate flagged vulnerabilities by updating base images or using vulnerability suppression for accepted risks.
 3. **`max-total` failure:** Reduce total vulnerability count by updating base images and dependencies.

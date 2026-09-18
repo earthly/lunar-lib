@@ -17,7 +17,7 @@ component JSON — the option changes the *verdict*, never what is collected.
 
 import sys
 
-from helpers import pushed_image_refs
+from helpers import no_scan_data_reasons, pushed_image_refs
 from lunar_policy import Check, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
@@ -163,9 +163,11 @@ def main(node=None):
             # bare `docker info` is enough — so its presence does not mean an
             # image shipped. With no pushed ref there is no image to carry
             # CVEs; `executed` is the check that gates whether a scan was owed.
-            if not pushed_image_refs(containers):
+            refs = pushed_image_refs(containers)
+            if not refs:
                 c.skip("No container image was pushed at this commit — nothing to scan")
-            c.fail("No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured.")
+            for reason in no_scan_data_reasons(refs):
+                c.fail(reason)
             return c
 
         in_scope = _severities_in_scope(min_severity)
