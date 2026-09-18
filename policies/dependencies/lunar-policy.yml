@@ -60,5 +60,5 @@ inputs:
     description: 'Whether to also check indirect (transitive) dependencies'
     default: "false"
   allowed_registries:
-    description: Comma-separated list of allowed package registry hosts (e.g. "dl.cloudsmith.io")
+    description: Comma-separated list of allowed package registry hosts (e.g. "dl.cloudsmith.io"). The approved-registries check skips while this is empty.
     default: ""

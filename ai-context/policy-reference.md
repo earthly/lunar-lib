@@ -713,6 +713,17 @@ if registry not in allowed:
     c.fail(f"Registry '{registry}' not in allowed list")
 ```
 
+That holds when the input has a usable default, as above: an empty value means someone deliberately blanked it. When the input's default is `""`, so the check ships unconfigured, empty means "not configured yet" instead — importing the plugin is enough to hit it, and an error turns every commit on every component into a policy error. Skip, naming the input and the zero-config alternative:
+
+```python
+# ALLOW-LIST with no default: skip until configured
+if not allowed:
+    c.skip(
+        "No 'allowed_registries' configured — set an allow-list to enforce "
+        "registry provenance, or use no-public-registries for the zero-config form"
+    )
+```
+
 **Block-list (empty = pass early):** A block-list defines what is NOT permitted. An empty block-list means "nothing is blocked", which is a valid (lenient) configuration.
 
 ```python

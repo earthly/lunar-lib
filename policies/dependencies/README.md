@@ -71,9 +71,9 @@ policies:
 ```
 
 Requires the [`package-registries`](https://github.com/earthly/lunar-lib/tree/main/collectors/package-registries)
-collector. `approved-registries` errors if `allowed_registries` is empty — an allowlist with no
-entries would fail every component. Use `no-public-registries` instead when you want the zero-config
-form.
+collector. `approved-registries` skips when `allowed_registries` is empty — an allowlist with no
+entries would fail every component, so the check cannot run until one is configured. Use
+`no-public-registries` instead when you want the zero-config form.
 
 ## Examples
 

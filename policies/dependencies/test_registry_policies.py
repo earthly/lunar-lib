@@ -100,14 +100,14 @@ class TestApprovedRegistries(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertEqual(len([r for r in results(check) if r == CheckStatus.FAIL]), 2)
 
-    def test_empty_allowlist_is_a_misconfiguration(self):
-        """An empty allow-list would fail every component — surface it as an
-        error rather than silently passing. Matches the container policy's
-        allowed-registries behaviour."""
+    def test_empty_allowlist_skips(self):
+        """An empty allow-list would fail every component, so the check cannot
+        run — skip it rather than erroring on every commit until someone
+        configures an allow-list or drops the check."""
         node = Node.from_component_json(component(entry("anything")), FINISHED)
-        with self.assertRaises(ValueError) as ctx:
-            check_approved_registries("", node=node)
-        self.assertIn("allowed_registries", str(ctx.exception))
+        check = check_approved_registries("", node=node)
+        self.assertIn(CheckStatus.SKIPPED, results(check))
+        self.assertIn("allowed_registries", check._results[0].failure_message)
 
     def test_missing_data_skips_after_collection(self):
         node = Node.from_component_json({}, FINISHED)

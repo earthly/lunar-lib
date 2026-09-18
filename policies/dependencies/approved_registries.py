@@ -14,10 +14,10 @@ def check_approved_registries(allowed_registries, node=None):
         allowed = [r.strip().lower() for r in allowed_registries.split(",") if r.strip()]
 
         if not allowed:
-            raise ValueError(
-                "Policy misconfiguration: 'allowed_registries' is empty. "
-                "An allow-list must contain at least one entry. "
-                "Configure allowed registries or exclude this check."
+            c.skip(
+                "No 'allowed_registries' configured — set an allow-list to "
+                "enforce registry provenance, or use no-public-registries for "
+                "the zero-config form"
             )
 
         registries = c.get_node(".dependencies.registries")
