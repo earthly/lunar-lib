@@ -10,6 +10,11 @@
 #
 # All scenarios run; any failure is logged and the script exits non-zero.
 #
+# Run this in the plugin image (`earthly ./catalogers/github-org+test`), not on
+# your host: the two glob scenarios below depend on sed dialect, and GNU sed
+# accepts expressions BusyBox sed — what ships — rejects. Green on a GNU host
+# proves nothing about those two.
+#
 # Opt-in real-API smoke: RUN_REAL_API_SMOKE=1 ./test-local.sh runs main.sh once
 # against a real org (TEST_ORG, default "earthly") using the real gh CLI, and
 # prints the captured catalog (no assertions — real topics vary). Requires a

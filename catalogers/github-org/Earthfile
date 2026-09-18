@@ -1,5 +1,15 @@
 VERSION 0.8
 
+# Offline test: test-local.sh stubs gh and lunar on PATH and drives main.sh as a
+# subprocess. On +base-image, not alpine — main.sh builds the repo-name globs
+# with sed, and a BusyBox/GNU dialect bug passes on a dev host and dies in the
+# shipped image.
+test:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY main.sh test-local.sh .
+    RUN ./test-local.sh
+
 image:
     FROM --pass-args ../../+base-image
 

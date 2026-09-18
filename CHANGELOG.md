@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `github-org` cataloger: repositories with no commits are no longer cataloged.
+  An empty repo has no commit for a collector to run against or a policy to
+  evaluate, so it only ever appeared in the catalog as a component that could
+  never report anything. Set `include_empty: "true"` to keep cataloging them
+  (#321).
+
 ### Fixed
+
+- `github-org` cataloger: the `include_repos` and `exclude_repos` glob filters
+  now work. Converting a glob to a regex escaped `?`, which BusyBox sed — the
+  sed in the plugin image — reads as a repetition operator, so the conversion
+  errored and every pattern collapsed to `^$`: an org with `include_repos` set
+  cataloged nothing at all, and `exclude_repos` excluded nothing. Neither filter
+  has ever worked in a released image (#321).
 
 - `github-org` cataloger: organizations with more than 1000 repositories are now
   cataloged in full. The cataloger passed `--no-archived` and `--visibility` to

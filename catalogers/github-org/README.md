@@ -151,6 +151,9 @@ catalogers:
       include_repos: "api-*,backend-*,frontend-*"
 ```
 
+Patterns match the repository name — not the `org/repo` path — and support `*`
+(any run of characters) and `?` (exactly one).
+
 ### Filter by Topic (allowlist / blocklist)
 
 Instead of maintaining a repository-name list, you can opt repos into the
