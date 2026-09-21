@@ -1,10 +1,14 @@
 # Terraform Collector
 
-Parses Terraform HCL files and collects IaC configuration data for policy analysis.
+Parses Terraform and OpenTofu configuration files and collects IaC configuration data for policy analysis.
 
 ## Overview
 
-This collector finds all `.tf` files in a repository and parses them using [hcl2json](https://github.com/tmccombs/hcl2json). It writes file validity status and the full parsed HCL JSON, enabling downstream policies to analyze providers, modules, backend configuration, resource inventory, and infrastructure security posture.
+This collector finds every configuration file the language accepts — `.tf`, `.tofu`, `.tf.json` and `.tofu.json` — and writes file validity status plus the full parsed JSON, enabling downstream policies to analyze providers, modules, backend configuration, resource inventory, and infrastructure security posture.
+
+HCL files go through [hcl2json](https://github.com/tmccombs/hcl2json); the `.json` variants are already in the target format and are read directly.
+
+**OpenTofu precedence.** Where a directory holds both `<base>.tf` and `<base>.tofu`, OpenTofu [uses the `.tofu` file and ignores the `.tf`](https://opentofu.org/docs/language/files/), and this collector does the same. Without that rule a policy would be evaluating configuration that is never applied.
 
 ## Collected Data
 
