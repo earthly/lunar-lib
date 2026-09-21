@@ -17,16 +17,13 @@ the next version ships.
 - changelog: generate the section at release time, drop [Unreleased] (#319)
 - gitlab cataloger: skip group discovery when include_groups is set (#323)
 - container-scan: gate max-severity on a pushed image, not on .containers (#315)
+- CI: record the images +all pushes so they get CVE-scanned (#316)
 
 ### Fixed
 
 - container-scan: name the unscanned images instead of blaming the config (#325)
 - after-json collectors: retry the get-json resolve instead of silently skipping (#322)
 - github-org: stop passing --no-archived so gh doesn't fall back to the 1000-capped search API (#318)
-
-### Security
-
-- CI: record the images +all pushes so they get CVE-scanned (#316)
 
 ## [1.15.1] — 2026-09-15
 
