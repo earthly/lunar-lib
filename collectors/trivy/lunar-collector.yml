@@ -93,6 +93,10 @@ collectors:
       images from the docker collector's record (.containers.native.docker.cicd.cmds[])
       and scans each with Trivy into .container_scan (per-image detail in
       .container_scan.images[] and .findings[].image).
+      Each scan is stamped with collected_at, the commit it ran at
+      (collected_sha) and the resolved registry digest of every image scanned, so
+      a consumer can tell a scan of the artifact it promotes from a scan of
+      whatever the floating tag pointed at that day.
     mainBash: container-rescan.sh
     # trivy can sometimes exceed the 1Gi default.
     size: large
@@ -112,6 +116,11 @@ collectors:
       .container_scan so shipped images are re-evaluated against CVEs published
       after they were built. Override with the `container_image` input. No code
       clone needed.
+
+      Same provenance as container-scan (collected_at, collected_sha, per-image
+      digest). With container_scan_history_size > 0 the re-scan also snapshots the
+      current .container_scan into a bounded .container_scan.history[] before
+      overwriting it, so the scan a release shipped with stays readable.
     mainBash: container-rescan.sh
     # Same image pull + unpack as `container-scan`, so the same large profile.
     size: large
@@ -160,6 +169,19 @@ inputs:
       Default: every image recorded as pushed in .containers.native.docker.cicd.cmds[]
       (by the docker collector), scanned in push order.
     default: ""
+  container_scan_history_size:
+    description: |
+      Maximum number of prior container scans to keep in .container_scan.history[]
+      on each cron re-scan. Each entry is {source, image, digest, vulnerabilities,
+      summary} — dated and digest-pinned, so a release-time scan stays readable
+      after later re-scans overwrite the live counts. findings[]/images[]/native
+      are omitted: the hub concatenates those across collectors, so snapshotting
+      them would double them. At the cap the oldest entry is kept and the
+      second-oldest dropped. 0 (default) writes no history. Only the cron
+      container-rescan maintains it — the on-push container-scan record is
+      concatenated rather than replaced, so a history[] on it would grow on every
+      push.
+    default: "0"
 
 secrets:
   REGISTRY_USERNAME:
@@ -256,9 +278,31 @@ example_component_json: |
       "source": {
         "tool": "trivy",
         "version": "0.69.3",
-        "integration": "ci"
+        "integration": "cron",
+        "collected_at": "2026-07-08T03:00:12Z",
+        "collected_sha": "7030ba7c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a"
       },
       "image": "myregistry.io/app:v1.2.3",
+      "digest": "sha256:de0eb0b3f2a47ba1eb89389859a9bd88b28e82f5826b6969ad604979713c2d4f",
+      "images": [
+        {
+          "image": "myregistry.io/app:v1.2.3",
+          "tool": "trivy",
+          "digest": "sha256:de0eb0b3f2a47ba1eb89389859a9bd88b28e82f5826b6969ad604979713c2d4f",
+          "os": {"family": "alpine", "version": "3.19"},
+          "vulnerabilities": {"critical": 0, "high": 1, "medium": 4, "low": 7, "total": 12},
+          "summary": {"has_critical": false, "has_high": true, "all_fixable": true}
+        }
+      ],
+      "history": [
+        {
+          "source": {"tool": "trivy", "integration": "after-json", "collected_at": "2026-07-01T14:22:03Z", "collected_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"},
+          "image": "myregistry.io/app:v1.2.3",
+          "digest": "sha256:9f2c5b1a7d3e4f60889ab0cc12de34f5678901234567890abcdef1234567890a",
+          "vulnerabilities": {"critical": 1, "high": 3, "medium": 4, "low": 7, "total": 15},
+          "summary": {"has_critical": true, "has_high": true, "all_fixable": false}
+        }
+      ],
       "os": {
         "family": "alpine",
         "version": "3.19"
