@@ -4,7 +4,7 @@ Catalogs all repositories from a GitHub organization as Lunar components.
 
 ## Overview
 
-This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility, repository name patterns, and repository topics (allow/blocklist), and can optionally stamp a default owner and domain on all components. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
+This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility, repository name patterns, and repository topics (allow/blocklist), and can optionally stamp a default owner and domain on all components. Empty repositories are skipped by default because they have no commit for Lunar to collect or evaluate. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
 
 ## Synced Data
 
@@ -94,6 +94,7 @@ catalogers:
       include_private: "true"
       include_internal: "false"
       include_archived: "false"
+      include_empty: "false"
       exclude_repos: "sandbox-*,deprecated-*,*-archive"
       tag_prefix: "gh-"
       default_owner: "platform-team@acme.com"
@@ -105,6 +106,20 @@ When `default_domain` is set, every discovered component gets that domain on its
 passes the hub's domain-reference validation. A domain definition in
 `lunar-config.yml` (or a later cataloger) takes precedence on merge, so you can
 set a richer description/owner there and this cataloger won't clobber it.
+
+### Empty Repositories
+
+Repositories with no commits are excluded by default. They cannot produce
+collector or policy results because Lunar has no Git SHA to evaluate. To include
+empty placeholder repositories in the catalog anyway, opt in explicitly:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    with:
+      org_name: "acme-corp"
+      include_empty: "true"
+```
 
 ### GitHub Enterprise Server
 
@@ -135,6 +150,9 @@ catalogers:
       org_name: "acme-corp"
       include_repos: "api-*,backend-*,frontend-*"
 ```
+
+Patterns match the repository name — not the `org/repo` path — and support `*`
+(any run of characters) and `?` (exactly one).
 
 ### Filter by Topic (allowlist / blocklist)
 

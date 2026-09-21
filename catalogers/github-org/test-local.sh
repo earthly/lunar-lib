@@ -10,6 +10,11 @@
 #
 # All scenarios run; any failure is logged and the script exits non-zero.
 #
+# Run this in the plugin image (`earthly ./catalogers/github-org+test`), not on
+# your host: the two glob scenarios below depend on sed dialect, and GNU sed
+# accepts expressions BusyBox sed — what ships — rejects. Green on a GNU host
+# proves nothing about those two.
+#
 # Opt-in real-API smoke: RUN_REAL_API_SMOKE=1 ./test-local.sh runs main.sh once
 # against a real org (TEST_ORG, default "earthly") using the real gh CLI, and
 # prints the captured catalog (no assertions — real topics vary). Requires a
@@ -80,8 +85,8 @@ export MOCK_LUNAR_COMPONENTS_OUT="$COMPONENTS_OUT"
 export MOCK_LUNAR_DOMAINS_OUT="$DOMAINS_OUT"
 
 # --- Repo fixture ---------------------------------------------------------
-# Two public repos with topics; the "payment-api" tags are what the scenarios
-# assert against (topic → tag with/without prefix).
+# Public, internal, archived, and empty fixtures exercise client-side filters;
+# the "payment-api" tags are what the topic-prefix scenarios assert against.
 cat > "$REPOS_FIXTURE" << 'EOF'
 [
   {
@@ -90,6 +95,7 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Payment processing API",
     "repositoryTopics": [{"name": "backend"}, {"name": "go"}],
     "isArchived": false,
+    "isEmpty": false,
     "visibility": "public"
   },
   {
@@ -98,6 +104,16 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Customer-facing web app",
     "repositoryTopics": [{"name": "react"}],
     "isArchived": false,
+    "isEmpty": false,
+    "visibility": "public"
+  },
+  {
+    "name": "empty-placeholder",
+    "url": "https://github.com/acme/empty-placeholder",
+    "description": "Reserved repository name",
+    "repositoryTopics": [],
+    "isArchived": false,
+    "isEmpty": true,
     "visibility": "public"
   },
   {
@@ -106,6 +122,7 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Retired billing service",
     "repositoryTopics": [],
     "isArchived": true,
+    "isEmpty": false,
     "visibility": "public"
   },
   {
@@ -114,6 +131,7 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Enterprise-internal tooling",
     "repositoryTopics": [],
     "isArchived": false,
+    "isEmpty": false,
     "visibility": "internal"
   }
 ]
@@ -128,6 +146,7 @@ export LUNAR_VAR_INCLUDE_PUBLIC="true"
 export LUNAR_VAR_INCLUDE_PRIVATE="false"
 export LUNAR_VAR_INCLUDE_INTERNAL="false"
 export LUNAR_VAR_INCLUDE_ARCHIVED="false"
+export LUNAR_VAR_INCLUDE_EMPTY="false"
 export LUNAR_VAR_INCLUDE_REPOS=""
 export LUNAR_VAR_EXCLUDE_REPOS=""
 export LUNAR_VAR_DEFAULT_OWNER=""
@@ -218,6 +237,28 @@ export LUNAR_VAR_DISALLOWED_TOPICS="go"
 run_scenario "disallow_beats_allow" \
     '(has("github.com/acme/payment-api") | not) and (has("github.com/acme/frontend-app"))'
 unset LUNAR_VAR_ALLOWED_TOPICS LUNAR_VAR_DISALLOWED_TOPICS
+
+# ── Repository glob filters ───────────────────────────────────────────────
+# BusyBox sed treats escaped `\?` as a repetition operator. The old converter
+# therefore failed every non-empty include/exclude pattern and returned `^$`.
+export LUNAR_VAR_EXCLUDE_REPOS="payment-api"
+run_scenario "exclude_exact_repo" \
+    '(has("github.com/acme/payment-api") | not) and has("github.com/acme/frontend-app")'
+unset LUNAR_VAR_EXCLUDE_REPOS
+
+export LUNAR_VAR_INCLUDE_REPOS="payment-ap?"
+run_scenario "include_question_glob" \
+    'has("github.com/acme/payment-api") and (has("github.com/acme/frontend-app") | not)'
+unset LUNAR_VAR_INCLUDE_REPOS
+
+# ── Empty repositories ────────────────────────────────────────────────────
+run_scenario "empty_repos_excluded_by_default" \
+    '(has("github.com/acme/empty-placeholder") | not)'
+
+export LUNAR_VAR_INCLUDE_EMPTY="true"
+run_scenario "include_empty_opt_in" \
+    'has("github.com/acme/empty-placeholder")'
+export LUNAR_VAR_INCLUDE_EMPTY="false"
 
 # ── ENG-1411 regression: archived repos are filtered client-side ──────────
 # main.sh must not pass `gh repo list --no-archived` — that flag switches gh to
