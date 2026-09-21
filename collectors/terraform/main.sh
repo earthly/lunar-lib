@@ -8,17 +8,12 @@ NETWORK_TYPES="aws_lb aws_elb aws_security_group aws_api_gateway_rest_api aws_ap
 SECURITY_TYPES="aws_wafv2_web_acl aws_wafv2_web_acl_association aws_kms_key"
 
 # --- Parse a single configuration file ---
-# .tf / .tofu are HCL and go through hcl2json; .tf.json / .tofu.json are already
-# the target format and must NOT — hcl2json rejects JSON input outright.
 process_file() {
     local tf_file="$1"
     local rel_path="${tf_file#./}"
 
     set +e
-    case "$tf_file" in
-        *.json) hcl_json="$(jq -S . "$tf_file" 2>&1)" ;;
-        *)      hcl_json="$(hcl2json "$tf_file" 2>&1)" ;;
-    esac
+    hcl_json="$(hcl2json "$tf_file" 2>&1)"
     status=$?
     set -e
 
@@ -32,18 +27,20 @@ process_file() {
 }
 export -f process_file
 
-# --- Find every configuration file the language accepts ---
-# OpenTofu reads .tofu and .tofu.json as well as .tf and .tf.json, and where a
-# directory holds both <base>.tf and <base>.tofu it uses the .tofu one and
-# ignores the .tf. Mirroring that matters: evaluating the file the tool ignores
-# lets a check pass on configuration that is never applied.
-tf_files=$(find . -type f \( -name '*.tf' -o -name '*.tofu' \
-                          -o -name '*.tf.json' -o -name '*.tofu.json' \) 2>/dev/null \
+# --- Find the HCL configuration files ---
+# OpenTofu reads .tofu as well as .tf, and where a directory holds both
+# <base>.tf and <base>.tofu it uses the .tofu and ignores the .tf. Mirroring
+# that matters: evaluating the file the tool ignores lets a check pass on
+# configuration that is never applied.
+#
+# The JSON variants (.tf.json / .tofu.json) are deliberately NOT collected yet.
+# They parse fine, but the .iac.modules normalization below assumes hcl2json's
+# list-shaped blocks and JSON syntax gives objects — see ENG-1860.
+tf_files=$(find . -type f \( -name '*.tf' -o -name '*.tofu' \) 2>/dev/null \
     | awk '
         { all[NR] = $0
           p = $0
-          if (p ~ /\.tofu\.json$/)  { sub(/\.tofu\.json$/, "", p); shadowed[p ".tf.json"] = 1 }
-          else if (p ~ /\.tofu$/)    { sub(/\.tofu$/, "", p);       shadowed[p ".tf"] = 1 }
+          if (p ~ /\.tofu$/) { sub(/\.tofu$/, "", p); shadowed[p ".tf"] = 1 }
         }
         END { for (i = 1; i <= NR; i++) if (!(all[i] in shadowed)) print all[i] }
     ')

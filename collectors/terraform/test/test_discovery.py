@@ -36,8 +36,10 @@ class DiscoveryTest(unittest.TestCase):
                     >> {self.capture}
                 """))
 
-        # hcl2json must fail on JSON input, exactly as the real binary does —
-        # otherwise the test would not notice the .json branch disappearing.
+        # hcl2json fails on JSON input, exactly as the real binary does. Nothing
+        # should feed it a .json file today; if discovery ever widens to the
+        # JSON variants without a parse path, these tests go red rather than
+        # silently recording every such file as invalid.
         with open(os.path.join(self.bin, "hcl2json"), "w") as fh:
             fh.write(textwrap.dedent("""\
                 #!/bin/bash
@@ -78,13 +80,19 @@ class DiscoveryTest(unittest.TestCase):
         written = self.run_collector()
         return sorted(f["path"] for f in written.get(".iac.files", []))
 
-    def test_finds_all_four_extensions(self):
+    def test_finds_tf_and_tofu(self):
         self.write("a.tf")
         self.write("b.tofu")
+        self.assertEqual(self.collected_paths(), ["a.tf", "b.tofu"])
+
+    def test_json_variants_are_deliberately_not_collected(self):
+        # They parse, but .iac.modules assumes hcl2json's list-shaped blocks
+        # and JSON syntax gives objects — ENG-1860. Collecting them would make
+        # is_lb_public throw and has_prevent_destroy silently wrong.
+        self.write("a.tf")
         self.write("c.tf.json", '{"resource":{}}\n')
         self.write("d.tofu.json", '{"resource":{}}\n')
-        self.assertEqual(self.collected_paths(),
-                         ["a.tf", "b.tofu", "c.tf.json", "d.tofu.json"])
+        self.assertEqual(self.collected_paths(), ["a.tf"])
 
     def test_tofu_shadows_tf_of_the_same_base(self):
         # OpenTofu applies main.tofu and ignores main.tf — collecting the .tf
@@ -92,11 +100,6 @@ class DiscoveryTest(unittest.TestCase):
         self.write("main.tf")
         self.write("main.tofu")
         self.assertEqual(self.collected_paths(), ["main.tofu"])
-
-    def test_tofu_json_shadows_tf_json_of_the_same_base(self):
-        self.write("conf.tf.json", '{"resource":{}}\n')
-        self.write("conf.tofu.json", '{"resource":{}}\n')
-        self.assertEqual(self.collected_paths(), ["conf.tofu.json"])
 
     def test_shadowing_is_per_directory_and_per_base(self):
         # main.tofu must not shadow another directory's main.tf, nor other.tf.
@@ -106,15 +109,6 @@ class DiscoveryTest(unittest.TestCase):
         self.write("mod/main.tf")
         self.assertEqual(self.collected_paths(),
                          ["main.tofu", "mod/main.tf", "other.tf"])
-
-    def test_json_variants_are_valid_not_parse_errors(self):
-        # hcl2json rejects JSON, so these must take the jq path.
-        self.write("c.tf.json", '{"resource":{"aws_s3_bucket":{"j":{"bucket":"b"}}}}\n')
-        written = self.run_collector()
-        files = {f["path"]: f for f in written[".iac.files"]}
-        self.assertTrue(files["c.tf.json"]["valid"], files["c.tf.json"])
-        native = {f["path"]: f for f in written[".iac.native.terraform.files"]}
-        self.assertIn("aws_s3_bucket", native["c.tf.json"]["hcl"]["resource"])
 
     def test_pure_terraform_repo_is_unchanged(self):
         self.write("main.tf")

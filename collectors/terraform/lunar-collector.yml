@@ -27,8 +27,8 @@ landing_page:
 collectors:
   - name: terraform
     description: |
-      Parses every Terraform/OpenTofu file in the repository (.tf, .tofu, .tf.json,
-      .tofu.json) and collects:
+      Parses every Terraform/OpenTofu HCL file in the repository (.tf, .tofu)
+      and collects:
       - File validity and parse errors (.iac.files[])
       - Normalized modules with resources and analysis (.iac.modules[])
       - Full parsed HCL JSON for terraform-specific policy (.iac.native.terraform.files[])
