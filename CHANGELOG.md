@@ -9,6 +9,22 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.16.0] — 2026-09-21
+
+### Changed
+
+- Skip empty repositories and fix repository filters (#321)
+- changelog: generate the section at release time, drop [Unreleased] (#319)
+- gitlab cataloger: skip group discovery when include_groups is set (#323)
+- container-scan: gate max-severity on a pushed image, not on .containers (#315)
+- CI: record the images +all pushes so they get CVE-scanned (#316)
+
+### Fixed
+
+- container-scan: name the unscanned images instead of blaming the config (#325)
+- after-json collectors: retry the get-json resolve instead of silently skipping (#322)
+- github-org: stop passing --no-archived so gh doesn't fall back to the 1000-capped search API (#318)
+
 ## [1.15.1] — 2026-09-15
 
 ### Fixed
@@ -921,6 +937,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/earthly/lunar-lib/compare/v1.14.5...v1.15.0
 [1.14.5]: https://github.com/earthly/lunar-lib/compare/v1.14.4...v1.14.5
