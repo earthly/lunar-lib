@@ -60,6 +60,7 @@ policies:
       Flags actions/checkout steps that don't set persist-credentials: false.
       The default (true) stores GITHUB_TOKEN in .git/config, which leaks if the
       checkout directory is uploaded as an artifact (ArtiPACKED attacks, 2024).
+      Jobs whose risk has been accepted can be exempted with `exempt_jobs`.
     mainPython: checkout_no_persist_credentials.py
     keywords: ["checkout", "credentials", "token", "security"]
 
@@ -70,3 +71,30 @@ policies:
       least-privilege. Workflows should explicitly pass only needed secrets.
     mainPython: no_secrets_inherit.py
     keywords: ["secrets", "inherit", "reusable", "least-privilege", "security"]
+
+inputs:
+  exempt_jobs:
+    description: |
+      Workflow jobs exempt from `checkout-no-persist-credentials`, for a risk
+      that has been reviewed and accepted. One entry per line:
+
+      ```
+      <workflow-file>:<job-id> = <reason>
+      ```
+
+      e.g. `.github/workflows/push.yaml:publish = accepted, TICKET-123: token
+      is repo-scoped and short-lived, job uploads no artifact`. The workflow
+      matches the collected path or its bare filename; the job id is the key
+      under `jobs:`. Blank lines and `#` comments are ignored.
+
+      An exemption never turns a finding into a pass. Findings that are not
+      exempt still fail; the check resolves to `skip`, naming each job and its
+      reason, only when every finding it made was exempted. The reason is
+      mandatory, and an entry that cannot be parsed fails the check without
+      exempting anything.
+
+      An entry naming a workflow the component has but a job it does not
+      define is reported as stale. An entry whose workflow file the component
+      does not have at all is ignored — one policy entry is normally shared by
+      every component in its scope.
+    default: ""
