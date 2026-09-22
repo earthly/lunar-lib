@@ -52,14 +52,14 @@ Being a per-component hook it **augments components that already exist** and can
 
 ```yaml
 catalogers:
-  - uses: github://earthly/lunar-lib/catalogers/moon@v1.16.0
+  - uses: github://earthly/lunar-lib/catalogers/moon@main
 ```
 
 No secrets or inputs are required. To keep test-only dependencies out of a service's paths:
 
 ```yaml
 catalogers:
-  - uses: github://earthly/lunar-lib/catalogers/moon@v1.16.0
+  - uses: github://earthly/lunar-lib/catalogers/moon@main
     with:
       exclude_scopes: "development"
 ```
