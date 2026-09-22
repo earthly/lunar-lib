@@ -834,6 +834,16 @@ class TlsPolicyApprovedTest(unittest.TestCase):
             {"viewer_certificate": [{"cloudfront_default_certificate": True}]}]}})
         self.assertEqual(self.run_with(n), CheckStatus.SKIPPED)
 
+    def test_explicit_false_default_certificate_is_still_checked(self):
+        # The provider only accepts minimum_protocol_version when this is false,
+        # so `= false` is the normal ACM shape. Skipping on presence let a weak
+        # minimum_protocol_version through unchecked.
+        n = node({"aws_cloudfront_distribution": {"cdn": [{"viewer_certificate": [{
+            "cloudfront_default_certificate": False,
+            "minimum_protocol_version": "TLSv1",
+        }]}]}})
+        self.assertEqual(self.run_with(n), CheckStatus.FAIL)
+
     def test_api_gateway_security_policy(self):
         bad = node({"aws_api_gateway_domain_name": {"api": [
             {"security_policy": "TLS_1_0"}]}})
@@ -891,14 +901,44 @@ class StatefulBackupConfiguredTest(unittest.TestCase):
         n = node({"aws_dynamodb_table": {"t": [{"name": "t"}]}})
         self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
 
-    def test_efs_backup_policy_enabled_passes(self):
-        n = node({"aws_efs_file_system": {"fs": [
-            {"backup_policy": [{"status": "ENABLED"}]}]}})
+    # EFS backups are a separate aws_efs_backup_policy resource keyed by
+    # file_system_id. The first cut asserted an inline backup_policy block that
+    # the provider has no such argument for, so the check could never pass on
+    # real configuration and the test only went green on an invented shape.
+    def test_efs_with_enabled_backup_policy_resource_passes(self):
+        n = node({
+            "aws_efs_file_system": {"fs": [{"encrypted": True}]},
+            "aws_efs_backup_policy": {"fs": [{
+                "file_system_id": "${aws_efs_file_system.fs.id}",
+                "backup_policy": [{"status": "ENABLED"}],
+            }]},
+        })
         self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.PASS)
 
-    def test_efs_backup_policy_disabled_fails(self):
-        n = node({"aws_efs_file_system": {"fs": [
-            {"backup_policy": [{"status": "DISABLED"}]}]}})
+    def test_efs_with_disabled_backup_policy_resource_fails(self):
+        n = node({
+            "aws_efs_file_system": {"fs": [{"encrypted": True}]},
+            "aws_efs_backup_policy": {"fs": [{
+                "file_system_id": "${aws_efs_file_system.fs.id}",
+                "backup_policy": [{"status": "DISABLED"}],
+            }]},
+        })
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_efs_with_no_backup_policy_resource_fails(self):
+        n = node({"aws_efs_file_system": {"fs": [{"encrypted": True}]}})
+        msg = failure_message(aws_stateful_backup_configured, n)
+        self.assertIn("has no aws_efs_backup_policy", msg)
+
+    def test_efs_backup_policy_for_a_different_filesystem_does_not_count(self):
+        # Correlation must be by file_system_id, not "some backup policy exists".
+        n = node({
+            "aws_efs_file_system": {"unbacked": [{"encrypted": True}]},
+            "aws_efs_backup_policy": {"other": [{
+                "file_system_id": "${aws_efs_file_system.somethingelse.id}",
+                "backup_policy": [{"status": "ENABLED"}],
+            }]},
+        })
         self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
 
     def test_skips_when_no_stateful_resources(self):

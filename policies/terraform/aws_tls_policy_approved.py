@@ -1,7 +1,7 @@
 """Require negotiated TLS to come from an approved policy, not just be present."""
 
 from lunar_policy import Check, variable_or_default
-from helpers import iter_resources, block
+from helpers import iter_resources, block, truthy
 
 
 _SECURE = ("https", "tls", "ssl")
@@ -45,8 +45,11 @@ def main(node=None):
         # CloudFront: the floor lives on the viewer certificate.
         for rtype, name, cfg in iter_resources(native, "aws_cloudfront_distribution"):
             for cert in block(cfg, "viewer_certificate"):
-                if cert.get("cloudfront_default_certificate") is not None:
+                if truthy(cert.get("cloudfront_default_certificate")):
                     continue  # the default cert pins its own policy
+                # An explicit `= false` is the normal ACM shape — the provider
+                # only accepts minimum_protocol_version when it is false — so
+                # this must test the value, not merely its presence.
                 checked += 1
                 version = cert.get("minimum_protocol_version")
                 if version is None:

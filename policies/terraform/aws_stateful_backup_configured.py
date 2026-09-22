@@ -1,7 +1,7 @@
 """Require stateful AWS resources to declare a backup or point-in-time recovery."""
 
 from lunar_policy import Check
-from helpers import iter_resources, block, as_int, truthy
+from helpers import iter_resources, block, as_int, truthy, references
 
 
 def main(node=None):
@@ -55,14 +55,29 @@ def main(node=None):
                     "{}.{} has point_in_time_recovery disabled".format(rtype, name)
                 )
 
-        # EFS: a backup policy, or the file system opts out explicitly.
-        for rtype, name, cfg in iter_resources(native, "aws_efs_file_system"):
+        # EFS backups live on a separate aws_efs_backup_policy resource keyed by
+        # file_system_id, not on an inline block — correlate the two.
+        backup_policies = list(iter_resources(native, "aws_efs_backup_policy"))
+        for rtype, name, _ in iter_resources(native, "aws_efs_file_system"):
             checked += 1
-            policies = block(cfg, "backup_policy")
-            if not policies:
-                offenders.append("{}.{} has no backup_policy block".format(rtype, name))
-            elif not any(str(p.get("status", "")).upper() == "ENABLED" for p in policies):
-                offenders.append("{}.{} has backup_policy disabled".format(rtype, name))
+            mine = [
+                bp for _, _, bp in backup_policies
+                if references(bp.get("file_system_id"), "aws_efs_file_system", name)
+            ]
+            if not mine:
+                offenders.append(
+                    "{}.{} has no aws_efs_backup_policy".format(rtype, name)
+                )
+                continue
+            enabled = any(
+                str(b.get("status", "")).upper() == "ENABLED"
+                for bp in mine
+                for b in block(bp, "backup_policy")
+            )
+            if not enabled:
+                offenders.append(
+                    "{}.{} has its aws_efs_backup_policy disabled".format(rtype, name)
+                )
 
         if not checked:
             c.skip("No stateful resources found")
