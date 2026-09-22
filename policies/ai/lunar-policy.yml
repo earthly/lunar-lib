@@ -54,9 +54,10 @@ policies:
 
   - name: instruction-file-length
     description: |
-      Validates that the root instruction file is within reasonable length bounds. Too short
-      means insufficient context; too long wastes context window budget and can reduce AI
-      task success rates.
+      Caps the size of every agent instruction file in ai.instructions.all[] — AGENTS.md plus
+      the CLAUDE.md / CODEX.md / GEMINI.md entries the tool collectors append — on both lines
+      and bytes, and names the files that bust the cap. Also holds the root file to a minimum
+      length, and the combined AGENTS.md bytes to a repo-wide budget.
     mainPython: instruction_file_length.py
     keywords: ["agents.md length", "context window", "token budget"]
 
@@ -90,8 +91,11 @@ inputs:
     description: Minimum number of lines for the root instruction file (0 to disable)
     default: "10"
   max_lines:
-    description: Maximum number of lines for the root instruction file (0 to disable)
+    description: Maximum number of lines for any single instruction file (0 to disable)
     default: "300"
+  max_bytes:
+    description: Maximum byte size for any single instruction file (0 to disable)
+    default: "32768"
   max_total_bytes:
     description: Maximum combined bytes across all instruction files (0 to disable)
     default: "32768"
