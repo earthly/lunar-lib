@@ -93,6 +93,7 @@ test:
     BUILD ./policies/repo-boilerplate+test
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
+    BUILD ./policies/terraform+test
 
 lint:
     FROM python:3.12-alpine
