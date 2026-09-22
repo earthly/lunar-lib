@@ -17,10 +17,14 @@
 # collected data onto that service.
 #
 # Silent skips (exit 0, no write):
+#   - not inside a git checkout (the hook was configured without clone-code)
 #   - component is the repo root (no subdir): it already matches every path,
 #     and writing paths would NARROW it
-#   - no moon workspace (`.moon/`) at or above the working directory
+#   - no moon workspace (`.moon/`) between the working directory and the repo
+#     root (the walk stops there, so moon's own ~/.moon is never adopted)
 #   - the component's subdir is not a moon project
+#   - the project has no dependencies once exclude_scopes is applied: there is
+#     nothing to add that the implicit `<subdir>/*` does not already cover
 #
 # Hard failures (non-zero, no write):
 #   - `moon query projects` fails or emits unparseable output
