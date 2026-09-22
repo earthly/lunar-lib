@@ -90,7 +90,8 @@ def main(node=None):
                 f" (and {len(findings) - 5} more)" if len(findings) > 5 else ""
             )
             exempt_suffix = (
-                f" [{len(exempted)} exempted: {format_exemptions(exempted)}]"
+                f" [{len(exempted)} exempted by exempt_jobs: "
+                f"{format_exemptions(exempted)}]"
                 if exempted
                 else ""
             )
@@ -103,7 +104,8 @@ def main(node=None):
             # failure paths — a stale entry has to survive into the result.
             c.skip(
                 f"{len(exempted)} checkout step(s) with credential "
-                f"persistence, all exempted — {format_exemptions(exempted)}"
+                f"persistence, all exempted by exempt_jobs — "
+                f"{format_exemptions(exempted)}"
             )
 
     return c

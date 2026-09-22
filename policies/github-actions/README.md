@@ -45,9 +45,8 @@ policies:
     # include: [no-script-injection, permissions-declared]  # Run specific checks only
 ```
 
-To accept the risk on a named job rather than fix it, list it under `exempt_jobs`
-with the reason. The remaining findings still fail, so a new unflagged checkout is
-still reported:
+To accept the risk on a named job rather than fix it, list it under `exempt_jobs`.
+The remaining findings still fail, so a new unflagged checkout is still reported:
 
 ```yaml
 policies:
@@ -57,7 +56,8 @@ policies:
     include: [checkout-no-persist-credentials]
     with:
       exempt_jobs: |
-        .github/workflows/publish.yaml:push = accepted, TICKET-123: repo-scoped 1h token, no artifact upload
+        # accepted TICKET-123 — repo-scoped 1h token, no artifact upload
+        .github/workflows/publish.yaml:push
 ```
 
 ## Examples

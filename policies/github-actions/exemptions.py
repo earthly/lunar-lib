@@ -1,9 +1,9 @@
 """Shared parsing and matching for the `exempt_jobs` policy input.
 
-An exemption records an accepted risk against one workflow job. It never turns a
-finding into a pass: the check still reports every finding that is not exempted,
-and resolves to `skip` — naming each job and its reason — only when every finding
-it made was exempted.
+An exemption records that a job's finding has been reviewed and accepted. It
+never turns a finding into a pass: the check still reports every finding that is
+not exempt, and resolves to `skip` — naming each exempted job — only when every
+finding it made was exempted.
 """
 
 import os
@@ -17,24 +17,21 @@ class ExemptionConfigError(ValueError):
 
 
 class Exemption:
-    """One `<workflow-file>:<job-id> = <reason>` entry."""
+    """One `<workflow-file>:<job-id>` entry."""
 
-    def __init__(self, workflow, job, reason):
+    def __init__(self, workflow, job):
         self.workflow = workflow
         self.job = job
-        self.reason = reason
 
     @property
     def target(self):
         return f"{self.workflow}:{self.job}"
 
     def __str__(self):
-        return f"{self.target} — {self.reason}"
+        return self.target
 
     def matches(self, wf_file, job_name):
-        if job_name != self.job:
-            return False
-        return self.matches_workflow(wf_file)
+        return job_name == self.job and self.matches_workflow(wf_file)
 
     def matches_workflow(self, wf_file):
         # The collector emits the path it found (`.github/workflows/ci.yml`);
@@ -43,40 +40,32 @@ class Exemption:
 
 
 def parse_exempt_jobs(raw):
-    """Parse the `exempt_jobs` input — one `<workflow-file>:<job-id> = <reason>`
-    per line, `#` comments and blank lines ignored.
+    """Parse the `exempt_jobs` input — `<workflow-file>:<job-id>` entries
+    separated by newlines or commas. Blank entries are ignored, and a `#`
+    comments out the rest of its line, so the rationale can sit next to the
+    entry it explains — including a rationale containing a comma, which is why
+    comments are stripped per line and only then split on commas.
 
     Raises ExemptionConfigError on anything else.
     """
+    entries = []
+    for line in raw.splitlines():
+        entries.extend(line.split("#", 1)[0].split(","))
+
     exemptions = []
-    for lineno, line in enumerate(raw.splitlines(), start=1):
-        line = line.strip()
-        if not line or line.startswith("#"):
+    for entry in entries:
+        entry = entry.strip()
+        if not entry:
             continue
 
-        target, sep, reason = line.partition("=")
-        if not sep:
-            raise ExemptionConfigError(
-                f"exempt_jobs line {lineno}: expected "
-                f"'<workflow-file>:<job-id> = <reason>', got {line!r}"
-            )
-
-        reason = reason.strip()
-        if not reason:
-            raise ExemptionConfigError(
-                f"exempt_jobs line {lineno}: a reason is required — an "
-                f"exemption records why the risk was accepted"
-            )
-
         # rpartition: workflow paths carry no colon, job ids cannot.
-        workflow, sep, job = target.strip().rpartition(":")
+        workflow, sep, job = entry.rpartition(":")
         if not sep or not workflow or not job:
             raise ExemptionConfigError(
-                f"exempt_jobs line {lineno}: expected "
-                f"'<workflow-file>:<job-id>' before '=', got {target.strip()!r}"
+                f"exempt_jobs: expected '<workflow-file>:<job-id>', got {entry!r}"
             )
 
-        exemptions.append(Exemption(workflow, job, reason))
+        exemptions.append(Exemption(workflow, job))
 
     return exemptions
 
@@ -114,7 +103,7 @@ def stale_exemptions(exemptions, workflows):
 
 
 def format_exemptions(exemptions, limit=5):
-    """Render exemptions for a check message, one line each.
+    """Render exemptions for a check message.
 
     Deduplicated by target: a job with two offending checkout steps matches the
     same entry twice, and naming it twice would read as two exemptions.

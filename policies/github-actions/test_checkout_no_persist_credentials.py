@@ -75,8 +75,9 @@ CI = {
 }
 
 EXEMPT_BOTH = (
-    ".github/workflows/publish.yaml:push = accepted, TICKET-1: repo-scoped 1h token\n"
-    ".github/workflows/deploy.yaml:push = accepted, TICKET-2: no artifact upload\n"
+    "# accepted TICKET-1 — repo-scoped 1h token, no artifact upload\n"
+    ".github/workflows/publish.yaml:push\n"
+    ".github/workflows/deploy.yaml:push\n"
 )
 
 
@@ -104,8 +105,8 @@ class TestExemptJobs(unittest.TestCase):
         reason = check.failure_reasons[0]
         self.assertIn("1 checkout step(s)", reason)
         self.assertIn("ci.yaml", reason)
-        self.assertIn("2 exempted", reason)
-        self.assertIn("TICKET-1", reason)
+        self.assertIn("2 exempted by exempt_jobs", reason)
+        self.assertIn("publish.yaml:push", reason)
 
     def test_non_exempt_job_in_an_exempted_workflow_still_fails(self):
         two_jobs = {
@@ -116,7 +117,7 @@ class TestExemptJobs(unittest.TestCase):
             },
         }
         with policy_vars(
-            exempt_jobs=".github/workflows/publish.yaml:push = accepted, TICKET-1\n"
+            exempt_jobs=".github/workflows/publish.yaml:push\n"
         ):
             check = check_persist_credentials(node([two_jobs]))
         self.assertEqual(check.status, CheckStatus.FAIL)
@@ -129,12 +130,29 @@ class TestExemptJobs(unittest.TestCase):
         message = check._results[0].failure_message
         self.assertIn("2 checkout step(s)", message)
         self.assertIn("publish.yaml:push", message)
-        self.assertIn("TICKET-1", message)
         self.assertIn("deploy.yaml:push", message)
-        self.assertIn("TICKET-2", message)
+
+    def test_a_comment_containing_a_comma_is_not_an_entry(self):
+        # Comments are stripped per line before the comma split, or the tail of
+        # a prose rationale parses as a second entry.
+        with policy_vars(
+            exempt_jobs=(
+                "# accepted TICKET-1: repo-scoped token, no artifact upload\n"
+                ".github/workflows/publish.yaml:push\n"
+            )
+        ):
+            check = check_persist_credentials(node([PUBLISH]))
+        self.assertTrue(is_skipped(check))
+
+    def test_comma_separated_entries_are_accepted(self):
+        with policy_vars(
+            exempt_jobs=".github/workflows/publish.yaml:push,.github/workflows/deploy.yaml:push"
+        ):
+            check = check_persist_credentials(node([PUBLISH, DEPLOY]))
+        self.assertTrue(is_skipped(check))
 
     def test_bare_filename_matches_the_collected_path(self):
-        with policy_vars(exempt_jobs="publish.yaml:push = accepted, TICKET-1\n"):
+        with policy_vars(exempt_jobs="publish.yaml:push\n"):
             check = check_persist_credentials(node([PUBLISH]))
         self.assertTrue(is_skipped(check))
 
@@ -142,7 +160,7 @@ class TestExemptJobs(unittest.TestCase):
         with policy_vars(
             exempt_jobs=(
                 "# reviewed 2026-09-22\n\n"
-                ".github/workflows/publish.yaml:push = accepted, TICKET-1\n"
+                ".github/workflows/publish.yaml:push  # accepted TICKET-1\n"
             )
         ):
             check = check_persist_credentials(node([PUBLISH]))
@@ -154,12 +172,12 @@ class TestExemptJobs(unittest.TestCase):
             "jobs": {"push": {"steps": [checkout("First"), checkout("Second")]}},
         }
         with policy_vars(
-            exempt_jobs=".github/workflows/publish.yaml:push = accepted, TICKET-1\n"
+            exempt_jobs=".github/workflows/publish.yaml:push\n"
         ):
             check = check_persist_credentials(node([twice]))
         message = check._results[0].failure_message
         self.assertIn("2 checkout step(s)", message)
-        self.assertEqual(message.count("TICKET-1"), 1)
+        self.assertEqual(message.count("publish.yaml:push"), 1)
 
     def test_unused_exemption_on_a_clean_job_passes(self):
         clean = {
@@ -167,7 +185,7 @@ class TestExemptJobs(unittest.TestCase):
             "jobs": {"push": {"steps": [checkout(persist=False)]}},
         }
         with policy_vars(
-            exempt_jobs=".github/workflows/publish.yaml:push = accepted, TICKET-1\n"
+            exempt_jobs=".github/workflows/publish.yaml:push\n"
         ):
             check = check_persist_credentials(node([clean]))
         self.assertEqual(check.status, CheckStatus.PASS)
@@ -177,7 +195,7 @@ class TestExemptJobs(unittest.TestCase):
 class TestStaleAndForeignEntries(unittest.TestCase):
     def test_entry_naming_a_job_the_workflow_lacks_is_reported(self):
         with policy_vars(
-            exempt_jobs=".github/workflows/ci.yaml:publish = accepted, TICKET-3\n"
+            exempt_jobs=".github/workflows/ci.yaml:publish\n"
         ):
             check = check_persist_credentials(node([CI]))
         self.assertEqual(check.status, CheckStatus.FAIL)
@@ -188,7 +206,7 @@ class TestStaleAndForeignEntries(unittest.TestCase):
         # skip away a stale entry.
         with policy_vars(
             exempt_jobs=(
-                EXEMPT_BOTH + ".github/workflows/publish.yaml:gone = accepted, TICKET-3\n"
+                EXEMPT_BOTH + ".github/workflows/publish.yaml:gone\n"
             )
         ):
             check = check_persist_credentials(node([PUBLISH, DEPLOY]))
@@ -206,27 +224,19 @@ class TestStaleAndForeignEntries(unittest.TestCase):
 
 
 class TestMalformedInput(unittest.TestCase):
-    def test_entry_without_a_reason_raises(self):
-        with policy_vars(exempt_jobs=".github/workflows/ci.yaml:build =\n"):
-            with self.assertRaises(ValueError):
-                check_persist_credentials(node([CI]))
-
-    def test_entry_without_an_equals_raises(self):
-        with policy_vars(exempt_jobs=".github/workflows/ci.yaml:build\n"):
-            with self.assertRaises(ValueError):
-                check_persist_credentials(node([CI]))
-
     def test_entry_without_a_job_raises(self):
-        with policy_vars(exempt_jobs="ci.yaml = accepted, TICKET-1\n"):
+        with policy_vars(exempt_jobs="ci.yaml\n"):
             with self.assertRaises(ValueError):
                 check_persist_credentials(node([CI]))
 
-    def test_a_malformed_line_exempts_nothing(self):
+    def test_entry_that_is_only_a_job_raises(self):
+        with policy_vars(exempt_jobs=":build\n"):
+            with self.assertRaises(ValueError):
+                check_persist_credentials(node([CI]))
+
+    def test_one_malformed_entry_exempts_nothing(self):
         with policy_vars(
-            exempt_jobs=(
-                ".github/workflows/publish.yaml:push = accepted, TICKET-1\n"
-                "deploy.yaml:push\n"
-            )
+            exempt_jobs=".github/workflows/publish.yaml:push,deploy.yaml\n"
         ):
             with self.assertRaises(ValueError):
                 check_persist_credentials(node([PUBLISH, DEPLOY]))
