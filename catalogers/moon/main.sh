@@ -38,16 +38,6 @@ EXCLUDE_SCOPES="${LUNAR_VAR_EXCLUDE_SCOPES:-}"
 
 echo "Component: $COMPONENT_ID"
 
-# --- The component's subdirectory -----------------------------------------
-# A component id is <host>/<org>/<repo>[/<subdir>]. Everything after the third
-# segment is the subdir; a bare repo component has none.
-SUBDIR=$(printf '%s\n' "$COMPONENT_ID" | cut -d/ -f4-)
-if [ -z "$SUBDIR" ]; then
-    echo "Component is the repo root (no subdir) — skipping: it already matches every path, and setting paths would narrow it"
-    exit 0
-fi
-echo "Subdir: $SUBDIR"
-
 # --- Locate the moon workspace --------------------------------------------
 # moon resolves its workspace by walking up for `.moon/`, so it would find the
 # root on its own. We resolve it ourselves anyway because `source` values are
@@ -70,8 +60,32 @@ if [ -z "$REPO_ROOT" ]; then
     echo "Not inside a git checkout — skipping (this cataloger needs clone-code: true)"
     exit 0
 fi
+# -P on both so a symlinked mount can't defeat the prefix arithmetic below.
+REPO_ROOT=$(cd "$REPO_ROOT" && pwd -P)
+CWD=$(pwd -P)
 
-WORKSPACE_ROOT=$(find_workspace_root "$PWD" || true)
+# --- The component's subdirectory -----------------------------------------
+# Take it from the checkout, not by parsing the component id: the hook already
+# put us in the component's subdirectory (the operator appends it to the
+# working dir), so `pwd` relative to the repo root IS the subdir. Parsing the
+# id instead would need per-forge rules — GitLab separates a nested namespace
+# from the subdir with `/-/`, so a naive "everything after the third slash"
+# resolves nothing there and the cataloger would silently do nothing.
+case "$CWD" in
+    "$REPO_ROOT") SUBDIR="" ;;
+    "$REPO_ROOT"/*) SUBDIR="${CWD#"$REPO_ROOT"/}" ;;
+    *)
+        echo "Working directory $CWD is not inside the checkout at $REPO_ROOT — skipping"
+        exit 0 ;;
+esac
+
+if [ -z "$SUBDIR" ]; then
+    echo "Component is the repo root (no subdir) — skipping: it already matches every path, and setting paths would narrow it"
+    exit 0
+fi
+echo "Subdir: $SUBDIR"
+
+WORKSPACE_ROOT=$(find_workspace_root "$CWD" || true)
 if [ -z "$WORKSPACE_ROOT" ]; then
     echo "No .moon/ at or above $PWD — not a moon workspace, skipping"
     exit 0

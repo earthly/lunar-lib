@@ -135,6 +135,18 @@ echo "Scenario 10: require_dependency_edges=false allows the edgeless graph"
 run "$ZERO/apps/a" "github.com/acme/z/apps/a" LUNAR_VAR_REQUIRE_DEPENDENCY_EDGES=false
 assert_paths '["apps/a/*"]'
 
+echo "Scenario 11: GitLab-style id (nested namespace + /-/ subdir) resolves"
+# Regression guard: deriving the subdir by "everything after the third slash"
+# resolves `subgroup/project/-/apps/web` on GitLab and silently writes nothing.
+# The subdir comes from the checkout, so the id's shape is irrelevant.
+run "$WS/apps/web" "gitlab.com/group/subgroup/project/-/apps/web"
+assert_paths '["apps/web/*","packages/auth/*","packages/telemetry/*"]'
+
+echo "Scenario 12: no git checkout at all skips (clone-code off)"
+BARE="$TEST_DIR/bare"; mkdir -p "$BARE"
+run "$BARE" "github.com/acme/mono/apps/web"
+if [ "$RUN_EXIT" -eq 0 ] && [ ! -f "$WRITE_OUT" ]; then pass "exit 0, no write"; else fail "exit=$RUN_EXIT"; fi
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then echo "All scenarios passed"; else echo "FAILURES"; fi
 exit "$FAILED"
