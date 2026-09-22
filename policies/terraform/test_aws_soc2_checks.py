@@ -24,6 +24,8 @@ import aws_elb_access_logging
 import aws_ebs_snapshot_encryption
 import aws_ebs_volume_encryption
 import aws_elb_https_only
+import aws_tls_policy_approved
+import aws_stateful_backup_configured
 import aws_guardduty_enabled
 import aws_rds_cloudwatch_logging
 import aws_s3_block_public_access
@@ -77,6 +79,18 @@ def node_terraform(tf):
 
 
 EMPTY = Node.from_component_json({"iac": {"native": {"terraform": {"files": []}}}})
+
+
+def failure_message(mod, n, **env):
+    """The check's failure text — asserted where a wrong diagnosis would mislead."""
+    for k, v in env.items():
+        os.environ["LUNAR_VAR_" + k] = v
+    try:
+        c = mod.main(n)
+    finally:
+        for k in env:
+            os.environ.pop("LUNAR_VAR_" + k, None)
+    return " ".join(r.failure_message or "" for r in getattr(c, "_results", []))
 
 
 def status(mod, n):
@@ -758,6 +772,141 @@ class TestOpenTofuStateEncryption(unittest.TestCase):
     def test_skip_no_terraform(self):
         self.assertEqual(
             status(opentofu_state_encryption, EMPTY), CheckStatus.SKIPPED)
+
+
+class TlsPolicyApprovedTest(unittest.TestCase):
+    """aws-tls-policy-approved: the negotiated suite, not just that TLS is on."""
+
+    APPROVED = "ELBSecurityPolicy-TLS13-1-2-2021-06,TLSv1.2_2021"
+
+    def run_with(self, n, approved=None):
+        val = self.APPROVED if approved is None else approved
+        os.environ["LUNAR_VAR_approved_tls_policies"] = val
+        try:
+            return status(aws_tls_policy_approved, n)
+        finally:
+            os.environ.pop("LUNAR_VAR_approved_tls_policies", None)
+
+    def listener(self, **kw):
+        cfg = {"protocol": "HTTPS"}
+        cfg.update(kw)
+        return node({"aws_lb_listener": {"web": [cfg]}})
+
+    def test_approved_ssl_policy_passes(self):
+        self.assertEqual(
+            self.run_with(self.listener(ssl_policy="ELBSecurityPolicy-TLS13-1-2-2021-06")),
+            CheckStatus.PASS)
+
+    def test_unapproved_ssl_policy_fails(self):
+        self.assertEqual(
+            self.run_with(self.listener(ssl_policy="ELBSecurityPolicy-TLS-1-0-2015-04")),
+            CheckStatus.FAIL)
+
+    def test_https_listener_with_no_ssl_policy_fails(self):
+        self.assertEqual(self.run_with(self.listener()), CheckStatus.FAIL)
+
+    def test_missing_ssl_policy_says_so_rather_than_naming_a_bogus_policy(self):
+        # Without its own branch this still fails, but reports `uses None` and
+        # sends the reader looking for a policy called "None".
+        msg = failure_message(aws_tls_policy_approved, self.listener(),
+                              approved_tls_policies=self.APPROVED)
+        self.assertIn("sets no ssl_policy", msg)
+        self.assertNotIn("uses None", msg)
+
+    def test_plaintext_listener_is_not_this_checks_business(self):
+        n = node({"aws_lb_listener": {"web": [{"protocol": "HTTP"}]}})
+        self.assertEqual(self.run_with(n), CheckStatus.SKIPPED)
+
+    def test_skips_when_no_approved_list_configured(self):
+        n = self.listener(ssl_policy="ELBSecurityPolicy-TLS-1-0-2015-04")
+        self.assertEqual(self.run_with(n, approved=""), CheckStatus.SKIPPED)
+
+    def test_cloudfront_minimum_protocol_version(self):
+        bad = node({"aws_cloudfront_distribution": {"cdn": [
+            {"viewer_certificate": [{"minimum_protocol_version": "TLSv1"}]}]}})
+        good = node({"aws_cloudfront_distribution": {"cdn": [
+            {"viewer_certificate": [{"minimum_protocol_version": "TLSv1.2_2021"}]}]}})
+        self.assertEqual(self.run_with(bad), CheckStatus.FAIL)
+        self.assertEqual(self.run_with(good), CheckStatus.PASS)
+
+    def test_cloudfront_default_certificate_pins_its_own_policy(self):
+        n = node({"aws_cloudfront_distribution": {"cdn": [
+            {"viewer_certificate": [{"cloudfront_default_certificate": True}]}]}})
+        self.assertEqual(self.run_with(n), CheckStatus.SKIPPED)
+
+    def test_api_gateway_security_policy(self):
+        bad = node({"aws_api_gateway_domain_name": {"api": [
+            {"security_policy": "TLS_1_0"}]}})
+        self.assertEqual(self.run_with(bad), CheckStatus.FAIL)
+
+    def test_skips_with_no_terraform_data(self):
+        self.assertEqual(self.run_with(EMPTY), CheckStatus.SKIPPED)
+
+
+class StatefulBackupConfiguredTest(unittest.TestCase):
+    """aws-stateful-backup-configured: MC 9 backup coverage."""
+
+    def test_rds_with_retention_passes(self):
+        n = node({"aws_db_instance": {"db": [{"backup_retention_period": 7}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.PASS)
+
+    def test_rds_with_zero_retention_fails(self):
+        n = node({"aws_db_instance": {"db": [{"backup_retention_period": 0}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_rds_with_undeclared_retention_fails(self):
+        n = node({"aws_db_instance": {"db": [{"engine": "postgres"}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_undeclared_retention_is_not_reported_as_unparseable(self):
+        # as_int(None) is None, so without its own branch this fails with "not a
+        # literal value" — which points at interpolation rather than absence.
+        n = node({"aws_db_instance": {"db": [{"engine": "postgres"}]}})
+        msg = failure_message(aws_stateful_backup_configured, n)
+        self.assertIn("does not declare backup_retention_period", msg)
+        self.assertNotIn("not a literal value", msg)
+
+    def test_rds_with_unresolved_retention_fails(self):
+        # Unknown is not known-good.
+        n = node({"aws_db_instance": {"db": [
+            {"backup_retention_period": "${var.retention}"}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_read_replica_is_skipped(self):
+        n = node({"aws_db_instance": {"replica": [
+            {"replicate_source_db": "primary"}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.SKIPPED)
+
+    def test_dynamodb_pitr_enabled_passes(self):
+        n = node({"aws_dynamodb_table": {"t": [
+            {"point_in_time_recovery": [{"enabled": True}]}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.PASS)
+
+    def test_dynamodb_pitr_disabled_fails(self):
+        n = node({"aws_dynamodb_table": {"t": [
+            {"point_in_time_recovery": [{"enabled": False}]}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_dynamodb_without_pitr_block_fails(self):
+        n = node({"aws_dynamodb_table": {"t": [{"name": "t"}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_efs_backup_policy_enabled_passes(self):
+        n = node({"aws_efs_file_system": {"fs": [
+            {"backup_policy": [{"status": "ENABLED"}]}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.PASS)
+
+    def test_efs_backup_policy_disabled_fails(self):
+        n = node({"aws_efs_file_system": {"fs": [
+            {"backup_policy": [{"status": "DISABLED"}]}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.FAIL)
+
+    def test_skips_when_no_stateful_resources(self):
+        n = node({"aws_lb": {"lb": [{"internal": True}]}})
+        self.assertEqual(status(aws_stateful_backup_configured, n), CheckStatus.SKIPPED)
+
+    def test_skips_with_no_terraform_data(self):
+        self.assertEqual(status(aws_stateful_backup_configured, EMPTY), CheckStatus.SKIPPED)
 
 
 if __name__ == "__main__":

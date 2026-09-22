@@ -35,6 +35,8 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
 | `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
 | `aws-s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
+| `aws-tls-policy-approved` | TLS uses an approved policy | Listener `ssl_policy`, CloudFront `minimum_protocol_version` or API Gateway `security_policy` outside `approved_tls_policies` |
+| `aws-stateful-backup-configured` | Stateful resources declare a backup | RDS with no/zero `backup_retention_period`, DynamoDB without PITR, EFS without an enabled `backup_policy` |
 | `aws-vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
 | `aws-security-group-no-public-admin-ports` | No public ingress to sensitive admin/database ports | A security group allows `0.0.0.0/0` to a port like RDP, MySQL, MSSQL, or Telnet |
 | `aws-rds-encryption-at-rest` | RDS storage is encrypted at rest | `aws_db_instance` / `aws_rds_cluster` without `storage_encrypted = true` |
