@@ -84,21 +84,21 @@ make_workspace "$WS"
 
 echo "Scenario 1: transitive closure (web -> telemetry -> auth)"
 run "$WS/apps/web" "github.com/acme/mono/apps/web"
-assert_paths '["apps/web/*","packages/auth/*","packages/telemetry/*"]'
+assert_paths '["packages/auth/*","packages/telemetry/*"]'
 
 echo "Scenario 2: direct + transitive both present (fleet-api)"
 run "$WS/apps/fleet-api" "github.com/acme/mono/apps/fleet-api"
-assert_paths '["apps/fleet-api/*","packages/auth/*","packages/telemetry/*"]'
+assert_paths '["packages/auth/*","packages/telemetry/*"]'
 
-echo "Scenario 3: leaf library gets only its own directory"
+echo "Scenario 3: leaf library has no dependencies, so writes nothing"
 run "$WS/packages/auth" "github.com/acme/mono/packages/auth"
-assert_paths '["packages/auth/*"]'
+if [ "$RUN_EXIT" -eq 0 ] && [ ! -f "$WRITE_OUT" ]; then pass "exit 0, no write (own subdir is implicit)"; else fail "exit=$RUN_EXIT"; fi
 
 echo "Scenario 4: exclude_scopes drops a development edge"
 run "$WS/tools/lint" "github.com/acme/mono/tools/lint"
-assert_paths '["packages/auth/*","tools/lint/*"]'
+assert_paths '["packages/auth/*"]'
 run "$WS/tools/lint" "github.com/acme/mono/tools/lint" LUNAR_VAR_EXCLUDE_SCOPES=development
-assert_paths '["tools/lint/*"]'
+if [ "$RUN_EXIT" -eq 0 ] && [ ! -f "$WRITE_OUT" ]; then pass "exit 0, no write (only edge excluded)"; else fail "exit=$RUN_EXIT"; fi
 
 echo "Scenario 5: repo-root component skips (writing paths would narrow it)"
 run "$WS" "github.com/acme/mono"
@@ -119,7 +119,7 @@ echo "Scenario 8: nested workspace prefixes every path with its offset"
 NEST="$TEST_DIR/nested"
 make_workspace "$NEST" "frontend"
 run "$NEST/frontend/apps/web" "github.com/acme/nest/frontend/apps/web"
-assert_paths '["frontend/apps/web/*","frontend/packages/auth/*","frontend/packages/telemetry/*"]'
+assert_paths '["frontend/packages/auth/*","frontend/packages/telemetry/*"]'
 
 echo "Scenario 9: edgeless multi-project graph fails closed"
 ZERO="$TEST_DIR/zero"; mkdir -p "$ZERO"/{apps/a,apps/b} "$ZERO/.moon"
@@ -133,14 +133,14 @@ if echo "$RUN_OUT" | grep -q "nothing depends on anything"; then pass "explains 
 
 echo "Scenario 10: require_dependency_edges=false allows the edgeless graph"
 run "$ZERO/apps/a" "github.com/acme/z/apps/a" LUNAR_VAR_REQUIRE_DEPENDENCY_EDGES=false
-assert_paths '["apps/a/*"]'
+if [ "$RUN_EXIT" -eq 0 ] && [ ! -f "$WRITE_OUT" ]; then pass "exit 0, no write"; else fail "exit=$RUN_EXIT"; fi
 
 echo "Scenario 11: GitLab-style id (nested namespace + /-/ subdir) resolves"
 # Regression guard: deriving the subdir by "everything after the third slash"
 # resolves `subgroup/project/-/apps/web` on GitLab and silently writes nothing.
 # The subdir comes from the checkout, so the id's shape is irrelevant.
 run "$WS/apps/web" "gitlab.com/group/subgroup/project/-/apps/web"
-assert_paths '["apps/web/*","packages/auth/*","packages/telemetry/*"]'
+assert_paths '["packages/auth/*","packages/telemetry/*"]'
 
 echo "Scenario 12: no git checkout at all skips (clone-code off)"
 BARE="$TEST_DIR/bare"; mkdir -p "$BARE"
@@ -172,7 +172,7 @@ echo "Scenario 14: a non-writable HOME does not break the run"
 # which a pod with a read-only root filesystem would be.
 RO_HOME="$TEST_DIR/ro-home"; mkdir -p "$RO_HOME"; chmod 555 "$RO_HOME"
 run "$WS/apps/web" "github.com/acme/mono/apps/web" HOME="$RO_HOME"
-assert_paths '["apps/web/*","packages/auth/*","packages/telemetry/*"]'
+assert_paths '["packages/auth/*","packages/telemetry/*"]'
 chmod 755 "$RO_HOME"
 
 echo ""

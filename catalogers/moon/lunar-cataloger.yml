@@ -10,9 +10,9 @@ landing_page:
   long_description: |
     Reads the dependency graph a monorepo already declares in its
     moon configuration and writes it into Lunar as component
-    `paths`. A component's paths become its own directory plus every
-    directory it transitively depends on, so a commit to a shared
-    library re-evaluates every service that consumes it.
+    `paths`. Each component gains a path entry for every directory it
+    transitively depends on, so a commit to a shared library
+    re-evaluates every service that consumes it.
   categories: ["service-catalog", "vcs"]
   icon: "assets/moon.svg"
   status: "beta"
@@ -29,7 +29,6 @@ example_catalog_json: |
     "components": {
       "github.com/acme/monorepo/apps/web": {
         "paths": [
-          "apps/web/*",
           "packages/auth/*",
           "packages/telemetry/*"
         ]
@@ -44,10 +43,11 @@ catalogers:
       the repository checked out. Walks up for `.moon/`, runs `moon query
       projects`, and matches the component's subdirectory against each project's
       `source`. The matched project's transitive `dependsOn` closure becomes the
-      component's `paths` — one `<dir>/*` glob per project reached, its own
-      directory included. Skips silently when the component is the repository
-      root, when there is no moon workspace, or when the subdirectory is not a
-      moon project.
+      component's `paths` — one `<dir>/*` glob per dependency reached. Its own
+      directory is not written; the hub derives that implicitly from the
+      component name. Skips silently when the component is the repository root,
+      when there is no moon workspace, when the subdirectory is not a moon
+      project, or when the project has no dependencies.
     mainBash: main.sh
     hook:
       type: component-repo

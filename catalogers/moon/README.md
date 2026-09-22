@@ -12,17 +12,17 @@ A component named after a subdirectory already matches changes under it, but Lun
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.components["<id>"].paths[]` | array | One `<dir>/*` glob for the component's own moon project directory and for every project it transitively depends on. Repo-relative, sorted, de-duplicated |
+| `.components["<id>"].paths[]` | array | One `<dir>/*` glob per project the component transitively depends on. Repo-relative, sorted, de-duplicated. The component's *own* directory is not written — the hub already derives an implicit `<subdir>/*` from the component name |
 
 Only `paths` is written — ownership, domains and tags come from whichever cataloger defines the component.
 
-The hub appends arrays when merging, so these globs **union** with any `paths` declared in `lunar-config.yml` rather than replacing them. A path declared in both places appears twice; that is harmless for matching, but worth deleting from the config once this cataloger owns the list.
+The hub appends arrays when merging, so these globs **union** with any `paths` declared in `lunar-config.yml` rather than replacing them. A path declared in both places appears twice — harmless for matching, but worth deleting from the config once this cataloger owns the list. (This is also why the component's own directory is omitted: the config sync materialises the implicit `<subdir>/*` onto every component, so emitting it here would duplicate it every time.)
 
 ## Catalogers
 
 | Cataloger | Description |
 |-----------|-------------|
-| `dependency-paths` | Finds the moon project whose `source` is the component's subdirectory, takes its transitive `dependsOn` closure, and writes one `<dir>/*` glob per project reached, including the component's own directory |
+| `dependency-paths` | Finds the moon project whose `source` is the component's subdirectory, takes its transitive `dependsOn` closure, and writes one `<dir>/*` glob per dependency reached |
 
 A trailing `*` is a prefix match in Lunar and it crosses `/`, so one glob per project covers every file beneath it. Where the moon workspace root sits below the repository root, each `source` is prefixed with that offset to keep the globs repo-relative.
 
@@ -31,6 +31,7 @@ A trailing `*` is a prefix match in Lunar and it crosses `/`, so one glob per pr
 - the component is the repository root — it already matches every path, so writing `paths` would *narrow* it
 - the repository has no `.moon/` at or above the component directory
 - the component's subdirectory is not a moon project
+- the project has no dependencies once `exclude_scopes` is applied — there is nothing to add that the implicit `<subdir>/*` does not already cover
 
 **Fails the run** (nothing written):
 

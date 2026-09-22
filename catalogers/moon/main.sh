@@ -5,9 +5,12 @@
 # Runs once per component of a repo that just received a commit, with the
 # repo checked out. Reads the moon project graph (`moon query projects`),
 # finds the project whose `source` is this component's subdirectory, and
-# writes `paths` = that project's own directory plus every directory it
-# transitively depends on, so a change to a shared library re-evaluates the
-# services that consume it.
+# writes `paths` = every directory it transitively depends on, so a change to a
+# shared library re-evaluates the services that consume it.
+#
+# Its OWN directory is deliberately not written: the hub derives an implicit
+# `<subdir>/*` from the component name and the config sync materialises it, so
+# emitting it again duplicates it on every component.
 #
 # `paths` gates policy EVALUATION, not data attribution. Widening it makes a
 # library change re-run a service's policies; it does not move a CI run's
@@ -177,6 +180,11 @@ PATHS_JSON=$(printf '%s' "$GRAPH" | jq -c \
           | {seen: (($s + $nbrs) | unique), frontier: ($nbrs - $s)}
         )
       | .seen
+      # Drop this project itself: the hub derives an implicit "<subdir>/*" from
+      # the component name (util/git.ComponentPathPatterns) and the config sync
+      # materialises it, so emitting it duplicates it on every component. The
+      # dependencies are what this cataloger uniquely knows.
+      | map(select(. != $root))
       | map($source_of[.] // empty)
       | map(. + "/*")
       | unique
@@ -187,7 +195,12 @@ if [ "$PATHS_JSON" = "null" ]; then
     exit 0
 fi
 
-echo "Resolved paths: $PATHS_JSON"
+if [ "$(printf '%s' "$PATHS_JSON" | jq 'length')" -eq 0 ]; then
+    echo "Project for '$SUBDIR' has no dependencies — nothing to add (its own subdir is implicit), skipping"
+    exit 0
+fi
+
+echo "Resolved dependency paths: $PATHS_JSON"
 
 # --- Write -----------------------------------------------------------------
 # The hub appends arrays on merge (util/maps.Merge), so these union with any
