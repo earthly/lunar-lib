@@ -107,7 +107,14 @@ WS_PREFIX="${WS_PREFIX#/}"
 # `moon query projects` prints JSON on stdout by default (there is no --json
 # flag in moon 2.x). It reads moon.yml files and needs no network; a language
 # toolchain is only required for edges moon infers rather than reads.
-GRAPH=$(cd "$WORKSPACE_ROOT" && moon query projects) || {
+# moon unpacks its embedded toolchain plugin under $HOME (~/.moon, ~/.proto) and
+# fails hard if that is not writable, which a cluster running snippet pods with
+# a read-only root filesystem would hit. Give it a scratch HOME so the run does
+# not depend on the pod's.
+MOON_SCRATCH_HOME=$(mktemp -d)
+trap 'rm -rf "$MOON_SCRATCH_HOME"' EXIT
+
+GRAPH=$(cd "$WORKSPACE_ROOT" && HOME="$MOON_SCRATCH_HOME" moon query projects) || {
     echo "moon query projects failed in $WORKSPACE_ROOT" >&2
     exit 1
 }

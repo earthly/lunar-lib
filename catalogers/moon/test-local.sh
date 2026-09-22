@@ -167,6 +167,14 @@ else
     fail "left the repo before giving up: $(echo "$RUN_OUT" | tail -1)"
 fi
 
+echo "Scenario 14: a non-writable HOME does not break the run"
+# moon unpacks its embedded plugin under $HOME and dies if that is read-only,
+# which a pod with a read-only root filesystem would be.
+RO_HOME="$TEST_DIR/ro-home"; mkdir -p "$RO_HOME"; chmod 555 "$RO_HOME"
+run "$WS/apps/web" "github.com/acme/mono/apps/web" HOME="$RO_HOME"
+assert_paths '["apps/web/*","packages/auth/*","packages/telemetry/*"]'
+chmod 755 "$RO_HOME"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then echo "All scenarios passed"; else echo "FAILURES"; fi
 exit "$FAILED"
