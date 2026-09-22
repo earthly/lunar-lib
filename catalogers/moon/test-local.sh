@@ -147,6 +147,26 @@ BARE="$TEST_DIR/bare"; mkdir -p "$BARE"
 run "$BARE" "github.com/acme/mono/apps/web"
 if [ "$RUN_EXIT" -eq 0 ] && [ ! -f "$WRITE_OUT" ]; then pass "exit 0, no write"; else fail "exit=$RUN_EXIT"; fi
 
+echo "Scenario 13: a .moon/ ABOVE the repo root is not adopted"
+# moon caches its own plugins in $HOME/.moon, so an unbounded upward walk can
+# leave the checkout and resolve sources against a directory outside the repo.
+OUTER="$TEST_DIR/outer"; mkdir -p "$OUTER/.moon" "$OUTER/inner/svc"
+printf "projects:\n  - 'svc'\n" > "$OUTER/.moon/workspace.yml"
+( cd "$OUTER/inner" && git init -q . && echo x > svc/a.txt && git add -A && \
+  git -c user.email=t@t -c user.name=t commit -qm init ) >/dev/null
+run "$OUTER/inner/svc" "github.com/acme/outer/svc"
+# Assert the REASON, not just "no write": an unbounded walk also ends up not
+# writing here, because the out-of-repo project's source fails to match the
+# subdir. Only the message distinguishes "never left the repo" from "left the
+# repo and then happened to miss".
+if [ "$RUN_EXIT" -ne 0 ] || [ -f "$WRITE_OUT" ]; then
+    fail "adopted an out-of-repo workspace: exit=$RUN_EXIT"
+elif echo "$RUN_OUT" | grep -q "between .* and the repo root"; then
+    pass "stopped the walk at the repo root"
+else
+    fail "left the repo before giving up: $(echo "$RUN_OUT" | tail -1)"
+fi
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then echo "All scenarios passed"; else echo "FAILURES"; fi
 exit "$FAILED"

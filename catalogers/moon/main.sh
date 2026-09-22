@@ -43,16 +43,21 @@ echo "Component: $COMPONENT_ID"
 # root on its own. We resolve it ourselves anyway because `source` values are
 # workspace-relative while `paths` must be repo-relative: when the workspace
 # root sits below the repo root, every source needs that offset prefixed.
+#
+# The walk stops at the repo root. moon keeps its own plugin cache in
+# `$HOME/.moon`, so an unbounded walk can leave the checkout, "find" that, and
+# resolve sources against a directory the repo knows nothing about.
 find_workspace_root() {
-    local dir="$1"
-    while [ "$dir" != "/" ]; do
+    local dir="$1" boundary="$2"
+    while :; do
         if [ -d "$dir/.moon" ]; then
             printf '%s\n' "$dir"
             return 0
         fi
+        [ "$dir" = "$boundary" ] && return 1
+        [ "$dir" = "/" ] && return 1
         dir=$(dirname "$dir")
     done
-    return 1
 }
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -85,9 +90,9 @@ if [ -z "$SUBDIR" ]; then
 fi
 echo "Subdir: $SUBDIR"
 
-WORKSPACE_ROOT=$(find_workspace_root "$CWD" || true)
+WORKSPACE_ROOT=$(find_workspace_root "$CWD" "$REPO_ROOT" || true)
 if [ -z "$WORKSPACE_ROOT" ]; then
-    echo "No .moon/ at or above $PWD — not a moon workspace, skipping"
+    echo "No .moon/ between $CWD and the repo root — not a moon workspace, skipping"
     exit 0
 fi
 echo "Workspace root: $WORKSPACE_ROOT (repo root: $REPO_ROOT)"
