@@ -7,7 +7,7 @@ COMPUTE_TYPES="aws_instance aws_ecs_service aws_lambda_function aws_autoscaling_
 NETWORK_TYPES="aws_lb aws_elb aws_security_group aws_api_gateway_rest_api aws_apigatewayv2_api aws_cloudfront_distribution aws_route53_zone"
 SECURITY_TYPES="aws_wafv2_web_acl aws_wafv2_web_acl_association aws_kms_key"
 
-# --- Parse a single .tf file ---
+# --- Parse a single configuration file ---
 process_file() {
     local tf_file="$1"
     local rel_path="${tf_file#./}"
@@ -27,8 +27,23 @@ process_file() {
 }
 export -f process_file
 
-# --- Find all .tf files ---
-tf_files=$(find . -type f -name '*.tf' 2>/dev/null)
+# --- Find the HCL configuration files ---
+# OpenTofu reads .tofu as well as .tf, and where a directory holds both
+# <base>.tf and <base>.tofu it uses the .tofu and ignores the .tf. Mirroring
+# that matters: evaluating the file the tool ignores lets a check pass on
+# configuration that is never applied.
+#
+# The JSON variants (.tf.json / .tofu.json) are deliberately NOT collected yet.
+# They parse fine, but the .iac.modules normalization below assumes hcl2json's
+# list-shaped blocks and JSON syntax gives objects — see ENG-1860.
+tf_files=$(find . -type f \( -name '*.tf' -o -name '*.tofu' \) 2>/dev/null \
+    | awk '
+        { all[NR] = $0
+          p = $0
+          if (p ~ /\.tofu$/) { sub(/\.tofu$/, "", p); shadowed[p ".tf"] = 1 }
+        }
+        END { for (i = 1; i <= NR; i++) if (!(all[i] in shadowed)) print all[i] }
+    ')
 if [ -z "$tf_files" ]; then
     exit 0
 fi

@@ -1,7 +1,7 @@
 version: 0
 
 name: terraform
-description: Parses Terraform HCL files and collects IaC configuration data
+description: Parses Terraform and OpenTofu configuration files and collects IaC configuration data
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:terraform-main
@@ -10,7 +10,7 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Terraform Collector"
   long_description: |
-    Parse Terraform HCL files to extract configuration data. Writes file validity
+    Parse Terraform and OpenTofu configuration files to extract configuration data. Writes file validity
     and full parsed HCL JSON for downstream policy analysis of providers, modules,
     backends, resources, and infrastructure security posture.
   categories: ["security", "orchestration"]
@@ -27,7 +27,8 @@ landing_page:
 collectors:
   - name: terraform
     description: |
-      Parses all Terraform (.tf) files in the repository using hcl2json and collects:
+      Parses every Terraform/OpenTofu HCL file in the repository (.tf, .tofu)
+      and collects:
       - File validity and parse errors (.iac.files[])
       - Normalized modules with resources and analysis (.iac.modules[])
       - Full parsed HCL JSON for terraform-specific policy (.iac.native.terraform.files[])

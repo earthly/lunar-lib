@@ -78,6 +78,7 @@ test:
     BUILD ./collectors/grype+test
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
+    BUILD ./collectors/terraform+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD ./probes/pr-title-ticket-ref+test
