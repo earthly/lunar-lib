@@ -25,8 +25,7 @@ policies:
     description: |
       Verifies that a catalog-info.yaml file exists in the repository.
       Every Backstage-managed service must have a catalog definition file.
-      Fails if the `backstage` collector reports no catalog file found,
-      unless `skip_when_no_catalog_info` is set.
+      Fails if the `backstage` collector reports no catalog file found.
     mainPython: ./catalog-info-exists.py
     keywords: ["backstage", "catalog-info", "service catalog", "file exists"]
 
@@ -34,8 +33,7 @@ policies:
     description: |
       Verifies that the catalog-info.yaml file is syntactically valid and
       passes Backstage descriptor schema checks (no lint errors reported
-      by the collector). Fails if it has lint errors, or is missing and
-      `skip_when_no_catalog_info` is not set.
+      by the collector). Fails if the file is missing or has lint errors.
     mainPython: ./catalog-info-valid.py
     keywords: ["backstage", "catalog-info", "lint", "schema", "validation"]
 
@@ -43,8 +41,7 @@ policies:
     description: |
       Validates that the owner field (spec.owner) is populated in the
       catalog-info.yaml. Ownership is required for incident routing
-      and accountability. Fails if no catalog file is present, unless
-      `skip_when_no_catalog_info` is set.
+      and accountability. Fails if no catalog file is present.
     mainPython: ./owner-set.py
     keywords: ["backstage", "ownership", "owner", "accountability"]
 
@@ -53,8 +50,7 @@ policies:
       Validates that the lifecycle stage (spec.lifecycle) is defined in
       the catalog-info.yaml. Lifecycle stages (production, experimental,
       deprecated) inform operational expectations and SLO requirements.
-      Fails if no catalog file is present, unless
-      `skip_when_no_catalog_info` is set.
+      Fails if no catalog file is present.
     mainPython: ./lifecycle-set.py
     keywords: ["backstage", "lifecycle", "production", "deprecated"]
 
@@ -62,8 +58,7 @@ policies:
     description: |
       Validates that the system grouping (spec.system) is defined in
       the catalog-info.yaml. System assignment enables dependency mapping
-      and architectural visibility. Fails if no catalog file is present,
-      unless `skip_when_no_catalog_info` is set.
+      and architectural visibility. Fails if no catalog file is present.
     mainPython: ./system-set.py
     keywords: ["backstage", "system", "grouping", "architecture"]
 
@@ -130,9 +125,9 @@ policies:
       data type (integer, number, boolean, string) with numeric bounds,
       string length, a regular-expression pattern, or an allowed-value
       set. Configure via the `required_annotations` input. Skipped when no
-      annotations are required (the default). Fails if a required key is
-      absent or empty, a value violates its declared constraint, or the
-      catalog file is missing and `skip_when_no_catalog_info` is not set.
+      annotations are required (the default). Fails if the catalog file is
+      missing, a required key is absent or empty, or a value violates its
+      declared constraint.
     mainPython: ./required-annotations.py
     keywords: ["backstage", "annotations", "metadata", "required", "type validation", "value constraints"]
 
@@ -141,9 +136,8 @@ policies:
       Verifies that catalog-info.yaml carries at least one tag matching
       each configured glob pattern (e.g. `location/*`, `runs-on/*`).
       Configure via the `required_tag_patterns` input. Skipped when no
-      patterns are required (the default). Fails if any pattern is unmatched
-      by the component's tags, or the catalog file is missing and
-      `skip_when_no_catalog_info` is not set.
+      patterns are required (the default). Fails if the catalog file is
+      missing or any pattern is unmatched by the component's tags.
     mainPython: ./required-tag-patterns.py
     keywords: ["backstage", "tags", "tag patterns", "glob", "required", "metadata"]
 
@@ -172,9 +166,21 @@ inputs:
       Skip every check in this policy on a component with no catalog-info.yaml,
       instead of failing it. Set to `"true"` when only some repositories in
       scope are registered in Backstage, so importing the policy broadly does
-      not turn the rest red. The default (`"false"`) treats a missing catalog
-      file as a violation. Only the file's absence is affected: a component
-      that has a catalog-info.yaml is held to every check either way.
+      not turn the rest red.
+
+      One switch for the whole family, and the only place their missing-file
+      behaviour is described. With the default (`"false"`) a missing catalog
+      file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
+      `lifecycle-set` and `system-set`; fails `required-annotations` and
+      `required-tag-patterns` when those are configured; passes the two
+      `disallowed-*` deny-checks, since nothing forbidden can be present
+      without a file; and skips the three referential-integrity checks, which
+      have nothing to cross-check. With `"true"` all twelve skip instead —
+      the `disallowed-*` pair included, so a component that is not in the
+      catalog reports no green passes it did not earn.
+
+      Only the file's absence is affected: a component that has a
+      catalog-info.yaml is held to every check either way.
     default: "false"
   required_annotations:
     description: |
