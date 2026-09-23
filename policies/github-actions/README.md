@@ -16,7 +16,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `no-dangerous-trigger-checkout` | Flags `pull_request_target` workflows that check out PR head code |
 | `permissions-declared` | Flags workflows with no explicit `permissions:` key |
 | `no-write-all-permissions` | Flags `permissions: write-all` at workflow or job level |
-| `checkout-no-persist-credentials` | Flags `actions/checkout` without `persist-credentials: false` |
+| `checkout-no-persist-credentials` | Flags `actions/checkout` without `persist-credentials: false`. Jobs whose risk has been accepted can be exempted with the `exempt_jobs` input |
 | `no-secrets-inherit` | Flags `secrets: inherit` in reusable workflow calls |
 
 ## Required Data
@@ -43,6 +43,21 @@ policies:
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [no-script-injection, permissions-declared]  # Run specific checks only
+```
+
+To accept the risk on a named job rather than fix it, list it under `exempt_jobs`.
+The remaining findings still fail, so a new unflagged checkout is still reported:
+
+```yaml
+policies:
+  - uses: github://earthly/lunar-lib/policies/github-actions@main
+    on: ["domain:your-domain"]
+    enforcement: block-pr
+    include: [checkout-no-persist-credentials]
+    with:
+      exempt_jobs: |
+        # accepted TICKET-123 — repo-scoped 1h token, no artifact upload
+        .github/workflows/publish.yaml:push
 ```
 
 ## Examples

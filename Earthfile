@@ -89,6 +89,7 @@ test:
     BUILD ./policies/git+test
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
+    BUILD ./policies/github-actions+test
     BUILD ./policies/sca+test
     BUILD ./policies/container-scan+test
     BUILD ./policies/repo-boilerplate+test
