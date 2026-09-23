@@ -35,6 +35,9 @@ export CURL_LOG="$TEST_DIR/curl.log"
 #   * STS AssumeRoleWithWebIdentity -> mock credentials when MOCK_STS=1.
 #     Matched against the whole arg list, not the last arg: the STS call puts
 #     --data-urlencode pairs *after* the URL.
+#   * STS AssumeRole (the aws_assume_role_arns hop), keyed off the role name:
+#     *denied* -> an AccessDenied error body (curl exits 0 on a 403),
+#     *unreachable* -> curl exit 28, else -> credentials for the assumed role.
 #   * the Backstage by-name API -> an http_code keyed off the entity name.
 cat > "$MOCK/curl" << 'EOF'
 #!/bin/bash
@@ -43,12 +46,23 @@ cat > "$MOCK/curl" << 'EOF'
 args="$*"
 case "$args" in
   *169.254.169.254*|*169.254.170.2*) exit 7 ;;
-  *sts.*amazonaws.com*)
+  *sts.*amazonaws.com*AssumeRoleWithWebIdentity*)
     if [ "${MOCK_STS:-0}" = "1" ]; then
       printf '%s' '<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>ASIAMOCKKEY</AccessKeyId><SecretAccessKey>mocksecret</SecretAccessKey><SessionToken>mocksessiontoken</SessionToken></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>'
       exit 0
     fi
     exit 7 ;;
+  *sts.*amazonaws.com*Action=AssumeRole*)
+    case "$args" in
+      *RoleArn=*denied*)
+        printf '%s' '<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><Error><Type>Sender</Type><Code>AccessDenied</Code><Message>User: arn:aws:sts::111111111111:assumed-role/base/s is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::210987654321:role/denied-other-env</Message></Error><RequestId>r-1</RequestId></ErrorResponse>'
+        exit 0 ;;
+      *RoleArn=*unreachable*) exit 28 ;;
+      *)
+        printf '%s' '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleResult><Credentials><AccessKeyId>ASIAASSUMED</AccessKeyId><SecretAccessKey>assumedsecret</SecretAccessKey><SessionToken>assumedtoken</SessionToken><Expiration>2026-09-23T16:00:00Z</Expiration></Credentials><AssumedRoleUser><AssumedRoleId>AROAEXAMPLE:lunar-backstage-collector</AssumedRoleId><Arn>arn:aws:sts::210987654321:assumed-role/backstage-api-reader/lunar-backstage-collector</Arn></AssumedRoleUser></AssumeRoleResult></AssumeRoleResponse>'
+        exit 0 ;;
+    esac ;;
+  *sts.*amazonaws.com*) exit 7 ;;
 esac
 
 url="${@: -1}"
@@ -357,6 +371,107 @@ assert_eq "IRSA web-identity creds take precedence over static keys" \
 assert_eq "IRSA session token is sent" \
   "$(grep -c 'x-amz-security-token: mocksessiontoken' "$CURL_LOG")" '1'
 
+echo "Backstage collector aws_assume_role_arns (sts:AssumeRole hop) tests:"
+
+OK_ROLE="arn:aws:iam::210987654321:role/backstage-api-reader"
+DENIED_ROLE="arn:aws:iam::210987654321:role/denied-other-env"
+DEAD_ROLE="arn:aws:iam::210987654321:role/unreachable"
+ASSUMED_SIG='--user ASIAASSUMED:assumedsecret -H x-amz-security-token: assumedtoken'
+
+# Negative control: unset means no STS hop, and the chain's own keys sign.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" payments '' http://fake:7007 >/dev/null
+assert_eq "no aws_assume_role_arns -> no sts:AssumeRole call" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '0'
+
+: > "$CURL_LOG"
+assert_eq "an assumed role resolves refs (200 exists / 404 miss)" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-west-2 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+     payments typo-platform http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+STS_CALL=$(grep -- 'Action=AssumeRole ' "$CURL_LOG" || true)
+assert_eq "exactly one sts:AssumeRole call" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '1'
+assert_eq "AssumeRole goes to the regional STS endpoint for aws_region" \
+  "$(echo "$STS_CALL" | grep -c -- '--get https://sts.us-west-2.amazonaws.com/ ' || true)" '1'
+assert_eq "AssumeRole is signed for sts with the chain's credentials" \
+  "$(echo "$STS_CALL" | grep -c -- '--aws-sigv4 aws:amz:us-west-2:sts --user AKIATEST:secret123 ' || true)" '1'
+assert_eq "AssumeRole names the role and the plugin's session" \
+  "$(echo "$STS_CALL" | grep -c -- "RoleArn=$OK_ROLE --data-urlencode RoleSessionName=lunar-backstage-collector" || true)" '1'
+assert_eq "keys without a session token send no x-amz-security-token to STS" \
+  "$(echo "$STS_CALL" | grep -c 'x-amz-security-token' || true)" '0'
+assert_eq "both lookups are signed with the assumed role's credentials" \
+  "$(grep -c -- "--aws-sigv4 aws:amz:us-west-2:execute-api $ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2'
+assert_eq "the chain's own keys never sign a lookup" \
+  "$(grep 'fake:7007' "$CURL_LOG" | grep -c 'AKIATEST' || true)" '0'
+
+# IRSA as the base: its temporary credentials (and their token) sign the hop.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 MOCK_STS=1 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/r AWS_WEB_IDENTITY_TOKEN_FILE=$TEST_DIR/wit LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+  payments '' http://fake:7007 >/dev/null 2>"$TEST_DIR/err"
+assert_eq "IRSA credentials sign the AssumeRole call, token included" \
+  "$(grep -- 'Action=AssumeRole ' "$CURL_LOG" | grep -c -- '--user ASIAMOCKKEY:mocksecret -H x-amz-security-token: mocksessiontoken' || true)" '1'
+assert_eq "and the lookup is signed with the assumed role" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "the auth log line shows both hops" \
+  "$(grep -c 'credentials via irsa-web-identity+assume-role' "$TEST_DIR/err" || true)" '1'
+
+# Temporary static keys carry their session token to STS, and only there.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_SECRET_AWS_SESSION_TOKEN=tmptok LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "temporary base keys send their session token to STS" \
+  "$(grep -- 'Action=AssumeRole ' "$CURL_LOG" | grep -c 'x-amz-security-token: tmptok' || true)" '1'
+assert_eq "the base session token never reaches a lookup" \
+  "$(grep 'fake:7007' "$CURL_LOG" | grep -c 'tmptok' || true)" '0'
+
+# A list falls through a refused role and an unreachable STS to the first role
+# that works. Set via the caller's env rather than $extra, which would
+# word-split the spaces this case is about.
+: > "$CURL_LOG"
+LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$DENIED_ROLE, $DEAD_ROLE, $OK_ROLE" \
+  run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" \
+  payments '' http://fake:7007 >/dev/null 2>"$TEST_DIR/err"
+assert_eq "a list tries each role in order until one is assumed" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '3'
+assert_eq "whitespace around list entries is ignored" \
+  "$(grep -c -- "RoleArn=$OK_ROLE " "$CURL_LOG" || true)" '1'
+assert_eq "the lookup is signed with the role that was assumed" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "a refused role is logged by position and STS error code" \
+  "$(grep -c 'aws_assume_role_arns role 1/3 not assumed (AccessDenied)' "$TEST_DIR/err" || true)" '1'
+assert_eq "an unreachable STS is logged with the curl exit code" \
+  "$(grep -c 'aws_assume_role_arns role 2/3 not assumed (request failed, curl exit 28)' "$TEST_DIR/err" || true)" '1'
+assert_eq "no role ARN or account id reaches the log" \
+  "$(grep -c -E '210987654321|111111111111|denied-other-env|backstage-api-reader' "$TEST_DIR/err" || true)" '0'
+
+# A YAML block scalar puts one ARN per line, with no commas.
+: > "$CURL_LOG"
+LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$DENIED_ROLE
+$OK_ROLE" run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" \
+  payments '' http://fake:7007 >/dev/null 2>&1
+assert_eq "a newline-separated list is split like a comma-separated one" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true) $(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2 1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE,$DENIED_ROLE" \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "roles after the first one assumed are never tried" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=,," \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "a list of only separators is treated as unset" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '0'
+assert_eq "so the chain's own keys sign the lookup" \
+  "$(grep -c -- '--user AKIATEST:secret123 http://fake:7007/' "$CURL_LOG" || true)" '1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" payments '' http://fake:7007 >/dev/null
+assert_eq "bearer mode ignores aws_assume_role_arns" \
+  "$(grep -c 'sts\.' "$CURL_LOG" || true)" '0'
+
 echo "Backstage collector ref_lookup (by-name / by-query) tests:"
 
 # Negative control first: an unset ref_lookup must keep hitting by-name and
@@ -459,6 +574,15 @@ assert_degraded "sigv4 without aws_region" \
 assert_degraded "sigv4 with no resolvable credentials" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1" payments '' http://fake:7007)" \
   "sigv4 credential resolution failed"
+
+assert_degraded "no role in aws_assume_role_arns can be assumed" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$DENIED_ROLE,$DEAD_ROLE" payments '' http://fake:7007)" \
+  "sts:AssumeRole failed for every role in aws_assume_role_arns"
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$DENIED_ROLE" payments '' http://fake:7007 >/dev/null
+assert_eq "a failed AssumeRole makes no Backstage request" \
+  "$(grep -c 'fake:7007' "$CURL_LOG" || true)" '0'
 
 assert_degraded "invalid auth_mode" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=oauth2" payments '' http://fake:7007)" \
