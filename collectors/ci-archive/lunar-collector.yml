@@ -1,0 +1,116 @@
+version: 0
+
+name: ci-archive
+description: Archive completed CI workflow runs and their logs to S3
+author: support@earthly.dev
+
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "CI Archive Collector"
+  long_description: |
+    Archives every CI workflow run for a commit — run metadata plus the full
+    logs — into a single zip in S3, once all runs for that commit have
+    finished. Gives you a durable record of CI output after the provider's
+    own retention window closes.
+  category: "ci-cd"
+  icon: "assets/ci-archive.svg"
+  status: "experimental"
+  related:
+    - slug: "ci-otel"
+      type: "collector"
+      reason: "Traces CI jobs live; ci-archive stores the finished run instead"
+
+inputs:
+  s3_bucket:
+    description: Destination S3 bucket. Required — the collector exits 0 with a stderr message if unset.
+  s3_prefix:
+    description: Key prefix within the bucket. The object key is <prefix>/<component>/<sha>/<run_set>.zip
+    default: "lunar/ci-archive"
+  aws_region:
+    description: AWS region of the bucket. Falls back to the runtime's AWS_REGION when unset.
+    default: ""
+  s3_endpoint_url:
+    description: Override the S3 endpoint, for S3-compatible stores (MinIO, Ceph). Empty means real AWS.
+    default: ""
+  max_archive_mb:
+    description: Skip the upload and record an error if the assembled zip exceeds this size.
+    default: "512"
+  include_runs_pattern:
+    description: Only archive workflow runs whose name matches this regex. Empty means all runs.
+    default: ""
+
+secrets:
+  GH_TOKEN:
+    description: GitHub token with `actions:read` to list workflow runs and download run logs
+  AWS_ACCESS_KEY_ID:
+    description: AWS access key for the S3 upload. Omit to use the runtime's ambient credentials (IAM role).
+  AWS_SECRET_ACCESS_KEY:
+    description: AWS secret key for the S3 upload. Omit to use the runtime's ambient credentials (IAM role).
+
+collectors:
+  - name: workflow-logs
+    description: |
+      Fires once every CI workflow run for the commit has completed — the
+      doneness gate — then lists those runs, downloads each run's log archive,
+      bundles them with a manifest into one zip, and uploads it to S3. Records
+      the object URI and the run inventory under .ci.archive so a consumer can
+      find the archive without guessing the key. Both hooks are declared on the
+      same path so the collector fires whether or not .ci is populated —
+      doneness is the trigger, the path is not a precondition.
+    mainBash: workflow-logs.sh
+    # Log archives for a busy repo can be hundreds of MB before compression.
+    size: large
+    hooks:
+      - type: after-json
+        path: .ci
+      - type: missing-json
+        path: .ci
+    keywords: ["ci archive", "workflow logs", "s3", "after-json", "workflow-end", "retention", "audit trail"]
+
+example_component_json: |
+  {
+    "ci": {
+      "archive": {
+        "source": {
+          "tool": "ci-archive",
+          "version": "0.1.0",
+          "integration": "after-json",
+          "collected_at": "2026-09-23T14:22:03Z",
+          "collected_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+        },
+        "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d/20260923T142203Z.zip",
+        "bucket": "acme-ci-archive",
+        "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d/20260923T142203Z.zip",
+        "size_bytes": 4823104,
+        "run_count": 3,
+        "runs": [
+          {
+            "id": 24322039765,
+            "name": "ci",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-09-23T14:02:11Z",
+            "completed_at": "2026-09-23T14:19:47Z",
+            "html_url": "https://github.com/acme/myproject/actions/runs/24322039765",
+            "log_bytes": 3914200
+          },
+          {
+            "id": 24322039912,
+            "name": "codeql",
+            "attempt": 1,
+            "status": "completed",
+            "conclusion": "failure",
+            "started_at": "2026-09-23T14:02:12Z",
+            "completed_at": "2026-09-23T14:21:58Z",
+            "html_url": "https://github.com/acme/myproject/actions/runs/24322039912",
+            "log_bytes": 908904
+          }
+        ],
+        "errors": [
+          {"run_id": 24322040001, "reason": "logs expired or unavailable (410)"}
+        ]
+      }
+    }
+  }
