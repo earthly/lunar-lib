@@ -2,6 +2,8 @@ import fnmatch
 
 from lunar_policy import Check, variable_or_default
 
+from catalog_presence import skip_if_no_catalog
+
 
 def main(node=None):
     c = Check(
@@ -19,8 +21,11 @@ def main(node=None):
                 "`disallowed_tag_patterns` input to forbid tag patterns."
             )
 
+        skip_if_no_catalog(c)
+
         # Pure deny-check: read defensively so a missing catalog file simply
         # means "no disallowed tag is present" (pass), rather than a failure.
+        # Set `skip_when_no_catalog_info` to skip instead of green-passing.
         tags = c.get_value_or_default(".catalog.native.backstage.metadata.tags", [])
         if not isinstance(tags, list):
             tags = []

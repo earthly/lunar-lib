@@ -2,6 +2,8 @@ import fnmatch
 
 from lunar_policy import Check, variable_or_default
 
+from catalog_presence import skip_if_no_catalog
+
 
 def main(node=None):
     c = Check(
@@ -18,6 +20,8 @@ def main(node=None):
                 "No required_tag_patterns configured. Set the "
                 "`required_tag_patterns` input to enforce tag patterns."
             )
+
+        skip_if_no_catalog(c)
 
         if not c.exists(".catalog.native.backstage"):
             c.fail(
