@@ -1,4 +1,4 @@
-"""Unit tests for the configurable backstage policies (required annotations + tag patterns)."""
+"""Unit tests for the backstage policy checks."""
 
 import os
 import unittest
@@ -22,6 +22,11 @@ def load_policy(filename):
     return module.main
 
 
+check_catalog_info_exists = load_policy("catalog-info-exists")
+check_catalog_info_valid = load_policy("catalog-info-valid")
+check_owner_set = load_policy("owner-set")
+check_lifecycle_set = load_policy("lifecycle-set")
+check_system_set = load_policy("system-set")
 check_required_annotations = load_policy("required-annotations")
 check_required_tag_patterns = load_policy("required-tag-patterns")
 check_disallowed_annotations = load_policy("disallowed-annotations")
@@ -57,6 +62,14 @@ def policy_vars(**kwargs):
 def is_skipped(check):
     """check.status never returns SKIPPED; a skip is recorded as a SKIPPED result."""
     return any(r.result == CheckStatus.SKIPPED for r in check._results)
+
+
+def skip_reason(check):
+    """The reason text of a skip, so tests can tell *which* gate skipped."""
+    return next(
+        (r.failure_message for r in check._results if r.result == CheckStatus.SKIPPED),
+        None,
+    )
 
 
 def backstage_data(annotations=None, tags=None):
@@ -691,6 +704,167 @@ class TestRequiredAnnotationsTyped(unittest.TestCase):
             data = backstage_data(annotations={"k": "5"})
             with self.assertRaises(ConstraintConfigError):
                 check_required_annotations(Node.from_component_json(data))
+
+
+# Every check in the policy, paired with the inputs it needs to get past its own
+# opt-in gate and reach the catalog-presence gate. Without those inputs the four
+# configurable checks skip on "nothing configured" and the assertions below would
+# pass vacuously.
+ALL_CHECKS = [
+    ("catalog-info-exists", check_catalog_info_exists, {}),
+    ("catalog-info-valid", check_catalog_info_valid, {}),
+    ("owner-set", check_owner_set, {}),
+    ("lifecycle-set", check_lifecycle_set, {}),
+    ("system-set", check_system_set, {}),
+    ("domain-exists", check_domain_exists, {}),
+    ("system-exists", check_system_exists, {}),
+    ("system-domain-exists", check_system_domain_exists, {}),
+    (
+        "required-annotations",
+        check_required_annotations,
+        {"required_annotations": "backstage.io/source-location"},
+    ),
+    (
+        "required-tag-patterns",
+        check_required_tag_patterns,
+        {"required_tag_patterns": "location/*"},
+    ),
+    (
+        "disallowed-annotations",
+        check_disallowed_annotations,
+        {"disallowed_annotations": "backstage.io/skip-checks"},
+    ),
+    (
+        "disallowed-tag-patterns",
+        check_disallowed_tag_patterns,
+        {"disallowed_tag_patterns": "deprecated/*"},
+    ),
+]
+
+# What each check resolves to on a missing catalog file with the mode OFF — the
+# behaviour this input must leave untouched.
+DEFAULT_NO_CATALOG = {
+    "catalog-info-exists": CheckStatus.FAIL,
+    "catalog-info-valid": CheckStatus.FAIL,
+    "owner-set": CheckStatus.FAIL,
+    "lifecycle-set": CheckStatus.FAIL,
+    "system-set": CheckStatus.FAIL,
+    "required-annotations": CheckStatus.FAIL,
+    "required-tag-patterns": CheckStatus.FAIL,
+    # Pure deny-checks: nothing present means nothing forbidden.
+    "disallowed-annotations": CheckStatus.PASS,
+    "disallowed-tag-patterns": CheckStatus.PASS,
+    # Referential integrity already skips without .refs.checked.
+    "domain-exists": CheckStatus.SKIPPED,
+    "system-exists": CheckStatus.SKIPPED,
+    "system-domain-exists": CheckStatus.SKIPPED,
+}
+
+
+class TestSkipWhenNoCatalogInfo(unittest.TestCase):
+    """The `skip_when_no_catalog_info` input, across all twelve checks."""
+
+    def test_every_check_skips_when_set(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="true", **inputs):
+                    check = check_fn(finished_node({}))
+                    self.assertTrue(is_skipped(check))
+                    # Assert on the reason, not just the status: the four
+                    # configurable checks have a skip gate of their own.
+                    self.assertIn("skip_when_no_catalog_info", skip_reason(check))
+
+    def test_default_leaves_every_check_unchanged(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(**inputs):
+                    check = check_fn(finished_node({}))
+                    expected = DEFAULT_NO_CATALOG[name]
+                    if expected == CheckStatus.SKIPPED:
+                        self.assertTrue(is_skipped(check))
+                        self.assertNotIn(
+                            "skip_when_no_catalog_info", skip_reason(check)
+                        )
+                    else:
+                        self.assertEqual(check.status, expected)
+
+    def test_explicit_false_leaves_every_check_unchanged(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="false", **inputs):
+                    check = check_fn(finished_node({}))
+                    expected = DEFAULT_NO_CATALOG[name]
+                    if expected == CheckStatus.SKIPPED:
+                        self.assertTrue(is_skipped(check))
+                    else:
+                        self.assertEqual(check.status, expected)
+
+    def test_set_does_not_skip_a_component_that_has_a_catalog_file(self):
+        # The mode is scoped to the file's absence. A component that *has* a
+        # catalog-info.yaml is still held to every check — otherwise this input
+        # would be a blanket off-switch for the policy.
+        with policy_vars(
+            skip_when_no_catalog_info="true",
+            required_annotations="backstage.io/source-location",
+            disallowed_annotations="backstage.io/skip-checks",
+        ):
+            present = finished_node(
+                {
+                    "catalog": {
+                        "native": {
+                            "backstage": {
+                                "valid": True,
+                                "metadata": {
+                                    "annotations": {
+                                        "backstage.io/skip-checks": "true"
+                                    }
+                                },
+                                "spec": {"type": "service"},
+                            }
+                        }
+                    }
+                }
+            )
+            self.assertEqual(
+                check_catalog_info_exists(present).status, CheckStatus.PASS
+            )
+            for check_fn in (check_owner_set, check_lifecycle_set, check_system_set):
+                self.assertEqual(check_fn(present).status, CheckStatus.FAIL)
+            # Configured checks still enforce: the required annotation is absent
+            # and a disallowed one is present.
+            self.assertEqual(
+                check_required_annotations(present).status, CheckStatus.FAIL
+            )
+            self.assertEqual(
+                check_disallowed_annotations(present).status, CheckStatus.FAIL
+            )
+
+    def test_set_still_pends_while_collectors_are_running(self):
+        # Absent data is only "no catalog file" once the collector has finished.
+        # Skipping earlier would resolve the check before the data could arrive.
+        for name, check_fn, inputs in ALL_CHECKS:
+            if DEFAULT_NO_CATALOG[name] == CheckStatus.PASS:
+                continue  # deny-checks read defensively and never pend
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="true", **inputs):
+                    check = check_fn(Node.from_component_json({}))
+                    self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_input_truthiness(self):
+        for raw, skips in [
+            ("true", True),
+            ("TRUE", True),
+            ("  true  ", True),
+            ("True", True),
+            ("false", False),
+            ("", False),
+            ("yes", False),
+            ("1", False),
+        ]:
+            with self.subTest(value=raw):
+                with policy_vars(skip_when_no_catalog_info=raw):
+                    check = check_owner_set(finished_node({}))
+                    self.assertEqual(is_skipped(check), skips)
 
 
 if __name__ == "__main__":

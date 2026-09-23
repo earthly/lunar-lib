@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from catalog_presence import skip_if_no_catalog
+
 
 def main(node=None):
     c = Check(
@@ -8,6 +10,8 @@ def main(node=None):
         node=node,
     )
     with c:
+        skip_if_no_catalog(c)
+
         c.assert_exists(
             ".catalog.native.backstage",
             "No catalog-info.yaml found. Add a catalog-info.yaml file to the repository root "
