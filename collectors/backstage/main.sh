@@ -6,21 +6,82 @@ SCRIPT_DIR="$(dirname "$0")"
 
 IFS=',' read -ra CANDIDATES <<< "$LUNAR_VAR_PATHS"
 
-CATALOG_FILE=""
-for candidate in "${CANDIDATES[@]}"; do
-  if [ -f "./$candidate" ]; then
-    CATALOG_FILE="./$candidate"
-    break
+# Prints the first `paths` candidate that exists in directory $1.
+first_catalog_in() {
+  local candidate
+  for candidate in "${CANDIDATES[@]}"; do
+    if [ -f "$1/$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Same lookup as collectors/repo-boilerplate/codeowners.sh: git, else the
+# nearest .git entry (a file in the hub's per-snippet worktrees).
+find_repo_root() {
+  local root dir
+  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "$root" ] && [ -d "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
   fi
-done
+  dir="$(pwd -P)"
+  while [ "$dir" != "/" ]; do
+    if [ -e "$dir/.git" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+CATALOG_FILE=""
+LINT_ARGS=()
+if CANDIDATE=$(first_catalog_in .); then
+  CATALOG_FILE="./$CANDIDATE"
+  PATH_NORMALIZED="$CANDIDATE"
+else
+  # A monorepo subdirectory component (the hub runs collectors from
+  # <repo>/<subdir>, whole repo checked out) whose entity lives in a file shared
+  # higher up. Walk up to the repo root; the nearest file wins, and the linter
+  # keeps only the entities that point at this directory.
+  HERE="$(pwd -P)"
+  REPO_ROOT="$(find_repo_root || true)"
+  if [ -n "$REPO_ROOT" ] && [[ "$HERE" == "$REPO_ROOT"/* ]]; then
+    COMPONENT_DIR="${HERE#"$REPO_ROOT"/}"
+    # The component id is <repo>/<subdir> (GitLab: <repo>/-/<subdir>). URLs are
+    # matched against that repo, so no repo means no match.
+    REPO_ID=""
+    case "${LUNAR_COMPONENT_ID:-}" in
+      */"$COMPONENT_DIR")
+        REPO_ID="${LUNAR_COMPONENT_ID%/"$COMPONENT_DIR"}"
+        REPO_ID="${REPO_ID%/-}"
+        ;;
+    esac
+    dir="$HERE"
+    up=""
+    while [ -n "$REPO_ID" ] && [ "$dir" != "$REPO_ROOT" ] && [ "$dir" != "/" ]; do
+      dir="$(dirname "$dir")"
+      up="../$up"
+      if CANDIDATE=$(first_catalog_in "$dir"); then
+        CATALOG_FILE="$dir/$CANDIDATE"
+        PATH_NORMALIZED="$up$CANDIDATE"
+        LINT_ARGS=(--component-dir "$COMPONENT_DIR" --repo "$REPO_ID")
+        echo "No catalog file in $COMPONENT_DIR; reading $PATH_NORMALIZED for entities that point at it." >&2
+        break
+      fi
+    done
+  fi
+fi
 
 if [ -z "$CATALOG_FILE" ]; then
   # No catalog-info.yaml found — write nothing. Absence of `.catalog.native.backstage`
   # IS the signal. Policies use Check.exists(".catalog.native.backstage") to detect.
   exit 0
 fi
-
-PATH_NORMALIZED="${CATALOG_FILE#./}"
 
 YQ_ERR=$(mktemp)
 trap 'rm -f "$YQ_ERR"' EXIT
@@ -34,8 +95,13 @@ trap 'rm -f "$YQ_ERR"' EXIT
 # YAML still exits non-zero and drops to the parse-error branch below.
 PARSE_OK=false
 if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
-  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED")
+  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED" "${LINT_ARGS[@]}")
   PARSE_OK=true
+  if [ "$RESULT" = "null" ]; then
+    # A shared file that doesn't describe this directory: same as no file.
+    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR (backstage.io/source-location or metadata.links); nothing collected." >&2
+    exit 0
+  fi
 else
   ERR_MSG=$(tr '\n' ' ' < "$YQ_ERR" | sed 's/[[:space:]]*$//' | head -c 500)
   [ -z "$ERR_MSG" ] && ERR_MSG="YAML parse error"

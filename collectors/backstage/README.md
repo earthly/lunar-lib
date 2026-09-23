@@ -16,7 +16,7 @@ When a catalog-info file is found, this collector writes to the following Compon
 |------|------|-------------|
 | `.catalog.native.backstage.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
 | `.catalog.native.backstage.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
-| `.catalog.native.backstage.path` | string | Relative path to the file that was parsed |
+| `.catalog.native.backstage.path` | string | Path of the parsed file, relative to the component's directory (e.g. `../../catalog-info.yaml` for a [monorepo's shared file](#monorepo-components)) |
 | `.catalog.native.backstage.apiVersion` | string | Backstage API version of the [primary entity](#multiple-entities) (e.g. `backstage.io/v1alpha1`) |
 | `.catalog.native.backstage.kind` | string | Kind of the [primary entity](#multiple-entities) (e.g. `Component`, `System`, `API`) |
 | `.catalog.native.backstage.metadata` | object | Raw `metadata` block of the primary entity (`name`, `description`, `annotations`, `tags`, etc.) |
@@ -52,6 +52,15 @@ A single `catalog-info.yaml` may declare several Backstage entities separated by
 - **`valid` / `errors[]` aggregate across all entities.** The file is `valid` only when every entity passes lint; each error message in a multi-entity file is prefixed with a `document N (Kind 'name')` locator (and carries an `entity` index into `entities[]`) so you can tell which document is at fault.
 - **`entities[]` lists all of them,** each with its own `valid`/`errors`/`apiVersion`/`kind`/`metadata`/`spec`.
 - **The primary entity is hoisted to the top level.** `.apiVersion`, `.kind`, `.metadata`, and `.spec` mirror the first `Component` in the file (or the first document when there is no `Component`). The single-entity policies — `owner-set`, `lifecycle-set`, `system-set`, `required-annotations`, the tag-pattern checks, and the referential-integrity lookups — read these paths, so they operate on that primary `Component` (owner, lifecycle, and system are `Component`-level fields in Backstage). A single-entity file behaves exactly as before: one element in `entities[]`, that entity hoisted.
+
+### Monorepo components
+
+A monorepo subdirectory component (e.g. `github.com/acme/monorepo/services/payments`) reads the catalog file in its own directory. If there isn't one, the collector walks up to the repository root and uses the nearest file it finds, so one root `catalog-info.yaml` can describe every component in the repo. From that file it keeps only the entities that point at the component's directory:
+
+- `backstage.io/source-location` names the directory, e.g. `url:https://github.com/acme/monorepo/tree/main/services/payments/`.
+- If an entity has no source-location, or it names the repository root, a `metadata.links` URL naming the directory counts instead.
+
+Only the kept entities are linted and listed in `entities[]`, so another component's broken entry can't fail this one; error locators still give each entity's document number in the shared file. If no entity points at the directory, nothing is written, the same as having no file. URLs must be GitHub, GitLab, or Bitbucket `tree`/`blob`/`src` links into the component's own repository, with a single-segment ref such as `main`.
 
 ### Lint checks
 

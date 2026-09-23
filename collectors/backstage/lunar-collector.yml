@@ -35,6 +35,11 @@ collectors:
       prefixes. Lints every entity for schema/syntax issues and writes the
       aggregated findings to `.catalog.native.backstage.valid` and
       `.catalog.native.backstage.errors[]`.
+      A monorepo subdirectory component with no catalog file of its own falls
+      back to the nearest one up to the repository root, keeping only the
+      entities whose `backstage.io/source-location` (or, when that is absent
+      or names the repository root, a `metadata.links` URL) points at its
+      directory.
       When `backstage_url` is configured, it additionally performs a
       referential-integrity check: for each grouping reference declared in the
       file (`spec.domain`, `spec.system`) it queries the Backstage catalog API
@@ -71,11 +76,14 @@ collectors:
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam"]
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam", "monorepo", "source-location"]
 
 inputs:
   paths:
-    description: Comma-separated list of catalog file paths to check (first match wins)
+    description: |
+      Comma-separated list of catalog file paths to check (first match wins).
+      A monorepo subdirectory component with no match also checks each parent
+      directory up to the repository root.
     default: "catalog-info.yaml,catalog-info.yml"
   backstage_url:
     description: |

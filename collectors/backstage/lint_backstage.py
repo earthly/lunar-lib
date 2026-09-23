@@ -9,6 +9,9 @@ present, `valid`/`errors` aggregate across all of them, the first Component (or
 first entity) is hoisted to the top level, and every entity is listed under
 `entities[]`. See `lint_documents` for the aggregate shape.
 
+With `--component-dir`, only the entities that point at that directory of
+`--repo` are kept (see `entity_dirs`); nothing matching prints `null`.
+
 Schema checks (Backstage descriptor format — https://backstage.io/docs/features/software-catalog/descriptor-format):
 - Top-level must be a mapping
 - apiVersion: required, string, should start with `backstage.io/`
@@ -23,6 +26,7 @@ import argparse
 import json
 import re
 import sys
+from urllib.parse import unquote, urlsplit
 
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9\-_.]*[a-z0-9])?$")
 
@@ -177,6 +181,74 @@ def lint(parsed, path):
     return output
 
 
+SOURCE_LOCATION = "backstage.io/source-location"
+
+# The path segment that precedes `<ref>/<path>` in a forge's browse URL:
+# GitHub and GitLab use tree/blob, Bitbucket Cloud uses src.
+BROWSE_SEGMENTS = {"tree", "blob", "src"}
+
+
+def repo_dir(url, repo):
+    """Directory of `repo` that `url` points at, relative to the repo root.
+
+    `url` is a Backstage location ref (`url:https://…`) or a plain URL; `repo`
+    is `<host>/<path>`, e.g. `github.com/acme/monorepo`. Returns "" for the repo
+    root, `services/api` for `…/tree/main/services/api/`, and None for another
+    repo or a page that isn't a directory. The ref must be one path segment
+    (`main`, a tag, a SHA): with a slash in it the path can't be told apart.
+    """
+    if not isinstance(url, str) or not repo:
+        return None
+    url = url.strip()
+    if url[:4].lower() == "url:":
+        url = url[4:]
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+    except ValueError:
+        return None
+    if parts.scheme.lower() not in ("http", "https"):
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    segments = [unquote(s) for s in parts.path.split("/") if s and s != "."]
+    repo_host, _, repo_path = repo.lower().partition("/")
+    repo_segments = [s for s in repo_path.split("/") if s]
+    count = len(repo_segments)
+    if host != repo_host or [s.lower() for s in segments[:count]] != repo_segments:
+        return None
+    rest = segments[count:]
+    if rest[:1] == ["-"]:  # GitLab: <project>/-/tree/<ref>/<path>
+        rest = rest[1:]
+    if not rest:
+        return ""
+    if len(rest) < 2 or rest[0] not in BROWSE_SEGMENTS or ".." in rest:
+        return None
+    return "/".join(rest[2:])
+
+
+def entity_dirs(entity, repo):
+    """Directories of `repo` that an entity declares as its source.
+
+    `backstage.io/source-location` decides when it names a subdirectory. When
+    it's absent or names the repo root (what Backstage derives for every entity
+    in a root catalog file), the entity's `metadata.links` URLs are used.
+    """
+    metadata = entity.get("metadata") if isinstance(entity, dict) else None
+    if not isinstance(metadata, dict):
+        return set()
+    annotations = metadata.get("annotations")
+    if isinstance(annotations, dict):
+        source = repo_dir(annotations.get(SOURCE_LOCATION), repo)
+        if source:
+            return {source}
+    links = metadata.get("links")
+    if not isinstance(links, list):
+        return set()
+    dirs = (repo_dir(link.get("url"), repo) for link in links if isinstance(link, dict))
+    return {d for d in dirs if d}
+
+
 def _entity_label(entity, index):
     """Human locator for one entity within a multi-document file.
 
@@ -197,7 +269,7 @@ def _entity_label(entity, index):
     return f"document {index + 1} ({detail})"
 
 
-def lint_documents(docs, path):
+def lint_documents(docs, path, component_dir=None, repo=None):
     """Lint every entity in a (possibly multi-document) catalog-info file.
 
     A single ``catalog-info.yaml`` may declare multiple Backstage entities
@@ -216,12 +288,23 @@ def lint_documents(docs, path):
       those paths and pre-date multi-doc support.
     - ``entities[]`` lists every parsed entity (its own ``valid``/``errors`` plus
       raw fields) so a policy can inspect all of them, not just the primary.
+
+    With ``component_dir`` (a monorepo subdirectory reading a shared file from
+    an ancestor directory), only the entities that point at that directory of
+    ``repo`` are linted and listed, so another component's entity can't fail
+    this one. Returns None when none of them do.
     """
     # A bare `---`, a trailing separator, or a blank file yields null documents;
     # Backstage's loader ignores them, so they are not entities.
     entities_in = [doc for doc in docs if doc is not None]
+    selected = list(enumerate(entities_in))
 
-    if not entities_in:
+    if component_dir is not None:
+        selected = [(i, doc) for i, doc in selected if component_dir in entity_dirs(doc, repo)]
+        if not selected:
+            return None
+
+    if not selected:
         return {
             "valid": False,
             "errors": [
@@ -234,16 +317,18 @@ def lint_documents(docs, path):
             "path": path,
         }
 
-    linted = [lint(doc, path) for doc in entities_in]
-    multi = len(linted) > 1
+    linted = [lint(doc, path) for _, doc in selected]
+    # Counted over the whole file: in a shared file a lone selected entity still
+    # needs its locator, and the document number is its position in the file.
+    multi = len(entities_in) > 1
 
     errors = []
-    for index, entity in enumerate(linted):
+    for index, ((position, _), entity) in enumerate(zip(selected, linted)):
         for err in entity["errors"]:
             if multi:
                 err = {
                     **err,
-                    "message": f"{_entity_label(entity, index)}: {err['message']}",
+                    "message": f"{_entity_label(entity, position)}: {err['message']}",
                     "entity": index,
                 }
             errors.append(err)
@@ -273,6 +358,8 @@ def lint_documents(docs, path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", required=True)
+    parser.add_argument("--component-dir", help="keep only entities pointing at this repo-relative dir")
+    parser.add_argument("--repo", help="the component's repo as <host>/<path>; used with --component-dir")
     args = parser.parse_args()
 
     try:
@@ -289,7 +376,7 @@ def main():
         # main.sh pipes a JSON array of documents (`yq ea -o=json '[.]'`); accept
         # a bare object too so a single parsed entity still lints correctly.
         docs = parsed if isinstance(parsed, list) else [parsed]
-        result = lint_documents(docs, args.path)
+        result = lint_documents(docs, args.path, args.component_dir, args.repo)
 
     json.dump(result, sys.stdout, separators=(",", ":"))
 

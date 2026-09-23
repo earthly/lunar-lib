@@ -1,0 +1,61 @@
+# A monorepo's shared root catalog-info.yaml: one file declaring the entities of
+# several subdirectory components. Entities point at their directory through
+# backstage.io/source-location, or only through metadata.links. Used by
+# test-local.sh, which runs the collector from each subdirectory.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: monorepo-root
+spec:
+  type: service
+  owner: team-platform
+  lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payments-api
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/monorepo/tree/main/services/payments/
+spec:
+  type: service
+  owner: team-payments
+  lifecycle: production
+  system: payment-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payments-grpc
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/monorepo/tree/main/services/payments/
+spec:
+  type: grpc
+  owner: team-payments
+  lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: web-frontend
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/monorepo/tree/main/
+  links:
+    - url: https://github.com/acme/monorepo/tree/main/services/web
+      title: Application Repository
+spec:
+  type: website
+  owner: team-web
+  lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: broken-worker
+  tags: ["bad/tag"]
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/monorepo/tree/main/services/worker/
+spec:
+  type: service
+  owner: team-worker
+  lifecycle: production
