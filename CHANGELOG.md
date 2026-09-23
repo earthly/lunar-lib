@@ -9,6 +9,18 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.17.0] — 2026-09-23
+
+### Changed
+
+- terraform: approved TLS policy and stateful-resource backup coverage (#329)
+- github-actions: exempt named jobs from checkout-no-persist-credentials (#331)
+- ai: cap every instruction file on lines and bytes, not just the root one (#332)
+- moon cataloger: populate monorepo component paths from the moon dependency graph (#330)
+- terraform collector: find .tofu files, honour OpenTofu precedence (#327)
+- terraform: permissions boundary, IMDSv2, OpenTofu state encryption (#326)
+- grype/trivy container scans: record collected_at, the commit, and the resolved image digest (#320)
+
 ## [1.16.0] — 2026-09-21
 
 ### Changed
@@ -937,6 +949,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/earthly/lunar-lib/compare/v1.14.5...v1.15.0
