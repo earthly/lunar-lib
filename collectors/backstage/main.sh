@@ -38,12 +38,24 @@ find_repo_root() {
   return 1
 }
 
+# Parent-directory lookup inputs; fallbacks match the manifest defaults.
+SEARCH_PARENT_DIRS="${LUNAR_VAR_SEARCH_PARENT_DIRS:-true}"
+MATCH=""
+if [ "${LUNAR_VAR_MATCH_SOURCE_LOCATION:-true}" = "true" ]; then
+  MATCH="source-location"
+fi
+if [ "${LUNAR_VAR_MATCH_LINKS:-false}" = "true" ]; then
+  MATCH="${MATCH:+$MATCH,}links"
+fi
+
 CATALOG_FILE=""
 LINT_ARGS=()
 if CANDIDATE=$(first_catalog_in .); then
   CATALOG_FILE="./$CANDIDATE"
   PATH_NORMALIZED="$CANDIDATE"
-else
+elif [ "$SEARCH_PARENT_DIRS" = "true" ] && [ -z "$MATCH" ]; then
+  echo "search_parent_dirs is on, but match_source_location and match_links are both off, so no entity can match." >&2
+elif [ "$SEARCH_PARENT_DIRS" = "true" ]; then
   # A monorepo subdirectory component (the hub runs collectors from
   # <repo>/<subdir>, whole repo checked out) whose entity lives in a file shared
   # higher up. Walk up to the repo root; the nearest file wins, and the linter
@@ -69,8 +81,8 @@ else
       if CANDIDATE=$(first_catalog_in "$dir"); then
         CATALOG_FILE="$dir/$CANDIDATE"
         PATH_NORMALIZED="$up$CANDIDATE"
-        LINT_ARGS=(--component-dir "$COMPONENT_DIR" --repo "$REPO_ID")
-        echo "No catalog file in $COMPONENT_DIR; reading $PATH_NORMALIZED for entities that point at it." >&2
+        LINT_ARGS=(--component-dir "$COMPONENT_DIR" --repo "$REPO_ID" --match "$MATCH")
+        echo "No catalog file in $COMPONENT_DIR; reading $PATH_NORMALIZED for entities that point at it ($MATCH)." >&2
         break
       fi
     done
@@ -99,7 +111,7 @@ if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
   PARSE_OK=true
   if [ "$RESULT" = "null" ]; then
     # A shared file that doesn't describe this directory: same as no file.
-    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR (backstage.io/source-location or metadata.links); nothing collected." >&2
+    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR ($MATCH); nothing collected." >&2
     exit 0
   fi
 else

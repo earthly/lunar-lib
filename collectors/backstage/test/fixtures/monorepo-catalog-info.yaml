@@ -59,3 +59,17 @@ spec:
   type: service
   owner: team-worker
   lifecycle: production
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: docs-site
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/monorepo/tree/main/services/docs/
+  links:
+    - url: https://github.com/acme/monorepo/tree/main/services/web
+      title: Site it documents
+spec:
+  type: website
+  owner: team-docs
+  lifecycle: production

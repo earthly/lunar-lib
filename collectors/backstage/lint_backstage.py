@@ -10,7 +10,8 @@ first entity) is hoisted to the top level, and every entity is listed under
 `entities[]`. See `lint_documents` for the aggregate shape.
 
 With `--component-dir`, only the entities that point at that directory of
-`--repo` are kept (see `entity_dirs`); nothing matching prints `null`.
+`--repo` through the `--match` references are kept (see `entity_dirs`);
+nothing matching prints `null`.
 
 Schema checks (Backstage descriptor format — https://backstage.io/docs/features/software-catalog/descriptor-format):
 - Top-level must be a mapping
@@ -187,6 +188,9 @@ SOURCE_LOCATION = "backstage.io/source-location"
 # GitHub and GitLab use tree/blob, Bitbucket Cloud uses src.
 BROWSE_SEGMENTS = {"tree", "blob", "src"}
 
+# What can tie an entity to a directory; main.sh passes the enabled subset.
+MATCH_ALL = frozenset({"source-location", "links"})
+
 
 def repo_dir(url, repo):
     """Directory of `repo` that `url` points at, relative to the repo root.
@@ -227,21 +231,24 @@ def repo_dir(url, repo):
     return "/".join(rest[2:])
 
 
-def entity_dirs(entity, repo):
+def entity_dirs(entity, repo, match=MATCH_ALL):
     """Directories of `repo` that an entity declares as its source.
 
     `backstage.io/source-location` decides when it names a subdirectory. When
     it's absent or names the repo root (what Backstage derives for every entity
     in a root catalog file), the entity's `metadata.links` URLs are used.
+    `match` says which of the two are consulted.
     """
     metadata = entity.get("metadata") if isinstance(entity, dict) else None
     if not isinstance(metadata, dict):
         return set()
     annotations = metadata.get("annotations")
-    if isinstance(annotations, dict):
+    if "source-location" in match and isinstance(annotations, dict):
         source = repo_dir(annotations.get(SOURCE_LOCATION), repo)
         if source:
             return {source}
+    if "links" not in match:
+        return set()
     links = metadata.get("links")
     if not isinstance(links, list):
         return set()
@@ -269,7 +276,7 @@ def _entity_label(entity, index):
     return f"document {index + 1} ({detail})"
 
 
-def lint_documents(docs, path, component_dir=None, repo=None):
+def lint_documents(docs, path, component_dir=None, repo=None, match=MATCH_ALL):
     """Lint every entity in a (possibly multi-document) catalog-info file.
 
     A single ``catalog-info.yaml`` may declare multiple Backstage entities
@@ -291,8 +298,8 @@ def lint_documents(docs, path, component_dir=None, repo=None):
 
     With ``component_dir`` (a monorepo subdirectory reading a shared file from
     an ancestor directory), only the entities that point at that directory of
-    ``repo`` are linted and listed, so another component's entity can't fail
-    this one. Returns None when none of them do.
+    ``repo`` through ``match`` are linted and listed, so another component's
+    entity can't fail this one. Returns None when none of them do.
     """
     # A bare `---`, a trailing separator, or a blank file yields null documents;
     # Backstage's loader ignores them, so they are not entities.
@@ -300,7 +307,9 @@ def lint_documents(docs, path, component_dir=None, repo=None):
     selected = list(enumerate(entities_in))
 
     if component_dir is not None:
-        selected = [(i, doc) for i, doc in selected if component_dir in entity_dirs(doc, repo)]
+        selected = [
+            (i, doc) for i, doc in selected if component_dir in entity_dirs(doc, repo, match)
+        ]
         if not selected:
             return None
 
@@ -360,7 +369,15 @@ def main():
     parser.add_argument("--path", required=True)
     parser.add_argument("--component-dir", help="keep only entities pointing at this repo-relative dir")
     parser.add_argument("--repo", help="the component's repo as <host>/<path>; used with --component-dir")
+    parser.add_argument(
+        "--match",
+        default=",".join(sorted(MATCH_ALL)),
+        help="comma-separated references that tie an entity to --component-dir: source-location, links",
+    )
     args = parser.parse_args()
+    match = frozenset(m.strip() for m in args.match.split(",") if m.strip())
+    if not match <= MATCH_ALL:
+        parser.error(f"--match: unknown value(s) {sorted(match - MATCH_ALL)}")
 
     try:
         parsed = json.load(sys.stdin)
@@ -376,7 +393,7 @@ def main():
         # main.sh pipes a JSON array of documents (`yq ea -o=json '[.]'`); accept
         # a bare object too so a single parsed entity still lints correctly.
         docs = parsed if isinstance(parsed, list) else [parsed]
-        result = lint_documents(docs, args.path, args.component_dir, args.repo)
+        result = lint_documents(docs, args.path, args.component_dir, args.repo, match)
 
     json.dump(result, sys.stdout, separators=(",", ":"))
 

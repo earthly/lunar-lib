@@ -594,7 +594,22 @@ run_mono() {
        bash "$SCRIPT_DIR/main.sh" 2>/dev/null )
 }
 
+# Same run, printing only main.sh's stderr.
+mono_stderr() {
+  local sub="$1"
+  shift
+  mkdir -p "$MONO/$sub"
+  ( cd "$MONO/$sub" \
+    && env PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="" \
+       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
+       "$@" \
+       bash "$SCRIPT_DIR/main.sh" >/dev/null ) 2>&1
+}
+
 names() { jq -c '[.entities[].metadata.name]'; }
+LINKS_ON=LUNAR_VAR_MATCH_LINKS=true
 
 make_mono
 OUT=$(run_mono services/payments)
@@ -606,8 +621,23 @@ assert_eq "the primary is the dir's Component, path points up at the shared file
 assert_eq "another dir's bad entity doesn't fail this component" \
   "$(echo "$OUT" | jq -c '.valid')" 'true'
 
-assert_eq "links match when source-location only names the repo root" \
-  "$(run_mono services/web | names)" '["web-frontend"]'
+assert_eq "links are off by default" \
+  "$(run_mono services/web | wc -c | tr -d ' ')" '0'
+assert_eq "match_links matches when source-location only names the repo root" \
+  "$(run_mono services/web "$LINKS_ON" | names)" '["web-frontend"]'
+assert_eq "an entity whose source-location names another dir isn't matched by its link" \
+  "$(run_mono services/docs "$LINKS_ON" | names)" '["docs-site"]'
+assert_eq "with match_source_location off, links decide for every entity" \
+  "$(run_mono services/web "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | names)" \
+  '["web-frontend","docs-site"]'
+assert_eq "with match_source_location off, source-location alone matches nothing" \
+  "$(run_mono services/payments "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs=false reads only the component's own dir" \
+  "$(run_mono services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=false | wc -c | tr -d ' ')" '0'
+assert_eq "both matchers off collects nothing" \
+  "$(run_mono services/payments LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
+assert_eq "and says why" \
+  "$(mono_stderr services/payments LUNAR_VAR_MATCH_SOURCE_LOCATION=false | grep -c 'both off')" '1'
 
 WORKER=$(run_mono services/worker)
 assert_eq "the selected entity's own lint errors still count" \
@@ -620,7 +650,7 @@ assert_eq "a dir no entity points at collects nothing" \
 
 assert_eq "the root component still reads the whole file, unfiltered" \
   "$(run_mono . LUNAR_COMPONENT_ID=github.com/acme/monorepo | jq -c '{name: .metadata.name, n: (.entities | length), path}')" \
-  '{"name":"monorepo-root","n":5,"path":"catalog-info.yaml"}'
+  '{"name":"monorepo-root","n":6,"path":"catalog-info.yaml"}'
 
 # A file in the component's own directory is used as-is — nothing filtered.
 mkdir -p "$MONO/services/payments"
@@ -693,7 +723,7 @@ if command -v git >/dev/null 2>&1; then
   rm "$MONO/.git"
   git -C "$MONO" init -q
   assert_eq "git rev-parse finds the repo root" \
-    "$(run_mono services/web | names)" '["web-frontend"]'
+    "$(run_mono services/payments | names)" '["payments-api","payments-grpc"]'
 else
   echo "  skip: git not installed, rev-parse path not exercised"
 fi

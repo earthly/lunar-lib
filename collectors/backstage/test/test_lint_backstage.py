@@ -747,6 +747,24 @@ class TestEntityDirs(unittest.TestCase):
         self.assertEqual(entity_dirs({"kind": "Component"}, REPO), set())
         self.assertEqual(entity_dirs("not-a-mapping", REPO), set())
 
+    def test_match_selects_the_references_consulted(self):
+        entity = _pointing(
+            "Component",
+            "c",
+            source_location="url:https://github.com/acme/monorepo/tree/main/services/docs",
+            links=["https://github.com/acme/monorepo/tree/main/services/web"],
+        )
+        self.assertEqual(entity_dirs(entity, REPO, {"source-location"}), {"services/docs"})
+        # Source-location off: it no longer decides, so the link counts.
+        self.assertEqual(entity_dirs(entity, REPO, {"links"}), {"services/web"})
+        self.assertEqual(entity_dirs(entity, REPO, frozenset()), set())
+
+    def test_links_ignored_unless_matched(self):
+        entity = _pointing(
+            "Component", "c", links=["https://github.com/acme/monorepo/tree/main/services/web"]
+        )
+        self.assertEqual(entity_dirs(entity, REPO, {"source-location"}), set())
+
     def test_malformed_links_ignored(self):
         entity = _component("c")
         entity["metadata"]["links"] = ["https://github.com/acme/monorepo/tree/main/x", {"title": "no url"}]
@@ -821,6 +839,15 @@ class TestComponentDirSelection(unittest.TestCase):
         self.assertIsNone(self.select("services/unlisted"))
         self.assertIsNone(lint_documents([None], "../catalog-info.yaml", "services/api", REPO))
 
+    def test_match_restricts_selection(self):
+        docs, path = self.docs, "../../catalog-info.yaml"
+        self.assertIsNone(lint_documents(docs, path, "services/web", REPO, {"source-location"}))
+        self.assertIsNone(lint_documents(docs, path, "services/api", REPO, {"links"}))
+        self.assertEqual(
+            [e["metadata"]["name"] for e in lint_documents(docs, path, "services/web", REPO, {"links"})["entities"]],
+            ["web"],
+        )
+
     def test_without_component_dir_nothing_is_filtered(self):
         result = lint_documents(self.docs, "catalog-info.yaml")
         self.assertEqual(len(result["entities"]), 5)
@@ -853,6 +880,19 @@ class TestMainStdinContract(unittest.TestCase):
         out = self._run(docs, "--component-dir", "services/api", "--repo", REPO)
         self.assertEqual([e["metadata"]["name"] for e in out["entities"]], ["api"])
         self.assertIsNone(self._run(docs, "--component-dir", "services/web", "--repo", REPO))
+        self.assertIsNone(
+            self._run(docs, "--component-dir", "services/api", "--repo", REPO, "--match", "links")
+        )
+
+    def test_unknown_match_value_is_rejected(self):
+        proc = subprocess.run(
+            [sys.executable, SCRIPT, "--path", "p", "--match", "source-location,name"],
+            input="[]",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("unknown value", proc.stderr)
 
     def test_json_array_of_entities(self):
         out = self._run(
