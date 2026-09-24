@@ -39,9 +39,9 @@ find_repo_root() {
 }
 
 # Parent-directory lookup inputs; fallbacks match the manifest defaults.
-SEARCH_PARENT_DIRS="${LUNAR_VAR_SEARCH_PARENT_DIRS:-true}"
+SEARCH_PARENT_DIRS="${LUNAR_VAR_SEARCH_PARENT_DIRS:-false}"
 MATCH=""
-if [ "${LUNAR_VAR_MATCH_SOURCE_LOCATION:-true}" = "true" ]; then
+if [ "${LUNAR_VAR_MATCH_SOURCE_LOCATION:-false}" = "true" ]; then
   MATCH="source-location"
 fi
 if [ "${LUNAR_VAR_MATCH_LINKS:-false}" = "true" ]; then

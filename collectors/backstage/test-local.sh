@@ -578,40 +578,45 @@ make_mono() {
   cp "$SCRIPT_DIR/test/fixtures/monorepo-catalog-info.yaml" "$MONO/catalog-info.yaml"
 }
 
-# run_mono <subdir> [KEY=VALUE ...] — main.sh from $MONO/<subdir>, component id
+# mono_main <subdir> [KEY=VALUE ...] — main.sh from $MONO/<subdir> with only the
+# given inputs (the rest at their defaults), component id
 # github.com/acme/monorepo/<subdir> unless overridden. Emits the collected
 # object, or nothing when the collector wrote nothing.
+mono_main() {
+  local sub="$1"
+  shift
+  mkdir -p "$MONO/$sub"
+  ( cd "$MONO/$sub" \
+    && env PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="" \
+       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
+       "$@" \
+       bash "$SCRIPT_DIR/main.sh" )
+}
+
+# The lookup is opt-in, so most cases run with it on: search_parent_dirs plus
+# source-location matching. Later KEY=VALUE arguments override these.
+LOOKUP_ON=(LUNAR_VAR_SEARCH_PARENT_DIRS=true LUNAR_VAR_MATCH_SOURCE_LOCATION=true)
 run_mono() {
   local sub="$1"
   shift
-  mkdir -p "$MONO/$sub"
-  ( cd "$MONO/$sub" \
-    && env PATH="$MOCK:$PATH" \
-       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
-       LUNAR_VAR_BACKSTAGE_URL="" \
-       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
-       "$@" \
-       bash "$SCRIPT_DIR/main.sh" 2>/dev/null )
-}
-
-# Same run, printing only main.sh's stderr.
-mono_stderr() {
-  local sub="$1"
-  shift
-  mkdir -p "$MONO/$sub"
-  ( cd "$MONO/$sub" \
-    && env PATH="$MOCK:$PATH" \
-       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
-       LUNAR_VAR_BACKSTAGE_URL="" \
-       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
-       "$@" \
-       bash "$SCRIPT_DIR/main.sh" >/dev/null ) 2>&1
+  mono_main "$sub" "${LOOKUP_ON[@]}" "$@" 2>/dev/null
 }
 
 names() { jq -c '[.entities[].metadata.name]'; }
 LINKS_ON=LUNAR_VAR_MATCH_LINKS=true
 
 make_mono
+assert_eq "the parent lookup is off by default" \
+  "$(mono_main services/payments 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and stays quiet" \
+  "$({ mono_main services/payments >/dev/null; } 2>&1 | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs alone matches nothing" \
+  "$(mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and logs why" \
+  "$({ mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true >/dev/null; } 2>&1 | grep -c 'both off')" '1'
+
 OUT=$(run_mono services/payments)
 assert_eq "source-location picks the dir's entities from the root file" \
   "$(echo "$OUT" | names)" '["payments-api","payments-grpc"]'
@@ -634,10 +639,6 @@ assert_eq "with match_source_location off, source-location alone matches nothing
   "$(run_mono services/payments "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
 assert_eq "search_parent_dirs=false reads only the component's own dir" \
   "$(run_mono services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=false | wc -c | tr -d ' ')" '0'
-assert_eq "both matchers off collects nothing" \
-  "$(run_mono services/payments LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
-assert_eq "and says why" \
-  "$(mono_stderr services/payments LUNAR_VAR_MATCH_SOURCE_LOCATION=false | grep -c 'both off')" '1'
 
 WORKER=$(run_mono services/worker)
 assert_eq "the selected entity's own lint errors still count" \
@@ -659,6 +660,9 @@ printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' \
   > "$MONO/services/payments/catalog-info.yaml"
 assert_eq "the component's own file wins over the shared one" \
   "$(run_mono services/payments | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"local-payments","path":"catalog-info.yaml"}'
+assert_eq "and is read with every input at its default" \
+  "$(mono_main services/payments 2>/dev/null | jq -c '{name: .metadata.name, path}')" \
   '{"name":"local-payments","path":"catalog-info.yaml"}'
 
 # The nearest ancestor wins over the root.

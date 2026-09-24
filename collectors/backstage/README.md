@@ -55,10 +55,10 @@ A single `catalog-info.yaml` may declare several Backstage entities separated by
 
 ### Monorepo components
 
-A monorepo subdirectory component (e.g. `github.com/acme/monorepo/services/payments`) reads the catalog file in its own directory. If there isn't one, it reads the nearest file in a parent directory, up to the repository root, so one root `catalog-info.yaml` can describe every component in the repo. Set `search_parent_dirs: "false"` to turn this off. From that file it keeps only the entities that point at the component's directory:
+A monorepo subdirectory component (e.g. `github.com/acme/monorepo/services/payments`) reads the catalog file in its own directory. With `search_parent_dirs: "true"`, one that has no file of its own reads the nearest file in a parent directory, up to the repository root, so one root `catalog-info.yaml` can describe every component in the repo. From that file it keeps only the entities that point at the component's directory, by whichever of these is turned on (all three inputs default to `false`):
 
-- `backstage.io/source-location` names the directory, e.g. `url:https://github.com/acme/monorepo/tree/main/services/payments/`. Controlled by `match_source_location`, on by default.
-- A `metadata.links` URL names the directory. Controlled by `match_links`, off by default. While source-location matching is on, links count only for entities whose source-location is absent or names the repository root.
+- `match_source_location: "true"` — the entity's `backstage.io/source-location` names the directory, e.g. `url:https://github.com/acme/monorepo/tree/main/services/payments/`.
+- `match_links: "true"` — a `metadata.links` URL names the directory. While source-location matching is on, links count only for entities whose source-location is absent or names the repository root.
 
 Only the kept entities are linted and listed in `entities[]`, so another component's broken entry can't fail this one; error locators still give each entity's document number in the shared file. If no entity points at the directory, nothing is written, the same as having no file. URLs must be GitHub, GitLab, or Bitbucket `tree`/`blob`/`src` links into the component's own repository, with a single-segment ref such as `main`.
 
@@ -90,7 +90,8 @@ collectors:
     on: ["domain:your-domain"]
     # with:
     #   paths: "catalog-info.yaml,catalog-info.yml"  # Customize search paths
-    #   match_links: "true"  # Monorepos: also match a parent file's entities by metadata.links
+    #   search_parent_dirs: "true"     # Monorepos: fall back to a parent directory's catalog file
+    #   match_source_location: "true"  # and keep its entities whose source-location names this dir
 ```
 
 ### Referential integrity (optional)
