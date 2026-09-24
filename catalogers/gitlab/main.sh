@@ -43,6 +43,8 @@ INITIAL_BACKOFF=5
 BATCH_SIZE=1000
 # Pace when the remaining API budget gets this low rather than driving into a 429.
 RATE_LIMIT_FLOOR=20
+# Room for a GitLab JSON error and the head of an HTML error page.
+ERROR_BODY_BYTES=2000
 
 GL_TOKEN="${LUNAR_SECRET_GL_TOKEN:-}"
 if [ -z "$GL_TOKEN" ]; then
@@ -74,19 +76,54 @@ echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
 
 # --- HTTP -------------------------------------------------------------------
 
+# X-Request-Id is GitLab's correlation ID: the reference GitLab support needs
+# to find a request in their logs.
+request_id() {
+    tr -d '\r' < "$1" | sed -n 's/^[Xx]-[Rr]equest-[Ii]d:[[:space:]]*//p' | tail -1
+}
+
+# log_failure <body-file> <header-file> <curl-stderr-file>
+# What escalating a failed call takes: curl's own error, plus whatever response
+# arrived: request ID, headers and the start of the body.
+log_failure() {
+    local out="$1" hdr="$2" err="$3" id size
+    if [ -s "$err" ]; then
+        sed 's/^/  /' "$err" >&2
+    fi
+    if [ -s "$hdr" ]; then
+        id=$(request_id "$hdr")
+        echo "  Request ID: ${id:-none}" >&2
+        # Set-Cookie can carry a session credential.
+        tr -d '\r' < "$hdr" | sed -e '/^$/d' \
+            -e 's/^\([Ss][Ee][Tt]-[Cc][Oo][Oo][Kk][Ii][Ee]:\).*/\1 <redacted>/' \
+            -e 's/^/  < /' >&2
+    fi
+    if [ -s "$out" ]; then
+        echo "  Body:" >&2
+        head -c "$ERROR_BODY_BYTES" "$out" | tr -d '\r' | awk '{ print "    " $0 }' >&2
+        size=$(wc -c < "$out" | tr -d ' ')
+        if [ "$size" -gt "$ERROR_BODY_BYTES" ]; then
+            echo "    [truncated, $size bytes total]" >&2
+        fi
+    fi
+}
+
 # gl_api <path-with-query> <out-file>
 # Writes the response body to <out-file>. Retries 429 and 5xx honoring
 # Retry-After; aborts the run on any other non-2xx, because shrinking the
 # reported project set is what silently retires components.
 gl_api() {
     local path="$1" out="$2"
-    local attempt=1 backoff=$INITIAL_BACKOFF code hdr="$WORK/hdr"
+    local attempt=1 backoff=$INITIAL_BACKOFF code last_id hdr="$WORK/hdr" err="$WORK/curl.err"
 
     while [ "$attempt" -le "$MAX_RETRIES" ]; do
+        # Cleared first: curl leaves -o untouched when no response arrives, and
+        # a stale file would be logged as this attempt's.
+        : > "$out"; : > "$hdr"
         code=$(curl -sS -o "$out" -D "$hdr" -w '%{http_code}' \
             -H "PRIVATE-TOKEN: ${GL_TOKEN}" \
             -H 'Accept: application/json' \
-            "${API_BASE}${path}" 2>>"$WORK/curl.err") || code="000"
+            "${API_BASE}${path}" 2>"$err") || code="000"
 
         case "$code" in
             2*)
@@ -110,19 +147,21 @@ gl_api() {
                 retry_after=$(sed -n 's/^[Rr]etry-[Aa]fter:[[:space:]]*\([0-9]*\).*/\1/p' "$hdr" | tail -1)
                 [ -n "$retry_after" ] && backoff="$retry_after"
                 echo "HTTP $code on $path (attempt $attempt/$MAX_RETRIES), retrying in ${backoff}s" >&2
+                log_failure "$out" "$hdr" "$err"
                 sleep "$backoff"
                 backoff=$((backoff * 2))
                 attempt=$((attempt + 1))
                 ;;
             *)
                 echo "Error: HTTP $code on $path — aborting rather than reporting a partial estate." >&2
-                head -c 500 "$out" >&2; echo >&2
+                log_failure "$out" "$hdr" "$err"
                 exit 1
                 ;;
         esac
     done
 
-    echo "Error: $path still failing after $MAX_RETRIES attempts — aborting rather than reporting a partial estate." >&2
+    last_id=$(request_id "$hdr")
+    echo "Error: $path still failing after $MAX_RETRIES attempts (last request ID: ${last_id:-none}) — aborting rather than reporting a partial estate." >&2
     exit 1
 }
 
