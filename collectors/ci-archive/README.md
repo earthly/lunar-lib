@@ -17,17 +17,20 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.archive.source` | object | Tool, version, integration, `collected_at`, `collected_sha` |
+| `.ci.archive.source` | object | Tool, integration, `collected_at`, `collected_sha` |
 | `.ci.archive.uri` | string | Full `s3://` URI of the uploaded archive |
 | `.ci.archive.bucket` | string | Destination bucket |
 | `.ci.archive.key` | string | Object key within the bucket |
 | `.ci.archive.size_bytes` | number | Size of the uploaded zip |
 | `.ci.archive.run_count` | number | Number of workflow runs included |
-| `.ci.archive.runs[]` | array | Per-run inventory: id, name, attempt, status, conclusion, timestamps, `html_url`, `log_bytes` |
+| `.ci.archive.runs[]` | array | Archived runs: id, name, workflow `path`, `event`, attempt, status, conclusion, timestamps, `html_url`, `log_bytes` |
 | `.ci.archive.errors[]` | array | Runs that could not be archived, with a reason |
 
-Nothing is written when no workflow runs are found for the commit, or when
-`s3_bucket` is unset — the collector exits 0 with a message on stderr.
+Nothing is written when the commit has no completed workflow runs, or when
+`s3_bucket` or `GH_TOKEN` is unset — the collector exits 0 with a message on
+stderr. If runs exist but nothing is uploaded (every log download failed, or the
+archive hit `max_archive_mb`), only `errors` and `source` are written, so
+`.ci.archive.uri` is present exactly when an archive exists.
 
 ### Archive layout
 
@@ -85,8 +88,14 @@ collectors:
 ```
 
 Inputs and secrets are documented in `lunar-collector.yml`. `GH_TOKEN` needs
-`actions:read`. The AWS credentials are optional — omit them to use the
-runtime's ambient credentials (IAM role).
+`actions:read`.
+
+AWS credentials resolve like the backstage collector's: an IAM role attached to
+the snippet pod first (IRSA, EKS Pod Identity, ECS task role, EC2 instance
+profile), then the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Lunar
+secrets are shared by every collector, so an attached role always wins over
+keys set for another plugin. With `s3_endpoint_url`, only the static keys are
+used. The identity needs `s3:PutObject` on the key prefix.
 
 ### Limits
 
@@ -97,3 +106,5 @@ runtime's ambient credentials (IAM role).
   in `.ci.archive.errors[]` rather than failing the collection.
 - **Size.** Log archives for a busy repository can be large; `max_archive_mb`
   bounds what gets uploaded.
+- **Monorepos.** Runs are resolved per commit, not per component, so each
+  component in a monorepo archives every run at the commit under its own key.

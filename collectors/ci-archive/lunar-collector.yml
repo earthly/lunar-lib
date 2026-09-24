@@ -23,18 +23,18 @@ landing_page:
 
 inputs:
   s3_bucket:
-    description: Destination S3 bucket. Required — the collector exits 0 with a stderr message if unset.
+    description: Destination S3 bucket. The collector skips (exit 0) when unset.
   s3_prefix:
-    description: Key prefix within the bucket. The object key is <prefix>/<component>/<sha>/<run_set>.zip
+    description: Key prefix in the bucket. Objects land at <prefix>/<component>/<sha>/<timestamp>.zip; empty means the bucket root.
     default: "lunar/ci-archive"
   aws_region:
-    description: AWS region of the bucket. Falls back to the runtime's AWS_REGION when unset.
+    description: Region of the bucket. Falls back to AWS_REGION, then to the region S3 reports for the bucket.
     default: ""
   s3_endpoint_url:
-    description: Override the S3 endpoint, for S3-compatible stores (MinIO, Ceph). Empty means real AWS.
+    description: Endpoint of an S3-compatible store (MinIO, Ceph). Requires the static AWS key secrets. Empty means AWS.
     default: ""
   max_archive_mb:
-    description: Skip the upload and record an error if the assembled zip exceeds this size.
+    description: Upload nothing and record an error if the archive would exceed this size.
     default: "512"
   include_runs_pattern:
     description: Only archive workflow runs whose name matches this regex. Empty means all runs.
@@ -42,11 +42,13 @@ inputs:
 
 secrets:
   GH_TOKEN:
-    description: GitHub token with `actions:read` to list workflow runs and download run logs
+    description: GitHub token with `actions:read`, to list workflow runs and download their logs
   AWS_ACCESS_KEY_ID:
-    description: AWS access key for the S3 upload. Omit to use the runtime's ambient credentials (IAM role).
+    description: Optional static key. Used only when no IAM role resolves (IRSA, Pod Identity, ECS, instance profile), and always with s3_endpoint_url.
   AWS_SECRET_ACCESS_KEY:
-    description: AWS secret key for the S3 upload. Omit to use the runtime's ambient credentials (IAM role).
+    description: Optional, paired with AWS_ACCESS_KEY_ID.
+  AWS_SESSION_TOKEN:
+    description: Optional, for temporary static credentials.
 
 collectors:
   - name: workflow-logs
@@ -72,22 +74,17 @@ example_component_json: |
   {
     "ci": {
       "archive": {
-        "source": {
-          "tool": "ci-archive",
-          "version": "0.1.0",
-          "integration": "after-json",
-          "collected_at": "2026-09-23T14:22:03Z",
-          "collected_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-        },
-        "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d/20260923T142203Z.zip",
+        "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/20260923T142203Z.zip",
         "bucket": "acme-ci-archive",
-        "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d/20260923T142203Z.zip",
+        "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/20260923T142203Z.zip",
         "size_bytes": 4823104,
-        "run_count": 3,
+        "run_count": 2,
         "runs": [
           {
             "id": 24322039765,
             "name": "ci",
+            "path": ".github/workflows/ci.yml",
+            "event": "push",
             "attempt": 1,
             "status": "completed",
             "conclusion": "success",
@@ -99,6 +96,8 @@ example_component_json: |
           {
             "id": 24322039912,
             "name": "codeql",
+            "path": ".github/workflows/codeql.yml",
+            "event": "push",
             "attempt": 1,
             "status": "completed",
             "conclusion": "failure",
@@ -109,8 +108,14 @@ example_component_json: |
           }
         ],
         "errors": [
-          {"run_id": 24322040001, "reason": "logs expired or unavailable (410)"}
-        ]
+          {"run_id": 24322040001, "name": "nightly", "reason": "logs expired or deleted (410)"}
+        ],
+        "source": {
+          "tool": "ci-archive",
+          "integration": "after-json",
+          "collected_at": "2026-09-23T14:22:03Z",
+          "collected_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+        }
       }
     }
   }
