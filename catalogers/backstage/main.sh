@@ -32,6 +32,9 @@
 #   auth_mode                 (default bearer) bearer | sigv4
 #   aws_region                (sigv4 only; falls back to AWS_REGION env)
 #   aws_service               (sigv4 only; default execute-api)
+#   aws_assume_role_arns      (sigv4 only; default empty) comma-separated role ARNs to
+#                             sts:AssumeRole into after the base credentials resolve;
+#                             the first STS accepts signs every request
 #   verify_repos              (default true) drop components whose repo does not exist
 #                             (no-op unless the GH_TOKEN secret is set)
 #
@@ -118,6 +121,34 @@ AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
 # scheduled run re-resolves fresh ones (self-refreshing, nothing to rotate).
 AUTH_ARGS=()
 
+# The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
+# assume_role_chain) are deliberately kept in sync with
+# collectors/backstage/main.sh — both plugins run in the same snippet pods under
+# the same service account, so credentials must resolve identically. A fix here
+# belongs there too, and vice versa.
+
+# parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
+# prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1
+# when the response carries no credentials (an <ErrorResponse>, or not XML).
+parse_sts_credentials() {
+    python3 -c '
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.fromstring(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+def find(tag):
+    for el in root.iter():
+        if el.tag.split("}")[-1] == tag:
+            return el.text or ""
+    return ""
+kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
+if not (kid and sec):
+    sys.exit(1)
+print(kid); print(sec); print(tok)
+' 2>/dev/null
+}
+
 # resolve_aws_credentials walks the AWS credential provider chain and sets
 # AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
 #
@@ -146,24 +177,8 @@ resolve_aws_credentials() {
             --data-urlencode "RoleSessionName=${AWS_ROLE_SESSION_NAME:-lunar-backstage-cataloger}" \
             --data-urlencode "DurationSeconds=3600" \
             --data-urlencode "WebIdentityToken=${wit}" 2>/dev/null)" || true
-        # STS query protocol returns XML; parse with python3 stdlib.
         local parsed
-        parsed="$(printf '%s' "$resp" | python3 -c '
-import sys, xml.etree.ElementTree as ET
-try:
-    root = ET.fromstring(sys.stdin.read())
-except Exception:
-    sys.exit(1)
-def find(tag):
-    for el in root.iter():
-        if el.tag.split("}")[-1] == tag:
-            return el.text or ""
-    return ""
-kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
-if not (kid and sec):
-    sys.exit(1)
-print(kid); print(sec); print(tok)
-' 2>/dev/null)" || true
+        parsed="$(printf '%s' "$resp" | parse_sts_credentials)" || true
         if [ -n "$parsed" ]; then
             AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
             AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
@@ -239,6 +254,57 @@ print(kid); print(sec); print(tok)
     return 1
 }
 
+# assume_role_chain is the optional aws_assume_role_arns hop, for a gateway that
+# only trusts a role the base identity can assume (usually cross-account). The
+# first candidate STS accepts replaces the credentials, so one config can span
+# environments whose base roles each assume only their own. No DurationSeconds:
+# STS's 1h default is the chained-role maximum. ARNs carry an account id, so
+# failures are logged by position and STS error code only.
+assume_role_chain() {
+    local raw=() arns=() arn resp status parsed reason i=0
+    local token_hdr=()
+    # Commas or whitespace separate entries; an ARN never contains whitespace.
+    IFS=',' read -ra raw <<< "${AWS_ASSUME_ROLE_ARNS//[[:space:]]/,}"
+    for arn in "${raw[@]}"; do
+        if [ -n "$arn" ]; then arns+=("$arn"); fi
+    done
+    if [ "${#arns[@]}" -eq 0 ]; then return 0; fi
+
+    if [ -n "$AWS_SIGV4_TOKEN" ]; then
+        token_hdr=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+    fi
+    for arn in "${arns[@]}"; do
+        i=$((i + 1))
+        status=0
+        resp="$(curl -sS --max-time 15 --get "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
+            --aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:sts" \
+            --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}" \
+            "${token_hdr[@]}" \
+            --data-urlencode "Action=AssumeRole" \
+            --data-urlencode "Version=2011-06-15" \
+            --data-urlencode "RoleArn=${arn}" \
+            --data-urlencode "RoleSessionName=lunar-backstage-cataloger" 2>/dev/null)" || status=$?
+        if [ "$status" -eq 0 ] && parsed="$(printf '%s' "$resp" | parse_sts_credentials)"; then
+            AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+            AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+            AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+            CRED_SOURCE="${CRED_SOURCE}+assume-role"
+            return 0
+        fi
+        if [ "$status" -ne 0 ]; then
+            reason="request failed, curl exit ${status}"
+        elif [[ "$resp" == *"<Code>"*"</Code>"* ]]; then
+            reason="${resp#*<Code>}"; reason="${reason%%</Code>*}"
+        else
+            reason="unrecognized STS response"
+        fi
+        echo "Backstage auth: aws_assume_role_arns role ${i}/${#arns[@]} not assumed (${reason})" >&2
+    done
+    echo "ERROR: sts:AssumeRole failed for every role in aws_assume_role_arns. The base identity" >&2
+    echo "  (${CRED_SOURCE}) needs sts:AssumeRole on the role, and the role's trust policy must allow it." >&2
+    return 1
+}
+
 case "$AUTH_MODE" in
     bearer)
         if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
@@ -248,11 +314,15 @@ case "$AUTH_MODE" in
     sigv4)
         AWS_SIGV4_REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
         AWS_SIGV4_SERVICE="${LUNAR_VAR_AWS_SERVICE:-execute-api}"
+        AWS_ASSUME_ROLE_ARNS="${LUNAR_VAR_AWS_ASSUME_ROLE_ARNS:-}"
         if [ -z "$AWS_SIGV4_REGION" ]; then
             echo "ERROR: aws_region required for sigv4 (set the aws_region input or the AWS_REGION env var)" >&2
             exit 1
         fi
         if ! resolve_aws_credentials; then
+            exit 1
+        fi
+        if ! assume_role_chain; then
             exit 1
         fi
         AUTH_ARGS=(--aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:${AWS_SIGV4_SERVICE}" \

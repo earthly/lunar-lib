@@ -121,6 +121,25 @@ metadata:
 
 The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
 
+#### Cross-account role (`aws_assume_role_arns`)
+
+Some gateways reject the pod's own role and accept only a role that the pod's role can *assume*, usually one in another account. List that role in `aws_assume_role_arns`. The cataloger resolves credentials as above, calls `sts:AssumeRole` with them, and signs every catalog request with the assumed role's credentials:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-west-2"
+      aws_assume_role_arns: "arn:aws:iam::210987654321:role/backstage-api-reader"
+```
+
+- The pod's role needs `sts:AssumeRole` on the target role, and the target role's trust policy must trust the pod's role. Only the target role needs `execute-api:Invoke`.
+- Several comma-separated ARNs are tried in order, and the first one STS accepts is used. This lets one config run in environments whose pod roles can each assume only their own target.
+- The call goes to the regional STS endpoint for `aws_region`. The session is named `lunar-backstage-cataloger` in CloudTrail and lasts STS's default hour, which is also the limit for a chained role.
+- If no listed role can be assumed, the cataloger exits with an error before fetching anything. The log names each role that failed by its position in the list and the STS error code (e.g. `AccessDenied`), never by ARN.
+
 #### Alternative: a standalone `aws-sigv4-proxy` service (no plugin config)
 
 If you'd rather keep signing out of the cataloger entirely, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as its **own** Kubernetes `Deployment` + `Service`, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy's in-cluster DNS name:

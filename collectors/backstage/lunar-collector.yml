@@ -118,10 +118,11 @@ inputs:
     default: "bearer"
   aws_region:
     description: |
-      AWS region used to scope the SigV4 signature and to reach STS when
-      assuming a web-identity (IRSA) role. Required when `auth_mode: sigv4`,
-      unless `AWS_REGION` is already present in the snippet pod's environment
-      (IRSA and most AWS runtimes set it, but not always). If `auth_mode:
+      AWS region used to scope the SigV4 signature and to reach STS (for the
+      IRSA web-identity exchange and any `aws_assume_role_arns` hop). Required
+      when `auth_mode: sigv4`, unless `AWS_REGION` is already present in the
+      snippet pod's environment (IRSA and most AWS runtimes set it, but not
+      always). If `auth_mode:
       sigv4` and neither this input nor the `AWS_REGION` env var is set, the
       referential-integrity lookups are skipped and each declared reference
       records an `aws_region required for sigv4` error, rather than signing
@@ -135,6 +136,16 @@ inputs:
       only for other fronting (e.g. a Lambda function URL signs as `lambda`).
       Ignored for `auth_mode: bearer`.
     default: "execute-api"
+  aws_assume_role_arns:
+    description: |
+      Comma-separated IAM role ARNs to `sts:AssumeRole` into, for a gateway
+      that only accepts a role the pod's own identity can assume (typically
+      in another account). After the credential chain resolves, the roles
+      are tried in order and the first one STS accepts signs the lookups.
+      Empty (the default) signs with the chain's credentials directly. If no
+      listed role can be assumed, each declared reference records an error
+      and parsing and linting still run. Ignored for `auth_mode: bearer`.
+    default: ""
   ref_lookup:
     description: |
       Which catalog endpoint resolves each declared reference. Only consulted
