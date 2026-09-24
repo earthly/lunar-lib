@@ -64,14 +64,17 @@ the pair fires exactly once per cycle regardless of whether `.ci` is populated.
 The path is not a real precondition — it is how a path-less "workflow end"
 trigger is expressed today.
 
-Two consequences worth knowing:
+Consequences worth knowing:
 
-- **Granularity is per commit, not per run.** The collector fires once after
-  *all* runs for the commit finish and archives them together. It does not fire
-  once per workflow run.
-- **Re-runs are not backfilled.** Runs are resolved from the commit at archive
-  time, so a re-run landing after the upload is not retroactively included; the
-  next doneness cycle writes a new object under a new timestamp.
+- **One archive per commit, not per run.** The collector fires once after *all*
+  runs for the commit finish and archives them together.
+- **Re-runs after the archive are not captured.** The hub fires this collector
+  once per (component, commit, pull request), permanently, so re-running a
+  workflow on the same commit never triggers another archive. Each run is
+  archived at the attempt that was latest when the last run finished.
+- **It fires on every in-scope component, CI or not.** On a component with no
+  workflow runs it finds nothing and exits, but still takes a large runner slot.
+  Scope `on:` to components that run GitHub Actions.
 
 ## Installation
 
