@@ -221,10 +221,10 @@ resolve_aws_credentials() {
   imds_token="$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
     -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 2>/dev/null)" || true
   if [ -n "$imds_token" ]; then
-    role="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+    role="$(curl -sSf --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
       "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>/dev/null)" || true
     if [ -n "$role" ]; then
-      resp="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+      resp="$(curl -sSf --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
         "http://169.254.169.254/latest/meta-data/iam/security-credentials/${role}" 2>/dev/null)" || true
       AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
       AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
