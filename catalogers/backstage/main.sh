@@ -363,6 +363,13 @@ echo "Owner format: $OWNER_FORMAT"
 # Backstage semantics: multiple ?filter= params are OR'd; commas within a
 # single filter are AND'd. We want (kind=X OR kind=Y) AND namespace AND user
 # filter — i.e. include namespace + user filter in every kind clause.
+#
+# Each param value (a filter clause, the cursor) is percent-encoded whole.
+# Backstage decodes before parsing, so the meaning is unchanged, but curl < 8.14
+# signs a literal `=` inside a value differently from AWS: under sigv4 every
+# clause, and any base64 cursor with `=` padding, would 403 on such a curl.
+url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
+
 FILTER_QUERY=""
 IFS=',' read -ra KIND_ARRAY <<< "$ENTITY_KINDS"
 for kind in "${KIND_ARRAY[@]}"; do
@@ -376,13 +383,13 @@ for kind in "${KIND_ARRAY[@]}"; do
     if [ -n "$USER_FILTER" ]; then
         CLAUSE="$CLAUSE,$USER_FILTER"
     fi
-    FILTER_QUERY="${FILTER_QUERY}&filter=$CLAUSE"
+    FILTER_QUERY="${FILTER_QUERY}&filter=$(url_escape "$CLAUSE")"
 done
 
 # --- Paginated fetch -----------------------------------------------------
 fetch_page() {
     local cursor="$1"
-    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&cursor=$cursor}$FILTER_QUERY"
+    local url="$BACKSTAGE_URL${API_PATH_PREFIX}/catalog/entities/by-query?limit=$PAGE_SIZE${cursor:+&cursor=$(url_escape "$cursor")}$FILTER_QUERY"
 
     local attempt=1
     local backoff=$INITIAL_BACKOFF

@@ -157,12 +157,25 @@ case "\$REQ_URL" in
     echo "\$REQ_URL" >> "$CURL_URLS"
     CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
     echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
+    # Page 1 hands out \$MOCK_CURSOR (default CURSOR_P2). The cursor that comes
+    # back is read the way Backstage's query parser reads it — '+' becomes a
+    # space, then percent-decoding — and anything but an exact match is a 400
+    # "Malformed cursor", as Backstage answers.
+    NEXT="\${MOCK_CURSOR:-CURSOR_P2}"
+    GOT=""
+    case "\$REQ_URL" in
+        *cursor=*) GOT="\${REQ_URL##*cursor=}"; GOT="\${GOT%%&*}"; GOT="\${GOT//+/ }"; GOT=\$(printf '%b' "\${GOT//%/\\\\x}") ;;
+    esac
     if [ "\$CALL_NUM" -ge 4 ]; then
         echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
-    elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
+    elif [ -n "\$GOT" ] && [ "\$GOT" != "\$NEXT" ]; then
+        echo '{"error":{"name":"InputError","message":"Malformed cursor"}}' > "\$WRITE_FILE"
+        echo "400"
+        exit 0
+    elif [ -n "\$GOT" ]; then
         jq -c '{items: .items[5:], pageInfo: {}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     else
-        jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
+        jq -c --arg next "\$NEXT" '{items: .items[0:5], pageInfo: {nextCursor: \$next}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     fi
     echo "200"
     ;;
@@ -658,9 +671,29 @@ check_eq "  ... and writes nothing" "0" "$(jq -s 'add // {} | keys | length' "$C
 grep -q 'sts:AssumeRole failed for every role in aws_assume_role_arns' "$SR_OUT" || \
     fail "expected the all-roles-failed error in the log"
 
+# --- 9. Query values are percent-encoded -----------------------------------
+# Every filter clause and the cursor go out percent-encoded: curl < 8.14 signs a
+# literal `=` inside a query value differently from AWS, so under sigv4 the
+# literal form 403s there. The cursor below is base64 with '+', '/' and '='
+# padding, which only survives the trip encoded.
+echo ""
+echo "=== query encoding ==="
+: > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+ENC_STATUS=0
+env MOCK_CURSOR='eyJwYWdlIjoyfQ+/==' LUNAR_VAR_VERIFY_REPOS=false \
+    "$SCRIPT_DIR/main.sh" > "$TEST_DIR/enc.out" 2>&1 || ENC_STATUS=$?
+check_eq "a base64 cursor with '+', '/' and '=' still reaches page 2" "0 2" \
+    "$ENC_STATUS $(grep -c . "$CURL_CALLS")"
+check_eq "  ... because it is sent percent-encoded" "1" \
+    "$(grep -c 'cursor=eyJwYWdlIjoyfQ%2B%2F%3D%3D' "$CURL_URLS" || true)"
+check_eq "filter clauses go on the wire percent-encoded" "2" \
+    "$(grep -c 'filter=kind%3DComponent%2Cmetadata.namespace%3Ddefault' "$CURL_URLS" || true)"
+check_eq "  ... with no literal filter grammar" "0" \
+    "$(grep -c 'filter=kind=' "$CURL_URLS" || true)"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), and sigv4 + aws_assume_role_arns verified"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), sigv4 + aws_assume_role_arns, and percent-encoded query values verified"
 else
     echo "TEST FAILED" >&2
     exit 1

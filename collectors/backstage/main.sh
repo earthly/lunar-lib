@@ -348,16 +348,13 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     esac
   fi
 
-  # Percent-encode one by-query filter value. A valid Backstage name or
-  # namespace (`[A-Za-z0-9][A-Za-z0-9._-]*`) contains nothing @uri escapes, so a
-  # legitimate reference goes on the wire byte-for-byte as written. It matters
-  # for the illegitimate ones, which is exactly what this feature is asked to
-  # detect: a hand-written catalog-info.yaml can declare
-  # `spec.domain: "a&filter=kind=system"`, and unencoded that would inject a
-  # second filter parameter — Backstage ORs filter params, so a miss could come
-  # back as a hit on an unrelated entity. Encoding keeps a bogus reference a
-  # miss (or, under sigv4, a signature rejection recorded as {name, error});
-  # either way never a false `exists: true`.
+  # Percent-encode a whole query-param value, the filter grammar's own `=` and
+  # `,` included: Backstage decodes the param before parsing it, so the meaning
+  # is unchanged, but curl < 8.14 signs a literal `=` inside a value differently
+  # from AWS, so under sigv4 the literal form 403s there (host-native runs; the
+  # plugin image ships a newer curl). Encoding `&` also keeps a hand-written
+  # `spec.domain: "a&filter=kind=system"` inside this one param instead of
+  # injecting a second filter, which Backstage would OR in.
   url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
 
   resolve_ref() {
@@ -405,12 +402,9 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       # by-query needs the response *body* (existence is `.items`, not the
       # status), so `-w '\n%{http_code}'` appends the status after it and one
       # request yields both. `limit=1` — we only ask whether anything matches.
-      # Commas and `=` stay literal: they are this endpoint's own filter
-      # grammar (comma = AND), and it is the wire form the cataloger has always
-      # sent. Only the two interpolated values are escaped.
       response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
         "${AUTH_ARGS[@]}" \
-        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=kind=${kind},metadata.namespace=$(url_escape "$ns"),metadata.name=$(url_escape "$name")")
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=$(url_escape "kind=${kind},metadata.namespace=${ns},metadata.name=${name}")")
       curl_status=$?
       http_code="${response##*$'\n'}"
       body="${response%$'\n'*}"

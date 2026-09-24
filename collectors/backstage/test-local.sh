@@ -97,14 +97,18 @@ mock_entity() {
 # by-query: existence lives in the body, so answer with a real by-query
 # envelope plus the trailing http_code that `-w '\n%{http_code}'` appends.
 # The name is read back out of the filter, which is also how the tests assert
-# the filter was built (and escaped) correctly.
+# the filter was built (and escaped) correctly. Like Backstage, the filter param
+# is decoded before its grammar is parsed, so encoded and literal forms parse
+# the same.
 case "$url" in
   */catalog/entities/by-query\?*)
-    qname="${url##*metadata.name=}"
-    qname="${qname%%&*}"
-    qkind="${url##*filter=kind=}"
+    filter="${url##*filter=}"
+    filter="${filter%%&*}"
+    filter=$(printf '%b' "${filter//%/\\x}")
+    qname="${filter##*metadata.name=}"
+    qkind="${filter#kind=}"
     qkind="${qkind%%,*}"
-    qns="${url##*metadata.namespace=}"
+    qns="${filter##*metadata.namespace=}"
     qns="${qns%%,*}"
     case "$qname" in
       boom)  exit 7 ;;
@@ -494,9 +498,13 @@ assert_eq "by-query resolves exists (non-empty .items) + miss (empty .items)" \
   "$BQ_REFS" \
   '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
 assert_eq "by-query calls the by-query endpoint with the entity filter" \
-  "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind=domain,metadata.namespace=default,metadata.name=payments' "$CURL_LOG")" '1'
+  "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind%3Ddomain%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 assert_eq "by-query filters on each reference's own kind" \
-  "$(grep -c 'filter=kind=system,metadata.namespace=default,metadata.name=typo-platform' "$CURL_LOG")" '1'
+  "$(grep -c 'filter=kind%3Dsystem%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dtypo-platform' "$CURL_LOG")" '1'
+# The grammar's own `=`/`,` go encoded too: curl < 8.14 mis-signs a literal `=`
+# inside a query value under sigv4.
+assert_eq "by-query sends no literal filter grammar on the wire" \
+  "$(grep 'by-query' "$CURL_LOG" | grep -c 'filter=kind=' || true)" '0'
 assert_eq "by-query sends no by-name request" \
   "$(grep -c 'by-name' "$CURL_LOG" || true)" '0'
 
@@ -506,7 +514,7 @@ assert_eq "by-query keeps a qualified ref's own namespace" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" prod/payments '' http://fake:7007 compns | jq -c '.refs.domain')" \
   '{"name":"prod/payments","exists":true}'
 assert_eq "by-query puts that namespace in the filter, not the component's" \
-  "$(grep -c 'metadata.namespace=prod,metadata.name=payments' "$CURL_LOG")" '1'
+  "$(grep -c 'metadata.namespace%3Dprod%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 
 # Non-definitive outcomes degrade exactly as they do under by-name.
 assert_eq "by-query transient 5xx -> error marker, not exists" \
@@ -529,11 +537,11 @@ assert_eq "by-query 200 with no .items array -> error, NOT exists:false" \
 
 # Query injection. Backstage ORs repeated `filter` params, so an unescaped `&`
 # in a declared reference could append a second filter and turn a miss into a
-# hit on an unrelated entity. The interpolated value must arrive encoded.
+# hit on an unrelated entity. The `&` must arrive encoded inside the one param.
 : > "$CURL_LOG"
 run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" 'a&filter=kind=system' '' http://fake:7007 >/dev/null
 assert_eq "by-query percent-encodes the interpolated ref value" \
-  "$(grep -c 'metadata.name=a%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
+  "$(grep -c 'metadata.name%3Da%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
 assert_eq "by-query does not inject a second filter param" \
   "$(grep -c '&filter=kind=system' "$CURL_LOG" || true)" '0'
 
@@ -545,7 +553,7 @@ assert_eq "by-query + sigv4 + root-mounted API resolves the ref" \
      payments '' http://fake:7007 | jq -c '.refs.domain')" \
   '{"name":"payments","exists":true}'
 assert_eq "by-query + sigv4 signs the by-query URL at the root path" \
-  "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind=domain' "$CURL_LOG")" '1'
+  "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind%3Ddomain' "$CURL_LOG")" '1'
 assert_eq "by-query + sigv4 passes the signing flags" \
   "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '1'
 assert_eq "by-query + sigv4 sends no Bearer header" \
