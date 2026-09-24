@@ -44,25 +44,41 @@ def main(node=None):
         if pdbs_node.exists():
             pdbs = [pdb.get_value() for pdb in pdbs_node]
 
-        for workload_node in workloads:
-            workload = workload_node.get_value()
-            kind = workload.get("kind", "")
+        def selected(workload):
+            ns = workload.get("namespace", "default")
+            return any(selector_matches(p.get("selector"), workload["pod_labels"])
+                       for p in pdbs if p.get("namespace", "default") == ns)
 
-            # Only check Deployments and StatefulSets
-            if kind not in ("Deployment", "StatefulSet"):
-                continue
+        def identity(workload):
+            return (workload.get("kind"), workload.get("namespace", "default"), workload.get("name"))
 
+        # Only check Deployments and StatefulSets
+        checked = [w.get_value() for w in workloads]
+        checked = [w for w in checked if w.get("kind") in ("Deployment", "StatefulSet")]
+
+        # apps/v1 requires pod template labels, so an entry without any is a partial
+        # manifest (e.g. a kustomize patch): it takes the verdict of the complete
+        # definition it patches.
+        complete = {}
+        for workload in checked:
+            if workload.get("pod_labels"):
+                complete[identity(workload)] = complete.get(identity(workload), False) or selected(workload)
+
+        for workload in checked:
+            kind = workload.get("kind")
             name = workload.get("name", "<unknown>")
             namespace = workload.get("namespace", "default")
             path = workload.get("path", "<unknown>")
-            same_ns = [p for p in pdbs if p.get("namespace", "default") == namespace]
 
-            if "pod_labels" in workload:
-                has_pdb = any(selector_matches(p.get("selector"), workload["pod_labels"]) for p in same_ns)
+            if workload.get("pod_labels"):
+                has_pdb = selected(workload)
+            elif identity(workload) in complete:
+                has_pdb = complete[identity(workload)]
             else:
-                # Collected by a k8s collector that predates pod_labels/selector:
-                # fall back to its guessed target name.
-                has_pdb = any(p.get("target_workload") == name for p in same_ns)
+                # No labels anywhere (a patch of a remote base, or a collector that
+                # predates pod_labels): fall back to the collector's name guess.
+                has_pdb = any(p.get("target_workload") == name for p in pdbs
+                              if p.get("namespace", "default") == namespace)
 
             c.assert_true(
                 has_pdb,

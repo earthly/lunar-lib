@@ -128,6 +128,20 @@ class PdbCheckTest(unittest.TestCase):
                     [pdb({"matchLabels": {"app": "a"}})])
         self.assertEqual(failures(check), ["deploy/app.yaml: Deployment default/b has no matching PodDisruptionBudget"])
 
+    # A kustomize patch is a partial Deployment with no pod template labels.
+    def test_patch_takes_the_verdict_of_the_definition_it_patches(self):
+        base = deployment("istiod", {"app": "istiod", "istio": "pilot"}, path="base/install.yaml")
+        patch = deployment("istiod", {}, path="base/patches/seccomp-istiod.yaml")
+        covered = run([base, patch], [pdb({"matchLabels": {"app": "istiod", "istio": "pilot"}})])
+        self.assertEqual(covered.status, CheckStatus.PASS, failures(covered))
+        uncovered = run([base, patch], [pdb({"matchLabels": {"app": "other"}})])
+        self.assertEqual(len(failures(uncovered)), 2)
+
+    def test_patch_without_a_definition_in_the_repo_falls_back_to_the_name(self):
+        patch = deployment("istiod", {}, path="patches/remote-base.yaml")
+        self.assertEqual(run([patch], [pdb({"matchLabels": {"app": "istiod"}})]).status, CheckStatus.PASS)
+        self.assertEqual(run([patch], [pdb({"matchLabels": {"app": "other"}})]).status, CheckStatus.FAIL)
+
     # Component JSON from a collector that predates pod_labels / selector.
     def test_legacy_data_falls_back_to_the_target_name(self):
         legacy = {"kind": "Deployment", "name": "payment-api", "namespace": "payments", "path": "d.yaml"}
