@@ -192,9 +192,29 @@ The role's trust policy must allow the snippet-pod service account to assume it,
 
 > **Already using SigV4 with the [Backstage cataloger](../../catalogers/backstage/README.md)?** Then this is already done. Both plugins run in the same snippet pods under the same service account, so one role annotation covers both — set `auth_mode: sigv4` here and it just works.
 
+#### Cross-account role (`aws_assume_role_arns`)
+
+Some gateways reject the pod's own role and accept only a role that the pod's role can *assume*, usually one in another account. List that role in `aws_assume_role_arns`. The collector resolves credentials as above, calls `sts:AssumeRole` with them, and signs the lookups with the assumed role's credentials:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    on: ["domain:your-domain"]
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-west-2"
+      aws_assume_role_arns: "arn:aws:iam::210987654321:role/backstage-api-reader"
+```
+
+- The pod's role needs `sts:AssumeRole` on the target role, and the target role's trust policy must trust the pod's role. Only the target role needs `execute-api:Invoke`.
+- Several comma-separated ARNs are tried in order, and the first one STS accepts is used. This lets one config run in environments whose pod roles can each assume only their own target.
+- The call goes to the regional STS endpoint for `aws_region`. The session is named `lunar-backstage-collector` in CloudTrail and lasts STS's default hour, which is also the limit for a chained role.
+- The log names a role that couldn't be assumed by its position in the list and the STS error code (e.g. `AccessDenied`), never by ARN.
+
 #### Failure modes
 
-Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
+Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, no role in `aws_assume_role_arns` can be assumed, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
 
 ```json
 "refs": {

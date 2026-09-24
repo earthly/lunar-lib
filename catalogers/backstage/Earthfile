@@ -3,10 +3,11 @@ VERSION 0.8
 # Offline unit test for the Backstage cataloger. test-local.sh stubs curl and
 # lunar on PATH and drives main.sh as a subprocess against the bundled
 # sample-catalog.json (served as a paginated /catalog/entities/by-query
-# response), so no network access or Lunar Hub is required.
+# response), so no network access or Lunar Hub is required. python3 parses the
+# STS responses in the sigv4 scenarios, as it does in base-main.
 test:
     FROM alpine:3.21
-    RUN apk add --no-cache bash jq
+    RUN apk add --no-cache bash jq python3
     WORKDIR /workspace
     COPY main.sh test-local.sh sample-catalog.json sample-catalog-multihost.json .
     RUN ./test-local.sh

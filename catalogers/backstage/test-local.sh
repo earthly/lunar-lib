@@ -103,6 +103,24 @@ chmod +x "$TEST_DIR/gql-respond"
 
 cat > "$TEST_DIR/curl" << EOF
 #!/bin/bash
+# Full argument lists go to \$CURL_ARGS_LOG when set, so the sigv4 scenarios can
+# assert which credentials signed each request. The AWS credential chain's
+# metadata endpoints are always unreachable, and STS AssumeRole answers by role
+# name: *denied* -> AccessDenied, anything else -> assumed-role credentials.
+[ -n "\${CURL_ARGS_LOG:-}" ] && printf '%s\n' "\$*" >> "\$CURL_ARGS_LOG"
+case "\$*" in
+    *169.254.169.254*|*169.254.170.2*) exit 7 ;;
+    *sts.*amazonaws.com*Action=AssumeRole*)
+        case "\$*" in
+            *RoleArn=*denied*)
+                printf '%s' '<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><Error><Type>Sender</Type><Code>AccessDenied</Code><Message>User: arn:aws:sts::111111111111:assumed-role/base/s is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::210987654321:role/denied-other-env</Message></Error><RequestId>r-1</RequestId></ErrorResponse>'
+                ;;
+            *)
+                printf '%s' '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleResult><Credentials><AccessKeyId>ASIAASSUMED</AccessKeyId><SecretAccessKey>assumedsecret</SecretAccessKey><SessionToken>assumedtoken</SessionToken></Credentials></AssumeRoleResult></AssumeRoleResponse>'
+                ;;
+        esac
+        exit 0 ;;
+esac
 WRITE_FILE=""
 REQ_URL=""
 while [ \$# -gt 0 ]; do
@@ -139,12 +157,25 @@ case "\$REQ_URL" in
     echo "\$REQ_URL" >> "$CURL_URLS"
     CALL_NUM=\$(wc -l < "$CURL_CALLS" 2>/dev/null || echo 0)
     echo "call \$((CALL_NUM + 1))" >> "$CURL_CALLS"
+    # Page 1 hands out \$MOCK_CURSOR (default CURSOR_P2). The cursor that comes
+    # back is read the way Backstage's query parser reads it — '+' becomes a
+    # space, then percent-decoding — and anything but an exact match is a 400
+    # "Malformed cursor", as Backstage answers.
+    NEXT="\${MOCK_CURSOR:-CURSOR_P2}"
+    GOT=""
+    case "\$REQ_URL" in
+        *cursor=*) GOT="\${REQ_URL##*cursor=}"; GOT="\${GOT%%&*}"; GOT="\${GOT//+/ }"; GOT=\$(printf '%b' "\${GOT//%/\\\\x}") ;;
+    esac
     if [ "\$CALL_NUM" -ge 4 ]; then
         echo '{"items":[],"pageInfo":{}}' > "\$WRITE_FILE"
-    elif echo "\$REQ_URL" | grep -q 'cursor=CURSOR_P2'; then
+    elif [ -n "\$GOT" ] && [ "\$GOT" != "\$NEXT" ]; then
+        echo '{"error":{"name":"InputError","message":"Malformed cursor"}}' > "\$WRITE_FILE"
+        echo "400"
+        exit 0
+    elif [ -n "\$GOT" ]; then
         jq -c '{items: .items[5:], pageInfo: {}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     else
-        jq -c '{items: .items[0:5], pageInfo: {nextCursor: "CURSOR_P2"}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
+        jq -c --arg next "\$NEXT" '{items: .items[0:5], pageInfo: {nextCursor: \$next}}' "\${MOCK_FIXTURE:-$FIXTURE}" > "\$WRITE_FILE"
     fi
     echo "200"
     ;;
@@ -572,9 +603,97 @@ SUBDIR_KEPT=$(echo "$SUBDIR_IN" | jq --arg prefix "github.com/" --rawfile presen
 [ "$SUBDIR_KEPT" = "github.com/acme/payment-api,github.com/acme/payment-api/services/billing" ] || \
     fail "monorepo subcomponent should follow its backing repo's verdict; got {$SUBDIR_KEPT}"
 
+# --- 8. SigV4 + aws_assume_role_arns ---------------------------------------
+# Static keys are the chain's base credentials here (the mock makes the metadata
+# endpoints unreachable). Assertions read full curl argument lists: which
+# credentials signed the STS hop, and which signed each catalog page.
+echo ""
+echo "=== sigv4 / aws_assume_role_arns scenarios ==="
+CURL_ARGS_LOG="$TEST_DIR/curl-args"
+OK_ROLE="arn:aws:iam::210987654321:role/backstage-api-reader"
+DENIED_ROLE="arn:aws:iam::210987654321:role/denied-other-env"
+ASSUMED_SIG='--user ASIAASSUMED:assumedsecret -H x-amz-security-token: assumedtoken'
+
+# sigv4_run <aws_assume_role_arns> -> SR_STATUS (exit code), SR_OUT (run log)
+sigv4_run() {
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"; : > "$CURL_ARGS_LOG"
+    SR_OUT="$TEST_DIR/sigv4.out"
+    SR_STATUS=0
+    env CURL_ARGS_LOG="$CURL_ARGS_LOG" \
+        LUNAR_VAR_AUTH_MODE=sigv4 \
+        LUNAR_VAR_AWS_REGION=us-west-2 \
+        LUNAR_SECRET_AWS_ACCESS_KEY_ID=AKIATEST \
+        LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=secret123 \
+        LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$1" \
+        LUNAR_VAR_VERIFY_REPOS=false \
+        "$SCRIPT_DIR/main.sh" > "$SR_OUT" 2>&1 || SR_STATUS=$?
+}
+count_args() { grep -c -- "$1" "$CURL_ARGS_LOG" || true; }
+check_eq() { # $1=label $2=expected $3=got
+    if [ "$3" = "$2" ]; then echo "  ok: $1"; else fail "[$1] expected {$2}, got {$3}"; fi
+}
+
+# (a) Negative control: no roles, no STS hop; the chain's keys sign every page.
+sigv4_run ""
+check_eq "sigv4 without aws_assume_role_arns succeeds" "0" "$SR_STATUS"
+check_eq "  ... makes no sts:AssumeRole call" "0" "$(count_args 'Action=AssumeRole ')"
+check_eq "  ... signs both catalog pages with the chain's keys" "2" \
+    "$(count_args '--aws-sigv4 aws:amz:us-west-2:execute-api --user AKIATEST:secret123 ')"
+
+# (b) One role: assumed with the chain's keys, then it signs every page.
+sigv4_run "$OK_ROLE"
+check_eq "an assumable role succeeds" "0" "$SR_STATUS"
+check_eq "  ... and writes the full catalog" "$COMPONENTS_GOT" "$(jq -s 'add // {} | keys | length' "$COMPONENTS_OUT")"
+check_eq "  ... assumed once at the regional endpoint, signed for sts with the chain's keys" "1" \
+    "$(count_args '--get https://sts.us-west-2.amazonaws.com/ --aws-sigv4 aws:amz:us-west-2:sts --user AKIATEST:secret123 ')"
+check_eq "  ... under the cataloger's session name" "1" "$(count_args 'RoleSessionName=lunar-backstage-cataloger')"
+check_eq "  ... and both catalog pages are signed with the assumed role" "2" \
+    "$(count_args "--aws-sigv4 aws:amz:us-west-2:execute-api $ASSUMED_SIG ")"
+check_eq "  ... never with the chain's keys" "0" "$(grep 'by-query' "$CURL_ARGS_LOG" | grep -c 'AKIATEST' || true)"
+check_eq "  ... and the auth line shows the hop" "1" "$(grep -c 'credentials via static-keys+assume-role' "$SR_OUT" || true)"
+
+# (c) A refused role falls through to the next, and is logged by position and
+#     STS error code only: the error message STS returns carries account ids.
+sigv4_run "$DENIED_ROLE,$OK_ROLE"
+check_eq "a refused role falls through to the next" "0" "$SR_STATUS"
+check_eq "  ... after trying both" "2" "$(count_args 'Action=AssumeRole ')"
+check_eq "  ... and signs with the role that was assumed" "2" "$(count_args "$ASSUMED_SIG ")"
+check_eq "  ... logging the refusal by position and STS error code" "1" \
+    "$(grep -c 'aws_assume_role_arns role 1/2 not assumed (AccessDenied)' "$SR_OUT" || true)"
+check_eq "  ... and never a role ARN or account id" "0" \
+    "$(grep -c -E '210987654321|111111111111|denied-other-env|backstage-api-reader' "$SR_OUT" || true)"
+
+# (d) No role can be assumed: fail before fetching anything.
+sigv4_run "$DENIED_ROLE"
+check_eq "no assumable role exits non-zero" "1" "$SR_STATUS"
+check_eq "  ... before fetching the catalog" "0" "$(grep -c . "$CURL_URLS" || true)"
+check_eq "  ... and writes nothing" "0" "$(jq -s 'add // {} | keys | length' "$COMPONENTS_OUT")"
+grep -q 'sts:AssumeRole failed for every role in aws_assume_role_arns' "$SR_OUT" || \
+    fail "expected the all-roles-failed error in the log"
+
+# --- 9. Query values are percent-encoded -----------------------------------
+# Every filter clause and the cursor go out percent-encoded: curl < 8.14 signs a
+# literal `=` inside a query value differently from AWS, so under sigv4 the
+# literal form 403s there. The cursor below is base64 with '+', '/' and '='
+# padding, which only survives the trip encoded.
+echo ""
+echo "=== query encoding ==="
+: > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+ENC_STATUS=0
+env MOCK_CURSOR='eyJwYWdlIjoyfQ+/==' LUNAR_VAR_VERIFY_REPOS=false \
+    "$SCRIPT_DIR/main.sh" > "$TEST_DIR/enc.out" 2>&1 || ENC_STATUS=$?
+check_eq "a base64 cursor with '+', '/' and '=' still reaches page 2" "0 2" \
+    "$ENC_STATUS $(grep -c . "$CURL_CALLS")"
+check_eq "  ... because it is sent percent-encoded" "1" \
+    "$(grep -c 'cursor=eyJwYWdlIjoyfQ%2B%2F%3D%3D' "$CURL_URLS" || true)"
+check_eq "filter clauses go on the wire percent-encoded" "2" \
+    "$(grep -c 'filter=kind%3DComponent%2Cmetadata.namespace%3Ddefault' "$CURL_URLS" || true)"
+check_eq "  ... with no literal filter grammar" "0" \
+    "$(grep -c 'filter=kind=' "$CURL_URLS" || true)"
+
 echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), and verify_repos (drop/keep, fail-open paths, GHES endpoint, batching) verified"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), sigv4 + aws_assume_role_arns, and percent-encoded query values verified"
 else
     echo "TEST FAILED" >&2
     exit 1

@@ -260,4 +260,4 @@ Projects **shared into** a group but owned elsewhere are excluded (`with_shared=
 
 ### Rate limits
 
-GitLab returns `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` on every API response. The cataloger reads them to pace itself as the remaining budget runs low, and retries `429` and `5xx` responses with exponential backoff, honouring `Retry-After` when GitLab sends it. Requests that fail for a non-transient reason (`401`, `403`, `404`) abort the run rather than shrinking the reported project set.
+GitLab returns `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` on every API response. The cataloger reads them to pace itself as the remaining budget runs low, and retries `429` and `5xx` responses with exponential backoff, honouring `Retry-After` when GitLab sends it. Requests that fail for a non-transient reason (`401`, `403`, `404`) abort the run rather than shrinking the reported project set. Every failed attempt logs the response headers and body, including the `X-Request-Id` GitLab support asks for.
