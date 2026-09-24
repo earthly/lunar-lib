@@ -1,6 +1,36 @@
 from lunar_policy import Check
 
 
+def selector_matches(selector, labels):
+    """Kubernetes LabelSelector semantics, as a policy/v1 PodDisruptionBudget
+    applies them: matchLabels is an AND of equalities, matchExpressions supports
+    In / NotIn / Exists / DoesNotExist, an empty selector matches every pod in
+    the namespace, and a null selector matches none."""
+    if not isinstance(selector, dict):
+        return False
+    labels = {str(k): str(v) for k, v in (labels or {}).items()}
+    for key, value in (selector.get("matchLabels") or {}).items():
+        if labels.get(str(key)) != str(value):
+            return False
+    for expr in selector.get("matchExpressions") or []:
+        key = str(expr.get("key", ""))
+        values = {str(v) for v in (expr.get("values") or [])}
+        operator = expr.get("operator")
+        if operator == "In":
+            ok = key in labels and labels[key] in values
+        elif operator == "NotIn":
+            ok = key not in labels or labels[key] not in values
+        elif operator == "Exists":
+            ok = key in labels
+        elif operator == "DoesNotExist":
+            ok = key not in labels
+        else:
+            ok = False  # the API server rejects any other operator
+        if not ok:
+            return False
+    return True
+
+
 def main(node=None):
     """Requires PodDisruptionBudgets for Deployments and StatefulSets."""
     c = Check("pdb", "Deployments and StatefulSets should have PodDisruptionBudgets", node=node)
@@ -9,30 +39,31 @@ def main(node=None):
         if not workloads.exists():
             c.skip("No Kubernetes workloads found in this repository")
 
-        pdbs = c.get_node(".k8s.pdbs")
+        pdbs = []
+        pdbs_node = c.get_node(".k8s.pdbs")
+        if pdbs_node.exists():
+            pdbs = [pdb.get_value() for pdb in pdbs_node]
 
-        # Build set of (namespace, workload_name) tuples that have PDBs
-        pdb_targets = set()
-        if pdbs.exists():
-            for pdb in pdbs:
-                target = pdb.get_value_or_default(".target_workload", "")
-                pdb_namespace = pdb.get_value_or_default(".namespace", "default")
-                if target:
-                    pdb_targets.add((pdb_namespace, target))
-
-        # Check Deployments and StatefulSets have matching PDBs
-        for workload in workloads:
-            kind = workload.get_value_or_default(".kind", "")
+        for workload_node in workloads:
+            workload = workload_node.get_value()
+            kind = workload.get("kind", "")
 
             # Only check Deployments and StatefulSets
             if kind not in ("Deployment", "StatefulSet"):
                 continue
 
-            name = workload.get_value_or_default(".name", "<unknown>")
-            namespace = workload.get_value_or_default(".namespace", "default")
-            path = workload.get_value_or_default(".path", "<unknown>")
+            name = workload.get("name", "<unknown>")
+            namespace = workload.get("namespace", "default")
+            path = workload.get("path", "<unknown>")
+            same_ns = [p for p in pdbs if p.get("namespace", "default") == namespace]
 
-            has_pdb = (namespace, name) in pdb_targets
+            if "pod_labels" in workload:
+                has_pdb = any(selector_matches(p.get("selector"), workload["pod_labels"]) for p in same_ns)
+            else:
+                # Collected by a k8s collector that predates pod_labels/selector:
+                # fall back to its guessed target name.
+                has_pdb = any(p.get("target_workload") == name for p in same_ns)
+
             c.assert_true(
                 has_pdb,
                 f"{path}: {kind} {namespace}/{name} has no matching PodDisruptionBudget"
@@ -43,4 +74,3 @@ def main(node=None):
 
 if __name__ == "__main__":
     main()
-

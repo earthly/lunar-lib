@@ -76,6 +76,7 @@ A compliant component with proper resource specs, probes, and security context:
         "name": "payment-api",
         "namespace": "payments",
         "path": "deploy/deployment.yaml",
+        "pod_labels": {"app": "payment-api"},
         "host_users": false,
         "host_network": false,
         "host_pid": false,
@@ -94,7 +95,7 @@ A compliant component with proper resource specs, probes, and security context:
       }
     ],
     "pdbs": [
-      {"name": "payment-api-pdb", "target_workload": "payment-api"}
+      {"name": "payment-api-pdb", "namespace": "payments", "selector": {"matchLabels": {"app": "payment-api"}}}
     ]
   }
 }
