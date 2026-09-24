@@ -4,10 +4,11 @@
 # Backstage catalog by-name API) and `lunar` (capturing the collected
 # `.catalog.native.backstage` write) so the collector can be exercised
 # end-to-end — through the real `yq`/`python3` pipeline — without network
-# access. Covers two things:
+# access. Covers three things:
 #   1. Multi-document parsing/linting (multiple entities separated by `---`).
 #      This is the path the alpine CI unit tests can't reach (no yq there).
 #   2. The optional referential-integrity feature.
+#   3. Monorepo subdirectory components reading a shared ancestor file.
 #
 # The mock curl returns an HTTP status keyed off the requested entity name:
 #   typo*  -> 404 (definitive miss)      five -> 502 (transient 5xx)
@@ -693,6 +694,175 @@ spec: {owner: team-demo, domain: typo-domain}
 EOF
 )" \
   '{"checked":true,"domain":{"name":"typo-domain","exists":false}}'
+
+# --- Monorepo: a subdirectory component reading a shared ancestor file -----
+echo
+echo "Monorepo ancestor catalog file tests:"
+
+# $MONO is a repo root holding the shared fixture. Its `.git` is a file whose
+# gitdir doesn't exist, like the hub's per-snippet worktree seen from a box
+# where git can't resolve it, so the `.git` walk (not git) finds the root.
+MONO="$TEST_DIR/repos/monorepo"
+make_mono() {
+  rm -rf "$TEST_DIR/repos"
+  mkdir -p "$MONO"
+  echo "gitdir: $TEST_DIR/no-such-gitdir" > "$MONO/.git"
+  cp "$SCRIPT_DIR/test/fixtures/monorepo-catalog-info.yaml" "$MONO/catalog-info.yaml"
+}
+
+# mono_main <subdir> [KEY=VALUE ...] — main.sh from $MONO/<subdir> with only the
+# given inputs (the rest at their defaults), component id
+# github.com/acme/monorepo/<subdir> unless overridden. Emits the collected
+# object, or nothing when the collector wrote nothing.
+mono_main() {
+  local sub="$1"
+  shift
+  mkdir -p "$MONO/$sub"
+  ( cd "$MONO/$sub" \
+    && env PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="" \
+       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
+       "$@" \
+       bash "$SCRIPT_DIR/main.sh" )
+}
+
+# The lookup is opt-in, so most cases run with it on: search_parent_dirs plus
+# source-location matching. Later KEY=VALUE arguments override these.
+LOOKUP_ON=(LUNAR_VAR_SEARCH_PARENT_DIRS=true LUNAR_VAR_MATCH_SOURCE_LOCATION=true)
+run_mono() {
+  local sub="$1"
+  shift
+  mono_main "$sub" "${LOOKUP_ON[@]}" "$@" 2>/dev/null
+}
+
+names() { jq -c '[.entities[].metadata.name]'; }
+LINKS_ON=LUNAR_VAR_MATCH_LINKS=true
+
+make_mono
+assert_eq "the parent lookup is off by default" \
+  "$(mono_main services/payments 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and stays quiet" \
+  "$({ mono_main services/payments >/dev/null; } 2>&1 | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs alone matches nothing" \
+  "$(mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and logs why" \
+  "$({ mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true >/dev/null; } 2>&1 | grep -c 'both off')" '1'
+
+OUT=$(run_mono services/payments)
+assert_eq "source-location picks the dir's entities from the root file" \
+  "$(echo "$OUT" | names)" '["payments-api","payments-grpc"]'
+assert_eq "the primary is the dir's Component, path points up at the shared file" \
+  "$(echo "$OUT" | jq -c '{name: .metadata.name, owner: .spec.owner, path}')" \
+  '{"name":"payments-api","owner":"team-payments","path":"../../catalog-info.yaml"}'
+assert_eq "another dir's bad entity doesn't fail this component" \
+  "$(echo "$OUT" | jq -c '.valid')" 'true'
+
+assert_eq "links are off by default" \
+  "$(run_mono services/web | wc -c | tr -d ' ')" '0'
+assert_eq "match_links matches when source-location only names the repo root" \
+  "$(run_mono services/web "$LINKS_ON" | names)" '["web-frontend"]'
+assert_eq "an entity whose source-location names another dir isn't matched by its link" \
+  "$(run_mono services/docs "$LINKS_ON" | names)" '["docs-site"]'
+assert_eq "with match_source_location off, links decide for every entity" \
+  "$(run_mono services/web "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | names)" \
+  '["web-frontend","docs-site"]'
+assert_eq "with match_source_location off, source-location alone matches nothing" \
+  "$(run_mono services/payments "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs=false reads only the component's own dir" \
+  "$(run_mono services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=false | wc -c | tr -d ' ')" '0'
+
+WORKER=$(run_mono services/worker)
+assert_eq "the selected entity's own lint errors still count" \
+  "$(echo "$WORKER" | jq -c '.valid')" 'false'
+assert_eq "its error names its document in the shared file" \
+  "$(echo "$WORKER" | jq -r '.errors[0].message' | grep -c "^document 5 (Component 'broken-worker')")" '1'
+
+assert_eq "a dir no entity points at collects nothing" \
+  "$(run_mono services/unlisted | wc -c | tr -d ' ')" '0'
+
+assert_eq "the root component still reads the whole file, unfiltered" \
+  "$(run_mono . LUNAR_COMPONENT_ID=github.com/acme/monorepo | jq -c '{name: .metadata.name, n: (.entities | length), path}')" \
+  '{"name":"monorepo-root","n":6,"path":"catalog-info.yaml"}'
+
+# A file in the component's own directory is used as-is — nothing filtered.
+mkdir -p "$MONO/services/payments"
+printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' \
+  'metadata: {name: local-payments}' 'spec: {owner: team-local, lifecycle: production}' \
+  > "$MONO/services/payments/catalog-info.yaml"
+assert_eq "the component's own file wins over the shared one" \
+  "$(run_mono services/payments | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"local-payments","path":"catalog-info.yaml"}'
+assert_eq "and is read with every input at its default" \
+  "$(mono_main services/payments 2>/dev/null | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"local-payments","path":"catalog-info.yaml"}'
+
+# The nearest ancestor wins over the root.
+make_mono
+mkdir -p "$MONO/services"
+sed 's/payments-api/mid-level-payments/' "$SCRIPT_DIR/test/fixtures/monorepo-catalog-info.yaml" \
+  > "$MONO/services/catalog-info.yml"
+assert_eq "the nearest ancestor file wins" \
+  "$(run_mono services/payments | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"mid-level-payments","path":"../catalog-info.yml"}'
+
+# The walk stops at the repo root: a file above it is never read.
+make_mono
+mv "$MONO/catalog-info.yaml" "$TEST_DIR/repos/catalog-info.yaml"
+assert_eq "no file at or below the repo root collects nothing" \
+  "$(run_mono services/payments | wc -c | tr -d ' ')" '0'
+
+# No repo root found: no walk at all.
+make_mono
+rm "$MONO/.git"
+assert_eq "without a .git to find the repo root there is no walk" \
+  "$(run_mono services/payments | wc -c | tr -d ' ')" '0'
+
+# URLs only match the component's own repo, taken from its id.
+make_mono
+assert_eq "a component of another repo doesn't match this repo's URLs" \
+  "$(run_mono services/payments LUNAR_COMPONENT_ID=github.com/acme/other/services/payments | wc -c | tr -d ' ')" '0'
+assert_eq "an id that doesn't end in the dir disables the walk" \
+  "$(run_mono services/payments LUNAR_COMPONENT_ID=github.com/acme/monorepo/elsewhere | wc -c | tr -d ' ')" '0'
+
+# GitLab ids put `/-/` before the subdir; the repo is what precedes it, so
+# GitLab's older dash-less tree URLs match too.
+make_mono
+GL=gitlab.com/acme/platform/monorepo
+printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' 'metadata:' '  name: gl-api' \
+  '  annotations:' "    backstage.io/source-location: url:https://$GL/-/tree/main/services/api/" \
+  'spec: {owner: team-api, lifecycle: production}' '---' \
+  'apiVersion: backstage.io/v1alpha1' 'kind: Component' 'metadata:' '  name: gl-legacy' \
+  '  annotations:' "    backstage.io/source-location: url:https://$GL/tree/main/services/legacy/" \
+  'spec: {owner: team-legacy, lifecycle: production}' > "$MONO/catalog-info.yaml"
+assert_eq "a GitLab component id matches a GitLab tree URL" \
+  "$(run_mono services/api LUNAR_COMPONENT_ID=$GL/-/services/api | names)" '["gl-api"]'
+assert_eq "and a dash-less GitLab tree URL" \
+  "$(run_mono services/legacy LUNAR_COMPONENT_ID=$GL/-/services/legacy | names)" '["gl-legacy"]'
+
+# An unparseable shared file is reported against the path that was read.
+make_mono
+printf 'kind: [unclosed\n' > "$MONO/catalog-info.yaml"
+assert_eq "an unparseable shared file is reported with its path" \
+  "$(run_mono services/payments | jq -c '{valid, path}')" \
+  '{"valid":false,"path":"../../catalog-info.yaml"}'
+
+# Referential integrity runs on the selected entity.
+make_mono
+assert_eq "refs resolve from the selected entity's spec" \
+  "$(run_mono services/payments LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=t | jq -c '.refs.system')" \
+  '{"name":"payment-platform","exists":true}'
+
+# Real git resolves the root when it can (the hub's worktrees have git).
+if command -v git >/dev/null 2>&1; then
+  make_mono
+  rm "$MONO/.git"
+  git -C "$MONO" init -q
+  assert_eq "git rev-parse finds the repo root" \
+    "$(run_mono services/payments | names)" '["payments-api","payments-grpc"]'
+else
+  echo "  skip: git not installed, rev-parse path not exercised"
+fi
 
 if [ "$FAILS" -eq 0 ]; then
   echo "All referential-integrity and auth-mode tests passed."
