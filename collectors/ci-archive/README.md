@@ -11,6 +11,9 @@ inventory of what was captured, so consumers can locate the archive without
 reconstructing the key. Useful when CI logs need to outlive the provider's
 retention window — audit trails, incident forensics, or compliance evidence.
 
+It can also run in your own CI as a GitHub Action, so uploads use your runners'
+credentials; see [From your own CI](#from-your-own-ci).
+
 ## Collected Data
 
 This collector writes to the following Component JSON paths:
@@ -99,6 +102,38 @@ profile), then the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Lunar
 secrets are shared by every collector, so an attached role always wins over
 keys set for another plugin. With `s3_endpoint_url`, only the static keys are
 used. The identity needs `s3:PutObject` on the key prefix.
+
+### From your own CI
+
+When the bucket must only be reachable from your runners, run the archive as a
+GitHub Action instead. A workflow on `workflow_run: completed` fires once per
+finished run attempt, re-runs included, after every log exists. The action
+downloads that attempt's logs, uploads them with the job's AWS credentials, and
+records the upload on the commit the run built:
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, `path`, `event`, `conclusion`, timestamps, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source` |
+
+Each attempt lands at `<s3-prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip`,
+holding `manifest.json` (the run and its jobs, with steps) and `logs.zip`
+(GitHub's log archive, verbatim).
+
+[examples/archive-ci-runs.yml](examples/archive-ci-runs.yml) is a complete
+workflow. It uses OIDC both for your AWS role and for the Lunar Hub, so the
+repository stores no keys. Things to know:
+
+- The workflow file must be on the default branch, and `workflows:` names the
+  workflows to archive.
+- The job needs `actions: read`, plus `id-token: write` for OIDC. The role needs
+  `s3:PutObject` on the prefix.
+- Recording needs the `lunar` CLI on the runner, which `earthly/lunar-ci-tracer`
+  installs. Set `record-in-lunar: "false"` to only upload.
+- The runner needs curl 7.75+, jq and python3. GitHub-hosted runners have them.
+- In a monorepo, receipts go on `<host>/<owner>/<repo>` unless `components`
+  lists the component IDs to record on.
+
+Inputs are documented in [action.yml](action.yml).
 
 ### Limits
 
