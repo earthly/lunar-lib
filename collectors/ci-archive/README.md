@@ -23,10 +23,12 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source` |
 
-Nothing is written when `s3_bucket` or `GH_TOKEN` is unset, or when the workflow
-doesn't match `include_runs_pattern`: the collector exits 0 with a message on
-stderr. A run that can't be archived (logs gone, over `max_archive_mb`, S3
-rejected the upload) fails the collector run and writes nothing.
+Nothing is written when `s3_bucket` or `GH_TOKEN` is unset, when the workflow
+doesn't match `include_runs_pattern`, or when the run's event isn't in
+`include_events`: the collector exits 0 with a message on stderr. A run that
+can't be archived (logs gone, over `max_archive_mb`, S3 rejected the upload, or
+no role in `aws_assume_role_arns` could be assumed) fails the collector run and
+writes nothing.
 
 ### Archive layout
 
@@ -54,6 +56,12 @@ It needs a Hub that has the `workflow-end` hook. In a monorepo, set
 [`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
 on components to say which workflows are theirs.
 
+GitHub files a run under the commit it checked out. For a run started by
+`workflow_run`, `schedule` or `workflow_dispatch`, that is the branch head when
+the run started, not necessarily the commit that led to it. To archive only
+runs a commit started, set `include_events: push` (add `pull_request` for PR
+runs).
+
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -77,6 +85,13 @@ profile), then the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Lunar
 secrets are shared by every collector, so an attached role always wins over
 keys set for another plugin. With `s3_endpoint_url`, only the static keys are
 used. The identity needs `s3:PutObject` on the key prefix.
+
+For a bucket in another account, set `aws_assume_role_arns` to a role there that
+can write to it. The collector assumes that role with the credentials above,
+sending `aws_external_id` if set, and uploads as the role. Its trust policy must
+allow the snippet pod's role, and the pod's role needs `sts:AssumeRole` on it.
+STS sessions are named `lunar-ci-archive-<run-id>-<attempt>`, so the bucket
+account's CloudTrail shows which run each upload came from.
 
 ### From your own CI
 

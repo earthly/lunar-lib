@@ -9,12 +9,15 @@ set -eo pipefail
 # included, with the run in LUNAR_CI_PIPELINE_*. The archiving is archive-run.sh,
 # shared with the GitHub Action; this wrapper supplies what the Hub knows in
 # place of a CI job: the repository, from the component, and AWS credentials,
-# from the pod's IAM role or the collector secrets.
+# from the pod's IAM role or the collector secrets, optionally exchanged for a
+# role in the bucket's account.
 
 log() { echo "ci-archive: $*" >&2; }
 
 S3_BUCKET="${LUNAR_VAR_S3_BUCKET:-}"
 S3_ENDPOINT_URL="${LUNAR_VAR_S3_ENDPOINT_URL:-}"
+ASSUME_ROLE_ARNS="${LUNAR_VAR_AWS_ASSUME_ROLE_ARNS:-}"
+EXTERNAL_ID="${LUNAR_VAR_AWS_EXTERNAL_ID:-}"
 INCLUDE_RUNS_PATTERN="${LUNAR_VAR_INCLUDE_RUNS_PATTERN:-}"
 RUN_ID="${LUNAR_CI_PIPELINE_RUN_ID:-}"
 ATTEMPT="${LUNAR_CI_PIPELINE_RUN_ATTEMPT:-}"
@@ -171,6 +174,66 @@ resolve_aws_credentials() {
   return 1
 }
 
+# assume_role_chain is the optional aws_assume_role_arns hop, for a bucket in
+# another account that only trusts a role there. The first role STS accepts
+# replaces the credentials. No DurationSeconds: STS's 1h default is the
+# chained-role maximum. ARNs carry an account id, so failures are logged by
+# position and STS error code only. AWS_ENDPOINT_URL_STS, the SDKs' override,
+# points it at another STS endpoint.
+assume_role_chain() {
+  local raw=() arns=() arn resp status parsed reason session sts i=0
+  local token_hdr=() external_id=()
+  # Commas or whitespace separate entries; an ARN never contains whitespace.
+  IFS=',' read -ra raw <<< "${ASSUME_ROLE_ARNS//[[:space:]]/,}"
+  for arn in "${raw[@]}"; do
+    if [ -n "$arn" ]; then arns+=("$arn"); fi
+  done
+  if [ "${#arns[@]}" -eq 0 ]; then return 0; fi
+
+  sts="${AWS_ENDPOINT_URL_STS:-https://sts.${REGION}.amazonaws.com}"
+  # Named per run attempt, so the bucket account's CloudTrail says which run
+  # each upload belongs to.
+  session="$(printf 'lunar-ci-archive-%s-%s' "$RUN_ID" "$ATTEMPT" | tr -c 'A-Za-z0-9+=,.@_-' '_' | cut -c1-64)"
+  if [ -n "$AWS_SIGV4_TOKEN" ]; then
+    token_hdr=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+  fi
+  if [ -n "$EXTERNAL_ID" ]; then
+    external_id=(--data-urlencode "ExternalId=${EXTERNAL_ID}")
+  fi
+  for arn in "${arns[@]}"; do
+    i=$((i + 1))
+    status=0
+    resp="$(curl -sS --max-time 15 --get "${sts%/}/" \
+      --aws-sigv4 "aws:amz:${REGION}:sts" \
+      --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}" \
+      "${token_hdr[@]}" \
+      --data-urlencode "Action=AssumeRole" \
+      --data-urlencode "Version=2011-06-15" \
+      --data-urlencode "RoleArn=${arn}" \
+      --data-urlencode "RoleSessionName=${session}" \
+      "${external_id[@]}" 2>/dev/null)" || status=$?
+    if [ "$status" -eq 0 ] && parsed="$(printf '%s' "$resp" | parse_sts_credentials)"; then
+      AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+      AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+      AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+      CRED_SOURCE="${CRED_SOURCE}+assume-role"
+      return 0
+    fi
+    if [ "$status" -ne 0 ]; then
+      reason="request failed, curl exit ${status}"
+    elif [[ "$resp" == *"<Code>"*"</Code>"* ]]; then
+      reason="${resp#*<Code>}"; reason="${reason%%</Code>*}"
+    else
+      reason="unrecognized STS response"
+    fi
+    log "aws_assume_role_arns role ${i}/${#arns[@]} not assumed (${reason})."
+  done
+  log "ERROR: sts:AssumeRole failed for every role in aws_assume_role_arns. The base identity"
+  log "  (${CRED_SOURCE}) needs sts:AssumeRole on the role, and the role's trust policy must"
+  log "  allow it, with aws_external_id if the policy requires one."
+  return 1
+}
+
 REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
 if [ -n "$S3_ENDPOINT_URL" ]; then
   # S3-compatible store: AWS roles mean nothing there, only static keys do.
@@ -191,6 +254,7 @@ else
   fi
   resolve_aws_credentials || exit 1
 fi
+assume_role_chain || exit 1
 log "uploading to bucket ${S3_BUCKET} (${REGION}) with AWS credentials from ${CRED_SOURCE}."
 
 GH_TOKEN="$LUNAR_SECRET_GH_TOKEN" \
@@ -199,5 +263,6 @@ CI_ARCHIVE_REPOSITORY="$REPO" CI_ARCHIVE_RUN_ID="$RUN_ID" CI_ARCHIVE_RUN_ATTEMPT
 CI_ARCHIVE_S3_BUCKET="$S3_BUCKET" CI_ARCHIVE_S3_PREFIX="${LUNAR_VAR_S3_PREFIX-lunar/ci-archive}" \
 CI_ARCHIVE_S3_ENDPOINT_URL="$S3_ENDPOINT_URL" CI_ARCHIVE_AWS_REGION="$REGION" \
 CI_ARCHIVE_MAX_ARCHIVE_MB="${LUNAR_VAR_MAX_ARCHIVE_MB:-512}" CI_ARCHIVE_INTEGRATION=workflow-end \
+CI_ARCHIVE_INCLUDE_EVENTS="${LUNAR_VAR_INCLUDE_EVENTS:-}" \
 AWS_ACCESS_KEY_ID="$AWS_SIGV4_KEY" AWS_SECRET_ACCESS_KEY="$AWS_SIGV4_SECRET" AWS_SESSION_TOKEN="$AWS_SIGV4_TOKEN" \
   exec bash "$(dirname "$0")/archive-run.sh"

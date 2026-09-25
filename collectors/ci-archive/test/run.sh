@@ -9,7 +9,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/../workflow-logs.sh"
 TMP="$(mktemp -d)"
-export S3_DIR="$TMP/s3"
+export S3_DIR="$TMP/s3" STS_LOG="$TMP/sts.log"
 mkdir -p "$S3_DIR"
 
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=127.0.0.1" \
@@ -58,6 +58,7 @@ expect() { # expect <description> <command...>
 expect_exit() { if [ "$CODE" -eq "$1" ]; then pass "exits $1"; else fail "exits $1 (got $CODE)"; fi; }
 receipt() { jq -e "$1" "$OUT"; }
 stderr_has() { grep -q -- "$1" "$ERR"; }
+stderr_lacks() { ! grep -q -- "$1" "$ERR"; }
 nothing_collected() { [ ! -s "$OUT" ]; }
 no_bucket() { [ ! -e "$S3_DIR/$1" ]; }
 object_path() { echo "$S3_DIR/$(jq -r '.ci.archive.runs[0] | .bucket + "/" + .key' "$OUT")"; }
@@ -118,6 +119,82 @@ expect "says why" stderr_has "does not match include_runs_pattern"
 run_case filtered-in 101 1 'LUNAR_VAR_INCLUDE_RUNS_PATTERN=^(build|deploy)$'
 expect_exit 0
 expect "archives a workflow include_runs_pattern matches" receipt '.ci.archive.runs[0].id == 101'
+
+# Run 601 was started by workflow_run, run 101 by push.
+run_case event-left-out 601 1 LUNAR_VAR_INCLUDE_EVENTS=push
+expect_exit 0
+expect "skips a run triggered by an event include_events leaves out" nothing_collected
+expect "says why" stderr_has "triggered by workflow_run, not one of the included events"
+
+run_case event-listed 101 1 'LUNAR_VAR_INCLUDE_EVENTS=pull_request, push'
+expect_exit 0
+expect "archives a run triggered by a listed event" receipt '.ci.archive.runs[0] | .id == 101 and .event == "push"'
+
+run_case all-events 601 1
+expect_exit 0
+expect "archives every event when include_events is empty" receipt '.ci.archive.runs[0] | .id == 601 and .event == "workflow_run"'
+
+# --- A bucket in another account: upload as a role there ---
+# ingress* buckets take only the credentials STS hands out for ROLE, and only
+# with EXTERNAL_ID (servers.py).
+ROLE=arn:aws:iam::111122223333:role/ci-archive-ingress
+EXTERNAL_ID='lunar-ext=test+1'
+STS=AWS_ENDPOINT_URL_STS=http://127.0.0.1:9002
+
+# Control arm: the base keys alone are refused, so assume-role below can only
+# pass by uploading as the role.
+run_case ingress-base-keys 101 1 "$STS" LUNAR_VAR_S3_BUCKET=ingress-base
+expect_exit 1
+expect "the base keys can't write to the other account's bucket" stderr_has "AccessDenied"
+expect "uploads nothing" no_bucket ingress-base
+
+run_case assume-role 101 1 "$STS" LUNAR_VAR_S3_BUCKET=ingress-ok \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID"
+expect_exit 0
+expect "uploads as the assumed role" test -s "$S3_DIR/ingress-ok/lunar/ci-archive/127.0.0.1_8443/acme/widgets/sha-101/101-1.zip"
+expect "records the upload" receipt '.ci.archive.runs[0].uri == "s3://ingress-ok/lunar/ci-archive/127.0.0.1_8443/acme/widgets/sha-101/101-1.zip"'
+expect "says where the credentials came from" stderr_has "credentials from static-keys+assume-role"
+expect "names the STS session after the run attempt" grep -qx "lunar-ci-archive-101-1" "$STS_LOG"
+
+# Control arm: temporary keys are refused without their session token, so the
+# next case proves the token was sent and signed.
+run_case temp-base-no-token 101 2 "$STS" LUNAR_VAR_S3_BUCKET=ingress-notoken \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID" \
+  LUNAR_SECRET_AWS_ACCESS_KEY_ID=ASIABASETEST LUNAR_SECRET_AWS_SECRET_ACCESS_KEY='base/Secret+test'
+expect_exit 1
+expect "STS refuses temporary keys sent without their token" stderr_has "role 1/1 not assumed (InvalidToken)"
+expect "uploads nothing" no_bucket ingress-notoken
+
+run_case assume-role-temp-base 101 2 "$STS" LUNAR_VAR_S3_BUCKET=ingress-temp \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID" \
+  LUNAR_SECRET_AWS_ACCESS_KEY_ID=ASIABASETEST LUNAR_SECRET_AWS_SECRET_ACCESS_KEY='base/Secret+test' \
+  LUNAR_SECRET_AWS_SESSION_TOKEN='IQoJb3JpZ2luX2VjE+base/session/token=='
+expect_exit 0
+expect "chains from temporary base credentials, session token signed" receipt '.ci.archive.runs[0].attempt == 2'
+
+run_case assume-role-order 101 1 "$STS" LUNAR_VAR_S3_BUCKET=ingress-order \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="arn:aws:iam::111122223333:role/elsewhere, $ROLE" \
+  LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID"
+expect_exit 0
+expect "moves past a role STS refuses" stderr_has "role 1/2 not assumed (AccessDenied)"
+expect "uploads as the next role" receipt '.ci.archive.runs[0].bucket == "ingress-order"'
+expect "keeps account ids out of the log" stderr_lacks "111122223333"
+
+run_case wrong-external-id 101 1 "$STS" LUNAR_VAR_S3_BUCKET=ingress-extid \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID=wrong
+expect_exit 1
+expect "reports STS's refusal" stderr_has "role 1/1 not assumed (AccessDenied)"
+expect "says what the role needs" stderr_has "sts:AssumeRole failed for every role"
+expect "uploads nothing" no_bucket ingress-extid
+expect "writes nothing" nothing_collected
+
+# Control arm: proves the STS stand-in really verifies signatures.
+run_case sts-bad-secret 101 1 "$STS" LUNAR_VAR_S3_BUCKET=ingress-badsig \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID" \
+  LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=wrong
+expect_exit 1
+expect "surfaces STS's error code" stderr_has "role 1/1 not assumed (SignatureDoesNotMatch)"
+expect "uploads nothing" no_bucket ingress-badsig
 
 # --- Opted in but broken: exit 1, write nothing ---
 run_case bad-token 101 1 LUNAR_SECRET_GH_TOKEN=wrong

@@ -2,7 +2,8 @@ VERSION 0.8
 
 # Offline end-to-end test: the real script, curl, jq, python3 and lunar CLI from
 # the collector's runtime image, against local stand-ins for the GitHub API and
-# a SigV4-verifying S3 (test/servers.py). No network, AWS or Lunar Hub needed.
+# a SigV4-verifying S3 and STS (test/servers.py). No network, AWS or Lunar Hub
+# needed.
 # openssl only generates the stand-in's throwaway TLS cert.
 test:
     FROM --pass-args ../../+base-image

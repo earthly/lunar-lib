@@ -31,6 +31,9 @@ inputs:
   max-archive-mb:
     description: Fail instead of uploading when the run's log archive is larger than this.
     default: "512"
+  include-events:
+    description: Only archive runs triggered by these events, comma-separated (for example push). Empty means all events.
+    default: ""
   github-token:
     description: Token with actions:read on the repository.
     default: ${{ github.token }}
@@ -58,3 +61,4 @@ runs:
         CI_ARCHIVE_COMPONENTS: ${{ inputs.components }}
         CI_ARCHIVE_RECORD_IN_LUNAR: ${{ inputs.record-in-lunar }}
         CI_ARCHIVE_MAX_ARCHIVE_MB: ${{ inputs.max-archive-mb }}
+        CI_ARCHIVE_INCLUDE_EVENTS: ${{ inputs.include-events }}

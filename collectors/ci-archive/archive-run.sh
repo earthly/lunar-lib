@@ -19,6 +19,7 @@ REGION="${CI_ARCHIVE_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
 MAX_ARCHIVE_MB="${CI_ARCHIVE_MAX_ARCHIVE_MB:-512}"
 RECORD="${CI_ARCHIVE_RECORD_IN_LUNAR:-true}"
 INTEGRATION="${CI_ARCHIVE_INTEGRATION:-github-action}"
+INCLUDE_EVENTS="${CI_ARCHIVE_INCLUDE_EVENTS:-}"
 EVENT_PATH="${GITHUB_EVENT_PATH:-}"
 RUN_ID="${CI_ARCHIVE_RUN_ID:-}"
 ATTEMPT="${CI_ARCHIVE_RUN_ATTEMPT:-}"
@@ -78,10 +79,15 @@ gh_get() {
 # --- 1. The run attempt and its jobs ---
 code=$(gh_get "actions/runs/${RUN_ID}/attempts/${ATTEMPT}" "$WORK/run.json")
 [ "$code" = "200" ] || { log "ERROR: reading run ${RUN_ID} attempt ${ATTEMPT} returned HTTP ${code}."; exit 1; }
+EVENT=$(jq -r '.event' "$WORK/run.json")
+# Commas or whitespace separate the events.
+if [ -n "$INCLUDE_EVENTS" ] && [[ ",${INCLUDE_EVENTS//[[:space:]]/,}," != *",${EVENT},"* ]]; then
+  log "run ${RUN_ID} was triggered by ${EVENT}, not one of the included events (${INCLUDE_EVENTS}); skipping."
+  exit 0
+fi
 STATUS=$(jq -r '.status' "$WORK/run.json")
 [ "$STATUS" = "completed" ] || { log "ERROR: run ${RUN_ID} attempt ${ATTEMPT} is ${STATUS}, not completed."; exit 1; }
 SHA=$(jq -r '.head_sha' "$WORK/run.json")
-EVENT=$(jq -r '.event' "$WORK/run.json")
 PR=""
 case "$EVENT" in
   pull_request|pull_request_target) PR=$(jq -r '.pull_requests[0].number // empty' "$WORK/run.json") ;;

@@ -1,4 +1,4 @@
-"""Local stand-ins for the GitHub Actions API and S3, for run.sh.
+"""Local stand-ins for the GitHub Actions API, S3 and STS, for run.sh.
 
 GitHub (HTTPS, 127.0.0.1:8443, the GHES /api/v3 layout): serves one run
 attempt, its jobs, and a 302 from its logs endpoint to a signed-URL blob, like
@@ -6,16 +6,34 @@ the real API. Scenarios are keyed by run ID. Blob requests carrying an
 Authorization header are rejected, so a leaked token fails the test.
 
 S3 (HTTP, 127.0.0.1:9001, path-style): PUT stores an object only if the
-request is SigV4-signed with AKIATEST/secret-test for us-east-1/s3 and the
-body matches x-amz-content-sha256, the same checks AWS makes. Objects land in
-$S3_DIR/<bucket>/<key> for run.sh to inspect.
+request is SigV4-signed for us-east-1/s3 by a key the bucket accepts and the
+body matches x-amz-content-sha256, the same checks AWS makes. Buckets named
+ingress* stand for a bucket in another account: only the credentials STS hands
+out for INGRESS_ROLE may write there. Every other bucket takes the static test
+key. Objects land in $S3_DIR/<bucket>/<key> for run.sh to inspect.
+
+STS (HTTP, 127.0.0.1:9002): the query-API GET form of sts:AssumeRole. It
+answers only calls SigV4-signed for us-east-1/sts by a base key, session token
+included, and grants only INGRESS_ROLE with EXTERNAL_ID, like a trust policy
+with an sts:ExternalId condition. Session names go to $STS_LOG.
 """
-import hashlib, hmac, io, json, os, ssl, sys, threading, urllib.parse, zipfile
+import hashlib, hmac, io, json, os, re, ssl, sys, threading, urllib.parse, zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = "test-gh-token"
-S3_KEY = ("AKIATEST", "secret-test")
+# Access key -> (secret, session token). The ASIA keys are temporary: AWS
+# rejects them without their token.
+KEYS = {
+    "AKIATEST": ("secret-test", None),
+    "ASIABASETEST": ("base/Secret+test", "IQoJb3JpZ2luX2VjE+base/session/token=="),
+    "ASIAASSUMEDTEST": ("assumed/Secret+test", "IQoJb3JpZ2luX2VjE+assumed/session/token=="),
+}
+BASE_KEYS = {"AKIATEST", "ASIABASETEST"}
+ASSUMED_KEY = "ASIAASSUMEDTEST"
+INGRESS_ROLE = "arn:aws:iam::111122223333:role/ci-archive-ingress"
+EXTERNAL_ID = "lunar-ext=test+1"
 S3_DIR = os.environ["S3_DIR"]
+STS_LOG = os.environ["STS_LOG"]
 BASE = "https://127.0.0.1:8443"
 
 
@@ -28,10 +46,10 @@ def logs_zip(run_id, attempt, size=0):
     return buf.getvalue()
 
 
-def attempt(run_id, n, name="build", status="completed", conclusion="success", jobs=2):
+def attempt(run_id, n, name="build", status="completed", conclusion="success", jobs=2, event="push"):
     return {
         "id": run_id, "run_attempt": n, "name": name, "path": f".github/workflows/{name}.yml",
-        "event": "push", "head_branch": "main", "head_sha": f"sha-{run_id}", "status": status,
+        "event": event, "head_branch": "main", "head_sha": f"sha-{run_id}", "status": status,
         "conclusion": conclusion if status == "completed" else None,
         "run_started_at": f"2026-09-24T00:0{n}:00Z", "updated_at": f"2026-09-24T00:0{n}:30Z",
         "html_url": f"https://example.test/acme/widgets/actions/runs/{run_id}/attempts/{n}",
@@ -48,6 +66,7 @@ ATTEMPTS = {(a["id"], a["run_attempt"]): a for a in [
     attempt(301, 1),
     attempt(401, 1),
     attempt(501, 1, jobs=150),
+    attempt(601, 1, name="promote", event="workflow_run"),
 ]}
 EXPIRED = {105}                 # logs endpoint answers 410
 BIG = {201: 1_500_000}          # bytes of incompressible log
@@ -115,39 +134,54 @@ class GitHub(BaseHTTPRequestHandler):
         return self.send(404, b'{"message":"Not Found"}')
 
 
-def s3_error(h, status, code):
-    body = f"<Error><Code>{code}</Code></Error>".encode()
+def aws_error(h, status, code, sts=False):
+    body = (f"<ErrorResponse><Error><Code>{code}</Code></Error></ErrorResponse>" if sts
+            else f"<Error><Code>{code}</Code></Error>").encode()
     h.send_response(status)
     h.send_header("Content-Length", str(len(body)))
     h.end_headers()
     h.wfile.write(body)
 
 
-def sigv4_problem(h, payload_hash):
-    """None if the request is validly signed for S3_KEY, else a reason."""
+def canonical_query(query):
+    """The SigV4 canonical query string: each name and value decoded, then
+    RFC 3986-encoded with upper-case hex, sorted."""
+    enc = lambda x: urllib.parse.quote(urllib.parse.unquote(x), safe="-_.~")
+    pairs = sorted((enc(k), enc(v)) for k, _, v in (p.partition("=") for p in query.split("&") if p))
+    return "&".join(f"{k}={v}" for k, v in pairs)
+
+
+def sigv4_signer(h, service, payload_hash):
+    """(access key, None) if the request is validly SigV4-signed for
+    us-east-1/<service> by a key in KEYS, its session token sent and signed;
+    else (None, the error code AWS would return)."""
     auth = h.headers.get("Authorization", "")
     if not auth.startswith("AWS4-HMAC-SHA256 "):
-        return "no SigV4 Authorization header"
+        return None, "AccessDenied"
     f = dict(x.strip().split("=", 1) for x in auth[len("AWS4-HMAC-SHA256 "):].split(","))
     akid, day, region, svc, _ = f["Credential"].split("/")
-    if (akid, region, svc) != (S3_KEY[0], "us-east-1", "s3"):
-        return f"credential scope {akid}/{region}/{svc}"
+    if akid not in KEYS:
+        return None, "InvalidAccessKeyId"
+    secret, token = KEYS[akid]
     signed = f["SignedHeaders"].split(";")
-    if "x-amz-content-sha256" not in signed:
-        return "x-amz-content-sha256 not signed"
+    if token is not None and (h.headers.get("x-amz-security-token") != token
+                              or "x-amz-security-token" not in signed):
+        return None, "InvalidToken"
+    if (region, svc) != ("us-east-1", service) or (service == "s3" and "x-amz-content-sha256" not in signed):
+        return None, "SignatureDoesNotMatch"
     path, _, query = h.path.partition("?")
     canon_uri = urllib.parse.quote(urllib.parse.unquote(path), safe="/-_.~")
     canon_hdrs = "".join(f"{n}:{' '.join(h.headers[n].split())}\n" for n in signed)
-    creq = "\n".join([h.command, canon_uri, query, canon_hdrs, ";".join(signed), payload_hash])
+    creq = "\n".join([h.command, canon_uri, canonical_query(query), canon_hdrs, ";".join(signed), payload_hash])
     scope = f"{day}/{region}/{svc}/aws4_request"
     sts = "\n".join(["AWS4-HMAC-SHA256", h.headers["x-amz-date"], scope,
                      hashlib.sha256(creq.encode()).hexdigest()])
-    k = ("AWS4" + S3_KEY[1]).encode()
+    k = ("AWS4" + secret).encode()
     for part in (day, region, svc, "aws4_request"):
         k = hmac.new(k, part.encode(), hashlib.sha256).digest()
     if hmac.new(k, sts.encode(), hashlib.sha256).hexdigest() != f["Signature"]:
-        return "signature mismatch"
-    return None
+        return None, "SignatureDoesNotMatch"
+    return akid, None
 
 
 class S3(BaseHTTPRequestHandler):
@@ -162,10 +196,14 @@ class S3(BaseHTTPRequestHandler):
             self.end_headers()
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         declared = self.headers.get("x-amz-content-sha256", "")
-        if sigv4_problem(self, declared):
-            return s3_error(self, 403, "SignatureDoesNotMatch")
+        akid, problem = sigv4_signer(self, "s3", declared)
+        if problem:
+            return aws_error(self, 403, problem)
+        bucket = urllib.parse.unquote(self.path.lstrip("/")).split("/", 1)[0]
+        if akid != (ASSUMED_KEY if bucket.startswith("ingress") else "AKIATEST"):
+            return aws_error(self, 403, "AccessDenied")
         if declared != hashlib.sha256(body).hexdigest():
-            return s3_error(self, 400, "XAmzContentSHA256Mismatch")
+            return aws_error(self, 400, "XAmzContentSHA256Mismatch")
         dest = os.path.join(S3_DIR, urllib.parse.unquote(self.path.lstrip("/")))
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         with open(dest, "wb") as out:
@@ -173,6 +211,36 @@ class S3(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+
+class STS(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        akid, problem = sigv4_signer(self, "sts", hashlib.sha256(b"").hexdigest())
+        if problem:
+            return aws_error(self, 403, problem, sts=True)
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
+        if q.get("Action") != "AssumeRole" or q.get("Version") != "2011-06-15":
+            return aws_error(self, 400, "InvalidAction", sts=True)
+        session = q.get("RoleSessionName", "")
+        if not re.fullmatch(r"[\w+=,.@-]{2,64}", session):
+            return aws_error(self, 400, "ValidationError", sts=True)
+        if akid not in BASE_KEYS or q.get("RoleArn") != INGRESS_ROLE or q.get("ExternalId") != EXTERNAL_ID:
+            return aws_error(self, 403, "AccessDenied", sts=True)
+        with lock, open(STS_LOG, "a") as out:
+            out.write(session + "\n")
+        secret, token = KEYS[ASSUMED_KEY]
+        body = (f'<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleResult>'
+                f"<Credentials><AccessKeyId>{ASSUMED_KEY}</AccessKeyId><SecretAccessKey>{secret}</SecretAccessKey>"
+                f"<SessionToken>{token}</SessionToken><Expiration>2026-09-24T01:00:00Z</Expiration></Credentials>"
+                f"</AssumeRoleResult></AssumeRoleResponse>").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/xml")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
 def serve(server):
@@ -187,5 +255,6 @@ if __name__ == "__main__":
     gh.socket = ctx.wrap_socket(gh.socket, server_side=True)
     serve(gh)
     serve(ThreadingHTTPServer(("127.0.0.1", 9001), S3))
+    serve(ThreadingHTTPServer(("127.0.0.1", 9002), STS))
     print("ready", flush=True)
     threading.Event().wait()

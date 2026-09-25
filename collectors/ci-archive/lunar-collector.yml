@@ -33,11 +33,20 @@ inputs:
   s3_endpoint_url:
     description: Endpoint of an S3-compatible store (MinIO, Ceph). Requires the static AWS key secrets. Empty means AWS.
     default: ""
+  aws_assume_role_arns:
+    description: Comma-separated IAM role ARNs to sts:AssumeRole into for the upload, for a bucket in another account. Tried in order; the first STS accepts uploads. Empty means the resolved credentials upload directly.
+    default: ""
+  aws_external_id:
+    description: ExternalId sent when assuming aws_assume_role_arns, for a trust policy that requires one.
+    default: ""
   max_archive_mb:
     description: Upload nothing and fail the run if a run attempt's log archive is larger than this.
     default: "512"
   include_runs_pattern:
     description: Only archive runs of workflows whose name matches this regex. Empty means all workflows.
+    default: ""
+  include_events:
+    description: Only archive runs triggered by these events, comma-separated (for example `push`). Empty means all events.
     default: ""
 
 secrets:
