@@ -3,7 +3,7 @@ version: 0
 name: moon
 description: Populates each monorepo component's paths from the moon project graph, so a change to a shared library re-evaluates the services that depend on it
 author: earthly
-default_image: earthly/lunar-lib:moon-main
+default_image: earthly/lunar-lib:moon-v1.17.1
 
 landing_page:
   display_name: "moon Cataloger"
