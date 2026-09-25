@@ -87,7 +87,9 @@ if [ -n "$INCLUDE_EVENTS" ] && [[ ",${INCLUDE_EVENTS//[[:space:]]/,}," != *",${E
 fi
 STATUS=$(jq -r '.status' "$WORK/run.json")
 [ "$STATUS" = "completed" ] || { log "ERROR: run ${RUN_ID} attempt ${ATTEMPT} is ${STATUS}, not completed."; exit 1; }
-SHA=$(jq -r '.head_sha' "$WORK/run.json")
+# The Hub hands a workflow-end collector the commit the run's chain started
+# from, which for a run another workflow started isn't the one GitHub recorded.
+SHA="${CI_ARCHIVE_SHA:-$(jq -r '.head_sha' "$WORK/run.json")}"
 PR=""
 case "$EVENT" in
   pull_request|pull_request_target) PR=$(jq -r '.pull_requests[0].number // empty' "$WORK/run.json") ;;
@@ -133,13 +135,16 @@ LOG_BYTES=$(file_size "$WORK/logs.zip")
 
 # --- 3. Bundle and upload ---
 ARCHIVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-jq -n --arg repo "$REPO" --arg at "$ARCHIVED_AT" --argjson bytes "$LOG_BYTES" \
+jq -n --arg repo "$REPO" --arg sha "$SHA" --arg at "$ARCHIVED_AT" --argjson bytes "$LOG_BYTES" \
+  --arg triggered_by "${CI_ARCHIVE_TRIGGERED_BY_RUN_ID:-}" --arg origin "${CI_ARCHIVE_ORIGIN_SOURCE:-}" \
   --slurpfile run "$WORK/run.json" --slurpfile jobs "$WORK/jobs.json" '
   ($run[0]) as $r | {
-    repository: $repo, sha: $r.head_sha, archived_at: $at,
-    run: {id: $r.id, attempt: $r.run_attempt, name: $r.name, path: $r.path, event: $r.event,
-          head_branch: $r.head_branch, conclusion: $r.conclusion, started_at: $r.run_started_at,
-          completed_at: $r.updated_at, html_url: $r.html_url, log_bytes: $bytes},
+    repository: $repo, sha: $sha, archived_at: $at,
+    run: ({id: $r.id, attempt: $r.run_attempt, name: $r.name, path: $r.path, event: $r.event,
+          head_branch: $r.head_branch, head_sha: $r.head_sha, conclusion: $r.conclusion,
+          started_at: $r.run_started_at, completed_at: $r.updated_at, html_url: $r.html_url, log_bytes: $bytes}
+          + (if $triggered_by == "" then {} else {triggered_by_run_id: $triggered_by} end)
+          + (if $origin == "" then {} else {origin_source: $origin} end)),
     jobs: $jobs[0]
   }' > "$WORK/manifest.json"
 python3 - "$WORK/archive.zip" "$WORK/manifest.json" "$WORK/logs.zip" <<'PY'

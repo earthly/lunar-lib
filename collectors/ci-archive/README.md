@@ -21,7 +21,7 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source` |
+| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
 
 Nothing is written when `s3_bucket` or `GH_TOKEN` is unset, when the workflow
 doesn't match `include_runs_pattern`, or when the run's event isn't in
@@ -56,11 +56,16 @@ It needs a Hub that has the `workflow-end` hook. In a monorepo, set
 [`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
 on components to say which workflows are theirs.
 
-GitHub files a run under the commit it checked out. For a run started by
-`workflow_run`, `schedule` or `workflow_dispatch`, that is the branch head when
-the run started, not necessarily the commit that led to it. To archive only
-runs a commit started, set `include_events: push` (add `pull_request` for PR
-runs).
+A run another workflow started (`workflow_run`), such as a promote or smoke
+test after a deploy, is archived under the commit its chain of runs started
+from, where the Hub can follow the chain: the CI tracer reports each link, or the
+workflow's `run-name` names the run that started it
+([details](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-workflow)).
+Its receipt keeps GitHub's commit in `head_sha`, and `origin_source` says how the
+chain was followed, or `unresolved` when it couldn't be and the run is filed at
+GitHub's commit. Runs started by `schedule` or `workflow_dispatch` are filed at
+the branch head when they started. To archive only runs a commit started, set
+`include_events: push` (add `pull_request` for PR runs).
 
 ## Installation
 
