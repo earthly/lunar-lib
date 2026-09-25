@@ -26,6 +26,7 @@ Kubernetes manifests. This is specific enough to warrant its own category.
         "namespace": "payments",
         "path": "deploy/deployment.yaml",
         "replicas": 3,
+        "pod_labels": {"app": "payment-api", "tier": "api"},
         "containers": [
           {
             "name": "api",
@@ -51,6 +52,7 @@ Kubernetes manifests. This is specific enough to warrant its own category.
         "name": "payment-api-pdb",
         "namespace": "payments",
         "path": "deploy/pdb.yaml",
+        "selector": {"matchLabels": {"app": "payment-api"}},
         "target_workload": "payment-api",
         "min_available": 2
       }
@@ -83,3 +85,4 @@ Kubernetes manifests. This is specific enough to warrant its own category.
 - `.k8s.workloads[].containers[].runs_as_non_root` — Security context
 - `.k8s.hpas[].min_replicas` — HPA minimum
 - `.k8s.summary.all_have_pdb` — All workloads have PDB
+- `.k8s.pdbs[].selector` vs `.k8s.workloads[].pod_labels` — PDB coverage. Match with LabelSelector semantics; `pdbs[].target_workload` is a deprecated name guess

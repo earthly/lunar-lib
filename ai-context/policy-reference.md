@@ -934,13 +934,15 @@ def check_pdb_coverage():
         if not workloads.exists():
             return
         
-        # Get list of workloads that have PDBs (by target_workload reference)
-        pdb_targets = set()
+        # A PDB covers a workload when its selector matches the pod template
+        # labels. (matchLabels only here; policies/k8s/pdb.py also handles
+        # matchExpressions and namespaces.)
+        selectors = []
         if pdbs.exists():
             for pdb in pdbs:
-                target = pdb.get_value_or_default(".target_workload", "")
-                if target:
-                    pdb_targets.add(target)
+                match_labels = pdb.get_value_or_default(".selector.matchLabels", None)
+                if match_labels:
+                    selectors.append(match_labels)
         
         # Check each Deployment has a matching PDB
         for workload in workloads:
@@ -950,8 +952,9 @@ def check_pdb_coverage():
             
             name = workload.get_value_or_default(".name", "<unknown>")
             path = workload.get_value_or_default(".path", "")
+            labels = workload.get_value_or_default(".pod_labels", {})
             
-            has_pdb = name in pdb_targets
+            has_pdb = any(sel.items() <= labels.items() for sel in selectors)
             c.assert_true(has_pdb, f"Deployment {name} ({path}) has no matching PDB")
 ```
 

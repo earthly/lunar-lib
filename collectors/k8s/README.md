@@ -14,8 +14,8 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.k8s.source` | object | Tool metadata (tool name and version) |
 | `.k8s.manifests[]` | array | Parsed K8s manifests with validity and resources |
-| `.k8s.workloads[]` | array | Workload resources with container specs |
-| `.k8s.pdbs[]` | array | PodDisruptionBudgets |
+| `.k8s.workloads[]` | array | Workload resources with container specs and `pod_labels` (the pod template labels) |
+| `.k8s.pdbs[]` | array | PodDisruptionBudgets with their full label `selector` (`target_workload` is deprecated) |
 | `.k8s.hpas[]` | array | HorizontalPodAutoscalers |
 | `.k8s.cicd` | object | kubectl CI command tracking (commands + client version) |
 
