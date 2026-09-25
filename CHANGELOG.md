@@ -9,6 +9,23 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.17.1] — 2026-09-25
+
+### Added
+
+- backstage collector: add opt-in lookup of a monorepo's shared catalog-info.yaml for subdirectory components (#337)
+- gitlab cataloger: add the request ID, response headers and body to GitLab API error logs (#340)
+- backstage: add aws_assume_role_arns for cross-account SigV4 auth (#336)
+
+### Changed
+
+- backstage: opt-in skip when no catalog-info.yaml is found (#335)
+
+### Fixed
+
+- k8s: fix pdb check to match PodDisruptionBudgets by label selector, not name (#339)
+- backstage: fix SigV4 signing of by-query lookups on curl older than 8.14 (#338)
+
 ## [1.17.0] — 2026-09-23
 
 ### Added
@@ -952,6 +969,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
