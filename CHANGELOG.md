@@ -14,12 +14,12 @@ the next version ships.
 ### Added
 
 - backstage collector: add opt-in lookup of a monorepo's shared catalog-info.yaml for subdirectory components (#337)
-- gitlab cataloger: add the request ID, response headers and body to GitLab API error logs (#340)
 - backstage: add aws_assume_role_arns for cross-account SigV4 auth (#336)
+- backstage: opt-in skip when no catalog-info.yaml is found (#335)
 
 ### Changed
 
-- backstage: opt-in skip when no catalog-info.yaml is found (#335)
+- gitlab cataloger: add the request ID, response headers and body to GitLab API error logs (#340)
 
 ### Fixed
 
