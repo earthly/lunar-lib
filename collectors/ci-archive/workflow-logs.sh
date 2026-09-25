@@ -206,7 +206,7 @@ resolve_aws_credentials() {
       auth_val="${AWS_CONTAINER_AUTHORIZATION_TOKEN}"
     fi
     [ -n "$auth_val" ] && hdr=(-H "Authorization: $auth_val")
-    resp="$(curl -sS --connect-timeout 3 "${hdr[@]}" "$ecs_url" 2>/dev/null)" || true
+    resp="$(curl -sS --connect-timeout 3 --max-time 5 "${hdr[@]}" "$ecs_url" 2>/dev/null)" || true
     AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
     AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
     AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
@@ -219,12 +219,12 @@ resolve_aws_credentials() {
 
   local imds_token role
   imds_token="$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
-    -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 2>/dev/null)" || true
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 --max-time 5 2>/dev/null)" || true
   if [ -n "$imds_token" ]; then
-    role="$(curl -sSf --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+    role="$(curl -sSf --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token: $imds_token" \
       "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>/dev/null)" || true
     if [ -n "$role" ]; then
-      resp="$(curl -sSf --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+      resp="$(curl -sSf --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token: $imds_token" \
         "http://169.254.169.254/latest/meta-data/iam/security-credentials/${role}" 2>/dev/null)" || true
       AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
       AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
