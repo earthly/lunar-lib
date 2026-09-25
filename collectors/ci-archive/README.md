@@ -125,6 +125,9 @@ repository stores no keys. Things to know:
 
 - The workflow file must be on the default branch, and `workflows:` names the
   workflows to archive.
+- GitHub stops `workflow_run` chains after three levels, and the archiver is
+  one of them. A workflow that already sits three `workflow_run` hops from a
+  push or PR can't be archived this way.
 - The job needs `actions: read`, plus `id-token: write` for OIDC. The role needs
   `s3:PutObject` on the prefix.
 - Recording needs the `lunar` CLI on the runner, which `earthly/lunar-ci-tracer`
