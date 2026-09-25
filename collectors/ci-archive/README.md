@@ -4,15 +4,16 @@ Archives completed CI workflow runs and their logs to S3.
 
 ## Overview
 
-Once every CI workflow run for a commit has finished, this collector lists those
-runs, downloads each one's log archive, bundles them into a single zip, and
-uploads it to S3. A receipt under `.ci.archive` records the object URI and an
-inventory of what was captured, so consumers can locate the archive without
-reconstructing the key. Useful when CI logs need to outlive the provider's
-retention window — audit trails, incident forensics, or compliance evidence.
+Each time a CI workflow run finishes, re-runs included, this collector downloads
+that run attempt's logs, bundles them with the run and its jobs, and uploads the
+zip to S3. It appends a receipt to `.ci.archive.runs` saying where the archive
+went, so consumers can find it without reconstructing the key. Useful when CI
+logs need to outlive the provider's retention window: audit trails, incident
+forensics, or compliance evidence.
 
 It can also run in your own CI as a GitHub Action, so uploads use your runners'
-credentials; see [From your own CI](#from-your-own-ci).
+credentials; see [From your own CI](#from-your-own-ci). Both write the same
+receipts and objects.
 
 ## Collected Data
 
@@ -20,64 +21,38 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.archive.source` | object | Tool, integration, `collected_at`, `collected_sha` |
-| `.ci.archive.uri` | string | Full `s3://` URI of the uploaded archive |
-| `.ci.archive.bucket` | string | Destination bucket |
-| `.ci.archive.key` | string | Object key within the bucket |
-| `.ci.archive.size_bytes` | number | Size of the uploaded zip |
-| `.ci.archive.run_count` | number | Number of workflow runs included |
-| `.ci.archive.runs[]` | array | Archived runs: id, name, workflow `path`, `event`, attempt, status, conclusion, timestamps, `html_url`, `log_bytes` |
-| `.ci.archive.errors[]` | array | Runs that could not be archived, with a reason |
+| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source` |
 
-Nothing is written when the commit has no completed workflow runs, or when
-`s3_bucket` or `GH_TOKEN` is unset — the collector exits 0 with a message on
-stderr. If runs exist but nothing is uploaded (every log download failed, or the
-archive hit `max_archive_mb`), only `errors` and `source` are written, so
-`.ci.archive.uri` is present exactly when an archive exists.
+Nothing is written when `s3_bucket` or `GH_TOKEN` is unset, or when the workflow
+doesn't match `include_runs_pattern`: the collector exits 0 with a message on
+stderr. A run that can't be archived (logs gone, over `max_archive_mb`, S3
+rejected the upload) fails the collector run and writes nothing.
 
 ### Archive layout
 
-One object per (component, commit), keyed
-`<s3_prefix>/<component-id>/<sha>/<UTC timestamp>.zip`. Inside:
+One object per run attempt, keyed
+`<s3_prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip`. Inside:
 
 ```text
-manifest.json          # run inventory, same shape as .ci.archive.runs[]
-runs/<run-id>/logs.zip # the provider's log archive, verbatim
+manifest.json   # the run and its jobs, with steps
+logs.zip        # GitHub's log archive for the attempt, verbatim
 ```
-
-Logs are stored as the provider returns them rather than being re-packed, so the
-per-job file structure is whatever GitHub produced.
 
 ## Collectors
 
 | Collector | Description |
 |--------|-------------|
-| `workflow-logs` | Lists the commit's workflow runs, downloads their logs, uploads one zip to S3 |
+| `workflow-logs` | Archives each finished run attempt to S3 and records it |
 
 ### When it runs
 
-It fires at the **doneness gate** — the point at which every workflow run
-relevant to a (component, commit) has completed. That is deliberately not a
-per-job hook: a job-scoped hook runs while the workflow is still in flight, when
-the run's logs are neither complete nor downloadable.
+On the Hub's `workflow-end` hook: once per finished run attempt, for each
+component the run's commit belongs to, after the attempt's logs exist. A re-run
+is a new attempt and is archived again. Component checks don't wait for it.
 
-The manifest declares `after-json` and `missing-json` on the same path. A
-collector fires if *any* of its hooks match, and these two are complements, so
-the pair fires exactly once per cycle regardless of whether `.ci` is populated.
-The path is not a real precondition — it is how a path-less "workflow end"
-trigger is expressed today.
-
-Consequences worth knowing:
-
-- **One archive per commit, not per run.** The collector fires once after *all*
-  runs for the commit finish and archives them together.
-- **Re-runs after the archive are not captured.** The hub fires this collector
-  once per (component, commit, pull request), permanently, so re-running a
-  workflow on the same commit never triggers another archive. Each run is
-  archived at the attempt that was latest when the last run finished.
-- **It fires on every in-scope component, CI or not.** On a component with no
-  workflow runs it finds nothing and exits, but still takes a large runner slot.
-  Scope `on:` to components that run GitHub Actions.
+It needs a Hub that has the `workflow-end` hook. In a monorepo, set
+[`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
+on components to say which workflows are theirs.
 
 ## Installation
 
@@ -108,16 +83,8 @@ used. The identity needs `s3:PutObject` on the key prefix.
 When the bucket must only be reachable from your runners, run the archive as a
 GitHub Action instead. A workflow on `workflow_run: completed` fires once per
 finished run attempt, re-runs included, after every log exists. The action
-downloads that attempt's logs, uploads them with the job's AWS credentials, and
-records the upload on the commit the run built:
-
-| Path | Type | Description |
-|------|------|-------------|
-| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, `path`, `event`, `conclusion`, timestamps, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source` |
-
-Each attempt lands at `<s3-prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip`,
-holding `manifest.json` (the run and its jobs, with steps) and `logs.zip`
-(GitHub's log archive, verbatim).
+archives that attempt with the job's AWS credentials and records the same
+`.ci.archive.runs[]` receipt on the commit the run built.
 
 [examples/archive-ci-runs.yml](examples/archive-ci-runs.yml) is a complete
 workflow. It uses OIDC both for your AWS role and for the Lunar Hub, so the
@@ -142,10 +109,5 @@ Inputs are documented in [action.yml](action.yml).
 
 - **GitHub only for now.** Run and log retrieval uses the GitHub Actions API;
   other providers need their own log-download path.
-- **Log retention.** GitHub deletes run logs after the repository's retention
-  period (90 days by default). A run whose logs have already expired is recorded
-  in `.ci.archive.errors[]` rather than failing the collection.
 - **Size.** Log archives for a busy repository can be large; `max_archive_mb`
-  bounds what gets uploaded.
-- **Monorepos.** Runs are resolved per commit, not per component, so each
-  component in a monorepo archives every run at the commit under its own key.
+  bounds what gets uploaded per attempt.

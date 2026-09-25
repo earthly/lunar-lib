@@ -1,9 +1,9 @@
 """Local stand-ins for the GitHub Actions API and S3, for run.sh.
 
-GitHub (HTTPS, 127.0.0.1:8443, the GHES /api/v3 layout): lists runs by
-head_sha and 302s each run's logs to a signed-URL blob, like the real API.
-Scenarios are keyed by the sha. Blob requests carrying an Authorization header
-are rejected, so a leaked token fails the test.
+GitHub (HTTPS, 127.0.0.1:8443, the GHES /api/v3 layout): serves one run
+attempt, its jobs, and a 302 from its logs endpoint to a signed-URL blob, like
+the real API. Scenarios are keyed by run ID. Blob requests carrying an
+Authorization header are rejected, so a leaked token fails the test.
 
 S3 (HTTP, 127.0.0.1:9001, path-style): PUT stores an object only if the
 request is SigV4-signed with AKIATEST/secret-test for us-east-1/s3 and the
@@ -19,39 +19,40 @@ S3_DIR = os.environ["S3_DIR"]
 BASE = "https://127.0.0.1:8443"
 
 
-def logs_zip(run_id, size=0):
+def logs_zip(run_id, attempt, size=0):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr("1_build.txt", f"2026-09-24T00:00:00Z run {run_id} log line\n")
+        zf.writestr("1_build.txt", f"2026-09-24T00:00:00Z run {run_id} attempt {attempt} log line\n")
         if size:
             zf.writestr("big.bin", os.urandom(size), compress_type=zipfile.ZIP_STORED)
     return buf.getvalue()
 
 
-def run(run_id, name, status="completed", conclusion="success"):
+def attempt(run_id, n, name="build", status="completed", conclusion="success", jobs=2):
     return {
-        "id": run_id, "name": name, "path": f".github/workflows/{name}.yml",
-        "event": "push", "status": status,
+        "id": run_id, "run_attempt": n, "name": name, "path": f".github/workflows/{name}.yml",
+        "event": "push", "head_branch": "main", "head_sha": f"sha-{run_id}", "status": status,
         "conclusion": conclusion if status == "completed" else None,
-        "run_attempt": 1, "run_started_at": "2026-09-24T00:00:00Z",
-        "updated_at": "2026-09-24T00:05:00Z",
-        "html_url": f"https://example.test/acme/widgets/actions/runs/{run_id}",
+        "run_started_at": f"2026-09-24T00:0{n}:00Z", "updated_at": f"2026-09-24T00:0{n}:30Z",
+        "html_url": f"https://example.test/acme/widgets/actions/runs/{run_id}/attempts/{n}",
+        "pull_requests": [], "_jobs": jobs,
     }
 
 
-# sha -> list of runs. Log behaviour is keyed by run id below.
-SCENARIOS = {
-    "sha-multi": [run(101, "build"), run(102, "test", conclusion="failure"),
-                  run(103, "lint"), run(104, "deploy", status="in_progress"),
-                  run(105, "nightly")],
-    "sha-none": [],
-    "sha-big": [run(201, "build"), run(202, "test")],
-    "sha-flaky": [run(301, "build")],
-    "sha-paged": [run(1000 + i, f"job-{i}") for i in range(105)],
-}
+# (run id, attempt) -> the attempt. Log behaviour is keyed by run id below.
+ATTEMPTS = {(a["id"], a["run_attempt"]): a for a in [
+    attempt(101, 1, conclusion="failure"), attempt(101, 2),
+    attempt(104, 1, status="in_progress"),
+    attempt(105, 1, name="nightly"),
+    attempt(201, 1),
+    attempt(301, 1),
+    attempt(401, 1),
+    attempt(501, 1, jobs=150),
+]}
 EXPIRED = {105}                 # logs endpoint answers 410
-BIG = {201: 700_000, 202: 700_000}
-flaky_left = {"sha-flaky": 1}   # listing 502s this many times first
+BIG = {201: 1_500_000}          # bytes of incompressible log
+flaky_left = {301: 1}           # the attempt endpoint 502s this many times first
+lagging_left = {401: 1}         # the logs endpoint 404s this many times first
 lock = threading.Lock()
 
 
@@ -74,28 +75,44 @@ class GitHub(BaseHTTPRequestHandler):
         if parts[0] == "blob":
             if "Authorization" in self.headers:
                 return self.send(400, b'{"message":"token sent to blob host"}')
-            run_id = int(parts[1].split(".")[0])
-            return self.send(200, logs_zip(run_id, BIG.get(run_id, 0)), "application/zip")
+            run_id, n = (int(x) for x in parts[1].split(".")[0].split("-"))
+            return self.send(200, logs_zip(run_id, n, BIG.get(run_id, 0)), "application/zip")
         if self.headers.get("Authorization") != f"Bearer {TOKEN}":
             return self.send(401, b'{"message":"Bad credentials"}')
-        # /api/v3/repos/acme/widgets/actions/runs[/<id>/logs]
-        if parts[:6] != ["api", "v3", "repos", "acme", "widgets", "actions"] or parts[6] != "runs":
+        # /api/v3/repos/acme/widgets/actions/runs/<id>/attempts/<n>[/jobs|/logs]
+        if parts[:7] != ["api", "v3", "repos", "acme", "widgets", "actions", "runs"] or len(parts) < 10 \
+                or parts[8] != "attempts":
             return self.send(404, b'{"message":"Not Found"}')
-        if len(parts) == 7:
-            q = urllib.parse.parse_qs(url.query)
-            sha = q.get("head_sha", [""])[0]
+        run_id, n = int(parts[7]), int(parts[9])
+        found = ATTEMPTS.get((run_id, n))
+        if not found:
+            return self.send(404, b'{"message":"Not Found"}')
+        rest = parts[10:]
+        if not rest:
             with lock:
-                if flaky_left.get(sha, 0) > 0:
-                    flaky_left[sha] -= 1
+                if flaky_left.get(run_id, 0) > 0:
+                    flaky_left[run_id] -= 1
                     return self.send(502, b'{"message":"bad gateway"}')
-            runs = SCENARIOS.get(sha, [])
-            per, page = int(q.get("per_page", ["30"])[0]), int(q.get("page", ["1"])[0])
-            body = {"total_count": len(runs), "workflow_runs": runs[(page - 1) * per: page * per]}
+            body = {k: v for k, v in found.items() if not k.startswith("_")}
             return self.send(200, json.dumps(body).encode())
-        run_id = int(parts[7])
-        if run_id in EXPIRED:
-            return self.send(410, b'{"message":"Gone"}')
-        return self.send(302, headers={"Location": f"{BASE}/blob/{run_id}.zip?sig=abc"})
+        if rest == ["jobs"]:
+            q = urllib.parse.parse_qs(url.query)
+            per, page = int(q.get("per_page", ["30"])[0]), int(q.get("page", ["1"])[0])
+            jobs = [{"id": run_id * 1000 + i, "name": f"job-{i}", "conclusion": found["conclusion"],
+                     "started_at": found["run_started_at"], "completed_at": found["updated_at"],
+                     "html_url": f"https://example.test/job/{i}",
+                     "steps": [{"number": 1, "name": "Run", "conclusion": found["conclusion"]}]}
+                    for i in range(found["_jobs"])]
+            return self.send(200, json.dumps({"total_count": len(jobs), "jobs": jobs[(page - 1) * per: page * per]}).encode())
+        if rest == ["logs"]:
+            if run_id in EXPIRED:
+                return self.send(410, b'{"message":"Gone"}')
+            with lock:
+                if lagging_left.get(run_id, 0) > 0:
+                    lagging_left[run_id] -= 1
+                    return self.send(404, b'{"message":"Not Found"}')
+            return self.send(302, headers={"Location": f"{BASE}/blob/{run_id}-{n}.zip?sig=abc"})
+        return self.send(404, b'{"message":"Not Found"}')
 
 
 def s3_error(h, status, code):

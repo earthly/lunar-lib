@@ -9,10 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "CI Archive Collector"
   long_description: |
-    Archives every CI workflow run for a commit — run metadata plus the full
-    logs — into a single zip in S3, once all runs for that commit have
-    finished. Gives you a durable record of CI output after the provider's
-    own retention window closes.
+    Archives each finished CI workflow run, re-runs included — run metadata,
+    jobs and the full logs — to S3, and records where each one went. Gives you
+    a durable record of CI output after the provider's own retention window
+    closes.
   category: "ci-cd"
   icon: "assets/ci-archive.svg"
   status: "experimental"
@@ -25,7 +25,7 @@ inputs:
   s3_bucket:
     description: Destination S3 bucket. The collector skips (exit 0) when unset.
   s3_prefix:
-    description: Key prefix in the bucket. Objects land at <prefix>/<component>/<sha>/<timestamp>.zip; empty means the bucket root.
+    description: Key prefix in the bucket. Objects land at <prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip; empty means the bucket root.
     default: "lunar/ci-archive"
   aws_region:
     description: Region of the bucket. Falls back to AWS_REGION, then to the region S3 reports for the bucket.
@@ -34,10 +34,10 @@ inputs:
     description: Endpoint of an S3-compatible store (MinIO, Ceph). Requires the static AWS key secrets. Empty means AWS.
     default: ""
   max_archive_mb:
-    description: Upload nothing and record an error if the archive would exceed this size.
+    description: Upload nothing and fail the run if a run attempt's log archive is larger than this.
     default: "512"
   include_runs_pattern:
-    description: Only archive workflow runs whose name matches this regex. Empty means all runs.
+    description: Only archive runs of workflows whose name matches this regex. Empty means all workflows.
     default: ""
 
 secrets:
@@ -53,69 +53,75 @@ secrets:
 collectors:
   - name: workflow-logs
     description: |
-      Fires once every CI workflow run for the commit has completed — the
-      doneness gate — then lists those runs, downloads each run's log archive,
-      bundles them with a manifest into one zip, and uploads it to S3. Records
-      the object URI and the run inventory under .ci.archive so a consumer can
-      find the archive without guessing the key. Both hooks are declared on the
-      same path so the collector fires whether or not .ci is populated —
-      doneness is the trigger, the path is not a precondition.
+      Fires once per finished CI workflow run attempt, re-runs included, on the
+      Hub's workflow-end hook. Downloads that attempt's log archive, bundles it
+      with the run and its jobs, uploads it to S3, and appends where it went to
+      .ci.archive.runs.
     mainBash: workflow-logs.sh
     # Log archives for a busy repo can be hundreds of MB before compression.
     size: large
-    hooks:
-      - type: after-json
-        path: .ci
-      - type: missing-json
-        path: .ci
-    keywords: ["ci archive", "workflow logs", "s3", "after-json", "workflow-end", "retention", "audit trail"]
+    hook:
+      type: workflow-end
+    keywords: ["ci archive", "workflow logs", "s3", "workflow-end", "retention", "audit trail"]
 
 example_component_json: |
   {
     "ci": {
       "archive": {
-        "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/20260923T142203Z.zip",
-        "bucket": "acme-ci-archive",
-        "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/20260923T142203Z.zip",
-        "size_bytes": 4823104,
-        "run_count": 2,
         "runs": [
           {
+            "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/24322039765-1.zip",
+            "bucket": "acme-ci-archive",
+            "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/24322039765-1.zip",
+            "size_bytes": 3921380,
             "id": 24322039765,
+            "attempt": 1,
             "name": "ci",
             "path": ".github/workflows/ci.yml",
             "event": "push",
-            "attempt": 1,
-            "status": "completed",
-            "conclusion": "success",
+            "head_branch": "main",
+            "conclusion": "failure",
             "started_at": "2026-09-23T14:02:11Z",
             "completed_at": "2026-09-23T14:19:47Z",
             "html_url": "https://github.com/acme/myproject/actions/runs/24322039765",
-            "log_bytes": 3914200
+            "log_bytes": 3914200,
+            "jobs": [
+              {"name": "build", "conclusion": "success"},
+              {"name": "test", "conclusion": "failure"}
+            ],
+            "source": {
+              "tool": "ci-archive",
+              "integration": "workflow-end",
+              "collected_at": "2026-09-23T14:20:03Z"
+            }
           },
           {
-            "id": 24322039912,
-            "name": "codeql",
-            "path": ".github/workflows/codeql.yml",
+            "uri": "s3://acme-ci-archive/lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/24322039765-2.zip",
+            "bucket": "acme-ci-archive",
+            "key": "lunar/ci-archive/github.com/acme/myproject/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b/24322039765-2.zip",
+            "size_bytes": 3808211,
+            "id": 24322039765,
+            "attempt": 2,
+            "name": "ci",
+            "path": ".github/workflows/ci.yml",
             "event": "push",
-            "attempt": 1,
-            "status": "completed",
-            "conclusion": "failure",
-            "started_at": "2026-09-23T14:02:12Z",
-            "completed_at": "2026-09-23T14:21:58Z",
-            "html_url": "https://github.com/acme/myproject/actions/runs/24322039912",
-            "log_bytes": 908904
+            "head_branch": "main",
+            "conclusion": "success",
+            "started_at": "2026-09-23T14:25:40Z",
+            "completed_at": "2026-09-23T14:41:02Z",
+            "html_url": "https://github.com/acme/myproject/actions/runs/24322039765",
+            "log_bytes": 3801009,
+            "jobs": [
+              {"name": "build", "conclusion": "success"},
+              {"name": "test", "conclusion": "success"}
+            ],
+            "source": {
+              "tool": "ci-archive",
+              "integration": "workflow-end",
+              "collected_at": "2026-09-23T14:41:15Z"
+            }
           }
-        ],
-        "errors": [
-          {"run_id": 24322040001, "name": "nightly", "reason": "logs expired or deleted (410)"}
-        ],
-        "source": {
-          "tool": "ci-archive",
-          "integration": "after-json",
-          "collected_at": "2026-09-23T14:22:03Z",
-          "collected_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-        }
+        ]
       }
     }
   }

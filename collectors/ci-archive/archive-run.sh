@@ -2,13 +2,13 @@
 set -eo pipefail
 
 # Archive one finished GitHub Actions run attempt (metadata plus the full log
-# archive) to S3 from the customer's own CI, then record where it went under
-# .ci.archive.runs[] on the commit that run built.
+# archive) to S3, then record where it went under .ci.archive.runs[] on the
+# commit that run built.
 #
-# Runs in a workflow triggered by `workflow_run: completed`, which fires once
-# per finished run attempt, re-runs included, after every log exists. AWS
-# credentials come from the job (aws-actions/configure-aws-credentials with
-# OIDC), so the bucket never has to trust Lunar.
+# Two callers, one per finished run attempt, re-runs included:
+#   - the GitHub Action, in a workflow on `workflow_run: completed`, with AWS
+#     credentials from the job (OIDC), so the bucket never has to trust Lunar;
+#   - workflow-logs.sh, the collector the Hub runs on its workflow-end hook.
 
 log() { echo "ci-archive: $*" >&2; }
 
@@ -18,6 +18,7 @@ S3_ENDPOINT_URL="${CI_ARCHIVE_S3_ENDPOINT_URL:-}"
 REGION="${CI_ARCHIVE_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
 MAX_ARCHIVE_MB="${CI_ARCHIVE_MAX_ARCHIVE_MB:-512}"
 RECORD="${CI_ARCHIVE_RECORD_IN_LUNAR:-true}"
+INTEGRATION="${CI_ARCHIVE_INTEGRATION:-github-action}"
 EVENT_PATH="${GITHUB_EVENT_PATH:-}"
 RUN_ID="${CI_ARCHIVE_RUN_ID:-}"
 ATTEMPT="${CI_ARCHIVE_RUN_ATTEMPT:-}"
@@ -187,13 +188,22 @@ if [ "$RECORD" != "true" ]; then
   exit 0
 fi
 command -v lunar >/dev/null 2>&1 || { log "ERROR: the lunar CLI is not on PATH; set record-in-lunar: false to skip."; exit 1; }
+BY=""
+[ -n "${GITHUB_RUN_ID:-}" ] && BY="${SERVER_URL}/${GITHUB_REPOSITORY:-$REPO}/actions/runs/${GITHUB_RUN_ID}"
 jq -n --arg uri "$URI" --arg bucket "$S3_BUCKET" --arg key "$KEY" --argjson size "$SIZE" \
-  --arg at "$ARCHIVED_AT" --arg by "${SERVER_URL}/${GITHUB_REPOSITORY:-$REPO}/actions/runs/${GITHUB_RUN_ID:-}" \
+  --arg at "$ARCHIVED_AT" --arg integration "$INTEGRATION" --arg by "$BY" \
   --slurpfile m "$WORK/manifest.json" '
   $m[0].run + {uri: $uri, bucket: $bucket, key: $key, size_bytes: $size,
     jobs: [$m[0].jobs[] | {name, conclusion}],
-    source: {tool: "ci-archive", integration: "github-action", collected_at: $at, archived_by: $by}}' \
+    source: ({tool: "ci-archive", integration: $integration, collected_at: $at}
+             + (if $by == "" then {} else {archived_by: $by} end))}' \
   > "$WORK/receipt.json"
+# Inside a Lunar collector the write lands on the component and commit the
+# collector runs for, which are the ones this run built.
+if [ -n "${LUNAR_COLLECT_STDOUT:-}" ]; then
+  lunar collect --json --array-append ".ci.archive.runs" - < "$WORK/receipt.json"
+  exit 0
+fi
 for component in $COMPONENTS; do
   pr_args=()
   [ -n "$PR" ] && pr_args=(--pr "$PR")
