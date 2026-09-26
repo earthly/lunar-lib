@@ -98,7 +98,7 @@ expect "leaves attempt 1's object alone" test -s "$OBJ"
 # --- A run another workflow started: filed under the commit its chain began at ---
 # GitHub recorded run 101 at sha-101 (main's head when it started); the Hub fired
 # the collector for origin-sha, where the chain started.
-run_case knock-on 101 1 LUNAR_COMPONENT_GIT_SHA=origin-sha LUNAR_CI_PIPELINE_HEAD_SHA=sha-101 \
+run_case chained 101 1 LUNAR_COMPONENT_GIT_SHA=origin-sha LUNAR_CI_PIPELINE_HEAD_SHA=sha-101 \
   LUNAR_CI_PIPELINE_TRIGGERED_BY_RUN_ID=90 LUNAR_CI_PIPELINE_ORIGIN_SOURCE=tracer
 expect_exit 0
 expect "keys the object by the chain's commit" receipt '.ci.archive.runs[0].uri == "s3://archive/lunar/ci-archive/127.0.0.1_8443/acme/widgets/origin-sha/101-1.zip"'
@@ -108,7 +108,7 @@ import json, sys, zipfile
 m = json.loads(zipfile.ZipFile(sys.argv[1]).read("manifest.json"))
 assert m["sha"] == "origin-sha" and m["run"]["head_sha"] == "sha-101"
 ' "$(object_path)"
-run_case not-knock-on 101 1
+run_case not-chained 101 1
 expect "a run nothing started carries no chain" receipt '.ci.archive.runs[0] | .head_sha == "sha-101" and (has("triggered_by_run_id") or has("origin_source") | not)'
 
 # --- Not configured, or not a workflow-end run: exit 0, write nothing ---
