@@ -23,11 +23,6 @@ This collector writes to the following Component JSON paths:
 |------|------|-------------|
 | `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `log_lines`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
 
-Leave `s3_bucket` unset to record runs without archiving them: each entry has
-the run, its jobs and its log's size and line count, but no `uri`, `bucket`,
-`key` or `size_bytes`, and no AWS credentials are needed. It's a quick way to
-check which runs fire and on which commits before wiring up a bucket.
-
 Nothing is written when `GH_TOKEN` is unset, when the workflow doesn't match
 `include_runs_pattern`, or when the run's event isn't in `include_events`: the
 collector exits 0 with a message on stderr. A run that can't be archived (logs
@@ -61,16 +56,34 @@ It needs a Hub that has the `after-ci-pipeline` hook. In a monorepo, set
 [`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
 on components to say which workflows are theirs.
 
-A run another workflow started (`workflow_run`), such as a promote or smoke
-test after a deploy, is archived under the commit its chain of runs started
-from, where the Hub can follow the chain: the CI tracer reports each link, or the
-workflow's `run-name` names the run that started it
-([details](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-pipeline)).
-Its receipt keeps GitHub's commit in `head_sha`, and `origin_source` says how the
-chain was followed, or `unresolved` when it couldn't be and the run is filed at
-GitHub's commit. Runs started by `schedule` or `workflow_dispatch` are filed at
-the branch head when they started. To archive only runs a commit started, set
+Runs started by `schedule` or `workflow_dispatch` are filed at the branch head
+when they started. To archive only runs a commit started, set
 `include_events: push` (add `pull_request` for PR runs).
+
+### Runs started by another workflow
+
+GitHub runs a workflow triggered `on: workflow_run`, such as a promote or smoke
+test after a deploy, at the default branch's latest commit rather than the commit
+its chain started from. On a busy main, those runs would be archived under a
+later commit than the one they deployed.
+
+So the Hub follows the chain back to its first run and archives each run under
+that run's commit. It learns each link from the CI Tracer, which reads the run
+that triggered a job's run from the job's event payload and reports it when the
+job starts. Where no tracer runs, the workflow can name that run in its title,
+and the Hub reads the link from there:
+
+```yaml
+run-name: "${{ github.workflow }} (from run ${{ github.event.workflow_run.id }})"
+```
+
+The receipt keeps GitHub's commit in `head_sha`, adds `triggered_by_run_id`, and
+records how the link was found in `origin_source`: `tracer`, `run-name`, or
+`unresolved` when nothing linked the run and it was archived at GitHub's commit.
+
+This works with GitHub Actions only, for now. It needs a Hub with chained-run
+following turned on (`HUB_CHAINED_RUNS_ENABLED=true`, off by default); see
+[runs started by another pipeline](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-pipeline).
 
 ## Installation
 
@@ -102,6 +115,40 @@ sending `aws_external_id` if set, and uploads as the role. Its trust policy must
 allow the snippet pod's role, and the pod's role needs `sts:AssumeRole` on it.
 STS sessions are named `lunar-ci-archive-<run-id>-<attempt>`, so the bucket
 account's CloudTrail shows which run each upload came from.
+
+### Try it without S3
+
+Leave out `s3_bucket` to check which runs fire, and on which commits, before
+wiring up a bucket. Each run is still recorded, with its log's size and line
+count, but nothing is uploaded and no AWS credentials are needed. `GH_TOKEN` is
+still required, to read the run and its logs.
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
+    on: ["domain:your-domain"]
+```
+
+Once a workflow run finishes, its entry shows up under `.ci.archive.runs` in the
+Component JSON of the commit it ran on, for example with
+`lunar component get-json <component> --git-sha <sha>`. Abridged:
+
+```json
+{
+  "id": 24322039765,
+  "attempt": 1,
+  "name": "ci",
+  "event": "push",
+  "head_sha": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+  "conclusion": "success",
+  "log_bytes": 3914200,
+  "log_lines": 48213,
+  "jobs": [{"name": "build", "conclusion": "success"}],
+  "source": {"tool": "ci-archive", "integration": "after-ci-pipeline", "collected_at": "2026-09-23T14:20:03Z"}
+}
+```
+
+With a bucket set, the entry also has `uri`, `bucket`, `key` and `size_bytes`.
 
 ### From your own CI
 
