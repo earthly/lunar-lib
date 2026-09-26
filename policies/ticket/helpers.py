@@ -8,8 +8,8 @@ from lunar_policy.nodepath import NodePath
 DEFAULT_TICKET_PATH = ".vcs.pr.ticket"
 
 # Jira returns a select-list option as {"value": ...}, a status, priority or
-# component as {"name": ...} and a user as {"displayName": ...}. Users also
-# carry `name` as an empty string, so the first non-empty key wins.
+# component as {"name": ...} and a user as {"displayName": ...}. A user can
+# also carry the deprecated `name` as "", so the first non-empty key wins.
 DISPLAY_KEYS = ("value", "name", "displayName")
 
 
