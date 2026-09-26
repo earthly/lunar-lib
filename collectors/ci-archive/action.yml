@@ -1,0 +1,64 @@
+name: Lunar CI Archive
+description: >-
+  Archive a finished GitHub Actions run attempt (metadata and full logs) to
+  your S3 bucket from your own runner, and record it in the commit's Lunar
+  Component JSON under .ci.archive.runs.
+inputs:
+  s3-bucket:
+    description: Destination S3 bucket.
+    required: true
+  s3-prefix:
+    description: Key prefix. Objects land at <prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip.
+    default: lunar/ci-archive
+  aws-region:
+    description: Bucket region. Defaults to AWS_REGION, which aws-actions/configure-aws-credentials sets.
+    default: ""
+  s3-endpoint-url:
+    description: Endpoint of an S3-compatible store (MinIO, Ceph). Empty means AWS.
+    default: ""
+  run-id:
+    description: Run to archive. Defaults to the run that triggered this workflow_run event.
+    default: ""
+  run-attempt:
+    description: Attempt to archive. Defaults to the triggering attempt.
+    default: ""
+  components:
+    description: Lunar components to record the archive on, space-separated. Defaults to <host>/<owner>/<repo>.
+    default: ""
+  record-in-lunar:
+    description: Record the receipt with `lunar collect`. Needs the lunar CLI on PATH and Hub access.
+    default: "true"
+  max-archive-mb:
+    description: Fail instead of uploading when the run's log archive is larger than this.
+    default: "512"
+  include-events:
+    description: Only archive runs triggered by these events, comma-separated (for example push). Empty means all events.
+    default: ""
+  github-token:
+    description: Token with actions:read on the repository.
+    default: ${{ github.token }}
+outputs:
+  uri:
+    description: s3:// URI of the uploaded archive.
+    value: ${{ steps.archive.outputs.uri }}
+  sha:
+    description: Commit the archived run built.
+    value: ${{ steps.archive.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - id: archive
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/archive-run.sh"
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CI_ARCHIVE_S3_BUCKET: ${{ inputs.s3-bucket }}
+        CI_ARCHIVE_S3_PREFIX: ${{ inputs.s3-prefix }}
+        CI_ARCHIVE_AWS_REGION: ${{ inputs.aws-region }}
+        CI_ARCHIVE_S3_ENDPOINT_URL: ${{ inputs.s3-endpoint-url }}
+        CI_ARCHIVE_RUN_ID: ${{ inputs.run-id }}
+        CI_ARCHIVE_RUN_ATTEMPT: ${{ inputs.run-attempt }}
+        CI_ARCHIVE_COMPONENTS: ${{ inputs.components }}
+        CI_ARCHIVE_RECORD_IN_LUNAR: ${{ inputs.record-in-lunar }}
+        CI_ARCHIVE_MAX_ARCHIVE_MB: ${{ inputs.max-archive-mb }}
+        CI_ARCHIVE_INCLUDE_EVENTS: ${{ inputs.include-events }}
