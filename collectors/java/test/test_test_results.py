@@ -137,6 +137,21 @@ class TestResults(unittest.TestCase):
         self.run_collector()
         self.assert_results(total=4, passed=3, failed=1, skipped=0)
 
+    def test_gradle_retry_lists_each_attempt_by_default(self):
+        # org.gradle.test-retry without mergeReruns: the failed attempt and the
+        # passing retry are separate testcases. Gradle printed "3 tests
+        # completed, 1 failed" and BUILD SUCCESSFUL.
+        self.layout("gradle-retry", "build/test-results/test")
+        self.run_collector("gradlew")
+        self.assert_results(total=3, passed=2, failed=1, skipped=0, tool="gradle")
+
+    def test_gradle_retry_with_merge_reruns_counts_the_flaky_test_as_passed(self):
+        # With reports.junitXml.mergeReruns = true the failed attempt becomes a
+        # <flakyFailure>, but the <testsuite> still says tests="3" failures="1".
+        self.layout("gradle-retry-merged", "build/test-results/test")
+        self.run_collector("gradlew")
+        self.assert_results(total=2, passed=2, failed=0, skipped=0, tool="gradle")
+
     def test_testng_junitreports_copy_is_not_counted_twice(self):
         # TestNG writes its own TEST-*.xml copies under junitreports/, and they
         # disagree with Surefire's (they include the disabled test).
