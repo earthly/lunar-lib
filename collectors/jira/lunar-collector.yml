@@ -93,6 +93,14 @@ inputs:
       sub-collector, so this bounds what a description full of key-shaped
       tokens can cost.
     default: "5"
+  ticket_path:
+    description: |
+      Where the ticket is recorded, as a path under .vcs.pr. To record a second
+      reference next to the delivery ticket, such as an architecture-review
+      submission, import the collector again under its own `name`, with a
+      `ticket_pattern` for that reference and a path of its own (e.g.
+      .vcs.pr.architecture_review).
+    default: ".vcs.pr.ticket"
   jira_base_url:
     description: Jira instance base URL (e.g. https://acme.atlassian.net)
   jira_user:

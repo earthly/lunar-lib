@@ -1,10 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
+from helpers import ticket_path
+
 
 def main(node=None):
     c = Check("ticket-status", "Ticket should be in an acceptable status", node=node)
     with c:
-        if not c.exists(".vcs.pr.ticket.status"):
+        root = ticket_path()
+        if not c.exists(f"{root}.status"):
             c.skip("No ticket status data available")
 
         allowed_str = variable_or_default("allowed_statuses", "")
@@ -17,8 +20,8 @@ def main(node=None):
         if not allowed and not disallowed:
             c.skip("No status constraints configured")
 
-        status = c.get_value_or_default(".vcs.pr.ticket.status", "")
-        ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "unknown")
+        status = c.get_value_or_default(f"{root}.status", "")
+        ticket_id = c.get_value_or_default(f"{root}.id", "unknown")
 
         if not status:
             c.skip("Ticket has no status information")

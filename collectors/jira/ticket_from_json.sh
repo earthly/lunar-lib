@@ -15,6 +15,8 @@ source "$(dirname "$0")/helpers.sh"
 # the ticket with the same shared logic. Needs no GH_TOKEN and works on any VCS
 # provider. Transitional: folds into `ticket` once after-json is stable.
 
+resolve_ticket_path || exit 1
+
 # In PR context the runtime sets LUNAR_COMPONENT_PR. Pass it through so
 # get-json returns the PR-scoped Component JSON (which carries .vcs.pr.*)
 # rather than the main-branch JSON. `lunar component get-json` does not default
@@ -127,12 +129,12 @@ esac
 
 # Write the ticket reference even when Jira could not confirm it, so an outage
 # does not make the PR look ticket-less.
-lunar collect ".vcs.pr.ticket.id" "$TICKET_KEY"
-jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j ".vcs.pr.ticket.source" -
+lunar collect "${TICKET_PATH}.id" "$TICKET_KEY"
+jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j "${TICKET_PATH}.source" -
 
 JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
 if [ -n "$JIRA_BASE_URL" ]; then
-  lunar collect ".vcs.pr.ticket.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
+  lunar collect "${TICKET_PATH}.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
 fi
 
 if [ -z "$TICKET_VALID" ]; then
@@ -141,7 +143,7 @@ if [ -z "$TICKET_VALID" ]; then
   # the ticket-valid policy why .valid is missing; unset means validation was
   # never configured.
   if [ -n "$TICKET_ERROR" ]; then
-    lunar collect ".vcs.pr.ticket.tracker_error" "$TICKET_ERROR"
+    lunar collect "${TICKET_PATH}.tracker_error" "$TICKET_ERROR"
   else
     echo "Jira API validation not configured, skipping." >&2
   fi
@@ -149,7 +151,7 @@ if [ -z "$TICKET_VALID" ]; then
 fi
 
 # Ticket exists — write normalized fields to generic paths.
-lunar collect -j ".vcs.pr.ticket.valid" true
+lunar collect -j "${TICKET_PATH}.valid" true
 
 TICKET_STATUS="$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name // empty')"
 TICKET_TYPE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.issuetype.name // empty')"
@@ -157,9 +159,9 @@ TICKET_SUMMARY="$(echo "$JIRA_RESPONSE" | jq -r '.fields.summary // empty')"
 TICKET_ASSIGNEE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.assignee.emailAddress // empty')"
 
 lunar collect \
-  ".vcs.pr.ticket.status" "$TICKET_STATUS" \
-  ".vcs.pr.ticket.type" "$TICKET_TYPE" \
-  ".vcs.pr.ticket.summary" "$TICKET_SUMMARY" \
-  ".vcs.pr.ticket.assignee" "$TICKET_ASSIGNEE"
+  "${TICKET_PATH}.status" "$TICKET_STATUS" \
+  "${TICKET_PATH}.type" "$TICKET_TYPE" \
+  "${TICKET_PATH}.summary" "$TICKET_SUMMARY" \
+  "${TICKET_PATH}.assignee" "$TICKET_ASSIGNEE"
 
-echo "$JIRA_RESPONSE" | lunar collect -j ".vcs.pr.ticket.native.jira" -
+echo "$JIRA_RESPONSE" | lunar collect -j "${TICKET_PATH}.native.jira" -
