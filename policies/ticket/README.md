@@ -4,7 +4,7 @@ Enforce issue tracker ticket hygiene across your organization's pull requests. W
 
 ## Overview
 
-This policy verifies that PRs reference valid tickets, checks ticket status and type, enforces a specific issue tracker, and detects ticket reuse across multiple PRs. It helps teams maintain traceability between code changes and project management.
+This policy verifies that PRs reference valid tickets, checks ticket status and type, enforces a specific issue tracker, and detects ticket reuse across multiple PRs. It can also require any ticket field, such as a Jira custom field, to hold an allowed value, and run the same checks on a second reference like an architecture-review submission. It helps teams maintain traceability between code changes and project management.
 
 ## Policies
 
