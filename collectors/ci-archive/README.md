@@ -53,11 +53,11 @@ logs.zip        # GitHub's log archive for the attempt, verbatim
 
 ### When it runs
 
-On the Hub's `workflow-end` hook: once per finished run attempt, for each
+On the Hub's `after-ci-pipeline` hook: once per finished run attempt, for each
 component the run's commit belongs to, after the attempt's logs exist. A re-run
 is a new attempt and is archived again. Component checks don't wait for it.
 
-It needs a Hub that has the `workflow-end` hook. In a monorepo, set
+It needs a Hub that has the `after-ci-pipeline` hook. In a monorepo, set
 [`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
 on components to say which workflows are theirs.
 
@@ -65,7 +65,7 @@ A run another workflow started (`workflow_run`), such as a promote or smoke
 test after a deploy, is archived under the commit its chain of runs started
 from, where the Hub can follow the chain: the CI tracer reports each link, or the
 workflow's `run-name` names the run that started it
-([details](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-workflow)).
+([details](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-pipeline)).
 Its receipt keeps GitHub's commit in `head_sha`, and `origin_source` says how the
 chain was followed, or `unresolved` when it couldn't be and the run is filed at
 GitHub's commit. Runs started by `schedule` or `workflow_dispatch` are filed at

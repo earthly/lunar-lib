@@ -63,15 +63,15 @@ collectors:
   - name: workflow-logs
     description: |
       Fires once per finished CI workflow run attempt, re-runs included, on the
-      Hub's workflow-end hook. Downloads that attempt's log archive, bundles it
-      with the run and its jobs, uploads it to S3, and appends where it went to
-      .ci.archive.runs.
+      Hub's after-ci-pipeline hook. Downloads that attempt's log archive, bundles
+      it with the run and its jobs, uploads it to S3, and appends where it went
+      to .ci.archive.runs.
     mainBash: workflow-logs.sh
     # Log archives for a busy repo can be hundreds of MB before compression.
     size: large
     hook:
-      type: workflow-end
-    keywords: ["ci archive", "workflow logs", "s3", "workflow-end", "retention", "audit trail"]
+      type: after-ci-pipeline
+    keywords: ["ci archive", "workflow logs", "s3", "after-ci-pipeline", "retention", "audit trail"]
 
 example_component_json: |
   {
@@ -100,7 +100,7 @@ example_component_json: |
             ],
             "source": {
               "tool": "ci-archive",
-              "integration": "workflow-end",
+              "integration": "after-ci-pipeline",
               "collected_at": "2026-09-23T14:20:03Z"
             }
           },
@@ -126,7 +126,7 @@ example_component_json: |
             ],
             "source": {
               "tool": "ci-archive",
-              "integration": "workflow-end",
+              "integration": "after-ci-pipeline",
               "collected_at": "2026-09-23T14:41:15Z"
             }
           }

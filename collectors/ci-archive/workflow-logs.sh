@@ -5,7 +5,7 @@ set -eo pipefail
 # jobs and the full log archive -- to S3, and record it as one entry under
 # .ci.archive.runs.
 #
-# Runs on the workflow-end hook: once per finished run attempt, re-runs
+# Runs on the after-ci-pipeline hook: once per finished run attempt, re-runs
 # included, with the run in LUNAR_CI_PIPELINE_*. The archiving is archive-run.sh,
 # shared with the GitHub Action; this wrapper supplies what the Hub knows in
 # place of a CI job: the repository, from the component, and AWS credentials,
@@ -28,7 +28,7 @@ if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   exit 0
 fi
 if [ -z "$RUN_ID" ] || [ -z "$ATTEMPT" ] || [ -z "${LUNAR_COMPONENT_ID:-}" ]; then
-  log "no workflow run in context: this collector runs on the Hub's workflow-end hook. Skipping."
+  log "no workflow run in context: this collector runs on the Hub's after-ci-pipeline hook. Skipping."
   exit 0
 fi
 if [ -n "$INCLUDE_RUNS_PATTERN" ]; then
@@ -266,7 +266,7 @@ CI_ARCHIVE_UPLOAD="$UPLOAD" CI_ARCHIVE_SHA="${LUNAR_COMPONENT_GIT_SHA:-}" CI_ARC
 CI_ARCHIVE_ORIGIN_SOURCE="${LUNAR_CI_PIPELINE_ORIGIN_SOURCE:-}" \
 CI_ARCHIVE_S3_BUCKET="$S3_BUCKET" CI_ARCHIVE_S3_PREFIX="${LUNAR_VAR_S3_PREFIX-lunar/ci-archive}" \
 CI_ARCHIVE_S3_ENDPOINT_URL="$S3_ENDPOINT_URL" CI_ARCHIVE_AWS_REGION="$REGION" \
-CI_ARCHIVE_MAX_ARCHIVE_MB="${LUNAR_VAR_MAX_ARCHIVE_MB:-512}" CI_ARCHIVE_INTEGRATION=workflow-end \
+CI_ARCHIVE_MAX_ARCHIVE_MB="${LUNAR_VAR_MAX_ARCHIVE_MB:-512}" CI_ARCHIVE_INTEGRATION=after-ci-pipeline \
 CI_ARCHIVE_INCLUDE_EVENTS="${LUNAR_VAR_INCLUDE_EVENTS:-}" \
 AWS_ACCESS_KEY_ID="$AWS_SIGV4_KEY" AWS_SECRET_ACCESS_KEY="$AWS_SIGV4_SECRET" AWS_SESSION_TOKEN="$AWS_SIGV4_TOKEN" \
   exec bash "$(dirname "$0")/archive-run.sh"

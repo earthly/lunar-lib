@@ -24,7 +24,7 @@ FAILED=0
 CASE=""
 
 # run_case <name> <run-id> <attempt> [VAR=value ...]: runs the collector in a
-# clean env, as the Hub's workflow-end hook would for that run attempt.
+# clean env, as the Hub's after-ci-pipeline hook would for that run attempt.
 run_case() {
   CASE="$1"; local run_id="$2" attempt="$3"; shift 3
   OUT="$TMP/$CASE.out"; ERR="$TMP/$CASE.err"
@@ -72,7 +72,7 @@ expect "records the attempt it fired for" receipt '.ci.archive.runs[0] | .id == 
 expect "keys the object by run and attempt" receipt '.ci.archive.runs[0].uri == "s3://archive/lunar/ci-archive/127.0.0.1_8443/acme/widgets/sha-101/101-1.zip"'
 expect "records sizes and jobs" receipt '.ci.archive.runs[0] | .size_bytes > 0 and .log_bytes > 0 and (.jobs | length) == 2'
 expect "counts the jobs' log lines, not the per-step copies" receipt '.ci.archive.runs[0].log_lines == 1'
-expect "stamps the workflow-end source" receipt '.ci.archive.runs[0].source | .tool == "ci-archive" and .integration == "workflow-end" and (has("archived_by") | not)'
+expect "stamps the after-ci-pipeline source" receipt '.ci.archive.runs[0].source | .tool == "ci-archive" and .integration == "after-ci-pipeline" and (has("archived_by") | not)'
 OBJ="$(object_path)"
 expect "uploads the object to S3" test -s "$OBJ"
 expect "object holds manifest.json and the attempt's logs.zip" test "$(zip_names "$OBJ" | tr '\n' ' ')" = "logs.zip manifest.json "
@@ -112,7 +112,7 @@ assert m["sha"] == "origin-sha" and m["run"]["head_sha"] == "sha-101"
 run_case not-chained 101 1
 expect "a run nothing started carries no chain" receipt '.ci.archive.runs[0] | .head_sha == "sha-101" and (has("triggered_by_run_id") or has("origin_source") | not)'
 
-# --- Not configured, or not a workflow-end run: exit 0, write nothing ---
+# --- Not configured, or not an after-ci-pipeline run: exit 0, write nothing ---
 run_case no-run 101 1 LUNAR_CI_PIPELINE_RUN_ID=
 expect_exit 0
 expect "writes nothing without a run in context" nothing_collected

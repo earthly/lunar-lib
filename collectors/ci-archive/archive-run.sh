@@ -8,7 +8,8 @@ set -eo pipefail
 # Two callers, one per finished run attempt, re-runs included:
 #   - the GitHub Action, in a workflow on `workflow_run: completed`, with AWS
 #     credentials from the job (OIDC), so the bucket never has to trust Lunar;
-#   - workflow-logs.sh, the collector the Hub runs on its workflow-end hook.
+#   - workflow-logs.sh, the collector the Hub runs on its after-ci-pipeline
+#     hook.
 
 log() { echo "ci-archive: $*" >&2; }
 
@@ -91,8 +92,9 @@ if [ -n "$INCLUDE_EVENTS" ] && [[ ",${INCLUDE_EVENTS//[[:space:]]/,}," != *",${E
 fi
 STATUS=$(jq -r '.status' "$WORK/run.json")
 [ "$STATUS" = "completed" ] || { log "ERROR: run ${RUN_ID} attempt ${ATTEMPT} is ${STATUS}, not completed."; exit 1; }
-# The Hub hands a workflow-end collector the commit the run's chain started
-# from, which for a run another workflow started isn't the one GitHub recorded.
+# The Hub hands an after-ci-pipeline collector the commit the run's chain
+# started from, which for a run another workflow started isn't the one GitHub
+# recorded.
 SHA="${CI_ARCHIVE_SHA:-$(jq -r '.head_sha' "$WORK/run.json")}"
 PR=""
 case "$EVENT" in
