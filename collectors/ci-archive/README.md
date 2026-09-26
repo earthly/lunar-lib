@@ -21,14 +21,19 @@ This collector writes to the following Component JSON paths:
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
+| `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `log_lines`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
 
-Nothing is written when `s3_bucket` or `GH_TOKEN` is unset, when the workflow
-doesn't match `include_runs_pattern`, or when the run's event isn't in
-`include_events`: the collector exits 0 with a message on stderr. A run that
-can't be archived (logs gone, over `max_archive_mb`, S3 rejected the upload, or
-no role in `aws_assume_role_arns` could be assumed) fails the collector run and
-writes nothing.
+Leave `s3_bucket` unset to record runs without archiving them: each entry has
+the run, its jobs and its log's size and line count, but no `uri`, `bucket`,
+`key` or `size_bytes`, and no AWS credentials are needed. It's a quick way to
+check which runs fire and on which commits before wiring up a bucket.
+
+Nothing is written when `GH_TOKEN` is unset, when the workflow doesn't match
+`include_runs_pattern`, or when the run's event isn't in `include_events`: the
+collector exits 0 with a message on stderr. A run that can't be archived (logs
+gone, over `max_archive_mb`, S3 rejected the upload, or no role in
+`aws_assume_role_arns` could be assumed) fails the collector run and writes
+nothing.
 
 ### Archive layout
 

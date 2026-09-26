@@ -23,7 +23,7 @@ landing_page:
 
 inputs:
   s3_bucket:
-    description: Destination S3 bucket. The collector skips (exit 0) when unset.
+    description: Destination S3 bucket. Unset, each run is recorded with its log line count but not uploaded.
   s3_prefix:
     description: Key prefix in the bucket. Objects land at <prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip; empty means the bucket root.
     default: "lunar/ci-archive"

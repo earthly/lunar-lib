@@ -23,10 +23,6 @@ RUN_ID="${LUNAR_CI_PIPELINE_RUN_ID:-}"
 ATTEMPT="${LUNAR_CI_PIPELINE_RUN_ATTEMPT:-}"
 WORKFLOW="${LUNAR_CI_PIPELINE_NAME:-}"
 
-if [ -z "$S3_BUCKET" ]; then
-  log "s3_bucket input is not set; skipping."
-  exit 0
-fi
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   log "GH_TOKEN secret is not set; skipping."
   exit 0
@@ -235,7 +231,11 @@ assume_role_chain() {
 }
 
 REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
-if [ -n "$S3_ENDPOINT_URL" ]; then
+UPLOAD=true
+if [ -z "$S3_BUCKET" ]; then
+  UPLOAD=false
+  log "s3_bucket is not set: recording run ${RUN_ID} attempt ${ATTEMPT} without uploading it."
+elif [ -n "$S3_ENDPOINT_URL" ]; then
   # S3-compatible store: AWS roles mean nothing there, only static keys do.
   REGION="${REGION:-us-east-1}"
   if ! use_static_keys; then
@@ -254,13 +254,15 @@ else
   fi
   resolve_aws_credentials || exit 1
 fi
-assume_role_chain || exit 1
-log "uploading to bucket ${S3_BUCKET} (${REGION}) with AWS credentials from ${CRED_SOURCE}."
+if [ "$UPLOAD" = true ]; then
+  assume_role_chain || exit 1
+  log "uploading to bucket ${S3_BUCKET} (${REGION}) with AWS credentials from ${CRED_SOURCE}."
+fi
 
 GH_TOKEN="$LUNAR_SECRET_GH_TOKEN" \
 GITHUB_SERVER_URL="https://${HOST}" GITHUB_API_URL="$API_BASE" \
 CI_ARCHIVE_REPOSITORY="$REPO" CI_ARCHIVE_RUN_ID="$RUN_ID" CI_ARCHIVE_RUN_ATTEMPT="$ATTEMPT" \
-CI_ARCHIVE_SHA="${LUNAR_COMPONENT_GIT_SHA:-}" CI_ARCHIVE_TRIGGERED_BY_RUN_ID="${LUNAR_CI_PIPELINE_TRIGGERED_BY_RUN_ID:-}" \
+CI_ARCHIVE_UPLOAD="$UPLOAD" CI_ARCHIVE_SHA="${LUNAR_COMPONENT_GIT_SHA:-}" CI_ARCHIVE_TRIGGERED_BY_RUN_ID="${LUNAR_CI_PIPELINE_TRIGGERED_BY_RUN_ID:-}" \
 CI_ARCHIVE_ORIGIN_SOURCE="${LUNAR_CI_PIPELINE_ORIGIN_SOURCE:-}" \
 CI_ARCHIVE_S3_BUCKET="$S3_BUCKET" CI_ARCHIVE_S3_PREFIX="${LUNAR_VAR_S3_PREFIX-lunar/ci-archive}" \
 CI_ARCHIVE_S3_ENDPOINT_URL="$S3_ENDPOINT_URL" CI_ARCHIVE_AWS_REGION="$REGION" \

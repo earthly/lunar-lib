@@ -71,6 +71,7 @@ expect "records one run entry" receipt '.ci.archive.runs | length == 1'
 expect "records the attempt it fired for" receipt '.ci.archive.runs[0] | .id == 101 and .attempt == 1 and .name == "build" and .conclusion == "failure"'
 expect "keys the object by run and attempt" receipt '.ci.archive.runs[0].uri == "s3://archive/lunar/ci-archive/127.0.0.1_8443/acme/widgets/sha-101/101-1.zip"'
 expect "records sizes and jobs" receipt '.ci.archive.runs[0] | .size_bytes > 0 and .log_bytes > 0 and (.jobs | length) == 2'
+expect "counts the jobs' log lines, not the per-step copies" receipt '.ci.archive.runs[0].log_lines == 1'
 expect "stamps the workflow-end source" receipt '.ci.archive.runs[0].source | .tool == "ci-archive" and .integration == "workflow-end" and (has("archived_by") | not)'
 OBJ="$(object_path)"
 expect "uploads the object to S3" test -s "$OBJ"
@@ -117,10 +118,15 @@ expect_exit 0
 expect "writes nothing without a run in context" nothing_collected
 expect "says why" stderr_has "no workflow run in context"
 
-run_case no-bucket 101 1 LUNAR_VAR_S3_BUCKET=
+# --- No s3_bucket: record the run and count its log lines, upload nothing ---
+objects_before=$(find "$S3_DIR" -type f | wc -l)
+run_case no-bucket 101 1 LUNAR_VAR_S3_BUCKET= LUNAR_VAR_S3_ENDPOINT_URL= \
+  LUNAR_SECRET_AWS_ACCESS_KEY_ID= LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=
 expect_exit 0
-expect "writes nothing without s3_bucket" nothing_collected
-expect "says why" stderr_has "s3_bucket input is not set"
+expect "records the run without AWS credentials" receipt '.ci.archive.runs[0] | .id == 101 and .attempt == 1 and .log_lines == 1 and .log_bytes > 0 and (.jobs | length) == 2'
+expect "records no storage location" receipt '.ci.archive.runs[0] | (has("uri") or has("bucket") or has("key") or has("size_bytes")) | not'
+expect "uploads nothing" test "$(find "$S3_DIR" -type f | wc -l)" -eq "$objects_before"
+expect "says why" stderr_has "s3_bucket is not set"
 
 run_case no-token 101 1 LUNAR_SECRET_GH_TOKEN=
 expect_exit 0

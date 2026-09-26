@@ -41,6 +41,8 @@ def logs_zip(run_id, attempt, size=0):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("1_build.txt", f"2026-09-24T00:00:00Z run {run_id} attempt {attempt} log line\n")
+        # GitHub also ships each step's slice of the job log in a folder per job.
+        zf.writestr("build/1_Set up job.txt", f"2026-09-24T00:00:00Z run {run_id} attempt {attempt} log line\n")
         if size:
             zf.writestr("big.bin", os.urandom(size), compress_type=zipfile.ZIP_STORED)
     return buf.getvalue()
