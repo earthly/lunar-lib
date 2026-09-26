@@ -79,6 +79,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD ./collectors/datadog+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
@@ -97,6 +98,7 @@ test:
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
+    BUILD ./policies/oncall+test
 
 lint:
     FROM python:3.12-alpine

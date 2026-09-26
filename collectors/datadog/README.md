@@ -1,10 +1,10 @@
 # Datadog Collector
 
-Collect dashboard, monitor, and SLO data from Datadog via the API, and discover Datadog-as-code JSON files committed in the component repository.
+Collect dashboard, monitor, SLO, and On-Call data from Datadog via the API, and discover Datadog-as-code JSON files committed in the component repository.
 
 ## Overview
 
-This plugin provides two sub-collectors. The `service` sub-collector queries the Datadog REST API for monitors, dashboard, and SLOs tagged with the component's service. The `repo-files` sub-collector walks the repo for Datadog-as-code JSON files (dashboards and monitor definitions) and captures their raw contents. All data lands under the tool-agnostic `.observability` category, so the shared `observability` policy works regardless of whether the data came from Datadog, Grafana, or another provider.
+This plugin provides three sub-collectors. The `service` sub-collector queries the Datadog REST API for monitors, dashboard, and SLOs tagged with the component's service. The `repo-files` sub-collector walks the repo for Datadog-as-code JSON files (dashboards and monitor definitions) and captures their raw contents. The `oncall` sub-collector reads the Datadog On-Call schedule and escalation policy of the component's team. Data lands under the tool-agnostic `.observability` and `.oncall` categories, so the shared `observability` and `oncall` policies work whether the data came from Datadog or another provider.
 
 ## Collected Data
 
@@ -24,6 +24,12 @@ This collector writes to the following Component JSON paths:
 | `.observability.native.datadog.api` | object | Raw Datadog API responses (monitors, dashboard, slos) plus the resolved service tag |
 | `.observability.native.datadog.repo_dashboards` | array | Raw JSON of each Datadog dashboard file discovered in the repo, with its path |
 | `.observability.native.datadog.repo_monitors` | array | Raw JSON of each Datadog monitor file discovered in the repo, with its path |
+| `.oncall.service` | object | The component's Datadog team: `id` and `name` |
+| `.oncall.escalation` | object | The escalation policy the team's routing rules page: `exists`, `levels` (steps), `policy_name`, `id` |
+| `.oncall.schedule` | object | The first schedule that policy targets: `exists`, `participants`, `rotation`, `id`, `name` |
+| `.oncall.summary` | object | Summary flags for quick policy evaluation |
+| `.oncall.native.datadog` | object | Raw Datadog API responses (team, routing rules, escalation policy, schedule) |
+| `.oncall.source` | object | Tool and integration metadata |
 
 ## Collectors
 
@@ -33,6 +39,7 @@ This plugin provides the following sub-collectors:
 |-----------|-------------|
 | `service` | Queries Datadog API for monitors (by service tag), dashboard (by UUID), and SLOs (by service tag) (code hook) |
 | `repo-files` | Discovers Datadog dashboard and monitor JSON files in the repo by content fingerprint (code hook) |
+| `oncall` | Reads the component's team's Datadog On-Call routing rules, escalation policy, and schedule (code hook) |
 
 ## Installation
 
@@ -46,12 +53,13 @@ collectors:
       datadog_site: "datadoghq.com"
       # service_name: "payment-api"   # Optional fallback if catalog meta isn't set
       # dashboard_id: "abc-123-def"   # Optional dashboard UUID
+      # team: "payments"              # Optional On-Call team fallback if catalog meta isn't set
       # find_command: "find ./datadog -type f -name '*.json'"  # Optional, narrows repo scan
 ```
 
 Required secrets:
 - `DATADOG_API_KEY` — Datadog API key (Organization Settings → API Keys)
-- `DATADOG_APP_KEY` — Datadog application key (Organization Settings → Application Keys). Required for monitor, dashboard, and SLO reads — these endpoints require both the API key and the application key.
+- `DATADOG_APP_KEY` — Datadog application key (Organization Settings → Application Keys). Required for monitor, dashboard, SLO, and On-Call reads — these endpoints require both the API key and the application key.
 
 **Application key scopes.** Modern Datadog application keys are scoped — if you pick "Custom Scopes" at creation time, select at minimum the scopes listed below, otherwise the API returns 403 for the matching endpoints. If you pick "All Scopes" at creation time no further action is needed, but least-privilege is preferred:
 
@@ -60,6 +68,8 @@ Required secrets:
 | `monitors_read` | `service` sub-collector | `GET /api/v1/monitor` |
 | `dashboards_read` | `service` sub-collector | `GET /api/v1/dashboard/{id}` |
 | `slos_read` | `service` sub-collector | `GET /api/v1/slo` |
+| `on_call_read` | `oncall` sub-collector | `GET /api/v2/on-call/teams/{team_id}/routing-rules`, `GET /api/v2/on-call/escalation-policies/{policy_id}`, `GET /api/v2/on-call/schedules/{schedule_id}` |
+| `teams_read` | `oncall` sub-collector, only when the team is given as a handle | `GET /api/v2/team` |
 
 The `repo-files` sub-collector does not call the Datadog API and is unaffected by application-key scoping.
 
@@ -82,6 +92,18 @@ Datadog dashboards are not universally tagged with `service:`, so the dashboard 
 3. If neither is set, dashboard data is not collected (monitors and SLOs still run).
 
 When the UUID resolves but the dashboard does not exist in Datadog, `.observability.dashboard.exists=false` is written so policies can flag the stale link. The UID is always written to `.observability.dashboard.id` so the link is visible in the component JSON even when the dashboard is missing.
+
+### On-Call team mapping
+
+Datadog On-Call is team-based, so the `oncall` sub-collector needs the component's Datadog team. It resolves it in this order:
+
+1. **Catalog meta annotation** — `datadog/team`, set via `lunar catalog component --meta datadog/team <team>`, typically by a cataloger that knows which team owns each component. This is the recommended approach.
+2. **`team` input** — `with: team: <team>` in `lunar-config.yml`, for static cases.
+3. If neither is set, the sub-collector exits cleanly without calling the API.
+
+Either takes a team handle (e.g. `payments`, looked up through the Teams API) or a team ID. From the team it follows the path a page takes: the first routing rule that names an escalation policy, that policy's steps (`levels`), and the first schedule a step targets. `participants` counts the distinct users in that schedule's layers that have not ended, leaving out deactivated users; `rotation` comes from the first such layer's interval.
+
+A team with no routing rules, or none that pages an escalation policy, is recorded as `exists: false`. Any other API error (401/403, a rate limit that outlasts the retries, 5xx) fails the run and writes nothing, so a missing scope or an outage never reads as "no on-call".
 
 ### Datadog site support
 

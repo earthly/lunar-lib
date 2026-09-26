@@ -1,0 +1,109 @@
+{
+  "data": {
+    "attributes": {
+      "name": "Payments primary",
+      "tags": ["team:payments"],
+      "time_zone": "Europe/London"
+    },
+    "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9",
+    "relationships": {
+      "layers": {
+        "data": [
+          { "id": "e1f2a3b4-c5d6-4e7f-8091-a2b3c4d5e6f7", "type": "layers" },
+          { "id": "e2a3b4c5-d6e7-4f80-91a2-b3c4d5e6f708", "type": "layers" }
+        ]
+      },
+      "teams": {
+        "data": [ { "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90", "type": "teams" } ]
+      }
+    },
+    "type": "schedules"
+  },
+  "included": [
+    {
+      "attributes": {
+        "effective_date": "2026-01-05T09:00:00Z",
+        "interval": { "days": 7 },
+        "name": "Weekly primary",
+        "restrictions": [],
+        "rotation_start": "2026-01-05T09:00:00Z",
+        "time_zone": "Europe/London"
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8091-a2b3c4d5e6f7",
+      "relationships": {
+        "members": {
+          "data": [
+            { "id": "f1000000-0000-4000-8000-000000000001", "type": "members" },
+            { "id": "f1000000-0000-4000-8000-000000000002", "type": "members" },
+            { "id": "f1000000-0000-4000-8000-000000000003", "type": "members" },
+            { "id": "f1000000-0000-4000-8000-000000000004", "type": "members" }
+          ]
+        }
+      },
+      "type": "layers"
+    },
+    {
+      "attributes": {
+        "effective_date": "2025-01-06T09:00:00Z",
+        "end_date": "2025-12-31T00:00:00Z",
+        "interval": { "days": 1 },
+        "name": "2025 rotation",
+        "restrictions": [],
+        "rotation_start": "2025-01-06T09:00:00Z",
+        "time_zone": "Europe/London"
+      },
+      "id": "e2a3b4c5-d6e7-4f80-91a2-b3c4d5e6f708",
+      "relationships": {
+        "members": {
+          "data": [ { "id": "f1000000-0000-4000-8000-000000000005", "type": "members" } ]
+        }
+      },
+      "type": "layers"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000001",
+      "relationships": { "user": { "data": { "id": "a1000000-0000-4000-8000-00000000000a", "type": "users" } } },
+      "type": "members"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000002",
+      "relationships": { "user": { "data": { "id": "a1000000-0000-4000-8000-00000000000b", "type": "users" } } },
+      "type": "members"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000003",
+      "relationships": { "user": { "data": { "id": "a1000000-0000-4000-8000-00000000000a", "type": "users" } } },
+      "type": "members"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000004",
+      "relationships": { "user": { "data": { "id": "a1000000-0000-4000-8000-00000000000c", "type": "users" } } },
+      "type": "members"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000005",
+      "relationships": { "user": { "data": { "id": "a1000000-0000-4000-8000-00000000000d", "type": "users" } } },
+      "type": "members"
+    },
+    {
+      "attributes": { "email": "ada@example.com", "name": "Ada Lovelace", "status": "active" },
+      "id": "a1000000-0000-4000-8000-00000000000a",
+      "type": "users"
+    },
+    {
+      "attributes": { "email": "grace@example.com", "name": "Grace Hopper", "status": "active" },
+      "id": "a1000000-0000-4000-8000-00000000000b",
+      "type": "users"
+    },
+    {
+      "attributes": { "email": "linus@example.com", "name": "Linus Torvalds", "status": "deactivated" },
+      "id": "a1000000-0000-4000-8000-00000000000c",
+      "type": "users"
+    },
+    {
+      "attributes": { "email": "ken@example.com", "name": "Ken Thompson", "status": "active" },
+      "id": "a1000000-0000-4000-8000-00000000000d",
+      "type": "users"
+    }
+  ]
+}
