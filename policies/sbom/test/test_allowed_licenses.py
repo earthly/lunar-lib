@@ -285,6 +285,9 @@ class ExpressionTest(unittest.TestCase):
         self.assertEqual(self.verdict(commons, '["MIT", "Apache-2.0"]'), CheckStatus.FAIL)
         self.assertEqual(self.verdict(commons, f'["MIT", "{commons}"]'), CheckStatus.PASS)
         self.assertEqual(self.verdict(f"MIT OR {commons}", "MIT"), CheckStatus.PASS)
+        # A family pattern must not stretch across " WITH " to the rider.
+        self.assertEqual(self.verdict(commons, '["MIT", "Apache-.*"]'), CheckStatus.FAIL)
+        self.assertEqual(self.verdict("Apache-2.0 WITH LLVM-exception", '["Apache-.*"]'), CheckStatus.PASS)
 
     def test_listed_exception_ids_match_case_insensitively(self):
         self.assertEqual(self.verdict("Apache-2.0 WITH llvm-exception", "Apache-2.0"), CheckStatus.PASS)

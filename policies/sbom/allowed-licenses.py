@@ -126,7 +126,9 @@ def _tree_allowed(tree, matcher, refs):
         return all(_tree_allowed(child, matcher, refs) for child in tree[1])
     _, identifier, exception = tree
     if exception:
-        if matcher(f"{identifier} WITH {exception}"):
+        # The pair matches only as written: a pattern like "Apache-.*" would
+        # otherwise stretch across " WITH " to whatever follows.
+        if matcher.literal(f"{identifier} WITH {exception}"):
             return True
         # A listed SPDX exception only relaxes the license, so the bare license
         # admitting it is enough. Anything else after WITH, such as the Commons
