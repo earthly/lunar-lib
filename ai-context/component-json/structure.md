@@ -101,6 +101,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.compliance.regimes` | List of applicable regimes (e.g., `["soc2", "pci-dss"]`) |
 | `.compliance.data_classification` | Data classification (`level`, `contains_pii`, `contains_pci`) |
 | `.compliance.controls` | Control status (`access_reviews`, `audit_logging`, `encryption_at_rest`) |
+| `.compliance.penetration_testing.reports[]` | Pen-test report records (`date`, `path`, `provider`, `scope`, `report_url`) |
 | **[`.api`](cat-api.md)** | **API specifications and documentation** |
 | `.api.spec_files[]` | Spec file metadata — protocol-agnostic (`path`, `format`, `protocol`, `valid`, `version`, `operation_count`, `schema_count`, `has_docs`) |
 | `.api.native.openapi` | Map of file path → raw OpenAPI/Swagger spec as JSON (all versions, same spec lineage) |

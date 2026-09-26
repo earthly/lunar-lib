@@ -10,8 +10,8 @@ landing_page:
   display_name: "Compliance Documentation Guardrails"
   long_description: |
     Verify that required compliance documentation exists, is kept current, and
-    contains required sections. Covers disaster recovery plans and exercise
-    records with support for additional compliance document types planned.
+    contains required sections. Covers disaster recovery plans, DR exercise
+    records and penetration-test reports.
   category: "operational-readiness"
   icon: "assets/compliance-docs.svg"
   status: "stable"
@@ -19,6 +19,9 @@ landing_page:
     - slug: "dr-docs"
       type: "collector"
       reason: "Provides disaster recovery documentation metadata"
+    - slug: "compliance-docs"
+      type: "collector"
+      reason: "Provides penetration-test report records"
   related: []
 
 policies:
@@ -61,6 +64,13 @@ policies:
     mainPython: ./dr-exercise-required-sections.py
     keywords: ["DR exercise", "required sections", "documentation structure"]
 
+  - name: pentest-report-recent
+    description: |
+      Ensures the latest penetration-test report is within the configured
+      threshold (default: 365 days). Skips components the compliance-docs collector doesn't run on.
+    mainPython: ./pentest-report-recent.py
+    keywords: ["penetration test", "pen test", "security testing", "compliance", "audit evidence"]
+
 inputs:
   max_days_since_exercise:
     description: Maximum number of days allowed since the last DR exercise
@@ -74,3 +84,6 @@ inputs:
   exercises_check_all:
     description: Check required sections on all exercises (true) or only the latest (false)
     default: "false"
+  max_days_since_pentest:
+    description: Maximum number of days allowed since the latest penetration-test report
+    default: 365
