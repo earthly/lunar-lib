@@ -278,6 +278,23 @@ class ExpressionTest(unittest.TestCase):
             run(cyclonedx(component("dep", lic_id("GPL-2.0-only"))), f'["{classpath}"]').status, CheckStatus.FAIL
         )
 
+    def test_with_an_unlisted_exception_needs_the_full_pair(self):
+        # The Commons Clause restricts Apache-2.0 and is not an SPDX exception,
+        # so allowing Apache-2.0 must not admit it.
+        commons = "Apache-2.0 WITH Commons-Clause"
+        self.assertEqual(self.verdict(commons, '["MIT", "Apache-2.0"]'), CheckStatus.FAIL)
+        self.assertEqual(self.verdict(commons, f'["MIT", "{commons}"]'), CheckStatus.PASS)
+        self.assertEqual(self.verdict(f"MIT OR {commons}", "MIT"), CheckStatus.PASS)
+
+    def test_listed_exception_ids_match_case_insensitively(self):
+        self.assertEqual(self.verdict("Apache-2.0 WITH llvm-exception", "Apache-2.0"), CheckStatus.PASS)
+
+    def test_exception_list_is_the_spdx_one(self):
+        from spdx_exceptions import SPDX_EXCEPTIONS
+        self.assertIn("llvm-exception", SPDX_EXCEPTIONS)
+        self.assertIn("classpath-exception-2.0", SPDX_EXCEPTIONS)
+        self.assertNotIn("commons-clause", SPDX_EXCEPTIONS)
+
     def test_with_binds_tighter_than_and(self):
         self.assertEqual(
             self.verdict("Apache-2.0 WITH LLVM-exception AND MIT", '["Apache-2.0", "MIT"]'), CheckStatus.PASS
@@ -288,8 +305,12 @@ class ExpressionTest(unittest.TestCase):
         self.assertEqual(self.verdict("LGPL-2.1+", '["LGPL-2.1+"]'), CheckStatus.PASS)
         self.assertEqual(self.verdict("LGPL-2.1+", "LGPL-3.0"), CheckStatus.FAIL)
 
-    def test_operators_are_case_insensitive(self):
-        self.assertEqual(self.verdict("GPL-3.0-only or MIT", "MIT"), CheckStatus.PASS)
+    def test_operators_are_case_sensitive(self):
+        # Lowercase and/or/with are words, so these stay free text (Annex D.2).
+        for text in ("GPL-3.0-only or MIT", "MIT with modifications", "MIT or later", "MIT and GPL-3.0-only"):
+            self.assertEqual(run(cyclonedx(component("dep", lic_name(text))), "MIT").status, CheckStatus.FAIL, text)
+        self.assertEqual(run(cyclonedx(component("dep", lic_name("MIT or later"))), '["MIT or later"]').status,
+                         CheckStatus.PASS)
 
     def test_an_identifier_field_holding_an_expression_is_parsed(self):
         # The syft collector writes a Rust crate's "X WITH E" to license.id.

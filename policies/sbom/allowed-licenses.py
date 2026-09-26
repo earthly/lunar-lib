@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, ".")
 from helpers import parse_patterns
 from lunar_policy import Check, variable_or_default
+from spdx_exceptions import SPDX_EXCEPTIONS
 
 MAX_NAMED = 5
 
@@ -42,7 +43,9 @@ def parse_expression(text):
     """Parse an SPDX license expression (SPDX 2.3 Annex D).
 
     Returns ("or" | "and", [children]) or ("license", identifier, exception_or_None).
-    Precedence is WITH, then AND, then OR. Raises ValueError if `text` isn't one.
+    Precedence is WITH, then AND, then OR, and operators are case-sensitive (Annex
+    D.2), so "MIT with modifications" stays free text. Raises ValueError if `text`
+    isn't an expression.
     """
     tokens = re.findall(r"[()]|[^\s()]+", text)
     pos = 0
@@ -56,10 +59,10 @@ def parse_expression(text):
         return tokens[pos - 1] if pos <= len(tokens) else None
 
     def is_op(token, op):
-        return token is not None and token.upper() == op
+        return token == op
 
     def is_identifier(token):
-        return token is not None and token not in ("(", ")") and token.upper() not in OPERATORS
+        return token is not None and token not in ("(", ")") and token not in OPERATORS
 
     def parse_or():
         children = [parse_and()]
@@ -122,10 +125,14 @@ def _tree_allowed(tree, matcher, refs):
     if kind == "and":
         return all(_tree_allowed(child, matcher, refs) for child in tree[1])
     _, identifier, exception = tree
-    # An exception only relaxes a license condition or adds permissions, so the
-    # bare license admitting it is enough; listing "X WITH E" admits just that pair.
-    if exception and matcher(f"{identifier} WITH {exception}"):
-        return True
+    if exception:
+        if matcher(f"{identifier} WITH {exception}"):
+            return True
+        # A listed SPDX exception only relaxes the license, so the bare license
+        # admitting it is enough. Anything else after WITH, such as the Commons
+        # Clause (a restriction), is admitted only by listing the full pair.
+        if exception.casefold() not in SPDX_EXCEPTIONS:
+            return False
     if matcher(identifier):
         return True
     # "X+" is "X or any later version", so admitting X admits it.
