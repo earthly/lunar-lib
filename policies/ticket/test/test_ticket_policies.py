@@ -158,7 +158,7 @@ class TestTicketField(unittest.TestCase):
         self.assertEqual(
             message(check),
             "Ticket ARB-56 field native.jira.fields.customfield_10042 is 'Payments', "
-            "which is not in the allowed list: Platform.")
+            "which is not in the allowed list: 'Platform'.")
 
     def test_unset_custom_field_fails(self):
         # Jira returns an unset custom field as null.

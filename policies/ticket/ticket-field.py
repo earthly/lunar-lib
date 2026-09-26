@@ -33,11 +33,15 @@ def main(node=None):
 
         if allowed:
             values = field_values(field, value)
-            shown = ", ".join(f"'{v}'" for v in values)
             c.assert_true(any(v in allowed for v in values),
-                          f"Ticket {ticket_id} field {field} is {shown}, which is "
-                          f"not in the allowed list: {', '.join(allowed)}.")
+                          f"Ticket {ticket_id} field {field} is {quoted(values)}, "
+                          f"which is not in the allowed list: {quoted(allowed)}.")
     return c
+
+
+def quoted(values):
+    # Quoted, since a value can itself contain a comma.
+    return ", ".join(f"'{v}'" for v in values)
 
 
 if __name__ == "__main__":
