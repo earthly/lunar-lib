@@ -60,13 +60,13 @@ secrets:
     description: Optional, for temporary static credentials.
 
 collectors:
-  - name: workflow-logs
+  - name: backup-logs-s3
     description: |
       Fires once per finished CI workflow run attempt, re-runs included, on the
       Hub's after-ci-pipeline hook. Downloads that attempt's log archive, bundles
       it with the run and its jobs, uploads it to S3, and appends where it went
       to .ci.archive.runs.
-    mainBash: workflow-logs.sh
+    mainBash: backup-logs-s3.sh
     # Log archives for a busy repo can be hundreds of MB before compression.
     size: large
     hook:

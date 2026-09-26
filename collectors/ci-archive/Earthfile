@@ -9,6 +9,6 @@ test:
     FROM --pass-args ../../+base-image
     RUN apk add --no-cache openssl
     WORKDIR /workspace
-    COPY workflow-logs.sh archive-run.sh .
+    COPY backup-logs-s3.sh archive-run.sh .
     COPY --dir test .
     RUN ./test/run.sh

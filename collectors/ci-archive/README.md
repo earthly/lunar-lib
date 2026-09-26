@@ -49,7 +49,7 @@ logs.zip        # GitHub's log archive for the attempt, verbatim
 
 | Collector | Description |
 |--------|-------------|
-| `workflow-logs` | Archives each finished run attempt to S3 and records it |
+| `backup-logs-s3` | Archives each finished run attempt to S3 and records it |
 
 ### When it runs
 

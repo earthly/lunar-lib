@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline end-to-end test for workflow-logs.sh (and the archive-run.sh it hands
+# Offline end-to-end test for backup-logs-s3.sh (and the archive-run.sh it hands
 # off to): the real scripts, curl, jq, python3 and lunar CLI against the
 # stand-ins in servers.py. The component is GHES-shaped
 # (127.0.0.1:8443/acme/widgets), so the /api/v3 path is exercised without any
@@ -7,7 +7,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT="$HERE/../workflow-logs.sh"
+SCRIPT="$HERE/../backup-logs-s3.sh"
 TMP="$(mktemp -d)"
 export S3_DIR="$TMP/s3" STS_LOG="$TMP/sts.log"
 mkdir -p "$S3_DIR"

@@ -8,7 +8,7 @@ set -eo pipefail
 # Two callers, one per finished run attempt, re-runs included:
 #   - the GitHub Action, in a workflow on `workflow_run: completed`, with AWS
 #     credentials from the job (OIDC), so the bucket never has to trust Lunar;
-#   - workflow-logs.sh, the collector the Hub runs on its after-ci-pipeline
+#   - backup-logs-s3.sh, the collector the Hub runs on its after-ci-pipeline
 #     hook.
 
 log() { echo "ci-archive: $*" >&2; }
