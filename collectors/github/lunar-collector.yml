@@ -23,16 +23,18 @@ collectors:
     description: |
       Fetches pull-request metadata from the GitHub API for the PR being
       evaluated and writes it under .vcs.pr — title, description, source and
-      target branch, author, labels, draft flag, state, URL, and number. This
-      is the GitHub source of .vcs.pr.* that the ticket collectors (jira,
-      linear) read via their after-json variants, so ticket and change-management
-      checks work without each ticket collector calling the GitHub API itself.
-      Runs only in PR context.
+      target branch, author, labels, draft flag, state, URL, number and head
+      SHA, plus the reviews submitted so far (reviewer, state, time, and the
+      commit each was made on) and the PR's commits with GitHub's signature
+      verification. This is the GitHub source of .vcs.pr.* that the ticket
+      collectors (jira, linear) read via their after-json variants, so ticket
+      and change-management checks work without each ticket collector calling
+      the GitHub API itself. Runs only in PR context.
     mainBash: pull_request.sh
     runs_on: [prs]
     hook:
       type: code
-    keywords: ["github", "pull request", "pr", "vcs.pr", "ticket", "change management"]
+    keywords: ["github", "pull request", "pr", "vcs.pr", "ticket", "change management", "reviews", "approvals", "signed commits"]
 
   - name: repository
     description: |
@@ -53,11 +55,14 @@ collectors:
       field of "classic", "ruleset", or "none". Collects required approvals, code
       owner review, dismiss stale reviews, required status checks, force push/deletion
       restrictions, linear history requirements, signed commit requirements, and
-      (classic only) push restrictions (users, teams, apps).
+      (classic only) push restrictions (users, teams, apps). Also lists every
+      ruleset with an active rule on the branch, with its bypass actors when the
+      token can see them, and (classic only) whether administrators can bypass
+      and who may bypass the pull-request requirement.
     mainBash: branch_protection.sh
     hook:
       type: code
-    keywords: ["branch protection", "code review", "github security", "required reviewers"]
+    keywords: ["branch protection", "code review", "github security", "required reviewers", "rulesets", "bypass actors"]
 
   - name: access-permissions
     description: |
@@ -69,6 +74,29 @@ collectors:
     hook:
       type: code
     keywords: ["access control", "permissions", "audit", "least privilege"]
+
+  - name: release-range
+    description: |
+      Opt-in: does nothing until release_tag_pattern is set. On the default
+      branch, lists the commits since the previous release tag (the tag
+      matching the pattern with the fewest commits ahead of it) and records
+      each one's signature verification and the merged pull request that
+      brought it in, with that PR's approvals, under .vcs.release_range.
+      Feeds the vcs policy's release-commits-merged-via-pr check, which
+      `lunar policy ok-release` can gate on.
+    mainBash: release_range.sh
+    runs_on: [default-branch]
+    hook:
+      type: code
+    keywords: ["release", "release range", "merged pull request", "ok-release", "change management", "signed commits"]
+
+inputs:
+  release_tag_pattern:
+    description: Regular expression matching the tags that mark a release, e.g. `^v[0-9]+\.[0-9]+\.[0-9]+$`. The release-range sub-collector does nothing while this is empty.
+    default: ""
+  release_range_max_commits:
+    description: Most commits the release-range sub-collector records; a longer range is recorded with `truncated` set.
+    default: "250"
 
 secrets:
   GH_TOKEN:
@@ -96,7 +124,34 @@ example_component_json: |
         "author": "jdoe",
         "labels": ["enhancement", "payments"],
         "draft": false,
-        "state": "open"
+        "state": "open",
+        "head_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+        "reviews": [
+          {
+            "reviewer": "alice",
+            "state": "CHANGES_REQUESTED",
+            "submitted_at": "2024-05-02T09:14:07Z",
+            "commit_sha": "4b7e1d9c2a5f8e3b6d0c9a1f7e2d5b8c4a3f6e19"
+          },
+          {
+            "reviewer": "alice",
+            "state": "APPROVED",
+            "submitted_at": "2024-05-02T15:40:51Z",
+            "commit_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21"
+          }
+        ],
+        "commits": [
+          {
+            "sha": "4b7e1d9c2a5f8e3b6d0c9a1f7e2d5b8c4a3f6e19",
+            "author": "jdoe",
+            "signature": {"verified": true, "reason": "valid"}
+          },
+          {
+            "sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+            "author": "jdoe",
+            "signature": {"verified": false, "reason": "unsigned"}
+          }
+        ]
       },
       "branch_protection": {
         "enabled": true,
@@ -117,7 +172,64 @@ example_component_json: |
           "users": ["deployment-bot"],
           "teams": ["platform-team"],
           "apps": ["github-actions"]
-        }
+        },
+        "enforce_admins": false,
+        "bypass_pull_request_allowances": {
+          "users": [],
+          "teams": [],
+          "apps": ["release-bot"]
+        },
+        "rulesets": [
+          {
+            "id": 1234567,
+            "name": "main",
+            "source_type": "Repository",
+            "source": "acme/payments",
+            "bypass_actors": [
+              {"actor_type": "OrganizationAdmin", "bypass_mode": "always"},
+              {"actor_type": "Integration", "actor_id": 98765, "bypass_mode": "always"}
+            ]
+          },
+          {
+            "id": 7654321,
+            "name": "org-baseline",
+            "source_type": "Organization",
+            "source": "acme"
+          }
+        ]
+      },
+      "release_range": {
+        "tag_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+        "head_sha": "c3e8a1f6d9b2e5a7c0f4d8b1e6a3c9f2d5b7e0a4",
+        "base": {"tag": "v2.3.0", "sha": "e1d4b7a0c3f6e9d2b5a8c1f4e7d0b3a6c9f2e5d8"},
+        "total_commits": 2,
+        "truncated": false,
+        "commits": [
+          {
+            "sha": "a7c0f3e6d9b2a5c8f1e4d7b0a3c6f9e2d5b8a1c4",
+            "author": "jdoe",
+            "signature": {"verified": true, "reason": "valid"},
+            "pull_request": {
+              "number": 123,
+              "base_branch": "main",
+              "merged_at": "2024-05-02T16:02:13Z",
+              "merged_by": "jdoe",
+              "head_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+              "approvals": [
+                {
+                  "reviewer": "alice",
+                  "submitted_at": "2024-05-02T15:40:51Z",
+                  "commit_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21"
+                }
+              ]
+            }
+          },
+          {
+            "sha": "c3e8a1f6d9b2e5a7c0f4d8b1e6a3c9f2d5b7e0a4",
+            "author": "github-actions[bot]",
+            "signature": {"verified": false, "reason": "unsigned"}
+          }
+        ]
       },
       "access": {
         "collaborators": [

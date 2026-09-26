@@ -1,0 +1,87 @@
+{
+  "data": {
+    "repository": {
+      "ref": {
+        "compare": {
+          "commits": {
+            "totalCount": 3,
+            "pageInfo": {
+              "hasNextPage": true,
+              "endCursor": "Mg"
+            },
+            "nodes": [
+              {
+                "oid": "a7c0f3e6d9b2a5c8f1e4d7b0a3c6f9e2d5b8a1c4",
+                "author": {
+                  "name": "Jane Doe",
+                  "user": {
+                    "login": "jdoe"
+                  }
+                },
+                "signature": {
+                  "isValid": true,
+                  "state": "VALID"
+                },
+                "associatedPullRequests": {
+                  "nodes": [
+                    {
+                      "number": 41,
+                      "merged": true,
+                      "mergedAt": "2024-05-02T16:02:13Z",
+                      "baseRefName": "main",
+                      "headRefOid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+                      "mergedBy": {
+                        "__typename": "User",
+                        "login": "octocat"
+                      },
+                      "reviews": {
+                        "nodes": [
+                          {
+                            "author": {
+                              "__typename": "User",
+                              "login": "alice"
+                            },
+                            "submittedAt": "2024-05-02T15:40:51Z",
+                            "commit": {
+                              "oid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21"
+                            }
+                          },
+                          {
+                            "author": {
+                              "__typename": "Bot",
+                              "login": "review-bot"
+                            },
+                            "submittedAt": "2024-05-02T15:41:10Z",
+                            "commit": {
+                              "oid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21"
+                            }
+                          },
+                          {
+                            "author": null,
+                            "submittedAt": "2024-05-02T15:42:00Z",
+                            "commit": null
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "oid": "6d9b2e5a8c1f4d7b0e3a6c9f2d5b8e1a4c7f0d3b",
+                "author": {
+                  "name": "github-actions[bot]",
+                  "user": null
+                },
+                "signature": null,
+                "associatedPullRequests": {
+                  "nodes": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

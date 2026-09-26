@@ -78,6 +78,54 @@ gh_api() {
   return 0
 }
 
+# Fetch every page of a list endpoint into GH_LIST as one JSON array. Returns
+# non-zero on a non-200 page (GH_HTTP_CODE keeps its status) or a non-array
+# body. Pages are merged through stdin: a page can exceed the per-argument limit.
+gh_api_list() {
+  local endpoint="$1"
+  local page=1
+  GH_LIST='[]'
+  while [ "$page" -le 10 ]; do
+    gh_api "${endpoint}?per_page=100&page=${page}"
+    [ "$GH_HTTP_CODE" = "200" ] || return 1
+    printf '%s' "$GH_BODY" | jq -e 'type == "array"' > /dev/null 2>&1 || return 1
+    GH_LIST=$(printf '%s\n%s\n' "$GH_LIST" "$GH_BODY" | jq -cs 'add')
+    [ "$(printf '%s' "$GH_BODY" | jq 'length')" -lt 100 ] && return 0
+    page=$((page + 1))
+  done
+}
+
+# Describe every ruleset that has an active rule on the default branch, from
+# the ruleset IDs in RULES_DATA, into RULESETS as a JSON array. GitHub returns
+# bypass_actors only to callers with write access to the ruleset, so it is
+# omitted when hidden and [] only when genuinely empty. A 404 ruleset (gone
+# since the rules call) is recorded as hidden. Returns non-zero on any other
+# API error.
+collect_rulesets() {
+  local id meta
+  RULESETS='[]'
+  for id in $(printf '%s' "$RULES_DATA" | jq -r '[.[].ruleset_id | select(. != null)] | unique | .[]'); do
+    gh_api "/repos/${OWNER}/${REPO}/rulesets/${id}"
+    if [ "$GH_HTTP_CODE" = "200" ]; then
+      # Nulls are dropped (actor_id is null for OrganizationAdmin and DeployKey):
+      # a policy reads null as missing data.
+      meta=$(printf '%s' "$GH_BODY" | jq -c '({id, name, source_type, source}
+        + if has("bypass_actors") then {bypass_actors: [.bypass_actors[]
+            | {actor_type, actor_id, bypass_mode} | with_entries(select(.value != null))]}
+          else {} end)
+        | with_entries(select(.value != null))')
+    elif [ "$GH_HTTP_CODE" = "404" ]; then
+      meta=$(printf '%s' "$RULES_DATA" | jq -c --argjson id "$id" 'first(.[] | select(.ruleset_id == $id))
+        | {id: .ruleset_id, source_type: .ruleset_source_type, source: .ruleset_source}
+        | with_entries(select(.value != null))')
+    else
+      return 1
+    fi
+    [ -n "$meta" ] || return 1
+    RULESETS=$(printf '%s\n%s\n' "$RULESETS" "[$meta]" | jq -cs 'add')
+  done
+}
+
 # Get the default branch from the repository. If this call fails we can't
 # reliably determine which branch to inspect, so abort (non-zero) rather than
 # guess — a non-zero exit marks the run errored and preserves any previously
@@ -154,7 +202,26 @@ if [ "$CLASSIC_PROTECTED" = "true" ]; then
     RESTRICTIONS_APPS='[]'
   fi
 
+  # "Do not allow bypassing the above settings" in the UI.
+  ENFORCE_ADMINS=$(echo "$PROTECTION_DATA" | jq '.enforce_admins.enabled // false')
+  BYPASS_ALLOWANCES=$(echo "$PROTECTION_DATA" | jq -c '.required_pull_request_reviews.bypass_pull_request_allowances // {}
+    | {users: [.users[]?.login], teams: [.teams[]?.slug], apps: [.apps[]?.slug]}')
+
   SOURCE="classic"
+
+  # Rulesets can target the branch on top of classic protection, each with its
+  # own bypass list. A failure reading them omits .rulesets rather than
+  # aborting: the classic data above is still accurate.
+  HAVE_RULESETS=false
+  if gh_api_list "/repos/${OWNER}/${REPO}/rules/branches/${DEFAULT_BRANCH}"; then
+    RULES_DATA="$GH_LIST"
+    if collect_rulesets; then
+      HAVE_RULESETS=true
+    fi
+  fi
+  if [ "$HAVE_RULESETS" != "true" ]; then
+    echo "Warning: could not read the rulesets on ${REPO_FULL_NAME}@${DEFAULT_BRANCH} (HTTP ${GH_HTTP_CODE}); .vcs.branch_protection.rulesets not collected." >&2
+  fi
 else
   # ---- Rulesets fallback ----
   # GitHub now recommends rulesets over classic branch protection. A repo can be
@@ -165,27 +232,32 @@ else
   # abort rather than coerce it to "no rules", which would falsely report the repo
   # as unprotected. An empty array on 200 is the genuine "no rulesets" signal,
   # handled below.
-  gh_api "/repos/${OWNER}/${REPO}/rules/branches/${DEFAULT_BRANCH}"
-  if [ "$GH_HTTP_CODE" != "200" ]; then
-    echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} for rulesets on ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting so the last-known-good branch protection data is retained." >&2
+  if ! gh_api_list "/repos/${OWNER}/${REPO}/rules/branches/${DEFAULT_BRANCH}"; then
+    # A 200 response is always a JSON array. If it somehow isn't, treat it as
+    # an error rather than silently coercing to "unprotected".
+    if [ "$GH_HTTP_CODE" = "200" ]; then
+      echo "Error: unexpected non-array response from the rulesets endpoint for ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting." >&2
+    else
+      echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} for rulesets on ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting so the last-known-good branch protection data is retained." >&2
+    fi
     exit 1
   fi
-  RULES_DATA="$GH_BODY"
-
-  # A 200 response is always a JSON array. If it somehow isn't, treat it as an
-  # error rather than silently coercing to "unprotected".
-  if ! echo "$RULES_DATA" | jq -e 'type == "array"' > /dev/null 2>&1; then
-    echo "Error: unexpected non-array response from the rulesets endpoint for ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting." >&2
-    exit 1
-  fi
+  RULES_DATA="$GH_LIST"
 
   if [ "$(echo "$RULES_DATA" | jq 'length')" = "0" ]; then
     # No classic protection AND no rulesets — truly unprotected.
     lunar collect -j ".vcs.branch_protection.enabled" false \
                   ".vcs.branch_protection.source" '"none"'
     lunar collect ".vcs.branch_protection.branch" "$DEFAULT_BRANCH"
+    echo '[]' | lunar collect -j ".vcs.branch_protection.rulesets" -
     exit 0
   fi
+
+  if ! collect_rulesets; then
+    echo "Error: GitHub API returned HTTP ${GH_HTTP_CODE} reading a ruleset on ${REPO_FULL_NAME}@${DEFAULT_BRANCH}. Aborting so the last-known-good branch protection data is retained." >&2
+    exit 1
+  fi
+  HAVE_RULESETS=true
 
   # Derive each branch_protection field from the matching rule type. Field
   # names in the wire format differ from classic protection (e.g.
@@ -238,8 +310,7 @@ else
   REQUIRE_LINEAR_HISTORY=$(echo "$RULES_DATA" | jq 'any(.[]; .type == "required_linear_history")')
   REQUIRE_SIGNED_COMMITS=$(echo "$RULES_DATA" | jq 'any(.[]; .type == "required_signatures")')
 
-  # Rulesets use bypass_actors rather than push restrictions — different
-  # semantics, not surfaced here. Leave the restrictions arrays empty.
+  # Rulesets have no push restrictions; who can bypass them is in .rulesets.
   RESTRICTIONS_USERS='[]'
   RESTRICTIONS_TEAMS='[]'
   RESTRICTIONS_APPS='[]'
@@ -267,3 +338,12 @@ echo "$RESTRICTIONS_USERS" | lunar collect -j ".vcs.branch_protection.restrictio
 echo "$RESTRICTIONS_TEAMS" | lunar collect -j ".vcs.branch_protection.restrictions.teams" -
 echo "$RESTRICTIONS_APPS" | lunar collect -j ".vcs.branch_protection.restrictions.apps" -
 echo "$REQUIRED_CHECKS" | lunar collect -j ".vcs.branch_protection.required_checks" -
+
+if [ "$HAVE_RULESETS" = "true" ]; then
+  echo "$RULESETS" | lunar collect -j ".vcs.branch_protection.rulesets" -
+fi
+
+if [ "$SOURCE" = "classic" ]; then
+  lunar collect -j ".vcs.branch_protection.enforce_admins" "$ENFORCE_ADMINS"
+  echo "$BYPASS_ALLOWANCES" | lunar collect -j ".vcs.branch_protection.bypass_pull_request_allowances" -
+fi
