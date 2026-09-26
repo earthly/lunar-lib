@@ -20,6 +20,32 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, "..", "test-results.sh")
 FIXTURES = os.path.join(HERE, "fixtures")
 
+# The hook fires when the build's JVM exits. These are the shapes of the JVM
+# command lines the Lunar agent traced for real Maven and Gradle wrapper builds.
+LAUNCHERS = {
+    "maven": [
+        "/opt/java/bin/java",
+        "-classpath",
+        "/root/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/boot/plexus-classworlds-2.9.0.jar",
+        "-Dclassworlds.conf=/root/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/bin/m2.conf",
+        "-Dmaven.home=/root/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15",
+        "-Dmaven.multiModuleProjectDirectory=/work",
+        "org.codehaus.plexus.classworlds.launcher.Launcher",
+        "-B",
+        "verify",
+    ],
+    "gradle": [
+        "/opt/java/bin/java",
+        "-Dfile.encoding=UTF-8",
+        "-Xmx64m",
+        "-Xms64m",
+        "-Dorg.gradle.appname=gradlew",
+        "-jar",
+        "/work/gradle/wrapper/gradle-wrapper.jar",
+        "test",
+    ],
+}
+
 
 class TestResults(unittest.TestCase):
     def setUp(self):
@@ -50,11 +76,12 @@ class TestResults(unittest.TestCase):
         """Copy fixtures/<fixture> (subdirectories included) to <work>/<dest>."""
         shutil.copytree(os.path.join(FIXTURES, fixture), os.path.join(self.work, dest), dirs_exist_ok=True)
 
-    def run_collector(self, command_bin="mvn"):
+    def run_collector(self, tool="maven"):
         env = dict(os.environ)
         env["PATH"] = self.bin + os.pathsep + env["PATH"]
         env["CAPTURE"] = self.capture
-        env["LUNAR_CI_COMMAND_BIN"] = command_bin
+        env["LUNAR_CI_COMMAND"] = json.dumps(LAUNCHERS[tool], separators=(",", ":"))
+        env["LUNAR_CI_COMMAND_BIN"] = "java"
         proc = subprocess.run(["bash", SCRIPT], cwd=self.work, env=env, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, f"exit {proc.returncode}: {proc.stderr}")
         return proc
@@ -101,7 +128,7 @@ class TestResults(unittest.TestCase):
         # totals match the Maven run.
         self.layout("gradle-test", "build/test-results/test")
         self.layout("gradle-integrationTest", "build/test-results/integrationTest")
-        self.run_collector("gradlew")
+        self.run_collector("gradle")
         self.assert_results(total=10, passed=6, failed=3, skipped=1, tool="gradle")
 
     def test_all_passing(self):
@@ -122,7 +149,7 @@ class TestResults(unittest.TestCase):
         # otherwise count the same suite twice.
         self.layout("surefire", "target/surefire-reports")
         self.layout("gradle-integrationTest", "build/test-results/integrationTest")
-        self.run_collector("mvnw")
+        self.run_collector("maven")
         self.assert_results(total=8, passed=5, failed=2, skipped=1)
         os.remove(self.capture)
         self.run_collector("gradle")
@@ -142,14 +169,14 @@ class TestResults(unittest.TestCase):
         # passing retry are separate testcases. Gradle printed "3 tests
         # completed, 1 failed" and BUILD SUCCESSFUL.
         self.layout("gradle-retry", "build/test-results/test")
-        self.run_collector("gradlew")
+        self.run_collector("gradle")
         self.assert_results(total=3, passed=2, failed=1, skipped=0, tool="gradle")
 
     def test_gradle_retry_with_merge_reruns_counts_the_flaky_test_as_passed(self):
         # With reports.junitXml.mergeReruns = true the failed attempt becomes a
         # <flakyFailure>, but the <testsuite> still says tests="3" failures="1".
         self.layout("gradle-retry-merged", "build/test-results/test")
-        self.run_collector("gradlew")
+        self.run_collector("gradle")
         self.assert_results(total=2, passed=2, failed=0, skipped=0, tool="gradle")
 
     def test_testng_junitreports_copy_is_not_counted_twice(self):

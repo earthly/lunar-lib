@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-# Read JUnit XML test reports after a Maven/Gradle command and record the totals.
-# Runs native on the CI runner, so it sticks to bash, find and awk (no jq/yq).
+# Read JUnit XML test reports when a Maven/Gradle build's JVM exits and record the
+# totals. Runs native on the CI runner, so it sticks to bash, find and awk.
 #
-# Reports read, relative to the command's working directory (any depth), for the
+# Reports read, relative to the build's working directory (any depth), for the
 # build tool that just ran, so a job that tests with both doesn't count twice:
-#   mvn/mvnw:       */target/surefire-reports/TEST-*.xml, */target/failsafe-reports/TEST-*.xml
-#   gradle/gradlew: */build/test-results/<task>/TEST-*.xml
+#   Maven:  */target/surefire-reports/TEST-*.xml, */target/failsafe-reports/TEST-*.xml
+#   Gradle: */build/test-results/<task>/TEST-*.xml
 # Only files directly in those directories count: TestNG also writes its own
 # copy of every suite to surefire-reports/junitreports/, which would double-count.
 #
@@ -19,8 +19,9 @@ set -e
 # Splitting records on "<" is safe because XML only allows a literal "<" inside
 # CDATA and comments, which are skipped until they close.
 
-case "${LUNAR_CI_COMMAND_BIN:-}" in
-    gradle|gradlew)
+# The hooked command is the build's JVM; Gradle's launch scripts pass -Dorg.gradle.appname.
+case "${LUNAR_CI_COMMAND:-}" in
+    *-Dorg.gradle.appname=*)
         tool=gradle
         report_dirs=(-path '*/build/test-results/*' ! -path '*/build/test-results/*/*/*') ;;
     *)

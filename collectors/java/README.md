@@ -44,7 +44,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 
 ### Test results
 
-`test-results` runs after every Maven or Gradle command and reads the `TEST-*.xml` files in `target/surefire-reports/`, `target/failsafe-reports/` and `build/test-results/<task>/` under the command's directory. It writes nothing when there are none.
+`test-results` runs when a Maven or Gradle build finishes. `mvn`, `mvnw`, `gradle` and `gradlew` all `exec` into the build's JVM, so the hook is on that `java` process, whose exit is the end of the build. It reads the `TEST-*.xml` files in `target/surefire-reports/` and `target/failsafe-reports/` (Maven) or `build/test-results/<task>/` (Gradle) under the build's directory, and writes nothing when there are none.
 
 - It counts each `<testcase>`: a failure or error fails it, `<skipped>` skips it, and a test that passed on a Surefire rerun counts as passed.
 - Gradle's test-retry plugin lists every attempt as its own test, so a test that passed on retry still counts its failed attempt. Set `reports.junitXml.mergeReruns = true` to report it the way Surefire does.

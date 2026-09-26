@@ -119,15 +119,18 @@ collectors:
 
   - name: test-results
     description: |
-      After a Maven or Gradle command, reads the JUnit XML reports it wrote
+      When a Maven or Gradle build finishes, reads the JUnit XML reports it wrote
       (Surefire, Failsafe, Gradle test tasks) and records how many tests passed,
       failed and were skipped. Writes the totals to .lang.java.tests.results and
       .testing.results, and whether every test passed to .testing.all_passing.
     mainBash: test-results.sh
+    # mvn/mvnw/gradle/gradlew exec into the build's JVM, so that JVM, not the
+    # wrapper, is the process whose exit marks the end of the build.
     hook:
       type: ci-after-command
       binary:
-        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+        name: java
+      args_pattern: org\.codehaus\.plexus\.classworlds\.launcher\.Launcher|org\.apache\.maven\.wrapper\.MavenWrapperMain|-Dorg\.gradle\.appname=
     keywords: ["junit", "test results", "surefire", "failsafe", "gradle test", "test reports"]
 
 example_component_json: |
