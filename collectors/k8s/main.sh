@@ -3,6 +3,7 @@
 set -e
 
 # Source helper function for helm template detection
+# shellcheck disable=SC1091  # sibling file, resolved at runtime
 source "$(dirname "$0")/helm.sh"
 
 # Directories to ignore
@@ -92,6 +93,12 @@ process_file() {
                 elif .kind == "Job" then .spec.template.spec
                 else .spec.template.spec
                 end
+            ),
+            # Pod template labels: what a PodDisruptionBudget selector matches.
+            pod_labels: (
+                (if .kind == "CronJob" then .spec.jobTemplate.spec.template.metadata.labels
+                 else .spec.template.metadata.labels
+                 end) // {}
             )
         }
     ]')
@@ -106,6 +113,7 @@ process_file() {
             namespace: .namespace,
             path: .path,
             replicas: .replicas,
+            pod_labels: .pod_labels,
             host_users: (if $w.pod_spec.hostUsers == null then true else $w.pod_spec.hostUsers end),
             host_network: (if $w.pod_spec.hostNetwork == null then false else $w.pod_spec.hostNetwork end),
             host_pid: (if $w.pod_spec.hostPID == null then false else $w.pod_spec.hostPID end),
@@ -140,6 +148,11 @@ process_file() {
             name: .metadata.name,
             namespace: (.metadata.namespace // "default"),
             path: $path,
+            # The full LabelSelector (matchLabels + matchExpressions); the pdb
+            # policy matches it against the pod_labels of each workload.
+            selector: (.spec.selector // null),
+            # Deprecated guess at the name of the covered workload; kept for
+            # one release so existing consumers keep working.
             target_workload: (.spec.selector.matchLabels.app // .spec.selector.matchLabels["app.kubernetes.io/name"] // null),
             min_available: (.spec.minAvailable // null),
             max_unavailable: (.spec.maxUnavailable // null)

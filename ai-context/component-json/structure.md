@@ -39,9 +39,9 @@ This table lists important sub-objects within each category. For full details, s
 | `.containers.builds[]` | Built images (`image`, `tag`, `signed`, `has_git_sha_label`) |
 | **[`.k8s`](cat-k8s.md)** | **Kubernetes manifests and configuration** |
 | `.k8s.manifests[]` | Manifest files (`path`, `valid`, `resources`) |
-| `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `containers`) |
+| `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `pod_labels`, `containers`) |
 | `.k8s.workloads[].containers[]` | Container specs (`has_resources`, `has_liveness_probe`, `runs_as_non_root`) |
-| `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `target_workload`, `min_available`) |
+| `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `selector`, `min_available`) |
 | `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`) |
 | `.k8s.summary` | Aggregated checks (`all_have_resources`, `all_have_probes`, `all_have_pdb`) |
 | **[`.iac`](cat-iac.md)** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |

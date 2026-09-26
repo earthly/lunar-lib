@@ -4,10 +4,11 @@
 # Backstage catalog by-name API) and `lunar` (capturing the collected
 # `.catalog.native.backstage` write) so the collector can be exercised
 # end-to-end — through the real `yq`/`python3` pipeline — without network
-# access. Covers two things:
+# access. Covers three things:
 #   1. Multi-document parsing/linting (multiple entities separated by `---`).
 #      This is the path the alpine CI unit tests can't reach (no yq there).
 #   2. The optional referential-integrity feature.
+#   3. Monorepo subdirectory components reading a shared ancestor file.
 #
 # The mock curl returns an HTTP status keyed off the requested entity name:
 #   typo*  -> 404 (definitive miss)      five -> 502 (transient 5xx)
@@ -35,6 +36,9 @@ export CURL_LOG="$TEST_DIR/curl.log"
 #   * STS AssumeRoleWithWebIdentity -> mock credentials when MOCK_STS=1.
 #     Matched against the whole arg list, not the last arg: the STS call puts
 #     --data-urlencode pairs *after* the URL.
+#   * STS AssumeRole (the aws_assume_role_arns hop), keyed off the role name:
+#     *denied* -> an AccessDenied error body (curl exits 0 on a 403),
+#     *unreachable* -> curl exit 28, else -> credentials for the assumed role.
 #   * the Backstage by-name API -> an http_code keyed off the entity name.
 cat > "$MOCK/curl" << 'EOF'
 #!/bin/bash
@@ -43,12 +47,23 @@ cat > "$MOCK/curl" << 'EOF'
 args="$*"
 case "$args" in
   *169.254.169.254*|*169.254.170.2*) exit 7 ;;
-  *sts.*amazonaws.com*)
+  *sts.*amazonaws.com*AssumeRoleWithWebIdentity*)
     if [ "${MOCK_STS:-0}" = "1" ]; then
       printf '%s' '<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>ASIAMOCKKEY</AccessKeyId><SecretAccessKey>mocksecret</SecretAccessKey><SessionToken>mocksessiontoken</SessionToken></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>'
       exit 0
     fi
     exit 7 ;;
+  *sts.*amazonaws.com*Action=AssumeRole*)
+    case "$args" in
+      *RoleArn=*denied*)
+        printf '%s' '<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><Error><Type>Sender</Type><Code>AccessDenied</Code><Message>User: arn:aws:sts::111111111111:assumed-role/base/s is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::210987654321:role/denied-other-env</Message></Error><RequestId>r-1</RequestId></ErrorResponse>'
+        exit 0 ;;
+      *RoleArn=*unreachable*) exit 28 ;;
+      *)
+        printf '%s' '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleResult><Credentials><AccessKeyId>ASIAASSUMED</AccessKeyId><SecretAccessKey>assumedsecret</SecretAccessKey><SessionToken>assumedtoken</SessionToken><Expiration>2026-09-23T16:00:00Z</Expiration></Credentials><AssumedRoleUser><AssumedRoleId>AROAEXAMPLE:lunar-backstage-collector</AssumedRoleId><Arn>arn:aws:sts::210987654321:assumed-role/backstage-api-reader/lunar-backstage-collector</Arn></AssumedRoleUser></AssumeRoleResult></AssumeRoleResponse>'
+        exit 0 ;;
+    esac ;;
+  *sts.*amazonaws.com*) exit 7 ;;
 esac
 
 url="${@: -1}"
@@ -83,14 +98,18 @@ mock_entity() {
 # by-query: existence lives in the body, so answer with a real by-query
 # envelope plus the trailing http_code that `-w '\n%{http_code}'` appends.
 # The name is read back out of the filter, which is also how the tests assert
-# the filter was built (and escaped) correctly.
+# the filter was built (and escaped) correctly. Like Backstage, the filter param
+# is decoded before its grammar is parsed, so encoded and literal forms parse
+# the same.
 case "$url" in
   */catalog/entities/by-query\?*)
-    qname="${url##*metadata.name=}"
-    qname="${qname%%&*}"
-    qkind="${url##*filter=kind=}"
+    filter="${url##*filter=}"
+    filter="${filter%%&*}"
+    filter=$(printf '%b' "${filter//%/\\x}")
+    qname="${filter##*metadata.name=}"
+    qkind="${filter#kind=}"
     qkind="${qkind%%,*}"
-    qns="${url##*metadata.namespace=}"
+    qns="${filter##*metadata.namespace=}"
     qns="${qns%%,*}"
     case "$qname" in
       boom)  exit 7 ;;
@@ -357,6 +376,107 @@ assert_eq "IRSA web-identity creds take precedence over static keys" \
 assert_eq "IRSA session token is sent" \
   "$(grep -c 'x-amz-security-token: mocksessiontoken' "$CURL_LOG")" '1'
 
+echo "Backstage collector aws_assume_role_arns (sts:AssumeRole hop) tests:"
+
+OK_ROLE="arn:aws:iam::210987654321:role/backstage-api-reader"
+DENIED_ROLE="arn:aws:iam::210987654321:role/denied-other-env"
+DEAD_ROLE="arn:aws:iam::210987654321:role/unreachable"
+ASSUMED_SIG='--user ASIAASSUMED:assumedsecret -H x-amz-security-token: assumedtoken'
+
+# Negative control: unset means no STS hop, and the chain's own keys sign.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" payments '' http://fake:7007 >/dev/null
+assert_eq "no aws_assume_role_arns -> no sts:AssumeRole call" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '0'
+
+: > "$CURL_LOG"
+assert_eq "an assumed role resolves refs (200 exists / 404 miss)" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-west-2 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+     payments typo-platform http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+STS_CALL=$(grep -- 'Action=AssumeRole ' "$CURL_LOG" || true)
+assert_eq "exactly one sts:AssumeRole call" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '1'
+assert_eq "AssumeRole goes to the regional STS endpoint for aws_region" \
+  "$(echo "$STS_CALL" | grep -c -- '--get https://sts.us-west-2.amazonaws.com/ ' || true)" '1'
+assert_eq "AssumeRole is signed for sts with the chain's credentials" \
+  "$(echo "$STS_CALL" | grep -c -- '--aws-sigv4 aws:amz:us-west-2:sts --user AKIATEST:secret123 ' || true)" '1'
+assert_eq "AssumeRole names the role and the plugin's session" \
+  "$(echo "$STS_CALL" | grep -c -- "RoleArn=$OK_ROLE --data-urlencode RoleSessionName=lunar-backstage-collector" || true)" '1'
+assert_eq "keys without a session token send no x-amz-security-token to STS" \
+  "$(echo "$STS_CALL" | grep -c 'x-amz-security-token' || true)" '0'
+assert_eq "both lookups are signed with the assumed role's credentials" \
+  "$(grep -c -- "--aws-sigv4 aws:amz:us-west-2:execute-api $ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2'
+assert_eq "the chain's own keys never sign a lookup" \
+  "$(grep 'fake:7007' "$CURL_LOG" | grep -c 'AKIATEST' || true)" '0'
+
+# IRSA as the base: its temporary credentials (and their token) sign the hop.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 MOCK_STS=1 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/r AWS_WEB_IDENTITY_TOKEN_FILE=$TEST_DIR/wit LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+  payments '' http://fake:7007 >/dev/null 2>"$TEST_DIR/err"
+assert_eq "IRSA credentials sign the AssumeRole call, token included" \
+  "$(grep -- 'Action=AssumeRole ' "$CURL_LOG" | grep -c -- '--user ASIAMOCKKEY:mocksecret -H x-amz-security-token: mocksessiontoken' || true)" '1'
+assert_eq "and the lookup is signed with the assumed role" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "the auth log line shows both hops" \
+  "$(grep -c 'credentials via irsa-web-identity+assume-role' "$TEST_DIR/err" || true)" '1'
+
+# Temporary static keys carry their session token to STS, and only there.
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_SECRET_AWS_SESSION_TOKEN=tmptok LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "temporary base keys send their session token to STS" \
+  "$(grep -- 'Action=AssumeRole ' "$CURL_LOG" | grep -c 'x-amz-security-token: tmptok' || true)" '1'
+assert_eq "the base session token never reaches a lookup" \
+  "$(grep 'fake:7007' "$CURL_LOG" | grep -c 'tmptok' || true)" '0'
+
+# A list falls through a refused role and an unreachable STS to the first role
+# that works. Set via the caller's env rather than $extra, which would
+# word-split the spaces this case is about.
+: > "$CURL_LOG"
+LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$DENIED_ROLE, $DEAD_ROLE, $OK_ROLE" \
+  run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" \
+  payments '' http://fake:7007 >/dev/null 2>"$TEST_DIR/err"
+assert_eq "a list tries each role in order until one is assumed" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '3'
+assert_eq "whitespace around list entries is ignored" \
+  "$(grep -c -- "RoleArn=$OK_ROLE " "$CURL_LOG" || true)" '1'
+assert_eq "the lookup is signed with the role that was assumed" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "a refused role is logged by position and STS error code" \
+  "$(grep -c 'aws_assume_role_arns role 1/3 not assumed (AccessDenied)' "$TEST_DIR/err" || true)" '1'
+assert_eq "an unreachable STS is logged with the curl exit code" \
+  "$(grep -c 'aws_assume_role_arns role 2/3 not assumed (request failed, curl exit 28)' "$TEST_DIR/err" || true)" '1'
+assert_eq "no role ARN or account id reaches the log" \
+  "$(grep -c -E '210987654321|111111111111|denied-other-env|backstage-api-reader' "$TEST_DIR/err" || true)" '0'
+
+# A YAML block scalar puts one ARN per line, with no commas.
+: > "$CURL_LOG"
+LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$DENIED_ROLE
+$OK_ROLE" run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" \
+  payments '' http://fake:7007 >/dev/null 2>&1
+assert_eq "a newline-separated list is split like a comma-separated one" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true) $(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2 1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE,$DENIED_ROLE" \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "roles after the first one assumed are never tried" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=,," \
+  payments '' http://fake:7007 >/dev/null
+assert_eq "a list of only separators is treated as unset" \
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '0'
+assert_eq "so the chain's own keys sign the lookup" \
+  "$(grep -c -- '--user AKIATEST:secret123 http://fake:7007/' "$CURL_LOG" || true)" '1'
+
+: > "$CURL_LOG"
+run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" payments '' http://fake:7007 >/dev/null
+assert_eq "bearer mode ignores aws_assume_role_arns" \
+  "$(grep -c 'sts\.' "$CURL_LOG" || true)" '0'
+
 echo "Backstage collector ref_lookup (by-name / by-query) tests:"
 
 # Negative control first: an unset ref_lookup must keep hitting by-name and
@@ -379,9 +499,13 @@ assert_eq "by-query resolves exists (non-empty .items) + miss (empty .items)" \
   "$BQ_REFS" \
   '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
 assert_eq "by-query calls the by-query endpoint with the entity filter" \
-  "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind=domain,metadata.namespace=default,metadata.name=payments' "$CURL_LOG")" '1'
+  "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind%3Ddomain%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 assert_eq "by-query filters on each reference's own kind" \
-  "$(grep -c 'filter=kind=system,metadata.namespace=default,metadata.name=typo-platform' "$CURL_LOG")" '1'
+  "$(grep -c 'filter=kind%3Dsystem%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dtypo-platform' "$CURL_LOG")" '1'
+# The grammar's own `=`/`,` go encoded too: curl < 8.14 mis-signs a literal `=`
+# inside a query value under sigv4.
+assert_eq "by-query sends no literal filter grammar on the wire" \
+  "$(grep 'by-query' "$CURL_LOG" | grep -c 'filter=kind=' || true)" '0'
 assert_eq "by-query sends no by-name request" \
   "$(grep -c 'by-name' "$CURL_LOG" || true)" '0'
 
@@ -391,7 +515,7 @@ assert_eq "by-query keeps a qualified ref's own namespace" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" prod/payments '' http://fake:7007 compns | jq -c '.refs.domain')" \
   '{"name":"prod/payments","exists":true}'
 assert_eq "by-query puts that namespace in the filter, not the component's" \
-  "$(grep -c 'metadata.namespace=prod,metadata.name=payments' "$CURL_LOG")" '1'
+  "$(grep -c 'metadata.namespace%3Dprod%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 
 # Non-definitive outcomes degrade exactly as they do under by-name.
 assert_eq "by-query transient 5xx -> error marker, not exists" \
@@ -414,11 +538,11 @@ assert_eq "by-query 200 with no .items array -> error, NOT exists:false" \
 
 # Query injection. Backstage ORs repeated `filter` params, so an unescaped `&`
 # in a declared reference could append a second filter and turn a miss into a
-# hit on an unrelated entity. The interpolated value must arrive encoded.
+# hit on an unrelated entity. The `&` must arrive encoded inside the one param.
 : > "$CURL_LOG"
 run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" 'a&filter=kind=system' '' http://fake:7007 >/dev/null
 assert_eq "by-query percent-encodes the interpolated ref value" \
-  "$(grep -c 'metadata.name=a%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
+  "$(grep -c 'metadata.name%3Da%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
 assert_eq "by-query does not inject a second filter param" \
   "$(grep -c '&filter=kind=system' "$CURL_LOG" || true)" '0'
 
@@ -430,7 +554,7 @@ assert_eq "by-query + sigv4 + root-mounted API resolves the ref" \
      payments '' http://fake:7007 | jq -c '.refs.domain')" \
   '{"name":"payments","exists":true}'
 assert_eq "by-query + sigv4 signs the by-query URL at the root path" \
-  "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind=domain' "$CURL_LOG")" '1'
+  "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind%3Ddomain' "$CURL_LOG")" '1'
 assert_eq "by-query + sigv4 passes the signing flags" \
   "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '1'
 assert_eq "by-query + sigv4 sends no Bearer header" \
@@ -459,6 +583,15 @@ assert_degraded "sigv4 without aws_region" \
 assert_degraded "sigv4 with no resolvable credentials" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1" payments '' http://fake:7007)" \
   "sigv4 credential resolution failed"
+
+assert_degraded "no role in aws_assume_role_arns can be assumed" \
+  "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$DENIED_ROLE,$DEAD_ROLE" payments '' http://fake:7007)" \
+  "sts:AssumeRole failed for every role in aws_assume_role_arns"
+
+: > "$CURL_LOG"
+run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$DENIED_ROLE" payments '' http://fake:7007 >/dev/null
+assert_eq "a failed AssumeRole makes no Backstage request" \
+  "$(grep -c 'fake:7007' "$CURL_LOG" || true)" '0'
 
 assert_degraded "invalid auth_mode" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=oauth2" payments '' http://fake:7007)" \
@@ -561,6 +694,175 @@ spec: {owner: team-demo, domain: typo-domain}
 EOF
 )" \
   '{"checked":true,"domain":{"name":"typo-domain","exists":false}}'
+
+# --- Monorepo: a subdirectory component reading a shared ancestor file -----
+echo
+echo "Monorepo ancestor catalog file tests:"
+
+# $MONO is a repo root holding the shared fixture. Its `.git` is a file whose
+# gitdir doesn't exist, like the hub's per-snippet worktree seen from a box
+# where git can't resolve it, so the `.git` walk (not git) finds the root.
+MONO="$TEST_DIR/repos/monorepo"
+make_mono() {
+  rm -rf "$TEST_DIR/repos"
+  mkdir -p "$MONO"
+  echo "gitdir: $TEST_DIR/no-such-gitdir" > "$MONO/.git"
+  cp "$SCRIPT_DIR/test/fixtures/monorepo-catalog-info.yaml" "$MONO/catalog-info.yaml"
+}
+
+# mono_main <subdir> [KEY=VALUE ...] — main.sh from $MONO/<subdir> with only the
+# given inputs (the rest at their defaults), component id
+# github.com/acme/monorepo/<subdir> unless overridden. Emits the collected
+# object, or nothing when the collector wrote nothing.
+mono_main() {
+  local sub="$1"
+  shift
+  mkdir -p "$MONO/$sub"
+  ( cd "$MONO/$sub" \
+    && env PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="" \
+       LUNAR_COMPONENT_ID="github.com/acme/monorepo/$sub" \
+       "$@" \
+       bash "$SCRIPT_DIR/main.sh" )
+}
+
+# The lookup is opt-in, so most cases run with it on: search_parent_dirs plus
+# source-location matching. Later KEY=VALUE arguments override these.
+LOOKUP_ON=(LUNAR_VAR_SEARCH_PARENT_DIRS=true LUNAR_VAR_MATCH_SOURCE_LOCATION=true)
+run_mono() {
+  local sub="$1"
+  shift
+  mono_main "$sub" "${LOOKUP_ON[@]}" "$@" 2>/dev/null
+}
+
+names() { jq -c '[.entities[].metadata.name]'; }
+LINKS_ON=LUNAR_VAR_MATCH_LINKS=true
+
+make_mono
+assert_eq "the parent lookup is off by default" \
+  "$(mono_main services/payments 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and stays quiet" \
+  "$({ mono_main services/payments >/dev/null; } 2>&1 | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs alone matches nothing" \
+  "$(mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true 2>/dev/null | wc -c | tr -d ' ')" '0'
+assert_eq "and logs why" \
+  "$({ mono_main services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=true >/dev/null; } 2>&1 | grep -c 'both off')" '1'
+
+OUT=$(run_mono services/payments)
+assert_eq "source-location picks the dir's entities from the root file" \
+  "$(echo "$OUT" | names)" '["payments-api","payments-grpc"]'
+assert_eq "the primary is the dir's Component, path points up at the shared file" \
+  "$(echo "$OUT" | jq -c '{name: .metadata.name, owner: .spec.owner, path}')" \
+  '{"name":"payments-api","owner":"team-payments","path":"../../catalog-info.yaml"}'
+assert_eq "another dir's bad entity doesn't fail this component" \
+  "$(echo "$OUT" | jq -c '.valid')" 'true'
+
+assert_eq "links are off by default" \
+  "$(run_mono services/web | wc -c | tr -d ' ')" '0'
+assert_eq "match_links matches when source-location only names the repo root" \
+  "$(run_mono services/web "$LINKS_ON" | names)" '["web-frontend"]'
+assert_eq "an entity whose source-location names another dir isn't matched by its link" \
+  "$(run_mono services/docs "$LINKS_ON" | names)" '["docs-site"]'
+assert_eq "with match_source_location off, links decide for every entity" \
+  "$(run_mono services/web "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | names)" \
+  '["web-frontend","docs-site"]'
+assert_eq "with match_source_location off, source-location alone matches nothing" \
+  "$(run_mono services/payments "$LINKS_ON" LUNAR_VAR_MATCH_SOURCE_LOCATION=false | wc -c | tr -d ' ')" '0'
+assert_eq "search_parent_dirs=false reads only the component's own dir" \
+  "$(run_mono services/payments LUNAR_VAR_SEARCH_PARENT_DIRS=false | wc -c | tr -d ' ')" '0'
+
+WORKER=$(run_mono services/worker)
+assert_eq "the selected entity's own lint errors still count" \
+  "$(echo "$WORKER" | jq -c '.valid')" 'false'
+assert_eq "its error names its document in the shared file" \
+  "$(echo "$WORKER" | jq -r '.errors[0].message' | grep -c "^document 5 (Component 'broken-worker')")" '1'
+
+assert_eq "a dir no entity points at collects nothing" \
+  "$(run_mono services/unlisted | wc -c | tr -d ' ')" '0'
+
+assert_eq "the root component still reads the whole file, unfiltered" \
+  "$(run_mono . LUNAR_COMPONENT_ID=github.com/acme/monorepo | jq -c '{name: .metadata.name, n: (.entities | length), path}')" \
+  '{"name":"monorepo-root","n":6,"path":"catalog-info.yaml"}'
+
+# A file in the component's own directory is used as-is — nothing filtered.
+mkdir -p "$MONO/services/payments"
+printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' \
+  'metadata: {name: local-payments}' 'spec: {owner: team-local, lifecycle: production}' \
+  > "$MONO/services/payments/catalog-info.yaml"
+assert_eq "the component's own file wins over the shared one" \
+  "$(run_mono services/payments | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"local-payments","path":"catalog-info.yaml"}'
+assert_eq "and is read with every input at its default" \
+  "$(mono_main services/payments 2>/dev/null | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"local-payments","path":"catalog-info.yaml"}'
+
+# The nearest ancestor wins over the root.
+make_mono
+mkdir -p "$MONO/services"
+sed 's/payments-api/mid-level-payments/' "$SCRIPT_DIR/test/fixtures/monorepo-catalog-info.yaml" \
+  > "$MONO/services/catalog-info.yml"
+assert_eq "the nearest ancestor file wins" \
+  "$(run_mono services/payments | jq -c '{name: .metadata.name, path}')" \
+  '{"name":"mid-level-payments","path":"../catalog-info.yml"}'
+
+# The walk stops at the repo root: a file above it is never read.
+make_mono
+mv "$MONO/catalog-info.yaml" "$TEST_DIR/repos/catalog-info.yaml"
+assert_eq "no file at or below the repo root collects nothing" \
+  "$(run_mono services/payments | wc -c | tr -d ' ')" '0'
+
+# No repo root found: no walk at all.
+make_mono
+rm "$MONO/.git"
+assert_eq "without a .git to find the repo root there is no walk" \
+  "$(run_mono services/payments | wc -c | tr -d ' ')" '0'
+
+# URLs only match the component's own repo, taken from its id.
+make_mono
+assert_eq "a component of another repo doesn't match this repo's URLs" \
+  "$(run_mono services/payments LUNAR_COMPONENT_ID=github.com/acme/other/services/payments | wc -c | tr -d ' ')" '0'
+assert_eq "an id that doesn't end in the dir disables the walk" \
+  "$(run_mono services/payments LUNAR_COMPONENT_ID=github.com/acme/monorepo/elsewhere | wc -c | tr -d ' ')" '0'
+
+# GitLab ids put `/-/` before the subdir; the repo is what precedes it, so
+# GitLab's older dash-less tree URLs match too.
+make_mono
+GL=gitlab.com/acme/platform/monorepo
+printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' 'metadata:' '  name: gl-api' \
+  '  annotations:' "    backstage.io/source-location: url:https://$GL/-/tree/main/services/api/" \
+  'spec: {owner: team-api, lifecycle: production}' '---' \
+  'apiVersion: backstage.io/v1alpha1' 'kind: Component' 'metadata:' '  name: gl-legacy' \
+  '  annotations:' "    backstage.io/source-location: url:https://$GL/tree/main/services/legacy/" \
+  'spec: {owner: team-legacy, lifecycle: production}' > "$MONO/catalog-info.yaml"
+assert_eq "a GitLab component id matches a GitLab tree URL" \
+  "$(run_mono services/api LUNAR_COMPONENT_ID=$GL/-/services/api | names)" '["gl-api"]'
+assert_eq "and a dash-less GitLab tree URL" \
+  "$(run_mono services/legacy LUNAR_COMPONENT_ID=$GL/-/services/legacy | names)" '["gl-legacy"]'
+
+# An unparseable shared file is reported against the path that was read.
+make_mono
+printf 'kind: [unclosed\n' > "$MONO/catalog-info.yaml"
+assert_eq "an unparseable shared file is reported with its path" \
+  "$(run_mono services/payments | jq -c '{valid, path}')" \
+  '{"valid":false,"path":"../../catalog-info.yaml"}'
+
+# Referential integrity runs on the selected entity.
+make_mono
+assert_eq "refs resolve from the selected entity's spec" \
+  "$(run_mono services/payments LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=t | jq -c '.refs.system')" \
+  '{"name":"payment-platform","exists":true}'
+
+# Real git resolves the root when it can (the hub's worktrees have git).
+if command -v git >/dev/null 2>&1; then
+  make_mono
+  rm "$MONO/.git"
+  git -C "$MONO" init -q
+  assert_eq "git rev-parse finds the repo root" \
+    "$(run_mono services/payments | names)" '["payments-api","payments-grpc"]'
+else
+  echo "  skip: git not installed, rev-parse path not exercised"
+fi
 
 if [ "$FAILS" -eq 0 ]; then
   echo "All referential-integrity and auth-mode tests passed."

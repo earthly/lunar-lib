@@ -6,21 +6,94 @@ SCRIPT_DIR="$(dirname "$0")"
 
 IFS=',' read -ra CANDIDATES <<< "$LUNAR_VAR_PATHS"
 
-CATALOG_FILE=""
-for candidate in "${CANDIDATES[@]}"; do
-  if [ -f "./$candidate" ]; then
-    CATALOG_FILE="./$candidate"
-    break
+# Prints the first `paths` candidate that exists in directory $1.
+first_catalog_in() {
+  local candidate
+  for candidate in "${CANDIDATES[@]}"; do
+    if [ -f "$1/$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Same lookup as collectors/repo-boilerplate/codeowners.sh: git, else the
+# nearest .git entry (a file in the hub's per-snippet worktrees).
+find_repo_root() {
+  local root dir
+  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "$root" ] && [ -d "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
   fi
-done
+  dir="$(pwd -P)"
+  while [ "$dir" != "/" ]; do
+    if [ -e "$dir/.git" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+# Parent-directory lookup inputs; fallbacks match the manifest defaults.
+SEARCH_PARENT_DIRS="${LUNAR_VAR_SEARCH_PARENT_DIRS:-false}"
+MATCH=""
+if [ "${LUNAR_VAR_MATCH_SOURCE_LOCATION:-false}" = "true" ]; then
+  MATCH="source-location"
+fi
+if [ "${LUNAR_VAR_MATCH_LINKS:-false}" = "true" ]; then
+  MATCH="${MATCH:+$MATCH,}links"
+fi
+
+CATALOG_FILE=""
+LINT_ARGS=()
+if CANDIDATE=$(first_catalog_in .); then
+  CATALOG_FILE="./$CANDIDATE"
+  PATH_NORMALIZED="$CANDIDATE"
+elif [ "$SEARCH_PARENT_DIRS" = "true" ] && [ -z "$MATCH" ]; then
+  echo "search_parent_dirs is on, but match_source_location and match_links are both off, so no entity can match." >&2
+elif [ "$SEARCH_PARENT_DIRS" = "true" ]; then
+  # A monorepo subdirectory component (the hub runs collectors from
+  # <repo>/<subdir>, whole repo checked out) whose entity lives in a file shared
+  # higher up. Walk up to the repo root; the nearest file wins, and the linter
+  # keeps only the entities that point at this directory.
+  HERE="$(pwd -P)"
+  REPO_ROOT="$(find_repo_root || true)"
+  if [ -n "$REPO_ROOT" ] && [[ "$HERE" == "$REPO_ROOT"/* ]]; then
+    COMPONENT_DIR="${HERE#"$REPO_ROOT"/}"
+    # The component id is <repo>/<subdir> (GitLab: <repo>/-/<subdir>). URLs are
+    # matched against that repo, so no repo means no match.
+    REPO_ID=""
+    case "${LUNAR_COMPONENT_ID:-}" in
+      */"$COMPONENT_DIR")
+        REPO_ID="${LUNAR_COMPONENT_ID%/"$COMPONENT_DIR"}"
+        REPO_ID="${REPO_ID%/-}"
+        ;;
+    esac
+    dir="$HERE"
+    up=""
+    while [ -n "$REPO_ID" ] && [ "$dir" != "$REPO_ROOT" ] && [ "$dir" != "/" ]; do
+      dir="$(dirname "$dir")"
+      up="../$up"
+      if CANDIDATE=$(first_catalog_in "$dir"); then
+        CATALOG_FILE="$dir/$CANDIDATE"
+        PATH_NORMALIZED="$up$CANDIDATE"
+        LINT_ARGS=(--component-dir "$COMPONENT_DIR" --repo "$REPO_ID" --match "$MATCH")
+        echo "No catalog file in $COMPONENT_DIR; reading $PATH_NORMALIZED for entities that point at it ($MATCH)." >&2
+        break
+      fi
+    done
+  fi
+fi
 
 if [ -z "$CATALOG_FILE" ]; then
   # No catalog-info.yaml found — write nothing. Absence of `.catalog.native.backstage`
   # IS the signal. Policies use Check.exists(".catalog.native.backstage") to detect.
   exit 0
 fi
-
-PATH_NORMALIZED="${CATALOG_FILE#./}"
 
 YQ_ERR=$(mktemp)
 trap 'rm -f "$YQ_ERR"' EXIT
@@ -34,8 +107,13 @@ trap 'rm -f "$YQ_ERR"' EXIT
 # YAML still exits non-zero and drops to the parse-error branch below.
 PARSE_OK=false
 if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
-  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED")
+  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED" "${LINT_ARGS[@]}")
   PARSE_OK=true
+  if [ "$RESULT" = "null" ]; then
+    # A shared file that doesn't describe this directory: same as no file.
+    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR ($MATCH); nothing collected." >&2
+    exit 0
+  fi
 else
   ERR_MSG=$(tr '\n' ' ' < "$YQ_ERR" | sed 's/[[:space:]]*$//' | head -c 500)
   [ -z "$ERR_MSG" ] && ERR_MSG="YAML parse error"
@@ -62,6 +140,35 @@ fi
 # the first document), which the linter hoists to the top level of $RESULT as
 # .spec/.metadata — so we read those here rather than $PARSED_JSON, which is now
 # a JSON array of all documents.
+#
+# The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
+# assume_role_chain) are deliberately kept in sync with
+# catalogers/backstage/main.sh — both plugins run in the same snippet pods under
+# the same service account, so credentials must resolve identically. A fix here
+# belongs there too, and vice versa.
+
+# parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
+# prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1
+# when the response carries no credentials (an <ErrorResponse>, or not XML).
+parse_sts_credentials() {
+  python3 -c '
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.fromstring(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+def find(tag):
+    for el in root.iter():
+        if el.tag.split("}")[-1] == tag:
+            return el.text or ""
+    return ""
+kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
+if not (kid and sec):
+    sys.exit(1)
+print(kid); print(sec); print(tok)
+' 2>/dev/null
+}
+
 # resolve_aws_credentials walks the AWS credential provider chain and sets
 # AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
 #
@@ -74,10 +181,6 @@ fi
 # matches the README's numbering (IRSA #1 recommended ... static #4 escape hatch).
 # Order: IRSA / EKS Pod Identity -> ECS task role -> EC2 IMDSv2 -> static secret.
 # Uses only curl + jq + python3 (all in base-main); no aws CLI / botocore.
-#
-# Deliberately kept in sync with catalogers/backstage/main.sh — both plugins run
-# in the same snippet pods under the same service account, so the chain must
-# resolve identically. A fix here belongs there too, and vice versa.
 resolve_aws_credentials() {
   AWS_SIGV4_KEY=""; AWS_SIGV4_SECRET=""; AWS_SIGV4_TOKEN=""; CRED_SOURCE=""
 
@@ -94,23 +197,7 @@ resolve_aws_credentials() {
       --data-urlencode "RoleSessionName=${AWS_ROLE_SESSION_NAME:-lunar-backstage-collector}" \
       --data-urlencode "DurationSeconds=3600" \
       --data-urlencode "WebIdentityToken=${wit}" 2>/dev/null)" || true
-    # STS query protocol returns XML; parse with python3 stdlib.
-    parsed="$(printf '%s' "$resp" | python3 -c '
-import sys, xml.etree.ElementTree as ET
-try:
-    root = ET.fromstring(sys.stdin.read())
-except Exception:
-    sys.exit(1)
-def find(tag):
-    for el in root.iter():
-        if el.tag.split("}")[-1] == tag:
-            return el.text or ""
-    return ""
-kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
-if not (kid and sec):
-    sys.exit(1)
-print(kid); print(sec); print(tok)
-' 2>/dev/null)" || true
+    parsed="$(printf '%s' "$resp" | parse_sts_credentials)" || true
     if [ -n "$parsed" ]; then
       AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
       AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
@@ -186,6 +273,57 @@ print(kid); print(sec); print(tok)
   return 1
 }
 
+# assume_role_chain is the optional aws_assume_role_arns hop, for a gateway that
+# only trusts a role the base identity can assume (usually cross-account). The
+# first candidate STS accepts replaces the credentials, so one config can span
+# environments whose base roles each assume only their own. No DurationSeconds:
+# STS's 1h default is the chained-role maximum. ARNs carry an account id, so
+# failures are logged by position and STS error code only.
+assume_role_chain() {
+  local raw=() arns=() arn resp status parsed reason i=0
+  local token_hdr=()
+  # Commas or whitespace separate entries; an ARN never contains whitespace.
+  IFS=',' read -ra raw <<< "${AWS_ASSUME_ROLE_ARNS//[[:space:]]/,}"
+  for arn in "${raw[@]}"; do
+    if [ -n "$arn" ]; then arns+=("$arn"); fi
+  done
+  if [ "${#arns[@]}" -eq 0 ]; then return 0; fi
+
+  if [ -n "$AWS_SIGV4_TOKEN" ]; then
+    token_hdr=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+  fi
+  for arn in "${arns[@]}"; do
+    i=$((i + 1))
+    status=0
+    resp="$(curl -sS --max-time 15 --get "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
+      --aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:sts" \
+      --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}" \
+      "${token_hdr[@]}" \
+      --data-urlencode "Action=AssumeRole" \
+      --data-urlencode "Version=2011-06-15" \
+      --data-urlencode "RoleArn=${arn}" \
+      --data-urlencode "RoleSessionName=lunar-backstage-collector" 2>/dev/null)" || status=$?
+    if [ "$status" -eq 0 ] && parsed="$(printf '%s' "$resp" | parse_sts_credentials)"; then
+      AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+      AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+      AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+      CRED_SOURCE="${CRED_SOURCE}+assume-role"
+      return 0
+    fi
+    if [ "$status" -ne 0 ]; then
+      reason="request failed, curl exit ${status}"
+    elif [[ "$resp" == *"<Code>"*"</Code>"* ]]; then
+      reason="${resp#*<Code>}"; reason="${reason%%</Code>*}"
+    else
+      reason="unrecognized STS response"
+    fi
+    echo "Backstage auth: aws_assume_role_arns role ${i}/${#arns[@]} not assumed (${reason})" >&2
+  done
+  echo "ERROR: sts:AssumeRole failed for every role in aws_assume_role_arns. The base identity" >&2
+  echo "  (${CRED_SOURCE}) needs sts:AssumeRole on the role, and the role's trust policy must allow it." >&2
+  return 1
+}
+
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:-}"
 if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   BASE_URL="${BACKSTAGE_URL%/}"
@@ -253,11 +391,14 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     sigv4)
       AWS_SIGV4_REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
       AWS_SIGV4_SERVICE="${LUNAR_VAR_AWS_SERVICE:-execute-api}"
+      AWS_ASSUME_ROLE_ARNS="${LUNAR_VAR_AWS_ASSUME_ROLE_ARNS:-}"
       if [ -z "$AWS_SIGV4_REGION" ]; then
         SETUP_ERROR="aws_region required for sigv4"
         echo "ERROR: $SETUP_ERROR (set the aws_region input or the AWS_REGION env var)" >&2
       elif ! resolve_aws_credentials; then
         SETUP_ERROR="sigv4 credential resolution failed"
+      elif ! assume_role_chain; then
+        SETUP_ERROR="sts:AssumeRole failed for every role in aws_assume_role_arns"
       else
         AUTH_ARGS=(--aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:${AWS_SIGV4_SERVICE}" \
                    --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}")
@@ -285,16 +426,13 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     esac
   fi
 
-  # Percent-encode one by-query filter value. A valid Backstage name or
-  # namespace (`[A-Za-z0-9][A-Za-z0-9._-]*`) contains nothing @uri escapes, so a
-  # legitimate reference goes on the wire byte-for-byte as written. It matters
-  # for the illegitimate ones, which is exactly what this feature is asked to
-  # detect: a hand-written catalog-info.yaml can declare
-  # `spec.domain: "a&filter=kind=system"`, and unencoded that would inject a
-  # second filter parameter — Backstage ORs filter params, so a miss could come
-  # back as a hit on an unrelated entity. Encoding keeps a bogus reference a
-  # miss (or, under sigv4, a signature rejection recorded as {name, error});
-  # either way never a false `exists: true`.
+  # Percent-encode a whole query-param value, the filter grammar's own `=` and
+  # `,` included: Backstage decodes the param before parsing it, so the meaning
+  # is unchanged, but curl < 8.14 signs a literal `=` inside a value differently
+  # from AWS, so under sigv4 the literal form 403s there (host-native runs; the
+  # plugin image ships a newer curl). Encoding `&` also keeps a hand-written
+  # `spec.domain: "a&filter=kind=system"` inside this one param instead of
+  # injecting a second filter, which Backstage would OR in.
   url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
 
   resolve_ref() {
@@ -342,12 +480,9 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       # by-query needs the response *body* (existence is `.items`, not the
       # status), so `-w '\n%{http_code}'` appends the status after it and one
       # request yields both. `limit=1` — we only ask whether anything matches.
-      # Commas and `=` stay literal: they are this endpoint's own filter
-      # grammar (comma = AND), and it is the wire form the cataloger has always
-      # sent. Only the two interpolated values are escaped.
       response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
         "${AUTH_ARGS[@]}" \
-        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=kind=${kind},metadata.namespace=$(url_escape "$ns"),metadata.name=$(url_escape "$name")")
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=$(url_escape "kind=${kind},metadata.namespace=${ns},metadata.name=${name}")")
       curl_status=$?
       http_code="${response##*$'\n'}"
       body="${response%$'\n'*}"

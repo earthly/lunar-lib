@@ -4,9 +4,9 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 ## Overview
 
-Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture. These checks apply to repositories that use Backstage as their service catalog and must be paired with the `backstage` collector.
+Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The three referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`) confirm the domain and system a component points at actually exist in Backstage; they are opt-in too — skipped (and passing) until the collector is configured with a `backstage_url`, so enabling them without the collector configured never turns a component red.
+The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The three referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`) confirm the domain and system a component points at actually exist in Backstage; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
 
 ## Policies
 
@@ -58,15 +58,19 @@ policies:
     on: ["domain:your-domain"]
     enforcement: report-pr
     # include: [catalog-info-exists, owner-set]  # Only run specific checks
-    # Opt in to the configurable checks by setting their inputs:
     with:
+      # Leave the rest of the fleet alone when it has no catalog-info.yaml:
+      skip_when_no_catalog_info: "true"
+      # Opt in to the configurable checks by setting their inputs:
       required_annotations: "backstage.io/source-location"
       required_tag_patterns: "location/*,runs-on/*"
       disallowed_annotations: "backstage.io/skip-checks"
       disallowed_tag_patterns: "deprecated/*"
 ```
 
-All four inputs are comma-separated lists; leave them unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
+`skip_when_no_catalog_info` defaults to `"false"`: a component with no `catalog-info.yaml` fails, because importing the policy is itself the statement that the component should be catalogued. Set it to `"true"` to scope enforcement to the repositories that are already in Backstage — every check then skips on a component with no catalog file, and a component that *has* one is held to every check exactly as before.
+
+The four list inputs are comma-separated; leave them unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
 
 ## Examples
 
@@ -124,6 +128,8 @@ All four inputs are comma-separated lists; leave them unset (the default) and th
 ```
 
 The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All four are skipped if unconfigured.
+
+With `skip_when_no_catalog_info: "true"` all twelve checks **skip** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
 
 **Failure messages:**
 - `"No catalog-info.yaml found"`
@@ -281,7 +287,7 @@ The comma-separated form (`required_annotations: "key1,key2"`) still works and r
 
 When this policy fails, resolve it by updating your `catalog-info.yaml`:
 
-1. **Missing file** - Create a `catalog-info.yaml` in the repository root following the [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format)
+1. **Missing file** - Create a `catalog-info.yaml` in the repository root following the [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format). If the component is not meant to be in the catalog, set `skip_when_no_catalog_info: "true"` on the policy import instead of excluding the checks one by one
 2. **Lint errors** - Review `.catalog.native.backstage.errors[]` in the component payload and fix the reported issues
 3. **Missing owner** - Add `spec.owner` with a valid team or user reference (e.g., `team-payments`)
 4. **Missing lifecycle** - Add `spec.lifecycle` with a stage: `production`, `experimental`, or `deprecated`

@@ -16,7 +16,7 @@ When a catalog-info file is found, this collector writes to the following Compon
 |------|------|-------------|
 | `.catalog.native.backstage.valid` | boolean | Whether the catalog-info file passed lint/schema checks |
 | `.catalog.native.backstage.errors[]` | array | Lint findings (each with `line`, `message`, `severity`) |
-| `.catalog.native.backstage.path` | string | Relative path to the file that was parsed |
+| `.catalog.native.backstage.path` | string | Path of the parsed file, relative to the component's directory (e.g. `../../catalog-info.yaml` for a [monorepo's shared file](#monorepo-components)) |
 | `.catalog.native.backstage.apiVersion` | string | Backstage API version of the [primary entity](#multiple-entities) (e.g. `backstage.io/v1alpha1`) |
 | `.catalog.native.backstage.kind` | string | Kind of the [primary entity](#multiple-entities) (e.g. `Component`, `System`, `API`) |
 | `.catalog.native.backstage.metadata` | object | Raw `metadata` block of the primary entity (`name`, `description`, `annotations`, `tags`, etc.) |
@@ -53,6 +53,15 @@ A single `catalog-info.yaml` may declare several Backstage entities separated by
 - **`entities[]` lists all of them,** each with its own `valid`/`errors`/`apiVersion`/`kind`/`metadata`/`spec`.
 - **The primary entity is hoisted to the top level.** `.apiVersion`, `.kind`, `.metadata`, and `.spec` mirror the first `Component` in the file (or the first document when there is no `Component`). The single-entity policies — `owner-set`, `lifecycle-set`, `system-set`, `required-annotations`, the tag-pattern checks, and the referential-integrity lookups — read these paths, so they operate on that primary `Component` (owner, lifecycle, and system are `Component`-level fields in Backstage). A single-entity file behaves exactly as before: one element in `entities[]`, that entity hoisted.
 
+### Monorepo components
+
+A monorepo subdirectory component (e.g. `github.com/acme/monorepo/services/payments`) reads the catalog file in its own directory. With `search_parent_dirs: "true"`, one that has no file of its own reads the nearest file in a parent directory, up to the repository root, so one root `catalog-info.yaml` can describe every component in the repo. From that file it keeps only the entities that point at the component's directory, by whichever of these is turned on (all three inputs default to `false`):
+
+- `match_source_location: "true"` — the entity's `backstage.io/source-location` names the directory, e.g. `url:https://github.com/acme/monorepo/tree/main/services/payments/`.
+- `match_links: "true"` — a `metadata.links` URL names the directory. While source-location matching is on, links count only for entities whose source-location is absent or names the repository root.
+
+Only the kept entities are linted and listed in `entities[]`, so another component's broken entry can't fail this one; error locators still give each entity's document number in the shared file. If no entity points at the directory, nothing is written, the same as having no file. URLs must be GitHub, GitLab, or Bitbucket `tree`/`blob`/`src` links into the component's own repository, with a single-segment ref such as `main`.
+
 ### Lint checks
 
 The `valid` / `errors[]` fields above come from a lint that mirrors the rules the Backstage **server** enforces on ingest, so violations surface in CI (via the `backstage` policy's `catalog-info-valid` check) instead of failing silently at registration. It reports:
@@ -81,6 +90,8 @@ collectors:
     on: ["domain:your-domain"]
     # with:
     #   paths: "catalog-info.yaml,catalog-info.yml"  # Customize search paths
+    #   search_parent_dirs: "true"     # Monorepos: fall back to a parent directory's catalog file
+    #   match_source_location: "true"  # and keep its entities whose source-location names this dir
 ```
 
 ### Referential integrity (optional)
@@ -181,9 +192,29 @@ The role's trust policy must allow the snippet-pod service account to assume it,
 
 > **Already using SigV4 with the [Backstage cataloger](../../catalogers/backstage/README.md)?** Then this is already done. Both plugins run in the same snippet pods under the same service account, so one role annotation covers both — set `auth_mode: sigv4` here and it just works.
 
+#### Cross-account role (`aws_assume_role_arns`)
+
+Some gateways reject the pod's own role and accept only a role that the pod's role can *assume*, usually one in another account. List that role in `aws_assume_role_arns`. The collector resolves credentials as above, calls `sts:AssumeRole` with them, and signs the lookups with the assumed role's credentials:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    on: ["domain:your-domain"]
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-west-2"
+      aws_assume_role_arns: "arn:aws:iam::210987654321:role/backstage-api-reader"
+```
+
+- The pod's role needs `sts:AssumeRole` on the target role, and the target role's trust policy must trust the pod's role. Only the target role needs `execute-api:Invoke`.
+- Several comma-separated ARNs are tried in order, and the first one STS accepts is used. This lets one config run in environments whose pod roles can each assume only their own target.
+- The call goes to the regional STS endpoint for `aws_region`. The session is named `lunar-backstage-collector` in CloudTrail and lasts STS's default hour, which is also the limit for a chained role.
+- The log names a role that couldn't be assumed by its position in the list and the STS error code (e.g. `AccessDenied`), never by ARN.
+
 #### Failure modes
 
-Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
+Parsing and linting are the collector's primary job and are **never** discarded because of an auth problem. If credentials can't be resolved, `aws_region` is missing, no role in `aws_assume_role_arns` can be assumed, `api_path_prefix` is wrong for your gateway, or the signed request is rejected, the collector still writes the full parse/lint result and records the reference lookup as a non-definitive `{name, error}`:
 
 ```json
 "refs": {

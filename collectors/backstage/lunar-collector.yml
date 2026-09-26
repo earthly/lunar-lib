@@ -35,6 +35,11 @@ collectors:
       prefixes. Lints every entity for schema/syntax issues and writes the
       aggregated findings to `.catalog.native.backstage.valid` and
       `.catalog.native.backstage.errors[]`.
+      Opt-in (`search_parent_dirs`): a monorepo subdirectory component with no
+      catalog file of its own falls back to the nearest one up to the
+      repository root, keeping only the entities that point at its directory
+      through `backstage.io/source-location` (`match_source_location`) or a
+      `metadata.links` URL (`match_links`).
       When `backstage_url` is configured, it additionally performs a
       referential-integrity check: for each grouping reference declared in the
       file (`spec.domain`, `spec.system`) it queries the Backstage catalog API
@@ -71,12 +76,36 @@ collectors:
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam"]
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam", "monorepo", "source-location"]
 
 inputs:
   paths:
-    description: Comma-separated list of catalog file paths to check (first match wins)
+    description: |
+      Comma-separated list of catalog file paths to check (first match wins).
+      With `search_parent_dirs`, a monorepo subdirectory component with no
+      match also checks each parent directory up to the repository root.
     default: "catalog-info.yaml,catalog-info.yml"
+  search_parent_dirs:
+    description: |
+      When a monorepo subdirectory component has no catalog file of its own,
+      read the nearest one in a parent directory, up to the repository root,
+      and keep only its entities that point at the component's directory.
+      Turn on `match_source_location`, `match_links`, or both to say how an
+      entity points at a directory; with neither, nothing matches.
+    default: "false"
+  match_source_location:
+    description: |
+      Keep an entity from a parent directory's catalog file when its
+      `backstage.io/source-location` names the component's directory (e.g.
+      `url:https://github.com/acme/monorepo/tree/main/services/payments/`).
+    default: "false"
+  match_links:
+    description: |
+      Keep an entity from a parent directory's catalog file when a
+      `metadata.links` URL names the component's directory. While
+      `match_source_location` is on, links count only for entities whose
+      source-location is absent or names the repository root.
+    default: "false"
   backstage_url:
     description: |
       Base URL of the Backstage instance (e.g. https://backstage.example.com).
@@ -118,10 +147,11 @@ inputs:
     default: "bearer"
   aws_region:
     description: |
-      AWS region used to scope the SigV4 signature and to reach STS when
-      assuming a web-identity (IRSA) role. Required when `auth_mode: sigv4`,
-      unless `AWS_REGION` is already present in the snippet pod's environment
-      (IRSA and most AWS runtimes set it, but not always). If `auth_mode:
+      AWS region used to scope the SigV4 signature and to reach STS (for the
+      IRSA web-identity exchange and any `aws_assume_role_arns` hop). Required
+      when `auth_mode: sigv4`, unless `AWS_REGION` is already present in the
+      snippet pod's environment (IRSA and most AWS runtimes set it, but not
+      always). If `auth_mode:
       sigv4` and neither this input nor the `AWS_REGION` env var is set, the
       referential-integrity lookups are skipped and each declared reference
       records an `aws_region required for sigv4` error, rather than signing
@@ -135,6 +165,16 @@ inputs:
       only for other fronting (e.g. a Lambda function URL signs as `lambda`).
       Ignored for `auth_mode: bearer`.
     default: "execute-api"
+  aws_assume_role_arns:
+    description: |
+      Comma-separated IAM role ARNs to `sts:AssumeRole` into, for a gateway
+      that only accepts a role the pod's own identity can assume (typically
+      in another account). After the credential chain resolves, the roles
+      are tried in order and the first one STS accepts signs the lookups.
+      Empty (the default) signs with the chain's credentials directly. If no
+      listed role can be assumed, each declared reference records an error
+      and parsing and linting still run. Ignored for `auth_mode: bearer`.
+    default: ""
   ref_lookup:
     description: |
       Which catalog endpoint resolves each declared reference. Only consulted

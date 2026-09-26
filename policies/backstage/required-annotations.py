@@ -1,5 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
+from catalog_presence import skip_if_no_catalog
 from constraints import parse_required_annotations, validate_value
 
 
@@ -21,6 +22,8 @@ def main(node=None):
                 "No required_annotations configured. Set the "
                 "`required_annotations` input to enforce annotation keys."
             )
+
+        skip_if_no_catalog(c)
 
         keys = [entry["key"] for entry in entries]
         if not c.exists(".catalog.native.backstage"):

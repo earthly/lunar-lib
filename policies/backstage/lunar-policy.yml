@@ -11,6 +11,7 @@ landing_page:
     Validates Backstage catalog-info.yaml entries for completeness and
     compliance. Checks that the catalog file exists and is valid, owner
     is set, lifecycle stage is defined, and system grouping is assigned.
+    Optionally skips components with no catalog file instead of failing them.
   category: "repository-and-ownership"
   icon: "assets/backstage.svg"
   status: "beta"
@@ -160,6 +161,27 @@ policies:
     keywords: ["backstage", "tags", "tag patterns", "glob", "disallowed", "forbidden"]
 
 inputs:
+  skip_when_no_catalog_info:
+    description: |
+      Skip every check in this policy on a component with no catalog-info.yaml,
+      instead of failing it. Set to `"true"` when only some repositories in
+      scope are registered in Backstage, so importing the policy broadly does
+      not turn the rest red.
+
+      One switch for the whole family, and the only place their missing-file
+      behaviour is described. With the default (`"false"`) a missing catalog
+      file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
+      `lifecycle-set` and `system-set`; fails `required-annotations` and
+      `required-tag-patterns` when those are configured; passes the two
+      `disallowed-*` deny-checks, since nothing forbidden can be present
+      without a file; and skips the three referential-integrity checks, which
+      have nothing to cross-check. With `"true"` all twelve skip instead —
+      the `disallowed-*` pair included, so a component that is not in the
+      catalog reports no green passes it did not earn.
+
+      Only the file's absence is affected: a component that has a
+      catalog-info.yaml is held to every check either way.
+    default: "false"
   required_annotations:
     description: |
       Annotation keys that must be present (and non-empty) in

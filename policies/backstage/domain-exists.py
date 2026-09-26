@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from catalog_presence import skip_if_no_catalog
+
 
 def main(node=None):
     c = Check(
@@ -8,6 +10,8 @@ def main(node=None):
         node=node,
     )
     with c:
+        skip_if_no_catalog(c)
+
         # Referential integrity is opt-in: it only runs when the `backstage`
         # collector is configured with `backstage_url`, which it signals by
         # writing `.refs.checked`. Without it there is nothing to verify, so
