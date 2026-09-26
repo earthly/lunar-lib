@@ -1,7 +1,7 @@
 version: 0
 
 name: java
-description: Collect Java project information, CI/CD commands, dependencies, and test coverage
+description: Collect Java project information, CI/CD commands, dependencies, test results, and test coverage
 author: earthly
 
 default_image: earthly/lunar-lib:base-main
@@ -11,14 +11,15 @@ landing_page:
   display_name: "Java Collector"
   long_description: |
     Analyze Java projects to collect build tool info, dependencies, CI/CD command
-    tracking, test scope, and JaCoCo coverage. Supports Maven and Gradle.
+    tracking, test scope, JUnit test results, and JaCoCo coverage. Supports Maven
+    and Gradle.
   categories: ["languages", "build"]
   icon: "assets/java.svg"
   status: "beta"
   related:
     - slug: "testing"
       type: "policy"
-      reason: "Testing guardrails including coverage thresholds using collected metrics"
+      reason: "Testing guardrails (tests passing, coverage thresholds) using collected data"
 
 collectors:
   - name: project
@@ -116,6 +117,19 @@ collectors:
         - value_pattern: ^test.*
     keywords: ["code coverage", "jacoco", "test coverage", "coverage metrics"]
 
+  - name: test-results
+    description: |
+      After a Maven or Gradle command, reads the JUnit XML reports it wrote
+      (Surefire, Failsafe, Gradle test tasks) and records how many tests passed,
+      failed and were skipped. Writes the totals to .lang.java.tests.results and
+      .testing.results, and whether every test passed to .testing.all_passing.
+    mainBash: test-results.sh
+    hook:
+      type: ci-after-command
+      binary:
+        name_pattern: ^(mvn|mvnw|gradle|gradlew)$
+    keywords: ["junit", "test results", "surefire", "failsafe", "gradle test", "test reports"]
+
 example_component_json: |
   {
     "lang": {
@@ -151,6 +165,13 @@ example_component_json: |
         },
         "tests": {
           "scope": "all",
+          "results": {
+            "total": 156,
+            "passed": 152,
+            "failed": 1,
+            "skipped": 3,
+            "source": { "tool": "maven", "integration": "ci" }
+          },
           "coverage": {
             "percentage": 72.5,
             "source": { "tool": "jacoco", "integration": "ci" }
@@ -163,6 +184,15 @@ example_component_json: |
           "transitive": [],
           "source": { "tool": "maven", "integration": "code" }
         }
+      }
+    },
+    "testing": {
+      "source": { "tool": "maven-surefire", "integration": "ci" },
+      "results": { "total": 156, "passed": 152, "failed": 1, "skipped": 3 },
+      "all_passing": false,
+      "coverage": {
+        "percentage": 72.5,
+        "source": { "tool": "jacoco", "integration": "ci" }
       }
     }
   }

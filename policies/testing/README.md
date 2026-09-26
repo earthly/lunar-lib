@@ -25,7 +25,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.testing` | object | Any test collector (e.g., `golang`) |
-| `.testing.all_passing` | boolean | Collectors that parse test results |
+| `.testing.all_passing` | boolean | Collectors that parse test results (e.g., `java`) |
 | `.testing.coverage` | object | Any coverage collector (e.g., `codecov`, `golang`) |
 | `.testing.coverage.percentage` | number | Coverage collectors that report percentage |
 

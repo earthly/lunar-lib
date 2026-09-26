@@ -79,6 +79,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD ./collectors/java+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test

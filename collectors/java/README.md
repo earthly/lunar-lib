@@ -1,12 +1,12 @@
 # Java Collector
 
-Collects Java project information, CI/CD commands, dependencies, and test coverage.
+Collects Java project information, CI/CD commands, dependencies, test results, and test coverage.
 
 ## Overview
 
-This collector gathers metadata about Java projects including build tool detection (Maven/Gradle), dependency graphs, CI/CD command tracking, test scope, and JaCoCo coverage metrics. It supports Maven, Gradle, and sbt build systems (the sbt sub-collector covers Java-only sbt repos and sits alongside the scala collector for mixed Scala/Java). Code hooks analyze project structure statically, while CI hooks observe build and test commands at runtime.
+This collector gathers metadata about Java projects including build tool detection (Maven/Gradle), dependency graphs, CI/CD command tracking, test scope, JUnit test results, and JaCoCo coverage metrics. It supports Maven, Gradle, and sbt build systems (the sbt sub-collector covers Java-only sbt repos and sits alongside the scala collector for mixed Scala/Java). Code hooks analyze project structure statically, while CI hooks observe build and test commands at runtime.
 
-**Note:** The CI-hook collectors (`test-coverage`, `test-scope`, `cicd`, `maven-cicd`, `gradle-cicd`, `sbt-cicd`) don't run builds or tests—they observe and collect data from commands that your CI pipeline already runs.
+**Note:** The CI-hook collectors (`test-results`, `test-coverage`, `test-scope`, `cicd`, `maven-cicd`, `gradle-cicd`, `sbt-cicd`) don't run builds or tests—they observe and collect data from commands that your CI pipeline already runs.
 
 ## Collected Data
 
@@ -20,7 +20,9 @@ This collector writes to the following Component JSON paths:
 | `.lang.java.maven.cicd` | object | Maven CI/CD command tracking with version |
 | `.lang.java.gradle.cicd` | object | Gradle CI/CD command tracking with version |
 | `.lang.java.sbt.cicd` | object | sbt CI/CD command tracking with version |
-| `.lang.java.tests` | object | Test scope and JaCoCo coverage information |
+| `.lang.java.tests` | object | Test scope, JUnit test results, and JaCoCo coverage information |
+| `.testing.results` | object | Normalized test totals: `total`, `passed`, `failed`, `skipped` (dual-write from JUnit XML) |
+| `.testing.all_passing` | boolean | `false` if any test failed or errored |
 | `.testing.coverage` | object | Normalized cross-language coverage (dual-write from JaCoCo) |
 | `.testing.source` | object | Normalized testing indicator |
 
@@ -38,6 +40,15 @@ This plugin provides the following collectors (use `include` to select a subset)
 | `sbt-cicd` | ci-before-command | Tracks sbt commands in CI with version |
 | `test-scope` | ci-before-command | Determines test scope (all vs module) |
 | `test-coverage` | ci-after-command | Extracts JaCoCo coverage from XML reports |
+| `test-results` | ci-after-command | Totals passed/failed/skipped tests from Surefire, Failsafe, and Gradle JUnit XML reports |
+
+### Test results
+
+`test-results` runs after every Maven or Gradle command and reads the `TEST-*.xml` files in `target/surefire-reports/`, `target/failsafe-reports/` and `build/test-results/<task>/` under the command's directory. It writes nothing when there are none.
+
+- It counts each `<testcase>`: a failure or error fails it, `<skipped>` skips it, and a test that passed on a Surefire rerun counts as passed.
+- Totals are per commit and the last write wins. If tests are split across parallel CI jobs, the job that finishes last supplies the totals.
+- Reports left over from an earlier build are counted too. CI checkouts start clean by default; a reused workspace needs `mvn clean` / `gradle clean`.
 
 ## Installation
 

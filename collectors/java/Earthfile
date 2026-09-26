@@ -1,0 +1,11 @@
+VERSION 0.8
+
+test:
+    FROM python:3.12-alpine
+    # test-results.sh is bash and uses find/awk (busybox here, like a minimal CI
+    # runner). The tests stub `lunar` on PATH and drive the real script.
+    RUN apk add --no-cache bash
+    WORKDIR /workspace
+    COPY test-results.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v
