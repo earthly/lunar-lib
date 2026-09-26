@@ -43,6 +43,15 @@ while IFS= read -r f; do
     docs=$(echo "$content" | yq -o=json '.' 2>/dev/null | jq -s '.' 2>/dev/null || echo '[]')
     [ "$docs" = "[]" ] && continue
 
+    # A ConfigMap carries MeshConfig as a YAML string in data.mesh; parse it in
+    # place so parse.jq can read it. A string that doesn't parse is left as is.
+    for i in $(echo "$docs" | jq -r 'to_entries[] | select((.value | type) == "object" and .value.kind == "ConfigMap"
+                                                            and (.value.data.mesh | type) == "string") | .key' 2>/dev/null); do
+        mesh=$(echo "$docs" | jq -r --argjson i "$i" '.[$i].data.mesh' | yq -o=json '.' 2>/dev/null | jq -c 'select(type == "object")' 2>/dev/null | head -n 1)
+        [ -n "$mesh" ] || continue
+        docs=$(echo "$docs" | jq --argjson i "$i" --argjson mesh "$mesh" '.[$i].data.mesh = $mesh')
+    done
+
     chunk=$(echo "$docs" | jq -c --arg path "$path" -f "$HERE/parse.jq" 2>/dev/null || echo '')
     [ -z "$chunk" ] && continue
 

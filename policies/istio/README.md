@@ -4,7 +4,7 @@ Enforces Istio service-mesh security and traffic best practices.
 
 ## Overview
 
-This policy validates Istio service-mesh configuration against production best practices: STRICT mutual TLS, an authorization baseline, no accidental allow-all rules, TLS on ingress gateways, and sidecar injection on mesh namespaces. It reads the normalized `.mesh` data produced by the `istio` collector, so the checks describe mesh posture rather than tool internals. It helps ensure a mesh actually enforces the encryption and access control it was adopted for, instead of quietly running in permissive mode.
+This policy validates Istio service-mesh configuration against production best practices: STRICT mutual TLS, an authorization baseline, no accidental allow-all rules, TLS on ingress gateways with approved versions and ciphers, and sidecar injection on mesh namespaces. It reads the normalized `.mesh` data produced by the `istio` collector, so the checks describe mesh posture rather than tool internals. It helps ensure a mesh actually enforces the encryption and access control it was adopted for, instead of quietly running in permissive mode.
 
 ## Policies
 
@@ -17,6 +17,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `authorization-policies-defined` | Requires at least one AuthorizationPolicy |
 | `no-permissive-authz` | Forbids blanket allow-all AuthorizationPolicy rules |
 | `gateway-tls` | Requires ingress Gateways to use TLS / redirect HTTP |
+| `tls-approved` | Requires configured TLS versions and cipher suites to be on the approved lists |
 | `sidecar-injection` | Requires mesh namespaces to enable sidecar injection |
 | `no-envoy-filter` | Advisory: flags brittle EnvoyFilter usage |
 
@@ -30,6 +31,7 @@ This policy reads from the following Component JSON paths:
 | `.mesh.peer_authentications[]` | array | `istio` collector |
 | `.mesh.authorization_policies[]` | array | `istio` collector |
 | `.mesh.gateways[]` | array | `istio` collector |
+| `.mesh.mesh_configs[]` | array | `istio` collector |
 | `.mesh.envoy_filters[]` | array | `istio` collector |
 | `.mesh.injection` | object | `istio` collector |
 | `.mesh.summary` | object | `istio` collector |
@@ -48,6 +50,8 @@ policies:
     # include: [mtls-strict, gateway-tls]  # Only run specific checks
     # with:
     #   required_mtls_mode: "STRICT"
+    #   approved_tls_versions: "TLSV1_2,TLSV1_3"
+    #   approved_cipher_suites: "ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384"
 ```
 
 ## Examples
@@ -115,5 +119,6 @@ When this policy fails, resolve it by:
 3. **For `authorization-policies-defined` failures:** Add an `AuthorizationPolicy` — start with a namespace default-deny (`{}`) plus explicit ALLOW rules for expected callers.
 4. **For `no-permissive-authz` failures:** Add `from`/`to`/`when` constraints to the flagged ALLOW rule so it no longer matches every source, or split it into scoped rules.
 5. **For `gateway-tls` failures:** Add a `tls` block to HTTPS/TLS `Gateway` servers, and set `tls.httpsRedirect: true` on plain HTTP servers so ingress never serves plaintext.
-6. **For `sidecar-injection` failures:** Label the namespace with `istio-injection=enabled` (or the revision label `istio.io/rev=<rev>`), and remove `sidecar.istio.io/inject: "false"` from workloads that should join the mesh.
-7. **For `no-envoy-filter` (advisory):** Review each `EnvoyFilter`; migrate to a supported Istio API where possible, or accept the upgrade risk. Pin `enforcement: report-pr` to keep it non-blocking.
+6. **For `tls-approved` failures:** Set `minProtocolVersion` (and `cipherSuites`, unless the minimum is `TLSV1_3`) from the approved lists on each Gateway server that terminates TLS (`SIMPLE`, `MUTUAL`, `OPTIONAL_MUTUAL`), or once in `meshConfig.tlsDefaults`, which servers inherit. Every version from the minimum up to `maxProtocolVersion` (TLS 1.3 when unset) must be approved. Each declared MeshConfig must also set an approved `meshMTLS.minProtocolVersion`, which governs mTLS between sidecars. MeshConfig is read from an IstioOperator or the istiod ConfigMap, not from Helm values files.
+7. **For `sidecar-injection` failures:** Label the namespace with `istio-injection=enabled` (or the revision label `istio.io/rev=<rev>`), and remove `sidecar.istio.io/inject: "false"` from workloads that should join the mesh.
+8. **For `no-envoy-filter` (advisory):** Review each `EnvoyFilter`; migrate to a supported Istio API where possible, or accept the upgrade risk. Pin `enforcement: report-pr` to keep it non-blocking.

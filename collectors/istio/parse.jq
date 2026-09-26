@@ -10,6 +10,11 @@ def is_istio: ((.apiVersion // "") | test("(networking|security|telemetry|instal
 def nm: (.metadata.name // "<unknown>");
 def ns: (.metadata.namespace // "default");
 def kindmatch($re): ((.kind // "") | test($re));
+# MeshConfig.TLSConfig: the version floor and cipher list Istio applies.
+def tls_config: {
+    min_protocol_version: (.minProtocolVersion // null),
+    cipher_suites: (.cipherSuites // null)
+  };
 
 # Drop null / non-object documents (empty YAML docs parse to null).
 [ .[] | select(. != null and (type == "object")) ] as $docs
@@ -65,7 +70,10 @@ def kindmatch($re): ((.kind // "") | test($re));
             port: (.port.number // null),
             protocol: (.port.protocol // null),
             tls_mode: (.tls.mode // null),
-            https_redirect: (.tls.httpsRedirect // false)
+            https_redirect: (.tls.httpsRedirect // false),
+            min_protocol_version: (.tls.minProtocolVersion // null),
+            max_protocol_version: (.tls.maxProtocolVersion // null),
+            cipher_suites: (.tls.cipherSuites // null)
           } ]
       } ],
 
@@ -98,6 +106,19 @@ def kindmatch($re): ((.kind // "") | test($re));
         profile: (.spec.profile // "default")
       } ],
 
+    # Each MeshConfig the repo declares: an IstioOperator's spec.meshConfig, or
+    # the istiod ConfigMap (`istio` / `istio-<revision>`), whose data.mesh
+    # main.sh has already parsed from its YAML string.
+    mesh_configs: [ $docs[]
+        | (if .kind == "IstioOperator" and is_istio and ((.spec.meshConfig | type) == "object") then .spec.meshConfig
+           elif .kind == "ConfigMap" and (nm | test("^istio(-.+)?$")) and ((.data.mesh | type) == "object") then .data.mesh
+           else empty end) as $mc
+        | {
+            kind: .kind, name: nm, namespace: ns, path: $path,
+            mesh_mtls: ($mc.meshMTLS // {} | tls_config),
+            tls_defaults: ($mc.tlsDefaults // {} | tls_config)
+          } ],
+
     injection_namespaces: [ $docs[] | select(.kind == "Namespace")
         | (.metadata.labels // {}) as $l
         | select(($l["istio-injection"] != null) or ($l["istio.io/rev"] != null))
@@ -118,4 +139,4 @@ def kindmatch($re): ((.kind // "") | test($re));
             inject: ($ann["sidecar.istio.io/inject"] == "true")
           } ]
   }
-| . + { istio_signal: ((.resources | length) + (.injection_namespaces | length) + (.workload_overrides | length)) }
+| . + { istio_signal: ((.resources | length) + (.injection_namespaces | length) + (.workload_overrides | length) + (.mesh_configs | length)) }

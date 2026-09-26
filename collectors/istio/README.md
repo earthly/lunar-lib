@@ -20,12 +20,13 @@ This collector writes to the following Component JSON paths:
 | `.mesh.request_authentications[]` | array | RequestAuthentication (JWT) resources (`issuers`) |
 | `.mesh.virtual_services[]` | array | VirtualService routing (`hosts`, `has_timeout`, `has_retries`) |
 | `.mesh.destination_rules[]` | array | DestinationRule traffic policy (`tls_mode`, `has_outlier_detection`) |
-| `.mesh.gateways[]` | array | Gateway servers (`port`, `protocol`, `tls_mode`, `https_redirect`) |
+| `.mesh.gateways[]` | array | Gateway servers (`port`, `protocol`, `tls_mode`, `https_redirect`, `min_protocol_version`, `max_protocol_version`, `cipher_suites`) |
 | `.mesh.service_entries[]` | array | ServiceEntry external hosts (`location`, `resolution`) |
 | `.mesh.sidecars[]` | array | Sidecar egress scope (`restricts_egress`, `egress_hosts`) |
 | `.mesh.envoy_filters[]` | array | EnvoyFilter resources (`name`, `namespace`) |
 | `.mesh.telemetry[]` | array | Telemetry config (`has_tracing`, `has_metrics`, `has_access_logging`) |
 | `.mesh.install[]` | array | IstioOperator install (`profile`) |
+| `.mesh.mesh_configs[]` | array | Each declared MeshConfig (IstioOperator `spec.meshConfig`, or the istiod ConfigMap's `mesh` key) with its `mesh_mtls` and `tls_defaults` minimum TLS version and cipher suites |
 | `.mesh.injection` | object | Namespace injection labels + per-workload inject overrides |
 | `.mesh.cicd` | object | istioctl CI command tracking (commands + client version) |
 | `.mesh.summary` | object | Derived posture booleans (`mtls_strict`, `all_gateways_tls`, etc.) |

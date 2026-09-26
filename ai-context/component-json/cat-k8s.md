@@ -67,6 +67,18 @@ Kubernetes manifests. This is specific enough to warrant its own category.
         "max_replicas": 10
       }
     ],
+    "network_policies": [
+      {
+        "name": "egress-no-metadata",
+        "namespace": "payments",
+        "path": "deploy/netpol.yaml",
+        "pod_selector": {},
+        "policy_types": ["Egress"],
+        "egress": [
+          {"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}
+        ]
+      }
+    ],
     "summary": {
       "all_valid": true,
       "all_have_resources": true,
@@ -86,3 +98,4 @@ Kubernetes manifests. This is specific enough to warrant its own category.
 - `.k8s.hpas[].min_replicas` — HPA minimum
 - `.k8s.summary.all_have_pdb` — All workloads have PDB
 - `.k8s.pdbs[].selector` vs `.k8s.workloads[].pod_labels` — PDB coverage. Match with LabelSelector semantics; `pdbs[].target_workload` is a deprecated name guess
+- `.k8s.network_policies[]` — `pod_selector` and `egress` as written; `policy_types` is effective (the API server's default when unset). Egress isolation per workload = a policy in its namespace whose `pod_selector` matches its `pod_labels` with `Egress` in `policy_types`

@@ -1,4 +1,15 @@
 VERSION 0.8
+
+test:
+    # Runs the real main.sh inside the collector image, so the tests exercise the
+    # yq, jq and parallel it ships. Only `lunar` and `kubeconform` (which fetches
+    # schemas over the network) are stubbed.
+    FROM +image
+    WORKDIR /workspace
+    COPY main.sh helm.sh .
+    COPY --dir test .
+    RUN cd test && python3 -m unittest discover -v
+
 # Build the k8s collector image
 image:
     FROM --pass-args ../../+base-image
