@@ -1,0 +1,626 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": ".",
+  "documentNamespace": "https://anchore.com/syft/dir/9e86945c-8f14-4a84-943d-53580ae9f01e",
+  "creationInfo": {
+    "licenseListVersion": "3.28",
+    "creators": [
+      "Organization: Anchore, Inc",
+      "Tool: syft-1.51.1"
+    ],
+    "created": "2026-09-26T16:28:08Z"
+  },
+  "packages": [
+    {
+      "name": "@bytecodealliance/preview2-shim",
+      "SPDXID": "SPDXRef-Package-npm--bytecodealliance-preview2-shim-835d4cadbeff8849",
+      "versionInfo": "0.26.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/@bytecodealliance/preview2-shim/-/preview2-shim-0.26.0.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "LicenseRef--Apache-2.0-WITH-LLVM-exception-",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2-shim:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2-shim:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2_shim:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2_shim:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:\\@bytecodealliance\\/preview2:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/%40bytecodealliance/preview2-shim@0.26.0"
+        }
+      ]
+    },
+    {
+      "name": "ag-grid-enterprise",
+      "SPDXID": "SPDXRef-Package-npm-ag-grid-enterprise-e7a0a9f75067ffa5",
+      "versionInfo": "36.2.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/ag-grid-enterprise/-/ag-grid-enterprise-36.2.0.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "LicenseRef-Commercial",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag-grid-enterprise:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag-grid-enterprise:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag_grid_enterprise:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag_grid_enterprise:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag-grid:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag-grid:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag_grid:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag_grid:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:ag:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/ag-grid-enterprise@36.2.0"
+        }
+      ]
+    },
+    {
+      "name": "argparse",
+      "SPDXID": "SPDXRef-Package-npm-argparse-a0f39067a323fdb0",
+      "versionInfo": "2.0.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/argparse/-/argparse-2.0.1.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "Python-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:argparse:argparse:2.0.1:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/argparse@2.0.1"
+        }
+      ]
+    },
+    {
+      "name": "dompurify",
+      "SPDXID": "SPDXRef-Package-npm-dompurify-d07ea9c1ee35fe66",
+      "versionInfo": "3.4.16",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/dompurify/-/dompurify-3.4.16.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "(MPL-2.0 OR Apache-2.0)",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:dompurify:dompurify:3.4.16:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/dompurify@3.4.16"
+        }
+      ]
+    },
+    {
+      "name": "inherits",
+      "SPDXID": "SPDXRef-Package-npm-inherits-911374ff7f37ba7f",
+      "versionInfo": "2.0.4",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "ISC",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:inherits:inherits:2.0.4:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/inherits@2.0.4"
+        }
+      ]
+    },
+    {
+      "name": "jszip",
+      "SPDXID": "SPDXRef-Package-npm-jszip-47a7b29ab705bbc2",
+      "versionInfo": "3.10.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "(MIT OR GPL-3.0-or-later)",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:jszip_project:jszip:3.10.1:*:*:*:*:node.js:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/jszip@3.10.1"
+        }
+      ]
+    },
+    {
+      "name": "node-forge",
+      "SPDXID": "SPDXRef-Package-npm-node-forge-72cf3b0bbdbc2556",
+      "versionInfo": "1.3.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/node-forge/-/node-forge-1.3.1.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "(BSD-3-Clause OR GPL-2.0)",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:digitalbazaar:forge:1.3.1:*:*:*:*:node.js:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/node-forge@1.3.1"
+        }
+      ]
+    },
+    {
+      "name": "pako",
+      "SPDXID": "SPDXRef-Package-npm-pako-8811cee431746c6d",
+      "versionInfo": "1.0.11",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/pako/-/pako-1.0.11.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "(MIT AND Zlib)",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:pako:pako:1.0.11:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/pako@1.0.11"
+        }
+      ]
+    },
+    {
+      "name": "sbom-license-fixture",
+      "SPDXID": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "versionInfo": "1.0.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom-license-fixture:sbom-license-fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom-license-fixture:sbom_license_fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom_license_fixture:sbom-license-fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom_license_fixture:sbom_license_fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom-license:sbom-license-fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom-license:sbom_license_fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom_license:sbom-license-fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom_license:sbom_license_fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom:sbom-license-fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sbom:sbom_license_fixture:1.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/sbom-license-fixture@1.0.0"
+        }
+      ]
+    },
+    {
+      "name": "sha.js",
+      "SPDXID": "SPDXRef-Package-npm-sha.js-6de29f769376875f",
+      "versionInfo": "2.4.11",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/sha.js/-/sha.js-2.4.11.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "(MIT AND BSD-3-Clause)",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:sha.js:sha.js:2.4.11:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/sha.js@2.4.11"
+        }
+      ]
+    },
+    {
+      "name": "tslib",
+      "SPDXID": "SPDXRef-Package-npm-tslib-732c6f5be784c8f2",
+      "versionInfo": "2.8.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz",
+      "filesAnalyzed": false,
+      "sourceInfo": "acquired package info from installed node module manifest file: /package-lock.json",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "0BSD",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:tslib:tslib:2.8.1:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/tslib@2.8.1"
+        }
+      ]
+    },
+    {
+      "name": ".",
+      "SPDXID": "SPDXRef-DocumentRoot-Directory-.",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "FILE"
+    }
+  ],
+  "files": [
+    {
+      "fileName": "package-lock.json",
+      "SPDXID": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "fileTypes": [
+        "APPLICATION"
+      ],
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "869fb4dbabea11e174f609437cff1c7a4fad299e"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5fe87ecc897c37a99c28d6825f2030f375ddfebda93821276facee039f8e02e5"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ],
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "licenseId": "LicenseRef--Apache-2.0-WITH-LLVM-exception-",
+      "extractedText": "NOASSERTION",
+      "name": "(Apache-2.0 WITH LLVM-exception)"
+    },
+    {
+      "licenseId": "LicenseRef-Commercial",
+      "extractedText": "NOASSERTION",
+      "name": "Commercial"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Package-npm-jszip-47a7b29ab705bbc2",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-sha.js-6de29f769376875f",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-node-forge-72cf3b0bbdbc2556",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-tslib-732c6f5be784c8f2",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm--bytecodealliance-preview2-shim-835d4cadbeff8849",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-pako-8811cee431746c6d",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-pako-8811cee431746c6d",
+      "relatedSpdxElement": "SPDXRef-Package-npm-jszip-47a7b29ab705bbc2",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-inherits-911374ff7f37ba7f",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sha.js-6de29f769376875f",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-argparse-a0f39067a323fdb0",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-dompurify-d07ea9c1ee35fe66",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-ag-grid-enterprise-e7a0a9f75067ffa5",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-jszip-47a7b29ab705bbc2",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-sha.js-6de29f769376875f",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-node-forge-72cf3b0bbdbc2556",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-tslib-732c6f5be784c8f2",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm--bytecodealliance-preview2-shim-835d4cadbeff8849",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-pako-8811cee431746c6d",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-inherits-911374ff7f37ba7f",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-argparse-a0f39067a323fdb0",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-dompurify-d07ea9c1ee35fe66",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-npm-ag-grid-enterprise-e7a0a9f75067ffa5",
+      "relatedSpdxElement": "SPDXRef-File-package-lock.json-fd71c2238fc07657",
+      "relationshipType": "OTHER",
+      "comment": "evident-by: indicates the package's existence is evident by the given file"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm--bytecodealliance-preview2-shim-835d4cadbeff8849",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-ag-grid-enterprise-e7a0a9f75067ffa5",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-argparse-a0f39067a323fdb0",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-dompurify-d07ea9c1ee35fe66",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-inherits-911374ff7f37ba7f",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-jszip-47a7b29ab705bbc2",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-node-forge-72cf3b0bbdbc2556",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-pako-8811cee431746c6d",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sbom-license-fixture-28cc1ba29f4ca5d8",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-sha.js-6de29f769376875f",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DocumentRoot-Directory-.",
+      "relatedSpdxElement": "SPDXRef-Package-npm-tslib-732c6f5be784c8f2",
+      "relationshipType": "CONTAINS"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-DocumentRoot-Directory-.",
+      "relationshipType": "DESCRIBES"
+    }
+  ]
+}
