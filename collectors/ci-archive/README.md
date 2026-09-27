@@ -44,6 +44,9 @@ manifest.json   # the run and its jobs, with steps
 logs.zip        # GitHub's log archive for the attempt, verbatim
 ```
 
+A run that never started a job, such as one whose workflow file GitHub couldn't
+parse, has no logs, so its object holds only `manifest.json`.
+
 ## Collectors
 
 | Collector | Description |
