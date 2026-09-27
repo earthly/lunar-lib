@@ -1,23 +1,27 @@
 """Local stand-ins for the GitHub Actions API, S3 and STS, for run.sh.
 
-GitHub (HTTPS, 127.0.0.1:8443, the GHES /api/v3 layout): serves one run
+GitHub (HTTPS, 127.0.0.1:8443, the GHES /api/v3 layout): serves a run
 attempt, its jobs, and a 302 from its logs endpoint to a signed-URL blob, like
-the real API. Scenarios are keyed by run ID. Blob requests carrying an
-Authorization header are rejected, so a leaked token fails the test.
+the real API, plus a repository's default branch and its filtered run list.
+Scenarios are keyed by run ID. Blob requests carrying an Authorization header
+are rejected, so a leaked token fails the test. The run list keeps GitHub's
+cap: a filtered query returns nothing past its first 1,000 runs.
 
-S3 (HTTP, 127.0.0.1:9001, path-style): PUT stores an object only if the
-request is SigV4-signed for us-east-1/s3 by a key the bucket accepts and the
+S3 (HTTP, 127.0.0.1:9001, path-style): PUT stores an object, and a
+ListObjectsV2 GET lists them 1,000 keys a page, only if the request is
+SigV4-signed for us-east-1/s3 by a key the bucket accepts and, for a PUT, the
 body matches x-amz-content-sha256, the same checks AWS makes. Buckets named
 ingress* stand for a bucket in another account: only the credentials STS hands
-out for INGRESS_ROLE may write there. Every other bucket takes the static test
-key. Objects land in $S3_DIR/<bucket>/<key> for run.sh to inspect.
+out for INGRESS_ROLE may use them. Buckets named nolist* refuse listing, like a
+role without s3:ListBucket. Every other bucket takes the static test key.
+Objects land in $S3_DIR/<bucket>/<key> for run.sh to inspect.
 
 STS (HTTP, 127.0.0.1:9002): the query-API GET form of sts:AssumeRole. It
 answers only calls SigV4-signed for us-east-1/sts by a base key, session token
 included, and grants only INGRESS_ROLE with EXTERNAL_ID, like a trust policy
 with an sts:ExternalId condition. Session names go to $STS_LOG.
 """
-import hashlib, hmac, io, json, os, re, ssl, sys, threading, urllib.parse, zipfile
+import base64, datetime, hashlib, hmac, io, json, os, re, ssl, sys, threading, urllib.parse, zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = "test-gh-token"
@@ -48,10 +52,11 @@ def logs_zip(run_id, attempt, size=0):
     return buf.getvalue()
 
 
-def attempt(run_id, n, name="build", status="completed", conclusion="success", jobs=2, event="push"):
+def attempt(run_id, n, name="build", status="completed", conclusion="success", jobs=2, event="push",
+            sha=None, branch="main"):
     return {
         "id": run_id, "run_attempt": n, "name": name, "path": f".github/workflows/{name}.yml",
-        "event": event, "head_branch": "main", "head_sha": f"sha-{run_id}", "status": status,
+        "event": event, "head_branch": branch, "head_sha": sha or f"sha-{run_id}", "status": status,
         "conclusion": conclusion if status == "completed" else None,
         "run_started_at": f"2026-09-24T00:0{n}:00Z", "updated_at": f"2026-09-24T00:0{n}:30Z",
         "html_url": f"https://example.test/acme/widgets/actions/runs/{run_id}/attempts/{n}",
@@ -69,12 +74,75 @@ ATTEMPTS = {(a["id"], a["run_attempt"]): a for a in [
     attempt(401, 1),
     attempt(501, 1, jobs=150),
     attempt(601, 1, name="promote", event="workflow_run"),
+    attempt(701, 1, name="broken", conclusion="startup_failure", jobs=0),
+    # acme/daily, for the daily backup. 803 is a run another workflow started:
+    # GitHub recorded it at sha-803-gh, the Hub files it under sha-801.
+    attempt(801, 1), attempt(802, 1, conclusion="failure"), attempt(802, 2),
+    attempt(803, 1, name="promote", event="workflow_run", sha="sha-803-gh"),
+    attempt(804, 1, status="in_progress"),
+    attempt(805, 1),
+    attempt(806, 1, name="broken", conclusion="startup_failure", jobs=0),
+    attempt(807, 1, branch="feature"),
+    attempt(808, 1, name="deploy", event="workflow_dispatch"),
+    # acme/flaky: one run the backup can't archive, one it can.
+    attempt(901, 1, name="nightly"), attempt(902, 1),
 ]}
-EXPIRED = {105}                 # logs endpoint answers 410
+EXPIRED = {105, 901}            # logs endpoint answers 410
+NO_LOGS = {701, 806}            # logs endpoint answers 404: the run started no jobs
 BIG = {201: 1_500_000}          # bytes of incompressible log
 flaky_left = {301: 1}           # the attempt endpoint 502s this many times first
 lagging_left = {401: 1}         # the logs endpoint 404s this many times first
 lock = threading.Lock()
+
+# Repository -> [(run id, hours before the stand-in started that it was created)].
+# The run list reports each run's latest attempt from ATTEMPTS.
+NOW = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+RUN_LISTS = {
+    "acme/daily": [(801, 5), (802, 6), (803, 4), (804, 1), (805, 60), (806, 3), (807, 2), (808, 7)],
+    "acme/flaky": [(901, 5), (902, 6)],
+}
+BUSY_RUNS = 1500                # acme/busy: all at sha-busy, spread over 46 hours
+
+
+def iso(t):
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def listed_runs(repo):
+    if repo == "acme/busy":
+        return [{"id": 100000 + i, "run_attempt": 1, "name": "build", "event": "push",
+                 "head_branch": "main", "head_sha": "sha-busy", "status": "completed",
+                 "conclusion": "success",
+                 "created_at": iso(NOW - datetime.timedelta(hours=1, seconds=i * 110))}
+                for i in range(BUSY_RUNS)]
+    runs = []
+    for run_id, hours in RUN_LISTS.get(repo, []):
+        latest = max(n for (i, n) in ATTEMPTS if i == run_id)
+        a = ATTEMPTS[(run_id, latest)]
+        runs.append({k: a[k] for k in ("id", "run_attempt", "name", "event", "head_branch",
+                                        "head_sha", "status", "conclusion")}
+                    | {"created_at": iso(NOW - datetime.timedelta(hours=hours))})
+    return runs
+
+
+def run_list(repo, query):
+    """GET /repos/<repo>/actions/runs with the branch, status and created
+    filters, newest first. A filtered query returns nothing past its first
+    1,000 runs, like GitHub's."""
+    q = urllib.parse.parse_qs(query)
+    per, page = int(q.get("per_page", ["30"])[0]), int(q.get("page", ["1"])[0])
+    runs = listed_runs(repo)
+    if "branch" in q:
+        runs = [r for r in runs if r["head_branch"] == q["branch"][0]]
+    if "status" in q:
+        runs = [r for r in runs if r["status"] == q["status"][0]]
+    if "created" in q:
+        lo, _, hi = q["created"][0].partition("..")
+        runs = [r for r in runs if lo <= r["created_at"] <= hi]
+    runs.sort(key=lambda r: r["created_at"], reverse=True)
+    if (page - 1) * per >= 1000:
+        return {"total_count": 0, "workflow_runs": []}
+    return {"total_count": len(runs), "workflow_runs": runs[:1000][(page - 1) * per: page * per]}
 
 
 class GitHub(BaseHTTPRequestHandler):
@@ -100,9 +168,15 @@ class GitHub(BaseHTTPRequestHandler):
             return self.send(200, logs_zip(run_id, n, BIG.get(run_id, 0)), "application/zip")
         if self.headers.get("Authorization") != f"Bearer {TOKEN}":
             return self.send(401, b'{"message":"Bad credentials"}')
-        # /api/v3/repos/acme/widgets/actions/runs/<id>/attempts/<n>[/jobs|/logs]
-        if parts[:7] != ["api", "v3", "repos", "acme", "widgets", "actions", "runs"] or len(parts) < 10 \
-                or parts[8] != "attempts":
+        # /api/v3/repos/<owner>/<repo>[/actions/runs[/<id>/attempts/<n>[/jobs|/logs]]]
+        if parts[:3] != ["api", "v3", "repos"] or len(parts) < 5:
+            return self.send(404, b'{"message":"Not Found"}')
+        repo = f"{parts[3]}/{parts[4]}"
+        if len(parts) == 5:
+            return self.send(200, json.dumps({"full_name": repo, "default_branch": "main"}).encode())
+        if parts[5:] == ["actions", "runs"]:
+            return self.send(200, json.dumps(run_list(repo, url.query)).encode())
+        if parts[5:7] != ["actions", "runs"] or len(parts) < 10 or parts[8] != "attempts":
             return self.send(404, b'{"message":"Not Found"}')
         run_id, n = int(parts[7]), int(parts[9])
         found = ATTEMPTS.get((run_id, n))
@@ -128,6 +202,8 @@ class GitHub(BaseHTTPRequestHandler):
         if rest == ["logs"]:
             if run_id in EXPIRED:
                 return self.send(410, b'{"message":"Gone"}')
+            if run_id in NO_LOGS:
+                return self.send(404, b'{"message":"Not Found"}')
             with lock:
                 if lagging_left.get(run_id, 0) > 0:
                     lagging_left[run_id] -= 1
@@ -192,6 +268,42 @@ class S3(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def allowed(self, akid, bucket):
+        return akid == (ASSUMED_KEY if bucket.startswith("ingress") else "AKIATEST")
+
+    def do_GET(self):
+        declared = self.headers.get("x-amz-content-sha256", "")
+        akid, problem = sigv4_signer(self, "s3", declared)
+        if problem:
+            return aws_error(self, 403, problem)
+        path, _, query = self.path.partition("?")
+        bucket = urllib.parse.unquote(path.strip("/")).split("/", 1)[0]
+        if not self.allowed(akid, bucket) or bucket.startswith("nolist"):
+            return aws_error(self, 403, "AccessDenied")
+        q = dict(urllib.parse.parse_qsl(query))
+        if q.get("list-type") != "2" or declared != hashlib.sha256(b"").hexdigest():
+            return aws_error(self, 400, "InvalidRequest")
+        root = os.path.join(S3_DIR, bucket)
+        keys = sorted(os.path.relpath(os.path.join(d, f), root)
+                      for d, _, files in os.walk(root) for f in files)
+        keys = [k for k in keys if k.startswith(q.get("prefix", ""))]
+        # Tokens are opaque base64, "=" padding and all, like S3's.
+        after = base64.b64decode(q["continuation-token"]).decode() if "continuation-token" in q else ""
+        keys = [k for k in keys if k > after]
+        page, more = keys[:1000], len(keys) > 1000
+        body = ('<?xml version="1.0" encoding="UTF-8"?>'
+                '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                + "".join(f"<Contents><Key>{k}</Key></Contents>" for k in page)
+                + f"<IsTruncated>{'true' if more else 'false'}</IsTruncated>"
+                + (f"<NextContinuationToken>{base64.b64encode(page[-1].encode()).decode()}</NextContinuationToken>"
+                   if more else "")
+                + "</ListBucketResult>").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/xml")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_PUT(self):
         if self.headers.get("Expect", "").lower() == "100-continue":
             self.send_response_only(100)
@@ -202,7 +314,7 @@ class S3(BaseHTTPRequestHandler):
         if problem:
             return aws_error(self, 403, problem)
         bucket = urllib.parse.unquote(self.path.lstrip("/")).split("/", 1)[0]
-        if akid != (ASSUMED_KEY if bucket.startswith("ingress") else "AKIATEST"):
+        if not self.allowed(akid, bucket):
             return aws_error(self, 403, "AccessDenied")
         if declared != hashlib.sha256(body).hexdigest():
             return aws_error(self, 400, "XAmzContentSHA256Mismatch")

@@ -1,13 +1,14 @@
 #!/bin/bash
-# Offline end-to-end test for backup-logs-s3.sh (and the archive-run.sh it hands
-# off to): the real scripts, curl, jq, python3 and lunar CLI against the
-# stand-ins in servers.py. The component is GHES-shaped
+# Offline end-to-end test for backup-logs-s3.sh and backup-logs-s3-daily.sh
+# (and the archive-run.sh both hand off to): the real scripts, curl, jq,
+# python3 and lunar CLI against the stand-ins in servers.py. The component is GHES-shaped
 # (127.0.0.1:8443/acme/widgets), so the /api/v3 path is exercised without any
 # test-only switch in the script.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/../backup-logs-s3.sh"
+DAILY="$HERE/../backup-logs-s3-daily.sh"
 TMP="$(mktemp -d)"
 export S3_DIR="$TMP/s3" STS_LOG="$TMP/sts.log"
 mkdir -p "$S3_DIR"
@@ -45,6 +46,25 @@ run_case() {
   CODE=$?
 }
 
+# run_daily <name> [VAR=value ...]: runs the daily backup in a clean env, as
+# the Hub's cron hook would on the root component of acme/daily.
+run_daily() {
+  CASE="$1"; shift
+  OUT="$TMP/$CASE.out"; ERR="$TMP/$CASE.err"
+  env -i PATH="$PATH" HOME="$TMP" \
+    CURL_CA_BUNDLE="$TMP/cert.pem" \
+    LUNAR_COLLECT_STDOUT=1 \
+    LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily \
+    LUNAR_COMPONENT_GIT_SHA=sha-head \
+    LUNAR_SECRET_GH_TOKEN=test-gh-token \
+    LUNAR_VAR_S3_BUCKET=archive \
+    LUNAR_VAR_S3_ENDPOINT_URL=http://127.0.0.1:9001 \
+    LUNAR_SECRET_AWS_ACCESS_KEY_ID=AKIATEST \
+    LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=secret-test \
+    "$@" bash "$DAILY" > "$OUT" 2> "$ERR"
+  CODE=$?
+}
+
 pass() { echo "ok   [$CASE] $1"; }
 fail() {
   echo "FAIL [$CASE] $1"
@@ -57,6 +77,7 @@ expect() { # expect <description> <command...>
 }
 expect_exit() { if [ "$CODE" -eq "$1" ]; then pass "exits $1"; else fail "exits $1 (got $CODE)"; fi; }
 receipt() { jq -e "$1" "$OUT"; }
+backup() { jq -e ".ci.archive.backup | $1" "$OUT"; }
 stderr_has() { grep -q -- "$1" "$ERR"; }
 stderr_lacks() { ! grep -q -- "$1" "$ERR"; }
 nothing_collected() { [ ! -s "$OUT" ]; }
@@ -274,6 +295,128 @@ expect "an empty s3_prefix writes at the bucket root" receipt '.ci.archive.runs[
 run_case monorepo 301 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/widgets/services/api
 expect_exit 0
 expect "resolves the repository of a monorepo component" receipt '.ci.archive.runs[0].key | startswith("lunar/ci-archive/127.0.0.1_8443/acme/widgets/sha-301/")'
+
+# --- A run that started no jobs has no logs: archive its manifest alone ---
+SECONDS=0
+run_case no-jobs 701 1 LUNAR_CI_PIPELINE_NAME=broken
+elapsed=$SECONDS
+expect_exit 0
+expect "records it with no logs" receipt '.ci.archive.runs[0] | .id == 701 and .conclusion == "startup_failure" and .log_bytes == 0 and .log_lines == 0 and .jobs == []'
+expect "uploads the manifest alone" test "$(zip_names "$(object_path)")" = "manifest.json"
+expect "doesn't wait on logs that never come" test "$elapsed" -lt 10
+
+# --- The daily backup ---
+DAILY_DIR="$S3_DIR/archive/lunar/ci-archive/127.0.0.1_8443/acme/daily"
+# The per-run path already archived 801, and 803 under the commit its chain
+# started from. acme/daily's window then holds 801, 802 (two attempts), 803,
+# 806 (started no jobs) and 808; 804 is still going, 805 is 60 hours old, and
+# 807 ran on another branch.
+run_case seed-801 801 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily LUNAR_COMPONENT_GIT_SHA=sha-801
+expect_exit 0
+run_case seed-803 803 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily LUNAR_COMPONENT_GIT_SHA=sha-801 \
+  LUNAR_CI_PIPELINE_NAME=promote
+expect_exit 0
+seeded_801="$(sha256sum < "$DAILY_DIR/sha-801/801-1.zip")"
+
+run_daily daily-first
+expect_exit 0
+expect "counts every finished attempt on the default branch in the window" backup '.branch == "main" and .attempt_count == 6'
+expect "uploads only the attempts the bucket lacks" backup '.uploaded_count == 4'
+expect "backs up a missed run under backup-logs-s3's key" test -s "$DAILY_DIR/sha-802/802-1.zip"
+expect "backs up each attempt of a re-run" test -s "$DAILY_DIR/sha-802/802-2.zip"
+expect "the object holds the run and its logs" test "$(zip_names "$DAILY_DIR/sha-802/802-2.zip" | tr '\n' ' ')" = "logs.zip manifest.json "
+expect "leaves an archived run alone" test "$(sha256sum < "$DAILY_DIR/sha-801/801-1.zip")" = "$seeded_801"
+expect "finds a chained run under its chain's first commit" test ! -e "$DAILY_DIR/sha-803-gh"
+expect "archives a run that started no jobs as its manifest alone" test "$(zip_names "$DAILY_DIR/sha-806/806-1.zip")" = "manifest.json"
+expect "skips a run still going" test ! -e "$DAILY_DIR/sha-804"
+expect "skips a run older than the lookback" test ! -e "$DAILY_DIR/sha-805"
+expect "skips another branch's runs" test ! -e "$DAILY_DIR/sha-807"
+expect "the window is the lookback" backup '((.until | fromdate) - (.since | fromdate)) == 172800'
+expect "stamps the cron source" backup '.source | .tool == "ci-archive" and .integration == "cron"'
+expect "adds nothing to .ci.archive.runs" receipt '.ci.archive | has("runs") | not'
+
+run_daily daily-again
+expect_exit 0
+expect "the next pass finds everything present" backup '.attempt_count == 6 and .uploaded_count == 0'
+
+run_daily daily-lookback LUNAR_VAR_DAILY_BACKUP_LOOKBACK_HOURS=72
+expect_exit 0
+expect "a longer lookback reaches older runs" backup '.attempt_count == 7 and .uploaded_count == 1'
+expect "and backs them up" test -s "$DAILY_DIR/sha-805/805-1.zip"
+
+run_daily daily-branch LUNAR_VAR_DAILY_BACKUP_BRANCH=feature
+expect_exit 0
+expect "backs up the branch it's given" backup '.branch == "feature" and .attempt_count == 1 and .uploaded_count == 1'
+
+run_daily daily-events LUNAR_VAR_INCLUDE_EVENTS=workflow_dispatch
+expect_exit 0
+expect "include_events applies" backup '.attempt_count == 1 and .uploaded_count == 0'
+
+run_daily daily-pattern 'LUNAR_VAR_INCLUDE_RUNS_PATTERN=^promote$'
+expect_exit 0
+expect "include_runs_pattern applies" backup '.attempt_count == 1 and .uploaded_count == 0'
+
+# --- No bucket: count the attempts, upload nothing ---
+objects_before=$(find "$S3_DIR" -type f | wc -l)
+run_daily daily-no-bucket LUNAR_VAR_S3_BUCKET= LUNAR_VAR_S3_ENDPOINT_URL= \
+  LUNAR_SECRET_AWS_ACCESS_KEY_ID= LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=
+expect_exit 0
+expect "counts the attempts without AWS credentials" backup '.attempt_count == 6 and (has("uploaded_count") | not)'
+expect "uploads nothing" test "$(find "$S3_DIR" -type f | wc -l)" -eq "$objects_before"
+expect "says why" stderr_has "s3_bucket is not set"
+
+# --- Only a repository's root component backs it up ---
+run_daily daily-subcomponent LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily/services/api
+expect_exit 0
+expect "does nothing on a monorepo's subdirectory component" nothing_collected
+expect "says why" stderr_has "not a repository's root component"
+
+run_daily daily-no-token LUNAR_SECRET_GH_TOKEN=
+expect_exit 0
+expect "writes nothing without GH_TOKEN" nothing_collected
+
+run_daily daily-bad-lookback LUNAR_VAR_DAILY_BACKUP_LOOKBACK_HOURS=2d
+expect_exit 1
+expect "rejects a lookback that isn't whole hours" stderr_has "daily_backup_lookback_hours must be"
+
+run_daily daily-bad-regex 'LUNAR_VAR_INCLUDE_RUNS_PATTERN=(unclosed'
+expect_exit 1
+expect "rejects an invalid include_runs_pattern" stderr_has "not a valid regex"
+
+# --- Without s3:ListBucket it can't tell what's missing: upload nothing, fail ---
+run_daily daily-no-list LUNAR_VAR_S3_BUCKET=nolist
+expect_exit 1
+expect "writes nothing" nothing_collected
+expect "uploads nothing" no_bucket nolist
+expect "says what the identity needs" stderr_has "AccessDenied). The daily backup needs s3:ListBucket"
+
+# --- One attempt can't be archived: the rest still are, and the pass fails ---
+run_daily daily-partial LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/flaky
+expect_exit 1
+expect "backs up the rest" test -s "$S3_DIR/archive/lunar/ci-archive/127.0.0.1_8443/acme/flaky/sha-902/902-1.zip"
+expect "writes no summary for a failed pass" nothing_collected
+expect "reports the attempt it couldn't archive" stderr_has "HTTP 410"
+expect "counts the failures" stderr_has "1 run attempt(s) on main since"
+
+# --- A busy repository: 1,500 runs in the window, all already archived ---
+# Past GitHub's 1,000-run cap for one filtered list, and 1,500 keys under one
+# commit folder, two ListObjectsV2 pages.
+BUSY_DIR="$S3_DIR/archive/lunar/ci-archive/127.0.0.1_8443/acme/busy/sha-busy"
+mkdir -p "$BUSY_DIR"
+for i in $(seq 100000 101499); do : > "$BUSY_DIR/$i-1.zip"; done
+run_daily daily-busy LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/busy
+expect_exit 0
+expect "sees every run past GitHub's 1,000-run cap and every S3 page" backup '.attempt_count == 1500 and .uploaded_count == 0'
+
+# --- A bucket in another account: list and upload as the role ---
+INGRESS_DIR="$S3_DIR/ingress-daily/lunar/ci-archive/127.0.0.1_8443/acme/daily"
+run_daily daily-assume-role "$STS" LUNAR_VAR_S3_BUCKET=ingress-daily \
+  LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$ROLE" LUNAR_VAR_AWS_EXTERNAL_ID="$EXTERNAL_ID"
+expect_exit 0
+expect "lists and uploads as the assumed role" backup '.attempt_count == 6 and .uploaded_count == 6'
+expect "keys a chained run it uploads by GitHub's commit" test -s "$INGRESS_DIR/sha-803-gh/803-1.zip"
+expect "names the listing's STS session" grep -qx "lunar-ci-archive-daily" "$STS_LOG"
+expect "names each upload's STS session after its run attempt" grep -qx "lunar-ci-archive-802-2" "$STS_LOG"
 
 echo
 if [ "$FAILED" -gt 0 ]; then

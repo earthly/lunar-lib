@@ -25,7 +25,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `log_lines`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
-| `.ci.archive.backup` | object | The last daily backup pass, on the repository's root component: `branch`, `since`, `until`, `attempt_count` (run attempts checked), `uploaded_count` (attempts it had to upload), `source` |
+| `.ci.archive.backup` | object | The last daily backup pass, on the repository's root component: `branch`, `since`, `until`, `attempt_count` (run attempts checked), `uploaded_count` (attempts it had to upload; absent without `s3_bucket`), `source` |
 
 Nothing is written when `GH_TOKEN` is unset, when the workflow doesn't match
 `include_runs_pattern`, or when the run's event isn't in `include_events`: the
@@ -153,8 +153,8 @@ account's CloudTrail shows which run each upload came from.
 Leave out `s3_bucket` to check which runs fire, and on which commits, before
 wiring up a bucket. Each run is still recorded, with its log's size and line
 count, but nothing is uploaded and no AWS credentials are needed. `GH_TOKEN` is
-still required, to read the run and its logs. The daily backup does nothing
-without a bucket.
+still required, to read the run and its logs. Without a bucket, the daily
+backup only counts the run attempts in its window.
 
 ```yaml
 collectors:
