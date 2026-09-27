@@ -112,6 +112,7 @@ the pass to `.ci.archive.backup`.
 - Each run is in two passes' windows, so a run still going at one pass is backed
   up by the next. A re-run of a run created before the window isn't seen; raise
   the lookback to cover it.
+- `include_runs_pattern` and `include_events` apply here too.
 - A run attempt it can't archive fails the pass once the others are done, and
   the next pass tries it again.
 
