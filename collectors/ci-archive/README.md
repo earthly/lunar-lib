@@ -11,9 +11,12 @@ went, so consumers can find it without reconstructing the key. Useful when CI
 logs need to outlive the provider's retention window: audit trails, incident
 forensics, or compliance evidence.
 
-It can also run in your own CI as a GitHub Action, so uploads use your runners'
-credentials; see [From your own CI](#from-your-own-ci). Both write the same
-receipts and objects.
+A daily pass backs up any run the per-run path missed; see
+[Daily backup](#daily-backup).
+
+It can also run in your own CI as a GitHub Action, writing the same receipts
+and objects with your runners' credentials; see
+[From your own CI](#from-your-own-ci).
 
 ## Collected Data
 
@@ -22,6 +25,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.ci.archive.runs[]` | array | One entry per archived run attempt: `uri`, `bucket`, `key`, `size_bytes`, run `id`, `attempt`, `name`, workflow `path`, `event`, `head_branch`, `head_sha`, `conclusion`, `started_at`, `completed_at`, `html_url`, `log_bytes`, `log_lines`, `jobs[]` (name, conclusion), `source`; for a run another workflow started, also `triggered_by_run_id` and `origin_source` |
+| `.ci.archive.backup` | object | The last daily backup pass, on the repository's root component: `branch`, `since`, `until`, `attempt_count` (run attempts checked), `uploaded_count` (attempts it had to upload), `source` |
 
 Nothing is written when `GH_TOKEN` is unset, when the workflow doesn't match
 `include_runs_pattern`, or when the run's event isn't in `include_events`: the
@@ -45,6 +49,7 @@ logs.zip        # GitHub's log archive for the attempt, verbatim
 | Collector | Description |
 |--------|-------------|
 | `backup-logs-s3` | Archives each finished run attempt to S3 and records it |
+| `backup-logs-s3-daily` | Once a day, uploads any recent run attempt that isn't in S3 yet |
 
 ### When it runs
 
@@ -85,6 +90,28 @@ This works with GitHub Actions only, for now. It needs a Hub with chained-run
 following turned on (`HUB_CHAINED_RUNS_ENABLED=true`, off by default); see
 [runs started by another pipeline](https://docs-lunar.earthly.dev/configuration/lunar-config/collector-hooks#runs-started-by-another-pipeline).
 
+### Daily backup
+
+`backup-logs-s3-daily` runs at 04:00 UTC. It lists the default branch's
+finished runs created in the last `daily_backup_lookback_hours` (48), and
+uploads every run attempt whose object isn't in the bucket yet, keyed as above.
+It's the safety net for runs the per-run path missed, such as a skipped hook or
+a Hub restart. It adds nothing to `.ci.archive.runs`, and writes a summary of
+the pass to `.ci.archive.backup`.
+
+- It runs only on a repository's root component (`github.com/<owner>/<repo>`),
+  which must be in the collector's `on:` scope. On a monorepo's subdirectory
+  components it exits without doing anything, so the repository is backed up
+  once.
+- It checks every commit folder the window's runs built, so a chained run the
+  Hub archived under its chain's first commit counts as present. Runs it
+  uploads itself are keyed by the commit GitHub recorded.
+- Each run is in two passes' windows, so a run still going at one pass is backed
+  up by the next. A re-run of a run created before the window isn't seen; raise
+  the lookback to cover it.
+- A run attempt it can't archive fails the pass once the others are done, and
+  the next pass tries it again.
+
 ## Installation
 
 Add to your `lunar-config.yml`:
@@ -107,7 +134,8 @@ the snippet pod first (IRSA, EKS Pod Identity, ECS task role, EC2 instance
 profile), then the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Lunar
 secrets are shared by every collector, so an attached role always wins over
 keys set for another plugin. With `s3_endpoint_url`, only the static keys are
-used. The identity needs `s3:PutObject` on the key prefix.
+used. The identity needs `s3:PutObject` on the key prefix, and the daily backup
+also needs `s3:ListBucket` on it.
 
 For a bucket in another account, set `aws_assume_role_arns` to a role there that
 can write to it. The collector assumes that role with the credentials above,
@@ -121,7 +149,8 @@ account's CloudTrail shows which run each upload came from.
 Leave out `s3_bucket` to check which runs fire, and on which commits, before
 wiring up a bucket. Each run is still recorded, with its log's size and line
 count, but nothing is uploaded and no AWS credentials are needed. `GH_TOKEN` is
-still required, to read the run and its logs.
+still required, to read the run and its logs. The daily backup does nothing
+without a bucket.
 
 ```yaml
 collectors:
