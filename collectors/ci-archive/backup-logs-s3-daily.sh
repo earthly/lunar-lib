@@ -115,6 +115,8 @@ jq -rs --arg re "$INCLUDE_RUNS_PATTERN" --arg events "$INCLUDE_EVENTS" '
 ATTEMPTS=$(wc -l < "$WORK/attempts.tsv" | tr -d ' ')
 WINDOW="${BRANCH} since $(iso "$SINCE")"
 
+# Scalars only: the latest cron record merges onto every later commit, where an
+# array would concatenate with other collectors' writes to the same path.
 summary() { # summary [uploaded-count]
   jq -n --arg branch "$BRANCH" --arg since "$(iso "$SINCE")" --arg until "$(iso "$UNTIL")" \
     --argjson attempts "$ATTEMPTS" --arg uploaded "${1:-}" --arg at "$(iso "$(date -u +%s)")" '
