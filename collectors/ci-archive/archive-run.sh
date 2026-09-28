@@ -5,11 +5,12 @@ set -eo pipefail
 # archive) to S3, then record where it went under .ci.archive.runs[] on the
 # commit that run built.
 #
-# Two callers, one per finished run attempt, re-runs included:
+# Callers:
 #   - the GitHub Action, in a workflow on `workflow_run: completed`, with AWS
 #     credentials from the job (OIDC), so the bucket never has to trust Lunar;
 #   - backup-logs-s3.sh, the collector the Hub runs on its after-ci-pipeline
-#     hook.
+#     hook, once per finished run attempt, re-runs included;
+#   - backup-logs-s3-daily.sh, for each recent run attempt the bucket lacks.
 
 log() { echo "ci-archive: $*" >&2; }
 
@@ -114,33 +115,39 @@ while :; do
 done
 
 # --- 2. The attempt's log archive ---
-# GitHub creates a job's log only when the job completes, so allow a short
-# lag after the run finishes. The 302 target is fetched without the token.
-code=""; loc=""
-for attempt in 1 2 3 4 5 6; do
-  out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 60 \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${API_BASE}/repos/${REPO}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/logs" 2>/dev/null) || out="000 "
-  code="${out%% *}"; loc="${out#* }"
-  case "$code" in 000|404|429|5??) sleep $((attempt * 5)); continue ;; esac
-  break
-done
-[ "$code" = "302" ] || { log "ERROR: downloading logs for run ${RUN_ID} attempt ${ATTEMPT} returned HTTP ${code}."; exit 1; }
-status=0
-curl -sS -f -o "$WORK/logs.zip" --max-time 900 --retry 2 --max-filesize "$MAX_BYTES" "$loc" 2>/dev/null || status=$?
-if [ "$status" -eq 63 ]; then
-  log "ERROR: the log archive is over max-archive-mb (${MAX_ARCHIVE_MB} MB); nothing uploaded."
-  exit 1
-elif [ "$status" -ne 0 ]; then
-  log "ERROR: log archive download failed (curl exit ${status})."
-  exit 1
-fi
-LOG_BYTES=$(file_size "$WORK/logs.zip")
-# Top-level files hold each job's whole log; the per-step files in the job
-# folders repeat it, so only those count (all files, if an archive has none).
-LOG_LINES=$(python3 - "$WORK/logs.zip" <<'COUNT'
+# A run that never started a job (a workflow file GitHub couldn't parse) has
+# no logs: GitHub 404s them for good, so archive its manifest alone.
+LOG_BYTES=0; LOG_LINES=0
+if [ "$(jq 'length' "$WORK/jobs.json")" -eq 0 ]; then
+  log "run ${RUN_ID} attempt ${ATTEMPT} started no jobs, so it has no logs; archiving its manifest alone."
+else
+  # GitHub creates a job's log only when the job completes, so allow a short
+  # lag after the run finishes. The 302 target is fetched without the token.
+  code=""; loc=""
+  for attempt in 1 2 3 4 5 6; do
+    out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 60 \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "${API_BASE}/repos/${REPO}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/logs" 2>/dev/null) || out="000 "
+    code="${out%% *}"; loc="${out#* }"
+    case "$code" in 000|404|429|5??) sleep $((attempt * 5)); continue ;; esac
+    break
+  done
+  [ "$code" = "302" ] || { log "ERROR: downloading logs for run ${RUN_ID} attempt ${ATTEMPT} returned HTTP ${code}."; exit 1; }
+  status=0
+  curl -sS -f -o "$WORK/logs.zip" --max-time 900 --retry 2 --max-filesize "$MAX_BYTES" "$loc" 2>/dev/null || status=$?
+  if [ "$status" -eq 63 ]; then
+    log "ERROR: the log archive is over max-archive-mb (${MAX_ARCHIVE_MB} MB); nothing uploaded."
+    exit 1
+  elif [ "$status" -ne 0 ]; then
+    log "ERROR: log archive download failed (curl exit ${status})."
+    exit 1
+  fi
+  LOG_BYTES=$(file_size "$WORK/logs.zip")
+  # Top-level files hold each job's whole log; the per-step files in the job
+  # folders repeat it, so only those count (all files, if an archive has none).
+  LOG_LINES=$(python3 - "$WORK/logs.zip" <<'COUNT'
 import sys, zipfile
 zf = zipfile.ZipFile(sys.argv[1])
 files = [i for i in zf.infolist() if not i.is_dir()]
@@ -152,6 +159,7 @@ for info in [i for i in files if "/" not in i.filename] or files:
 print(total)
 COUNT
 )
+fi
 
 # --- 3. Bundle and upload ---
 ARCHIVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -171,11 +179,12 @@ jq -n --arg repo "$REPO" --arg sha "$SHA" --arg at "$ARCHIVED_AT" --argjson byte
 URI=""; KEY=""; SIZE=0
 if [ "$UPLOAD" = true ]; then
   python3 - "$WORK/archive.zip" "$WORK/manifest.json" "$WORK/logs.zip" <<'PY'
-import sys, zipfile
+import os, sys, zipfile
 archive, manifest, logs = sys.argv[1:4]
 with zipfile.ZipFile(archive, "w", allowZip64=True) as zf:
     zf.write(manifest, "manifest.json", compress_type=zipfile.ZIP_DEFLATED)
-    zf.write(logs, "logs.zip", compress_type=zipfile.ZIP_STORED)
+    if os.path.exists(logs):
+        zf.write(logs, "logs.zip", compress_type=zipfile.ZIP_STORED)
 PY
 
   prefix="${S3_PREFIX#/}"; prefix="${prefix%/}"

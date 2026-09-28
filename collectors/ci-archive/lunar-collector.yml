@@ -9,10 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "CI Archive Collector"
   long_description: |
-    Archives each finished CI workflow run, re-runs included — run metadata,
-    jobs and the full logs — to S3, and records where each one went. Gives you
-    a durable record of CI output after the provider's own retention window
-    closes.
+    Archives each finished CI workflow run on the default branch, re-runs
+    included — run metadata, jobs and the full logs — to S3, and records where
+    each one went. Gives you a durable record of CI output after the provider's
+    own retention window closes.
   category: "ci-cd"
   icon: "assets/ci-archive.svg"
   status: "experimental"
@@ -23,7 +23,7 @@ landing_page:
 
 inputs:
   s3_bucket:
-    description: Destination S3 bucket. Unset, each run is recorded with its log line count but not uploaded.
+    description: Destination S3 bucket. Unset, each run is recorded with its log line count but not uploaded, and the daily backup only counts run attempts.
   s3_prefix:
     description: Key prefix in the bucket. Objects land at <prefix>/<host>/<owner>/<repo>/<sha>/<run-id>-<attempt>.zip; empty means the bucket root.
     default: "lunar/ci-archive"
@@ -48,6 +48,12 @@ inputs:
   include_events:
     description: Only archive runs triggered by these events, comma-separated (for example `push`). Empty means all events.
     default: ""
+  daily_backup_lookback_hours:
+    description: How far back backup-logs-s3-daily looks, by when each run was created. Twice the daily schedule, so a run still going at one pass is caught by the next.
+    default: "48"
+  daily_backup_branch:
+    description: Branch whose runs backup-logs-s3-daily backs up. Empty means the repository's default branch.
+    default: ""
 
 secrets:
   GH_TOKEN:
@@ -62,16 +68,37 @@ secrets:
 collectors:
   - name: backup-logs-s3
     description: |
-      Fires once per finished CI workflow run attempt, re-runs included, on the
-      Hub's after-ci-pipeline hook. Downloads that attempt's log archive, bundles
-      it with the run and its jobs, uploads it to S3, and appends where it went
-      to .ci.archive.runs.
+      Fires once per finished CI workflow run attempt on the default branch,
+      re-runs included, on the Hub's after-ci-pipeline hook. Downloads that
+      attempt's log archive, bundles it with the run and its jobs, uploads it to
+      S3, and appends where it went to .ci.archive.runs.
     mainBash: backup-logs-s3.sh
     # Log archives for a busy repo can be hundreds of MB before compression.
     size: large
+    runs_on: [default-branch]
     hook:
       type: after-ci-pipeline
     keywords: ["ci archive", "workflow logs", "s3", "after-ci-pipeline", "retention", "audit trail"]
+
+  - name: backup-logs-s3-daily
+    description: |
+      Once a day, lists the finished CI workflow runs on the default branch
+      from the last daily_backup_lookback_hours and uploads every run attempt
+      that isn't in S3 yet, under the same key backup-logs-s3 uses. The safety
+      net for runs the per-run path missed. For usage in a monorepo, this
+      collector should target only the monorepo root component, since it
+      captures workflows for the entire repository, unlike backup-logs-s3,
+      which can disambiguate per-component CI runs within monorepo
+      subcomponents. Writes a summary of the pass to .ci.archive.backup.
+    mainBash: backup-logs-s3-daily.sh
+    # Downloads the same log archives backup-logs-s3 does.
+    size: large
+    runs_on: [default-branch]
+    hook:
+      type: cron
+      schedule: "0 4 * * *"  # daily at 04:00 UTC
+      clone-code: false      # GitHub API and S3 only
+    keywords: ["ci archive", "workflow logs", "s3", "cron", "backup", "retention", "audit trail"]
 
 example_component_json: |
   {
@@ -130,7 +157,19 @@ example_component_json: |
               "collected_at": "2026-09-23T14:41:15Z"
             }
           }
-        ]
+        ],
+        "backup": {
+          "branch": "main",
+          "since": "2026-09-22T04:00:09Z",
+          "until": "2026-09-24T04:00:09Z",
+          "attempt_count": 412,
+          "uploaded_count": 3,
+          "source": {
+            "tool": "ci-archive",
+            "integration": "cron",
+            "collected_at": "2026-09-24T04:06:52Z"
+          }
+        }
       }
     }
   }
