@@ -308,14 +308,17 @@ expect "doesn't wait on logs that never come" test "$elapsed" -lt 10
 # --- The daily backup ---
 DAILY_DIR="$S3_DIR/archive/lunar/ci-archive/127.0.0.1_8443/acme/daily"
 # The per-run path already archived 801, and 803 under the commit its chain
-# started from. acme/daily's window then holds 801, 802 (two attempts), 803,
-# 806 (started no jobs) and 808; 804 is still going, 805 is 60 hours old, and
-# 807 ran on another branch.
-run_case seed-801 801 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily LUNAR_COMPONENT_GIT_SHA=sha-801
+# started from, each from a subdirectory component of the monorepo. The daily
+# pass runs on the root component, so these prove the two share one key.
+# acme/daily's window then holds 801, 802 (two attempts), 803, 806 (started no
+# jobs) and 808; 804 is still going, 805 is 60 hours old, and 807 ran on another
+# branch.
+run_case seed-801 801 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily/services/api LUNAR_COMPONENT_GIT_SHA=sha-801
 expect_exit 0
-run_case seed-803 803 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily LUNAR_COMPONENT_GIT_SHA=sha-801 \
+run_case seed-803 803 1 LUNAR_COMPONENT_ID=127.0.0.1:8443/acme/daily/services/web LUNAR_COMPONENT_GIT_SHA=sha-801 \
   LUNAR_CI_PIPELINE_NAME=promote
 expect_exit 0
+expect "a subdirectory component archives under the repository's key" test -s "$DAILY_DIR/sha-801/801-1.zip"
 seeded_801="$(sha256sum < "$DAILY_DIR/sha-801/801-1.zip")"
 
 run_daily daily-first
