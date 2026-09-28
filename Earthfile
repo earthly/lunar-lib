@@ -98,6 +98,7 @@ test:
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
+    BUILD ./policies/ticket+test
 
 lint:
     FROM python:3.12-alpine

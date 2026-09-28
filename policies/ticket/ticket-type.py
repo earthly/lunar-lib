@@ -1,10 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
+from helpers import ticket_path
+
 
 def main(node=None):
     c = Check("ticket-type", "Ticket should be an acceptable issue type", node=node)
     with c:
-        if not c.exists(".vcs.pr.ticket.type"):
+        root = ticket_path()
+        if not c.exists(f"{root}.type"):
             c.skip("No ticket type data available")
 
         allowed_str = variable_or_default("allowed_types", "")
@@ -14,8 +17,8 @@ def main(node=None):
         if not allowed:
             c.skip("No type constraints configured")
 
-        issue_type = c.get_value_or_default(".vcs.pr.ticket.type", "")
-        ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "unknown")
+        issue_type = c.get_value_or_default(f"{root}.type", "")
+        ticket_id = c.get_value_or_default(f"{root}.id", "unknown")
 
         if not issue_type:
             c.skip("Ticket has no type information")
