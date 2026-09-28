@@ -9,10 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "CI Archive Collector"
   long_description: |
-    Archives each finished CI workflow run, re-runs included — run metadata,
-    jobs and the full logs — to S3, and records where each one went. Gives you
-    a durable record of CI output after the provider's own retention window
-    closes.
+    Archives each finished CI workflow run on the default branch, re-runs
+    included — run metadata, jobs and the full logs — to S3, and records where
+    each one went. Gives you a durable record of CI output after the provider's
+    own retention window closes.
   category: "ci-cd"
   icon: "assets/ci-archive.svg"
   status: "experimental"
@@ -68,13 +68,14 @@ secrets:
 collectors:
   - name: backup-logs-s3
     description: |
-      Fires once per finished CI workflow run attempt, re-runs included, on the
-      Hub's after-ci-pipeline hook. Downloads that attempt's log archive, bundles
-      it with the run and its jobs, uploads it to S3, and appends where it went
-      to .ci.archive.runs.
+      Fires once per finished CI workflow run attempt on the default branch,
+      re-runs included, on the Hub's after-ci-pipeline hook. Downloads that
+      attempt's log archive, bundles it with the run and its jobs, uploads it to
+      S3, and appends where it went to .ci.archive.runs.
     mainBash: backup-logs-s3.sh
     # Log archives for a busy repo can be hundreds of MB before compression.
     size: large
+    runs_on: [default-branch]
     hook:
       type: after-ci-pipeline
     keywords: ["ci archive", "workflow logs", "s3", "after-ci-pipeline", "retention", "audit trail"]
@@ -90,8 +91,6 @@ collectors:
     mainBash: backup-logs-s3-daily.sh
     # Downloads the same log archives backup-logs-s3 does.
     size: large
-    # Cron-only: runs_on sits on the sub-collector; a consumer's `uses:` line
-    # can't set it for a cron hook.
     runs_on: [default-branch]
     hook:
       type: cron

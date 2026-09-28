@@ -4,12 +4,12 @@ Archives completed CI workflow runs and their logs to S3.
 
 ## Overview
 
-Each time a CI workflow run finishes, re-runs included, this collector downloads
-that run attempt's logs, bundles them with the run and its jobs, and uploads the
-zip to S3. It appends a receipt to `.ci.archive.runs` saying where the archive
-went, so consumers can find it without reconstructing the key. Useful when CI
-logs need to outlive the provider's retention window: audit trails, incident
-forensics, or compliance evidence.
+Each time a CI workflow run on the default branch finishes, re-runs included,
+this collector downloads that run attempt's logs, bundles them with the run and
+its jobs, and uploads the zip to S3. It appends a receipt to `.ci.archive.runs`
+saying where the archive went, so consumers can find it without reconstructing
+the key. Useful when CI logs need to outlive the provider's retention window:
+audit trails, incident forensics, or compliance evidence.
 
 A daily pass backs up any run the per-run path missed; see
 [Daily backup](#daily-backup).
@@ -56,9 +56,10 @@ parse, has no logs, so its object holds only `manifest.json`.
 
 ### When it runs
 
-On the Hub's `after-ci-pipeline` hook: once per finished run attempt, for each
-component the run's commit belongs to, after the attempt's logs exist. A re-run
-is a new attempt and is archived again. Component checks don't wait for it.
+On the Hub's `after-ci-pipeline` hook: once per finished run attempt on the
+default branch, for each component the run's commit belongs to, after the
+attempt's logs exist. PR runs aren't archived. A re-run is a new attempt and is
+archived again. Component checks don't wait for it.
 
 It needs a Hub that has the `after-ci-pipeline` hook. In a monorepo, set
 [`ciPipelines`](https://docs-lunar.earthly.dev/configuration/lunar-config/components#cipipelines)
@@ -66,7 +67,7 @@ on components to say which workflows are theirs.
 
 Runs started by `schedule` or `workflow_dispatch` are filed at the branch head
 when they started. To archive only runs a commit started, set
-`include_events: push` (add `pull_request` for PR runs).
+`include_events: push`.
 
 ### Runs started by another workflow
 
