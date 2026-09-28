@@ -85,9 +85,11 @@ collectors:
       Once a day, lists the finished CI workflow runs on the default branch
       from the last daily_backup_lookback_hours and uploads every run attempt
       that isn't in S3 yet, under the same key backup-logs-s3 uses. The safety
-      net for runs the per-run path missed. Runs only on a repository's root
-      component, so a monorepo is backed up once. Writes a summary of the pass
-      to .ci.archive.backup.
+      net for runs the per-run path missed. For usage in a monorepo, this
+      collector should target only the monorepo root component, since it
+      captures workflows for the entire repository, unlike backup-logs-s3,
+      which can disambiguate per-component CI runs within monorepo
+      subcomponents. Writes a summary of the pass to .ci.archive.backup.
     mainBash: backup-logs-s3-daily.sh
     # Downloads the same log archives backup-logs-s3 does.
     size: large

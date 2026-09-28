@@ -103,10 +103,10 @@ It's the safety net for runs the per-run path missed, such as a skipped hook or
 a Hub restart. It adds nothing to `.ci.archive.runs`, and writes a summary of
 the pass to `.ci.archive.backup`.
 
-- It runs only on a repository's root component (`github.com/<owner>/<repo>`),
-  which must be in the collector's `on:` scope. On a monorepo's subdirectory
-  components it exits without doing anything, so the repository is backed up
-  once.
+- In a monorepo, target only the root component (`github.com/<owner>/<repo>`):
+  it captures workflows for the entire repository, unlike `backup-logs-s3`,
+  which can tell subcomponents' runs apart. On a subdirectory component it
+  exits without doing anything.
 - It checks every commit folder the window's runs built, so a chained run the
   Hub archived under its chain's first commit counts as present. Runs it
   uploads itself are keyed by the commit GitHub recorded.
@@ -129,6 +129,24 @@ collectors:
       s3_bucket: "your-ci-archive-bucket"
       s3_prefix: "lunar/ci-archive"
       aws_region: "us-east-1"
+```
+
+In a monorepo, import it a second time so the daily backup targets only the root
+component:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
+    on: ["domain:your-domain"]
+    exclude: [backup-logs-s3-daily]
+    with:
+      s3_bucket: "your-ci-archive-bucket"
+  - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
+    name: ci-archive-daily
+    on: ["component:github.com/acme/monorepo"]
+    include: [backup-logs-s3-daily]
+    with:
+      s3_bucket: "your-ci-archive-bucket"
 ```
 
 Inputs and secrets are documented in `lunar-collector.yml`. `GH_TOKEN` needs
