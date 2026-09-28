@@ -96,7 +96,8 @@ following turned on (`HUB_CHAINED_RUNS_ENABLED=true`, off by default); see
 
 ### Daily backup
 
-`backup-logs-s3-daily` runs at 04:00 UTC. It lists the default branch's
+`backup-logs-s3-daily` runs at 04:00 UTC, or on the cron schedule in
+`daily_backup_schedule`. It lists the default branch's
 finished runs created in the last `daily_backup_lookback_hours` (48), and
 uploads every run attempt whose object isn't in the bucket yet, keyed as above.
 It's the safety net for runs the per-run path missed, such as a skipped hook or
@@ -111,8 +112,9 @@ the pass to `.ci.archive.backup`.
   Hub archived under its chain's first commit counts as present. Runs it
   uploads itself are keyed by the commit GitHub recorded.
 - Each run is in two passes' windows, so a run still going at one pass is backed
-  up by the next. A re-run of a run created before the window isn't seen; raise
-  the lookback to cover it.
+  up by the next. On a custom schedule, keep the lookback at least twice its
+  interval. A re-run of a run created before the window isn't seen; raise the
+  lookback to cover it.
 - `include_runs_pattern` and `include_events` apply here too.
 - A run attempt it can't archive fails the pass once the others are done, and
   the next pass tries it again.

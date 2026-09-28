@@ -54,6 +54,9 @@ inputs:
   daily_backup_branch:
     description: Branch whose runs backup-logs-s3-daily backs up. Empty means the repository's default branch.
     default: ""
+  daily_backup_schedule:
+    description: Cron schedule, in UTC, for backup-logs-s3-daily, no more often than every 10 minutes. Keep daily_backup_lookback_hours at least twice its interval.
+    default: "0 4 * * *"
 
 secrets:
   GH_TOKEN:
@@ -96,7 +99,7 @@ collectors:
     runs_on: [default-branch]
     hook:
       type: cron
-      schedule: "0 4 * * *"  # daily at 04:00 UTC
+      schedule: "${{ inputs.daily_backup_schedule }}"
       clone-code: false      # GitHub API and S3 only
     keywords: ["ci archive", "workflow logs", "s3", "cron", "backup", "retention", "audit trail"]
 
