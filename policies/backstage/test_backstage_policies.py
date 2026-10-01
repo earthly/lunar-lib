@@ -855,7 +855,7 @@ DEFAULT_NO_CATALOG = {
 
 
 class TestSkipWhenNoCatalogInfo(unittest.TestCase):
-    """The `skip_when_no_catalog_info` input, across all thirteen checks."""
+    """The `skip_when_no_catalog_info` input, across all checks."""
 
     def test_every_check_skips_when_set(self):
         for name, check_fn, inputs in ALL_CHECKS:

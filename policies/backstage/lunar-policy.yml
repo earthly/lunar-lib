@@ -188,8 +188,8 @@ inputs:
       `lifecycle-set` and `system-set`; fails `required-annotations` and
       `required-tag-patterns` when those are configured; passes the two
       `disallowed-*` deny-checks, since nothing forbidden can be present
-      without a file; and skips the four referential-integrity checks, which
-      have nothing to cross-check. With `"true"` all thirteen skip instead —
+      without a file; and skips the referential-integrity checks, which
+      have nothing to cross-check. With `"true"` every check skips instead —
       the `disallowed-*` pair included, so a component that is not in the
       catalog reports no green passes it did not earn.
 

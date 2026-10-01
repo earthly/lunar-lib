@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The four referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
+The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
 
 ## Policies
 
@@ -42,7 +42,7 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 | `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
 | `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
-| `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; all four RI checks skip (pass) when absent |
+| `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; the RI checks skip (pass) when absent |
 | `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }` on a transient lookup failure) for `spec.domain`; read by `domain-exists` |
 | `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`, plus `has_domain` once the system resolves; read by `system-exists` and `system-domain-set` |
 | `.catalog.native.backstage.refs.system_domain` | object | `backstage` collector — `{ name, exists, via_system }` (or `{ name, error, via_system }`) for the domain the component's system belongs to; read by `system-domain-exists` |
@@ -130,7 +130,7 @@ The four list inputs are comma-separated; leave them unset (the default) and the
 
 The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All four are skipped if unconfigured.
 
-With `skip_when_no_catalog_info: "true"` all thirteen checks **skip** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
+With `skip_when_no_catalog_info: "true"` every check **skips** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
 
 **Failure messages:**
 - `"No catalog-info.yaml found"`
@@ -258,7 +258,7 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 `system-domain-set` **fails**: `"System 'team-tools' (referenced by spec.system) does not belong to any domain."` Like `system-domain-exists`, it names the System, because `spec.domain` is set on that entity. It **skips** when `has_domain` is absent from a resolved system, which is what a collector older than this check writes.
 
 
-**Not configured / transient outage — all four skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and all four checks **skip (pass)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:
+**Not configured / transient outage — they skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and every referential-integrity check **skips (passes)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:
 
 ```json
 { "catalog": { "native": { "backstage": {
