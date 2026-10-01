@@ -259,13 +259,20 @@ class HarnessTest(unittest.TestCase):
                     self.assertTrue(skipped(check), module)
 
     def test_mesh_with_istio_resources_is_still_checked(self):
-        # Every .mesh the collector wrote before had resources or injection data.
-        mesh = {"provider": "istio", "resources": [], "peer_authentications": [],
-                "injection": {"namespaces": [{"name": "shop", "enabled": True}], "workload_overrides": []},
-                "summary": {"mtls_default_mode": None}}
-        check = importlib.import_module("mtls_strict").main(
-            Node.from_component_json({"mesh": mesh}, {"workflows_finished": True}))
-        self.assertEqual(check.status, CheckStatus.FAIL)
+        # Every .mesh the collector wrote before had resources or injection data;
+        # each one on its own must keep the checks running.
+        shapes = {
+            "resources": ([{"kind": "Gateway", "name": "ingress", "namespace": "istio-system", "valid": True}], [], []),
+            "namespaces": ([], [{"name": "shop", "enabled": True}], []),
+            "workload_overrides": ([], [], [{"kind": "Deployment", "name": "api", "namespace": "shop", "inject": False}]),
+        }
+        for label, (resources, namespaces, overrides) in shapes.items():
+            mesh = {"provider": "istio", "resources": resources, "peer_authentications": [],
+                    "injection": {"namespaces": namespaces, "workload_overrides": overrides},
+                    "summary": {"mtls_default_mode": None}}
+            check = importlib.import_module("mtls_strict").main(
+                Node.from_component_json({"mesh": mesh}, {"workflows_finished": True}))
+            self.assertEqual(check.status, CheckStatus.FAIL, label)
 
 
 if __name__ == "__main__":
