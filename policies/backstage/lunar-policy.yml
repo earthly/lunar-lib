@@ -109,13 +109,27 @@ policies:
       catalog file, typically owned by another team, not this component's).
       Passes when there is nothing to cross-check — no `spec.system` declared,
       the system itself did not resolve (that is `system-exists`'s failure to
-      report), or the system belongs to no domain. Skips (passes) when
+      report), or the system belongs to no domain (that is
+      `system-domain-set`'s). Skips (passes) when
       referential integrity was not performed — the `backstage` collector is
       not configured with `backstage_url` (no `.refs.checked`) — or the lookup
       errored transiently (`.refs.system_domain.error`), so an unconfigured
       collector or a Backstage outage never turns this red.
     mainPython: ./system-domain-exists.py
     keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "cross-reference", "transitive"]
+
+  - name: system-domain-set
+    description: |
+      Verifies that the system the component belongs to is itself assigned to
+      a domain (`System.spec.domain`), read from the collector's
+      `.catalog.native.backstage.refs.system.has_domain`. Fails when the
+      system resolves in Backstage but declares no domain, naming the System
+      to fix. Passes when no `spec.system` is declared or the system does not
+      resolve (`system-set` and `system-exists` report those). Skips when the
+      collector has no `backstage_url`, the system lookup errored, or the
+      collector predates `has_domain`.
+    mainPython: ./system-domain-set.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
 
   - name: required-annotations
     description: |
@@ -174,8 +188,8 @@ inputs:
       `lifecycle-set` and `system-set`; fails `required-annotations` and
       `required-tag-patterns` when those are configured; passes the two
       `disallowed-*` deny-checks, since nothing forbidden can be present
-      without a file; and skips the three referential-integrity checks, which
-      have nothing to cross-check. With `"true"` all twelve skip instead —
+      without a file; and skips the four referential-integrity checks, which
+      have nothing to cross-check. With `"true"` all thirteen skip instead —
       the `disallowed-*` pair included, so a component that is not in the
       catalog reports no green passes it did not earn.
 

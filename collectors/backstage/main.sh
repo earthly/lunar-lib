@@ -570,7 +570,18 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
     # invariant so that stays true if resolve_ref ever starts capturing error
     # bodies too.
     if [ "$(echo "$SYSTEM_ENTRY" | jq -r '.exists // false')" = "true" ]; then
-      SYSTEM_DOMAIN_REF=$(jq -r '.spec.domain // empty' "$ENTITY_BODY_FILE" 2>/dev/null || :)
+      # Record whether the System declares a domain: without it, "belongs to
+      # no domain" looks the same as a collector that never checked. Left unset
+      # when the body isn't an entity, so nothing is inferred from a response
+      # we couldn't read.
+      if SYSTEM_DOMAIN_REF=$(jq -er 'if type == "object" then (.spec.domain // "" | tostring) else error("not an entity") end' \
+           "$ENTITY_BODY_FILE" 2>/dev/null); then
+        HAS_DOMAIN=false
+        [ -n "$SYSTEM_DOMAIN_REF" ] && HAS_DOMAIN=true
+        REFS=$(echo "$REFS" | jq --argjson has "$HAS_DOMAIN" '.system += {has_domain: $has}')
+      else
+        SYSTEM_DOMAIN_REF=""
+      fi
       if [ -n "$SYSTEM_DOMAIN_REF" ]; then
         # A bare reference on the System resolves against the SYSTEM's namespace,
         # not the component's — they can differ — so borrow it for this lookup.
