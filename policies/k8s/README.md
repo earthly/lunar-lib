@@ -22,6 +22,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `host-network` | Forbids `hostNetwork: true` on PodSpecs | Workload shares the host network namespace — bypasses NetworkPolicy and exposes node interfaces |
 | `host-pid` | Forbids `hostPID: true` on PodSpecs | Workload shares the host PID namespace — can see, signal, and potentially attach to processes on the node |
 | `host-ipc` | Forbids `hostIPC: true` on PodSpecs | Workload shares the host IPC namespace — can read or tamper with node-wide shared memory |
+| `metadata-egress-blocked` | Requires NetworkPolicy to block pod egress to the instance-metadata endpoint | Workload's pods can reach 169.254.169.254, where node credentials can be read |
 | `min-kubectl-version` | Enforces minimum kubectl version in CI | kubectl client used in CI is below threshold |
 
 ## Required Data
@@ -34,6 +35,7 @@ This policy reads from the following Component JSON paths:
 | `.k8s.workloads[]` | array | `k8s` collector |
 | `.k8s.hpas[]` | array | `k8s` collector |
 | `.k8s.pdbs[]` | array | `k8s` collector |
+| `.k8s.network_policies[]` | array | `k8s` collector |
 | `.k8s.cicd.cmds[]` | array | `k8s` collector (cicd sub-collector) |
 
 **Note:** Ensure the `k8s` collector is configured before enabling this policy.
@@ -56,6 +58,7 @@ policies:
     #   min_replicas: "3"
     #   max_limit_to_request_ratio: "4"
     #   min_kubectl_version: "1.28"
+    #   metadata_ips: "169.254.169.254,fd00:ec2::254"  # IPv6 EKS clusters
 ```
 
 ## Examples
@@ -96,6 +99,15 @@ A compliant component with proper resource specs, probes, and security context:
     ],
     "pdbs": [
       {"name": "payment-api-pdb", "namespace": "payments", "selector": {"matchLabels": {"app": "payment-api"}}}
+    ],
+    "network_policies": [
+      {
+        "name": "egress-no-metadata",
+        "namespace": "payments",
+        "pod_selector": {},
+        "policy_types": ["Egress"],
+        "egress": [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}]
+      }
     ]
   }
 }
@@ -159,7 +171,8 @@ When this policy fails, resolve it by:
 8. **For `host-network` failures:** Remove `spec.hostNetwork: true` from the PodSpec. Workloads that legitimately need the host network (CNI agents, node-local proxies, host-bound metrics exporters) can opt out via `include`/`exclude` in `lunar-config.yml`.
 9. **For `host-pid` failures:** Remove `spec.hostPID: true` from the PodSpec. Node-level monitoring agents that need a host-wide process view can opt out via `include`/`exclude` in `lunar-config.yml`.
 10. **For `host-ipc` failures:** Remove `spec.hostIPC: true` from the PodSpec. Workloads that genuinely need host IPC (rare — usually legacy shared-memory consumers) can opt out via `include`/`exclude` in `lunar-config.yml`.
-11. **For `min-kubectl-version` failures:** Upgrade the kubectl client in your CI pipeline (e.g., pin `azure/setup-kubectl@v4` or `setup-kubectl` action to a newer version, or update the installed kubectl on self-hosted runners)
+11. **For `metadata-egress-blocked` failures:** Select the workload with a NetworkPolicy that has `Egress` in `policyTypes`, namespace-wide (`podSelector: {}`) or per workload, and allow `0.0.0.0/0` with `except: [169.254.169.254/32]`, or no egress at all. Policies are additive: any selecting policy with a rule that has no `to`, or an `ipBlock` without the `except`, reopens TCP 80 to the endpoint. Only `networking.k8s.io` NetworkPolicy in this repository is read, so exclude the check where the endpoint is blocked some other way (e.g. AdminNetworkPolicy), or where pods need it by design (GKE Workload Identity serves them through it). `hostNetwork` workloads are left to `host-network`.
+12. **For `min-kubectl-version` failures:** Upgrade the kubectl client in your CI pipeline (e.g., pin `azure/setup-kubectl@v4` or `setup-kubectl` action to a newer version, or update the installed kubectl on self-hosted runners)
 
 Consumers who want any of these surfaced without blocking can pin `enforcement: report-pr` at config time — but that's a consumer-side knob; the checks themselves just pass or fail.
 

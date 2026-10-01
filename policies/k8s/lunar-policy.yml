@@ -10,7 +10,8 @@ landing_page:
   display_name: "Kubernetes Guardrails"
   long_description: |
     Enforce Kubernetes best practices including manifest validation, resource limits,
-    probes, PodDisruptionBudgets, and HPA configurations for production readiness.
+    probes, PodDisruptionBudgets, HPA configurations, and NetworkPolicy egress to the
+    instance-metadata endpoint.
   category: "deployment-and-infrastructure"
   icon: "assets/k8s.svg"
   status: "stable"
@@ -107,6 +108,14 @@ policies:
     mainPython: host_ipc.py
     keywords: ["hostIPC", "IPC namespace", "shared memory", "container escape", "least privilege"]
 
+  - name: metadata-egress-blocked
+    description: |
+      Requires a NetworkPolicy to keep each workload's pods from reaching the
+      cloud instance-metadata endpoint (169.254.169.254), where node credentials
+      can be read.
+    mainPython: metadata_egress_blocked.py
+    keywords: ["NetworkPolicy", "egress", "instance metadata", "IMDS", "169.254.169.254", "credential theft"]
+
   - name: min-kubectl-version
     description: |
       Ensures the kubectl version used in CI meets the minimum required version.
@@ -124,4 +133,7 @@ inputs:
   min_kubectl_version:
     description: Minimum kubectl version required in CI (semver, e.g. "1.28")
     default: "1.28"
+  metadata_ips:
+    description: Comma-separated metadata endpoint IPs that metadata-egress-blocked keeps pods from reaching on TCP port 80 (add fd00:ec2::254 for IPv6 EKS clusters)
+    default: "169.254.169.254"
 

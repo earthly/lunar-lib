@@ -173,13 +173,36 @@ process_file() {
         }
     ]')
     
+    # Extract NetworkPolicies. The apiVersion filter keeps out Calico's
+    # projectcalico.org NetworkPolicy, which shares the kind but not the schema.
+    network_policies=$(echo "$docs" | jq --arg path "$path" '[
+        .[] |
+        select(.kind == "NetworkPolicy" and ((.apiVersion // "") | startswith("networking.k8s.io/"))) |
+        {
+            name: .metadata.name,
+            namespace: (.metadata.namespace // "default"),
+            path: $path,
+            # An absent podSelector is the empty selector: every pod in the namespace.
+            pod_selector: (.spec.podSelector // {}),
+            # Effective policyTypes: when unset, the API server applies Ingress, plus
+            # Egress only if the policy has at least one egress rule.
+            policy_types: (
+                if ((.spec.policyTypes // []) | length) > 0 then .spec.policyTypes
+                else ["Ingress"] + (if ((.spec.egress // []) | length) > 0 then ["Egress"] else [] end)
+                end
+            ),
+            egress: (.spec.egress // [])
+        }
+    ]')
+
     # Output JSON with all data
     jq -n \
         --argjson manifest "$manifest" \
         --argjson workloads "$workloads_with_containers" \
         --argjson pdbs "$pdbs" \
         --argjson hpas "$hpas" \
-        '{manifest: $manifest, workloads: $workloads, pdbs: $pdbs, hpas: $hpas}'
+        --argjson network_policies "$network_policies" \
+        '{manifest: $manifest, workloads: $workloads, pdbs: $pdbs, hpas: $hpas, network_policies: $network_policies}'
 }
 
 export -f process_file
@@ -202,7 +225,8 @@ results=$(eval "$FIND_CMD" 2>/dev/null | \
         manifests: [.[].manifest | select(. != null)],
         workloads: [.[].workloads[] | select(. != null)],
         pdbs: [.[].pdbs[] | select(. != null)],
-        hpas: [.[].hpas[] | select(. != null)]
+        hpas: [.[].hpas[] | select(. != null)],
+        network_policies: [.[].network_policies[] | select(. != null)]
     }')
 
 # Only collect if we found at least one manifest

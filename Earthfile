@@ -81,6 +81,8 @@ test:
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
     BUILD ./collectors/java+test
+    BUILD ./collectors/k8s+test
+    BUILD ./collectors/istio+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
@@ -92,6 +94,7 @@ test:
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
     BUILD ./policies/k8s+test
+    BUILD ./policies/istio+test
     BUILD ./policies/github-actions+test
     BUILD ./policies/sca+test
     BUILD ./policies/container-scan+test
