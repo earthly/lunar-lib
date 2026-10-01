@@ -93,12 +93,15 @@ gh_api_list() {
     [ "$(printf '%s' "$GH_BODY" | jq 'length')" -lt 100 ] && return 0
     page=$((page + 1))
   done
+  return 1  # 10 full pages: the list may go on, so it isn't known to be complete
 }
 
-# Describe every ruleset that has an active rule on the default branch, from
-# the ruleset IDs in RULES_DATA, into RULESETS as a JSON array. GitHub returns
-# bypass_actors only to callers with write access to the ruleset, so it is
-# omitted when hidden and [] only when genuinely empty. A 404 ruleset (gone
+# Describe every branch ruleset that has an active rule on the default branch,
+# from the ruleset IDs in RULES_DATA, into RULESETS as a JSON array. The rules
+# call also returns repository-target rulesets (rename, delete, visibility
+# rules), which say nothing about the branch, so those are left out. GitHub
+# returns bypass_actors only to callers with write access to the ruleset, so it
+# is omitted when hidden and [] only when genuinely empty. A 404 ruleset (gone
 # since the rules call) is recorded as hidden. Returns non-zero on any other
 # API error.
 collect_rulesets() {
@@ -107,6 +110,7 @@ collect_rulesets() {
   for id in $(printf '%s' "$RULES_DATA" | jq -r '[.[].ruleset_id | select(. != null)] | unique | .[]'); do
     gh_api "/repos/${OWNER}/${REPO}/rulesets/${id}"
     if [ "$GH_HTTP_CODE" = "200" ]; then
+      [ "$(printf '%s' "$GH_BODY" | jq -r '.target // "branch"')" = "branch" ] || continue
       # Nulls are dropped (actor_id is null for OrganizationAdmin and DeployKey):
       # a policy reads null as missing data.
       meta=$(printf '%s' "$GH_BODY" | jq -c '({id, name, source_type, source}

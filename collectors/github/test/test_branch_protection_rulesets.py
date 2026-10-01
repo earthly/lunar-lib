@@ -106,6 +106,32 @@ class RulesetBypassTest(ScriptTestCase):
         self.assertEqual([r["id"] for r in bp["rulesets"]], [42, 73])
         self.assertTrue(bp["require_signed_commits"])  # the page-2 rule counts
 
+    def test_repository_target_rulesets_are_left_out(self):
+        # The rules call also returns repository-target rulesets (delete,
+        # transfer, visibility rules); their bypass lists don't cover the branch.
+        rules = fixture_json("rules_branch.json") + [
+            {"type": "repository_delete", "ruleset_source_type": "Organization",
+             "ruleset_source": "my-org", "ruleset_id": 99}]
+        self.base()
+        self.rules(json.dumps(rules))
+        self.ruleset(42, fixture("ruleset_42.json"))
+        self.ruleset(73, fixture("ruleset_73_empty.json"))
+        self.ruleset(99, fixture("ruleset_99_repository.json"))
+        rc, _ = self.run_script()
+        self.assertEqual(rc, 0)
+        self.assertEqual([r["id"] for r in self.bp()["rulesets"]], [42, 73])
+
+    def test_rules_listing_cut_off_after_ten_pages_aborts(self):
+        full = json.dumps([{"type": "pull_request", "ruleset_source_type": "Repository",
+                            "ruleset_source": "monalisa/my-repo", "ruleset_id": 42,
+                            "parameters": {"required_approving_review_count": 1}}] * 100)
+        self.base()
+        for page in range(1, 11):
+            self.rules(full, page=str(page))
+        rc, _ = self.run_script()
+        self.assertNotEqual(rc, 0)
+        self.assertNotIn(".vcs.branch_protection.enabled", self.collected())
+
     def test_unprotected_branch_records_no_rulesets(self):
         self.base()
         self.rules("[]")

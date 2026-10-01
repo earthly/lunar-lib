@@ -121,7 +121,7 @@ policies:
   - name: release-commits-merged-via-pr
     description: |
       Every commit since the previous release tag must have reached the default
-      branch through a merged pull request. Gate releases with
+      branch through merged pull requests. Gate releases with
       `enforcement: block-release`.
     mainPython: ./release-commits-merged-via-pr.py
     runs_on: [default-branch]

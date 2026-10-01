@@ -47,6 +47,7 @@ class ReleaseRangeTest(ScriptTestCase):
         self.assertEqual(rr["base"], {"tag": "v1.1.0", "sha": "e1d4b7a0c3f6e9d2b5a8c1f4e7d0b3a6c9f2e5d8"})
         self.assertEqual(rr["tag_pattern"], PATTERN)
         self.assertEqual(rr["head_sha"], HEAD)
+        self.assertEqual(rr["default_branch"], "main")
         self.assertEqual(rr["total_commits"], 3)
         self.assertIs(rr["truncated"], False)
         c1, c2, c3 = rr["commits"]
@@ -55,7 +56,8 @@ class ReleaseRangeTest(ScriptTestCase):
             "author": "jdoe",
             "signature": {"verified": True, "reason": "valid"},
             "pull_request": {
-                "number": 41, "base_branch": "main", "merged_at": "2024-05-02T16:02:13Z",
+                "number": 41, "base_branch": "main", "head_branch": "feature/payments",
+                "merged_at": "2024-05-02T16:02:13Z",
                 "merged_by": "octocat", "head_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
                 "approvals": [
                     {"reviewer": "alice", "submitted_at": "2024-05-02T15:40:51Z",
@@ -73,8 +75,9 @@ class ReleaseRangeTest(ScriptTestCase):
             "author": "github-actions[bot]",
             "signature": {"verified": False, "reason": "unsigned"},
         })
-        # The merged PR into the default branch wins over one into develop;
-        # the unmerged PR is ignored. GraphQL's UNKNOWN_SIG_TYPE maps to REST's reason.
+        # A commit merged into both main and develop (a gitflow hotfix): the PR
+        # into the default branch is recorded; the unmerged PR is ignored.
+        # GraphQL's UNKNOWN_SIG_TYPE maps to REST's reason.
         self.assertEqual(c3["signature"], {"verified": False, "reason": "unknown_signature_type"})
         self.assertEqual(c3["pull_request"]["number"], 43)
         self.assertEqual(c3["pull_request"]["merged_by"], "merge-queue[bot]")
@@ -141,6 +144,20 @@ class ReleaseRangeTest(ScriptTestCase):
         ranges = [r for r in self.requests() if RANGE in r["payload"]["query"]]
         self.assertEqual([r["payload"]["variables"]["first"] for r in ranges], [2])
 
+    def test_max_commits_is_read_as_decimal_and_capped(self):
+        # 0250 would be octal to bash and 08 an arithmetic error; huge values
+        # wrap. GitHub lists at most 1000 commits of a comparison.
+        for raw, first in (("002", 2), ("08", 8), ("123456789012345678901", 100)):
+            with self.subTest(raw=raw):
+                self.tearDown()
+                self.setUp()  # fresh mocks and capture for each value
+                self.standard_routes()
+                rc, stderr = self.run_range(LUNAR_VAR_RELEASE_RANGE_MAX_COMMITS=raw)
+                self.assertEqual(rc, 0, stderr)
+                ranges = [r for r in self.requests() if RANGE in r["payload"]["query"]]
+                self.assertEqual(ranges[0]["payload"]["variables"]["first"], first)
+                self.assertGreater(len(self.release_range()["commits"]), 0)
+
     def test_no_matching_tag_records_the_pattern_without_a_base(self):
         self.standard_routes()
         rc, stderr = self.run_range(LUNAR_VAR_RELEASE_TAG_PATTERN="^release-")
@@ -202,6 +219,7 @@ class ReleaseRangeTest(ScriptTestCase):
     def test_invalid_inputs_fail_loudly(self):
         for env in ({"LUNAR_VAR_RELEASE_TAG_PATTERN": "v[0-9"},
                     {"LUNAR_VAR_RELEASE_RANGE_MAX_COMMITS": "0"},
+                    {"LUNAR_VAR_RELEASE_RANGE_MAX_COMMITS": "000"},
                     {"LUNAR_VAR_RELEASE_RANGE_MAX_COMMITS": "lots"}):
             with self.subTest(env=env):
                 rc, _ = self.run_range(**env)

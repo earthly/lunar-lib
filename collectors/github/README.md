@@ -61,9 +61,10 @@ Written only when `release_tag_pattern` is set. The previous release is the tag 
 | `.vcs.release_range.tag_pattern` | string | The pattern used |
 | `.vcs.release_range.head_sha` | string | The commit being evaluated |
 | `.vcs.release_range.base` | object | The previous release: `tag`, `sha`. Absent when no matching tag precedes the commit |
+| `.vcs.release_range.default_branch` | string | The repository's default branch |
 | `.vcs.release_range.total_commits` | number | Commits in the range |
-| `.vcs.release_range.truncated` | boolean | More commits than `release_range_max_commits`; only the oldest were recorded |
-| `.vcs.release_range.commits[]` | array | Oldest first: `sha`, `author`, `signature`, and `pull_request` (`number`, `base_branch`, `merged_at`, `merged_by`, `head_sha`, `approvals[]`) when a merged PR brought the commit in |
+| `.vcs.release_range.truncated` | boolean | Not every commit was recorded: the range is longer than `release_range_max_commits`, or than the 1000 commits GitHub lists for a comparison |
+| `.vcs.release_range.commits[]` | array | Oldest first (for a range over 1000 commits, the oldest of the newest 1000): `sha`, `author`, `signature`, and `pull_request` (`number`, `base_branch`, `head_branch`, `merged_at`, `merged_by`, `head_sha`, `approvals[]`) when GitHub associates the commit with a merged PR. A PR into the default branch is preferred; a gitflow feature commit is linked only to its PR into `develop` |
 
 ## Collectors
 

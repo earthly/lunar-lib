@@ -16,6 +16,10 @@ def main(node=None):
             c.skip("No commit signature data collected; the github collector's pull-request sub-collector provides it.")
 
         commits = commits_node.get_value()
+        if not isinstance(commits, list):
+            # Older docs described .vcs.pr.commits as a count.
+            c.skip("No per-commit signature data: .vcs.pr.commits is not a list of commits.")
+
         unverified = [
             commit for commit in commits
             if not isinstance(commit.get("signature"), dict) or commit["signature"].get("verified") is not True

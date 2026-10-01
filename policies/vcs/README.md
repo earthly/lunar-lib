@@ -36,7 +36,9 @@ These read what happened on each change rather than the settings: the commits of
 | Policy | Description |
 |--------|-------------|
 | `pr-commits-signed` | Every commit in a pull request must carry a signature GitHub verified (PRs only) |
-| `release-commits-merged-via-pr` | Every commit since the previous release tag must have reached the default branch through a merged pull request (default branch only; needs the github collector's opt-in `release-range`) |
+| `release-commits-merged-via-pr` | Every commit since the previous release tag must have reached the default branch through merged pull requests (default branch only; needs the github collector's opt-in `release-range`) |
+
+A commit reached the default branch through merged pull requests when its own pull request merged into it, or merged into a branch that a later pull request carried on into it. Gitflow needs the second route, because GitHub links a feature commit to its pull request into `develop` and not to the release pull request from `develop` into the default branch. A branch that was merged by pull request and then pushed straight to the default branch fails. In a range GitHub couldn't list in full, a commit that can't be traced is unknown, so the check skips rather than fails.
 
 ### Repository Settings Policies
 
@@ -265,7 +267,7 @@ When branch protection policies fail, configure branch protection rules in your 
 
 - **`disallow-bypass-actors`**: remove the listed bypass actors from each ruleset (Settings → Rules → Rulesets), or under classic protection turn on "Do not allow bypassing the above settings" and clear "Allow specified actors to bypass required pull requests". An actor you accept goes in `allowed_bypass_actors`. A skip means the token can't see a ruleset's bypass list; GitHub shows it only to callers with write access to the ruleset.
 - **`pr-commits-signed`**: sign commits with a GPG, SSH or S/MIME key registered to your GitHub account, then re-sign the listed commits (e.g. `git rebase --exec 'git commit --amend --no-edit -S' <base>`) and force-push the branch.
-- **`release-commits-merged-via-pr`**: the listed commits were pushed to the default branch directly. Route them through a pull request (revert and re-land), or record an exception with a Lunar release bypass. Require pull requests on the branch so it can't recur.
+- **`release-commits-merged-via-pr`**: the listed commits reached the default branch without a pull request into it. Either they were pushed there directly, or they were merged into another branch that was then pushed straight to the default branch. Land them through a pull request (revert and re-land), or record an exception with a Lunar release bypass. Require pull requests on the default branch so it can't recur.
 
 ### Repository Settings Policies
 

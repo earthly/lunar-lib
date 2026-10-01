@@ -95,7 +95,7 @@ inputs:
     description: Regular expression matching the tags that mark a release, e.g. `^v[0-9]+\.[0-9]+\.[0-9]+$`. The release-range sub-collector does nothing while this is empty.
     default: ""
   release_range_max_commits:
-    description: Most commits the release-range sub-collector records; a longer range is recorded with `truncated` set.
+    description: Most commits the release-range sub-collector records, up to the 1000 GitHub lists for a comparison; a longer range is recorded with `truncated` set.
     default: "250"
 
 secrets:
@@ -201,6 +201,7 @@ example_component_json: |
       "release_range": {
         "tag_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
         "head_sha": "c3e8a1f6d9b2e5a7c0f4d8b1e6a3c9f2d5b7e0a4",
+        "default_branch": "main",
         "base": {"tag": "v2.3.0", "sha": "e1d4b7a0c3f6e9d2b5a8c1f4e7d0b3a6c9f2e5d8"},
         "total_commits": 2,
         "truncated": false,
@@ -212,6 +213,7 @@ example_component_json: |
             "pull_request": {
               "number": 123,
               "base_branch": "main",
+              "head_branch": "abc-456-payment-validation",
               "merged_at": "2024-05-02T16:02:13Z",
               "merged_by": "jdoe",
               "head_sha": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",

@@ -29,6 +29,7 @@
                       "merged": true,
                       "mergedAt": "2024-05-02T16:02:13Z",
                       "baseRefName": "develop",
+                      "headRefName": "hotfix/crash",
                       "headRefOid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
                       "mergedBy": {
                         "__typename": "User",
@@ -43,6 +44,7 @@
                       "merged": true,
                       "mergedAt": "2024-05-02T16:02:13Z",
                       "baseRefName": "main",
+                      "headRefName": "hotfix/crash",
                       "headRefOid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
                       "mergedBy": {
                         "__typename": "Bot",
@@ -57,6 +59,7 @@
                       "merged": false,
                       "mergedAt": null,
                       "baseRefName": "main",
+                      "headRefName": "feature/retry",
                       "headRefOid": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
                       "mergedBy": null,
                       "reviews": {

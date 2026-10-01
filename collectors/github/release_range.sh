@@ -36,11 +36,22 @@ if ! jq -n --arg re "$PATTERN" '"" | test($re)' > /dev/null 2>&1; then
 fi
 
 case "$MAX_COMMITS" in
-  '' | *[!0-9]* | 0)
+  '' | *[!0-9]*)
     echo "Error: release_range_max_commits must be a positive integer, got: ${MAX_COMMITS}" >&2
     exit 1
     ;;
 esac
+# Strip leading zeros (bash reads 0250 as octal, and 08 not at all), and cap at
+# 1000: GitHub lists only the newest 1000 commits of a comparison.
+MAX_COMMITS="${MAX_COMMITS#"${MAX_COMMITS%%[!0]*}"}"
+if [ -z "$MAX_COMMITS" ]; then
+  echo "Error: release_range_max_commits must be a positive integer, got: ${LUNAR_VAR_RELEASE_RANGE_MAX_COMMITS}" >&2
+  exit 1
+fi
+if [ "${#MAX_COMMITS}" -gt 4 ] || [ "$MAX_COMMITS" -gt 1000 ]; then
+  echo "release_range_max_commits capped at 1000, the most commits GitHub lists for a comparison." >&2
+  MAX_COMMITS=1000
+fi
 
 # Component IDs are <host>/<owner>/<repository>[/<subpath>...]. Keep only
 # owner/repository, and route GHES hosts to /api/graphql.
@@ -167,8 +178,9 @@ if [ -z "$BASE" ]; then
   exit 0
 fi
 
-# 3. The range itself, oldest first: signature state, and the merged pull
-#    request that introduced each commit with that PR's approvals.
+# 3. The range itself, oldest first (of the newest 1000 for a longer range):
+#    signature state, and the merged pull request that introduced each commit,
+#    with that PR's approvals.
 RANGE_QUERY='query($owner: String!, $name: String!, $base: String!, $head: String!,
                $first: Int!, $cursor: String) {
   repository(owner: $owner, name: $name) {
@@ -183,7 +195,7 @@ RANGE_QUERY='query($owner: String!, $name: String!, $base: String!, $head: Strin
             signature { isValid state }
             associatedPullRequests(first: 5) {
               nodes {
-                number merged mergedAt baseRefName headRefOid
+                number merged mergedAt baseRefName headRefName headRefOid
                 mergedBy { __typename login }
                 reviews(first: 50, states: [APPROVED]) {
                   nodes { author { __typename login } submittedAt commit { oid } }
@@ -212,7 +224,7 @@ COMMIT_FILTER='def login: if . == null then null
   + ([.associatedPullRequests.nodes[]? | select(.merged)]
      | (map(select(.baseRefName == $default)) + .) | first
      | if . == null then {} else {pull_request: ({
-         number, base_branch: .baseRefName, merged_at: .mergedAt,
+         number, base_branch: .baseRefName, head_branch: .headRefName, merged_at: .mergedAt,
          merged_by: (.mergedBy | login), head_sha: .headRefOid,
          approvals: [.reviews.nodes[]?
            | {reviewer: ((.author | login) // "ghost"), submitted_at: .submittedAt, commit_sha: .commit.oid}
@@ -247,5 +259,6 @@ while :; do
 done
 
 emit "$(printf '%s\n%s\n' "$BASE" "$COMMITS" | jq -cs --arg p "$PATTERN" --arg h "$HEAD_SHA" \
-  --argjson total "$TOTAL" '{tag_pattern: $p, head_sha: $h, base: .[0],
-    total_commits: $total, truncated: ($total > (.[1] | length)), commits: .[1]}')"
+  --arg default "$DEFAULT_BRANCH" --argjson total "$TOTAL" '{tag_pattern: $p, head_sha: $h,
+    default_branch: $default, base: .[0], total_commits: $total,
+    truncated: ($total > (.[1] | length)), commits: .[1]}')"

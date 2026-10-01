@@ -935,6 +935,10 @@ class TestPrCommitsSigned(unittest.TestCase):
         check = check_pr_commits_signed(finished({"vcs": {"pr": {"number": 7}}}))
         self.assertIn("No commit signature data", skip_reason(check))
 
+    def test_commit_count_instead_of_list_skips(self):
+        check = check_pr_commits_signed(finished({"vcs": {"pr": {"number": 7, "commits": 3}}}))
+        self.assertIn("not a list", skip_reason(check))
+
     def test_outside_a_pr_skips(self):
         check = check_pr_commits_signed(finished(make_branch_protection_data()))
         self.assertIn("No pull request data", skip_reason(check))
@@ -947,7 +951,7 @@ class TestPrCommitsSigned(unittest.TestCase):
 def release_data(commits, base=True, truncated=False, total=None):
     rr = {"tag_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$", "head_sha": "c" * 40}
     if base:
-        rr.update({"base": {"tag": "v1.1.0", "sha": "e" * 40},
+        rr.update({"default_branch": "main", "base": {"tag": "v1.1.0", "sha": "e" * 40},
                    "total_commits": total if total is not None else len(commits),
                    "truncated": truncated, "commits": commits})
     return {"vcs": {"release_range": rr}}
@@ -955,10 +959,17 @@ def release_data(commits, base=True, truncated=False, total=None):
 
 MERGED = {"sha": "a7c0f3e6d9b2a5c8f1e4d7b0a3c6f9e2d5b8a1c4", "author": "jdoe",
           "signature": {"verified": True, "reason": "valid"},
-          "pull_request": {"number": 41, "base_branch": "main", "merged_at": "2024-05-02T16:02:13Z",
+          "pull_request": {"number": 41, "base_branch": "main", "head_branch": "feature/payments",
+                           "merged_at": "2024-05-02T16:02:13Z",
                            "approvals": [{"reviewer": "alice", "submitted_at": "2024-05-02T15:40:51Z"}]}}
 DIRECT = {"sha": "6d9b2e5a8c1f4d7b0e3a6c9f2d5b8e1a4c7f0d3b", "author": "github-actions[bot]",
           "signature": {"verified": False, "reason": "unsigned"}}
+
+
+def commit_via(sha, number, base, head, merged):
+    return {"sha": sha, "author": "jdoe", "signature": {"verified": True, "reason": "valid"},
+            "pull_request": {"number": number, "base_branch": base, "head_branch": head,
+                             "merged_at": merged, "approvals": []}}
 
 
 class TestReleaseCommitsMergedViaPr(unittest.TestCase):
@@ -974,9 +985,58 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertEqual(
             check.failure_reasons[0],
-            "1 commit(s) since v1.1.0 did not reach the default branch through a merged pull request:"
-            "\n    * 6d9b2e5a8c1f by github-actions[bot]",
+            "1 commit(s) since v1.1.0 did not reach main through a merged pull request:"
+            "\n    * 6d9b2e5a8c1f by github-actions[bot]: no merged pull request",
         )
+
+    def test_gitflow_release_passes(self):
+        # GitHub links a feature commit only to its PR into develop; the release
+        # PR from develop into main, merged later, carried it on.
+        feature = commit_via("1" * 40, 38, base="develop", head="feature/x", merged="2024-05-01T10:00:00Z")
+        release = commit_via("2" * 40, 40, base="main", head="develop", merged="2024-05-02T10:00:00Z")
+        check = check_release_commits_merged_via_pr(finished(release_data([feature, release])))
+        self.assertEqual(check.status, CheckStatus.PASS)
+        self.assertIsNone(skip_reason(check))
+
+    def test_branch_pushed_straight_to_default_fails(self):
+        # PRs merge into develop, then develop is pushed to main with no PR.
+        feature = commit_via("3" * 40, 539, base="develop", head="feature/y", merged="2024-05-01T10:00:00Z")
+        check = check_release_commits_merged_via_pr(finished(release_data([feature])))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn(
+            "\n    * 333333333333 by jdoe: merged into develop by #539, which no later pull request carried into main",
+            check.failure_reasons[0])
+
+    def test_release_pr_merged_before_the_commit_does_not_carry_it(self):
+        release = commit_via("2" * 40, 40, base="main", head="develop", merged="2024-05-01T10:00:00Z")
+        later = commit_via("4" * 40, 41, base="develop", head="feature/z", merged="2024-05-03T10:00:00Z")
+        check = check_release_commits_merged_via_pr(finished(release_data([release, later])))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("444444444444", check.failure_reasons[0])
+        self.assertNotIn("222222222222", check.failure_reasons[0])
+
+    def test_chain_of_branches_passes(self):
+        commits = [
+            commit_via("5" * 40, 50, base="develop-2", head="feature/a", merged="2024-05-01T10:00:00Z"),
+            commit_via("6" * 40, 51, base="develop", head="develop-2", merged="2024-05-02T10:00:00Z"),
+            commit_via("7" * 40, 52, base="main", head="develop", merged="2024-05-03T10:00:00Z"),
+        ]
+        check = check_release_commits_merged_via_pr(finished(release_data(commits)))
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_untraced_commit_in_truncated_range_is_unknown_not_failed(self):
+        # The release PR that carried it may be among the commits not recorded.
+        feature = commit_via("3" * 40, 539, base="develop", head="feature/y", merged="2024-05-01T10:00:00Z")
+        check = check_release_commits_merged_via_pr(finished(release_data([feature], truncated=True, total=400)))
+        self.assertIn("Only 1 of 400 commits since v1.1.0 were recorded", skip_reason(check))
+
+    def test_range_longer_than_github_lists_says_so(self):
+        check = check_release_commits_merged_via_pr(finished(release_data([MERGED], truncated=True, total=4078)))
+        self.assertIn("GitHub lists at most 1000 commits", skip_reason(check))
+
+    def test_range_without_commits_skips(self):
+        check = check_release_commits_merged_via_pr(finished(release_data([])))
+        self.assertIn("without its commits", skip_reason(check))
 
     def test_truncated_range_fails_on_what_it_saw(self):
         check = check_release_commits_merged_via_pr(finished(release_data([DIRECT], truncated=True, total=400)))
@@ -985,7 +1045,8 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
 
     def test_truncated_clean_range_skips(self):
         check = check_release_commits_merged_via_pr(finished(release_data([MERGED], truncated=True, total=400)))
-        self.assertIn("Only the oldest 1 of 400 commits since v1.1.0", skip_reason(check))
+        self.assertIn("Only 1 of 400 commits since v1.1.0 were recorded", skip_reason(check))
+        self.assertIn("Raise release_range_max_commits", skip_reason(check))
 
     def test_no_previous_release_skips(self):
         check = check_release_commits_merged_via_pr(finished(release_data([], base=False)))
