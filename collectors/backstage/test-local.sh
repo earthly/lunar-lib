@@ -138,6 +138,9 @@ case "$name" in
   # by-name trusts the status, so this reads as exists:true — but the body
   # isn't an entity, so nothing may be inferred from it.
   login) printf '%s\n200' '<html><body>SSO login</body></html>'; exit 0 ;;
+  # Valid JSON that still isn't an entity: a gateway error object, and null.
+  gatewayerr) printf '%s\n200' '{"error":{"name":"NotFoundError"}}'; exit 0 ;;
+  nullbody) printf '%s\n200' 'null'; exit 0 ;;
   typo*) printf '%s\n404' '{}'; exit 0 ;;
   *)     printf '%s\n200' "$(mock_entity "$kind" "$ns" "$name")"; exit 0 ;;
 esac
@@ -708,6 +711,12 @@ done
 assert_eq "an unreadable System body records no has_domain" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' login http://fake:7007 | jq -c '.refs')" \
   '{"checked":true,"system":{"name":"login","exists":true}}'
+assert_eq "a JSON body that isn't an entity records no has_domain" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' gatewayerr http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"system":{"name":"gatewayerr","exists":true}}'
+assert_eq "a null body records no has_domain" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' nullbody http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"system":{"name":"nullbody","exists":true}}'
 
 # The transitive entry is additive: a `kind: System` catalog file still gets its
 # own `.refs.domain` from spec.domain, unchanged by any of the above.

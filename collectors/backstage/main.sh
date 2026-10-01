@@ -574,7 +574,7 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       # no domain" looks the same as a collector that never checked. Left unset
       # when the body isn't an entity, so nothing is inferred from a response
       # we couldn't read.
-      if SYSTEM_DOMAIN_REF=$(jq -er 'if type == "object" then (.spec.domain // "" | tostring) else error("not an entity") end' \
+      if SYSTEM_DOMAIN_REF=$(jq -er 'if type == "object" and has("kind") then (.spec.domain // "" | tostring) else error("not an entity") end' \
            "$ENTITY_BODY_FILE" 2>/dev/null); then
         HAS_DOMAIN=false
         [ -n "$SYSTEM_DOMAIN_REF" ] && HAS_DOMAIN=true
