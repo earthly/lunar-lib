@@ -34,6 +34,7 @@ check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
 check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
 check_system_domain_exists = load_policy("system-domain-exists")
+check_system_domain_set = load_policy("system-domain-set")
 
 from constraints import (
     parse_required_annotations,
@@ -388,10 +389,13 @@ class TestSystemDomainExists(unittest.TestCase):
         )
 
     def test_system_without_domain_passes(self):
-        # A System that belongs to no domain is legitimate — not a violation.
+        # No domain means nothing to verify here; `system-domain-set` reports it.
         self.assertEqual(
             check_system_domain_exists(
-                refs_node({"checked": True, "system": {"name": "standalone", "exists": True}})
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "standalone", "exists": True, "has_domain": False},
+                })
             ).status,
             CheckStatus.PASS,
         )
@@ -465,6 +469,93 @@ class TestSystemDomainExists(unittest.TestCase):
             ).status,
             CheckStatus.PASS,
         )
+
+
+class TestSystemDomainSet(unittest.TestCase):
+    """The component's system must itself belong to a domain."""
+
+    def test_unconfigured_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_set(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_set(finished_node({}))))
+
+    def test_no_system_declared_passes(self):
+        # `system-set` owns "should spec.system be set".
+        self.assertEqual(
+            check_system_domain_set(refs_node({"checked": True})).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_missing_passes_here(self):
+        # `system-exists` reports an unresolvable system; no second failure.
+        self.assertEqual(
+            check_system_domain_set(
+                refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_lookup_error_skips(self):
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "payment-platform", "error": "HTTP 502"}})
+        )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 502", skip_reason(check))
+
+    def test_system_without_domain_fails_and_names_it(self):
+        check = check_system_domain_set(
+            refs_node({
+                "checked": True,
+                "system": {"name": "team-tools", "exists": True, "has_domain": False},
+            })
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("team-tools", check.failure_reasons[0])
+
+    def test_system_with_domain_passes(self):
+        self.assertEqual(
+            check_system_domain_set(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+                    "system_domain": {
+                        "name": "payments",
+                        "exists": True,
+                        "via_system": "payment-platform",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_dangling_domain_passes_here(self):
+        # The system does declare a domain; that it doesn't resolve is
+        # `system-domain-exists`'s failure to report.
+        self.assertEqual(
+            check_system_domain_set(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "orphan-system", "exists": True, "has_domain": True},
+                    "system_domain": {
+                        "name": "ghost-domain",
+                        "exists": False,
+                        "via_system": "orphan-system",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_older_collector_without_has_domain_skips(self):
+        # A resolved system with no has_domain is what every collector before
+        # this check writes. Reading that as "no domain" would fail every
+        # component whose collector is pinned to an older release.
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "payment-platform", "exists": True}})
+        )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("predates", skip_reason(check))
 
 
 class TestConstraintParsing(unittest.TestCase):
@@ -719,6 +810,7 @@ ALL_CHECKS = [
     ("domain-exists", check_domain_exists, {}),
     ("system-exists", check_system_exists, {}),
     ("system-domain-exists", check_system_domain_exists, {}),
+    ("system-domain-set", check_system_domain_set, {}),
     (
         "required-annotations",
         check_required_annotations,
@@ -758,11 +850,12 @@ DEFAULT_NO_CATALOG = {
     "domain-exists": CheckStatus.SKIPPED,
     "system-exists": CheckStatus.SKIPPED,
     "system-domain-exists": CheckStatus.SKIPPED,
+    "system-domain-set": CheckStatus.SKIPPED,
 }
 
 
 class TestSkipWhenNoCatalogInfo(unittest.TestCase):
-    """The `skip_when_no_catalog_info` input, across all twelve checks."""
+    """The `skip_when_no_catalog_info` input, across all checks."""
 
     def test_every_check_skips_when_set(self):
         for name, check_fn, inputs in ALL_CHECKS:

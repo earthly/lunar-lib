@@ -298,9 +298,11 @@ fi
 
 # --- project enumeration ----------------------------------------------------
 
-# Keyset via id_after. NOTE: pagination=keyset is silently ignored on this
-# endpoint (it still returns offset Link headers), so id_after is what makes
+# Keyset via id_before. NOTE: pagination=keyset is silently ignored on this
+# endpoint (it still returns offset Link headers), so id_before is what makes
 # the paging actually keyset — do not switch to following Link: rel="next".
+# Newest first because id DESC is the endpoint's default order; ascending has
+# timed out server-side (a 500 after 60s) even on small groups.
 ARCHIVED_PARAM=""
 [ "$INCLUDE_ARCHIVED" != "true" ] && ARCHIVED_PARAM="&archived=false"
 
@@ -308,20 +310,20 @@ ARCHIVED_PARAM=""
 while IFS= read -r group; do
     [ -z "$group" ] && continue
     enc=$(urlenc_path "$group")
-    after=0
+    cursor=""
     pages=0
     before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     while :; do
         # with_shared=false: GitLab includes projects shared INTO the group by
         # default, which are owned elsewhere — they would be cataloged outside
         # the account's groups and duplicated across any group sharing them.
-        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&per_page=${PER_PAGE}&order_by=id&sort=asc&id_after=${after}${ARCHIVED_PARAM}" \
+        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
         jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
-        after=$(jq -r '.[-1].id' "$WORK/proj-page.json")
+        cursor=$(jq -r '.[-1].id' "$WORK/proj-page.json")
         pages=$((pages + 1))
     done
     now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
@@ -341,11 +343,11 @@ fi
 # every project on the instance, including every user's scratch repos.
 if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
     echo "Sweeping personal namespaces the account is a member of..."
-    after=0
+    cursor=""
     pages=0
     before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     while :; do
-        gl_api "/projects?membership=true&per_page=${PER_PAGE}&order_by=id&sort=asc&id_after=${after}${ARCHIVED_PARAM}" \
+        gl_api "/projects?membership=true&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/personal-page.json"
         n=$(jq 'length' "$WORK/personal-page.json")
         [ "$n" -eq 0 ] && break
@@ -354,7 +356,7 @@ if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
         jq -c '.[] | select(.namespace.kind == "user")
                | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: .namespace.full_path, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/personal-page.json" >> "$WORK/projects.ndjson"
-        after=$(jq -r '.[-1].id' "$WORK/personal-page.json")
+        cursor=$(jq -r '.[-1].id' "$WORK/personal-page.json")
         pages=$((pages + 1))
     done
     now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
