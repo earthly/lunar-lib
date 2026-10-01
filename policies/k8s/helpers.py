@@ -97,3 +97,32 @@ def parse_mem_bytes(value) -> Optional[float]:
 
     return None
 
+
+def selector_matches(selector, labels):
+    """Kubernetes LabelSelector semantics: matchLabels is an AND of equalities,
+    matchExpressions supports In / NotIn / Exists / DoesNotExist, an empty
+    selector matches every pod in the namespace, and a null selector matches
+    none (as a policy/v1 PodDisruptionBudget applies it)."""
+    if not isinstance(selector, dict):
+        return False
+    labels = {str(k): str(v) for k, v in (labels or {}).items()}
+    for key, value in (selector.get("matchLabels") or {}).items():
+        if labels.get(str(key)) != str(value):
+            return False
+    for expr in selector.get("matchExpressions") or []:
+        key = str(expr.get("key", ""))
+        values = {str(v) for v in (expr.get("values") or [])}
+        operator = expr.get("operator")
+        if operator == "In":
+            ok = key in labels and labels[key] in values
+        elif operator == "NotIn":
+            ok = key not in labels or labels[key] not in values
+        elif operator == "Exists":
+            ok = key in labels
+        elif operator == "DoesNotExist":
+            ok = key not in labels
+        else:
+            ok = False  # the API server rejects any other operator
+        if not ok:
+            return False
+    return True

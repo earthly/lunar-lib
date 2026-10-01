@@ -36,6 +36,9 @@ collectors:
         Sidecar, EnvoyFilter
       - Telemetry resources (tracing / metrics / access logging)
       - Install profile from IstioOperator
+      - TLS protocol versions and cipher suites on Gateway servers, and the
+        mesh-wide TLS settings (meshMTLS, tlsDefaults) of each declared MeshConfig
+        (IstioOperator or the istiod ConfigMap)
       - Sidecar injection: namespace labels (istio-injection / istio.io/rev) and
         per-workload sidecar.istio.io/inject overrides
       Each resource is validated with `istioctl analyze` (offline, no cluster required).
@@ -95,8 +98,11 @@ example_component_json: |
           "name": "bookinfo-gateway",
           "namespace": "istio-system",
           "servers": [
-            {"port": 443, "protocol": "HTTPS", "tls_mode": "SIMPLE", "https_redirect": false},
-            {"port": 80, "protocol": "HTTP", "https_redirect": true}
+            {"port": 443, "protocol": "HTTPS", "tls_mode": "SIMPLE", "https_redirect": false,
+             "min_protocol_version": "TLSV1_2", "max_protocol_version": null,
+             "cipher_suites": ["ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384"]},
+            {"port": 80, "protocol": "HTTP", "tls_mode": null, "https_redirect": true,
+             "min_protocol_version": null, "max_protocol_version": null, "cipher_suites": null}
           ],
           "path": "istio/gateway.yaml"
         }
@@ -115,6 +121,13 @@ example_component_json: |
       ],
       "install": [
         {"kind": "IstioOperator", "name": "control-plane", "namespace": "istio-system", "profile": "default", "path": "istio/istiooperator.yaml"}
+      ],
+      "mesh_configs": [
+        {
+          "kind": "IstioOperator", "name": "control-plane", "namespace": "istio-system", "path": "istio/istiooperator.yaml",
+          "mesh_mtls": {"min_protocol_version": "TLSV1_3", "cipher_suites": null},
+          "tls_defaults": {"min_protocol_version": "TLSV1_2", "cipher_suites": ["ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384"]}
+        }
       ],
       "injection": {
         "namespaces": [

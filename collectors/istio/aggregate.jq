@@ -21,6 +21,7 @@
     envoy_filters: [ $chunks[].envoy_filters[] ],
     telemetry: [ $chunks[].telemetry[] ],
     install: [ $chunks[].install[] ],
+    mesh_configs: [ $chunks[].mesh_configs[] ],
     injection: {
       namespaces: [ $chunks[].injection_namespaces[] ],
       workload_overrides: [ $chunks[].workload_overrides[] ]
