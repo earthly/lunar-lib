@@ -130,6 +130,8 @@ With `.testing.runs`, `passing` checks every build instead of the last one to fi
 
 **Failure message:** `"Tests are failing in CI / integration (1 of 10 failed). Check CI logs for test failure details."`
 
+On GitHub Actions every leg of a matrix job reports the same job name, so re-running one failed leg on its own replaces the other legs' results. Use **Re-run failed jobs**, which re-runs every failed leg together.
+
 ### Failing Example — Low Coverage (`min-coverage` policy)
 
 ```json
