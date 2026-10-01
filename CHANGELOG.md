@@ -20,12 +20,15 @@ the next version ships.
 - ci-archive: add a daily cron that backs up the default branch's CI logs to S3 (#351)
 - ci-archive: add a collector that archives each finished CI run attempt and its logs to S3 (#334)
 
-### Fixed
+### Changed
 
 - CI: authenticate earthly/actions-setup so a rate-limited runner IP no longer fails the build (#360)
+- gitlab cataloger: page project listings newest-first (#353)
+
+### Fixed
+
 - grype, trivy: fix the on-push container scan skipping when a newer main commit lands first (#354)
 - nodejs, elixir: fix detection of repos with no root package.json or mix.exs (#355)
-- gitlab cataloger: fix project listing timeouts by paging newest-first (#353)
 
 ## [1.17.1] — 2026-09-25
 
