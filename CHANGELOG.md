@@ -23,7 +23,7 @@ the next version ships.
 ### Changed
 
 - CI: authenticate earthly/actions-setup so a rate-limited runner IP no longer fails the build (#360)
-- gitlab cataloger: page project listings newest-first (#353)
+- gitlab cataloger: page project listings newest-first; a project created mid-run is now cataloged on the next run (#353)
 
 ### Fixed
 
