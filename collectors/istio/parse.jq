@@ -139,4 +139,4 @@ def tls_config: {
             inject: ($ann["sidecar.istio.io/inject"] == "true")
           } ]
   }
-| . + { istio_signal: ((.resources | length) + (.injection_namespaces | length) + (.workload_overrides | length) + (.mesh_configs | length)) }
+| . + { istio_signal: ((.resources | length) + (.injection_namespaces | length) + (.workload_overrides | length)) }

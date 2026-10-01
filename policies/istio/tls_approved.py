@@ -46,7 +46,8 @@ def main(node=None):
     """Requires configured TLS protocol versions and cipher suites to be approved."""
     c = Check("tls-approved", "TLS versions and cipher suites should be on the approved lists", node=node)
     with c:
-        mesh_present(c)
+        # MeshConfig alone is enough here: it carries meshMTLS and tlsDefaults.
+        mesh_present(c, resources_required=False)
 
         versions = configured("approved_tls_versions")
         suites = configured("approved_cipher_suites")
@@ -81,10 +82,11 @@ def main(node=None):
                 c.fail(f"{where} meshConfig.meshMTLS {'; '.join(found)}")
 
             # tlsDefaults may leave a value unset for each server to choose;
-            # whatever it does set must be approved.
+            # whatever it does set must be approved. It has no ceiling of its own,
+            # so only its floor is checked here; servers are checked over their range.
             defaults = mc.get("tls_defaults") or {}
             floor, ciphers = defaults.get("min_protocol_version"), defaults.get("cipher_suites")
-            found = [version_problem(floor, "TLSV1_3", versions) if versions and pinned(floor) else None,
+            found = [version_problem(floor, floor, versions) if versions and pinned(floor) else None,
                      cipher_problem(ciphers, suites) if suites and ciphers else None]
             found = [f for f in found if f]
             if found:

@@ -176,6 +176,15 @@ class MeshConfigTest(unittest.TestCase):
         check = run(mesh_configs=[mesh_config(mtls_min="TLSV1_3")])
         self.assertEqual(check.status, CheckStatus.PASS, failures(check))
 
+    def test_tls_1_2_only_standard(self):
+        # Istio fixes the mesh mTLS ceiling at TLS 1.3, so meshMTLS can't meet it.
+        # tlsDefaults sets no ceiling, so its approved floor is all it is judged on.
+        check = run(mesh_configs=[mesh_config(mtls_min="TLSV1_2", mtls_ciphers=GOOD_CIPHERS,
+                                              defaults_min="TLSV1_2", defaults_ciphers=GOOD_CIPHERS)],
+                    versions="TLSV1_2")
+        self.assertEqual(failures(check), [
+            "IstioOperator istio-system/control-plane meshConfig.meshMTLS allows unapproved protocol versions TLSV1_3"])
+
 
 class ConfigurationTest(unittest.TestCase):
     def test_no_approved_lists_skips(self):
@@ -220,6 +229,43 @@ class HarnessTest(unittest.TestCase):
             self.assertTrue(skipped(done), module)
             running = main(Node.from_component_json({}, {"workflows_finished": False}))
             self.assertEqual(running.status, CheckStatus.PENDING, module)
+
+
+    def test_mesh_config_only_component(self):
+        # The .mesh the collector writes for a repo whose one Istio file is a
+        # rendered istiod ConfigMap. Before mesh_configs it wrote nothing, so the
+        # existing checks must still skip; tls-approved has config to judge.
+        mesh_only_config = {
+            "provider": "istio", "resources": [], "peer_authentications": [], "authorization_policies": [],
+            "request_authentications": [], "virtual_services": [], "destination_rules": [], "gateways": [],
+            "service_entries": [], "sidecars": [], "envoy_filters": [], "telemetry": [], "install": [],
+            "mesh_configs": [mesh_config(kind="ConfigMap", name="istio", mtls_min="TLSV1_3",
+                                         defaults_ciphers=["AES128-GCM-SHA256"])],
+            "injection": {"namespaces": [], "workload_overrides": []},
+            "summary": {"mtls_default_mode": None, "mtls_strict": False, "has_authorization_policies": False,
+                        "all_gateways_tls": True, "injection_enabled": False, "uses_envoy_filters": False},
+        }
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "lunar-policy.yml")) as fh:
+            modules = re.findall(r"mainPython:\s*(\w+)\.py", fh.read())
+        env = {"LUNAR_VAR_approved_tls_versions": VERSIONS, "LUNAR_VAR_approved_cipher_suites": SUITES}
+        with mock.patch.dict(os.environ, env):
+            for module in modules:
+                check = importlib.import_module(module).main(
+                    Node.from_component_json({"mesh": mesh_only_config}, {"workflows_finished": True}))
+                if module == "tls_approved":
+                    self.assertEqual(failures(check), ["ConfigMap istio-system/istio meshConfig.tlsDefaults uses "
+                                                       "unapproved cipher suites AES128-GCM-SHA256"])
+                else:
+                    self.assertTrue(skipped(check), module)
+
+    def test_mesh_with_istio_resources_is_still_checked(self):
+        # Every .mesh the collector wrote before had resources or injection data.
+        mesh = {"provider": "istio", "resources": [], "peer_authentications": [],
+                "injection": {"namespaces": [{"name": "shop", "enabled": True}], "workload_overrides": []},
+                "summary": {"mtls_default_mode": None}}
+        check = importlib.import_module("mtls_strict").main(
+            Node.from_component_json({"mesh": mesh}, {"workflows_finished": True}))
+        self.assertEqual(check.status, CheckStatus.FAIL)
 
 
 if __name__ == "__main__":

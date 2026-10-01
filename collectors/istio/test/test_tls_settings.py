@@ -242,6 +242,25 @@ class TlsSettingsTest(unittest.TestCase):
         }])
         self.assertEqual(mesh["resources"], [])
 
+    def test_mesh_config_only_files_are_not_analyzed(self):
+        # The ConfigMap is recorded, but istioctl analyze still sees only files
+        # with Istio resources, as before mesh_configs.
+        real = shutil.which("istioctl")
+        log = os.path.join(self.bin, "istioctl.log")
+        shim = os.path.join(self.bin, "istioctl")
+        with open(shim, "w") as fh:
+            fh.write(f'#!/bin/bash\necho "$*" >> {log}\nexec {real} "$@"\n')
+        os.chmod(shim, 0o755)
+        self.write("rendered/istiod-configmap.yaml", RENDERED_CONFIGMAP)
+        self.write("istio/gateway.yaml", GATEWAY)
+        mesh = self.collect()[".mesh"]
+        self.assertEqual([m["path"] for m in mesh["mesh_configs"]], ["rendered/istiod-configmap.yaml"])
+        with open(log) as fh:
+            analyze = [line for line in fh.read().splitlines() if line.startswith("analyze")]
+        self.assertEqual(len(analyze), 1, analyze)
+        self.assertIn("istio/gateway.yaml", analyze[0])
+        self.assertNotIn("istiod-configmap.yaml", analyze[0])
+
     def test_only_istiod_configmaps_are_read(self):
         revision = RENDERED_CONFIGMAP.replace("name: istio\n", "name: istio-canary\n")
         injector = textwrap.dedent("""\

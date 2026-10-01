@@ -80,6 +80,13 @@ class CoveredTest(unittest.TestCase):
         check = run([workload("api", {})], [netpol(egress=egress)])
         self.assertEqual(check.status, CheckStatus.PASS, failures(check))
 
+    def test_port_80_on_another_protocol_passes(self):
+        # The metadata service is TCP; UDP or SCTP port 80 doesn't reach it.
+        for protocol in ("UDP", "SCTP"):
+            egress = [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0"}}], "ports": [{"protocol": protocol, "port": 80}]}]
+            check = run([workload("api", {})], [netpol(egress=egress)])
+            self.assertEqual(check.status, CheckStatus.PASS, (protocol, failures(check)))
+
     def test_named_port_cannot_match_the_metadata_ip(self):
         # A named port resolves against the destination pod's ports.
         egress = [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0"}}], "ports": [{"port": "http"}]}]

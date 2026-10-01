@@ -56,8 +56,12 @@ while IFS= read -r f; do
     [ -z "$chunk" ] && continue
 
     signal=$(echo "$chunk" | jq '.istio_signal // 0' 2>/dev/null || echo 0)
-    if [ "${signal:-0}" -gt 0 ]; then
+    configs=$(echo "$chunk" | jq '.mesh_configs | length' 2>/dev/null || echo 0)
+    if [ "${signal:-0}" -gt 0 ] || [ "${configs:-0}" -gt 0 ]; then
         echo "$chunk" >> "$CHUNKS_FILE"
+    fi
+    # A file holding only MeshConfig has no Istio resources for istioctl analyze.
+    if [ "${signal:-0}" -gt 0 ]; then
         ISTIO_FILES+=("$path")
     fi
 done < <(eval "$FIND_CMD" 2>/dev/null | grep -vE "$DIR_PATTERN" | grep -vE "$FILE_PATTERN")
