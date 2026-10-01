@@ -31,7 +31,7 @@ This collector writes to the following Component JSON paths:
 | `.mesh.cicd` | object | istioctl CI command tracking (commands + client version) |
 | `.mesh.summary` | object | Derived posture booleans (`mtls_strict`, `all_gateways_tls`, etc.) |
 
-The collector reads config from the repository, not a live cluster (like the `k8s` collector); `istioctl analyze` runs with `--use-kube=false` so no cluster credentials are required. If no Istio resources are found it writes nothing, so downstream policies skip cleanly on non-mesh components.
+The collector reads config from the repository, not a live cluster (like the `k8s` collector); `istioctl analyze` runs with `--use-kube=false` so no cluster credentials are required. If no Istio config is found it writes nothing, so downstream policies skip cleanly on non-mesh components. A repo whose only Istio file is MeshConfig (e.g. a rendered istiod ConfigMap) gets just `.mesh.mesh_configs`.
 
 ## Collectors
 
