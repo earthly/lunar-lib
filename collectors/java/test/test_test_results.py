@@ -47,6 +47,15 @@ LAUNCHERS = {
 }
 
 
+# The CI context the Lunar agent exports to a command hook on GitHub Actions.
+CI_CONTEXT = {
+    "LUNAR_CI_PIPELINE_NAME": "CI",
+    "LUNAR_CI_PIPELINE_RUN_ID": "36909154652",
+    "LUNAR_CI_PIPELINE_RUN_ATTEMPT": "2",
+    "LUNAR_CI_JOB_NAME": "build",
+    "LUNAR_CI_STEP_INDEX": "4",
+}
+
 class TestResults(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="java-test-results-")
@@ -76,14 +85,15 @@ class TestResults(unittest.TestCase):
         """Copy fixtures/<fixture> (subdirectories included) to <work>/<dest>."""
         shutil.copytree(os.path.join(FIXTURES, fixture), os.path.join(self.work, dest), dirs_exist_ok=True)
 
-    def run_collector(self, tool="maven"):
-        env = dict(os.environ)
-        env["PATH"] = self.bin + os.pathsep + env["PATH"]
+    def run_collector(self, tool="maven", ci=None, expect_exit=0, path=None):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LUNAR_CI_")}
+        env["PATH"] = (path or self.bin) + os.pathsep + env["PATH"]
         env["CAPTURE"] = self.capture
         env["LUNAR_CI_COMMAND"] = json.dumps(LAUNCHERS[tool], separators=(",", ":"))
         env["LUNAR_CI_COMMAND_BIN"] = "java"
+        env.update(CI_CONTEXT if ci is None else ci)
         proc = subprocess.run(["bash", SCRIPT], cwd=self.work, env=env, capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, f"exit {proc.returncode}: {proc.stderr}")
+        self.assertEqual(proc.returncode, expect_exit, f"exit {proc.returncode}: {proc.stderr}")
         return proc
 
     def collected(self):
@@ -103,12 +113,14 @@ class TestResults(unittest.TestCase):
     def assert_results(self, total, passed, failed, skipped, tool="maven"):
         got = self.collected()
         counts = {"total": total, "passed": passed, "failed": failed, "skipped": skipped}
+        run = {"pipeline": "CI", "run_id": "36909154652", "attempt": 2, "job": "build", "step": 4}
         self.assertEqual(
             got,
             {
                 ".lang.java.tests.results": {**counts, "source": {"tool": tool, "integration": "ci"}},
                 ".testing.results": counts,
                 ".testing.all_passing": failed == 0,
+                ".testing.runs": [{**run, **counts, "all_passing": failed == 0}],
             },
         )
 
@@ -222,6 +234,58 @@ class TestResults(unittest.TestCase):
         proc = self.run_collector()
         self.assertEqual(self.collected(), {})
         self.assertIn("no test cases", proc.stderr)
+
+
+    def test_run_entry_escapes_names(self):
+        self.layout("surefire", "target/surefire-reports")
+        os.remove(os.path.join(self.work, "target/surefire-reports/TEST-com.example.CalculatorTest.xml"))
+        ci = {**CI_CONTEXT, "LUNAR_CI_PIPELINE_NAME": 'Java "CI" \\ nightly', "LUNAR_CI_JOB_NAME": "it\tsuite"}
+        self.run_collector(ci=ci)
+        run = self.collected()[".testing.runs"][0]
+        self.assertEqual((run["pipeline"], run["job"]), ('Java "CI" \\ nightly', "it suite"))
+
+    def test_run_entry_without_ci_context(self):
+        self.layout("surefire", "target/surefire-reports")
+        os.remove(os.path.join(self.work, "target/surefire-reports/TEST-com.example.CalculatorTest.xml"))
+        self.run_collector(ci={})
+        run = self.collected()[".testing.runs"][0]
+        self.assertEqual(
+            {k: run[k] for k in ("pipeline", "run_id", "attempt", "job", "step")},
+            {"pipeline": "", "run_id": "", "attempt": 1, "job": "", "step": 0},
+        )
+
+    def test_run_entry_ignores_non_numeric_attempt_and_step(self):
+        # Both land in the JSON unquoted, so anything but digits would break it.
+        self.layout("surefire", "target/surefire-reports")
+        os.remove(os.path.join(self.work, "target/surefire-reports/TEST-com.example.CalculatorTest.xml"))
+        self.run_collector(ci={**CI_CONTEXT, "LUNAR_CI_PIPELINE_RUN_ATTEMPT": "2x", "LUNAR_CI_STEP_INDEX": "four"})
+        run = self.collected()[".testing.runs"][0]
+        self.assertEqual((run["attempt"], run["step"]), (1, 0))
+
+    def test_reports_are_parsed_in_batches(self):
+        # 450 reports takes three awk batches; every batch has to be counted.
+        src = os.path.join(FIXTURES, "surefire", "TEST-com.example.AllPassTest.xml")
+        dest = os.path.join(self.work, "target/surefire-reports")
+        os.makedirs(dest)
+        for i in range(450):
+            shutil.copy(src, os.path.join(dest, f"TEST-com.example.AllPassTest{i}.xml"))
+        shutil.copy(os.path.join(FIXTURES, "surefire", "TEST-com.example.CalculatorTest.xml"), dest)
+        self.run_collector()
+        self.assert_results(total=906, passed=903, failed=2, skipped=1)
+
+    def test_parse_failure_is_an_error_not_a_skip(self):
+        # A dead awk must not read as "no reports", or as partial totals.
+        self.layout("surefire", "target/surefire-reports")
+        broken = os.path.join(self.tmp, "broken-bin")
+        os.makedirs(broken)
+        for name in os.listdir(self.bin):
+            os.symlink(os.path.join(self.bin, name), os.path.join(broken, name))
+        with open(os.path.join(broken, "awk"), "w") as f:
+            f.write("#!/bin/sh\necho 'awk: out of memory' >&2\nexit 2\n")
+        os.chmod(os.path.join(broken, "awk"), 0o755)
+        proc = self.run_collector(path=broken, expect_exit=1)
+        self.assertIn("Could not parse the JUnit XML reports", proc.stderr)
+        self.assertEqual(self.collected(), {})
 
 
 if __name__ == "__main__":
