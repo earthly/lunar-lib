@@ -128,7 +128,11 @@ if [ -z "$SERVICE_ID" ]; then
   fi
   # Every source answered and none maps the component. .oncall.unmapped tells
   # the oncall policy this apart from a collector that never ran.
-  echo "No PagerDuty service ID found (looked in: $(printf '%s; ' "${SEARCHED[@]}")). Set 'pagerduty/service-id' meta, the service_id input, or enable backstage_discovery." >&2
+  LOOKED_IN="$(printf '%s, ' "${SEARCHED[@]}")"
+  echo "No PagerDuty service ID found (looked in: ${LOOKED_IN%, })." >&2
+  if [ "${LUNAR_VAR_BACKSTAGE_DISCOVERY:-false}" != "true" ]; then
+    echo "Set the 'pagerduty/service-id' meta or the service_id input, or enable backstage_discovery." >&2
+  fi
   jq -n '{"tool": "pagerduty", "integration": "api"}' | lunar collect -j ".oncall.source" -
   printf '%s\n' "${SEARCHED[@]}" | jq -nR '{searched: [inputs]}' | lunar collect -j ".oncall.unmapped" -
   exit 0

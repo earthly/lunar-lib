@@ -13,7 +13,8 @@
 #     -> curl exit 28, else credentials for the assumed role.
 #   * Backstage by-name / by-query from test/fixtures/backstage-entities.yaml,
 #     except these names: boom -> connection error, five -> HTTP 502,
-#     login -> a 200 HTML login page, noitems -> a 200 without `.items`.
+#     login -> a 200 HTML login page, notentity -> a 200 JSON body that isn't
+#     an entity, noitems -> a 200 without `.items`.
 #   * PagerDuty /services, /escalation_policies, /schedules. PGONE00 -> 404.
 #
 # Run: ./test-local.sh   (needs bash, jq, yq, python3)
@@ -96,6 +97,7 @@ special() {
     boom) exit 7 ;;
     five) printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
     login) printf '%s\n200' '<html><body>SSO login</body></html>'; exit 0 ;;
+    notentity) printf '%s\n200' '{"message":"sign in required"}'; exit 0 ;;
     noitems) printf '%s\n200' '{"totalItems":0}'; exit 0 ;;
   esac
 }
@@ -352,7 +354,7 @@ for mode in by-name by-query; do
   assert_eq "[$mode] a Component missing from the catalog is marked" \
     "$(got unmapped | jq -c '.searched[2]')" '"component:default/not-registered (not in catalog)"'
 
-  for broken in five boom login; do
+  for broken in five boom login notentity; do
     new_case "$mode-$broken"
     catalog "$broken" > "$CASE/catalog-info.yaml"
     run_case "${M[@]}"
