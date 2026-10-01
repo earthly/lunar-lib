@@ -100,6 +100,7 @@ test:
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
+    BUILD ./policies/testing+test
 
 lint:
     FROM python:3.12-alpine

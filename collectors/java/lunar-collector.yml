@@ -122,7 +122,8 @@ collectors:
       When a Maven or Gradle build finishes, reads the JUnit XML reports it wrote
       (Surefire, Failsafe, Gradle test tasks) and records how many tests passed,
       failed and were skipped. Writes the totals to .lang.java.tests.results and
-      .testing.results, and whether every test passed to .testing.all_passing.
+      .testing.results, whether every test passed to .testing.all_passing, and
+      one entry per build to .testing.runs.
     mainBash: test-results.sh
     # mvn/mvnw/gradle/gradlew exec into the build's JVM, so that JVM, not the
     # wrapper, is the process whose exit marks the end of the build.
@@ -193,6 +194,20 @@ example_component_json: |
       "source": { "tool": "maven-surefire", "integration": "ci" },
       "results": { "total": 156, "passed": 152, "failed": 1, "skipped": 3 },
       "all_passing": false,
+      "runs": [
+        {
+          "pipeline": "CI",
+          "run_id": "36909154652",
+          "attempt": 1,
+          "job": "build",
+          "step": 4,
+          "total": 156,
+          "passed": 152,
+          "failed": 1,
+          "skipped": 3,
+          "all_passing": false
+        }
+      ],
       "coverage": {
         "percentage": 72.5,
         "source": { "tool": "jacoco", "integration": "ci" }

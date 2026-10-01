@@ -26,6 +26,7 @@ This policy reads from the following Component JSON paths:
 |------|------|-------------|
 | `.testing` | object | Any test collector (e.g., `golang`) |
 | `.testing.all_passing` | boolean | Collectors that parse test results (e.g., `java`) |
+| `.testing.runs` | array | Per-build results; when present, `passing` uses these instead of `all_passing` (e.g., `java`) |
 | `.testing.coverage` | object | Any coverage collector (e.g., `codecov`, `golang`) |
 | `.testing.coverage.percentage` | number | Coverage collectors that report percentage |
 
@@ -111,6 +112,23 @@ When a language project exists but no test data:
 ```
 
 **Failure message:** `"Tests are failing. Check CI logs for test failure details."`
+
+With `.testing.runs`, `passing` checks every build instead of the last one to finish, keeping each build's latest CI attempt, and names the builds that failed:
+
+```json
+{
+  "lang": {"java": {}},
+  "testing": {
+    "all_passing": true,
+    "runs": [
+      {"pipeline": "CI", "run_id": "100", "attempt": 1, "job": "integration", "step": 3, "total": 10, "failed": 1, "all_passing": false},
+      {"pipeline": "CI", "run_id": "100", "attempt": 1, "job": "unit", "step": 3, "total": 56, "failed": 0, "all_passing": true}
+    ]
+  }
+}
+```
+
+**Failure message:** `"Tests are failing in CI / integration (1 of 10 failed). Check CI logs for test failure details."`
 
 ### Failing Example — Low Coverage (`min-coverage` policy)
 
