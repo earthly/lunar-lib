@@ -25,14 +25,14 @@ When a catalog-info file is found, this collector writes to the following Compon
 | `.catalog.native.backstage.refs` | object | Referential-integrity results; written (as an object) only when `backstage_url` is configured |
 | `.catalog.native.backstage.refs.checked` | boolean | `true` whenever `backstage_url` is set — the "referential integrity ran" signal the policy keys off to distinguish *configured* from *not configured* |
 | `.catalog.native.backstage.refs.domain` | object | For the declared `spec.domain`: `{ name, exists }` when the lookup resolved (200/404), or `{ name, error }` on a transient failure. Absent when no domain is declared |
-| `.catalog.native.backstage.refs.system` | object | For the declared `spec.system` — same semantics as `refs.domain` |
+| `.catalog.native.backstage.refs.system` | object | For the declared `spec.system` — same semantics as `refs.domain`, plus `has_domain` (boolean) once the system resolves: whether that System declares a `spec.domain` |
 | `.catalog.native.backstage.refs.system_domain` | object | For the domain the component's *system* belongs to: `{ name, exists, via_system }`, or `{ name, error, via_system }` on a transient failure. Absent unless the system resolved **and** itself declares a `spec.domain` |
 
 **Referential integrity.** When `backstage_url` is set, the collector resolves each declared grouping reference against the Backstage catalog API (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and records the outcome under `.refs`. The `<namespace>` is taken from the reference itself — a qualified ref (`ns/name`) carries its own, otherwise the component's own `metadata.namespace` is used, falling back to `default`, so there is no namespace input to configure:
 
 - `.refs.checked = true` — always written when `backstage_url` is set, regardless of what (if anything) is declared. This is the signal the policy uses to tell "collector configured" from "not configured."
 - `spec.domain` → `.refs.domain = { "name": "<value>", "exists": <bool> }` on a definitive lookup, or `{ "name": "<value>", "error": "<reason>" }` on a transient failure.
-- `spec.system` → `.refs.system` — same shape and semantics as `refs.domain`.
+- `spec.system` → `.refs.system` — same shape and semantics as `refs.domain`. When the system resolves, it also carries `has_domain`: whether that System declares a `spec.domain` at all. It is absent when the System entity Backstage returned could not be read, so "belongs to no domain" is never inferred from a response the collector couldn't parse.
 - the system's own `spec.domain` → `.refs.system_domain = { "name": "<value>", "exists": <bool>, "via_system": "<the declared spec.system>" }` — the *transitive* hop. Written only when `spec.system` resolved **and** that System declares a domain; `via_system` names the System that pointed there, because the entity to fix is the System's own catalog file, not this component's.
 
 The system lookup already returns the resolved System entity, so reading its `spec.domain` costs nothing extra — only the domain itself is a second request. A bare domain reference on the System resolves against the *System's* namespace (not the component's), which can differ.

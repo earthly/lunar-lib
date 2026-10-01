@@ -135,6 +135,12 @@ name="${nsname#*/}"
 case "$name" in
   boom)  exit 7 ;;
   five)  printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
+  # by-name trusts the status, so this reads as exists:true — but the body
+  # isn't an entity, so nothing may be inferred from it.
+  login) printf '%s\n200' '<html><body>SSO login</body></html>'; exit 0 ;;
+  # Valid JSON that still isn't an entity: a gateway error object, and null.
+  gatewayerr) printf '%s\n200' '{"error":{"name":"NotFoundError"}}'; exit 0 ;;
+  nullbody) printf '%s\n200' 'null'; exit 0 ;;
   typo*) printf '%s\n404' '{}'; exit 0 ;;
   *)     printf '%s\n200' "$(mock_entity "$kind" "$ns" "$name")"; exit 0 ;;
 esac
@@ -649,28 +655,44 @@ for mode in by-name by-query; do
     '{"name":"typo-domain","exists":false,"via_system":"dangling-system"}'
   assert_eq "[$mode] a dangling system domain leaves system-exists passing" \
     "$(echo "$DANGLING" | jq -c '.system.exists')" 'true'
+  assert_eq "[$mode] a system with a dangling domain still declares one" \
+    "$(echo "$DANGLING" | jq -c '.system.has_domain')" 'true'
   assert_eq "[$mode] the component declares no spec.domain, so .refs.domain stays absent" \
     "$(echo "$DANGLING" | jq -c 'has("domain")')" 'false'
 
   # Healthy chain.
+  HEALTHY=$(run_full "$MODE_ENV" '' payment-platform http://fake:7007 | jq -c '.refs')
   assert_eq "[$mode] healthy chain -> exists:true" \
-    "$(run_full "$MODE_ENV" '' payment-platform http://fake:7007 | jq -c '.refs.system_domain')" \
+    "$(echo "$HEALTHY" | jq -c '.system_domain')" \
     '{"name":"payments","exists":true,"via_system":"payment-platform"}'
+  assert_eq "[$mode] healthy chain -> has_domain:true" \
+    "$(echo "$HEALTHY" | jq -c '.system')" \
+    '{"name":"payment-platform","exists":true,"has_domain":true}'
 
-  # A System that belongs to no domain is legitimate: no entry, no false fail.
+  # A System that belongs to no domain has nothing to resolve, so no
+  # system_domain entry — but it is recorded, for `system-domain-set`.
+  NODOMAIN=$(run_full "$MODE_ENV" '' team-nodomain http://fake:7007 | jq -c '.refs')
   assert_eq "[$mode] system belonging to no domain writes no system_domain" \
-    "$(run_full "$MODE_ENV" '' team-nodomain http://fake:7007 | jq -c 'has("system_domain")')" \
-    'false'
+    "$(echo "$NODOMAIN" | jq -c 'has("system_domain")')" 'false'
+  assert_eq "[$mode] system belonging to no domain -> has_domain:false" \
+    "$(echo "$NODOMAIN" | jq -c '.system')" \
+    '{"name":"team-nodomain","exists":true,"has_domain":false}'
 
   # An unresolvable system has no entity to read a domain off, and the failure
   # is already `system-exists`'s to report — don't double-report it.
   assert_eq "[$mode] missing system writes no system_domain" \
     "$(run_full "$MODE_ENV" '' typo-system http://fake:7007 | jq -c '.refs | has("system_domain")')" \
     'false'
+  assert_eq "[$mode] missing system records no has_domain" \
+    "$(run_full "$MODE_ENV" '' typo-system http://fake:7007 | jq -c '.refs.system')" \
+    '{"name":"typo-system","exists":false}'
 
   # A transient failure resolving the system stops the hop too.
   assert_eq "[$mode] errored system lookup writes no system_domain" \
     "$(run_full "$MODE_ENV" '' five http://fake:7007 | jq -c '.refs | has("system_domain")')" \
+    'false'
+  assert_eq "[$mode] errored system lookup records no has_domain" \
+    "$(run_full "$MODE_ENV" '' five http://fake:7007 | jq -c '.refs.system | has("has_domain")')" \
     'false'
 
   # A bare spec.domain on the System resolves against the SYSTEM's namespace,
@@ -682,6 +704,19 @@ for mode in by-name by-query; do
   assert_eq "[$mode] and never looks the domain up in the component's namespace" \
     "$(grep -c 'domain/comp-ns/' "$CURL_LOG" || true)" '0'
 done
+
+# A by-name 200 whose body isn't an entity (a gateway login page): the system
+# counts as found, but "belongs to no domain" must not be inferred from a body
+# that couldn't be read.
+assert_eq "an unreadable System body records no has_domain" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' login http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"system":{"name":"login","exists":true}}'
+assert_eq "a JSON body that isn't an entity records no has_domain" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' gatewayerr http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"system":{"name":"gatewayerr","exists":true}}'
+assert_eq "a null body records no has_domain" \
+  "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' nullbody http://fake:7007 | jq -c '.refs')" \
+  '{"checked":true,"system":{"name":"nullbody","exists":true}}'
 
 # The transitive entry is additive: a `kind: System` catalog file still gets its
 # own `.refs.domain` from spec.domain, unchanged by any of the above.
@@ -851,7 +886,7 @@ assert_eq "an unparseable shared file is reported with its path" \
 make_mono
 assert_eq "refs resolve from the selected entity's spec" \
   "$(run_mono services/payments LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=t | jq -c '.refs.system')" \
-  '{"name":"payment-platform","exists":true}'
+  '{"name":"payment-platform","exists":true,"has_domain":true}'
 
 # Real git resolves the root when it can (the hub's worktrees have git).
 if command -v git >/dev/null 2>&1; then

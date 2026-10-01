@@ -58,9 +58,12 @@ collectors:
       `spec.system` is followed one hop further: that System's own `spec.domain`
       is resolved and recorded at `.refs.system_domain = {name, exists,
       via_system}`, which is what makes the domain check meaningful for an
-      ordinary `kind: Component` file. The hop reuses the System entity the
-      system lookup already returned, so it costs one extra request and only
-      when the system both resolves and declares a domain. The `<namespace>` is derived from the reference itself —
+      ordinary `kind: Component` file. A resolved system also carries
+      `.refs.system.has_domain`, so a System that belongs to no domain is
+      recorded rather than looking like one that was never checked. The hop
+      reuses the System entity the system lookup already returned, so it costs
+      one extra request and only when the system both resolves and declares a
+      domain. The `<namespace>` is derived from the reference itself —
       a qualified ref (`ns/name`) carries its own, otherwise the component's own
       `metadata.namespace` is used, falling back to `default` — so no namespace
       configuration is required. When `backstage_url` is empty (the default) no
@@ -297,7 +300,8 @@ example_component_json: |
           "refs": {
             "checked": true,
             "domain": { "name": "payments", "exists": true },
-            "system": { "name": "payment-platform", "exists": true }
+            "system": { "name": "payment-platform", "exists": true, "has_domain": true },
+            "system_domain": { "name": "payments", "exists": true, "via_system": "payment-platform" }
           }
         }
       }
