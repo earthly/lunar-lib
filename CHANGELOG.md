@@ -9,6 +9,24 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.18.0] — 2026-10-01
+
+### Added
+
+- backstage: add required-link-types and dependencies-documented checks (#357)
+- k8s, istio: add a metadata-endpoint egress check and an approved TLS versions and ciphers check (#345)
+- backstage: add a system-domain-set check for a component whose system belongs to no domain (#356)
+- sbom: add an allowed-licenses allow-list check (#344)
+- ci-archive: add a daily cron that backs up the default branch's CI logs to S3 (#351)
+- ci-archive: add a collector that archives each finished CI run attempt and its logs to S3 (#334)
+
+### Fixed
+
+- CI: authenticate earthly/actions-setup so a rate-limited runner IP no longer fails the build (#360)
+- grype, trivy: fix the on-push container scan skipping when a newer main commit lands first (#354)
+- nodejs, elixir: fix detection of repos with no root package.json or mix.exs (#355)
+- gitlab cataloger: fix project listing timeouts by paging newest-first (#353)
+
 ## [1.17.1] — 2026-09-25
 
 ### Added
@@ -969,6 +987,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
