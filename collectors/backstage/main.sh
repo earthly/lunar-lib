@@ -142,10 +142,11 @@ fi
 # a JSON array of all documents.
 #
 # The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
-# assume_role_chain) are deliberately kept in sync with
-# catalogers/backstage/main.sh — both plugins run in the same snippet pods under
-# the same service account, so credentials must resolve identically. A fix here
-# belongs there too, and vice versa.
+# assume_role_chain) and url_escape are deliberately kept in sync with
+# catalogers/backstage/main.sh and collectors/pagerduty/backstage.sh — all three
+# run in the same snippet pods under the same service account, so credentials
+# must resolve identically. A fix here belongs there too, and vice versa;
+# scripts/validate_shared_helpers.py fails +lint when the copies drift.
 
 # parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
 # prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1

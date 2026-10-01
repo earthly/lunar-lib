@@ -11,7 +11,8 @@ On-call, incident management, runbooks, disaster recovery. **Normalized across P
     },
     "service": {
       "id": "PXXXXXX",
-      "name": "Payment API"
+      "name": "Payment API",
+      "discovered_via": "system:default/payment-platform"
     },
     "schedule": {
       "exists": true,
@@ -66,9 +67,28 @@ On-call, incident management, runbooks, disaster recovery. **Normalized across P
 }
 ```
 
+`.oncall.service.discovered_via` names where the service ID came from: a meta key (`meta:pagerduty/service-id`), an input (`input:service_id`), the Backstage entity it was read from (`component:`, `system:` or `domain:<namespace>/<name>`), or a checked-out file (`file:catalog-info.yaml`).
+
+When a collector looks for the component's service and finds none, it writes `.oncall.unmapped` in place of `.oncall.service`, listing the places it looked:
+
+```json
+{
+  "oncall": {
+    "source": { "tool": "pagerduty", "integration": "api" },
+    "unmapped": {
+      "searched": ["meta:pagerduty/service-id", "input:service_id", "component:default/checkout", "system:default/payment-platform", "file:catalog-info.yaml"]
+    }
+  }
+}
+```
+
+A collector that couldn't complete its lookup writes neither, so an outage isn't read as a missing mapping. `.oncall.source` alone doesn't mean "unmapped": the pagerduty and opsgenie collectors write it before an API call that can fail.
+
 ## Key Policy Paths
 
-- `.oncall` — On-call configured (use `assert_exists(".oncall")`)
+- `.oncall` — Some on-call data was collected. Not proof that on-call is configured: `dr-docs` writes `.oncall.disaster_recovery` on every component it runs on, and an unmapped component gets `.oncall.unmapped`
+- `.oncall.service.id` — Component mapped to an on-call service
+- `.oncall.unmapped` — A collector looked for a service mapping and found none
 - `.oncall.schedule.participants` — Rotation size
 - `.oncall.runbook.exists` — Runbook present
 - `.oncall.sla.defined` — SLA documented

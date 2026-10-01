@@ -1,0 +1,13 @@
+VERSION 0.8
+
+# Offline test for the collector's service-ID resolution: meta, input, the live
+# Backstage walk (by-name / by-query, bearer / sigv4) and the checked-out file.
+# test-local.sh stubs curl and lunar on PATH, so no network, AWS, Backstage or
+# Lunar Hub is needed. Runs on +base-image, the collector's real runtime, for
+# its bash, jq, yq and python3. No image: target — the plugin uses base-main.
+test:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY oncall.sh backstage.sh test-local.sh .
+    COPY --dir test .
+    RUN ./test-local.sh

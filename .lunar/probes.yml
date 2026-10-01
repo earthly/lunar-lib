@@ -111,10 +111,10 @@ probes:
       at all and then invented a "per-component cycle hasn't reached the
       repo" excuse. Set `runs-on: cronos` on the relevant job(s).
 
-  # The four probes below run the same Python validators that `earthly +lint`
-  # invokes in CI. Calling them directly (~120ms each, ~700ms for all four)
-  # avoids the ~30s buildkitd warmup the Earthly target needs and lets us
-  # catch lint failures at file-edit time instead of after-the-fact in CI.
+  # The probes below run the same Python validators that `earthly +lint`
+  # invokes in CI. Calling them directly (~120ms each) avoids the ~30s
+  # buildkitd warmup the Earthly target needs and lets us catch lint failures
+  # at file-edit time instead of after-the-fact in CI.
 
   - name: readme-structure
     hook:
@@ -143,6 +143,13 @@ probes:
       paths: "**/Earthfile"
     check: "python3 scripts/validate_earthfile_wiring.py"
     message: "A plugin Earthfile defines an image: target that isn't wired into the root Earthfile's +all target. CI will not build or push this image until the BUILD --pass-args line is added."
+
+  - name: shared-helpers-in-sync
+    hook:
+      type: agent-after-file-edit
+      paths: ["collectors/**/*.sh", "catalogers/**/*.sh"]
+    check: "python3 scripts/validate_shared_helpers.py"
+    message: "A bash helper that is copied between plugins now differs from its other copies. Make the same change in every file listed in scripts/validate_shared_helpers.py."
 
   # ── Path-scoped advisories (agent-after-file-edit, no `check:`) ──
   # Reminders shown alongside file edits. No `check:` — the `message:` is the

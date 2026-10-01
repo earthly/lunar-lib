@@ -80,6 +80,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD --pass-args ./collectors/pagerduty+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
@@ -98,6 +99,7 @@ test:
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
+    BUILD ./policies/oncall+test
 
 lint:
     FROM python:3.12-alpine
@@ -118,6 +120,9 @@ lint:
     # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
     RUN python scripts/validate_manifest_schema.py --self-test
     RUN python scripts/validate_manifest_schema.py
+    # Copied bash helpers (e.g. the Backstage SigV4 helpers) must not drift apart
+    RUN python scripts/validate_shared_helpers.py --self-test
+    RUN python scripts/validate_shared_helpers.py
 
 ai-context:
     COPY --dir ai-context .
