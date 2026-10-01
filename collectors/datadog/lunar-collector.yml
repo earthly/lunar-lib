@@ -77,8 +77,8 @@ collectors:
   - name: oncall
     description: |
       Queries Datadog On-Call for the component's team: its routing rules,
-      the escalation policy they page, and the first schedule that policy
-      targets. The team comes from the component's `datadog/team` meta
+      the escalation policy its fallback rule pages, and the first schedule
+      that policy targets. The team comes from the component's `datadog/team` meta
       annotation or the `team` input, as a team handle or team ID. Does
       nothing when neither is set. Writes .oncall.service, .oncall.schedule,
       .oncall.escalation, and .oncall.summary for the tool-agnostic oncall

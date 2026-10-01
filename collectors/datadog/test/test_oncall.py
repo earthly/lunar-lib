@@ -30,6 +30,8 @@ TEAMS = "/api/v2/team"
 RULES = f"/api/v2/on-call/teams/{TEAM_ID}/routing-rules"
 POLICY = f"/api/v2/on-call/escalation-policies/{POLICY_ID}"
 SCHEDULE = f"/api/v2/on-call/schedules/{SCHEDULE_ID}"
+OTHER_POLICY_ID = "0a0b0c0d-0e0f-4a1b-8c2d-000000000001"
+OTHER_POLICY = f"/api/v2/on-call/escalation-policies/{OTHER_POLICY_ID}"
 
 # Stub curl: logs each request, then answers from $MOCK_DIR/routes.json, keyed
 # by URL path. A route is one response or a list consumed in order (the last
@@ -235,7 +237,7 @@ class OncallCollectorTest(unittest.TestCase):
         self.assertIn("filter%5Bkeyword%5D=payments&", urls[0])
         self.assertTrue(urls[1].endswith("/routing-rules?include=rules"))
         self.assertTrue(urls[2].endswith("?include=teams,steps,steps.targets"))
-        self.assertTrue(urls[3].endswith("?include=layers,layers.members,layers.members.user"))
+        self.assertTrue(urls[3].endswith("?include=teams,layers,layers.members,layers.members.user"))
 
         oncall = res.oncall
         # The keyword search also returned payments-eu; only the exact handle counts.
@@ -334,18 +336,76 @@ class OncallCollectorTest(unittest.TestCase):
         self.assertIn(POLICY, res.paths_requested())
         self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
 
-    def test_rules_follow_evaluation_order_not_included_order(self):
-        other = "0a0b0c0d-0e0f-4a1b-8c2d-000000000001"
+    def test_fallback_rule_wins_over_an_earlier_narrow_rule(self):
+        # Rule 1 is urgency:low in business hours; rule 2 is the fallback.
+        # Giving rule 1 a policy of its own must not change what is graded.
         rules = fixture("routing-rules.json")
-        rules["included"][0]["relationships"]["policy"]["data"] = {"id": other, "type": "policies"}
-        # Evaluation order is data.relationships.rules; put the POLICY_ID rule first.
+        rules["included"][0]["relationships"]["policy"]["data"] = {"id": OTHER_POLICY_ID, "type": "policies"}
+        routes = happy_routes()
+        routes[RULES] = ok(rules)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
+        self.assertNotIn(OTHER_POLICY, res.paths_requested())
+
+    def test_first_policy_before_the_fallback_when_the_fallback_pages_none(self):
+        rules = fixture("routing-rules.json")
+        rules["included"][0]["relationships"]["policy"]["data"] = {"id": POLICY_ID, "type": "policies"}
+        rules["included"][1]["relationships"]["policy"]["data"] = None
+        routes = happy_routes()
+        routes[RULES] = ok(rules)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
+
+    def test_rules_after_the_fallback_never_match(self):
+        # Evaluation order is data.relationships.rules: a Slack-only fallback
+        # first leaves the policy-paging rule behind it unreachable.
+        rules = fixture("routing-rules.json")
+        rules["included"][0]["relationships"]["policy"]["data"] = {"id": POLICY_ID, "type": "policies"}
+        rules["included"][1]["relationships"]["policy"]["data"] = None
+        rules["data"]["relationships"]["rules"]["data"].reverse()
+        routes = happy_routes()
+        routes[RULES] = ok(rules)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["escalation"]["exists"], False)
+        self.assertNotIn(POLICY, res.paths_requested())
+
+    def test_a_rule_with_a_query_is_not_the_fallback(self):
+        rules = fixture("routing-rules.json")
+        narrow = rules["included"][0]
+        narrow["attributes"].update(query="priority:1", time_restriction=None)
+        narrow["relationships"]["policy"]["data"] = {"id": OTHER_POLICY_ID, "type": "policies"}
+        routes = happy_routes()
+        routes[RULES] = ok(rules)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
+
+    def test_a_time_restricted_rule_is_not_the_fallback(self):
+        rules = fixture("routing-rules.json")
+        narrow = rules["included"][0]
+        narrow["attributes"]["query"] = ""   # every page, but business hours only
+        narrow["relationships"]["policy"]["data"] = {"id": OTHER_POLICY_ID, "type": "policies"}
+        routes = happy_routes()
+        routes[RULES] = ok(rules)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
+
+    def test_without_a_fallback_rules_follow_evaluation_order(self):
+        rules = fixture("routing-rules.json")
+        rules["included"][0]["relationships"]["policy"]["data"] = {"id": OTHER_POLICY_ID, "type": "policies"}
+        rules["included"][1]["attributes"]["query"] = "priority:1"
+        # Evaluation order is data.relationships.rules, not included order.
         rules["data"]["relationships"]["rules"]["data"].reverse()
         routes = happy_routes()
         routes[RULES] = ok(rules)
         res = self.run_collector(routes=routes)
         self.assertEqual(res.rc, 0, res.stderr)
         self.assertEqual(res.oncall["escalation"]["id"], POLICY_ID)
-        self.assertNotIn(f"/api/v2/on-call/escalation-policies/{other}", res.paths_requested())
+        self.assertNotIn(OTHER_POLICY, res.paths_requested())
 
     def test_no_rule_pages_a_policy(self):
         rules = fixture("routing-rules.json")
@@ -431,6 +491,31 @@ class OncallCollectorTest(unittest.TestCase):
         res = self.run_collector(routes=routes)
         self.assertEqual(res.rc, 0, res.stderr)
         self.assertEqual(res.oncall["schedule"]["participants"], 4)
+
+    def test_users_without_a_status_still_count(self):
+        # Only a user Datadog reports as deactivated is left out.
+        schedule = fixture("schedule.json")
+        for item in schedule["included"]:
+            if item["type"] == "users":
+                del item["attributes"]["status"]
+        routes = happy_routes()
+        routes[SCHEDULE] = ok(schedule)
+        res = self.run_collector(routes=routes)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["schedule"]["participants"], 3)
+
+    def test_team_name_from_the_schedule_when_the_policy_is_another_teams(self):
+        policy = fixture("escalation-policy.json")
+        policy["included"][0].update(
+            id="2b3c4d5e-6f70-4812-93a4-b5c6d7e8f901",
+            attributes={"avatar": "", "description": "", "handle": "sre", "name": "SRE"},
+        )
+        policy["data"]["relationships"]["teams"]["data"][0]["id"] = "2b3c4d5e-6f70-4812-93a4-b5c6d7e8f901"
+        routes = happy_routes()
+        routes[POLICY] = ok(policy)
+        res = self.run_collector(routes=routes, team=TEAM_ID)
+        self.assertEqual(res.rc, 0, res.stderr)
+        self.assertEqual(res.oncall["service"], {"id": TEAM_ID, "name": "Payments"})
 
     def test_participants_count_a_layer_that_ends_in_the_future(self):
         schedule = fixture("schedule.json")

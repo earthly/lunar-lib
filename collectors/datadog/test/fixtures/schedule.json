@@ -104,6 +104,16 @@
       "attributes": { "email": "ken@example.com", "name": "Ken Thompson", "status": "active" },
       "id": "a1000000-0000-4000-8000-00000000000d",
       "type": "users"
+    },
+    {
+      "attributes": {
+        "avatar": "",
+        "description": "Payment API and settlement services",
+        "handle": "payments",
+        "name": "Payments"
+      },
+      "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90",
+      "type": "teams"
     }
   ]
 }

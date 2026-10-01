@@ -25,7 +25,7 @@ This collector writes to the following Component JSON paths:
 | `.observability.native.datadog.repo_dashboards` | array | Raw JSON of each Datadog dashboard file discovered in the repo, with its path |
 | `.observability.native.datadog.repo_monitors` | array | Raw JSON of each Datadog monitor file discovered in the repo, with its path |
 | `.oncall.service` | object | The component's Datadog team: `id` and `name` |
-| `.oncall.escalation` | object | The escalation policy the team's routing rules page: `exists`, `levels` (steps), `policy_name`, `id` |
+| `.oncall.escalation` | object | The escalation policy the team's fallback routing rule pages: `exists`, `levels` (steps), `policy_name`, `id` |
 | `.oncall.schedule` | object | The first schedule that policy targets: `exists`, `participants`, `rotation`, `id`, `name` |
 | `.oncall.summary` | object | Summary flags for quick policy evaluation |
 | `.oncall.native.datadog` | object | Raw Datadog API responses (team, routing rules, escalation policy, schedule) |
@@ -101,7 +101,7 @@ Datadog On-Call is team-based, so the `oncall` sub-collector needs the component
 2. **`team` input** — `with: team: <team>` in `lunar-config.yml`, for static cases.
 3. If neither is set, the sub-collector exits cleanly without calling the API.
 
-Either takes a team handle (e.g. `payments`, looked up through the Teams API) or a team ID. From the team it follows the path a page takes: the first routing rule that names an escalation policy, that policy's steps (`levels`), and the first schedule a step targets. `participants` counts the distinct users in that schedule's layers that have not ended, leaving out deactivated users; `rotation` comes from the first such layer's interval.
+Either takes a team handle (e.g. `payments`, looked up through the Teams API) or a team ID. From the team it follows the path a page takes: the escalation policy the team's fallback routing rule pages (the rule with no query and no time restriction, which Datadog requires last), that policy's steps (`levels`), and the first schedule a step targets. If the fallback pages no policy, the first rule before it that does is used. `participants` counts the distinct users in that schedule's layers that have not ended, leaving out users Datadog reports as deactivated; `rotation` comes from the first such layer's interval.
 
 A team with no routing rules, or none that pages an escalation policy, is recorded as `exists: false`. Any other API error (401/403, a rate limit that outlasts the retries, 5xx) fails the run and writes nothing, so a missing scope or an outage never reads as "no on-call".
 

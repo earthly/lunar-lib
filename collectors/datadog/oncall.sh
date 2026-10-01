@@ -107,9 +107,12 @@ else
   fi
 fi
 
-# Routing rules decide which escalation policy a page goes to. A rule names it
-# through either its policy relationship or an escalation_policy action; the
-# first rule, in evaluation order, that names one gives the team's policy.
+# Routing rules run top to bottom and the first match routes the page, so the
+# rule that represents the team is the fallback: no query and no time
+# restriction, which Datadog requires last. Grade the policy it pages; if it
+# pages none, take the first rule before it that does. Rules after the
+# fallback never match. A rule names its policy through either its policy
+# relationship or an escalation_policy action.
 POLICY_ID=""
 HAVE_RULES=false
 if fetch "/api/v2/on-call/teams/$(uri "$TEAM_ID")/routing-rules?include=rules" "$RULES_FILE" "$ONCALL_SCOPE"; then
@@ -120,10 +123,17 @@ if fetch "/api/v2/on-call/teams/$(uri "$TEAM_ID")/routing-rules?include=rules" "
     | (if ($order | length) > 0
        then [$order[] as $id | first($inc[] | select(.type == "team_routing_rules" and .id == $id))]
        else [$inc[] | select(.type == "team_routing_rules")] end)
-    | [.[] | (.relationships.policy.data.id // empty),
-             ((.attributes.actions // [])[] | select(.type == "escalation_policy") | .policy_id // empty)]
-    | map(select(. != ""))
-    | .[0] // empty
+    | map({
+        fallback: ((.attributes.query // "") == "" and .attributes.time_restriction == null),
+        policy: ([(.relationships.policy.data.id // empty),
+                  ((.attributes.actions // [])[] | select(.type == "escalation_policy") | .policy_id // empty)]
+                 | map(select(. != "")) | .[0] // "")
+      })
+    | ((to_entries | map(select(.value.fallback)) | .[0].key) // (length - 1)) as $end
+    | .[0:($end + 1)]
+    | ((map(select(.fallback and .policy != "")) | .[0].policy)
+       // (map(select(.policy != "")) | .[0].policy)
+       // empty)
   ' "$RULES_FILE")"
   if [ -z "$POLICY_ID" ]; then
     echo "No routing rule of team ${TEAM_ID} pages an escalation policy." >&2
@@ -166,14 +176,14 @@ if [ -n "$POLICY_ID" ]; then
 fi
 
 # Schedule: participants are the distinct users across the layers that have
-# not ended, leaving out deactivated users. The first such layer's interval
-# gives the rotation length.
+# not ended, leaving out users Datadog reports as deactivated (a user with no
+# status still counts). The first such layer's interval gives the rotation.
 SCHEDULE_EXISTS=false
 PARTICIPANTS=0
 ROTATION="unknown"
 SCHEDULE_NAME=""
 if [ -n "$SCHEDULE_ID" ]; then
-  if fetch "/api/v2/on-call/schedules/$(uri "$SCHEDULE_ID")?include=layers,layers.members,layers.members.user" "$SCHEDULE_FILE" "$ONCALL_SCOPE"; then
+  if fetch "/api/v2/on-call/schedules/$(uri "$SCHEDULE_ID")?include=teams,layers,layers.members,layers.members.user" "$SCHEDULE_FILE" "$ONCALL_SCOPE"; then
     SCHEDULE_EXISTS=true
     SCHEDULE_NAME="$(jq -r '.data.attributes.name // empty' "$SCHEDULE_FILE")"
     jq '
