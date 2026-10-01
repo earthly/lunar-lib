@@ -3,19 +3,21 @@
 
 container-rescan.sh resolves the image to scan out of the docker collector's
 pushed-image record in Component JSON, fetched with `lunar component get-json`.
-The regression these tests lock in: in PR context the script must pass
-`--pr "$LUNAR_COMPONENT_PR"` (and `--git-sha "$LUNAR_COMPONENT_GIT_SHA"`) — the
-Hub resolves an unqualified lookup to the default-branch snapshot
-(`WHERE pr IS NULL`), so without the flags a PR run reads main's Component JSON,
-never sees the image the PR pushed, and skips.
+The regression these tests lock in: the on-push (after-json) run must pin the
+lookup to its own commit — `--git-sha "$LUNAR_COMPONENT_GIT_SHA"`, plus
+`--pr "$LUNAR_COMPONENT_PR"` on a PR. The Hub resolves an unqualified lookup to
+the default branch's latest snapshot (`WHERE pr IS NULL`), so without the flags
+a PR run reads main's Component JSON and a main run reads whatever commit landed
+after it; neither carries the images this commit pushed, so the scan skips.
 
-The mirror-image regression is just as important: on the default branch the
-lookup must stay unpinned. The cron `container-rescan` gets a `head_sha`
-dimension (the latest *ingested* main commit, which may not be collected yet) but
-no `pr`, so pinning there would resolve nothing and silently stop the re-scan.
+The mirror-image regression is just as important: the cron `container-rescan`
+on the default branch must stay unpinned. It gets a `head_sha` dimension (the
+latest *ingested* main commit, which may not be collected yet) but no `pr`, so
+pinning there would resolve nothing and silently stop the re-scan.
 
 The `lunar` stub returns PR-scoped JSON only when `--pr` is present (mirroring
-the Hub) and logs its calls to $CAPTURE; the real script runs as a subprocess
+the Hub), one commit's JSON for `--git-sha` alone when that commit has a
+fixture, and logs its calls to $CAPTURE; the real script runs as a subprocess
 with a stubbed `grype`.
 """
 
@@ -94,6 +96,17 @@ class Base(unittest.TestCase):
                   for a in "$@"; do
                     if [ "$a" = "--pr" ]; then cat "$MOCK_DIR/pr.json"; exit 0; fi
                   done
+                  # --git-sha alone resolves that one commit, which need not be
+                  # main's latest. A commit with no sha-<sha>.json fixture
+                  # resolves to main.json.
+                  sha=""; prev=""
+                  for a in "$@"; do
+                    [ "$prev" = "--git-sha" ] && sha="$a"
+                    prev="$a"
+                  done
+                  if [ -n "$sha" ] && [ -f "$MOCK_DIR/sha-$sha.json" ]; then
+                    cat "$MOCK_DIR/sha-$sha.json"; exit 0
+                  fi
                   cat "$MOCK_DIR/main.json"
                   exit 0
                 fi
@@ -249,14 +262,28 @@ class DefaultBranchLookupTest(Base):
         self.assertEqual(scan["image"], self.MAIN_IMAGE)
         self.assertEqual(scan["source"]["integration"], "cron")
 
-    def test_after_json_push_to_main_is_not_pinned(self):
-        # An after-json run on a main push has head_sha but no pr: default-branch
-        # latest is already the commit being scanned, so leave it unpinned.
-        env = dict(self.CRON_ENV, LUNAR_COLLECTOR_NAME="grype.container-scan")
+    def test_after_json_push_to_main_reads_its_own_commit(self):
+        # main moved on before the read (a [skip ci] bot commit seconds after
+        # the push), so the default branch's latest snapshot no longer carries
+        # this commit's push record. Pre-fix the unpinned read got that newer
+        # commit, found no push, and skipped; the on-push run must pin its sha.
+        self.fixture("main.json", self.NO_PUSH_JSON)
+        self.fixture("sha-deadbeef.json", self.MAIN_JSON)
+        env = dict(self.CRON_ENV, LUNAR_COLLECTOR_NAME="grype.container-scan",
+                   LUNAR_CONTAINER_SCAN_TEST_RESOLVE_BUDGET="2",
+                   LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP="1")
         result, log = self.run_script(env)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertNotIn("--git-sha", self.getjson_calls(log)[0])
+        calls = self.getjson_calls(log)
+        self.assertEqual(len(calls), 1, msg=log)
+        self.assertIn("--git-sha deadbeef", calls[0])
+        self.assertNotIn("--pr", calls[0])
         self.assertIn(f"Scanning image: {self.MAIN_IMAGE}", result.stderr)
+        scan = self.collected(log, ".container_scan")
+        self.assertIsNotNone(scan, msg=log)
+        self.assertEqual(scan["image"], self.MAIN_IMAGE)
+        self.assertEqual(scan["source"]["integration"], "after-json")
+        self.assertEqual(scan["source"]["collected_sha"], "deadbeef")
 
 
 class SkipSafetyTest(Base):
