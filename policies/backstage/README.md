@@ -198,7 +198,7 @@ Drop the `runbook` link and `required-link-types` fails: `"catalog-info.yaml has
 
 These checks read the `.refs` block the `backstage` collector writes when it is configured with a `backstage_url`. The `.refs.checked` marker (always written when the collector is configured) is what lets the checks tell "configured" from "not configured."
 
-> **Which check fires depends on the entity kind.** In Backstage, `spec.system` lives on `Component` entities and `spec.domain` lives on `System` entities. A Component has **no domain of its own** — it reaches one only *through* its system (a `spec.domain` written directly on a Component is inert; Backstage generates no domain relation from it). So for the common one-`Component`-per-repo case the everyday checks are `system-exists` and `system-domain-exists`, while `domain-exists` only does work when the repo's `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). Each check passes silently when its reference isn't declared.
+> **Which check fires depends on the entity kind.** In Backstage, `spec.system` lives on `Component` entities and `spec.domain` lives on `System` entities. A Component has **no domain of its own** — it reaches one only *through* its system (a `spec.domain` written directly on a Component is inert; Backstage generates no domain relation from it). So for the common one-`Component`-per-repo case the everyday checks are `system-exists` and `system-domain-exists`, while `domain-exists` only does work when the repo's `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). `domain-exists`, `system-exists` and `system-domain-exists` pass silently when their reference isn't declared; `system-domain-set` skips.
 
 **Component → system.** The declared system is a typo that doesn't resolve in Backstage:
 
@@ -219,7 +219,7 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 }
 ```
 
-`system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. `domain-exists` **passes** — no `spec.domain` is declared on this Component, so there's nothing to cross-reference.
+`system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. `domain-exists` **passes** — no `spec.domain` is declared on this Component, so there's nothing to cross-reference. `system-domain-set` **skips**: there's no System to read a domain off.
 
 **System → domain.** A `kind: System` catalog file whose declared domain does resolve:
 
@@ -289,7 +289,7 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 }
 ```
 
-`system-domain-set` **fails**: `"System 'team-tools' (referenced by spec.system) does not belong to any domain."` Like `system-domain-exists`, it names the System, because `spec.domain` is set on that entity. It **skips** when `has_domain` is absent from a resolved system, which is what a collector older than this check writes.
+`system-domain-set` **fails**: `"System 'team-tools' (referenced by spec.system) does not belong to any domain."` Like `system-domain-exists`, it names the System, because `spec.domain` is set on that entity. It **skips**, rather than passing, when there is no System to check: no `spec.system` is declared (`system-set` fails that) or the system doesn't resolve (`system-exists` fails that). It also skips when `has_domain` is absent from a resolved system, which is what a collector older than this check writes.
 
 
 **Not configured / transient outage — they skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and every referential-integrity check **skips (passes)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:

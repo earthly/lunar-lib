@@ -626,21 +626,21 @@ class TestSystemDomainSet(unittest.TestCase):
     def test_no_catalog_file_skips(self):
         self.assertTrue(is_skipped(check_system_domain_set(finished_node({}))))
 
-    def test_no_system_declared_passes(self):
-        # `system-set` owns "should spec.system be set".
-        self.assertEqual(
-            check_system_domain_set(refs_node({"checked": True})).status,
-            CheckStatus.PASS,
-        )
+    def test_no_system_declared_skips(self):
+        # No domain was checked, so not a pass; `system-set` owns "should
+        # spec.system be set", so not a second failure either.
+        check = check_system_domain_set(refs_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("system-set", skip_reason(check))
 
-    def test_system_missing_passes_here(self):
-        # `system-exists` reports an unresolvable system; no second failure.
-        self.assertEqual(
-            check_system_domain_set(
-                refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
-            ).status,
-            CheckStatus.PASS,
+    def test_system_missing_skips(self):
+        # `system-exists` reports an unresolvable system; skip, don't pass.
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
         )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'nope'", skip_reason(check))
+        self.assertIn("system-exists", skip_reason(check))
 
     def test_system_lookup_error_skips(self):
         check = check_system_domain_set(
