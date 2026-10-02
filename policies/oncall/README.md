@@ -8,7 +8,7 @@ This policy validates that services have proper on-call operational readiness:
 an active schedule, a configured escalation policy, and enough rotation
 participants to avoid burnout. It reads from the tool-agnostic `.oncall`
 category, so the same guardrails work whether the data comes from PagerDuty,
-OpsGenie, or another incident management tool.
+OpsGenie, Datadog On-Call, or another incident management tool.
 
 ## Policies
 
@@ -26,9 +26,9 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.oncall.schedule.exists` | boolean | `pagerduty` or `opsgenie` collector (or any oncall-category collector) |
-| `.oncall.schedule.participants` | number | `pagerduty` or `opsgenie` collector |
-| `.oncall.escalation.exists` | boolean | `pagerduty` or `opsgenie` collector |
+| `.oncall.schedule.exists` | boolean | `pagerduty`, `opsgenie`, or `datadog` collector (or any oncall-category collector) |
+| `.oncall.schedule.participants` | number | `pagerduty`, `opsgenie`, or `datadog` collector |
+| `.oncall.escalation.exists` | boolean | `pagerduty`, `opsgenie`, or `datadog` collector |
 
 **Note:** Ensure a collector that writes to the `.oncall` category is configured before enabling this policy.
 
@@ -70,12 +70,12 @@ policies:
 }
 ```
 
-**Failure message:** `"On-call schedule is not configured for this service"`
+**Failure message:** `"Service has no on-call schedule configured. Set up a schedule in your on-call tool (PagerDuty, OpsGenie, Datadog On-Call, etc.) and attach it to the service's escalation policy."`
 
 ## Remediation
 
 When this policy fails, you can resolve it by:
 
-1. **schedule-configured:** Create an on-call schedule in your incident-management tool (PagerDuty, OpsGenie, etc.) for the service and assign team members
+1. **schedule-configured:** Create an on-call schedule in your incident-management tool (PagerDuty, OpsGenie, Datadog On-Call, etc.) for the service and assign team members
 2. **escalation-defined:** Create an escalation policy in your incident-management tool with at least one level
 3. **min-participants:** Add more team members to the on-call rotation (default minimum is 2)
