@@ -317,7 +317,7 @@ while IFS= read -r group; do
         # with_shared=false: GitLab includes projects shared INTO the group by
         # default, which are owned elsewhere — they would be cataloged outside
         # the account's groups and duplicated across any group sharing them.
-        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
