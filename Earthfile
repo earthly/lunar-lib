@@ -80,6 +80,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD ./collectors/java+test
     BUILD ./collectors/k8s+test
     BUILD ./collectors/istio+test
     BUILD ./catalogers/backstage+test
@@ -102,6 +103,7 @@ test:
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
+    BUILD ./policies/testing+test
 
 lint:
     FROM python:3.12-alpine

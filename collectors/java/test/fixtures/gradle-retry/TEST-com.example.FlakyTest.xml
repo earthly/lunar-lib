@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.FlakyTest" tests="3" skipped="0" failures="1" errors="0" timestamp="2026-09-26T17:43:26" hostname="bf78e9d803ff" time="0.955">
+  <properties/>
+  <testcase name="stable()" classname="com.example.FlakyTest" time="0.034"/>
+  <testcase name="passesOnRetry()" classname="com.example.FlakyTest" time="0.013">
+    <failure message="org.opentest4j.AssertionFailedError: first attempt fails" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: first attempt fails
+	at app//org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:38)
+	at app//org.junit.jupiter.api.Assertions.fail(Assertions.java:138)
+	at app//com.example.FlakyTest.passesOnRetry(FlakyTest.java:17)
+	at java.base@17.0.13/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base@17.0.13/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base@17.0.13/java.util.ArrayList.forEach(ArrayList.java:1511)
+</failure>
+  </testcase>
+  <testcase name="passesOnRetry()" classname="com.example.FlakyTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
