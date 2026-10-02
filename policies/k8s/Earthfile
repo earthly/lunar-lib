@@ -8,4 +8,4 @@ test:
     COPY requirements.txt .
     RUN pip install --no-cache-dir -r requirements.txt
     COPY *.py .
-    RUN python -m unittest test_pdb -v
+    RUN python -m unittest discover -v

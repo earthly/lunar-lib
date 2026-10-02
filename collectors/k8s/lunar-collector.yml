@@ -11,8 +11,8 @@ landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
     Parse Kubernetes YAML manifests and render Helm charts to extract workloads, containers,
-    resource limits, probes, PodDisruptionBudgets, and autoscalers. Capture kubectl
-    commands in CI for deployment traceability.
+    resource limits, probes, PodDisruptionBudgets, autoscalers, and NetworkPolicies.
+    Capture kubectl commands in CI for deployment traceability.
   categories: ["orchestration", "containers", "ci-cd"]
   icon: "assets/k8s.svg"
   status: "stable"
@@ -36,11 +36,12 @@ collectors:
       - Container specs with resource requests/limits, probes, and shutdown hooks
       - PodDisruptionBudgets (PDBs)
       - HorizontalPodAutoscalers (HPAs) and KEDA ScaledObjects
+      - NetworkPolicies (pod selector, policy types, egress rules)
       Helm chart templates are rendered by the `helm` sub-collector instead.
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa", "keda"]
+    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa", "keda", "networkpolicy"]
 
   - name: helm
     description: |
@@ -268,6 +269,18 @@ example_component_json: |
           "target_workload": "worker",
           "min_replicas": 2,
           "max_replicas": 20
+        }
+      ],
+      "network_policies": [
+        {
+          "name": "egress-no-metadata",
+          "namespace": "payments",
+          "path": "deploy/netpol.yaml",
+          "pod_selector": {},
+          "policy_types": ["Egress"],
+          "egress": [
+            {"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}
+          ]
         }
       ],
       "cicd": {

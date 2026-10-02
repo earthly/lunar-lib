@@ -1,4 +1,14 @@
 VERSION 0.8
+
+test:
+    # Runs the real main.sh inside the collector image, so the tests exercise the
+    # yq, jq and istioctl it ships. Only `lunar` is stubbed.
+    FROM +image
+    WORKDIR /workspace
+    COPY main.sh parse.jq aggregate.jq helm.sh .
+    COPY --dir test .
+    RUN cd test && python3 -m unittest discover -v
+
 # Build the istio collector image
 image:
     FROM --pass-args ../../+base-image

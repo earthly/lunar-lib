@@ -109,13 +109,27 @@ policies:
       catalog file, typically owned by another team, not this component's).
       Passes when there is nothing to cross-check — no `spec.system` declared,
       the system itself did not resolve (that is `system-exists`'s failure to
-      report), or the system belongs to no domain. Skips (passes) when
+      report), or the system belongs to no domain (that is
+      `system-domain-set`'s). Skips (passes) when
       referential integrity was not performed — the `backstage` collector is
       not configured with `backstage_url` (no `.refs.checked`) — or the lookup
       errored transiently (`.refs.system_domain.error`), so an unconfigured
       collector or a Backstage outage never turns this red.
     mainPython: ./system-domain-exists.py
     keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "cross-reference", "transitive"]
+
+  - name: system-domain-set
+    description: |
+      Verifies that the system the component belongs to is itself assigned to
+      a domain (`System.spec.domain`), read from the collector's
+      `.catalog.native.backstage.refs.system.has_domain`. Fails when the
+      system resolves in Backstage but declares no domain, naming the System
+      to fix. Passes when no `spec.system` is declared or the system does not
+      resolve (`system-set` and `system-exists` report those). Skips when the
+      collector has no `backstage_url`, the system lookup errored, or the
+      collector predates `has_domain`.
+    mainPython: ./system-domain-set.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
 
   - name: required-annotations
     description: |
@@ -141,6 +155,16 @@ policies:
     mainPython: ./required-tag-patterns.py
     keywords: ["backstage", "tags", "tag patterns", "glob", "required", "metadata"]
 
+  - name: required-link-types
+    description: |
+      Verifies that catalog-info.yaml has a `metadata.links` entry of each
+      configured link type (e.g. `runbook`, `dashboard`), matched exactly on
+      the link's `type`. Configure via the `required_link_types` input.
+      Skipped when no link types are required (the default). Fails if the
+      catalog file is missing or any required type has no link.
+    mainPython: ./required-link-types.py
+    keywords: ["backstage", "links", "link type", "runbook", "dashboard", "required", "metadata"]
+
   - name: disallowed-annotations
     description: |
       Verifies that catalog-info.yaml declares none of a configurable set
@@ -160,6 +184,17 @@ policies:
     mainPython: ./disallowed-tag-patterns.py
     keywords: ["backstage", "tags", "tag patterns", "glob", "disallowed", "forbidden"]
 
+  - name: dependencies-documented
+    description: |
+      Verifies that catalog-info.yaml declares the component's dependencies:
+      a non-empty `spec.dependsOn`, or a non-empty comma-separated value in
+      the annotation named by the `dependencies_annotation` input. Targets
+      are not looked up in the catalog. Skipped unless `require_dependencies`
+      is `"true"`. Fails if the catalog file is missing or declares no
+      dependencies.
+    mainPython: ./dependencies-documented.py
+    keywords: ["backstage", "dependencies", "dependsOn", "dependency mapping", "metadata"]
+
 inputs:
   skip_when_no_catalog_info:
     description: |
@@ -171,11 +206,12 @@ inputs:
       One switch for the whole family, and the only place their missing-file
       behaviour is described. With the default (`"false"`) a missing catalog
       file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
-      `lifecycle-set` and `system-set`; fails `required-annotations` and
-      `required-tag-patterns` when those are configured; passes the two
+      `lifecycle-set` and `system-set`; fails `required-annotations`,
+      `required-tag-patterns`, `required-link-types` and
+      `dependencies-documented` when those are configured; passes the two
       `disallowed-*` deny-checks, since nothing forbidden can be present
-      without a file; and skips the three referential-integrity checks, which
-      have nothing to cross-check. With `"true"` all twelve skip instead —
+      without a file; and skips the referential-integrity checks, which
+      have nothing to cross-check. With `"true"` every check skips instead —
       the `disallowed-*` pair included, so a component that is not in the
       catalog reports no green passes it did not earn.
 
@@ -219,6 +255,14 @@ inputs:
       case-insensitive. Empty (the default) disables the
       `required-tag-patterns` check.
     default: ""
+  required_link_types:
+    description: |
+      Comma-separated list of link types; catalog-info.yaml
+      `metadata.links` must include an entry whose `type` is each of them.
+      Example: `runbook,dashboard`. Matching is exact and case-sensitive,
+      and only the `type` is compared, not the link's title or URL. Empty
+      (the default) disables the `required-link-types` check.
+    default: ""
   disallowed_annotations:
     description: |
       Comma-separated list of annotation keys that must NOT be present in
@@ -232,4 +276,18 @@ inputs:
       `metadata.tags` must NOT include any tag matching these patterns.
       Example: `deprecated/*,internal-only`. Matching is case-insensitive.
       Empty (the default) disables the `disallowed-tag-patterns` check.
+    default: ""
+  require_dependencies:
+    description: |
+      Set to `"true"` to enforce `dependencies-documented`. Off by default,
+      so importing the whole policy doesn't fail every component that
+      declares no dependencies.
+    default: "false"
+  dependencies_annotation:
+    description: |
+      Annotation key that also counts as declared dependencies when its
+      value is a non-empty comma-separated list, for catalogs that record
+      dependencies there instead of in `spec.dependsOn`. Example:
+      `example.com/dependencies`. Empty (the default) checks
+      `spec.dependsOn` only.
     default: ""

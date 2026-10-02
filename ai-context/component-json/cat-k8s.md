@@ -106,6 +106,18 @@ Plain manifests and rendered Helm charts share the same arrays. An entry that ca
         "max_replicas": 20
       }
     ],
+    "network_policies": [
+      {
+        "name": "egress-no-metadata",
+        "namespace": "payments",
+        "path": "deploy/netpol.yaml",
+        "pod_selector": {},
+        "policy_types": ["Egress"],
+        "egress": [
+          {"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}
+        ]
+      }
+    ],
     "summary": {
       "all_valid": true,
       "all_have_resources": true,
@@ -130,4 +142,5 @@ Effective values are recorded: an unset `replicas` is 1, an unset `termination_g
 - `.k8s.hpas[].min_replicas` — HPA minimum
 - `.k8s.summary.all_have_pdb` — All workloads have PDB
 - `.k8s.pdbs[].selector` vs `.k8s.workloads[].pod_labels` — PDB coverage. Match with LabelSelector semantics; `pdbs[].target_workload` is a deprecated name guess
-- `render` — Never match a workload to a PDB or autoscaler from another values set of its own chart; plain manifests and other charts match as usual
+- `.k8s.network_policies[]` — `pod_selector` and `egress` as written; `policy_types` is effective (the API server's default when unset). Egress isolation per workload = a policy in its namespace whose `pod_selector` matches its `pod_labels` with `Egress` in `policy_types`
+- `render` — Never match a workload to a PDB, autoscaler or NetworkPolicy from another values set of its own chart; plain manifests and other charts match as usual
