@@ -304,7 +304,7 @@ fi
 # Newest first because id DESC is the endpoint's default order; ascending has
 # timed out server-side (a 500 after 60s) even on small groups.
 # simple=false is the default too, pinned because simple=true drops archived,
-# forked_from_project and marked_for_deletion_*, which the filters below read.
+# forked_from_project and marked_for_deletion_*, all of which are read below.
 ARCHIVED_PARAM=""
 [ "$INCLUDE_ARCHIVED" != "true" ] && ARCHIVED_PARAM="&archived=false"
 
