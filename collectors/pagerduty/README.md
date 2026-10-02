@@ -95,6 +95,7 @@ collectors:
 - The `backstage` sub-collector runs once the backstage collector's lookup (`.catalog.native.backstage.refs.entity`) is in the Component JSON. The JSON it reads can lag that write by several minutes, so it retries the read for up to `backstage_wait_seconds` (1800 by default), backing off up to 60s between attempts, then fails the run. The `oncall` checks wait for it.
 - `oncall` writes `.oncall.service_lookup` for a component it can't map, and `backstage` then writes `.oncall.service` if the live catalog maps it. The check reads `.oncall.service` first, so it passes. `oncall-cron` checks the same places, then the backstage collector's lookup in the default branch's Component JSON.
 - The System and Domain are the ones the catalog file declares (`spec.system`, and that System's `spec.domain`), which the backstage collector also checks for referential integrity. A Component missing from the catalog still inherits from the System its file declares.
+- A monorepo component whose entity is in a shared parent `catalog-info.yaml` (the backstage collector's `search_parent_dirs`) is always `backstage`'s to collect: `oncall` reads only the component's own directory.
 
 ### Inputs
 

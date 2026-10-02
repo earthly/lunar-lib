@@ -176,9 +176,11 @@ catalog() {
 }
 
 # new_case <name> — a fresh checkout dir; write its catalog-info.yaml to
-# "$CASE/catalog-info.yaml" before backstage_json / run_case.
+# "$CASE/catalog-info.yaml" before backstage_json / run_case. Set CASE_CWD to
+# run the collectors from a subdirectory (a monorepo component).
 new_case() {
   CASE="$TEST_DIR/cases/$1"
+  CASE_CWD=""
   rm -rf "$CASE"
   mkdir -p "$CASE/bs"
 }
@@ -188,7 +190,7 @@ new_case() {
 # collected as the case's Component JSON.
 backstage_json() {
   : > "$CURL_LOG"
-  ( cd "$CASE" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE/bs" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
+  ( cd "${CASE_CWD:-$CASE}" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE/bs" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
       LUNAR_VAR_BACKSTAGE_URL=http://bs.test:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=bs-token \
       "$@" bash "$BACKSTAGE_DIR/main.sh" ) > /dev/null 2> "$CASE/bs/stderr"
@@ -203,7 +205,7 @@ run_case() {
   shift
   : > "$CURL_LOG"
   CASE_EXIT=0
-  ( cd "$CASE" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
+  ( cd "${CASE_CWD:-$CASE}" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
       TMPDIR="$CASE" LUNAR_COMPONENT_ID=github.com/acme/svc LUNAR_COMPONENT_GIT_SHA=abc123 \
       LUNAR_SECRET_PAGERDUTY_API_KEY=pd-test-key LUNAR_VAR_PAGERDUTY_BASE_URL=https://pd.test \
       "$@" bash "$SCRIPT_DIR/$script" ) > "$CASE/stdout" 2> "$CASE/stderr" || CASE_EXIT=$?
@@ -462,6 +464,37 @@ assert_eq "inherited from the System: oncall misses the file, backstage collects
   "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 assert_eq "oncall's miss stays recorded next to the service" \
   "$(svc_lookup)" '{"searched":["meta:pagerduty/service-id","input:service_id","file:catalog-info.yaml"]}'
+
+# A monorepo component whose catalog entity lives in a shared ancestor file,
+# found by the backstage collector's search_parent_dirs. oncall only reads the
+# component's own directory, so the file's ID is not one it can collect, and
+# backstage mustn't hand it off.
+new_case combo-monorepo
+echo "gitdir: $TEST_DIR/no-such-gitdir" > "$CASE/.git"
+mkdir -p "$CASE/services/payments"
+printf '%s\n' 'apiVersion: backstage.io/v1alpha1' 'kind: Component' 'metadata:' '  name: mono-payments' \
+  '  annotations:' '    backstage.io/source-location: url:https://github.com/acme/mono/tree/main/services/payments/' \
+  '    pagerduty.com/service-id: PMONO01' 'spec: {type: service, owner: t, lifecycle: production, system: payment-platform}' \
+  > "$CASE/catalog-info.yaml"
+CASE_CWD="$CASE/services/payments"
+MONO=(LUNAR_COMPONENT_ID=github.com/acme/mono/services/payments)
+backstage_json "${MONO[@]}" LUNAR_VAR_SEARCH_PARENT_DIRS=true LUNAR_VAR_MATCH_SOURCE_LOCATION=true
+assert_eq "monorepo: the backstage collector read the shared ancestor file" \
+  "$(jq -c '.catalog.native.backstage | [.path, .metadata.name]' "$CASE/component.json")" '["../../catalog-info.yaml","mono-payments"]'
+run_case oncall.sh "$FILE" "${MONO[@]}"
+run_case backstage.sh "$FILE" "${MONO[@]}"
+assert_eq "monorepo: oncall can't see that file, so backstage collects the live entity" \
+  "$(queried) $(via)" "PMONO01 component:default/mono-payments"
+assert_eq "monorepo: oncall's miss lists its own directory's file" \
+  "$(svc_lookup | jq -c '.searched[2:]')" '["file:catalog-info.yaml (not found)","file:catalog-info.yml (not found)"]'
+
+new_case combo-dotslash
+catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case oncall.sh "$FILE" LUNAR_VAR_BACKSTAGE_CATALOG_PATHS=./catalog-info.yaml
+run_case backstage.sh "$FILE" LUNAR_VAR_BACKSTAGE_CATALOG_PATHS=./catalog-info.yaml
+assert_eq "a ./-prefixed backstage_catalog_paths entry still hands off" \
+  "$(queried) $(via)" "PFILE01 file:./catalog-info.yaml"
 
 new_case combo-unmapped
 catalog orphan > "$CASE/catalog-info.yaml"

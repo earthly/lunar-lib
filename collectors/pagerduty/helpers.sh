@@ -227,6 +227,24 @@ file_id_from_backstage_json() {
   ' 2>/dev/null || :
 }
 
+# oncall_reads_backstage_file <component-json> — whether the catalog file the
+# backstage collector parsed is one oncall reads from its checkout: a
+# backstage_catalog_paths entry in the component's own directory. With
+# search_parent_dirs the backstage collector can read a shared ancestor file
+# (recorded as ../…), which oncall never sees.
+oncall_reads_backstage_file() {
+  local path p
+  local -a paths=()
+  path=$(printf '%s' "$1" | jq -r '.catalog.native.backstage.path | strings' 2>/dev/null) || path=""
+  [ -n "$path" ] || return 1
+  IFS=',' read -ra paths <<< "${LUNAR_VAR_BACKSTAGE_CATALOG_PATHS:-catalog-info.yaml,catalog-info.yml}"
+  for p in "${paths[@]}"; do
+    p="$(echo "$p" | xargs)"
+    [ "${p#./}" = "$path" ] && return 0
+  done
+  return 1
+}
+
 # finish_unresolved [hint] — no service ID: write .oncall.service_lookup with
 # the places looked, which tells the oncall policy this apart from a collector
 # that never ran. A lookup that couldn't complete goes in its errors, so the

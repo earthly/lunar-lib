@@ -8,6 +8,7 @@
 #   orphan        no system                             -> miss
 #   lonely        system not in the catalog             -> miss
 #   quiet         system with no annotation, no domain  -> miss
+#   mono-payments own annotation, declared in a monorepo's shared root file
 apiVersion: backstage.io/v1alpha1
 kind: Domain
 metadata:
@@ -132,3 +133,16 @@ spec:
   lifecycle: production
   owner: team-ops
   system: platform/core
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mono-payments
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/mono/tree/main/services/payments/
+    pagerduty.com/service-id: PMONO01
+spec:
+  type: service
+  lifecycle: production
+  owner: t
+  system: payment-platform

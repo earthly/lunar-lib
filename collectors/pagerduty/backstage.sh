@@ -41,7 +41,8 @@ case "$READ_STATE" in
     ;;
 esac
 
-if [ "$DISCOVERY" = "true" ] && [ -n "$(file_id_from_backstage_json "$COMPONENT_JSON")" ]; then
+if [ "$DISCOVERY" = "true" ] && oncall_reads_backstage_file "$COMPONENT_JSON" \
+   && [ -n "$(file_id_from_backstage_json "$COMPONENT_JSON")" ]; then
   echo "The service ID is in the catalog file, which the oncall sub-collector reads with backstage_discovery: \"true\"." >&2
   exit 0
 fi
