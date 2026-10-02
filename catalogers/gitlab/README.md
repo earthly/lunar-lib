@@ -251,7 +251,7 @@ Two steps per run. First, `/groups?top_level_only=true&min_access_level=40` list
 
 Project listing uses **keyset pagination** (`order_by=id&sort=desc` plus `id_before`), walking newest-first until a page comes back empty. Descending is the endpoint's default order; ascending has timed out server-side (HTTP 500) even on small groups. There is no configured ceiling on the number of projects or groups: a cap that silences itself is worse than a long run, so the cataloger pages until GitLab says there are no more.
 
-A listing page that fails with HTTP 500 is retried with `simple=true`, GitLab's lighter project entity; on GitLab before 18.2 that entity has no visibility, so the run aborts instead. Projects from such a page are cataloged as non-forks, and as unarchived when `include_archived` is on.
+A listing page that fails with HTTP 500 is retried with `simple=true`, GitLab's lighter project entity. Before GitLab 18.2 that entity has no visibility, so the cataloger keeps retrying with full details instead. Projects from a simple page are cataloged as non-forks, and as unarchived when `include_archived` is on.
 
 Two pagination details are worth knowing, because both look like they work and don't:
 

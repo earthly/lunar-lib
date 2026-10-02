@@ -115,6 +115,7 @@ log_failure() {
 # A listing that asks for simple=false is retried with simple=true after an
 # HTTP 500. That entity is lighter but has no fork or archived details, so
 # GL_SIMPLE tells the caller which kind of page it got.
+SIMPLE_USABLE=true
 gl_api() {
     local path="$1" out="$2"
     local attempt=1 backoff=$INITIAL_BACKOFF code last_id hdr="$WORK/hdr" err="$WORK/curl.err"
@@ -131,11 +132,15 @@ gl_api() {
 
         case "$code" in
             2*)
-                # Before 18.2 the simple entity has no visibility, and the
-                # visibility filter would then drop every project on the page.
+                # Before 18.2 the simple entity has no visibility, which the
+                # filter needs: back to full details for the rest of the run,
+                # without spending an attempt on the unusable page.
                 if [ "$GL_SIMPLE" = "true" ] && ! jq -e 'all(.[]; .visibility != null)' "$out" >/dev/null; then
-                    echo "Error: simple=true listing on $path has no project visibility (GitLab before 18.2) — aborting rather than reporting a partial estate." >&2
-                    exit 1
+                    echo "  simple=true has no project visibility here (GitLab before 18.2), retrying with full details" >&2
+                    SIMPLE_USABLE=false
+                    path="${path/simple=true/simple=false}"
+                    GL_SIMPLE=false
+                    continue
                 fi
                 # Pace against the documented budget instead of discovering it via a 429.
                 local remaining reset now sleep_for
@@ -158,7 +163,7 @@ gl_api() {
                 [ -n "$retry_after" ] && backoff="$retry_after"
                 echo "HTTP $code on $path (attempt $attempt/$MAX_RETRIES), retrying in ${backoff}s" >&2
                 log_failure "$out" "$hdr" "$err"
-                if [ "$code" = "500" ] && [[ "$path" == *simple=false* ]]; then
+                if [ "$code" = "500" ] && [ "$SIMPLE_USABLE" = "true" ] && [[ "$path" == *simple=false* ]]; then
                     path="${path/simple=false/simple=true}"
                     GL_SIMPLE=true
                     echo "  Retrying this page with simple=true, without fork or archived details" >&2
@@ -432,10 +437,11 @@ jq -s \
       # Either field satisfies it: gitlab.com currently returns both
       # marked_for_deletion_on and _at in agreement, and reading only one would
       # silently stop filtering if that one is the half that goes away.
-      # The rename is matched too (GitLab 18.3+): a simple=true page has
-      # neither field.
+      # The rename is matched too, because a simple=true page has neither
+      # field: -deletion_scheduled-<id> since GitLab 18.3, -deleted-<id> before.
       | select((.pending_deletion
-                or (.id as $id | .path_with_namespace | endswith("-deletion_scheduled-\($id)"))) | not)
+                or (.id as $id | .path_with_namespace
+                    | endswith("-deletion_scheduled-\($id)") or endswith("-deleted-\($id)"))) | not)
       | . + {norm_topics: [(.topics // [])[] | norm] }
       # allow ∩ topics, expressed as set difference twice
       | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)
