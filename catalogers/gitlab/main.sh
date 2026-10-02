@@ -303,6 +303,8 @@ fi
 # the paging actually keyset — do not switch to following Link: rel="next".
 # Newest first because id DESC is the endpoint's default order; ascending has
 # timed out server-side (a 500 after 60s) even on small groups.
+# simple=false is the default too, pinned because simple=true drops archived,
+# forked_from_project and marked_for_deletion_*, which the filters below read.
 ARCHIVED_PARAM=""
 [ "$INCLUDE_ARCHIVED" != "true" ] && ARCHIVED_PARAM="&archived=false"
 
@@ -347,7 +349,7 @@ if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
     pages=0
     before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     while :; do
-        gl_api "/projects?membership=true&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+        gl_api "/projects?membership=true&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/personal-page.json"
         n=$(jq 'length' "$WORK/personal-page.json")
         [ "$n" -eq 0 ] && break
