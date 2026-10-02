@@ -11,8 +11,8 @@ landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
     Parse Kubernetes YAML manifests to extract workloads, containers, resource limits,
-    probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. Capture kubectl
-    commands in CI for deployment traceability.
+    probes, PodDisruptionBudgets, HorizontalPodAutoscalers, and NetworkPolicies.
+    Capture kubectl commands in CI for deployment traceability.
   categories: ["orchestration", "containers", "ci-cd"]
   icon: "assets/k8s.svg"
   status: "stable"
@@ -33,10 +33,11 @@ collectors:
       - Container specs with resource requests/limits and probes
       - PodDisruptionBudgets (PDBs)
       - HorizontalPodAutoscalers (HPAs)
+      - NetworkPolicies (pod selector, policy types, egress rules)
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa"]
+    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa", "networkpolicy"]
 
   - name: cicd
     description: |
@@ -122,6 +123,18 @@ example_component_json: |
           "target_workload": "payment-api",
           "min_replicas": 3,
           "max_replicas": 10
+        }
+      ],
+      "network_policies": [
+        {
+          "name": "egress-no-metadata",
+          "namespace": "payments",
+          "path": "deploy/netpol.yaml",
+          "pod_selector": {},
+          "policy_types": ["Egress"],
+          "egress": [
+            {"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}
+          ]
         }
       ],
       "cicd": {
