@@ -31,6 +31,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.vcs.branch_protection` | Protection settings (`enabled`, `required_approvals`, `require_codeowner_review`) |
 | `.vcs.pr` | PR-specific data (only in PR context) — see [PR-Specific Data](conventions.md#pr-specific-data) |
 | `.vcs.pr.ticket` | Extracted ticket reference (`id`, `source`, `url`) |
+| `.vcs.release_range` | Commits since the previous release tag, with the merged PR behind each (default branch, opt-in) |
 | **[`.containers`](cat-containers.md)** | **Container images, Dockerfiles, registries** |
 | `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`, `labels`) |
 | `.containers.definitions[].base_images[]` | Base image info (`reference`, `image`, `tag`) |
@@ -43,6 +44,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.k8s.workloads[].containers[]` | Container specs (`has_resources`, `has_liveness_probe`, `runs_as_non_root`) |
 | `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `selector`, `min_available`) |
 | `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`) |
+| `.k8s.network_policies[]` | NetworkPolicies (`pod_selector`, `policy_types`, `egress`) |
 | `.k8s.summary` | Aggregated checks (`all_have_resources`, `all_have_probes`, `all_have_pdb`) |
 | **[`.iac`](cat-iac.md)** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |
 | `.iac.source` | Tool metadata (`tool`, `version`) |

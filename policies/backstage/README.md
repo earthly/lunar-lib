@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
+The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The opt-in checks (`required-*`, `disallowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
 
 ## Policies
 
@@ -25,8 +25,10 @@ This plugin provides the following policies (use `include` to select a subset):
 | `system-domain-set` | Verifies that the component's *system* belongs to a domain at all (needs collector `backstage_url`) |
 | `required-annotations` | Validates that configured annotation keys are present, and optionally that their values match typed constraints (opt-in via the `required_annotations` input) |
 | `required-tag-patterns` | Validates that the component's tags match configured glob patterns (opt-in via the `required_tag_patterns` input) |
+| `required-link-types` | Validates that `metadata.links` has an entry of each configured link `type`, e.g. `runbook` (opt-in via the `required_link_types` input) |
 | `disallowed-annotations` | Fails if any forbidden annotation key is present (opt-in via the `disallowed_annotations` input) |
 | `disallowed-tag-patterns` | Fails if any tag matches a forbidden glob pattern (opt-in via the `disallowed_tag_patterns` input) |
+| `dependencies-documented` | Validates that `spec.dependsOn`, or a configured annotation, lists at least one dependency (opt-in via the `require_dependencies` input) |
 
 ## Required Data
 
@@ -42,6 +44,8 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 | `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
 | `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
+| `.catalog.native.backstage.metadata.links` | array | `backstage` collector (read by `required-link-types`) |
+| `.catalog.native.backstage.spec.dependsOn` | array | `backstage` collector (read by `dependencies-documented`, which also reads the `dependencies_annotation` annotation when set) |
 | `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; the RI checks skip (pass) when absent |
 | `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }` on a transient lookup failure) for `spec.domain`; read by `domain-exists` |
 | `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`, plus `has_domain` once the system resolves; read by `system-exists` and `system-domain-set` |
@@ -67,11 +71,15 @@ policies:
       required_tag_patterns: "location/*,runs-on/*"
       disallowed_annotations: "backstage.io/skip-checks"
       disallowed_tag_patterns: "deprecated/*"
+      required_link_types: "runbook"
+      require_dependencies: "true"
 ```
 
 `skip_when_no_catalog_info` defaults to `"false"`: a component with no `catalog-info.yaml` fails, because importing the policy is itself the statement that the component should be catalogued. Set it to `"true"` to scope enforcement to the repositories that are already in Backstage — every check then skips on a component with no catalog file, and a component that *has* one is held to every check exactly as before.
 
-The four list inputs are comma-separated; leave them unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
+The list inputs are comma-separated; leave one unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all. `required-link-types` needs a `metadata.links` entry whose `type` exactly equals each listed type; the link's title and URL aren't checked.
+
+`dependencies-documented` is off until `require_dependencies` is `"true"`, so a whole-policy import doesn't fail every component that lists no dependencies. Once on, it passes on any non-empty `spec.dependsOn` (targets are not looked up in Backstage) or, when `dependencies_annotation` names an annotation, on a non-empty comma-separated value there. A component with nothing to depend on fails too, so leave such components out with `on:`.
 
 ## Examples
 
@@ -128,7 +136,7 @@ The four list inputs are comma-separated; leave them unset (the default) and the
 {}
 ```
 
-The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All four are skipped if unconfigured.
+The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks and `dependencies-documented` fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All of them are skipped if unconfigured.
 
 With `skip_when_no_catalog_info: "true"` every check **skips** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
 
@@ -141,7 +149,7 @@ With `skip_when_no_catalog_info: "true"` every check **skips** on this component
 
 ### Configurable checks: required and disallowed annotations / tag patterns
 
-With `required_annotations: "backstage.io/source-location"`, `required_tag_patterns: "location/*,runs-on/*"`, `disallowed_annotations: "backstage.io/skip-checks"`, and `disallowed_tag_patterns: "deprecated/*"` configured, this component **passes** all four configurable checks:
+With `required_annotations: "backstage.io/source-location"`, `required_tag_patterns: "location/*,runs-on/*"`, `disallowed_annotations: "backstage.io/skip-checks"`, and `disallowed_tag_patterns: "deprecated/*"` configured, this component **passes** all four of those checks:
 
 ```json
 {
@@ -159,6 +167,32 @@ With `required_annotations: "backstage.io/source-location"`, `required_tag_patte
 ```
 
 Remove the `backstage.io/source-location` annotation and `required-annotations` fails: `"catalog-info.yaml is missing required annotation(s): backstage.io/source-location"`. Drop every `runs-on/*` tag and `required-tag-patterns` fails: `"catalog-info.yaml has no tag matching required pattern(s): runs-on/*"`. Conversely, add a `backstage.io/skip-checks` annotation and `disallowed-annotations` fails; add a `deprecated/legacy` tag and `disallowed-tag-patterns` fails: `"catalog-info.yaml has tag(s) matching disallowed pattern(s): deprecated/* (deprecated/legacy)"`.
+
+### Configurable checks: typed links and declared dependencies
+
+With `required_link_types: "runbook,dashboard"` and `require_dependencies: "true"` configured, this component **passes** `required-link-types` and `dependencies-documented`:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "metadata": {
+          "links": [
+            { "url": "https://wiki.example.com/payment-api/runbook", "title": "Runbook", "type": "runbook" },
+            { "url": "https://grafana.example.com/d/abc123", "title": "Service dashboard", "type": "dashboard" }
+          ]
+        },
+        "spec": {
+          "dependsOn": ["resource:payments-db", "component:auth-service"]
+        }
+      }
+    }
+  }
+}
+```
+
+Drop the `runbook` link and `required-link-types` fails: `"catalog-info.yaml has no metadata.links entry of type: runbook. Present link types: dashboard."` A link titled "Runbook" with no `type` doesn't count. Empty `spec.dependsOn` and `dependencies-documented` fails: `"catalog-info.yaml declares no dependencies."` With `dependencies_annotation: "example.com/dependencies"` set, an annotation such as `example.com/dependencies: "resource:payments-db,component:auth-service"` passes it instead.
 
 ### Referential integrity: domain-exists, system-exists, system-domain-exists and system-domain-set
 
@@ -316,3 +350,5 @@ When this policy fails, resolve it by updating your `catalog-info.yaml`:
 5. **Missing system** - Add `spec.system` referencing the parent system that groups related components
 6. **Referential-integrity failure** (`domain-exists` / `system-exists`) - The `spec.domain` or `spec.system` value points at an entity that does not exist in the Backstage catalog. Fix the reference to match an existing entity's `metadata.name`, or register the missing Domain/System in Backstage
 7. **System has no domain** (`system-domain-set`) - Set `spec.domain` on the named System entity, in that System's own catalog file
+8. **Missing link type** (`required-link-types`) - Add a `metadata.links` entry with the missing `type` and its `url`
+9. **No dependencies** (`dependencies-documented`) - List the entities the component depends on under `spec.dependsOn` (e.g. `resource:payments-db`), or in the annotation named by `dependencies_annotation`

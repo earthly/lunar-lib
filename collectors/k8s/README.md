@@ -4,7 +4,7 @@ Parses Kubernetes manifests and tracks kubectl commands in CI.
 
 ## Overview
 
-This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, and HorizontalPodAutoscalers. It also intercepts `kubectl` commands during CI runs so deployment invocations (apply, rollout, etc.) are recorded alongside the manifest data.
+This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It extracts structured information about workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs), their container specifications including resource limits and probes, PodDisruptionBudgets, HorizontalPodAutoscalers, and NetworkPolicies. It also intercepts `kubectl` commands during CI runs so deployment invocations (apply, rollout, etc.) are recorded alongside the manifest data.
 
 ## Collected Data
 
@@ -17,6 +17,7 @@ This collector writes to the following Component JSON paths:
 | `.k8s.workloads[]` | array | Workload resources with container specs and `pod_labels` (the pod template labels) |
 | `.k8s.pdbs[]` | array | PodDisruptionBudgets with their full label `selector` (`target_workload` is deprecated) |
 | `.k8s.hpas[]` | array | HorizontalPodAutoscalers |
+| `.k8s.network_policies[]` | array | NetworkPolicies: `pod_selector`, effective `policy_types` (API-server default when unset), and `egress` rules as written |
 | `.k8s.cicd` | object | kubectl CI command tracking (commands + client version) |
 
 ## Collectors
@@ -25,7 +26,7 @@ This integration provides the following collectors (use `include` to select a su
 
 | Collector | Description |
 |-----------|-------------|
-| `k8s` | Parses Kubernetes manifests, workloads, PodDisruptionBudgets, and HorizontalPodAutoscalers |
+| `k8s` | Parses Kubernetes manifests, workloads, PodDisruptionBudgets, HorizontalPodAutoscalers, and NetworkPolicies |
 | `cicd` | Tracks all kubectl commands executed in CI pipelines (apply, rollout, etc.) |
 
 ## Installation

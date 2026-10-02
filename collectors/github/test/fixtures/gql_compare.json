@@ -1,0 +1,21 @@
+{
+  "data": {
+    "repository": {
+      "t0": {
+        "compare": {
+          "aheadBy": 0
+        }
+      },
+      "t1": {
+        "compare": {
+          "aheadBy": 3
+        }
+      },
+      "t2": {
+        "compare": {
+          "aheadBy": 9
+        }
+      }
+    }
+  }
+}
