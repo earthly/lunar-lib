@@ -12,7 +12,7 @@ landing_page:
     Enforce on-call operational readiness standards. Verify that services are
     mapped to an on-call service and have an active schedule, a multi-level
     escalation policy, and enough rotation participants. Works with any
-    oncall-category collector (PagerDuty, OpsGenie, etc.).
+    oncall-category collector (PagerDuty, OpsGenie, Datadog On-Call, etc.).
   category: "operational-readiness"
   icon: "assets/oncall.svg"
   status: "beta"
@@ -23,8 +23,11 @@ landing_page:
     - slug: "opsgenie"
       type: "collector"
       reason: "Provides on-call and escalation data (OpsGenie implementation)"
+    - slug: "datadog"
+      type: "collector"
+      reason: "Provides on-call and escalation data (Datadog On-Call implementation)"
   related: []
-  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "opsgenie", "operational readiness"]
+  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "opsgenie", "datadog", "operational readiness"]
 
 policies:
   - name: service-mapped
@@ -50,7 +53,7 @@ policies:
       checking .oncall.escalation.exists is true. Fails if no escalation
       data is present.
     mainPython: ./escalation_defined.py
-    keywords: ["escalation", "incident", "pagerduty", "opsgenie", "response"]
+    keywords: ["escalation", "incident", "pagerduty", "opsgenie", "datadog", "response"]
 
   - name: min-participants
     description: |
