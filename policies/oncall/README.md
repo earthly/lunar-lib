@@ -28,7 +28,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.oncall.service.id` | string | `pagerduty` or `opsgenie` collector (or any oncall-category collector) |
-| `.oncall.unmapped` | object | `pagerduty` collector, when it looked for a service and found none |
+| `.oncall.service_lookup` | object | `pagerduty` collector, when it looked for a service and found none |
 | `.oncall.schedule.exists` | boolean | `pagerduty` or `opsgenie` collector (or any oncall-category collector) |
 | `.oncall.schedule.participants` | number | `pagerduty` or `opsgenie` collector |
 | `.oncall.escalation.exists` | boolean | `pagerduty` or `opsgenie` collector |
@@ -81,22 +81,22 @@ policies:
 {
   "oncall": {
     "source": { "tool": "pagerduty", "integration": "api" },
-    "unmapped": {
-      "searched": ["meta:pagerduty/service-id", "input:service_id", "component:default/checkout", "system:default/payment-platform", "file:catalog-info.yaml"]
+    "service_lookup": {
+      "searched": ["meta:pagerduty/service-id", "input:service_id", "file:catalog-info.yaml", "component:default/checkout", "system:default/payment-platform"]
     }
   }
 }
 ```
 
-**Failure message (`service-mapped`):** `"No PagerDuty service is mapped to this component (looked in: meta:pagerduty/service-id, input:service_id, component:default/checkout, system:default/payment-platform, file:catalog-info.yaml). Annotate its Backstage Component, System or Domain with pagerduty.com/service-id, or set the pagerduty/service-id meta or the collector's service_id input."`
+**Failure message (`service-mapped`):** `"No PagerDuty service is mapped to this component (looked in: meta:pagerduty/service-id, input:service_id, file:catalog-info.yaml, component:default/checkout, system:default/payment-platform). Annotate its Backstage Component, System or Domain with pagerduty.com/service-id, or set the pagerduty/service-id meta or the collector's service_id input."`
 
-`service-mapped` skips when no collector looked for a service: none is configured for the component, or its lookup couldn't complete (e.g. Backstage was unreachable). The other checks still fail on the missing data.
+`service-mapped` passes whenever a collector wrote `.oncall.service.id`, even next to a `.oncall.service_lookup` another one wrote. It skips when no collector looked for a service, and when `.oncall.service_lookup.errors` says a lookup couldn't complete (e.g. Backstage was unreachable). The other checks still fail on the missing data.
 
 ## Remediation
 
 When this policy fails, you can resolve it by:
 
-1. **service-mapped:** Map the component to its service: a `pagerduty.com/service-id` annotation on its Backstage Component (or its System or Domain, with the pagerduty collector's `backstage_discovery: live` and the backstage collector's `backstage_url`), the `pagerduty/service-id` component meta, or the collector's `service_id` input
+1. **service-mapped:** Map the component to its service: a `pagerduty.com/service-id` annotation on its Backstage Component (or its System or Domain, with the pagerduty collector's `backstage` sub-collector and the backstage collector's `backstage_url`), the `pagerduty/service-id` component meta, or the collector's `service_id` input
 2. **schedule-configured:** Create an on-call schedule in your incident-management tool (PagerDuty, OpsGenie, etc.) for the service and assign team members
 3. **escalation-defined:** Create an escalation policy in your incident-management tool with at least one level
 4. **min-participants:** Add more team members to the on-call rotation (default minimum is 2)

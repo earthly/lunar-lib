@@ -92,7 +92,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.observability.summary` | Aggregated checks (`golden_signals_complete`, `has_dashboard`) |
 | **[`.oncall`](cat-oncall.md)** | **On-call, incident management, runbooks** |
 | `.oncall.service` | Mapped on-call service (`id`, `name`, `status`, `discovered_via`) |
-| `.oncall.unmapped` | Present when a collector looked for a service mapping and found none (`searched`) |
+| `.oncall.service_lookup` | Present when a collector looked for a service mapping and found none (`searched`, and `errors` for lookups that didn't complete) |
 | `.oncall.schedule` | Schedule info (`exists`, `participants`, `rotation`) |
 | `.oncall.escalation` | Escalation info (`exists`, `levels`) |
 | `.oncall.runbook` | Runbook info (`exists`, `path`, `url`) |

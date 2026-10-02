@@ -67,7 +67,7 @@ collectors:
       `.refs.entity = {kind, name, exists}`, and every entry that resolves to
       an entity carries its canonical `ref` and its `annotations`, so other
       collectors can read annotations from the live catalog without calling
-      Backstage again (the pagerduty collector's `backstage_discovery: live`
+      Backstage again (the pagerduty collector's `backstage` sub-collector
       inherits a service ID from the System or Domain this way). The
       `<namespace>` is derived from the reference itself —
       a qualified ref (`ns/name`) carries its own, otherwise the component's own

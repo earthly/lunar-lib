@@ -1,17 +1,14 @@
 #!/bin/bash
-# The backstage sub-collector: with backstage_discovery: live, finds the
-# component's PagerDuty service in the Backstage lookup the backstage collector
-# wrote to Component JSON, then queries PagerDuty. Dispatched by an after-json
-# hook on .catalog.native.backstage.refs.entity.
+# The backstage sub-collector: finds the component's PagerDuty service in what
+# the backstage collector read from the live catalog (the Component, else its
+# System, else that System's Domain), for components the oncall sub-collector
+# can't map from meta, service_id or, with backstage_discovery: "true", the
+# catalog file. Dispatched by an after-json hook on
+# .catalog.native.backstage.refs.entity.
 set -e
 
 # shellcheck source=collectors/pagerduty/helpers.sh disable=SC1091
 source "$(dirname "$0")/helpers.sh"
-
-if [ "$DISCOVERY" != "live" ]; then
-  echo "backstage_discovery is '$DISCOVERY', not 'live': the oncall sub-collector handles this component." >&2
-  exit 0
-fi
 
 require_api_key
 
@@ -44,6 +41,14 @@ case "$READ_STATE" in
     ;;
 esac
 
+if [ "$DISCOVERY" = "true" ] && [ -n "$(file_id_from_backstage_json "$COMPONENT_JSON")" ]; then
+  echo "The service ID is in the catalog file, which the oncall sub-collector reads with backstage_discovery: \"true\"." >&2
+  exit 0
+fi
+
+# The oncall sub-collector records meta, the input and the file as searched.
+# shellcheck disable=SC2034  # read by finish_unresolved
+SEARCHED=()
 resolve_from_backstage_json "$COMPONENT_JSON"
 [ -n "$SERVICE_ID" ] || finish_unresolved
 collect_pagerduty

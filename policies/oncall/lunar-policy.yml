@@ -29,9 +29,10 @@ landing_page:
 policies:
   - name: service-mapped
     description: |
-      Verifies the component is mapped to an on-call service. Fails when the
-      collector looked for one and found none (.oncall.unmapped), naming the
-      places it looked; skips when no collector looked.
+      Verifies the component is mapped to an on-call service. Fails when a
+      collector looked for one and found none (.oncall.service_lookup), naming
+      the places it looked; skips when no collector looked, or a lookup
+      couldn't finish.
     mainPython: ./service_mapped.py
     keywords: ["oncall", "service mapping", "pagerduty", "backstage", "service-id"]
 

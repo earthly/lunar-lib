@@ -7,40 +7,40 @@ source "$(dirname "$0")/helpers.sh"
 
 require_api_key
 
-# Component meta, then the explicit input, then backstage_discovery.
+# Component meta, then the explicit input, then (backstage_discovery: "true")
+# the checked-out catalog-info.yaml.
 resolve_meta_and_input
+if [ -z "$SERVICE_ID" ] && [ "$DISCOVERY" = "true" ]; then
+  resolve_from_checkout
+fi
 
+# The daily refresh also reads what the backstage collector found in the live
+# catalog, from the default branch's Component JSON, so a service inherited
+# from a System or Domain stays fresh. On push that's the backstage
+# sub-collector's job, since the lookup may not have landed yet.
 if [ -z "$SERVICE_ID" ]; then
-  case "$DISCOVERY" in
-    false) ;;
-    true)
-      resolve_from_checkout
-      ;;
-    live)
-      case "${LUNAR_COLLECTOR_NAME:-}" in
-        *oncall-cron)
-          # The daily refresh reads the backstage collector's lookup off the
-          # default branch's current JSON. It isn't dispatched off a record, so
-          # a short retry is enough, and the next run tries again.
-          read_component_json 30 false
-          if [ "$READ_STATE" != "ok" ]; then
-            echo "backstage_discovery: live, but the Component JSON has no Backstage lookup (.catalog.native.backstage.refs.entity) yet. Is the backstage collector running with backstage_url set? Skipping this refresh." >&2
-            exit 0
-          fi
-          resolve_from_backstage_json "$COMPONENT_JSON"
-          ;;
+  case "${LUNAR_COLLECTOR_NAME:-}" in
+    *oncall-cron)
+      read_component_json 0 false
+      case "$READ_STATE" in
+        ok) resolve_from_backstage_json "$COMPONENT_JSON" ;;
+        # No live lookup to read: the backstage collector isn't set up with
+        # backstage_url, or this repo has no catalog file.
+        no_lookup) ;;
         *)
-          echo "backstage_discovery: live. The backstage sub-collector resolves this component's service once the backstage collector's lookup lands." >&2
+          echo "Could not read the default branch's Component JSON; skipping this refresh." >&2
           exit 0
           ;;
       esac
       ;;
-    *)
-      echo "Invalid backstage_discovery '$DISCOVERY' (expected false, true or live). Writing nothing." >&2
-      exit 0
-      ;;
   esac
 fi
 
-[ -n "$SERVICE_ID" ] || finish_unresolved
+if [ -z "$SERVICE_ID" ]; then
+  hint="The backstage sub-collector, if included, looks in the live catalog next."
+  if [ "$DISCOVERY" != "true" ]; then
+    hint="Map it with the 'pagerduty/service-id' meta, the service_id input or, with backstage_discovery: \"true\", catalog-info.yaml. $hint"
+  fi
+  finish_unresolved "$hint"
+fi
 collect_pagerduty

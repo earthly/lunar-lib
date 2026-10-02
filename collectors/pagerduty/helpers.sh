@@ -4,13 +4,19 @@
 # The globals set here (READ_STATE, COMPONENT_JSON, ...) are read by those scripts.
 # shellcheck disable=SC2034
 
+# backstage_discovery switches the checked-out catalog-info.yaml on or off.
+# The live catalog is the backstage sub-collector's job, so it has no setting.
 DISCOVERY="${LUNAR_VAR_BACKSTAGE_DISCOVERY:-false}"
+case "$DISCOVERY" in
+  true|false) ;;
+  *) echo "backstage_discovery is '$DISCOVERY', but it takes \"true\" or \"false\"; not reading the catalog file. The backstage sub-collector does the live lookup." >&2 ;;
+esac
 ANNOTATION_KEYS="${LUNAR_VAR_BACKSTAGE_ANNOTATIONS:-pagerduty.com/service-id,pagerduty/service-id}"
 
 SERVICE_ID=""
 DISCOVERED_VIA=""
-LOOKUP_ERROR=""
 SEARCHED=()
+LOOKUP_ERRORS=()
 
 require_api_key() {
   if [ -z "${LUNAR_SECRET_PAGERDUTY_API_KEY:-}" ]; then
@@ -151,16 +157,16 @@ read_component_json() {
 
 # resolve_from_backstage_json <component-json>
 #
-# backstage_discovery: "live" — the service ID from what the backstage collector
-# read out of the live catalog: the component's own entity, then its System,
-# then that System's Domain (a System catalog file: its own Domain), then the
-# catalog file it parsed. The first lookup that couldn't complete ends the live
-# walk, because an earlier entity's ID would have won; the file still answers.
+# The service ID from what the backstage collector read out of the live
+# catalog: the component's own entity, then its System, then that System's
+# Domain (a System catalog file: its own Domain). A lookup that couldn't
+# complete ends the walk, because an earlier entity's ID would have won, and
+# goes to LOOKUP_ERRORS.
 resolve_from_backstage_json() {
-  local state label id error stop=false
+  local state label id error
   while IFS=$'\x1f' read -r state label id error; do
     case "$state" in
-      file)
+      hit)
         SEARCHED+=("$label")
         if [ -n "$id" ]; then
           SERVICE_ID="$id"
@@ -168,26 +174,13 @@ resolve_from_backstage_json() {
           return 0
         fi
         ;;
-      *)
-        [ "$stop" = true ] && continue
-        case "$state" in
-          hit)
-            SEARCHED+=("$label")
-            if [ -n "$id" ]; then
-              SERVICE_ID="$id"
-              DISCOVERED_VIA="$label"
-              return 0
-            fi
-            ;;
-          miss)
-            SEARCHED+=("$label (not in catalog)")
-            ;;
-          error)
-            LOOKUP_ERROR="the backstage collector's lookup of $label failed ($error)"
-            echo "backstage_discovery: $LOOKUP_ERROR" >&2
-            stop=true
-            ;;
-        esac
+      miss)
+        SEARCHED+=("$label (not in catalog)")
+        ;;
+      error)
+        LOOKUP_ERRORS+=("$label: $error")
+        echo "The backstage collector's lookup of $label failed ($error)." >&2
+        return 0
         ;;
     esac
   done < <(printf '%s' "$1" | jq -r --arg keys "$ANNOTATION_KEYS" '
@@ -214,34 +207,52 @@ resolve_from_backstage_json() {
           step($refs.system; canon("system"; $refs.system.name // ""; $ns)),
           step($refs.system_domain;
                canon("domain"; $refs.system_domain.name // ""; (ns_of($refs.system.ref) // $ns))),
-          (if $kind == "system" then step($refs.domain; canon("domain"; $refs.domain.name // ""; $ns)) else empty end),
-          { state: "file",
-            label: "file:\($b.path // "catalog-info.yaml")",
-            id: ( [ ($b.entities // [])[] | select(type == "object" and .kind == "Component")
-                    | .metadata.annotations ]
-                  | if length > 0 then . else [ $b.metadata.annotations ] end
-                  | first_id(.) ) } )
+          (if $kind == "system" then step($refs.domain; canon("domain"; $refs.domain.name // ""; $ns)) else empty end) )
       | [.state, .label, (.id // ""), (.error // "")] | join("\u001f")
   ' 2>/dev/null)
 }
 
-# No service ID. If a lookup couldn't complete, write nothing: the mapping may be
-# on an entity we couldn't read, and an outage must not read as "no service
-# mapped". Otherwise every source answered, so write .oncall.unmapped, which
-# tells the oncall policy this apart from a collector that never ran.
+# file_id_from_backstage_json <component-json> — the service ID in the catalog
+# file as the backstage collector parsed it: the first configured key with a
+# value, across its Component entities.
+file_id_from_backstage_json() {
+  printf '%s' "$1" | jq -r --arg keys "$ANNOTATION_KEYS" '
+    ($keys | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $ks
+    | .catalog.native.backstage as $b
+    | [ ($b.entities // [])[] | select(type == "object" and .kind == "Component") | .metadata.annotations ]
+    | (if length > 0 then . else [ $b.metadata.annotations ] end) as $anns
+    | [ $ks[] as $k | $anns[] | if type == "object" then .[$k] else null end
+        | strings | gsub("\\s"; "") | select(. != "") ]
+    | (.[0] // "")
+  ' 2>/dev/null || :
+}
+
+# finish_unresolved [hint] — no service ID: write .oncall.service_lookup with
+# the places looked, which tells the oncall policy this apart from a collector
+# that never ran. A lookup that couldn't complete goes in its errors, so the
+# policy skips instead of reporting a missing mapping during an outage.
+# Sub-collectors each record what they searched, so .oncall.service_lookup can
+# sit next to a .oncall.service another one found; the policy reads
+# .oncall.service first.
 finish_unresolved() {
-  if [ -n "$LOOKUP_ERROR" ]; then
-    echo "No PagerDuty service ID found, and the Backstage lookup above didn't complete. Writing nothing." >&2
-    exit 0
+  local looked_in="" searched errors
+  if [ ${#SEARCHED[@]} -gt 0 ]; then
+    looked_in="$(printf '%s, ' "${SEARCHED[@]}")"
+    looked_in=" (looked in: ${looked_in%, })"
   fi
-  local looked_in
-  looked_in="$(printf '%s, ' "${SEARCHED[@]}")"
-  echo "No PagerDuty service ID found (looked in: ${looked_in%, })." >&2
-  if [ "$DISCOVERY" = "false" ]; then
-    echo "Set the 'pagerduty/service-id' meta or the service_id input, or enable backstage_discovery." >&2
+  echo "No PagerDuty service ID found${looked_in}." >&2
+  if [ ${#LOOKUP_ERRORS[@]} -gt 0 ]; then
+    echo "A Backstage lookup didn't complete, so this is recorded as an error, not a missing mapping." >&2
+  elif [ -n "${1:-}" ]; then
+    echo "$1" >&2
   fi
+  searched=$(printf '%s\n' "${SEARCHED[@]}" | jq -R 'select(length > 0)' | jq -sc .)
+  errors=$(printf '%s\n' "${LOOKUP_ERRORS[@]}" | jq -R 'select(length > 0)' | jq -sc .)
   jq -n '{"tool": "pagerduty", "integration": "api"}' | lunar collect -j ".oncall.source" -
-  printf '%s\n' "${SEARCHED[@]}" | jq -nR '{searched: [inputs]}' | lunar collect -j ".oncall.unmapped" -
+  jq -n --argjson s "$searched" --argjson e "$errors" '
+    (if ($s | length) > 0 then {searched: $s} else {} end)
+    + (if ($e | length) > 0 then {errors: $e} else {} end)' \
+    | lunar collect -j ".oncall.service_lookup" -
   exit 0
 }
 

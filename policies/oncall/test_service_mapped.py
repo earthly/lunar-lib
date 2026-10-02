@@ -37,11 +37,11 @@ class ServiceMappedTest(unittest.TestCase):
         self.assertEqual(outcome(c), CheckStatus.PASS)
 
     def test_pass_when_another_collector_maps_it(self):
-        oncall = {"source": {"tool": "datadog"}, "service": {"id": "team-1"}, "unmapped": {"searched": SEARCHED}}
+        oncall = {"source": {"tool": "datadog"}, "service": {"id": "team-1"}, "service_lookup": {"searched": SEARCHED}}
         self.assertEqual(outcome(check(node(oncall))), CheckStatus.PASS)
 
-    def test_fail_when_unmapped(self):
-        c = check(node({"source": SOURCE, "unmapped": {"searched": SEARCHED}}))
+    def test_fail_when_no_collector_mapped_it(self):
+        c = check(node({"source": SOURCE, "service_lookup": {"searched": SEARCHED}}))
         self.assertEqual(outcome(c), CheckStatus.FAIL)
         self.assertEqual(
             c.failure_reasons,
@@ -55,16 +55,16 @@ class ServiceMappedTest(unittest.TestCase):
         )
 
     def test_fail_message_drops_repeats_from_code_and_cron(self):
-        c = check(node({"source": SOURCE, "unmapped": {"searched": SEARCHED[:2] + SEARCHED[:2]}}))
+        c = check(node({"source": SOURCE, "service_lookup": {"searched": SEARCHED[:2] + SEARCHED[:2]}}))
         self.assertIn("(looked in: meta:pagerduty/service-id, input:service_id).", c.failure_reasons[0])
 
     def test_fail_without_a_searched_list(self):
-        c = check(node({"source": SOURCE, "unmapped": {}}))
+        c = check(node({"source": SOURCE, "service_lookup": {}}))
         self.assertEqual(outcome(c), CheckStatus.FAIL)
         self.assertTrue(c.failure_reasons[0].startswith("No PagerDuty service is mapped to this component. "))
 
     def test_generic_wording_for_other_tools(self):
-        c = check(node({"source": {"tool": "opsgenie"}, "unmapped": {"searched": ["input:team_id"]}}))
+        c = check(node({"source": {"tool": "opsgenie"}, "service_lookup": {"searched": ["input:team_id"]}}))
         self.assertEqual(
             c.failure_reasons,
             [
@@ -73,10 +73,33 @@ class ServiceMappedTest(unittest.TestCase):
             ],
         )
 
+    def test_pass_when_a_lookup_missed_but_another_sub_collector_mapped_it(self):
+        # pagerduty's oncall misses the checked-out file, its backstage sub-collector finds the System's ID.
+        oncall = {
+            "source": SOURCE,
+            "service_lookup": {"searched": SEARCHED[:2] + ["file:catalog-info.yaml"]},
+            "service": {"id": "PSYS001", "discovered_via": "system:default/payment-platform"},
+        }
+        self.assertEqual(outcome(check(node(oncall))), CheckStatus.PASS)
+
+    def test_skip_when_a_lookup_did_not_complete(self):
+        lookup = {"searched": SEARCHED[:3], "errors": ["system:default/payment-platform: HTTP 503"]}
+        c = check(node({"source": SOURCE, "service_lookup": lookup}))
+        self.assertEqual(outcome(c), CheckStatus.SKIPPED)
+        self.assertEqual(
+            c._results[0].failure_message,
+            "Couldn't tell whether a PagerDuty service is mapped: system:default/payment-platform: HTTP 503",
+        )
+
+    def test_skip_when_one_sub_collector_missed_and_another_could_not_finish(self):
+        # Arrays from two sub-collectors concatenate; the error decides.
+        lookup = {"searched": ["meta:pagerduty/service-id", "file:catalog-info.yaml"], "errors": ["component:default/checkout: HTTP 401"]}
+        self.assertEqual(outcome(check(node({"source": SOURCE, "service_lookup": lookup}))), CheckStatus.SKIPPED)
+
     def test_skip_when_no_collector_ran(self):
         c = check(node())
         self.assertEqual(outcome(c), CheckStatus.SKIPPED)
-        self.assertIn("No on-call collector reported a service lookup", c._results[0].failure_message)
+        self.assertIn("No on-call collector looked up a service", c._results[0].failure_message)
 
     def test_skip_when_only_other_oncall_data(self):
         # dr-docs writes .oncall.disaster_recovery on every component.
@@ -89,8 +112,8 @@ class ServiceMappedTest(unittest.TestCase):
     def test_pending_while_collection_runs(self):
         self.assertEqual(check(node(finished=False)).status, CheckStatus.PENDING)
 
-    def test_pending_while_collection_runs_even_if_unmapped_so_far(self):
-        c = check(node({"source": SOURCE, "unmapped": {"searched": SEARCHED}}, finished=False))
+    def test_pending_while_collection_runs_even_if_a_lookup_missed_so_far(self):
+        c = check(node({"source": SOURCE, "service_lookup": {"searched": SEARCHED}}, finished=False))
         self.assertEqual(c.status, CheckStatus.PENDING)
 
     def test_mapped_passes_before_collection_finishes(self):
