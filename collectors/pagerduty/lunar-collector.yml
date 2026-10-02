@@ -11,7 +11,8 @@ landing_page:
   long_description: |
     Query the PagerDuty API to collect on-call schedule, escalation policy,
     and current responder data. Normalizes results into the .oncall category
-    for tool-agnostic policy evaluation.
+    for tool-agnostic policy evaluation. Can find each component's service
+    in Backstage, including one declared on its System or Domain.
   categories: ["incident-management"]
   icon: "assets/pagerduty.svg"
   status: "beta"
@@ -19,6 +20,9 @@ landing_page:
     - slug: "oncall"
       type: "policy"
       reason: "Enforces on-call schedule, escalation, and staffing standards"
+    - slug: "backstage"
+      type: "collector"
+      reason: "Its live catalog lookup feeds the backstage sub-collector"
 
 collectors:
   - name: oncall
@@ -28,30 +32,33 @@ collectors:
       the service ID in order: the component's `pagerduty/service-id` meta
       annotation (set by a cataloger via
       `lunar catalog component --meta pagerduty/service-id <id>`), then the
-      explicit service_id input, then — when `backstage_discovery` is enabled
-      — the component's own `catalog-info.yaml` (read from the fresh checkout
-      the code hook provides, so no `clone-code` is needed), reading the service
-      ID directly from a `pagerduty.com/service-id` / `pagerduty/service-id`
-      annotation. Fetches service details, on-call schedule participants, and
-      escalation policy. Writes normalized data to .oncall.service,
-      .oncall.schedule, .oncall.escalation, and .oncall.summary. Stores the raw
-      API response under .oncall.native.pagerduty.
+      explicit service_id input, then — with `backstage_discovery: "true"` —
+      the component's own `catalog-info.yaml` from the checkout. Records where
+      the ID came from at .oncall.service.discovered_via. Fetches service
+      details, on-call schedule participants, and escalation policy. Writes
+      normalized data to .oncall.service, .oncall.schedule, .oncall.escalation,
+      and .oncall.summary, and the raw API responses under
+      .oncall.native.pagerduty. When none of those sources maps the component,
+      writes .oncall.service_lookup with the places it looked instead, and the
+      `backstage` sub-collector, if included, looks in the live catalog.
     mainBash: oncall.sh
     hook:
       type: code
-    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule"]
+    keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "service mapping"]
 
   - name: oncall-cron
     description: |
       Same PagerDuty query as `oncall`, but on a daily cron instead of on push —
       it re-collects on a schedule so `.oncall` stays fresh as on-call schedules
       and escalation policies rotate between commits (they change on their own
-      clock, independent of code). Resolves the service ID identically and writes
-      the same normalized .oncall.service, .oncall.schedule, .oncall.escalation,
-      and .oncall.summary (raw responses under .oncall.native.pagerduty).
-      `clone-code` gives it the checkout so `backstage_discovery` can still read
-      `catalog-info.yaml`. Include `oncall` for on-push evaluation, `oncall-cron`
-      for always-fresh scheduled refresh, or both.
+      clock, independent of code). Resolves the service ID identically, then
+      also reads the backstage collector's live lookup from the default
+      branch's Component JSON when there is one. Writes the same
+      normalized .oncall.service, .oncall.schedule, .oncall.escalation, and
+      .oncall.summary (raw responses under .oncall.native.pagerduty).
+      `clone-code` gives it the checkout so `backstage_discovery: "true"` can
+      read `catalog-info.yaml`. Include `oncall` for on-push evaluation,
+      `oncall-cron` for always-fresh scheduled refresh, or both.
     mainBash: oncall.sh
     hook:
       type: cron
@@ -64,6 +71,23 @@ collectors:
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "cron", "scheduled"]
 
+  - name: backstage
+    description: |
+      Finds the component's PagerDuty service in what the backstage collector
+      read from the live catalog: the component's own entity, else its System,
+      else that System's Domain. Covers the components `oncall` can't map from
+      meta, service_id or, with `backstage_discovery: "true"`, the catalog
+      file, and leaves those to `oncall`. Runs once the backstage collector's
+      lookup (.catalog.native.backstage.refs.entity) lands in the Component
+      JSON, retrying the read for up to `backstage_wait_seconds` while it
+      catches up, then queries PagerDuty and writes .oncall like `oncall`. Only
+      the backstage collector calls Backstage; it needs `backstage_url` set.
+    mainBash: backstage.sh
+    hook:
+      type: after-json
+      path: .catalog.native.backstage.refs.entity
+    keywords: ["pagerduty", "oncall", "backstage", "service mapping", "service-id", "after-json", "inherited annotations"]
+
 inputs:
   service_id:
     description: >
@@ -75,29 +99,31 @@ inputs:
     default: "https://api.pagerduty.com"
   backstage_discovery:
     description: >
-      When "true", and no service ID is found via component meta or the
-      service_id input, discover it from the component's own
-      catalog-info.yaml: the collector reads the file from the runner's
-      checkout (oncall runs on a code hook, which clones; oncall-cron sets
-      clone-code) and takes the PagerDuty service ID
-      from the annotation keys listed in backstage_annotations. Opt-in, and
-      needs no extra secret — the runner's checkout is used, not a token.
-      Lets the oncall guardrails work off the standard PagerDuty Backstage
-      annotation without a cataloger or component meta.
+      When "true", and component meta and the service_id input don't give a
+      service ID, read it from the annotations in the component's checked-out
+      catalog-info.yaml. The live catalog, including an ID inherited from the
+      component's System or Domain, is the `backstage` sub-collector's job and
+      needs no setting here.
     default: "false"
   backstage_annotations:
     description: >
       Comma-separated annotation keys to read the service ID from, tried in
-      order (first non-empty value across the file's Component entities wins).
-      Defaults to both conventional spellings — PagerDuty's Backstage
-      integration guide uses `pagerduty.com/service-id`; Lunar's meta uses
-      `pagerduty/service-id`. Only used when backstage_discovery is "true".
+      order (first non-empty value wins). Defaults to both conventional
+      spellings — PagerDuty's Backstage integration guide uses
+      `pagerduty.com/service-id`; Lunar's meta uses `pagerduty/service-id`.
+      Used for the checked-out catalog-info.yaml and the live catalog alike.
     default: "pagerduty.com/service-id,pagerduty/service-id"
   backstage_catalog_paths:
     description: >
       Comma-separated catalog-info file paths to try in the checked-out repo
       (first match wins). Only used when backstage_discovery is "true".
     default: "catalog-info.yaml,catalog-info.yml"
+  backstage_wait_seconds:
+    description: >
+      How long the `backstage` sub-collector keeps retrying the read of the
+      backstage collector's lookup before it fails the run. The Component JSON
+      it reads can lag the write that triggered it by several minutes.
+    default: "1800"
 
 secrets:
   PAGERDUTY_API_KEY:
@@ -113,7 +139,8 @@ example_component_json: |
       "service": {
         "id": "PXXXXXX",
         "name": "Payment API",
-        "status": "active"
+        "status": "active",
+        "discovered_via": "system:default/payment-platform"
       },
       "schedule": {
         "exists": true,

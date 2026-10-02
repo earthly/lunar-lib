@@ -80,6 +80,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD --pass-args ./collectors/pagerduty+test
     BUILD ./collectors/k8s+test
     BUILD ./collectors/istio+test
     BUILD ./collectors/datadog+test
