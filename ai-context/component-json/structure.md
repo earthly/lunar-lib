@@ -31,6 +31,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.vcs.branch_protection` | Protection settings (`enabled`, `required_approvals`, `require_codeowner_review`) |
 | `.vcs.pr` | PR-specific data (only in PR context) — see [PR-Specific Data](conventions.md#pr-specific-data) |
 | `.vcs.pr.ticket` | Extracted ticket reference (`id`, `source`, `url`) |
+| `.vcs.release_range` | Commits since the previous release tag, with the merged PR behind each (default branch, opt-in) |
 | **[`.containers`](cat-containers.md)** | **Container images, Dockerfiles, registries** |
 | `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`, `labels`) |
 | `.containers.definitions[].base_images[]` | Base image info (`reference`, `image`, `tag`) |

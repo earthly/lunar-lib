@@ -1,0 +1,138 @@
+[
+  {
+    "id": 80,
+    "node_id": "MDE3OlB1bGxSZXF1ZXN0UmV2aWV380",
+    "user": {
+      "login": "octocat",
+      "id": 1,
+      "node_id": "MDQ6VXNlcjE=",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/octocat",
+      "html_url": "https://github.com/octocat",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "body": "Here is the body for the review.",
+    "state": "CHANGES_REQUESTED",
+    "html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80",
+    "pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
+    "_links": {
+      "html": {
+        "href": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
+      }
+    },
+    "submitted_at": "2024-05-02T09:14:07Z",
+    "commit_id": "4b7e1d9c2a5f8e3b6d0c9a1f7e2d5b8c4a3f6e19",
+    "author_association": "COLLABORATOR"
+  },
+  {
+    "id": 81,
+    "node_id": "MDE3OlB1bGxSZXF1ZXN0UmV2aWV381",
+    "user": {
+      "login": "octocat",
+      "id": 1,
+      "node_id": "MDQ6VXNlcjE=",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/octocat",
+      "html_url": "https://github.com/octocat",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "body": "Here is the body for the review.",
+    "state": "APPROVED",
+    "html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80",
+    "pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
+    "_links": {
+      "html": {
+        "href": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
+      }
+    },
+    "submitted_at": "2024-05-02T15:40:51Z",
+    "commit_id": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+    "author_association": "COLLABORATOR"
+  },
+  {
+    "id": 82,
+    "node_id": "MDE3OlB1bGxSZXF1ZXN0UmV2aWV382",
+    "user": null,
+    "body": "Here is the body for the review.",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80",
+    "pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
+    "_links": {
+      "html": {
+        "href": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
+      }
+    },
+    "submitted_at": "2024-05-02T16:01:00Z",
+    "commit_id": null,
+    "author_association": "COLLABORATOR"
+  },
+  {
+    "id": 83,
+    "node_id": "MDE3OlB1bGxSZXF1ZXN0UmV2aWV383",
+    "user": {
+      "login": "hubot",
+      "id": 1,
+      "node_id": "MDQ6VXNlcjE=",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/octocat",
+      "html_url": "https://github.com/octocat",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "body": "Here is the body for the review.",
+    "state": "PENDING",
+    "html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80",
+    "pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
+    "_links": {
+      "html": {
+        "href": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-80"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
+      }
+    },
+    "commit_id": "9f1c2e7d4b8a6f3e0c5d2b1a7e4f8c3d6b9a0e21",
+    "author_association": "COLLABORATOR"
+  }
+]

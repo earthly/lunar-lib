@@ -1,0 +1,44 @@
+{
+  "data": {
+    "repository": {
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "refs": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "NA"
+        },
+        "nodes": [
+          {
+            "name": "v1.2.0",
+            "target": {
+              "oid": "c3e8a1f6d9b2e5a7c0f4d8b1e6a3c9f2d5b7e0a4"
+            }
+          },
+          {
+            "name": "nightly-20240502",
+            "target": {
+              "oid": "f0e1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8e9"
+            }
+          },
+          {
+            "name": "v1.1.0",
+            "target": {
+              "oid": "d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0",
+              "target": {
+                "oid": "e1d4b7a0c3f6e9d2b5a8c1f4e7d0b3a6c9f2e5d8"
+              }
+            }
+          },
+          {
+            "name": "v1.0.0",
+            "target": {
+              "oid": "b2c5e8a1d4f7b0c3e6a9d2f5b8c1e4a7d0f3b6c9"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
