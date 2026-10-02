@@ -126,9 +126,9 @@ policies:
 
   - name: topology-spread
     description: |
-      Requires Deployments and StatefulSets that can run more than one replica to have a
-      topologySpreadConstraint on `topology_key` (zone by default) that selects their pods,
-      with maxSkew within `topology_max_skew`.
+      Requires Deployments and StatefulSets that can run more than one replica (their autoscaler's
+      maximum, else spec.replicas) to have a topologySpreadConstraint on `topology_key` (zone by
+      default) that selects their pods, with maxSkew within `topology_max_skew`.
     mainPython: topology_spread.py
     keywords: ["topology spread", "availability zones", "maxSkew", "pod placement", "high availability"]
 
@@ -142,7 +142,8 @@ policies:
   - name: pdb-budget
     description: |
       Fails a PodDisruptionBudget that allows no voluntary disruption, which blocks node drains:
-      maxUnavailable 0, or minAvailable at or above the replicas it covers. Also fails one with no
+      maxUnavailable 0, or a minAvailable (a percentage rounds up) that covers every pod of a workload
+      at its smallest size, its autoscaler's minimum else spec.replicas. Also fails one with no
       selector, or with both minAvailable and maxUnavailable set.
     mainPython: pdb_budget.py
     keywords: ["pdb", "pod disruption budget", "node drain", "maxUnavailable", "minAvailable"]

@@ -24,9 +24,9 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `host-ipc` | Forbids `hostIPC: true` on PodSpecs | Workload shares the host IPC namespace — can read or tamper with node-wide shared memory |
 | `metadata-egress-blocked` | Requires NetworkPolicy to block pod egress to the instance-metadata endpoint | Workload's pods can reach 169.254.169.254, where node credentials can be read |
 | `min-kubectl-version` | Enforces minimum kubectl version in CI | kubectl client used in CI is below threshold |
-| `topology-spread` | Requires a topologySpreadConstraint on `topology_key` (zone by default) for Deployments and StatefulSets that can run more than one replica | Replicas can all land in one zone, so one zone failure takes the workload down |
+| `topology-spread` | Requires a topologySpreadConstraint on `topology_key` (zone by default) for Deployments and StatefulSets that can run more than one replica (see [Replica counts](#replica-counts)) | Replicas can all land in one zone, so one zone failure takes the workload down |
 | `graceful-shutdown` | Requires a preStop hook and a long enough termination grace period on Deployments and StatefulSets | Pods stop while requests are still in flight or still being routed to them |
-| `pdb-budget` | Requires every PodDisruptionBudget to allow at least one voluntary disruption | The budget blocks node drains, so nodes can't be upgraded or patched |
+| `pdb-budget` | Requires every PodDisruptionBudget to allow at least one voluntary disruption at the smallest size of the workloads it covers (see [Replica counts](#replica-counts)) | The budget blocks node drains, so nodes can't be upgraded or patched |
 | `no-static-replicas` | Forbids `spec.replicas` on a workload an HPA or KEDA ScaledObject scales | Every deploy resets the replica count the autoscaler chose |
 | `probes-distinct` | Requires liveness and readiness probes to check different endpoints | An overloaded pod is restarted instead of taken out of rotation |
 | `probe-timeouts` | Requires probe timeouts of at least `min_probe_timeout_seconds` and below the probe period | Slow responses fail probes, or a check is still running when the next one starts |
@@ -41,8 +41,13 @@ The `k8s` collector's `helm` sub-collector renders each chart and records the ob
 - A failure names the chart template and the values files, e.g. `charts/api/templates/deployment.yaml [values-prod.yaml]: ...`. When the same finding shows up in several values sets of a chart, it's reported once and lists them.
 - A workload is never matched to a PodDisruptionBudget, autoscaler or NetworkPolicy from another values set of its own chart, since those are alternative deployments of the same release. Objects from the same render, from plain manifests and from other charts all match, so a plain-manifest workload can be covered by a chart's PodDisruptionBudget.
 - A chart that fails to render fails `valid` with helm's error, so it can't pass every other check by contributing nothing.
+- A chart that no `helm_values` line applies to is only checked by `valid`: its default render contributes no objects, because chart defaults (`resources: {}`, a disabled PodDisruptionBudget) are often left for whoever deploys the chart to fill in. When such charts are a component's only Kubernetes content, the workload checks skip and say that `helm_values` isn't set.
 
 The checks added alongside chart rendering (`topology-spread` through `pod-annotations`) skip when the `k8s` collector is older than the fields they read.
+
+### Replica counts
+
+A workload that an HPA or KEDA ScaledObject scales gets its size from the autoscaler, matched by `scaleTargetRef` in the same namespace (and under the render rules above), since `no-static-replicas` asks for `spec.replicas` to be left out. `pdb-budget` uses its smallest size, the autoscaler's minimum (`minReplicas` / `minReplicaCount`, at least 1), and `topology-spread` its largest (`maxReplicas` / `maxReplicaCount`). A workload without one uses `spec.replicas`, or 1 when it's unset. Percentages round up against that count, as Kubernetes' disruption controller does: `minAvailable: 50%` of 3 pods leaves one free and passes, `67%` of 3 covers all of them and fails, and only `maxUnavailable: 0` or `0%` blocks every drain.
 
 ## Required Data
 
@@ -86,7 +91,7 @@ policies:
     #   min_probe_timeout_seconds: "2"
     #   allowed_registries: "ghcr.io/acme,123456789012.dkr.ecr.us-east-1.amazonaws.com"
     #   deprecated_api_versions: "policy/v1beta1,autoscaling/v2beta2"
-    #   required_pod_annotations: "app.kubernetes.io/part-of"
+    #   required_pod_annotations: "prometheus.io/scrape"
     #   forbidden_pod_annotations: "karpenter.sh/do-not-disrupt"
 ```
 
@@ -164,10 +169,10 @@ A Helm chart rendered with `values-prod.yaml`, plus a second chart whose depende
 {
   "k8s": {
     "manifests": [
-      {"path": "charts/my-app", "render": {"chart": "charts/my-app", "values": ["values.yaml", "values-prod.yaml"]}, "valid": true, "resources": [
+      {"path": "charts/my-app", "render": {"chart": "charts/my-app", "values": ["values.yaml", "values-prod.yaml"], "validated_only": false}, "valid": true, "resources": [
         {"kind": "Deployment", "name": "my-app", "namespace": "default", "api_version": "apps/v1"}
       ]},
-      {"path": "charts/reports", "render": {"chart": "charts/reports", "values": ["values.yaml"]}, "valid": false,
+      {"path": "charts/reports", "render": {"chart": "charts/reports", "values": ["values.yaml"], "validated_only": true}, "valid": false,
        "error": "helm template: An error occurred while checking for chart dependencies. You may need to run `helm dependency build` to fetch missing dependencies: found in Chart.yaml, but missing in charts/ directory: postgresql"}
     ],
     "workloads": [

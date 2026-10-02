@@ -37,16 +37,17 @@ This integration provides the following collectors (use `include` to select a su
 
 The `helm` collector renders each chart it finds (a directory with a `Chart.yaml`) with `helm template`, offline. Library charts aren't rendered, and a subchart in another chart's `charts/` directory is rendered as part of its parent. The `k8s` collector still skips templated files, so a chart's templates are only ever read through its render.
 
-By default each chart renders once, with its own `values.yaml`. To check the values a chart is deployed with, list them in `helm_values`, one render per line:
+The k8s checks only see a chart's objects for the values it is deployed with, which you list in `helm_values`, one render per line:
 
 ```yaml
 helm_values: |
+  values.yaml                            # the defaults, when that's what you deploy
   values-staging.yaml
   values-prod.yaml values-prod-eu.yaml   # files apply in order, on top of values.yaml
   ci/*-values.yaml                       # a glob gives one render per matching file
 ```
 
-Paths are relative to the chart directory, and every line applies to every chart. A chart skips the lines whose files it doesn't have, and renders with `values.yaml` alone when none apply.
+Paths are relative to the chart directory, and every line applies to every chart. A chart skips the lines whose files it doesn't have. A chart that no line applies to, including every chart when `helm_values` is empty, is rendered with its `values.yaml` only to check that it builds: it gets a `.k8s.manifests[]` entry with `render.validated_only: true` and contributes no objects. Chart defaults are often meant to be filled in by whoever deploys the chart (a chart library ships `resources: {}` and its PodDisruptionBudget disabled), so checking them would fail what the chart's owner can't fix.
 
 Charts render against helm's built-in Kubernetes version and core APIs. A chart that only renders an object when its CRD is installed, such as a KEDA ScaledObject behind `.Capabilities.APIVersions.Has "keda.sh/v1alpha1"`, needs that API listed in `helm_api_versions`.
 

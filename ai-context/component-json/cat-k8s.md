@@ -2,7 +2,7 @@
 
 Kubernetes manifests. This is specific enough to warrant its own category.
 
-Plain manifests and rendered Helm charts share the same arrays. An entry that came from a chart carries `render` (the chart directory and the values files it was rendered with), and its `path` is the template that produced it.
+Plain manifests and rendered Helm charts share the same arrays. An entry that came from a chart carries `render` (the chart directory and the values files it was rendered with), and its `path` is the template that produced it. A chart no `helm_values` line applies to is rendered with its defaults only to check that it builds: its `.k8s.manifests[]` entry has `render.validated_only: true`, and it contributes no other entries.
 
 ```json
 {
@@ -23,7 +23,7 @@ Plain manifests and rendered Helm charts share the same arrays. An entry that ca
       },
       {
         "path": "charts/worker",
-        "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
+        "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"], "validated_only": false},
         "valid": true,
         "resources": [
           {"kind": "Deployment", "name": "worker", "namespace": "default", "api_version": "apps/v1"}
@@ -144,3 +144,4 @@ Effective values are recorded: an unset `replicas` is 1, an unset `termination_g
 - `.k8s.pdbs[].selector` vs `.k8s.workloads[].pod_labels` — PDB coverage. Match with LabelSelector semantics; `pdbs[].target_workload` is a deprecated name guess
 - `.k8s.network_policies[]` — `pod_selector` and `egress` as written; `policy_types` is effective (the API server's default when unset). Egress isolation per workload = a policy in its namespace whose `pod_selector` matches its `pod_labels` with `Egress` in `policy_types`
 - `render` — Never match a workload to a PDB, autoscaler or NetworkPolicy from another values set of its own chart; plain manifests and other charts match as usual
+- `.k8s.hpas[]` / `.k8s.scaled_objects[]` vs `.k8s.workloads[].replicas` — An autoscaler targeting a workload sets its size range (min for disruption budgets, max for spread); `replicas` applies only without one

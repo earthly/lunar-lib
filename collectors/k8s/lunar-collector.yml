@@ -46,11 +46,12 @@ collectors:
   - name: helm
     description: |
       Renders each Helm chart in the repository with `helm template`, once per values
-      set in `helm_values` (the chart's own values.yaml by default), and parses the output
-      the same way as a static manifest. Rendered objects land in the same `.k8s` arrays,
-      tagged with the chart and values files that produced them. A chart that fails to
-      render is recorded as an invalid manifest, so the `valid` check fails instead of
-      every check skipping.
+      set in `helm_values`, and parses the output the same way as a static manifest.
+      Rendered objects land in the same `.k8s` arrays, tagged with the chart and values
+      files that produced them. A chart no values set applies to is rendered with its
+      own values.yaml only to check that it builds: it gets a `.k8s.manifests[]` entry
+      and no objects. A chart that fails to render is recorded as an invalid manifest,
+      so the `valid` check fails instead of every check skipping.
     mainBash: render.sh
     hook:
       type: code
@@ -78,7 +79,7 @@ inputs:
     default: "find . -type f \\( -name 'Chart.yaml' -o -name 'Chart.yml' \\)"
   helm_values:
     description: |
-      Values sets to render each chart with, one per line. A line lists values files, relative to the chart directory, applied in order on top of the chart's values.yaml; a glob gives one render per matching file. A chart skips lines whose files it doesn't have, and renders with values.yaml alone when no line applies. `#` starts a comment. Empty renders every chart with values.yaml alone.
+      Values sets to check each chart's objects with, one per line. A line lists values files, relative to the chart directory, applied in order on top of the chart's values.yaml; a glob gives one render per matching file, and a line of just `values.yaml` checks the defaults. A chart skips lines whose files it doesn't have. A chart no line applies to is only checked to build: its values.yaml render records validity and no objects. `#` starts a comment.
     default: ""
   helm_dependency_build:
     description: Run `helm dependency build` before rendering a chart whose remote dependencies aren't vendored in its charts/ directory (true/false). Needs network access to the chart repositories. When off, such a chart fails to render and is reported as invalid. Local file:// dependencies are always built.
@@ -104,7 +105,7 @@ example_component_json: |
         },
         {
           "path": "charts/worker",
-          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
+          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"], "validated_only": false},
           "valid": true,
           "resources": [
             {"kind": "Deployment", "name": "worker", "namespace": "default", "api_version": "apps/v1"},
@@ -114,7 +115,7 @@ example_component_json: |
         },
         {
           "path": "charts/reports",
-          "render": {"chart": "charts/reports", "values": ["values.yaml"]},
+          "render": {"chart": "charts/reports", "values": ["values.yaml"], "validated_only": true},
           "valid": false,
           "error": "helm template: An error occurred while checking for chart dependencies. You may need to run `helm dependency build` to fetch missing dependencies: found in Chart.yaml, but missing in charts/ directory: postgresql"
         }
