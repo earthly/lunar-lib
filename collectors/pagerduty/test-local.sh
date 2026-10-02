@@ -1,26 +1,29 @@
 #!/bin/bash
 #
 # Offline test for the pagerduty collector's service-ID resolution. Stubs
-# `curl` and `lunar` on PATH and runs oncall.sh from a per-case checkout dir,
-# so no network, no AWS, no Backstage and no Lunar Hub are needed.
+# `curl`, `lunar` and `sleep` on PATH and runs the scripts from a per-case
+# checkout dir, so no network, no Backstage and no Lunar Hub are needed.
 #
-# The mock curl logs every invocation (so cases can assert which endpoints and
-# auth flags were used) and answers:
-#   * AWS metadata endpoints -> unreachable, so the credential chain is
-#     deterministic whatever the host exposes.
-#   * STS AssumeRoleWithWebIdentity -> credentials when MOCK_STS=1. STS
-#     AssumeRole, keyed off the role: *denied* -> AccessDenied, *unreachable*
-#     -> curl exit 28, else credentials for the assumed role.
+# The live (backstage_discovery: live) cases first run the real backstage
+# collector ($BACKSTAGE_DIR/main.sh) against the mock Backstage, then serve what
+# it collected to backstage.sh / oncall.sh as the Component JSON. So the two
+# collectors' contract is tested end to end, not against a hand-written blob.
+#
+# The mock curl answers:
 #   * Backstage by-name / by-query from test/fixtures/backstage-entities.yaml,
 #     except these names: boom -> connection error, five -> HTTP 502,
 #     login -> a 200 HTML login page, notentity -> a 200 JSON body that isn't
-#     an entity, noitems -> a 200 without `.items`.
+#     an entity.
 #   * PagerDuty /services, /escalation_policies, /schedules. PGONE00 -> 404.
+# The mock `lunar component get-json` serves $CASE/component.json; the first
+# MOCK_GETJSON_FAIL calls fail and the next MOCK_GETJSON_STALE calls return a
+# blob without the backstage lookup, for the retry cases.
 #
 # Run: ./test-local.sh   (needs bash, jq, yq, python3)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BACKSTAGE_DIR="${BACKSTAGE_DIR:-$SCRIPT_DIR/../backstage}"
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 MOCK="$TEST_DIR/bin"
@@ -34,28 +37,6 @@ yq ea -o=json '[.]' "$SCRIPT_DIR/test/fixtures/backstage-entities.yaml" > "$ENTI
 cat > "$MOCK/curl" << 'EOF'
 #!/bin/bash
 printf '%s\n' "$*" >> "$CURL_LOG"
-
-args="$*"
-case "$args" in
-  *169.254.169.254*|*169.254.170.2*) exit 7 ;;
-  *sts.*amazonaws.com*AssumeRoleWithWebIdentity*)
-    if [ "${MOCK_STS:-0}" = "1" ]; then
-      printf '%s' '<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>ASIAMOCKKEY</AccessKeyId><SecretAccessKey>mocksecret</SecretAccessKey><SessionToken>mocksessiontoken</SessionToken></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>'
-      exit 0
-    fi
-    exit 7 ;;
-  *sts.*amazonaws.com*Action=AssumeRole*)
-    case "$args" in
-      *RoleArn=*denied*)
-        printf '%s' '<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><Error><Type>Sender</Type><Code>AccessDenied</Code><Message>not authorized</Message></Error></ErrorResponse>'
-        exit 0 ;;
-      *RoleArn=*unreachable*) exit 28 ;;
-      *)
-        printf '%s' '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleResult><Credentials><AccessKeyId>ASIAASSUMED</AccessKeyId><SecretAccessKey>assumedsecret</SecretAccessKey><SessionToken>assumedtoken</SessionToken></Credentials></AssumeRoleResult></AssumeRoleResponse>'
-        exit 0 ;;
-    esac ;;
-  *sts.*amazonaws.com*) exit 7 ;;
-esac
 
 out=""
 prev=""
@@ -98,7 +79,6 @@ special() {
     five) printf '%s\n502' '{"message":"bad gateway"}'; exit 0 ;;
     login) printf '%s\n200' '<html><body>SSO login</body></html>'; exit 0 ;;
     notentity) printf '%s\n200' '{"message":"sign in required"}'; exit 0 ;;
-    noitems) printf '%s\n200' '{"totalItems":0}'; exit 0 ;;
   esac
 }
 case "$url" in
@@ -140,18 +120,43 @@ exit 7
 EOF
 chmod +x "$MOCK/curl"
 
-# --- Mock lunar: append each `lunar collect -j <path> -` write to a file ----
+# --- Mock lunar ----------------------------------------------------------
+# `collect -j <path> -` appends the write to a per-path file. `component
+# get-json` logs its arguments and serves $MOCK_DIR/component.json.
 cat > "$MOCK/lunar" << 'EOF'
 #!/bin/bash
 if [ "${1:-}" = "collect" ] && [ "${2:-}" = "-j" ]; then
   safe="${3//[^a-zA-Z0-9]/_}"
   cat >> "$MOCK_DIR/collect${safe}.out"
+  exit 0
+fi
+if [ "${1:-}" = "component" ] && [ "${2:-}" = "get-json" ]; then
+  printf '%s\n' "${*:3}" >> "$MOCK_DIR/getjson.log"
+  n=$(wc -l < "$MOCK_DIR/getjson.log")
+  if [ "$n" -le "${MOCK_GETJSON_FAIL:-0}" ]; then
+    echo "Error: rpc error: code = NotFound desc = component not found" >&2
+    printf 'Usage:\n  lunar component get-json [flags]\n' >&2
+    exit 1
+  fi
+  if [ "$n" -le $(( ${MOCK_GETJSON_FAIL:-0} + ${MOCK_GETJSON_STALE:-0} )) ]; then
+    echo '{"catalog":{"native":{"backstage":{"valid":true,"kind":"Component"}}}}'
+    exit 0
+  fi
+  cat "$MOCK_DIR/component.json"
+  exit 0
 fi
 exit 0
 EOF
 chmod +x "$MOCK/lunar"
 
-# catalog <name> [namespace] [annotation-line] — a one-Component
+# --- Mock sleep: record the backoff instead of waiting --------------------
+cat > "$MOCK/sleep" << 'EOF'
+#!/bin/bash
+printf '%s\n' "$1" >> "$MOCK_DIR/sleeps"
+EOF
+chmod +x "$MOCK/sleep"
+
+# catalog <name> [namespace] [annotation-line] [system] — a one-Component
 # catalog-info.yaml naming the entity to look up.
 catalog() {
   echo "apiVersion: backstage.io/v1alpha1"
@@ -165,24 +170,43 @@ catalog() {
   fi
   echo "spec:"
   echo "  type: service"
+  echo "  lifecycle: production"
   echo "  owner: team-test"
+  if [ -n "${4:-}" ]; then echo "  system: $4"; fi
 }
 
-# run_case <name> [KEY=VALUE ...] — runs oncall.sh in $TEST_DIR/cases/<name>
-# with a clean environment plus the given variables. The case dir is the
-# checkout: write its catalog-info.yaml to "$CASE/catalog-info.yaml" first via
-# `new_case`. The PagerDuty key is set unless a case clears it.
+# new_case <name> — a fresh checkout dir; write its catalog-info.yaml to
+# "$CASE/catalog-info.yaml" before backstage_json / run_case.
 new_case() {
   CASE="$TEST_DIR/cases/$1"
   rm -rf "$CASE"
-  mkdir -p "$CASE"
+  mkdir -p "$CASE/bs"
 }
-run_case() {
+
+# backstage_json [KEY=VALUE ...] — runs the real backstage collector on the
+# case's catalog-info.yaml against the mock Backstage and stores what it
+# collected as the case's Component JSON.
+backstage_json() {
   : > "$CURL_LOG"
+  ( cd "$CASE" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE/bs" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
+      LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+      LUNAR_VAR_BACKSTAGE_URL=http://bs.test:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=bs-token \
+      "$@" bash "$BACKSTAGE_DIR/main.sh" ) > /dev/null 2> "$CASE/bs/stderr"
+  jq '{catalog: {native: {backstage: .}}}' "$CASE/bs/collect_catalog_native_backstage.out" > "$CASE/component.json"
+}
+
+# run_case <script> [KEY=VALUE ...] — runs oncall.sh or backstage.sh in the
+# case dir with a clean environment plus the given variables. The PagerDuty key
+# is set unless a case clears it.
+run_case() {
+  local script="$1"
+  shift
+  : > "$CURL_LOG"
+  CASE_EXIT=0
   ( cd "$CASE" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
+      TMPDIR="$CASE" LUNAR_COMPONENT_ID=github.com/acme/svc LUNAR_COMPONENT_GIT_SHA=abc123 \
       LUNAR_SECRET_PAGERDUTY_API_KEY=pd-test-key LUNAR_VAR_PAGERDUTY_BASE_URL=https://pd.test \
-      "$@" bash "$SCRIPT_DIR/oncall.sh" ) > "$CASE/stdout" 2> "$CASE/stderr" \
-    || echo "oncall.sh exited $?" >> "$CASE/stderr"
+      "$@" bash "$SCRIPT_DIR/$script" ) > "$CASE/stdout" 2> "$CASE/stderr" || CASE_EXIT=$?
 }
 
 # got <path-suffix> — what was collected at .oncall.<suffix>, or null.
@@ -200,6 +224,10 @@ writes() {
   done
   echo "$n"
 }
+reads() { if [ -f "$CASE/getjson.log" ]; then wc -l < "$CASE/getjson.log" | tr -d ' '; else echo 0; fi; }
+logged() { grep -c -- "$1" "$CASE/stderr" || true; }
+slept() { awk '{ s += $1 } END { print s + 0 }' "$CASE/sleeps" 2>/dev/null || echo 0; }
+longest_sleep() { awk '$1 > m { m = $1 } END { print m + 0 }' "$CASE/sleeps" 2>/dev/null || echo 0; }
 
 FAILS=0
 assert_eq() {
@@ -215,247 +243,274 @@ assert_eq() {
   fi
 }
 
-BS="LUNAR_VAR_BACKSTAGE_DISCOVERY=true"
-LIVE=(LUNAR_VAR_BACKSTAGE_DISCOVERY=true LUNAR_VAR_BACKSTAGE_URL=http://bs.test:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=bs-token)
-STATIC_KEYS=(LUNAR_SECRET_AWS_ACCESS_KEY_ID=AKIATEST LUNAR_SECRET_AWS_SECRET_ACCESS_KEY=secret123)
-SIGV4=("${LIVE[@]}" LUNAR_VAR_BACKSTAGE_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1)
+FILE=LUNAR_VAR_BACKSTAGE_DISCOVERY=true
+LIVE=LUNAR_VAR_BACKSTAGE_DISCOVERY=live
+CRON=LUNAR_COLLECTOR_NAME=pagerduty.oncall-cron
 
-echo "Resolution from meta, input and the checked-out file:"
+echo "Resolution from meta, input and the checked-out file (oncall):"
 
 new_case dotcom
 cp "$SCRIPT_DIR/test/fixtures/catalog-info-dotcom.yaml" "$CASE/catalog-info.yaml"
-run_case "$BS"
+run_case oncall.sh "$FILE"
 assert_eq "file: pagerduty.com/service-id drives the query" "$(queried) $(via)" "PABC123 file:catalog-info.yaml"
 assert_eq "file: the full service record is written" \
   "$(got service | jq -c '{id, name, status}')" '{"id":"PABC123","name":"Service PABC123","status":"active"}'
 assert_eq "file: schedule and escalation still collected" \
   "$(got schedule | jq -c .) $(got escalation | jq -c '.levels')" '{"exists":true,"participants":2,"rotation":"weekly"} 2'
 assert_eq "file: no .oncall.unmapped on a mapped component" "$(got unmapped)" "null"
+assert_eq "file: no Component JSON read" "$(reads)" "0"
 
 new_case lunarkey
 cp "$SCRIPT_DIR/test/fixtures/catalog-info-lunarkey.yaml" "$CASE/catalog-info.yaml"
-run_case "$BS"
+run_case oncall.sh "$FILE"
 assert_eq "file: second key, skipping a non-Component document" "$(queried) $(via)" "PDEF456 file:catalog-info.yaml"
 
 new_case meta
 catalog payment-api > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}' LUNAR_VAR_SERVICE_ID=PINPUT9
+run_case oncall.sh "$FILE" 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}' LUNAR_VAR_SERVICE_ID=PINPUT9
 assert_eq "meta wins over the input and discovery" "$(queried) $(via)" "PMETA01 meta:pagerduty/service-id"
-assert_eq "meta: no Backstage request" "$(count bs.test)" "0"
 
 new_case input
-catalog payment-api > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_VAR_SERVICE_ID=PINPUT9
+catalog payment-api "" "pagerduty.com/service-id: PABC123" > "$CASE/catalog-info.yaml"
+run_case oncall.sh "$FILE" LUNAR_VAR_SERVICE_ID=PINPUT9
 assert_eq "input wins over discovery" "$(queried) $(via)" "PINPUT9 input:service_id"
-assert_eq "input: no Backstage request" "$(count bs.test)" "0"
 
 new_case discovery-off
 catalog payment-api "" "pagerduty.com/service-id: PABC123" > "$CASE/catalog-info.yaml"
-run_case LUNAR_VAR_BACKSTAGE_URL=http://bs.test:7007
+run_case oncall.sh
 assert_eq "discovery off: no query" "$(queried)" "none"
 assert_eq "discovery off: unmapped, listing meta and input" \
   "$(got unmapped)" '{"searched":["meta:pagerduty/service-id","input:service_id"]}'
-assert_eq "discovery off: backstage_url alone makes no request" "$(count bs.test)" "0"
 assert_eq "unmapped: .oncall.source names the tool" "$(got source)" '{"tool":"pagerduty","integration":"api"}'
 assert_eq "unmapped: no .oncall.service" "$(got service)" "null"
 
 new_case no-file
-run_case "$BS"
+run_case oncall.sh "$FILE"
 assert_eq "no catalog file: unmapped, both candidate paths listed" \
   "$(got unmapped | jq -c '.searched[2:]')" '["file:catalog-info.yaml (not found)","file:catalog-info.yml (not found)"]'
 
 new_case bad-yaml
 printf 'kind: [unclosed\n' > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}"
-assert_eq "unparseable catalog file: unmapped, no Backstage request" \
-  "$(got unmapped | jq -c '.searched[2:]') $(count bs.test)" '["file:catalog-info.yaml (unparseable)"] 0'
+run_case oncall.sh "$FILE"
+assert_eq "unparseable catalog file: unmapped" \
+  "$(got unmapped | jq -c '.searched[2:]')" '["file:catalog-info.yaml (unparseable)"]'
 
 new_case no-secret
-catalog payment-api > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_SECRET_PAGERDUTY_API_KEY=
+catalog payment-api "" "pagerduty.com/service-id: PABC123" > "$CASE/catalog-info.yaml"
+run_case oncall.sh "$FILE" LUNAR_SECRET_PAGERDUTY_API_KEY=
 assert_eq "no PAGERDUTY_API_KEY: nothing written, no requests" \
   "$(writes) $(wc -l < "$CURL_LOG" | tr -d ' ')" "0 0"
 
 new_case invalid-id
 catalog payment-api "" "pagerduty.com/service-id: '../users?limit=100'" > "$CASE/catalog-info.yaml"
-run_case "$BS"
+run_case oncall.sh "$FILE"
 assert_eq "a value that isn't a PagerDuty ID is never sent" "$(queried) $(count pd.test)" "none 0"
 assert_eq "but is recorded with where it came from" \
   "$(got service)" '{"id":"../users?limit=100","discovered_via":"file:catalog-info.yaml"}'
 
 new_case pd-404
 catalog payment-api "" "pagerduty.com/service-id: PGONE00" > "$CASE/catalog-info.yaml"
-run_case "$BS"
+run_case oncall.sh "$FILE"
 assert_eq "PagerDuty 404: the mapping is still recorded, with its source" \
   "$(got service)" '{"id":"PGONE00","discovered_via":"file:catalog-info.yaml"}'
 assert_eq "PagerDuty 404: not reported as unmapped" "$(got unmapped)" "null"
 
-echo "Live Backstage lookup:"
+new_case bad-mode
+catalog payment-api "" "pagerduty.com/service-id: PABC123" > "$CASE/catalog-info.yaml"
+run_case oncall.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=yes
+assert_eq "an invalid backstage_discovery writes nothing and says why" \
+  "$(writes) $(logged "Invalid backstage_discovery 'yes'")" "0 1"
+
+echo "backstage_discovery: live, through the backstage collector's lookup (backstage sub-collector):"
 
 for mode in by-name by-query; do
-  M=("${LIVE[@]}" "LUNAR_VAR_BACKSTAGE_REF_LOOKUP=$mode")
+  BS=("LUNAR_VAR_REF_LOOKUP=$mode")
 
   new_case "$mode-component"
-  catalog payment-api > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] the Component's own annotation" "$(queried) $(via)" "PCOMP01 component:default/payment-api"
-  assert_eq "[$mode] one request when the Component answers" "$(count bs.test)" "1"
-  assert_eq "[$mode] bearer token sent" "$(count 'Authorization: Bearer bs-token')" "1"
+  assert_eq "[$mode] no Backstage request from the pagerduty collector" "$(count bs.test)" "0"
+  assert_eq "[$mode] the full service record is written" \
+    "$(got service | jq -c '{id, status}') $(got summary | jq -c .has_oncall)" '{"id":"PCOMP01","status":"active"} true'
 
   new_case "$mode-system"
-  catalog checkout > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] inherited from the System" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
   new_case "$mode-domain"
-  catalog ledger-api > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog ledger-api "" "" ledger-system > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] inherited from the System's Domain" "$(queried) $(via)" "PDOM001 domain:default/finance"
-  assert_eq "[$mode] three requests: component, system, domain" "$(count bs.test)" "3"
 
   new_case "$mode-namespaces"
-  catalog alpha ops > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog alpha ops "" platform/core > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] qualified system ref, bare domain resolved in the System's namespace" \
     "$(queried) $(via)" "PDOMNS1 domain:platform/infra"
 
   new_case "$mode-live-beats-file"
-  catalog checkout "" "pagerduty.com/service-id: PFILE01" > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
-  assert_eq "[$mode] the live entity wins over the checked-out file" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
+  catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
+  assert_eq "[$mode] the live entity wins over the catalog file" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
   new_case "$mode-miss-file"
   catalog orphan "" "pagerduty.com/service-id: PFILE01" > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
-  assert_eq "[$mode] a live miss falls back to the file" "$(queried) $(via)" "PFILE01 file:catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
+  assert_eq "[$mode] no annotation in the catalog: the file answers" "$(queried) $(via)" "PFILE01 file:catalog-info.yaml"
 
   new_case "$mode-miss"
   catalog orphan > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
-  assert_eq "[$mode] no annotation anywhere: unmapped, every lookup listed" \
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
+  assert_eq "[$mode] no annotation anywhere: unmapped, every place listed" \
     "$(got unmapped)" '{"searched":["meta:pagerduty/service-id","input:service_id","component:default/orphan","file:catalog-info.yaml"]}'
   assert_eq "[$mode] unmapped: no PagerDuty query" "$(queried)" "none"
 
   new_case "$mode-quiet"
-  catalog quiet > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog quiet "" "" standalone-system > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] System with no annotation and no domain: unmapped" \
     "$(got unmapped | jq -c '.searched[2:4]')" '["component:default/quiet","system:default/standalone-system"]'
 
   new_case "$mode-dangling"
-  catalog lonely > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
+  catalog lonely "" "" ghost-system > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
   assert_eq "[$mode] a System missing from the catalog is marked" \
     "$(got unmapped | jq -c '.searched[3]')" '"system:default/ghost-system (not in catalog)"'
 
   new_case "$mode-unregistered"
-  catalog not-registered > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
-  assert_eq "[$mode] a Component missing from the catalog is marked" \
-    "$(got unmapped | jq -c '.searched[2]')" '"component:default/not-registered (not in catalog)"'
+  catalog not-registered "" "" payment-platform > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
+  assert_eq "[$mode] a Component missing from the catalog still inherits from its declared System" \
+    "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
   for broken in five boom login notentity; do
     new_case "$mode-$broken"
-    catalog "$broken" > "$CASE/catalog-info.yaml"
-    run_case "${M[@]}"
-    assert_eq "[$mode] lookup that can't complete ($broken): nothing written" \
-      "$(writes)" "0"
-    assert_eq "[$mode] and the failure is logged" \
-      "$(grep -c 'live Backstage lookup failed' "$CASE/stderr" || true)" "1"
+    catalog "$broken" "" "" payment-platform > "$CASE/catalog-info.yaml"
+    backstage_json "${BS[@]}"
+    run_case backstage.sh "$LIVE"
+    assert_eq "[$mode] a lookup that couldn't complete ($broken): nothing written" "$(writes)" "0"
+    assert_eq "[$mode] and the failure is logged" "$(logged "lookup of component:default/$broken failed")" "1"
   done
 
   new_case "$mode-error-file"
-  catalog five "" "pagerduty/service-id: PFILE02" > "$CASE/catalog-info.yaml"
-  run_case "${M[@]}"
-  assert_eq "[$mode] a failed lookup still falls back to the file" "$(queried) $(via)" "PFILE02 file:catalog-info.yaml"
+  catalog five "" "pagerduty/service-id: PFILE02" payment-platform > "$CASE/catalog-info.yaml"
+  backstage_json "${BS[@]}"
+  run_case backstage.sh "$LIVE"
+  assert_eq "[$mode] a failed lookup ends the live walk, and the file still answers" \
+    "$(queried) $(via)" "PFILE02 file:catalog-info.yaml"
 done
-
-new_case by-name-url
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}"
-assert_eq "by-name is the default endpoint" \
-  "$(count 'http://bs.test:7007/api/catalog/entities/by-name/component/default/checkout') $(count by-query)" "1 0"
-assert_eq "by-name follows to the system" \
-  "$(count 'http://bs.test:7007/api/catalog/entities/by-name/system/default/payment-platform')" "1"
-
-new_case by-query-url
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_VAR_BACKSTAGE_REF_LOOKUP=by-query
-assert_eq "by-query sends the encoded entity filter, never by-name" \
-  "$(count 'by-query?limit=1&filter=kind%3Dcomponent%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dcheckout') $(count by-name)" "1 0"
-
-new_case by-query-noitems
-catalog noitems > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_VAR_BACKSTAGE_REF_LOOKUP=by-query
-assert_eq "by-query 200 without .items: a failed lookup, not a miss" "$(got unmapped) $(got source)" "null null"
-
-new_case prefix-root
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_VAR_BACKSTAGE_API_PATH_PREFIX= LUNAR_VAR_BACKSTAGE_URL=http://bs.test:7007/
-assert_eq "empty backstage_api_path_prefix mounts the API at the root" \
-  "$(count 'http://bs.test:7007/catalog/entities/by-name/component/default/checkout') $(count /api/)" "1 0"
 
 new_case custom-key
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}" LUNAR_VAR_BACKSTAGE_ANNOTATIONS=pagerduty/service-id
-assert_eq "backstage_annotations narrows the keys read off live entities" "$(via)" "system:default/payment-platform"
-run_case "${LIVE[@]}" LUNAR_VAR_BACKSTAGE_ANNOTATIONS=acme.com/pd
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" LUNAR_VAR_BACKSTAGE_ANNOTATIONS=pagerduty/service-id
+assert_eq "backstage_annotations narrows the keys read" "$(via)" "system:default/payment-platform"
+run_case backstage.sh "$LIVE" LUNAR_VAR_BACKSTAGE_ANNOTATIONS=acme.com/pd
 assert_eq "an annotation key no entity carries: unmapped" "$(got unmapped | jq -c '.searched | length')" "6"
 
-new_case no-component
-printf 'apiVersion: backstage.io/v1alpha1\nkind: System\nmetadata: {name: payment-platform}\nspec: {owner: t}\n' > "$CASE/catalog-info.yaml"
-run_case "${LIVE[@]}"
-assert_eq "a file with no Component: no lookup, unmapped" "$(count bs.test) $(got unmapped | jq -c '.searched[2]')" '0 "file:catalog-info.yaml"'
+new_case system-file
+printf 'apiVersion: backstage.io/v1alpha1\nkind: System\nmetadata: {name: ledger-system}\nspec: {owner: t, domain: finance}\n' > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE"
+assert_eq "a System catalog file inherits from its own Domain" "$(queried) $(via)" "PDOM001 domain:default/finance"
 
-echo "Backstage auth (bearer / sigv4):"
+new_case live-meta
+catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}'
+assert_eq "meta: left to oncall, nothing written, no read" "$(writes) $(reads)" "0 0"
+run_case oncall.sh "$LIVE" 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}'
+assert_eq "meta: oncall collects it in live mode" "$(queried) $(via)" "PMETA01 meta:pagerduty/service-id"
 
-new_case sigv4-static
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}"
-assert_eq "sigv4: resolves like bearer" "$(via)" "system:default/payment-platform"
-assert_eq "sigv4: both lookups signed for execute-api" "$(count '--aws-sigv4 aws:amz:us-east-1:execute-api --user AKIATEST:secret123')" "2"
-assert_eq "sigv4: no Bearer header" "$(count 'Authorization: Bearer')" "0"
+new_case live-oncall
+catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case oncall.sh "$LIVE"
+assert_eq "oncall leaves a Backstage-mapped component to the backstage sub-collector" \
+  "$(writes) $(reads) $(queried)" "0 0 none"
 
-new_case sigv4-service
-catalog payment-api > "$CASE/catalog-info.yaml"
-run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}" LUNAR_VAR_AWS_SERVICE=lambda LUNAR_SECRET_AWS_SESSION_TOKEN=tmptok
-assert_eq "sigv4: aws_service and the session token reach the request" \
-  "$(count 'aws:amz:us-east-1:lambda') $(count 'x-amz-security-token: tmptok')" "1 1"
+new_case not-live
+catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$FILE"
+assert_eq "backstage sub-collector: nothing to do unless backstage_discovery is live" "$(writes) $(reads)" "0 0"
+run_case backstage.sh
+assert_eq "backstage sub-collector: nothing to do with discovery off" "$(writes) $(reads)" "0 0"
 
-new_case sigv4-irsa
-catalog payment-api > "$CASE/catalog-info.yaml"
-echo "mock-web-identity-token" > "$TEST_DIR/wit"
-run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}" MOCK_STS=1 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/r AWS_WEB_IDENTITY_TOKEN_FILE="$TEST_DIR/wit"
-assert_eq "sigv4: IRSA credentials win over static keys" \
-  "$(count '--user ASIAMOCKKEY:mocksecret -H x-amz-security-token: mocksessiontoken http://bs.test')" "1"
-assert_eq "sigv4: IRSA session named for this collector" "$(count 'RoleSessionName=lunar-pagerduty-collector')" "1"
+new_case live-no-secret
+catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" LUNAR_SECRET_PAGERDUTY_API_KEY=
+assert_eq "backstage sub-collector without PAGERDUTY_API_KEY: nothing read or written" "$(writes) $(reads)" "0 0"
 
-OK_ROLE="arn:aws:iam::210987654321:role/backstage-api-reader"
-new_case sigv4-assume
-catalog checkout > "$CASE/catalog-info.yaml"
-run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}" LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="arn:aws:iam::210987654321:role/denied, $OK_ROLE"
-assert_eq "assume role: tried in order, named for this collector" \
-  "$(count 'Action=AssumeRole ') $(count "RoleArn=$OK_ROLE --data-urlencode RoleSessionName=lunar-pagerduty-collector")" "2 1"
-assert_eq "assume role: lookups signed with the assumed role" \
-  "$(count '--user ASIAASSUMED:assumedsecret -H x-amz-security-token: assumedtoken http://bs.test')" "2"
-assert_eq "assume role: resolves through the walk" "$(via)" "system:default/payment-platform"
+echo "Reading the Component JSON (retry, pinning):"
 
-for setup in "no-region|LUNAR_VAR_AWS_REGION=|aws_region required for sigv4" \
-             "no-creds|LUNAR_SECRET_AWS_ACCESS_KEY_ID=|sigv4 credential resolution failed" \
-             "denied|LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=arn:aws:iam::1:role/denied|sts:AssumeRole failed" \
-             "bad-mode|LUNAR_VAR_BACKSTAGE_AUTH_MODE=oauth2|invalid backstage_auth_mode 'oauth2'" \
-             "bad-lookup|LUNAR_VAR_BACKSTAGE_REF_LOOKUP=by-id|invalid backstage_ref_lookup 'by-id'"; do
-  IFS='|' read -r label override message <<< "$setup"
-  new_case "setup-$label"
-  catalog checkout > "$CASE/catalog-info.yaml"
-  run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}" "$override"
-  assert_eq "setup error ($label): no Backstage request, nothing written" \
-    "$(count bs.test) $(writes)" "0 0"
-  assert_eq "setup error ($label): logged" "$(grep -c "live lookup not run: $message" "$CASE/stderr" || true)" "1"
-  catalog checkout "" "pagerduty.com/service-id: PFILE03" > "$CASE/catalog-info.yaml"
-  run_case "${SIGV4[@]}" "${STATIC_KEYS[@]}" "$override"
-  assert_eq "setup error ($label): the file still answers" "$(queried) $(via)" "PFILE03 file:catalog-info.yaml"
-done
+new_case pin
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE"
+assert_eq "backstage: pinned to the commit the wave fired for" "$(cat "$CASE/getjson.log")" "github.com/acme/svc --git-sha abc123"
+run_case backstage.sh "$LIVE" LUNAR_COMPONENT_PR=42
+assert_eq "backstage: and to the PR on a PR" "$(tail -1 "$CASE/getjson.log")" "github.com/acme/svc --pr 42 --git-sha abc123"
+
+new_case stale
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" MOCK_GETJSON_FAIL=1 MOCK_GETJSON_STALE=2
+assert_eq "a failed read, then two without the lookup, then it lands: resolves" \
+  "$(queried) $(via) $(reads)" "PSYS001 system:default/payment-platform 4"
+assert_eq "backing off 5s, 10s, 15s" "$(tr '\n' ' ' < "$CASE/sleeps")" "5 10 15 "
+assert_eq "and saying how long it waited" "$(logged 'Waited 30s across 4 attempt(s)')" "1"
+assert_eq "the get-json error is shown once, without its usage block" \
+  "$(logged 'get-json: Error: rpc error') $(logged 'Usage:')" "1 0"
+
+new_case budget
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" MOCK_GETJSON_STALE=1000
+assert_eq "the default budget is 1800s, backing off up to 60s" \
+  "$(slept) $(longest_sleep) $(reads)" "1770 60 36"
+assert_eq "a lookup that never becomes readable fails the run" "$CASE_EXIT $(writes)" "1 0"
+assert_eq "and says why" "$(logged 'still isn.t readable after 1770s')" "1"
+
+new_case budget-input
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case backstage.sh "$LIVE" MOCK_GETJSON_FAIL=1000 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=60
+assert_eq "backstage_wait_seconds sets the budget" "$(slept) $(reads)" "50 5"
+assert_eq "an unreadable Component JSON fails the run" "$CASE_EXIT $(writes) $(logged 'Could not read Component JSON')" "1 0 1"
+run_case backstage.sh "$LIVE" MOCK_GETJSON_STALE=1 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=soon
+assert_eq "an invalid backstage_wait_seconds falls back to 1800" \
+  "$(logged "Invalid backstage_wait_seconds 'soon'") $(via)" "1 system:default/payment-platform"
+
+echo "oncall-cron in live mode (default branch):"
+
+new_case cron
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case oncall.sh "$LIVE" "$CRON"
+assert_eq "cron reads the default branch's JSON and resolves" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
+assert_eq "cron does not pin a sha" "$(cat "$CASE/getjson.log")" "github.com/acme/svc"
+
+new_case cron-no-lookup
+catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
+backstage_json
+run_case oncall.sh "$LIVE" "$CRON" MOCK_GETJSON_STALE=1000
+assert_eq "cron with no Backstage lookup in the JSON: a short retry, then skips" \
+  "$CASE_EXIT $(writes) $(slept)" "0 0 30"
+assert_eq "and says the backstage collector needs backstage_url" "$(logged 'Is the backstage collector running with backstage_url set')" "1"
 
 echo
 if [ "$FAILS" -eq 0 ]; then

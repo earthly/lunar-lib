@@ -122,11 +122,10 @@ AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
 AUTH_ARGS=()
 
 # The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
-# assume_role_chain) and url_escape are deliberately kept in sync with
-# collectors/backstage/main.sh and collectors/pagerduty/backstage.sh — all three
-# run in the same snippet pods under the same service account, so credentials
-# must resolve identically. A fix here belongs there too, and vice versa;
-# scripts/validate_shared_helpers.py fails +lint when the copies drift.
+# assume_role_chain) are deliberately kept in sync with
+# collectors/backstage/main.sh — both plugins run in the same snippet pods under
+# the same service account, so credentials must resolve identically. A fix here
+# belongs there too, and vice versa.
 
 # parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
 # prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1
@@ -169,7 +168,7 @@ resolve_aws_credentials() {
     #    STS AssumeRoleWithWebIdentity (token-authenticated POST, no signing).
     if [ -n "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" ] && [ -n "${AWS_ROLE_ARN:-}" ] \
        && [ -f "${AWS_WEB_IDENTITY_TOKEN_FILE}" ]; then
-        local wit resp parsed
+        local wit resp
         wit="$(cat "$AWS_WEB_IDENTITY_TOKEN_FILE")"
         resp="$(curl -sS -X POST "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
             --data-urlencode "Action=AssumeRoleWithWebIdentity" \
@@ -178,6 +177,7 @@ resolve_aws_credentials() {
             --data-urlencode "RoleSessionName=${AWS_ROLE_SESSION_NAME:-lunar-backstage-cataloger}" \
             --data-urlencode "DurationSeconds=3600" \
             --data-urlencode "WebIdentityToken=${wit}" 2>/dev/null)" || true
+        local parsed
         parsed="$(printf '%s' "$resp" | parse_sts_credentials)" || true
         if [ -n "$parsed" ]; then
             AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"

@@ -142,11 +142,10 @@ fi
 # a JSON array of all documents.
 #
 # The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
-# assume_role_chain) and url_escape are deliberately kept in sync with
-# catalogers/backstage/main.sh and collectors/pagerduty/backstage.sh — all three
-# run in the same snippet pods under the same service account, so credentials
-# must resolve identically. A fix here belongs there too, and vice versa;
-# scripts/validate_shared_helpers.py fails +lint when the copies drift.
+# assume_role_chain) are deliberately kept in sync with
+# catalogers/backstage/main.sh — both plugins run in the same snippet pods under
+# the same service account, so credentials must resolve identically. A fix here
+# belongs there too, and vice versa.
 
 # parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
 # prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1
@@ -436,6 +435,24 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   # injecting a second filter, which Backstage would OR in.
   url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
 
+  # The canonical ref and the annotations of the entity in $ENTITY_BODY_FILE,
+  # as JSON to merge into a ref entry. Other collectors read annotations from
+  # here (pagerduty finds its service ID this way) instead of calling Backstage
+  # again. `{}` when the body isn't an entity: nothing is inferred from a
+  # response we couldn't read.
+  entity_facts() {
+    local facts
+    facts=$(jq -c '
+      if type == "object" and (.kind | type) == "string"
+         and (.metadata | type) == "object" and (.metadata.name | type) == "string"
+      then {ref: "\(.kind | ascii_downcase):\(.metadata.namespace // "default")/\(.metadata.name)"}
+           + (if (.metadata.annotations | type) == "object" and (.metadata.annotations | length) > 0
+              then {annotations: .metadata.annotations} else {} end)
+      else {} end' "$ENTITY_BODY_FILE" 2>/dev/null) || facts=""
+    [ -n "$facts" ] || facts='{}'
+    printf '%s\n' "$facts"
+  }
+
   resolve_ref() {
     # $1 = Backstage kind (domain|system); $2 = declared reference value.
     # Emits a JSON object: {name, exists} on a definitive answer, or
@@ -518,13 +535,13 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
           '{name: $name, error: $err}'
       elif [ "$item_count" -gt 0 ]; then
         printf '%s' "$body" | jq -c '.items[0]' > "$ENTITY_BODY_FILE" 2>/dev/null || :
-        jq -n --arg name "$value" '{name: $name, exists: true}'
+        jq -n --arg name "$value" --argjson facts "$(entity_facts)" '{name: $name, exists: true} + $facts'
       else
         jq -n --arg name "$value" '{name: $name, exists: false}'
       fi
     elif [ "$http_code" = "200" ]; then
       printf '%s' "$body" > "$ENTITY_BODY_FILE"
-      jq -n --arg name "$value" '{name: $name, exists: true}'
+      jq -n --arg name "$value" --argjson facts "$(entity_facts)" '{name: $name, exists: true} + $facts'
     elif [ "$http_code" = "404" ]; then
       jq -n --arg name "$value" '{name: $name, exists: false}'
     else
@@ -538,6 +555,16 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   # for why this can't be a variable.
   ENTITY_BODY_FILE=$(mktemp)
   trap 'rm -f "$YQ_ERR" "$ENTITY_BODY_FILE"' EXIT
+
+  # The primary entity itself, as the live catalog has it. Backstage processors
+  # can add annotations the file doesn't carry, such as an ID inherited from
+  # the entity's System, so readers of annotations want this copy.
+  ENTITY_KIND=$(echo "$RESULT" | jq -r '.kind | strings')
+  ENTITY_NAME=$(echo "$RESULT" | jq -r '.metadata.name | strings')
+  if [ -n "$ENTITY_KIND" ] && [ -n "$ENTITY_NAME" ]; then
+    ENTITY_ENTRY=$(resolve_ref "${ENTITY_KIND,,}" "$ENTITY_NAME")
+    REFS=$(echo "$REFS" | jq --arg kind "$ENTITY_KIND" --argjson e "$ENTITY_ENTRY" '. + {entity: ({kind: $kind} + $e)}')
+  fi
 
   DOMAIN_REF=$(echo "$RESULT" | jq -r '.spec.domain // empty')
   if [ -n "$DOMAIN_REF" ]; then

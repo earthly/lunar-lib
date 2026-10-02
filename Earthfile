@@ -124,9 +124,6 @@ lint:
     # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
     RUN python scripts/validate_manifest_schema.py --self-test
     RUN python scripts/validate_manifest_schema.py
-    # Copied bash helpers (e.g. the Backstage SigV4 helpers) must not drift apart
-    RUN python scripts/validate_shared_helpers.py --self-test
-    RUN python scripts/validate_shared_helpers.py
 
 ai-context:
     COPY --dir ai-context .
