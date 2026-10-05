@@ -39,9 +39,9 @@ prepare_dependencies() {
         # dependency build only fetches from repositories helm knows by name.
         local url
         while IFS= read -r url; do
-            helm repo add "$(printf '%s' "$url" | md5sum | cut -c1-12)" "$url" --force-update >/dev/null 2>&1 || true
+            timeout 300 helm repo add "$(printf '%s' "$url" | md5sum | cut -c1-12)" "$url" --force-update >/dev/null 2>&1 || true
         done < <(echo "$deps" | jq -r '.[].repository // "" | select(startswith("http"))' | sort -u)
-        helm dependency build "$dir" >/dev/null 2>&1 || true  # a failure surfaces in the render
+        timeout 300 helm dependency build "$dir" >/dev/null 2>&1 || true  # a failure surfaces in the render
         return 0
     fi
     local name repo
@@ -49,13 +49,24 @@ prepare_dependencies() {
         if compgen -G "$dir/charts/$name-*.tgz" >/dev/null || [ -f "$dir/charts/$name/Chart.yaml" ]; then
             continue
         fi
-        helm package "$dir/${repo#file://}" -d "$dir/charts" >/dev/null 2>&1 || true
+        timeout 300 helm package "$dir/${repo#file://}" -d "$dir/charts" >/dev/null 2>&1 || true
     done < <(echo "$deps" | jq -r '.[] | select((.repository // "") | startswith("file://")) | [.name, .repository] | @tsv')
 }
 
-# Renders one values set and prints its .k8s entries as a JSON object.
+# A valid helm release name: a lowercase DNS label of at most 53 characters.
+release_name() {
+    local name
+    name=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')
+    while [ "${name#-}" != "$name" ]; do name="${name#-}"; done
+    name="${name:0:53}"
+    while [ "${name%-}" != "$name" ]; do name="${name%-}"; done
+    printf '%s' "${name:-release}"
+}
+
+# Renders one values set and prints its .k8s entries as a JSON object. dir is
+# the chart's path for tools; rel_dir is the path recorded in the JSON.
 render() {
-    local dir="$1" release="$2" sets_json="$3" index="$4" validated_only="$5"
+    local dir="$1" rel_dir="$2" release="$3" sets_json="$4" index="$5" validated_only="$6"
     local values out err valid=true
     values=$(echo "$sets_json" | jq -c --argjson i "$index" '.sets[$i]')
     out="$WORK/out/$index"
@@ -67,11 +78,16 @@ render() {
     done < <(echo "$values" | jq -r '.[] | select(. != "values.yaml")')
 
     local manifest
-    manifest=$(jq -n --arg dir "$dir" --argjson values "$values" --argjson only "$validated_only" \
+    manifest=$(jq -n --arg dir "$rel_dir" --argjson values "$values" --argjson only "$validated_only" \
         '{path: $dir, render: {chart: $dir, values: $values, validated_only: $only}}')
 
     if ! err=$(timeout 300 helm "${args[@]}" 2>&1 >/dev/null); then
-        err="helm template: ${err#Error: }"
+        # Keep helm's own message: helm 4 also logs it as a level=ERROR line
+        # first, and the --debug hint isn't something the user can pass here.
+        local message
+        message=$(printf '%s\n' "$err" | sed -n '/^Error: /,$p' | grep -v -e '^level=' -e '^Use --debug flag' | sed '/^$/d')
+        [ -n "$message" ] || message="${err:-helm exited without an error message}"
+        err="helm template: ${message#Error: }"
         echo "$manifest" | jq --arg error "${err:0:2000}" '{manifest: (. + {valid: false, resources: [], error: $error})}'
         return 0
     fi
@@ -86,12 +102,12 @@ render() {
     docs=$(find "$out" -type f | sort | while IFS= read -r file; do
         rel="${file#"$out"/}"
         rel="${rel#*/}"
-        if [ "$dir" = "." ]; then path="$rel"; else path="$dir/$rel"; fi
+        if [ "$rel_dir" = "." ]; then path="$rel"; else path="$rel_dir/$rel"; fi
         yq -o=json '.' "$file" 2>/dev/null | jq -s --arg path "$path" 'map(select(type == "object") + {__path: $path})'
     done | jq -s 'add // []')
 
-    local validation_error="" chart_out prefix="$dir/"
-    [ "$dir" = "." ] && prefix=""
+    local validation_error="" chart_out prefix="$rel_dir/"
+    [ "$rel_dir" = "." ] && prefix=""
     if ! validation_error=$(kubeconform -strict -ignore-missing-schemas "$out" 2>&1); then
         valid=false
         for chart_out in "$out"/*; do
@@ -102,7 +118,7 @@ render() {
     fi
 
     echo "$docs" | jq -f "$SCRIPT_DIR/extract.jq" \
-        --argjson render "{\"chart\": $(jq -n --arg d "$dir" '$d'), \"values\": $values}" \
+        --argjson render "{\"chart\": $(jq -n --arg d "$rel_dir" '$d'), \"values\": $values}" \
         --arg kinds "$WORKLOAD_KINDS" \
         | jq --argjson manifest "$manifest" --argjson valid "$valid" --arg error "$validation_error" \
             '{manifest: ($manifest + {valid: $valid, resources: .resources} + (if $error == "" then {} else {error: $error} end))}
@@ -111,7 +127,10 @@ render() {
 
 chart_files=()
 while IFS= read -r chart_file; do
-    chart_files+=("${chart_file#./}")
+    # Relative paths keep a ./ prefix, so a directory named like a flag never
+    # reaches helm or yq as one.
+    case "$chart_file" in /*|./*) ;; *) chart_file="./$chart_file" ;; esac
+    chart_files+=("$chart_file")
 done < <(eval "$FIND_CMD" 2>/dev/null | grep -vE '(^|/)(\.git|node_modules|vendor)(/|$)' | sort)
 [ "${#chart_files[@]}" -gt 0 ] || exit 0
 
@@ -125,6 +144,7 @@ results="$WORK/results.jsonl"
 charts=0
 for chart_file in "${chart_files[@]}"; do
     dir=$(dirname "$chart_file")
+    rel_dir="${dir#./}"
     parent=$(dirname "$dir")
     # A subchart is rendered with the chart whose charts/ directory holds it.
     if [ "$(basename "$parent")" = "charts" ] && \
@@ -138,13 +158,13 @@ for chart_file in "${chart_files[@]}"; do
     # Named for its directory, or for the chart itself at the repository root.
     release=$(basename "$dir")
     [ "$dir" = "." ] && release=$(yq '.name // "release"' "$chart_file" 2>/dev/null)
-    release=$(echo "$release" | tr '[:upper:]_.' '[:lower:]--')
+    release=$(release_name "$release")
     prepare_dependencies "$dir" "$chart_file"
     sets_json=$(python3 "$SCRIPT_DIR/values_sets.py" "$dir")
     validated_only=$(echo "$sets_json" | jq '.validated_only')
     count=$(echo "$sets_json" | jq '.sets | length')
     for ((i = 0; i < count; i++)); do
-        render "$dir" "$release" "$sets_json" "$i" "$validated_only" >> "$results"
+        render "$dir" "$rel_dir" "$release" "$sets_json" "$i" "$validated_only" >> "$results"
     done
     charts=$((charts + 1))
 done
