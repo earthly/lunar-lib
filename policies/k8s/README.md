@@ -43,11 +43,11 @@ The `k8s` collector's `helm` sub-collector renders each chart and records the ob
 - A chart that fails to render fails `valid` with helm's error, so it can't pass every other check by contributing nothing.
 - A chart that no `helm_values` line or `helm_values_chains` chain applies to is only checked by `valid`: its default render contributes no objects, because chart defaults (`resources: {}`, a disabled PodDisruptionBudget) are often left for whoever deploys the chart to fill in. When such charts are a component's only Kubernetes content, the workload checks skip and say that no values set applies, pointing at `helm_values` and `helm_values_chains`.
 
-The checks added alongside chart rendering (`topology-spread` through `pod-annotations`) skip when the `k8s` collector is older than the fields they read.
+The checks added alongside chart rendering (`topology-spread` through `pod-annotations`) skip when the `k8s` collector is older than the fields they read, and when nothing in the repository is in their scope, such as no workload that can run more than one replica, rather than passing on nothing.
 
 ### Replica counts
 
-A workload that an HPA or KEDA ScaledObject scales gets its size from the autoscaler, matched by `scaleTargetRef` in the same namespace (and under the render rules above), since `no-static-replicas` asks for `spec.replicas` to be left out. `pdb-budget` uses its smallest size, the autoscaler's minimum (`minReplicas` / `minReplicaCount`, at least 1), and `topology-spread` its largest (`maxReplicas` / `maxReplicaCount`). A workload without one uses `spec.replicas`, or 1 when it's unset. Percentages round up against that count, as Kubernetes' disruption controller does: `minAvailable: 50%` of 3 pods leaves one free and passes, `67%` of 3 covers all of them and fails, and only `maxUnavailable: 0` or `0%` blocks every drain.
+A workload that an HPA or KEDA ScaledObject scales gets its size from the autoscaler, matched by `scaleTargetRef` in the same namespace (and under the render rules above), since `no-static-replicas` asks for `spec.replicas` to be left out. `pdb-budget` uses its smallest size, the autoscaler's minimum (`minReplicas` / `minReplicaCount`, at least 1), and `topology-spread` its largest (`maxReplicas` / `maxReplicaCount`). A workload without one uses `spec.replicas`, or 1 when it's unset. Percentages round up against that count, as Kubernetes' disruption controller does: `minAvailable: 50%` of 3 pods leaves one free and passes, `67%` of 3 covers all of them and fails, and only `maxUnavailable: 0` or `0%` blocks every drain. A budget that selects several workloads counts their pods together, as Kubernetes does.
 
 ## Required Data
 

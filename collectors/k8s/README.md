@@ -57,7 +57,7 @@ Charts render against helm's built-in Kubernetes version and core APIs. A chart 
 
 The values sets of one chart are alternative deployments of the same release, so policies never match a workload to a PodDisruptionBudget, autoscaler or NetworkPolicy from another values set of its own chart. Objects from plain manifests and from other charts still match.
 
-A chart that fails to render gets a `.k8s.manifests[]` entry with `valid: false` and helm's error, so the `valid` check fails instead of every check skipping. Remote dependencies must be vendored in the chart's `charts/` directory, or set `helm_dependency_build: true` to fetch them first, which needs network access to the chart repositories. Local `file://` dependencies are built either way.
+A chart that fails to render gets a `.k8s.manifests[]` entry with `valid: false` and helm's error, so the `valid` check fails instead of every check skipping. A render that applies a values set is also validated with kubeconform, like a static manifest. Remote dependencies must be vendored in the chart's `charts/` directory, or set `helm_dependency_build: true` to fetch them first, which needs network access to the chart repositories. Local `file://` dependencies are built either way.
 
 ## Installation
 

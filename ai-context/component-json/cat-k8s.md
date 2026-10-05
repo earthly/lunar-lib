@@ -91,6 +91,7 @@ Plain manifests and rendered Helm charts share the same arrays. An entry that ca
         "namespace": "payments",
         "path": "deploy/hpa.yaml",
         "target_workload": "payment-api",
+        "target_kind": "Deployment",
         "min_replicas": 3,
         "max_replicas": 10
       }
@@ -102,6 +103,7 @@ Plain manifests and rendered Helm charts share the same arrays. An entry that ca
         "path": "charts/worker/templates/scaledobject.yaml",
         "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
         "target_workload": "worker",
+        "target_kind": "Deployment",
         "min_replicas": 2,
         "max_replicas": 20
       }
@@ -129,7 +131,7 @@ Plain manifests and rendered Helm charts share the same arrays. An entry that ca
 }
 ```
 
-Effective values are recorded: an unset `replicas` is 1, an unset `termination_grace_period_seconds` is 30, and an unset probe timing takes the Kubernetes default. `replicas_set` says whether the manifest sets `spec.replicas` itself.
+Effective values are recorded: an unset `replicas` is 1, an unset `termination_grace_period_seconds` is 30, an unset probe timing takes the Kubernetes default, and a KEDA ScaledObject's unset range is 0 to 100. `replicas_set` says whether the manifest sets `spec.replicas` itself. A probe's `handler` is `httpGet`, `tcpSocket`, `grpc` or `exec`; an `exec` probe also carries its `command`, and a `grpc` probe its `service`.
 
 ## Key Policy Paths
 
