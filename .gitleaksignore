@@ -1,0 +1,5 @@
+# gitleaks findings on test data that can't carry an inline `gitleaks:allow` (JSON, line continuations).
+# Format is file:rule:line; update the line number if the file shifts.
+catalogers/backstage-catalog-info/test-local.sh:generic-api-key:389
+collectors/github/test/fixtures/pull_request.json:generic-api-key:319
+collectors/github/test/fixtures/pull_request.json:generic-api-key:461
