@@ -49,7 +49,7 @@ helm_values: |
 
 Paths are relative to the chart directory, and every line applies to every chart. A chart skips the lines whose files it doesn't have.
 
-When overlays are named for what they stack on, `helm_values_chains: true` derives the sets instead of listing them. An overlay extends the ones its name continues at a dash (`values-prod-eu.yaml` extends `values-prod.yaml`, not `values-pro.yaml`), and each overlay that nothing extends is one chain: `values.yaml`, the overlays it extends, then itself. So `values-prod-eu.yaml` renders as `values.yaml values-prod.yaml values-prod-eu.yaml`, `values-staging.yaml` as `values.yaml values-staging.yaml`, and a chart with no `values-*.yaml` renders with `values.yaml` alone. That's the layering a CI that applies overlays by file name ships, so a fleet of repos needs no per-repo list. Chains add to `helm_values`, and identical sets render once.
+When overlays are named for what they stack on, `helm_values_chains` derives the sets instead of listing them. An overlay extends the ones its name continues at a dash (`values-prod-eu.yaml` extends `values-prod.yaml`, not `values-pro.yaml`), and each overlay that nothing extends is one chain: `values.yaml`, the overlays it extends, then itself. So `values-prod-eu.yaml` renders as `values.yaml values-prod.yaml values-prod-eu.yaml`, and `values-staging.yaml` as `values.yaml values-staging.yaml`. With `overlays`, a chart with no `values-*.yaml` stays build-only, which keeps chart libraries quiet across a whole fleet. With `all`, such a chart is checked with `values.yaml` alone, the full layering a CI that applies overlays by file name ships; use it only where every chart is a deployed app. Chains add to `helm_values`, and identical sets render once.
 
 A chart that no line or chain applies to, including every chart when both are unset, is rendered with its `values.yaml` only to check that it builds: it gets a `.k8s.manifests[]` entry with `render.validated_only: true` and contributes no objects. Chart defaults are often meant to be filled in by whoever deploys the chart (a chart library ships `resources: {}` and its PodDisruptionBudget disabled), so checking them would fail what the chart's owner can't fix.
 
@@ -72,7 +72,7 @@ collectors:
     #   find_command: "find ./deploy -name '*.yaml'"  # Custom find command
     #   helm_values: |
     #     values-prod.yaml
-    #   helm_values_chains: "true"  # Or derive the values sets from file names
+    #   helm_values_chains: "overlays"  # Or derive the values sets from file names
     #   helm_dependency_build: "true"  # Fetch remote chart dependencies (needs network)
     #   helm_api_versions: "keda.sh/v1alpha1"  # Render objects gated on a CRD
 ```

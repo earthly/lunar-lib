@@ -84,8 +84,8 @@ inputs:
     default: ""
   helm_values_chains:
     description: |
-      Also check each chart with the values chains its file names imply (true/false). An overlay extends the ones its name continues at a dash (values-prod-eu.yaml extends values-prod.yaml). Each values-*.yaml that nothing extends is one chain: values.yaml, the overlays it extends, then itself. A chart with no values-*.yaml is checked with values.yaml alone. Adds to the sets in helm_values.
-    default: "false"
+      Derive values sets from each chart's file names: `overlays` or `all`. Empty (the default) is off. An overlay extends the ones its name continues at a dash (values-prod-eu.yaml extends values-prod.yaml), and each values-*.yaml that nothing extends is one chain: values.yaml, the overlays it extends, then itself. A chart with no values-*.yaml stays build-only under `overlays`, and is checked with values.yaml alone under `all`, which is only right where every chart is a deployed app, not a chart library. Adds to the sets in helm_values.
+    default: ""
   helm_dependency_build:
     description: Run `helm dependency build` before rendering a chart whose remote dependencies aren't vendored in its charts/ directory (true/false). Needs network access to the chart repositories. When off, such a chart fails to render and is reported as invalid. Local file:// dependencies are always built.
     default: "false"
