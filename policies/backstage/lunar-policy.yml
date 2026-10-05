@@ -124,10 +124,11 @@ policies:
       a domain (`System.spec.domain`), read from the collector's
       `.catalog.native.backstage.refs.system.has_domain`. Fails when the
       system resolves in Backstage but declares no domain, naming the System
-      to fix. Passes when no `spec.system` is declared or the system does not
-      resolve (`system-set` and `system-exists` report those). Skips when the
-      collector has no `backstage_url`, the system lookup errored, or the
-      collector predates `has_domain`.
+      to fix. Skips when there is no System to check: no `spec.system` is
+      declared, or the system does not resolve (`system-set` and
+      `system-exists` report those). Also skips when the collector has no
+      `backstage_url`, the system lookup errored, or the collector predates
+      `has_domain`.
     mainPython: ./system-domain-set.py
     keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
 
