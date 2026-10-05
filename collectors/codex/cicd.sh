@@ -18,7 +18,7 @@ SANDBOX=$(extract_flag_value "$CMD_STR" "--sandbox" "-s")
 APPROVAL_MODE=$(extract_flag_value "$CMD_STR" "--ask-for-approval" "-a")
 
 JSON="{"
-JSON="$JSON\"cmd\": "$(json_escape "$CMD_STR")","
+JSON="$JSON\"cmd\": \"$(json_escape "$CMD_STR")\","
 JSON="$JSON\"cmd_args\": $LUNAR_CI_COMMAND,"
 JSON="$JSON\"tool\": \"$TOOL\","
 JSON="$JSON\"version\": \"$VERSION\""
