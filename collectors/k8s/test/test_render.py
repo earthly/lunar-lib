@@ -276,6 +276,29 @@ class RenderTest(Harness):
         self.assertEqual(renders, [(".", ["values.yaml"], False, True)])
         self.assertEqual((k8s["workloads"][0]["path"], k8s["workloads"][0]["name"]), ("templates/deployment.yaml", "svc"))
 
+    def test_any_directory_name_becomes_a_valid_release_name(self):
+        long_dir = "a" * 60
+        cut_on_dash = "a" * 52 + "_x"  # the cut to 53 ends on a dash, which must go after it
+        dirs = ("_internal", "trailing-dash-", long_dir, cut_on_dash, "My.Chart_v2", "-weird")
+        for d in dirs:
+            self.chart(f"charts/{d}")
+        k8s, renders = self.renders(helm_values="values.yaml")
+        self.assertEqual(sorted((path, valid) for path, _, _, valid in renders),
+                         sorted((f"charts/{d}", True) for d in dirs))
+        self.assertEqual(sorted(w["name"] for w in k8s["workloads"]),
+                         sorted(["internal", "trailing-dash", "a" * 53, "a" * 52, "my-chart-v2", "weird"]))
+        self.assertIn("charts/-weird/templates/deployment.yaml", [w["path"] for w in k8s["workloads"]])
+
+    def test_a_render_error_is_recorded_once_without_helms_debug_hint(self):
+        self.chart("charts/broken", templates={"deployment.yaml": '{{ fail "boom" }}\n'})
+        k8s, renders = self.renders(helm_values="values.yaml")
+        self.assertEqual(renders, [("charts/broken", ["values.yaml"], False, False)])
+        error = k8s["manifests"][0]["error"]
+        self.assertTrue(error.startswith("helm template: execution error at "), error)
+        self.assertEqual(error.count("boom"), 1, error)
+        self.assertNotIn("level=", error)
+        self.assertNotIn("--debug", error)
+
     def test_without_helm_the_run_fails_instead_of_failing_every_chart(self):
         self.chart("charts/api")
         env = dict(os.environ, PATH=self.bin + os.pathsep + "/usr/bin:/bin")
