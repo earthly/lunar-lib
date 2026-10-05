@@ -1,5 +1,5 @@
 #!/bin/bash
-# The backstage sub-collector: finds the component's PagerDuty service in what
+# The from-backstage-collector sub-collector: finds the component's PagerDuty service in what
 # the backstage collector read from the live catalog (the Component, else its
 # System, else that System's Domain), for components the oncall sub-collector
 # can't map from meta, service_id or, with backstage_discovery: "true", the
@@ -51,5 +51,5 @@ fi
 # shellcheck disable=SC2034  # read by finish_unresolved
 SEARCHED=()
 resolve_from_backstage_json "$COMPONENT_JSON"
-[ -n "$SERVICE_ID" ] || finish_unresolved
+[ -n "$SERVICE_ID" ] || finish_unresolved "Annotate the Component, its System or its Domain in Backstage with ${ANNOTATION_KEYS//,/ or }."
 collect_pagerduty

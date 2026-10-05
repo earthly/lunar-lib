@@ -1,15 +1,15 @@
 #!/bin/bash
 # Shared by oncall.sh (the oncall and oncall-cron sub-collectors) and
-# backstage.sh (the backstage sub-collector).
+# from-backstage-collector.sh (the from-backstage-collector sub-collector).
 # The globals set here (READ_STATE, COMPONENT_JSON, ...) are read by those scripts.
 # shellcheck disable=SC2034
 
 # backstage_discovery switches the checked-out catalog-info.yaml on or off.
-# The live catalog is the backstage sub-collector's job, so it has no setting.
+# The live catalog is the from-backstage-collector sub-collector's job, so it has no setting.
 DISCOVERY="${LUNAR_VAR_BACKSTAGE_DISCOVERY:-false}"
 case "$DISCOVERY" in
   true|false) ;;
-  *) echo "backstage_discovery is '$DISCOVERY', but it takes \"true\" or \"false\"; not reading the catalog file. The backstage sub-collector does the live lookup." >&2 ;;
+  *) echo "backstage_discovery is '$DISCOVERY', but it takes \"true\" or \"false\"; not reading the catalog file. The from-backstage-collector sub-collector does the live lookup." >&2 ;;
 esac
 ANNOTATION_KEYS="${LUNAR_VAR_BACKSTAGE_ANNOTATIONS:-pagerduty.com/service-id,pagerduty/service-id}"
 
@@ -98,7 +98,7 @@ resolve_from_checkout() {
 # Sets COMPONENT_JSON, READ_STATE (ok | read_failed | no_lookup), WAITED and
 # ATTEMPT.
 #
-# The backstage sub-collector is dispatched off that path in the LIVE merged
+# The from-backstage-collector sub-collector is dispatched off that path in the LIVE merged
 # blob, but `lunar component get-json` reads a copy the Hub's mat workers drain
 # asynchronously, so the first reads can come back without it. The other
 # after-json collectors retry for 900s (codeql measured the lag at 195-292s+,

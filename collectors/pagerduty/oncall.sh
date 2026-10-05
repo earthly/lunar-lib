@@ -37,7 +37,7 @@ if [ -z "$SERVICE_ID" ]; then
 fi
 
 if [ -z "$SERVICE_ID" ]; then
-  hint="The backstage sub-collector, if included, looks in the live catalog next."
+  hint="The from-backstage-collector sub-collector, if included, looks in the live catalog next."
   if [ "$DISCOVERY" != "true" ]; then
     hint="Map it with the 'pagerduty/service-id' meta, the service_id input or, with backstage_discovery: \"true\", catalog-info.yaml. $hint"
   fi

@@ -22,7 +22,7 @@ landing_page:
       reason: "Enforces on-call schedule, escalation, and staffing standards"
     - slug: "backstage"
       type: "collector"
-      reason: "Its live catalog lookup feeds the backstage sub-collector"
+      reason: "Its live catalog lookup feeds the from-backstage-collector sub-collector"
 
 collectors:
   - name: oncall
@@ -40,7 +40,7 @@ collectors:
       and .oncall.summary, and the raw API responses under
       .oncall.native.pagerduty. When none of those sources maps the component,
       writes .oncall.service_lookup with the places it looked instead, and the
-      `backstage` sub-collector, if included, looks in the live catalog.
+      `from-backstage-collector` sub-collector, if included, looks in the live catalog.
     mainBash: oncall.sh
     hook:
       type: code
@@ -71,7 +71,7 @@ collectors:
       clone-code: true       # checkout lets backstage_discovery read catalog-info.yaml locally
     keywords: ["pagerduty", "oncall", "escalation", "incident management", "on-call schedule", "cron", "scheduled"]
 
-  - name: backstage
+  - name: from-backstage-collector
     description: |
       Finds the component's PagerDuty service in what the backstage collector
       read from the live catalog: the component's own entity, else its System,
@@ -82,7 +82,7 @@ collectors:
       JSON, retrying the read for up to `backstage_wait_seconds` while it
       catches up, then queries PagerDuty and writes .oncall like `oncall`. Only
       the backstage collector calls Backstage; it needs `backstage_url` set.
-    mainBash: backstage.sh
+    mainBash: from-backstage-collector.sh
     hook:
       type: after-json
       path: .catalog.native.backstage.refs.entity
@@ -102,7 +102,7 @@ inputs:
       When "true", and component meta and the service_id input don't give a
       service ID, read it from the annotations in the component's checked-out
       catalog-info.yaml. The live catalog, including an ID inherited from the
-      component's System or Domain, is the `backstage` sub-collector's job and
+      component's System or Domain, is the `from-backstage-collector` sub-collector's job and
       needs no setting here.
     default: "false"
   backstage_annotations:
@@ -120,7 +120,7 @@ inputs:
     default: "catalog-info.yaml,catalog-info.yml"
   backstage_wait_seconds:
     description: >
-      How long the `backstage` sub-collector keeps retrying the read of the
+      How long the `from-backstage-collector` sub-collector keeps retrying the read of the
       backstage collector's lookup before it fails the run. The Component JSON
       it reads can lag the write that triggered it by several minutes.
     default: "1800"

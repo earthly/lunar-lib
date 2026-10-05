@@ -22,7 +22,7 @@ test-offline:
     RUN ./test-local.sh
 
 # The collector's scripts, for collectors/pagerduty's test, which runs the real
-# collector to produce the Component JSON its backstage sub-collector reads.
+# collector to produce the Component JSON its from-backstage-collector sub-collector reads.
 src:
     FROM alpine:3.21
     WORKDIR /src

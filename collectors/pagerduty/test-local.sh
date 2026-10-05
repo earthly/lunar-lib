@@ -6,7 +6,7 @@
 #
 # The live-catalog cases first run the real backstage collector
 # ($BACKSTAGE_DIR/main.sh) against the mock Backstage, then serve what it
-# collected to backstage.sh / oncall.sh as the Component JSON. So the two
+# collected to from-backstage-collector.sh / oncall.sh as the Component JSON. So the two
 # collectors' contract is tested end to end, not against a hand-written blob.
 #
 # The mock curl answers:
@@ -197,7 +197,7 @@ backstage_json() {
   jq '{catalog: {native: {backstage: .}}}' "$CASE/bs/collect_catalog_native_backstage.out" > "$CASE/component.json"
 }
 
-# run_case <script> [KEY=VALUE ...] — runs oncall.sh or backstage.sh in the
+# run_case <script> [KEY=VALUE ...] — runs oncall.sh or from-backstage-collector.sh in the
 # case dir with a clean environment plus the given variables. The PagerDuty key
 # is set unless a case clears it.
 run_case() {
@@ -296,7 +296,7 @@ assert_eq "discovery off: service_lookup lists meta and input" \
 assert_eq "service_lookup: .oncall.source names the tool" "$(got source)" '{"tool":"pagerduty","integration":"api"}'
 assert_eq "service_lookup: no .oncall.service" "$(got service)" "null"
 assert_eq "oncall never reads the Component JSON on push" "$(reads)" "0"
-assert_eq "and says where else to map it" "$(logged 'backstage_discovery: "true", catalog-info.yaml. The backstage sub-collector, if included')" "1"
+assert_eq "and says where else to map it" "$(logged 'backstage_discovery: "true", catalog-info.yaml. The from-backstage-collector sub-collector, if included')" "1"
 
 new_case no-file
 run_case oncall.sh "$FILE"
@@ -335,7 +335,7 @@ run_case oncall.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=live
 assert_eq "backstage_discovery other than true/false: warned, and the file isn't read" \
   "$(logged "backstage_discovery is 'live', but it takes") $(queried) $(svc_lookup | jq -c '.searched | length')" "1 none 2"
 
-echo "backstage sub-collector: the backstage collector's live lookup:"
+echo "from-backstage-collector sub-collector: the backstage collector's live lookup:"
 
 for mode in by-name by-query; do
   BS=("LUNAR_VAR_REF_LOOKUP=$mode")
@@ -343,7 +343,7 @@ for mode in by-name by-query; do
   new_case "$mode-component"
   catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] the Component's own annotation" "$(queried) $(via)" "PCOMP01 component:default/payment-api"
   assert_eq "[$mode] no Backstage request from the pagerduty collector" "$(count bs.test)" "0"
   assert_eq "[$mode] the full service record is written" \
@@ -352,26 +352,26 @@ for mode in by-name by-query; do
   new_case "$mode-system"
   catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] inherited from the System" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
   new_case "$mode-domain"
   catalog ledger-api "" "" ledger-system > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] inherited from the System's Domain" "$(queried) $(via)" "PDOM001 domain:default/finance"
 
   new_case "$mode-namespaces"
   catalog alpha ops "" platform/core > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] qualified system ref, bare domain resolved in the System's namespace" \
     "$(queried) $(via)" "PDOMNS1 domain:platform/infra"
 
   new_case "$mode-miss"
   catalog orphan > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] no annotation in the live catalog: service_lookup lists what it looked up" \
     "$(svc_lookup)" '{"searched":["component:default/orphan"]}'
   assert_eq "[$mode] and no PagerDuty query" "$(queried)" "none"
@@ -379,21 +379,21 @@ for mode in by-name by-query; do
   new_case "$mode-quiet"
   catalog quiet "" "" standalone-system > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] System with no annotation and no domain" \
     "$(svc_lookup | jq -c .searched)" '["component:default/quiet","system:default/standalone-system"]'
 
   new_case "$mode-dangling"
   catalog lonely "" "" ghost-system > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] a System missing from the catalog is marked" \
     "$(svc_lookup | jq -c '.searched[1]')" '"system:default/ghost-system (not in catalog)"'
 
   new_case "$mode-unregistered"
   catalog not-registered "" "" payment-platform > "$CASE/catalog-info.yaml"
   backstage_json "${BS[@]}"
-  run_case backstage.sh
+  run_case from-backstage-collector.sh
   assert_eq "[$mode] a Component missing from the catalog still inherits from its declared System" \
     "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
@@ -401,7 +401,7 @@ for mode in by-name by-query; do
     new_case "$mode-$broken"
     catalog "$broken" "" "" payment-platform > "$CASE/catalog-info.yaml"
     backstage_json "${BS[@]}"
-    run_case backstage.sh
+    run_case from-backstage-collector.sh
     assert_eq "[$mode] a lookup that couldn't complete ($broken) is an error, not a miss" \
       "$(svc_lookup | jq -c '[(.errors | length), (.errors[0] | startswith("component:default/'"$broken"': ")), has("searched")]') $(queried) $(got service)" \
       '[1,true,false] none null'
@@ -411,35 +411,35 @@ done
 new_case file-in-live
 catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh
+run_case from-backstage-collector.sh
 assert_eq "backstage_discovery off: the file isn't consulted, the live catalog answers" \
   "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 
 new_case custom-key
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh LUNAR_VAR_BACKSTAGE_ANNOTATIONS=pagerduty/service-id
+run_case from-backstage-collector.sh LUNAR_VAR_BACKSTAGE_ANNOTATIONS=pagerduty/service-id
 assert_eq "backstage_annotations narrows the keys read" "$(via)" "system:default/payment-platform"
-run_case backstage.sh LUNAR_VAR_BACKSTAGE_ANNOTATIONS=acme.com/pd
+run_case from-backstage-collector.sh LUNAR_VAR_BACKSTAGE_ANNOTATIONS=acme.com/pd
 assert_eq "an annotation key no entity carries: Component, System and Domain listed" \
   "$(svc_lookup | jq -c .searched)" '["component:default/checkout","system:default/payment-platform","domain:default/finance"]'
 
 new_case system-file
 printf 'apiVersion: backstage.io/v1alpha1\nkind: System\nmetadata: {name: ledger-system}\nspec: {owner: t, domain: finance}\n' > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh
+run_case from-backstage-collector.sh
 assert_eq "a System catalog file inherits from its own Domain" "$(queried) $(via)" "PDOM001 domain:default/finance"
 
 new_case live-meta
 catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}'
+run_case from-backstage-collector.sh 'LUNAR_COMPONENT_META={"pagerduty/service-id":"PMETA01"}'
 assert_eq "meta: left to oncall, nothing written, no read" "$(writes) $(reads)" "0 0"
 
 new_case live-no-secret
 catalog payment-api "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh LUNAR_SECRET_PAGERDUTY_API_KEY=
+run_case from-backstage-collector.sh LUNAR_SECRET_PAGERDUTY_API_KEY=
 assert_eq "no PAGERDUTY_API_KEY: nothing read or written" "$(writes) $(reads)" "0 0"
 
 echo "oncall and backstage together (one push):"
@@ -450,7 +450,7 @@ new_case combo-file
 catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
 run_case oncall.sh "$FILE"
-run_case backstage.sh "$FILE"
+run_case from-backstage-collector.sh "$FILE"
 assert_eq "mapped in catalog-info.yaml: oncall collects it, backstage steps aside" \
   "$(queried) $(via) $(svc_lookup) $(logged 'which the oncall sub-collector reads')" \
   "PFILE01 file:catalog-info.yaml null 1"
@@ -459,7 +459,7 @@ new_case combo-inherited
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
 run_case oncall.sh "$FILE"
-run_case backstage.sh "$FILE"
+run_case from-backstage-collector.sh "$FILE"
 assert_eq "inherited from the System: oncall misses the file, backstage collects it" \
   "$(queried) $(via)" "PSYS001 system:default/payment-platform"
 assert_eq "oncall's miss stays recorded next to the service" \
@@ -482,7 +482,7 @@ backstage_json "${MONO[@]}" LUNAR_VAR_SEARCH_PARENT_DIRS=true LUNAR_VAR_MATCH_SO
 assert_eq "monorepo: the backstage collector read the shared ancestor file" \
   "$(jq -c '.catalog.native.backstage | [.path, .metadata.name]' "$CASE/component.json")" '["../../catalog-info.yaml","mono-payments"]'
 run_case oncall.sh "$FILE" "${MONO[@]}"
-run_case backstage.sh "$FILE" "${MONO[@]}"
+run_case from-backstage-collector.sh "$FILE" "${MONO[@]}"
 assert_eq "monorepo: oncall can't see that file, so backstage collects the live entity" \
   "$(queried) $(via)" "PMONO01 component:default/mono-payments"
 assert_eq "monorepo: oncall's miss lists its own directory's file" \
@@ -492,7 +492,7 @@ new_case combo-dotslash
 catalog checkout "" "pagerduty.com/service-id: PFILE01" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
 run_case oncall.sh "$FILE" LUNAR_VAR_BACKSTAGE_CATALOG_PATHS=./catalog-info.yaml
-run_case backstage.sh "$FILE" LUNAR_VAR_BACKSTAGE_CATALOG_PATHS=./catalog-info.yaml
+run_case from-backstage-collector.sh "$FILE" LUNAR_VAR_BACKSTAGE_CATALOG_PATHS=./catalog-info.yaml
 assert_eq "a ./-prefixed backstage_catalog_paths entry still hands off" \
   "$(queried) $(via)" "PFILE01 file:./catalog-info.yaml"
 
@@ -500,7 +500,7 @@ new_case combo-unmapped
 catalog orphan > "$CASE/catalog-info.yaml"
 backstage_json
 run_case oncall.sh "$FILE"
-run_case backstage.sh "$FILE"
+run_case from-backstage-collector.sh "$FILE"
 assert_eq "mapped nowhere: one list of every place looked" \
   "$(svc_lookup)" '{"searched":["meta:pagerduty/service-id","input:service_id","file:catalog-info.yaml","component:default/orphan"]}'
 
@@ -508,7 +508,7 @@ new_case combo-outage
 catalog five "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
 run_case oncall.sh "$FILE"
-run_case backstage.sh "$FILE"
+run_case from-backstage-collector.sh "$FILE"
 assert_eq "Backstage failing: the error rides along with oncall's miss, so the check skips" \
   "$(svc_lookup | jq -c '{searched, errors: [.errors[] | sub(": .*"; "")]}')" \
   '{"searched":["meta:pagerduty/service-id","input:service_id","file:catalog-info.yaml"],"errors":["component:default/five"]}'
@@ -518,15 +518,15 @@ echo "Reading the Component JSON (retry, pinning):"
 new_case pin
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh
+run_case from-backstage-collector.sh
 assert_eq "backstage: pinned to the commit the wave fired for" "$(cat "$CASE/getjson.log")" "github.com/acme/svc --git-sha abc123"
-run_case backstage.sh LUNAR_COMPONENT_PR=42
+run_case from-backstage-collector.sh LUNAR_COMPONENT_PR=42
 assert_eq "backstage: and to the PR on a PR" "$(tail -1 "$CASE/getjson.log")" "github.com/acme/svc --pr 42 --git-sha abc123"
 
 new_case stale
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh MOCK_GETJSON_FAIL=1 MOCK_GETJSON_STALE=2
+run_case from-backstage-collector.sh MOCK_GETJSON_FAIL=1 MOCK_GETJSON_STALE=2
 assert_eq "a failed read, then two without the lookup, then it lands: resolves" \
   "$(queried) $(via) $(reads)" "PSYS001 system:default/payment-platform 4"
 assert_eq "backing off 5s, 10s, 15s" "$(tr '\n' ' ' < "$CASE/sleeps")" "5 10 15 "
@@ -537,7 +537,7 @@ assert_eq "the get-json error is shown once, without its usage block" \
 new_case budget
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh MOCK_GETJSON_STALE=1000
+run_case from-backstage-collector.sh MOCK_GETJSON_STALE=1000
 assert_eq "the default budget is 1800s, backing off up to 60s" \
   "$(slept) $(longest_sleep) $(reads)" "1770 60 36"
 assert_eq "a lookup that never becomes readable fails the run" "$CASE_EXIT $(writes)" "1 0"
@@ -546,10 +546,10 @@ assert_eq "and says why" "$(logged 'still isn.t readable after 1770s')" "1"
 new_case budget-input
 catalog checkout "" "" payment-platform > "$CASE/catalog-info.yaml"
 backstage_json
-run_case backstage.sh MOCK_GETJSON_FAIL=1000 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=60
+run_case from-backstage-collector.sh MOCK_GETJSON_FAIL=1000 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=60
 assert_eq "backstage_wait_seconds sets the budget" "$(slept) $(reads)" "50 5"
 assert_eq "an unreadable Component JSON fails the run" "$CASE_EXIT $(writes) $(logged 'Could not read Component JSON')" "1 0 1"
-run_case backstage.sh MOCK_GETJSON_STALE=1 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=soon
+run_case from-backstage-collector.sh MOCK_GETJSON_STALE=1 LUNAR_VAR_BACKSTAGE_WAIT_SECONDS=soon
 assert_eq "an invalid backstage_wait_seconds falls back to 1800" \
   "$(logged "Invalid backstage_wait_seconds 'soon'") $(via)" "1 system:default/payment-platform"
 

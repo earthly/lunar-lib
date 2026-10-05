@@ -74,7 +74,7 @@ class ServiceMappedTest(unittest.TestCase):
         )
 
     def test_pass_when_a_lookup_missed_but_another_sub_collector_mapped_it(self):
-        # pagerduty's oncall misses the checked-out file, its backstage sub-collector finds the System's ID.
+        # pagerduty's oncall misses the checked-out file, its from-backstage-collector sub-collector finds the System's ID.
         oncall = {
             "source": SOURCE,
             "service_lookup": {"searched": SEARCHED[:2] + ["file:catalog-info.yaml"]},

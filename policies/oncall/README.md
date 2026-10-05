@@ -96,7 +96,7 @@ policies:
 
 When this policy fails, you can resolve it by:
 
-1. **service-mapped:** Map the component to its service: a `pagerduty.com/service-id` annotation on its Backstage Component (or its System or Domain, with the pagerduty collector's `backstage` sub-collector and the backstage collector's `backstage_url`), the `pagerduty/service-id` component meta, or the collector's `service_id` input
+1. **service-mapped:** Map the component to its service: a `pagerduty.com/service-id` annotation on its Backstage Component (or its System or Domain, with the pagerduty collector's `from-backstage-collector` sub-collector and the backstage collector's `backstage_url`), the `pagerduty/service-id` component meta, or the collector's `service_id` input
 2. **schedule-configured:** Create an on-call schedule in your incident-management tool (PagerDuty, OpsGenie, Datadog On-Call, etc.) for the service and assign team members
 3. **escalation-defined:** Create an escalation policy in your incident-management tool with at least one level
 4. **min-participants:** Add more team members to the on-call rotation (default minimum is 2)
