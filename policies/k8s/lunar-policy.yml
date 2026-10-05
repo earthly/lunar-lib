@@ -9,9 +9,9 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Kubernetes Guardrails"
   long_description: |
-    Enforce Kubernetes best practices on plain manifests and rendered Helm charts, including
-    manifest validation, resource limits, probes, PodDisruptionBudgets, autoscaling, topology
-    spread, graceful shutdown, and NetworkPolicy egress to the instance-metadata endpoint.
+    Enforce Kubernetes best practices including manifest validation, resource limits,
+    probes, PodDisruptionBudgets, HPA configurations, and NetworkPolicy egress to the
+    instance-metadata endpoint.
   category: "deployment-and-infrastructure"
   icon: "assets/k8s.svg"
   status: "stable"
@@ -24,10 +24,9 @@ policies:
   - name: valid
     description: |
       Validates that all Kubernetes manifests in the repository are syntactically correct
-      and conform to K8s schema, and that every Helm chart renders. Invalid manifests will
-      fail deployment.
+      and conform to K8s schema. Invalid manifests will fail deployment.
     mainPython: valid.py
-    keywords: ["kubernetes", "manifest validation", "yaml", "kubeconform", "helm template"]
+    keywords: ["kubernetes", "manifest validation", "yaml", "kubeconform"]
 
   - name: requests-and-limits
     description: |
@@ -124,72 +123,6 @@ policies:
     mainPython: min_kubectl_version.py
     keywords: ["kubectl", "version", "ci/cd", "compatibility", "security"]
 
-  - name: topology-spread
-    description: |
-      Requires Deployments and StatefulSets that can run more than one replica (their autoscaler's
-      maximum, else spec.replicas) to have a topologySpreadConstraint on `topology_key` (zone by
-      default) that selects their pods, with maxSkew within `topology_max_skew`.
-    mainPython: topology_spread.py
-    keywords: ["topology spread", "availability zones", "maxSkew", "pod placement", "high availability"]
-
-  - name: graceful-shutdown
-    description: |
-      Requires Deployments and StatefulSets to drain before stopping: a preStop hook on a container
-      and a terminationGracePeriodSeconds of at least `min_termination_grace_period_seconds`.
-    mainPython: graceful_shutdown.py
-    keywords: ["graceful shutdown", "preStop", "terminationGracePeriodSeconds", "SIGTERM", "zero-downtime deploys"]
-
-  - name: pdb-budget
-    description: |
-      Fails a PodDisruptionBudget that allows no voluntary disruption, which blocks node drains:
-      maxUnavailable 0, or a minAvailable (a percentage rounds up) that covers every pod of a workload
-      at its smallest size, its autoscaler's minimum else spec.replicas. Also fails one with no
-      selector, or with both minAvailable and maxUnavailable set.
-    mainPython: pdb_budget.py
-    keywords: ["pdb", "pod disruption budget", "node drain", "maxUnavailable", "minAvailable"]
-
-  - name: no-static-replicas
-    description: |
-      Fails a Deployment or StatefulSet that sets spec.replicas while an HPA or KEDA ScaledObject
-      scales it: every apply resets the replica count the autoscaler chose.
-    mainPython: no_static_replicas.py
-    keywords: ["hpa", "keda", "autoscaling", "spec.replicas", "argocd sync", "helm upgrade"]
-
-  - name: probes-distinct
-    description: |
-      Requires each container's liveness and readiness probes to check different endpoints, so a
-      pod too busy to serve leaves rotation instead of being restarted.
-    mainPython: probes_distinct.py
-    keywords: ["liveness probe", "readiness probe", "health checks", "probe endpoints"]
-
-  - name: probe-timeouts
-    description: |
-      Requires every probe's timeoutSeconds to be at least `min_probe_timeout_seconds` and below
-      its periodSeconds, so one slow check isn't still running when the next starts.
-    mainPython: probe_timeouts.py
-    keywords: ["probe timeout", "timeoutSeconds", "periodSeconds", "health checks", "pod restarts"]
-
-  - name: allowed-registries
-    description: |
-      Requires every container and init container image to come from a registry in
-      `allowed_registries`. Skipped until the list is set.
-    mainPython: allowed_registries.py
-    keywords: ["container registry", "image source", "supply chain security", "approved registries"]
-
-  - name: deprecated-api-versions
-    description: |
-      Fails manifests and rendered charts that use an apiVersion listed in
-      `deprecated_api_versions`. Skipped until the list is set.
-    mainPython: deprecated_api_versions.py
-    keywords: ["deprecated apis", "apiVersion", "kubernetes upgrade", "removed apis"]
-
-  - name: pod-annotations
-    description: |
-      Requires the pod template annotations in `required_pod_annotations` and fails those in
-      `forbidden_pod_annotations`. Skipped until either list is set.
-    mainPython: pod_annotations.py
-    keywords: ["pod annotations", "required annotations", "forbidden annotations", "karpenter"]
-
 inputs:
   min_replicas:
     description: Minimum replicas required for HPAs (default 3)
@@ -203,37 +136,4 @@ inputs:
   metadata_ips:
     description: Comma-separated metadata endpoint IPs that metadata-egress-blocked keeps pods from reaching on TCP port 80 (add fd00:ec2::254 for IPv6 EKS clusters)
     default: "169.254.169.254"
-  topology_key:
-    description: Node label topology-spread requires a constraint on (default topology.kubernetes.io/zone)
-    default: "topology.kubernetes.io/zone"
-  topology_max_skew:
-    description: Largest maxSkew topology-spread accepts on that constraint (default 1)
-    default: "1"
-  topology_when_unsatisfiable:
-    description: whenUnsatisfiable value topology-spread requires on that constraint (DoNotSchedule or ScheduleAnyway). Empty accepts either.
-    default: ""
-  topology_require_match_label_keys:
-    description: Also require the constraint to set matchLabelKeys with pod-template-hash, so a rollout's skew counts only the new revision's pods (true/false)
-    default: "false"
-  min_termination_grace_period_seconds:
-    description: Smallest terminationGracePeriodSeconds graceful-shutdown accepts. An unset value counts as the Kubernetes default, 30 (default 30)
-    default: "30"
-  require_prestop:
-    description: Whether graceful-shutdown requires a preStop hook on at least one container (true/false)
-    default: "true"
-  min_probe_timeout_seconds:
-    description: Smallest probe timeoutSeconds probe-timeouts accepts. An unset value counts as the Kubernetes default, 1 (default 1)
-    default: "1"
-  allowed_registries:
-    description: Comma-separated registries, or registry/path prefixes, images may come from (e.g. "ghcr.io/acme,123456789012.dkr.ecr.us-east-1.amazonaws.com"). An image with no registry counts as docker.io. Empty skips allowed-registries.
-    default: ""
-  deprecated_api_versions:
-    description: Comma-separated apiVersions deprecated-api-versions fails, each optionally narrowed to one kind (e.g. "policy/v1beta1,networking.k8s.io/v1beta1:Ingress"). Empty skips the check.
-    default: ""
-  required_pod_annotations:
-    description: Comma-separated annotation keys every workload's pod template must set. Empty requires none.
-    default: ""
-  forbidden_pod_annotations:
-    description: Comma-separated annotation keys no workload's pod template may set (e.g. "karpenter.sh/do-not-disrupt"). Empty forbids none.
-    default: ""
 
