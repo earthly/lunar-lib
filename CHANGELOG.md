@@ -9,6 +9,23 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.18.1] — 2026-10-05
+
+### Added
+
+- pagerduty: find the service ID in the backstage collector's live lookup, including one set on the System or Domain; oncall: add service-mapped (#359)
+- datadog: add an oncall sub-collector reading Datadog On-Call for policies/oncall (#347)
+- github collector + vcs policy: add PR reviews and commit signatures, ruleset bypass actors, and a release-range merged-PR check (#346)
+
+### Changed
+
+- claude, codex, gemini: quote JSON string values in the cicd collectors (#364)
+- gitlab cataloger: retry a project listing page with simple=true after an HTTP 500 (#362)
+
+### Fixed
+
+- backstage: fix system-domain-set passing when there's no System to check (#363)
+
 ## [1.18.0] — 2026-10-01
 
 ### Added
@@ -990,6 +1007,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
 [1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0

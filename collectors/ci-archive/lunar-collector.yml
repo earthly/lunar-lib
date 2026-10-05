@@ -4,7 +4,7 @@ name: ci-archive
 description: Archive completed CI workflow runs and their logs to S3
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.18.1
 
 landing_page:
   display_name: "CI Archive Collector"
