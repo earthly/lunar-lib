@@ -1,0 +1,47 @@
+{
+  "data": {
+    "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90",
+    "relationships": {
+      "rules": {
+        "data": [
+          { "id": "5e0c6a8b-1f2d-4a3b-9c4d-6e7f8a9b0c1d", "type": "team_routing_rules" },
+          { "id": "6f1d7b9c-2a3e-4b4c-8d5e-7f8a9b0c1d2e", "type": "team_routing_rules" }
+        ]
+      }
+    },
+    "type": "team_routing_rules"
+  },
+  "included": [
+    {
+      "attributes": {
+        "actions": [
+          { "channel": "C0PAYMENTS", "type": "send_slack_message", "workspace": "T0EXAMPLE" }
+        ],
+        "query": "urgency:low",
+        "time_restriction": {
+          "restrictions": [
+            { "end_day": "friday", "end_time": "17:00:00", "start_day": "monday", "start_time": "09:00:00" }
+          ],
+          "time_zone": "Europe/London"
+        },
+        "urgency": "low"
+      },
+      "id": "5e0c6a8b-1f2d-4a3b-9c4d-6e7f8a9b0c1d",
+      "relationships": { "policy": { "data": null } },
+      "type": "team_routing_rules"
+    },
+    {
+      "attributes": {
+        "actions": null,
+        "query": "",
+        "time_restriction": null,
+        "urgency": "high"
+      },
+      "id": "6f1d7b9c-2a3e-4b4c-8d5e-7f8a9b0c1d2e",
+      "relationships": {
+        "policy": { "data": { "id": "b7a1e2d4-3c5f-4e6a-8b9c-0d1e2f3a4b5c", "type": "policies" } }
+      },
+      "type": "team_routing_rules"
+    }
+  ]
+}
