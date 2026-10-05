@@ -1,36 +1,30 @@
 from lunar_policy import Check
 
+from helpers import Findings, entries_or_skip
+
 
 def main(node=None):
     """Requires containers to run as non-root users."""
     c = Check("non-root", "Containers should run as non-root", node=node)
     with c:
-        workloads = c.get_node(".k8s.workloads")
-        if not workloads.exists():
-            c.skip("No Kubernetes workloads found in this repository")
+        workloads = entries_or_skip(c, ".k8s.workloads", "No Kubernetes workloads found in this repository")
 
+        findings = Findings(c)
         for workload in workloads:
-            kind = workload.get_value_or_default(".kind", "")
-            name = workload.get_value_or_default(".name", "<unknown>")
-            namespace = workload.get_value_or_default(".namespace", "default")
-            path = workload.get_value_or_default(".path", "<unknown>")
+            kind = workload.get("kind", "")
+            name = workload.get("name", "<unknown>")
+            namespace = workload.get("namespace", "default")
 
-            containers = workload.get_node(".containers")
-            if not containers.exists():
-                continue
-
-            for container in containers:
-                cname = container.get_value_or_default(".name", "<container>")
-                runs_as_non_root = container.get_value_or_default(".runs_as_non_root", False)
-
-                c.assert_true(
-                    runs_as_non_root,
-                    f"{path}: {kind} {namespace}/{name} container {cname!r} should set securityContext.runAsNonRoot: true"
+            for container in workload.get("containers") or []:
+                cname = container.get("name", "<container>")
+                findings.check(
+                    container.get("runs_as_non_root") is True, workload,
+                    f"{kind} {namespace}/{name} container {cname!r} should set securityContext.runAsNonRoot: true"
                 )
+        findings.report()
 
     return c
 
 
 if __name__ == "__main__":
     main()
-
