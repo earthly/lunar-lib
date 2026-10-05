@@ -20,3 +20,12 @@ test-offline:
     COPY main.sh test-local.sh lint_backstage.py .
     COPY --dir test .
     RUN ./test-local.sh
+
+# The collector's scripts, for collectors/pagerduty's test, which runs the real
+# collector to produce the Component JSON its from-backstage-collector sub-collector reads.
+src:
+    FROM alpine:3.21
+    WORKDIR /src
+    COPY main.sh lint_backstage.py .
+    SAVE ARTIFACT main.sh
+    SAVE ARTIFACT lint_backstage.py

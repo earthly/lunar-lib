@@ -63,7 +63,13 @@ collectors:
       recorded rather than looking like one that was never checked. The hop
       reuses the System entity the system lookup already returned, so it costs
       one extra request and only when the system both resolves and declares a
-      domain. The `<namespace>` is derived from the reference itself —
+      domain. It also looks up the primary entity itself, recorded at
+      `.refs.entity = {kind, name, exists}`, and every entry that resolves to
+      an entity carries its canonical `ref` and its `annotations`, so other
+      collectors can read annotations from the live catalog without calling
+      Backstage again (the pagerduty collector's `from-backstage-collector` sub-collector
+      inherits a service ID from the System or Domain this way). The
+      `<namespace>` is derived from the reference itself —
       a qualified ref (`ns/name`) carries its own, otherwise the component's own
       `metadata.namespace` is used, falling back to `default` — so no namespace
       configuration is required. When `backstage_url` is empty (the default) no
@@ -299,9 +305,10 @@ example_component_json: |
           ],
           "refs": {
             "checked": true,
-            "domain": { "name": "payments", "exists": true },
-            "system": { "name": "payment-platform", "exists": true, "has_domain": true },
-            "system_domain": { "name": "payments", "exists": true, "via_system": "payment-platform" }
+            "entity": { "kind": "Component", "name": "payment-api", "exists": true, "ref": "component:default/payment-api", "annotations": { "backstage.io/techdocs-ref": "dir:.", "backstage.io/source-location": "url:https://github.com/acme/payment-api" } },
+            "domain": { "name": "payments", "exists": true, "ref": "domain:default/payments" },
+            "system": { "name": "payment-platform", "exists": true, "ref": "system:default/payment-platform", "has_domain": true, "annotations": { "pagerduty.com/service-id": "PSYS001" } },
+            "system_domain": { "name": "payments", "exists": true, "ref": "domain:default/payments", "via_system": "payment-platform" }
           }
         }
       }
