@@ -135,7 +135,10 @@ for chart_file in "${chart_files[@]}"; do
         continue
     fi
 
-    release=$(basename "$(cd "$dir" && pwd)" | tr '[:upper:]_.' '[:lower:]--')
+    # Named for its directory, or for the chart itself at the repository root.
+    release=$(basename "$dir")
+    [ "$dir" = "." ] && release=$(yq '.name // "release"' "$chart_file" 2>/dev/null)
+    release=$(echo "$release" | tr '[:upper:]_.' '[:lower:]--')
     prepare_dependencies "$dir" "$chart_file"
     sets_json=$(python3 "$SCRIPT_DIR/values_sets.py" "$dir")
     validated_only=$(echo "$sets_json" | jq '.validated_only')

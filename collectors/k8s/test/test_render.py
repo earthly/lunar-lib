@@ -181,6 +181,11 @@ class RenderTest(Harness):
         self.assertEqual(k8s["manifests"][0]["resources"],
                          [{"kind": "Deployment", "name": "api", "namespace": "default", "api_version": "apps/v1"}])
 
+    def test_an_overlay_extends_another_only_at_a_dash(self):
+        self.chart("charts/api", overlays={"values-pro.yaml": "replicas: 2\n", "values-prod.yaml": "replicas: 3\n"})
+        _, renders = self.renders(helm_values_chains="overlays")
+        self.assertEqual([r[1] for r in renders], [["values.yaml", "values-pro.yaml"], ["values.yaml", "values-prod.yaml"]])
+
     def test_chains_overlays_leaves_a_chart_without_overlays_build_only_and_all_checks_it(self):
         self.chart("charts/lib-defaults")
         _, renders = self.renders(helm_values_chains="overlays")
@@ -269,7 +274,7 @@ class RenderTest(Harness):
         self.chart(".", name="svc")
         k8s, renders = self.renders(helm_values="values.yaml")
         self.assertEqual(renders, [(".", ["values.yaml"], False, True)])
-        self.assertEqual(k8s["workloads"][0]["path"], "templates/deployment.yaml")
+        self.assertEqual((k8s["workloads"][0]["path"], k8s["workloads"][0]["name"]), ("templates/deployment.yaml", "svc"))
 
     def test_without_helm_the_run_fails_instead_of_failing_every_chart(self):
         self.chart("charts/api")
