@@ -271,6 +271,14 @@ class RenderTest(Harness):
         self.assertEqual(renders, [(".", ["values.yaml"], False, True)])
         self.assertEqual(k8s["workloads"][0]["path"], "templates/deployment.yaml")
 
+    def test_without_helm_the_run_fails_instead_of_failing_every_chart(self):
+        self.chart("charts/api")
+        env = dict(os.environ, PATH=self.bin + os.pathsep + "/usr/bin:/bin")
+        proc = subprocess.run(["bash", RENDER_SH], cwd=self.repo, env=env, capture_output=True, text=True)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("helm is not installed", proc.stderr)
+        self.assertFalse(os.path.exists(self.capture))
+
     def test_an_unknown_chains_mode_fails_loudly(self):
         self.chart("charts/api")
         proc = self.run_script(RENDER_SH, helm_values_chains="true")

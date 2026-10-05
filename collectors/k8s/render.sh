@@ -109,11 +109,21 @@ render() {
              + del(.resources)'
 }
 
+chart_files=()
+while IFS= read -r chart_file; do
+    chart_files+=("${chart_file#./}")
+done < <(eval "$FIND_CMD" 2>/dev/null | grep -vE '(^|/)(\.git|node_modules|vendor)(/|$)' | sort)
+[ "${#chart_files[@]}" -gt 0 ] || exit 0
+
+# Without these, every chart would be recorded as failing to render.
+for tool in helm kubeconform yq jq python3; do
+    command -v "$tool" >/dev/null || { echo "helm: $tool is not installed; can't render charts" >&2; exit 1; }
+done
+
 results="$WORK/results.jsonl"
 : > "$results"
 charts=0
-while IFS= read -r chart_file; do
-    chart_file="${chart_file#./}"
+for chart_file in "${chart_files[@]}"; do
     dir=$(dirname "$chart_file")
     parent=$(dirname "$dir")
     # A subchart is rendered with the chart whose charts/ directory holds it.
@@ -134,7 +144,7 @@ while IFS= read -r chart_file; do
         render "$dir" "$release" "$sets_json" "$i" "$validated_only" >> "$results"
     done
     charts=$((charts + 1))
-done < <(eval "$FIND_CMD" 2>/dev/null | grep -vE '(^|/)(\.git|node_modules|vendor)(/|$)' | sort)
+done
 
 [ "$charts" -gt 0 ] || exit 0
 
