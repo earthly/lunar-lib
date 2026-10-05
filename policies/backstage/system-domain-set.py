@@ -23,9 +23,16 @@ def main(node=None):
             )
             return c
 
+        # With no System to read a domain off, skip rather than pass: a pass
+        # would claim a domain was checked. The checks that own those two
+        # failures, `system-set` and `system-exists`, report them.
         ref = c.get_value_or_default(".catalog.native.backstage.refs.system", None)
         if not isinstance(ref, dict):
-            # No spec.system declared; `system-set` owns "should it be set".
+            c.skip(
+                "catalog-info.yaml declares no spec.system, so there is no "
+                "System to check for a domain. `system-set` reports a missing "
+                "spec.system."
+            )
             return c
 
         name = ref.get("name", "?")
@@ -39,7 +46,11 @@ def main(node=None):
             return c
 
         if not ref.get("exists"):
-            # An unresolvable system is `system-exists`'s failure to report.
+            c.skip(
+                f"System '{name}' (referenced by spec.system) does not exist in "
+                "Backstage, so there is no domain to check. `system-exists` "
+                "reports the missing System."
+            )
             return c
 
         if "has_domain" not in ref:
