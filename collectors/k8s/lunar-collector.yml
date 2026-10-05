@@ -46,7 +46,8 @@ collectors:
   - name: helm
     description: |
       Renders each Helm chart in the repository with `helm template`, once per values
-      set in `helm_values`, and parses the output the same way as a static manifest.
+      set in `helm_values` or derived from its file names with `helm_values_chains`,
+      and parses the output the same way as a static manifest.
       Rendered objects land in the same `.k8s` arrays, tagged with the chart and values
       files that produced them. A chart no values set applies to is rendered with its
       own values.yaml only to check that it builds: it gets a `.k8s.manifests[]` entry
@@ -79,8 +80,12 @@ inputs:
     default: "find . -type f \\( -name 'Chart.yaml' -o -name 'Chart.yml' \\)"
   helm_values:
     description: |
-      Values sets to check each chart's objects with, one per line. A line lists values files, relative to the chart directory, applied in order on top of the chart's values.yaml; a glob gives one render per matching file, and a line of just `values.yaml` checks the defaults. A chart skips lines whose files it doesn't have. A chart no line applies to is only checked to build: its values.yaml render records validity and no objects. `#` starts a comment.
+      Values sets to check each chart's objects with, one per line. A line lists values files, relative to the chart directory, applied in order on top of the chart's values.yaml; a glob gives one render per matching file, and a line of just `values.yaml` checks the defaults. A chart skips lines whose files it doesn't have. A chart no line or chain applies to is only checked to build: its values.yaml render records validity and no objects. `#` starts a comment.
     default: ""
+  helm_values_chains:
+    description: |
+      Also check each chart with the values chains its file names imply (true/false). An overlay extends the ones its name continues at a dash (values-prod-eu.yaml extends values-prod.yaml). Each values-*.yaml that nothing extends is one chain: values.yaml, the overlays it extends, then itself. A chart with no values-*.yaml is checked with values.yaml alone. Adds to the sets in helm_values.
+    default: "false"
   helm_dependency_build:
     description: Run `helm dependency build` before rendering a chart whose remote dependencies aren't vendored in its charts/ directory (true/false). Needs network access to the chart repositories. When off, such a chart fails to render and is reported as invalid. Local file:// dependencies are always built.
     default: "false"

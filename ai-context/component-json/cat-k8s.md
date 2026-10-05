@@ -2,7 +2,7 @@
 
 Kubernetes manifests. This is specific enough to warrant its own category.
 
-Plain manifests and rendered Helm charts share the same arrays. An entry that came from a chart carries `render` (the chart directory and the values files it was rendered with), and its `path` is the template that produced it. A chart no `helm_values` line applies to is rendered with its defaults only to check that it builds: its `.k8s.manifests[]` entry has `render.validated_only: true`, and it contributes no other entries.
+Plain manifests and rendered Helm charts share the same arrays. An entry that came from a chart carries `render` (the chart directory and the values files it was rendered with), and its `path` is the template that produced it. A chart no `helm_values` line or `helm_values_chains` chain applies to is rendered with its defaults only to check that it builds: its `.k8s.manifests[]` entry has `render.validated_only: true`, and it contributes no other entries.
 
 ```json
 {
