@@ -85,7 +85,7 @@ Follow the template in `collector-README-template.md` or `policy-README-template
 - Overview (2-3 sentences)
 - Collected Data table (paths, types, descriptions)
 - Sub-collector/check table
-- Installation YAML example
+- Installation YAML example, with `include:` listing every sub-collector or check (`+lint` enforces it)
 - Inputs table
 - Notes on anything non-obvious
 
