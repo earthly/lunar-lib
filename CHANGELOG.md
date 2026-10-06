@@ -9,6 +9,16 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.19.0] — 2026-10-06
+
+### Added
+
+- k8s: render Helm charts, and add nine k8s checks (#368)
+
+### Fixed
+
+- k8s: fix rendering Helm charts whose directory name isn't a valid release name (#369)
+
 ## [1.18.1] — 2026-10-05
 
 ### Added
@@ -1007,6 +1017,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
 [1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
 [1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
