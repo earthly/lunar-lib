@@ -73,12 +73,37 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/k8s@v1.0.0
     on: [kubernetes]
+    include:
+      - k8s   # Plain manifests
+      - helm  # Helm charts, rendered
+      - cicd  # kubectl commands in CI
 
 policies:
   - uses: github://earthly/lunar-lib/policies/k8s@v1.0.0
     on: [kubernetes]
     enforcement: report-pr
-    # include: [valid, requests-and-limits, probes]  # Only run specific checks
+    include:
+      - valid
+      - requests-and-limits
+      - probes
+      - min-replicas
+      - pdb
+      - non-root
+      - host-users
+      - host-network
+      - host-pid
+      - host-ipc
+      - metadata-egress-blocked
+      - min-kubectl-version
+      - topology-spread
+      - graceful-shutdown
+      - pdb-budget
+      - no-static-replicas
+      - probes-distinct
+      - probe-timeouts
+      - allowed-registries
+      - deprecated-api-versions
+      - pod-annotations
     # with:
     #   min_replicas: "3"
     #   max_limit_to_request_ratio: "4"

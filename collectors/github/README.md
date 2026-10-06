@@ -86,7 +86,12 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/github@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
-    # include: [repository]  # Only run specific checks (omit to run all)
+    include:
+      - pull-request        # PR metadata
+      - repository          # Repository settings
+      - branch-protection   # Branch protection rules
+      - access-permissions  # Collaborators and teams
+      - release-range       # Commits since the last release (needs release_tag_pattern)
     # with:
     #   release_tag_pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'  # enables release-range
 ```

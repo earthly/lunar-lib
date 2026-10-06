@@ -47,7 +47,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/istio@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [kubernetes, mesh]
     enforcement: report-pr
-    # include: [mtls-strict, gateway-tls]  # Only run specific checks
+    include:
+      - valid
+      - mtls-strict
+      - authorization-policies-defined
+      - no-permissive-authz
+      - gateway-tls
+      - tls-approved
+      - sidecar-injection
+      - no-envoy-filter
     # with:
     #   required_mtls_mode: "STRICT"
     #   approved_tls_versions: "TLSV1_2,TLSV1_3"

@@ -49,7 +49,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/git@v1.0.0
     on: ["domain:your-domain"]
-    # include: [pre-commit, gitattributes]  # Run a subset
+    include:
+      - pre-commit     # .pre-commit-config.yaml
+      - gitattributes  # .gitattributes
+      - gitmodules     # .gitmodules
     # with:
     #   pre_commit_paths: ".pre-commit-config.yaml,.pre-commit-config.yml"
     #   gitattributes_paths: ".gitattributes"

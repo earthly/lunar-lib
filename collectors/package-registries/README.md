@@ -80,6 +80,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/package-registries@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, node]
+    include: [scan]
     # with:
     #   ecosystems: "npm,maven"   # Restrict to specific ecosystems
 ```

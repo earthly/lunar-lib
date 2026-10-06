@@ -45,5 +45,12 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/nodejs@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project        # package.json, lockfiles and TypeScript
+      - dependencies   # Dependencies from package.json
+      - cicd           # node commands in CI
+      - npm-cicd       # npm commands in CI
+      - yarn-cicd      # Yarn commands in CI
+      - pnpm-cicd      # pnpm commands in CI
+      - test-coverage  # Test coverage
 ```

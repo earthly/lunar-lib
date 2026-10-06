@@ -14,8 +14,8 @@ a per-language **bundle** that groups shell guardrails the same way
 agent edits a shell script it runs ShellCheck against it and, on a non-zero
 exit, reports the findings back to the agent as a block reason.
 
-Consumers take the whole bundle or a subset — see
-[Configuration](#configuration).
+Consumers list the sub-probes they run with `include:` — see
+[Installation](#installation).
 
 ## Probes
 
@@ -75,6 +75,7 @@ version: 0
 
 probes:
   - uses: github://earthly/lunar-lib/probes/shell@v1.0.0
+    include: [shellcheck]
 ```
 
 ## Requirements
@@ -90,15 +91,6 @@ probes:
 ShellCheck reads its own configuration from the repo's `.shellcheckrc`
 automatically — enabled/disabled checks, the severity floor, and shell
 dialect all live there.
-
-To take only part of the bundle, use `include:` / `exclude:` (probe
-names, mutually exclusive) on the `uses:` entry:
-
-```yaml
-probes:
-  - uses: github://earthly/lunar-lib/probes/shell@v1.0.0
-    include: [shellcheck]       # explicit — the bundle's only probe today
-```
 
 The bundle does not currently expose any `inputs:`. A `shfmt` formatting
 sub-probe (`shell.shfmt`) and severity-gating knobs are tracked as future

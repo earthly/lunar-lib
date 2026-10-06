@@ -42,6 +42,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/codeql@main
     on: ["domain:your-domain"]
+    include:
+      - github-app      # CodeQL check-runs on PRs
+      - running-in-prs  # Proves CodeQL runs on PRs
+      - cicd            # CodeQL runs in CI, with SARIF
     secrets:
       GH_TOKEN: ${GH_TOKEN}
 ```

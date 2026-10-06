@@ -41,7 +41,14 @@ policies:
   - uses: github://earthly/lunar-lib/policies/git@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [pre-commit-config-exists, gitattributes-eol-normalized]
+    include:
+      - pre-commit-config-exists
+      - pre-commit-pinned-refs
+      - pre-commit-secret-scan-hook
+      - pre-commit-ci-skip-empty
+      - gitattributes-exists
+      - gitattributes-eol-normalized
+      - submodules-no-floating-branches
     # with:
     #   secret_scan_hook_ids: "gitleaks,detect-secrets,trufflehog"
 ```

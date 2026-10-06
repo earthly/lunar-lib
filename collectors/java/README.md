@@ -47,5 +47,13 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/java@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project        # Build tools and Java version
+      - dependencies   # Maven and Gradle dependencies
+      - cicd           # java and javac commands in CI
+      - maven-cicd     # Maven commands in CI
+      - gradle-cicd    # Gradle commands in CI
+      - sbt-cicd       # sbt commands in CI
+      - test-scope     # Test scope in CI
+      - test-coverage  # JaCoCo coverage
 ```

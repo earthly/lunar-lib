@@ -4,7 +4,7 @@ Parses Kubernetes manifests, renders Helm charts, and tracks kubectl commands in
 
 ## Overview
 
-This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It renders each Helm chart with `helm template` and parses the output the same way, so workloads defined in charts are checked like plain manifests. It extracts workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs) with their container specs, resource limits, probes and shutdown settings, plus PodDisruptionBudgets, HorizontalPodAutoscalers, KEDA ScaledObjects and NetworkPolicies. It also intercepts `kubectl` commands during CI runs so deployment invocations (apply, rollout, etc.) are recorded alongside the manifest data.
+This collector finds all Kubernetes YAML manifests in a repository and validates them using [kubeconform](https://github.com/yannh/kubeconform). It renders each Helm chart with `helm template` and parses the output the same way, so the `k8s` policy checks what a chart deploys; to check the chart itself (lint, version, pinned dependencies), use the [`helm` collector](../helm). It extracts workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs) with their container specs, resource limits, probes and shutdown settings, plus PodDisruptionBudgets, HorizontalPodAutoscalers, KEDA ScaledObjects and NetworkPolicies. It also intercepts `kubectl` commands during CI runs so deployment invocations (apply, rollout, etc.) are recorded alongside the manifest data.
 
 ## Collected Data
 
@@ -67,7 +67,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/k8s@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [kubernetes, backend]
-    # exclude: [helm]  # Don't render Helm charts
+    include:
+      - k8s   # Plain manifests
+      - helm  # Helm charts, rendered
+      - cicd  # kubectl commands in CI
     # with:
     #   find_command: "find ./deploy -name '*.yaml'"  # Custom find command
     #   helm_values: |

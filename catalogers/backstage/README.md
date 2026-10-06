@@ -73,6 +73,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -94,6 +95,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -128,6 +130,7 @@ Some gateways reject the pod's own role and accept only a role that the pod's ro
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -162,6 +165,7 @@ By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       api_path_prefix: ""   # gateway is mounted at root — no /api hop
@@ -176,10 +180,12 @@ For organisations that already run [`github-org`](../github-org) to enumerate re
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme"
 
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -193,6 +199,7 @@ Backstage components are matched to Lunar components by reading an annotation on
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       component_id_annotation: "github.com/project-slug"  # value: "acme/payment-api"
@@ -283,6 +290,7 @@ A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdo
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.2.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain

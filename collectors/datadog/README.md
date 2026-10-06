@@ -49,6 +49,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/datadog@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - service     # Monitors, dashboard and SLOs from the API
+      - repo-files  # Dashboard and monitor JSON in the repo
+      - oncall      # On-Call routing, escalation and schedule
     with:
       datadog_site: "datadoghq.com"
       # service_name: "payment-api"   # Optional fallback if catalog meta isn't set

@@ -48,7 +48,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/ruby@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [gemfile-exists, lockfile-exists]  # Only run specific checks
+    include:
+      - gemfile-exists
+      - lockfile-exists
+      - ruby-version-set
+      - bundler-audit-clean
+      - min-ruby-version
+      - min-ruby-version-cicd
+      - min-bundler-version-cicd
+      - min-rake-version-cicd
     # with:
     #   max_audit_vulnerabilities: "0"
     #   min_ruby_version: "3.0"

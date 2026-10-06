@@ -4,7 +4,7 @@ Parse Helm charts and collect chart metadata, lint results, and dependency infor
 
 ## Overview
 
-This collector finds all Helm charts in a repository (directories containing `Chart.yaml`) and extracts structured metadata. It runs `helm lint` on each chart, parses version information, checks for a `values.schema.json` file, and enumerates chart dependencies with their version constraints. The collector outputs normalized data under `.k8s.helm` for policy evaluation.
+This collector finds all Helm charts in a repository (directories containing `Chart.yaml`) and extracts structured metadata. It runs `helm lint` on each chart, parses version information, checks for a `values.schema.json` file, and enumerates chart dependencies with their version constraints. It writes `.k8s.helm` for the [`helm` policy](../../policies/helm), which checks the chart itself. To check what a chart deploys (resource limits, probes, disruption budgets), use the `helm` sub-collector of the [`k8s` collector](../k8s) with the `k8s` policy; a repo that publishes and deploys charts uses both.
 
 ## Collected Data
 
@@ -48,6 +48,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/helm@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [kubernetes, helm]
+    include:
+      - charts  # Chart metadata, lint and dependencies
+      - cicd    # helm commands in CI
     # with:
     #   find_command: "find ./charts -name 'Chart.yaml'"  # Custom find command
     #   lint_strict: "true"  # Enable strict lint mode

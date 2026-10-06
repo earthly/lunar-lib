@@ -40,7 +40,12 @@ policies:
   - uses: github://earthly/lunar-lib/policies/testing@main
     on: ["domain:engineering"]
     enforcement: report-pr
-    # include: [executed, passing]  # Only run specific checks (omit to run all)
+    include:
+      - executed
+      - passing
+      - coverage-collected
+      - coverage-reported
+      - min-coverage
     with:
       # required_languages: Only enforce for components with detected language projects
       # Checks for .lang.<language> existence (set by language collectors)

@@ -53,7 +53,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/sbom@main
     on: ["domain:engineering"]
     enforcement: block-pr
-    # include: [sbom-exists, disallowed-licenses]
+    include:
+      - sbom-exists
+      - has-licenses
+      - disallowed-licenses
+      - allowed-licenses
+      - min-components
+      - standard-format
+      - blocked-origins
+      - disallowed-packages
     with:
       disallowed_licenses: "GPL.*,BSL.*,AGPL.*"
       # allowed_licenses: '["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"]'
