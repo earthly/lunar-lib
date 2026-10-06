@@ -5,7 +5,7 @@ description: Collect dashboard, monitor, SLO, and On-Call data from Datadog via 
 
 author: support@earthly.dev
 
-default_image: earthly/lunar-lib:base-main
+default_image: earthly/lunar-lib:base-v1.19.0
 
 landing_page:
   display_name: "Datadog Collector"
