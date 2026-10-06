@@ -31,6 +31,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/openapi@main
     on: ["domain:your-domain"]
     enforcement: report-pr
+    include: [spec-version]
     # with:
     #   min_version: "3"  # default — require OpenAPI 3.x+
 ```

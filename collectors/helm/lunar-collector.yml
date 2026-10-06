@@ -22,7 +22,7 @@ landing_page:
       reason: "Enforces Helm chart best practices using this collector's data"
     - slug: "k8s"
       type: "collector"
-      reason: "Collects Kubernetes manifest data that Helm charts generate"
+      reason: "Checks what Helm charts deploy; this collector checks the charts themselves"
 
 collectors:
   - name: charts

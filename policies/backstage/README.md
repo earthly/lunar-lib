@@ -62,7 +62,22 @@ policies:
   - uses: github://earthly/lunar-lib/policies/backstage@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [catalog-info-exists, owner-set]  # Only run specific checks
+    include:
+      - catalog-info-exists
+      - catalog-info-valid
+      - owner-set
+      - lifecycle-set
+      - system-set
+      - domain-exists
+      - system-exists
+      - system-domain-exists
+      - system-domain-set
+      - required-annotations
+      - required-tag-patterns
+      - required-link-types
+      - disallowed-annotations
+      - disallowed-tag-patterns
+      - dependencies-documented
     with:
       # Leave the rest of the fleet alone when it has no catalog-info.yaml:
       skip_when_no_catalog_info: "true"

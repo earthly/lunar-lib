@@ -43,7 +43,12 @@ policies:
   - uses: github://earthly/lunar-lib/policies/compliance-docs@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [production, tier1]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # include: [dr-plan-exists, dr-exercise-recent]  # Only run specific checks
+    include:
+      - dr-plan-exists
+      - dr-plan-rto-rpo-defined
+      - dr-plan-required-sections
+      - dr-exercise-recent
+      - dr-exercise-required-sections
     # with:
     #   max_days_since_exercise: "365"
     #   plan_required_sections: "Overview,Recovery Steps,Contact List"

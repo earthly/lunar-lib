@@ -44,7 +44,12 @@ policies:
   - uses: github://earthly/lunar-lib/policies/nodejs@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [lockfile-exists, typescript-configured]  # Only run specific checks
+    include:
+      - lockfile-exists
+      - typescript-configured
+      - engines-pinned
+      - min-node-version
+      - min-node-version-cicd
     with:
       min_node_version: "18"       # Minimum required Node.js major version (default: "18")
       min_node_version_cicd: "18"  # Minimum Node.js version for CI/CD commands (default: "18")

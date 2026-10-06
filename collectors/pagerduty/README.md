@@ -78,16 +78,18 @@ The collector resolves the PagerDuty service ID in this order:
 
 ### Live Backstage lookup
 
-The live lookup needs the backstage collector on the same components with `backstage_url` set, and the `from-backstage-collector` sub-collector (included unless you `include:` a subset). Together with `backstage_discovery: "true"`, a component mapped in its own `catalog-info.yaml` is collected on push by `oncall`, and one that inherits its service from a System or Domain is collected by `from-backstage-collector`:
+The live lookup needs the backstage collector on the same components with `backstage_url` set, and `from-backstage-collector` in the pagerduty collector's `include`. Together with `backstage_discovery: "true"`, a component mapped in its own `catalog-info.yaml` is collected on push by `oncall`, and one that inherits its service from a System or Domain is collected by `from-backstage-collector`:
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
   - uses: github://earthly/lunar-lib/collectors/pagerduty@v1.0.0
     on: ["domain:your-domain"]
+    include: [oncall, from-backstage-collector]
     with:
       backstage_discovery: "true"   # optional: read catalog-info.yaml first
 ```

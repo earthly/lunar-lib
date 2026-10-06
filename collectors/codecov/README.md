@@ -44,7 +44,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/codecov@main
     on: [backend]
-    # include: [ran]  # Only record that codecov ran (no API call needed)
+    include:
+      - ran      # Records that Codecov ran
+      - results  # Coverage results from the Codecov API
     # with:
     #   use_env_token: "true"  # Use CODECOV_TOKEN from CI environment
 ```

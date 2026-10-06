@@ -33,4 +33,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/gemini@main
     on: ["domain:your-domain"]
+    include:
+      - instruction-file  # GEMINI.md files
+      - cicd              # Gemini CLI runs in CI
 ```

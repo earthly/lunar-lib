@@ -50,6 +50,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/istio@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [kubernetes, mesh]
+    include:
+      - istio  # Istio resources
+      - cicd   # istioctl commands in CI
     # with:
     #   find_command: "find ./istio -name '*.yaml'"  # Custom find command
 ```

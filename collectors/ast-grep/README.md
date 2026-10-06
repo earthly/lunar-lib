@@ -33,6 +33,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ast-grep@v1.0.0
     on: [go, python]
+    include: [ast-grep]
     with:
       rules: |
         id: logging.logrus_fatal

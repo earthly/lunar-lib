@@ -25,7 +25,7 @@ landing_page:
       reason: "Collects container definitions that K8s workloads reference"
     - slug: "helm"
       type: "collector"
-      reason: "Lints the Helm charts this collector renders"
+      reason: "Checks Helm charts themselves; this collector checks what they deploy"
 
 collectors:
   - name: k8s

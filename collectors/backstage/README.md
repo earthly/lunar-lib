@@ -92,6 +92,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     # with:
     #   paths: "catalog-info.yaml,catalog-info.yml"  # Customize search paths
     #   search_parent_dirs: "true"     # Monorepos: fall back to a parent directory's catalog file
@@ -106,6 +107,7 @@ To cross-check the domain and system declared in `catalog-info.yaml` against a l
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -124,7 +126,8 @@ Some Backstage deployments authorize only the catalog **search** endpoint. A gat
 
 ```yaml
 collectors:
-  - uses: earthly/lunar-lib/collectors/backstage@v1.14.0
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.14.0
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       ref_lookup: "by-query"
@@ -166,6 +169,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -204,6 +208,7 @@ Some gateways reject the pod's own role and accept only a role that the pod's ro
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"

@@ -44,7 +44,11 @@ policies:
   - uses: github://earthly/lunar-lib/policies/oncall@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [schedule-configured]  # Only run specific checks
+    include:
+      - service-mapped
+      - schedule-configured
+      - escalation-defined
+      - min-participants
     # with:
     #   min_participants: "3"
 ```

@@ -43,11 +43,12 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/endoflife@v1.0.0
     on: ["domain:your-domain"]
+    include: [runtime]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/endoflife@v1.0.0
     enforcement: report-pr
-    # include: [runtime-not-eol]  # Only run the hard-EOL check
+    include: [runtime-not-eol, runtime-supported]
 ```
 
 The collector and policy are paired — the policy reads `.lang.<language>.eol` data, which only the `endoflife` collector writes today. Make sure the collector is enabled wherever the policy runs.

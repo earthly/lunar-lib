@@ -140,6 +140,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
 ```
 
 Then set the token at **cataloger** scope — the default scope is `collector`, and a secret in the wrong scope is invisible to this plugin:
@@ -157,6 +158,7 @@ Point `gitlab_host` at your instance:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       gitlab_host: "gitlab.acme.com"
 ```
@@ -170,6 +172,7 @@ Discovery is automatic, so scoping is done with path globs rather than a group l
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       include_projects: "acme/*,globex/platform/*"   # only these
       exclude_projects: "*/sandbox/*,*/deprecated-*" # never these
@@ -182,6 +185,7 @@ catalogers:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       include_groups: "acme,globex/platform"
       exclude_groups: "acme/sandbox"
@@ -194,6 +198,7 @@ Entries are group paths and may be subgroups; subgroups are always included, so 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       gitlab_host: "gitlab.acme.com"
       include_public: "true"
@@ -231,6 +236,7 @@ You can opt projects into the catalog by **GitLab topic**. Tag the projects you 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       allowed_topics: "lunar"          # only projects carrying the `lunar` topic
       disallowed_topics: "no-catalog"  # …but never projects carrying `no-catalog`

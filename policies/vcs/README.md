@@ -84,10 +84,28 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  # Run all policies (default - enforces all branch protection and repository settings)
+  # Every check: branch protection and repository settings
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
     on: "domain:your-domain"  # Or use tags like production, critical
     enforcement: report-pr    # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+      - minimum-approvals
+      - require-codeowner-review
+      - dismiss-stale-reviews
+      - require-status-checks
+      - require-branches-up-to-date
+      - disallow-force-push
+      - disallow-branch-deletion
+      - require-linear-history
+      - require-signed-commits
+      - disallow-bypass-actors
+      - pr-commits-signed
+      - release-commits-merged-via-pr
+      - require-private
+      - require-default-branch
+      - allowed-merge-strategies
     with:
       min_approvals: 2
       allowed_merge_strategies: "squash"

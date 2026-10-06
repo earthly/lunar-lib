@@ -37,12 +37,19 @@ The policy walks the parsed workflow data (triggers, permissions, jobs, steps, r
 collectors:
   - uses: github://earthly/lunar-lib/collectors/github-actions@main
     on: ["domain:your-domain"]
+    include: [workflows]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/github-actions@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [no-script-injection, permissions-declared]  # Run specific checks only
+    include:
+      - no-script-injection
+      - no-dangerous-trigger-checkout
+      - permissions-declared
+      - no-write-all-permissions
+      - checkout-no-persist-credentials
+      - no-secrets-inherit
 ```
 
 To accept the risk on a named job rather than fix it, list it under `exempt_jobs`.

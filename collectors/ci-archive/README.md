@@ -125,6 +125,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - backup-logs-s3        # Archives each finished run to S3
+      - backup-logs-s3-daily  # Daily catch-up of runs missed
     with:
       s3_bucket: "your-ci-archive-bucket"
       s3_prefix: "lunar/ci-archive"
@@ -138,7 +141,7 @@ component:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
     on: ["domain:your-domain"]
-    exclude: [backup-logs-s3-daily]
+    include: [backup-logs-s3]
     with:
       s3_bucket: "your-ci-archive-bucket"
   - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
@@ -179,6 +182,7 @@ backup only counts the run attempts in its window.
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ci-archive@v1.0.0
     on: ["domain:your-domain"]
+    include: [backup-logs-s3, backup-logs-s3-daily]
 ```
 
 Once a workflow run finishes, its entry shows up under `.ci.archive.runs` in the

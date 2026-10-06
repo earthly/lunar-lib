@@ -37,7 +37,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/observability@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [dashboard-exists]  # Only run specific checks
+    include: [dashboard-exists, alerts-configured, slo-defined]
 ```
 
 ## Examples
