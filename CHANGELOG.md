@@ -11,10 +11,9 @@ the next version ships.
 
 ## [1.19.0] — 2026-10-06
 
-### Changed
+### Added
 
 - k8s: render Helm charts, and add nine k8s checks (#368)
-- k8s: render Helm charts, and add nine k8s checks (#358)
 
 ### Fixed
 
