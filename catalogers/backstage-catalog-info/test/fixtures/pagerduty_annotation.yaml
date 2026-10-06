@@ -6,7 +6,7 @@ metadata:
   annotations:
     github.com/project-slug: acme/payment-api
     pagerduty.com/service-id: PABC123
-    pagerduty.com/integration-key: 0123456789abcdef0123456789abcdef
+    pagerduty.com/integration-key: 0123456789abcdef0123456789abcdef # gitleaks:allow
   tags:
     - payments
     - tier1
