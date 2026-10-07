@@ -43,6 +43,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/docker@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - dockerfile  # Parses Dockerfiles
+      - cicd        # docker commands in CI
+      - hadolint    # Lints Dockerfiles with hadolint
     # with:
     #   find_command: "find ./docker -name Dockerfile"  # Custom Dockerfile search
 ```

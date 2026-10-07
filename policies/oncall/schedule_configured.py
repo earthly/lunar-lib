@@ -8,8 +8,8 @@ def main(node=None):
         c.assert_true(
             schedule_node.exists() and bool(schedule_node.get_value()),
             "Service has no on-call schedule configured. Set up a schedule "
-            "in your on-call tool (PagerDuty, OpsGenie, etc.) and attach "
-            "it to the service's escalation policy.",
+            "in your on-call tool (PagerDuty, OpsGenie, Datadog On-Call, etc.) "
+            "and attach it to the service's escalation policy.",
         )
     return c
 

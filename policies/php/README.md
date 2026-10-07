@@ -46,7 +46,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/php@v1.0.0
     on: [php]  # Or use tags like ["domain:backend"]
     enforcement: report-pr
-    # include: [composer-json-exists, composer-lock-exists]  # Only run specific checks
+    include:
+      - composer-json-exists
+      - composer-lock-exists
+      - phpunit-configured
+      - static-analysis-configured
+      - code-style-configured
+      - min-version
+      - min-version-cicd
+      - min-composer-version
     with:
       min_version: "8.1"  # Minimum required PHP version (default: "8.1")
       min_version_cicd: "8.1"  # Minimum required PHP CI runtime version (default: "8.1")

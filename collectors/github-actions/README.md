@@ -41,4 +41,5 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/github-actions@main
     on: ["domain:your-domain"]  # Or use tags like [backend, frontend]
+    include: [workflows]
 ```

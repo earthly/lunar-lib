@@ -1,0 +1,148 @@
+# The catalog test-local.sh's mock Backstage serves. It is also a valid seed
+# for a real Backstage, so the same walk can be run against a live instance.
+#
+#   payment-api   own annotation                        -> component
+#   checkout      inherits from payment-platform        -> system
+#   ledger-api    ledger-system has none, finance does  -> domain
+#   alpha (ops)   platform/core -> bare `infra` resolves in the System's namespace
+#   orphan        no system                             -> miss
+#   lonely        system not in the catalog             -> miss
+#   quiet         system with no annotation, no domain  -> miss
+#   mono-payments own annotation, declared in a monorepo's shared root file
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: finance
+  annotations:
+    pagerduty.com/service-id: PDOM001
+spec:
+  owner: team-finance
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: payment-platform
+  annotations:
+    pagerduty/service-id: PSYS001
+spec:
+  owner: team-payments
+  domain: finance
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: ledger-system
+spec:
+  owner: team-ledger
+  domain: finance
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: standalone-system
+spec:
+  owner: team-misc
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-api
+  annotations:
+    pagerduty.com/service-id: PCOMP01
+spec:
+  type: service
+  lifecycle: production
+  owner: team-payments
+  system: payment-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout
+spec:
+  type: service
+  lifecycle: production
+  owner: team-payments
+  system: payment-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ledger-api
+spec:
+  type: service
+  lifecycle: production
+  owner: team-ledger
+  system: ledger-system
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: orphan
+spec:
+  type: service
+  lifecycle: production
+  owner: team-misc
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: lonely
+spec:
+  type: service
+  lifecycle: production
+  owner: team-misc
+  system: ghost-system
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: quiet
+spec:
+  type: service
+  lifecycle: production
+  owner: team-misc
+  system: standalone-system
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: infra
+  namespace: platform
+  annotations:
+    pagerduty.com/service-id: PDOMNS1
+spec:
+  owner: team-infra
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: core
+  namespace: platform
+spec:
+  owner: team-infra
+  domain: infra
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: alpha
+  namespace: ops
+spec:
+  type: service
+  lifecycle: production
+  owner: team-ops
+  system: platform/core
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mono-payments
+  annotations:
+    backstage.io/source-location: url:https://github.com/acme/mono/tree/main/services/payments/
+    pagerduty.com/service-id: PMONO01
+spec:
+  type: service
+  lifecycle: production
+  owner: t
+  system: payment-platform

@@ -140,6 +140,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
 ```
 
 Then set the token at **cataloger** scope — the default scope is `collector`, and a secret in the wrong scope is invisible to this plugin:
@@ -157,6 +158,7 @@ Point `gitlab_host` at your instance:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       gitlab_host: "gitlab.acme.com"
 ```
@@ -170,6 +172,7 @@ Discovery is automatic, so scoping is done with path globs rather than a group l
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       include_projects: "acme/*,globex/platform/*"   # only these
       exclude_projects: "*/sandbox/*,*/deprecated-*" # never these
@@ -182,6 +185,7 @@ catalogers:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       include_groups: "acme,globex/platform"
       exclude_groups: "acme/sandbox"
@@ -194,6 +198,7 @@ Entries are group paths and may be subgroups; subgroups are always included, so 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       gitlab_host: "gitlab.acme.com"
       include_public: "true"
@@ -231,6 +236,7 @@ You can opt projects into the catalog by **GitLab topic**. Tag the projects you 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
     with:
       allowed_topics: "lunar"          # only projects carrying the `lunar` topic
       disallowed_topics: "no-catalog"  # …but never projects carrying `no-catalog`
@@ -249,11 +255,13 @@ This cataloger reads the GitLab REST API (`/api/v4`) with `curl`, authenticating
 
 Two steps per run. First, `/groups?top_level_only=true&min_access_level=40` lists the top-level groups where the account holds at least the maintainer role — only groups it is a member of, not every group on the instance. That level is fixed rather than configurable on purpose: maintainer is what the Hub itself requires of the GitLab service account, and group membership at that level is how the Hub decides what to serve, so the cataloger discovers exactly the groups the Hub can work with. Cataloging a group below it would create components whose webhooks can never be registered, which show up and then sit at zero checks forever. Then each group's projects are listed from `/groups/:id/projects?include_subgroups=true`, which covers the whole subtree in one pass, so subgroups are never enumerated separately. `include_groups` skips straight to that second step — GitLab takes a URL-encoded path wherever it takes a group ID.
 
-Project listing uses **keyset pagination** (`order_by=id&sort=asc` plus `id_after`), walking until a page comes back empty. There is no configured ceiling on the number of projects or groups: a cap that silences itself is worse than a long run, so the cataloger pages until GitLab says there are no more.
+Project listing uses **keyset pagination** (`order_by=id&sort=desc` plus `id_before`), walking newest-first until a page comes back empty. Descending is the endpoint's default order; ascending has timed out server-side (HTTP 500) even on small groups. There is no configured ceiling on the number of projects or groups: a cap that silences itself is worse than a long run, so the cataloger pages until GitLab says there are no more.
+
+A listing page that fails with HTTP 500 is retried with `simple=true`, GitLab's lighter project entity. Before GitLab 18.2 that entity has no visibility, so the cataloger keeps retrying with full details instead. Projects from a simple page are cataloged as non-forks, and as unarchived when `include_archived` is on.
 
 Two pagination details are worth knowing, because both look like they work and don't:
 
-- The `pagination=keyset` query parameter is **not** honoured on `/groups/:id/projects`. GitLab accepts it and still returns offset-paginated `Link` headers, including a `rel="last"`. Passing `id_after` explicitly is what makes the paging genuinely keyset, and is why the cataloger does not follow `Link: rel="next"`.
+- The `pagination=keyset` query parameter is **not** honoured on `/groups/:id/projects`. GitLab accepts it and still returns offset-paginated `Link` headers, including a `rel="last"`. Passing `id_before` explicitly is what makes the paging genuinely keyset, and is why the cataloger does not follow `Link: rel="next"`.
 - On `/groups`, `id_after` is ignored entirely — that endpoint is offset-only. Group discovery therefore pages by `page=N` to the last page. It is bounded by the number of groups rather than projects, so offset paging is cheap there.
 
 Projects **shared into** a group but owned elsewhere are excluded (`with_shared=false`). GitLab includes them by default, which would otherwise catalog projects outside the account's groups and duplicate any project shared into more than one of them.

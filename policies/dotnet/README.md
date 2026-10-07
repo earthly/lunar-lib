@@ -41,7 +41,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/dotnet@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [project-file-exists, target-framework-set]  # Only run specific checks
+    include:
+      - project-file-exists
+      - target-framework-set
+      - dependencies-locked
+      - test-project-exists
+      - min-sdk-version
+      - min-sdk-version-cicd
     # inputs:
     #   min_sdk_version: "8.0"        # Minimum SDK version for development
     #   min_sdk_version_cicd: "8.0"   # Minimum SDK version for CI/CD

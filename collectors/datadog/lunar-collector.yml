@@ -1,7 +1,7 @@
 version: 0
 
 name: datadog
-description: Collect dashboard, monitor, and SLO data from Datadog via the API
+description: Collect dashboard, monitor, SLO, and On-Call data from Datadog via the API
 
 author: support@earthly.dev
 
@@ -10,10 +10,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Datadog Collector"
   long_description: |
-    Query the Datadog API for dashboards, monitors, and SLOs linked to each
-    component. Normalizes to .observability for tool-agnostic policies;
-    raw data at .observability.native.datadog.
-  categories: ["service-catalog"]
+    Query the Datadog API for the dashboards, monitors, and SLOs linked to
+    each component, plus its team's On-Call schedule and escalation policy.
+    Normalizes to .observability and .oncall for tool-agnostic policies;
+    raw data under each category's .native.datadog.
+  categories: ["service-catalog", "incident-management"]
   icon: "assets/datadog.svg"
   status: "experimental"
   related:
@@ -23,6 +24,9 @@ landing_page:
     - slug: "datadog"
       type: "policy"
       reason: "Datadog-specific monitor and SLO guardrails using this collector's native data"
+    - slug: "oncall"
+      type: "policy"
+      reason: "Enforces on-call schedule, escalation, and staffing standards"
 
 collectors:
   - name: service
@@ -70,6 +74,20 @@ collectors:
       type: code
     keywords: ["datadog", "dashboard-as-code", "monitors-as-code", "repo", "json"]
 
+  - name: oncall
+    description: |
+      Queries Datadog On-Call for the component's team: its routing rules,
+      the escalation policy its fallback rule pages, and the first schedule
+      that policy targets. The team comes from the component's `datadog/team` meta
+      annotation or the `team` input, as a team handle or team ID. Does
+      nothing when neither is set. Writes .oncall.service, .oncall.schedule,
+      .oncall.escalation, and .oncall.summary for the tool-agnostic oncall
+      policy, with raw API responses under .oncall.native.datadog.
+    mainBash: oncall.sh
+    hook:
+      type: code
+    keywords: ["datadog", "on-call", "oncall", "escalation", "schedule", "incident management"]
+
 inputs:
   datadog_site:
     description: >
@@ -89,6 +107,12 @@ inputs:
       are not universally tagged with `service:`, so they must be mapped
       explicitly.
     default: ""
+  team:
+    description: >
+      Datadog team handle (e.g. `payments`) or team ID whose On-Call setup
+      the `oncall` sub-collector reads. Optional if the component has a
+      `datadog/team` meta annotation.
+    default: ""
   find_command:
     description: >
       Command used by the `repo-files` sub-collector to enumerate candidate
@@ -105,11 +129,13 @@ secrets:
   DATADOG_APP_KEY:
     description: >
       Datadog application key (from Organization Settings → Application
-      Keys). Required for monitor, dashboard, and SLO reads — these
-      endpoints require both `DD-API-KEY` and `DD-APPLICATION-KEY`
+      Keys). Required for monitor, dashboard, SLO, and On-Call reads —
+      these endpoints require both `DD-API-KEY` and `DD-APPLICATION-KEY`
       headers. If created with custom scopes, the key must include
-      `monitors_read`, `dashboards_read`, and `slos_read`; otherwise
-      the corresponding endpoint returns 403.
+      `monitors_read`, `dashboards_read`, and `slos_read`, plus
+      `on_call_read` for the `oncall` sub-collector (and `teams_read` when
+      the team is given as a handle); otherwise the corresponding endpoint
+      returns 403.
 
 example_component_json: |
   {
@@ -153,6 +179,42 @@ example_component_json: |
             }
           ]
         }
+      }
+    },
+    "oncall": {
+      "service": {
+        "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90",
+        "name": "Payments"
+      },
+      "escalation": {
+        "exists": true,
+        "levels": 2,
+        "policy_name": "Payments escalation",
+        "id": "b7a1e2d4-3c5f-4e6a-8b9c-0d1e2f3a4b5c"
+      },
+      "schedule": {
+        "exists": true,
+        "participants": 2,
+        "rotation": "weekly",
+        "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9",
+        "name": "Payments primary"
+      },
+      "summary": {
+        "has_oncall": true,
+        "has_escalation": true,
+        "min_participants": 2
+      },
+      "native": {
+        "datadog": {
+          "team": { "...Teams API team object (when the team is given as a handle)..." },
+          "routing_rules": { "...routing rules response..." },
+          "escalation_policy": { "...escalation policy response..." },
+          "schedule": { "...schedule response..." }
+        }
+      },
+      "source": {
+        "tool": "datadog",
+        "integration": "api"
       }
     }
   }

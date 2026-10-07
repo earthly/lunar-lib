@@ -22,15 +22,15 @@ MCP_CONFIG=$(extract_flag_value "$CMD_STR" "--mcp-config")
 
 # Build JSON — native bash (no jq in CI collectors)
 JSON="{"
-JSON="$JSON\"cmd\": "$(json_escape "$CMD_STR")","
+JSON="$JSON\"cmd\": \"$(json_escape "$CMD_STR")\","
 JSON="$JSON\"cmd_args\": $LUNAR_CI_COMMAND,"
 JSON="$JSON\"tool\": \"$TOOL\","
 JSON="$JSON\"version\": \"$VERSION\""
 
-[ -n "$ALLOWED_TOOLS" ] && JSON="$JSON,\"allowed_tools\": "$(json_escape "$ALLOWED_TOOLS")""
-[ -n "$DISALLOWED_TOOLS" ] && JSON="$JSON,\"disallowed_tools\": "$(json_escape "$DISALLOWED_TOOLS")""
-[ -n "$TOOLS_RESTRICTION" ] && JSON="$JSON,\"tools_restriction\": "$(json_escape "$TOOLS_RESTRICTION")""
-[ -n "$MCP_CONFIG" ] && JSON="$JSON,\"mcp_config\": "$(json_escape "$MCP_CONFIG")""
+[ -n "$ALLOWED_TOOLS" ] && JSON="$JSON,\"allowed_tools\": \"$(json_escape "$ALLOWED_TOOLS")\""
+[ -n "$DISALLOWED_TOOLS" ] && JSON="$JSON,\"disallowed_tools\": \"$(json_escape "$DISALLOWED_TOOLS")\""
+[ -n "$TOOLS_RESTRICTION" ] && JSON="$JSON,\"tools_restriction\": \"$(json_escape "$TOOLS_RESTRICTION")\""
+[ -n "$MCP_CONFIG" ] && JSON="$JSON,\"mcp_config\": \"$(json_escape "$MCP_CONFIG")\""
 
 JSON="$JSON}"
 

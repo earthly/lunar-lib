@@ -46,6 +46,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/ticket
     on: ["domain:your-domain"]
     enforcement: report-pr
+    include:
+      - ticket-present
+      - ticket-valid
+      - ticket-source
+      - ticket-status
+      - ticket-type
+      - ticket-reuse
     with:
       allowed_sources: "jira"
       disallowed_statuses: "Done,Closed"

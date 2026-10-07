@@ -53,20 +53,26 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include:
+      - auto              # Scans the repo's dependencies
+      - cicd              # Trivy runs in CI
+      - rescan            # Daily rescan for new CVEs
+      - container-scan    # Scans each pushed image
+      - container-rescan  # Daily rescan of pushed images
 ```
 
 Zero configuration required. Works with any language Trivy supports.
 
-By default this also enables the `rescan` cron sub-collector, which re-runs the
-scan daily on each component's default branch and overwrites `.sca`. To keep the
-on-push (`auto`) and CI-detection (`cicd`) scans but turn the scheduled re-scan
-off, exclude it:
+The `rescan` cron sub-collector re-runs the scan daily on each component's
+default branch and overwrites `.sca`. To keep the on-push (`auto`) and
+CI-detection (`cicd`) scans but turn the scheduled re-scan off, leave it out of
+`include`:
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
-    exclude: [rescan]
+    include: [auto, cicd, container-scan, container-rescan]
 ```
 
 ### Scan history (point-in-time audit)
@@ -81,6 +87,7 @@ like when we shipped this release"). Opt in by keeping a bounded history:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include: [auto, cicd, rescan, container-scan, container-rescan]
     with:
       scan_history_size: "30"   # keep up to 30 prior scans in .sca.history[]
       max_rescans: "0"          # 0 = keep re-scanning forever (default)
@@ -129,11 +136,13 @@ All three scan the shipped image *itself* in the Trivy collector image — no in
 collectors:
   - uses: github://earthly/lunar-lib/collectors/docker@main
     on: ["domain:your-domain"]
+    include: [cicd]
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include: [cicd, container-scan, container-rescan]
 ```
 
-> **`container-scan` needs a Hub with the `after-json` hook.** Without it, `exclude: [container-scan]` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
+> **`container-scan` needs a Hub with the `after-json` hook.** Without it, leave `container-scan` out of `include` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
 
 **Scan provenance.** A container scan records what it scanned and when: `source.collected_at`, `source.collected_sha` (the commit the run was bound to) and the registry `digest` of each image, resolved from the scanner's own output. The digest is the field that matters — the recorded reference is usually a floating tag like `registry/app:main`, so counts alone cannot tell you whether a scan covers the artifact you are about to promote. Compare `digest` against the digest you are promoting; if they differ, the numbers describe different bytes. A digest the registry does not report is left absent rather than guessed.
 
@@ -145,6 +154,7 @@ collectors:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include: [auto, cicd, rescan, container-scan, container-rescan]
     with:
       container_scan_history_size: "30"
 ```

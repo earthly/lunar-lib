@@ -36,6 +36,7 @@ This policy reads from the following Component JSON paths:
 policies:
   - uses: github://earthly/lunar-lib/policies/ticket-coverage@main
     enforcement: score
+    include: [ticket-coverage]
     with:
       min_percentage: "80"
 ```

@@ -35,6 +35,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/linear
     on: ["domain:your-domain"]
+    include:
+      - ticket          # Ticket from the PR, via the Linear API
+      - ticket-history  # Ticket reuse across PRs
     with:
       type_labels: "bug,feature,chore,improvement"
 ```

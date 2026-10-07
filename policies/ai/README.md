@@ -34,12 +34,21 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ai@main
     on: ["domain:your-domain"]
+    include:
+      - instruction-files  # AGENTS.md files
+      - plans-dir          # AI plans directory
+      - ai-authorship      # AI authorship from commits
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
     on: ["domain:your-domain"]
+    include: [code-reviewer]
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
   - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
+    include:
+      - code-reviewer     # Claude Code Review check-runs on PRs
+      - cicd              # Claude CLI runs in CI
+      - instruction-file  # CLAUDE.md files
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 
@@ -47,6 +56,14 @@ collectors:
 policies:
   - uses: github://earthly/lunar-lib/policies/ai@main
     enforcement: report-pr
+    include:
+      - code-reviewer
+      - instruction-file-exists
+      - canonical-naming
+      - instruction-file-length
+      - instruction-file-sections
+      - plans-dir-exists
+      - ai-authorship-annotated
 ```
 
 ## Examples

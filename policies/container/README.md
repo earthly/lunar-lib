@@ -52,7 +52,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/container@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [no-latest, stable-tags, build-tagged]  # Only include specific policies
+    include:
+      - no-latest
+      - stable-tags
+      - allowed-registries
+      - required-labels
+      - healthcheck
+      - user
+      - build-tagged
+      - dockerfile-lint-clean
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
     #   required_labels: "org.opencontainers.image.source,git_sha"

@@ -9,6 +9,71 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.19.0] — 2026-10-06
+
+### Added
+
+- k8s: render Helm charts, and add nine k8s checks (#368)
+
+### Fixed
+
+- k8s: fix rendering Helm charts whose directory name isn't a valid release name (#369)
+
+## [1.18.1] — 2026-10-05
+
+### Added
+
+- pagerduty: find the service ID in the backstage collector's live lookup, including one set on the System or Domain; oncall: add service-mapped (#359)
+- datadog: add an oncall sub-collector reading Datadog On-Call for policies/oncall (#347)
+- github collector + vcs policy: add PR reviews and commit signatures, ruleset bypass actors, and a release-range merged-PR check (#346)
+
+### Changed
+
+- claude, codex, gemini: quote JSON string values in the cicd collectors (#364)
+- gitlab cataloger: retry a project listing page with simple=true after an HTTP 500 (#362)
+
+### Fixed
+
+- backstage: fix system-domain-set passing when there's no System to check (#363)
+
+## [1.18.0] — 2026-10-01
+
+### Added
+
+- backstage: add required-link-types and dependencies-documented checks (#357)
+- k8s, istio: add a metadata-endpoint egress check and an approved TLS versions and ciphers check (#345)
+- backstage: add a system-domain-set check for a component whose system belongs to no domain (#356)
+- sbom: add an allowed-licenses allow-list check (#344)
+- ci-archive: add a daily cron that backs up the default branch's CI logs to S3 (#351)
+- ci-archive: add a collector that archives each finished CI run attempt and its logs to S3 (#334)
+
+### Changed
+
+- CI: authenticate earthly/actions-setup so a rate-limited runner IP no longer fails the build (#360)
+- gitlab cataloger: page project listings newest-first; a project created mid-run is now cataloged on the next run (#353)
+
+### Fixed
+
+- grype, trivy: fix the on-push container scan skipping when a newer main commit lands first (#354)
+- nodejs, elixir: fix detection of repos with no root package.json or mix.exs (#355)
+
+## [1.17.1] — 2026-09-25
+
+### Added
+
+- backstage collector: add opt-in lookup of a monorepo's shared catalog-info.yaml for subdirectory components (#337)
+- backstage: add aws_assume_role_arns for cross-account SigV4 auth (#336)
+- backstage: opt-in skip when no catalog-info.yaml is found (#335)
+
+### Changed
+
+- gitlab cataloger: add the request ID, response headers and body to GitLab API error logs (#340)
+
+### Fixed
+
+- k8s: fix pdb check to match PodDisruptionBudgets by label selector, not name (#339)
+- backstage: fix SigV4 signing of by-query lookups on curl older than 8.14 (#338)
+
 ## [1.17.0] — 2026-09-23
 
 ### Added
@@ -952,6 +1017,10 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
+[1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
+[1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
+[1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1

@@ -24,6 +24,7 @@ Add to the **service repo's** `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/argocd-deployment-gate@v1.0.0
     on: ["domain:your-service-repo"]
+    include: [gate]
 ```
 
 By default the mapping comes from cataloger-set component **meta annotations** — set them (typically from your own cataloger) with:

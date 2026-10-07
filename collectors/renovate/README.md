@@ -35,6 +35,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/renovate@v1.0.0
     on: ["domain:your-domain"]
+    include: [config]
     # with:
     #   paths: "renovate.json,.github/renovate.json"  # Override default search paths
 ```

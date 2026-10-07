@@ -18,10 +18,13 @@ image:
     # pinned lunar-scripts base (it only installs, never upgrades — see the root
     # Earthfile's base-image for the alpine twin of this). RUN --no-cache so the
     # upgrade re-runs every build instead of coming out of the layer cache.
+    # git + safe.directory, as in the root base-image: project detection falls
+    # back to `git ls-files` when the repo has no root mix.exs.
     RUN --no-cache apt-get update \
         && apt-get upgrade -y \
-        && apt-get install -y --no-install-recommends erlang elixir \
-        && rm -rf /var/lib/apt/lists/*
+        && apt-get install -y --no-install-recommends erlang elixir git \
+        && rm -rf /var/lib/apt/lists/* \
+        && git config --system --add safe.directory '*'
 
     # Verify installations
     RUN elixir --version && mix --version

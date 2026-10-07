@@ -42,7 +42,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/golang@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [go-mod-exists, go-sum-exists]  # Only run specific checks
+    include:
+      - go-mod-exists
+      - go-sum-exists
+      - min-go-version
+      - min-go-version-cicd
+      - tests-recursive
+      - vendoring
     with:
       min_go_version: "1.21"       # Minimum required Go version in go.mod (default: "1.21")
       min_go_version_cicd: "1.21"  # Minimum Go version for CI/CD commands (default: "1.21")
