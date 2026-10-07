@@ -53,10 +53,12 @@ policies:
       - ticket-status
       - ticket-type
       - ticket-reuse
+      - ticket-field   # skips until ticket_field is set
     with:
       allowed_sources: "jira"
       disallowed_statuses: "Done,Closed"
       max_ticket_reuse: "3"
+      # ticket_field: "native.jira.fields.customfield_10042"  # Optional: enables ticket-field
 ```
 
 ### Checking a second reference
