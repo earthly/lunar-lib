@@ -84,6 +84,7 @@ test:
     BUILD ./collectors/k8s+test
     BUILD ./collectors/istio+test
     BUILD ./collectors/datadog+test
+    BUILD ./collectors/argocd-deployment-tracking+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test

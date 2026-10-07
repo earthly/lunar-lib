@@ -21,16 +21,19 @@ source "$(dirname "$0")/helpers.sh"
 # --pr from the environment (unlike the component id, which falls back to
 # LUNAR_COMPONENT_ID), so without this the PR title is never seen and the
 # collector skips. Empty array when unset → no --pr, same as before.
-pr_arg=()
-[ -n "${LUNAR_COMPONENT_PR:-}" ] && pr_arg=(--pr "$LUNAR_COMPONENT_PR")
-
-# The read races the record that dispatched this run, so in PR context it is
-# RETRIED.
 #
-# The after-json wave fires off the LIVE merged blob the instant .vcs.pr.title
-# lands, but `lunar component get-json` resolves through a copy the Hub's mat
-# workers drain asynchronously — so this collector can be dispatched by a record
-# it cannot yet read.
+# --git-sha pins the commit the wave fired for. --pr alone resolves the PR's
+# latest materialized row, which can be another commit's (old title included).
+json_args=()
+[ -n "${LUNAR_COMPONENT_PR:-}" ] && json_args=(--pr "$LUNAR_COMPONENT_PR")
+[ -n "${LUNAR_COMPONENT_GIT_SHA:-}" ] && json_args+=(--git-sha "$LUNAR_COMPONENT_GIT_SHA")
+
+# On Hubs before 4.9.0 the read races the record that dispatched this run, so in
+# PR context it is RETRIED. The after-json wave fires off the LIVE merged blob
+# the instant .vcs.pr.title lands, but those Hubs serve even a --git-sha read
+# from a copy their mat workers drain asynchronously — so this collector can be
+# dispatched by a record it cannot yet read. Hub 4.9.0+ serves it from the live
+# blob.
 #
 # Here the trigger path IS the input: the hook is `after-json` on .vcs.pr.title,
 # and the Hub dispatches only collectors whose path is PRESENT in that live blob.
@@ -57,7 +60,7 @@ ATTEMPT=0
 WAITED=0
 while :; do
   ATTEMPT=$((ATTEMPT + 1))
-  if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>"$GETJSON_ERR"); then
+  if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${json_args[@]}" 2>"$GETJSON_ERR"); then
     # `set -e` is on and there is no pipefail, so an assignment from a failing
     # jq would abort the script here on jq's bare exit status — no retry, no
     # explanation. An unparseable blob is one of the shapes this fix exists to
