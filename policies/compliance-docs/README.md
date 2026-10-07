@@ -51,6 +51,7 @@ policies:
       - dr-plan-required-sections
       - dr-exercise-recent
       - dr-exercise-required-sections
+      - pentest-report-recent
     # with:
     #   max_days_since_exercise: "365"
     #   plan_required_sections: "Overview,Recovery Steps,Contact List"

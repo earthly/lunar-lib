@@ -55,6 +55,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/compliance-docs@v1.0.0
     on: ["pentest-in-scope"]  # The services that need a pen test; pentest-report-recent skips the rest
+    include: [pentest]
     # with:
     #   pentest_dir_paths: "docs/pentests"
 ```
