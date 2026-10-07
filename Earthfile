@@ -106,6 +106,7 @@ test:
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
     BUILD ./policies/oncall+test
+    BUILD ./policies/ticket+test
 
 lint:
     FROM python:3.12-alpine

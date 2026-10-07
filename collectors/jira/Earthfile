@@ -2,10 +2,11 @@ VERSION 0.8
 
 test:
     FROM python:3.12-alpine
-    # ticket_from_json.sh is bash and shells out to jq, and sources helpers.sh.
-    # The tests stub `lunar` on PATH and drive the real script as a subprocess.
-    RUN apk add --no-cache bash jq
+    # The scripts are bash and shell out to jq and curl, and source helpers.sh.
+    # The tests stub `lunar` on PATH, answer Jira from a local HTTP server, and
+    # drive the real scripts as subprocesses.
+    RUN apk add --no-cache bash jq curl
     WORKDIR /workspace
-    COPY ticket_from_json.sh helpers.sh .
+    COPY ticket.sh ticket_from_json.sh ticket-history.sh helpers.sh .
     COPY --dir test .
     RUN cd test && python -m unittest discover -v

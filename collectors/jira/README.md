@@ -28,6 +28,8 @@ This collector writes to the following Component JSON paths:
 | `.vcs.pr.ticket.reuse_count` | number | Count of other PRs referencing the same ticket |
 | `.vcs.pr.ticket.native.jira` | object | Full raw Jira API response |
 
+An import with its own `ticket_path` writes the same fields under that path instead (see [Recording a second reference](#recording-a-second-reference)).
+
 ## Collectors
 
 This integration provides the following collectors (use `include` to select a subset):
@@ -130,3 +132,29 @@ with:
 Transient failures — connection refused, timeouts, `429`, `5xx` — are retried `jira_retries` times before the collector calls Jira unreachable. Rejected credentials are never retried: that is a misconfiguration rather than a property of the PR, so the run fails and an operator has to fix it.
 
 The runs that succeed keep the ticket reference, so an outage does not make the PR look ticket-less — `ticket-present` still passes, and `ticket-valid` fails naming the real cause. A failed run does the opposite: the Hub discards everything the run collected, so `ticket-present` fails with "PR does not reference a ticket" until the credentials are fixed.
+
+### Recording a second reference
+
+To record a second reference next to the delivery ticket, such as an architecture-review submission on its own Jira board, import the collector again under its own `name`, with a `ticket_pattern` for that board and a `ticket_path` of its own:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/jira
+    include: [ticket]
+    on: ["domain:your-domain"]
+    with:
+      jira_base_url: "https://acme.atlassian.net"
+      jira_user: "user@acme.com"
+      ticket_pattern: "ABC-[0-9]+"
+  - uses: github://earthly/lunar-lib/collectors/jira
+    name: jira-architecture-review
+    include: [ticket]
+    on: ["domain:your-domain"]
+    with:
+      jira_base_url: "https://acme.atlassian.net"
+      jira_user: "user@acme.com"
+      ticket_pattern: "ARB-[0-9]+"
+      ticket_path: ".vcs.pr.architecture_review"
+```
+
+The second import resolves and validates its key the same way and writes the same fields under `.vcs.pr.architecture_review`. Narrow each import's `ticket_pattern` to its own project keys, or the delivery import can take the review key as the PR's ticket. The Jira user needs **Browse Projects** on both projects. To check the reference, point a second import of the [`ticket`](../../policies/ticket) policy at the same path.

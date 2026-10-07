@@ -69,6 +69,14 @@ policies:
     runs_on: [prs]
     keywords: ["ticket reuse", "compliance", "audit"]
 
+  - name: ticket-field
+    description: |
+      Ensures a configured ticket field, such as a Jira custom field, has an
+      allowed value.
+    mainPython: ./ticket-field.py
+    runs_on: [prs]
+    keywords: ["ticket field", "jira custom field", "approval", "issue tracker"]
+
 inputs:
   allowed_sources:
     description: Comma-separated list of allowed ticket sources (e.g. "jira,linear"). Empty = any.
@@ -85,3 +93,21 @@ inputs:
   max_ticket_reuse:
     description: Maximum number of other PRs allowed to reference the same ticket
     default: "3"
+  ticket_field:
+    description: |
+      Field the `ticket-field` check reads, as a path relative to the ticket
+      (e.g. native.jira.fields.customfield_10042 for a Jira custom field).
+      Empty skips the check.
+    default: ""
+  allowed_field_values:
+    description: |
+      Values `ticket-field` accepts: comma-separated, one per line, or a JSON
+      array for values that contain a comma. Empty accepts any value, so the
+      field only has to be set.
+    default: ""
+  ticket_path:
+    description: |
+      Where every check reads the ticket from. Point a second import of this
+      policy at the path a second jira collector import records to (e.g.
+      .vcs.pr.architecture_review) to check that reference as well.
+    default: ".vcs.pr.ticket"
