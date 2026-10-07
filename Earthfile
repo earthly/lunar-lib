@@ -74,6 +74,7 @@ test:
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
+    BUILD --pass-args ./collectors/compliance-docs+test
     BUILD ./collectors/package-registries+test
     BUILD ./collectors/trivy+test
     BUILD ./collectors/grype+test
@@ -92,6 +93,7 @@ test:
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
     BUILD ./policies/ai+test
+    BUILD ./policies/compliance-docs+test
     BUILD ./policies/git+test
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
