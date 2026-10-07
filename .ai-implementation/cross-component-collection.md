@@ -107,10 +107,10 @@ commit anywhere in the fleet), so a cross-component array like
 (saw it climb 1→2→…→9 with zero manual triggers). It doesn't break policies if
 the dupes are identical, but the JSON isn't pristine.
 
-Guard it collector-side: **before pushing, read the target's current state and
-skip if it already carries your write.** link-push reads the target's app-name
-set (where `linked_from == self`) and skips when it matches what it would push.
-That held `apps: 1` across 16 consecutive hub re-runs.
+Guard it collector-side: **before pushing, read the target at the sha you're
+writing and skip if it already carries your write.** link-push reads the
+target's app-name set (where `linked_from == self`) and skips when it matches
+what it would push. That held `apps: 1` across 16 consecutive hub re-runs.
 
 > The complete fix (handle a *changed* app set + dedupe hub-side) is a platform
 > change: `CollectExternal` should supersede prior external records for the same
@@ -128,21 +128,18 @@ rather than run with a broken self-ref.
 
 ---
 
-## Reading the target's live state: use `get-json`, NOT the SQL view
+## Reading the target's live state: `get-json --git-sha`, NOT the SQL view
 
-The skip-guard in #4 needs the target's **current** merged JSON. Two ways to
-read it, and only one is correct here:
+The skip-guard in #4 needs the target's merged JSON at the sha you push to,
+including whatever the previous run pushed there. Only one read reliably has it:
 
 | Source | Freshness | Use for |
 |--------|-----------|---------|
-| `lunar component get-json <id>` | **Immediate** — direct hub read, reflects a just-submitted external record at once | The idempotency guard, and confirming an oob write landed |
-| SQL-API `components_latest` (via `lunar sql`) | **Materialized — lags by minutes** | Bulk queries / image-match lookups where staleness is tolerable |
+| `lunar component get-json <id> --git-sha <sha>` | **Immediate** on Hub 4.9.0+ — served from the live merged blob, so it reflects a just-submitted external record at once | The idempotency guard, and confirming an oob write landed |
+| `lunar component get-json <id>` with no `--git-sha`, or SQL-API `components_latest` (via `lunar sql`) | **Materialized** — trails a fresh write | Another component's current state; bulk queries / image-match lookups where staleness is tolerable |
 
-The first idempotency-guard attempt read `components_latest` and **kept
-duplicating** because the view hadn't caught up to the prior push — the guard
-never saw it. Switching to `get-json` fixed it. `get-json` is also the
-*authoritative* answer when the SQL view and reality disagree (it's how I
-proved the "shadow" was real and not a view quirk).
+A guard that reads the materialized copy can miss the prior push and **keep
+duplicating**. The first attempt read `components_latest` and did exactly that.
 
 ---
 
@@ -199,5 +196,5 @@ of the service that builds the image.
 1. `env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX` on the `lunar collect --component …`.
 2. Target a **real ingested SHA** (resolve default-branch HEAD).
 3. Don't churn the cronos manifest while testing (component ids are version-derived).
-4. Make the write **idempotent** with a `get-json` skip-guard (never the SQL view).
+4. Make the write **idempotent** with a `get-json --git-sha <target sha>` skip-guard (never the SQL view or an unpinned read).
 5. **Bail if `$LUNAR_COMPONENT_ID` is empty** — don't run a cross-component writer with a broken self-ref.

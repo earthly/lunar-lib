@@ -199,12 +199,13 @@ for ((g=0; g<GROUP_COUNT; g++)); do
     # is CollectExternal superseding prior records for the same
     # component+sha+collector — tracked as a platform follow-up.)
     WANT_NAMES=$(printf '%s' "$RECORDS" | jq -cS '[.[].name] | unique' 2>/dev/null)
-    # Read the target's LIVE merged JSON via get-json (a direct hub read), not
-    # the SQL-API components_latest view: that view is materialized and lags by
-    # minutes, so a guard reading it never sees the prior push and keeps
-    # duplicating. get-json reflects a just-submitted external record at once.
+    # Read the target at the sha this pushes to. Hub 4.9.0+ serves a --git-sha
+    # read from the live merged blob, so it reflects the prior push at once. An
+    # unpinned get-json and the SQL-API components_latest view both read the
+    # materialized copy, which lags, so a guard reading either can miss the
+    # prior push and keep duplicating.
     HAVE_NAMES=$(env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX \
-        lunar component get-json "$TID" 2>/dev/null \
+        lunar component get-json "$TID" --git-sha "$TSHA" 2>/dev/null \
         | jq -cS --arg lf "$LUNAR_COMPONENT_ID" \
             'if (.cd.gitops.linked_from == $lf) then ([.cd.gitops.applications[]?.name] | unique) else empty end' 2>/dev/null)
     if [ -n "$HAVE_NAMES" ] && [ "$HAVE_NAMES" = "$WANT_NAMES" ]; then

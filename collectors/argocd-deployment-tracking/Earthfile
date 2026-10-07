@@ -1,0 +1,12 @@
+VERSION 0.8
+
+# Offline test for link_push.sh's idempotency guard. The test stubs parse.sh,
+# lunar and psql, so it needs no kubeconform, Lunar Hub or database. No image:
+# target — the plugin uses argocd-main.
+test:
+    FROM python:3.12-alpine
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY link_push.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest test_link_push -v

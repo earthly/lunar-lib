@@ -101,20 +101,21 @@ log "root=$ROOT sha=${SHA:0:8} pr=${PR:-none}"
 # Hub reads are retried for several MINUTES, and a persistent failure is FATAL
 # rather than a quiet exit 0.
 #
-# Why so long: the wave fires when COLLECTION settles, but `lunar component
-# get-json` reads through `public.components` / `public.components_latest`,
-# and both are views over `mat.components` + `mat.component_json` — BASE TABLES
-# drained asynchronously by the hub's mat workers. A SHA-pinned read needs THIS
-# commit's row to have drained; until it does the lookup simply returns
-# NotFound. Measured on cronos: 210s of NotFound after the wave had already
-# fired and failed. A 20s budget was nowhere near enough.
+# Why so long: the wave fires when COLLECTION settles, but on Hubs before 4.9.0
+# `lunar component get-json` reads through `public.components` /
+# `public.components_latest`, views over `mat.components` + `mat.component_json`
+# — BASE TABLES drained asynchronously by the hub's mat workers. There a
+# SHA-pinned read needs THIS commit's row to have drained; until it does the
+# lookup simply returns NotFound. Measured on cronos: 210s of NotFound after the
+# wave had already fired and failed. A 20s budget was nowhere near enough. Hub
+# 4.9.0+ serves a pinned read from the live merged blob, so it resolves at once.
 #
 # Falling back to the UNPINNED read would be wrong, not merely lax. It resolves
 # `components_latest ... WHERE pr IS NULL`, which succeeds immediately — but by
 # returning whichever older commit HAS drained. During that same window it
 # returned the PREVIOUS DAY's commit. The fan-out would then have written those
-# stale findings under this commit's SHA. Pinning is correct; waiting is the
-# price.
+# stale findings under this commit's SHA. Pinning is correct; on older Hubs,
+# waiting is the price.
 #
 # And the failure has to be loud: the after-json wave is fire-once per
 # (component, sha, pr) forever, so a swallowed read permanently loses this

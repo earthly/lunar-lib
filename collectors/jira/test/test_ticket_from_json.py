@@ -3,14 +3,16 @@
 
 ticket_from_json.sh reads the PR's title/description from the *PR-scoped*
 Component JSON via `lunar component get-json`, then resolves the ticket with the
-shared helpers. The regression these tests lock in: the script must pass
+shared helpers. The regressions these tests lock in: the script must pass
 `--pr "$LUNAR_COMPONENT_PR"` to get-json — without it, get-json returns the
-main-branch JSON (which has no `.vcs.pr`) and the ticket is never resolved.
+main-branch JSON (which has no `.vcs.pr`) and the ticket is never resolved —
+and `--git-sha "$LUNAR_COMPONENT_GIT_SHA"`, without which it reads the PR's
+latest materialized row, which can be an earlier commit's.
 
-The `lunar` stub returns PR-scoped JSON only when `--pr` is present (mirroring
-the Hub) and logs its `collect` calls to $CAPTURE; the real script runs as a
-subprocess. No Jira is configured, so resolution takes the best candidate
-unchecked — enough to prove the PR title was read.
+The `lunar` stub returns a commit's own JSON for `--git-sha`, PR-scoped JSON for
+`--pr` (mirroring the Hub) and logs its `collect` calls to $CAPTURE; the real
+script runs as a subprocess. No Jira is configured, so resolution takes the best
+candidate unchecked — enough to prove which PR title was read.
 """
 
 import os
@@ -44,10 +46,12 @@ class Base(unittest.TestCase):
         os.chmod(path, 0o755)
 
     def _write_stubs(self):
-        # lunar stub: `component get-json` returns the PR-scoped fixture only
-        # when --pr is passed, else the main-branch fixture (no .vcs.pr) —
-        # exactly the distinction the real Hub makes. Everything else (collect)
-        # is logged to $CAPTURE: args, then any piped stdin.
+        # lunar stub: `component get-json` returns sha-<sha>.json when
+        # --git-sha names a commit that has one, else the PR-scoped fixture
+        # when --pr is passed (the PR's latest row), else the main-branch
+        # fixture (no .vcs.pr) — the distinctions the real Hub makes.
+        # Everything else (collect) is logged to $CAPTURE: args, then any
+        # piped stdin.
         self._stub(
             "lunar",
             textwrap.dedent(
@@ -78,6 +82,13 @@ class Base(unittest.TestCase):
                       exit 0
                     fi
                   fi
+                  prev=""
+                  for a in "$@"; do
+                    if [ "$prev" = "--git-sha" ] && [ -f "$MOCK_DIR/sha-$a.json" ]; then
+                      cat "$MOCK_DIR/sha-$a.json"; exit 0
+                    fi
+                    prev="$a"
+                  done
                   for a in "$@"; do
                     if [ "$a" = "--pr" ]; then cat "$MOCK_DIR/pr.json"; exit 0; fi
                   done
@@ -120,6 +131,7 @@ class Base(unittest.TestCase):
     MAIN_JSON = '{"vcs":{}}'
 
     BASE_ENV = {"LUNAR_COMPONENT_ID": "github.com/acme/backend"}
+    SHA = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
 
 
 class TicketFromJsonTest(Base):
@@ -134,6 +146,21 @@ class TicketFromJsonTest(Base):
         self.assertIn("--pr 8", log)  # get-json was PR-scoped
         self.assertIn(".vcs.pr.ticket.id", log)  # ticket was resolved + collected
         self.assertIn("ABC-123", log)
+
+    def test_reads_the_commit_the_wave_fired_for(self):
+        # The PR's latest row still holds the previous commit's title; this
+        # commit's title names a different ticket. Fails if the script reads
+        # with --pr alone.
+        self.fixture("pr.json", self.PR_JSON)
+        self.fixture("main.json", self.MAIN_JSON)
+        self.fixture("sha-%s.json" % self.SHA,
+                     '{"vcs":{"pr":{"title":"[ABC-456] Add healthz","description":""}}}')
+        result, log = self.run_script(dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8",
+                                           LUNAR_COMPONENT_GIT_SHA=self.SHA))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("ABC-456", log)
+        self.assertNotIn("ABC-123", log)
+        self.assertIn("--pr 8 --git-sha " + self.SHA, log)
 
     def test_skips_cleanly_without_pr_context(self):
         # No LUNAR_COMPONENT_PR (not a PR run): no --pr, get-json returns the

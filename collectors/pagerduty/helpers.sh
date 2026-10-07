@@ -99,11 +99,12 @@ resolve_from_checkout() {
 # ATTEMPT.
 #
 # The from-backstage-collector sub-collector is dispatched off that path in the LIVE merged
-# blob, but `lunar component get-json` reads a copy the Hub's mat workers drain
-# asynchronously, so the first reads can come back without it. The other
-# after-json collectors retry for 900s (codeql measured the lag at 195-292s+,
-# and container-scan runs have resolved up to 530s after their record); this
-# defaults to twice that, with a 60s backoff ceiling instead of 30s.
+# blob. Hub 4.9.0+ serves the --git-sha read below from that blob; older Hubs
+# read a copy their mat workers drain asynchronously, so the first reads can
+# come back without it. The other after-json collectors retry for 900s (codeql
+# measured the lag at 195-292s+, and container-scan runs have resolved up to
+# 530s after their record); this defaults to twice that, with a 60s backoff
+# ceiling instead of 30s.
 #
 # --pr narrows to the PR. --git-sha pins the commit the wave fired for: without
 # it, a default-branch read resolves the latest snapshot, which can be a later
