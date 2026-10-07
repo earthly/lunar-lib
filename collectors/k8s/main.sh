@@ -1,5 +1,5 @@
 #!/bin/bash
-# Collects Kubernetes manifests and workload, PDB, and HPA metadata.
+# Collects Kubernetes manifests and workload, PDB, and autoscaler metadata.
 set -e
 
 # Source helper function for helm template detection
@@ -61,130 +61,31 @@ process_file() {
     
     # Parse YAML to JSON array (handle multi-document YAML)
     # yq outputs one JSON doc per YAML doc; jq -s slurps them into an array
-    docs=$(echo "$content" | yq -o=json '.' 2>/dev/null | jq -s '.' || echo '[]')
-    
-    # Extract resources from the file
-    resources=$(echo "$docs" | jq '[.[] | select(.kind != null) | {kind: .kind, name: .metadata.name, namespace: (.metadata.namespace // "default")}]')
-    
+    docs=$(echo "$content" | yq -o=json '.' 2>/dev/null | jq -s --arg path "$path" \
+        'map(select(type == "object") + {__path: $path})' || echo '[]')
+
+    extracted=$(echo "$docs" | jq -f "$EXTRACT_JQ" --argjson render null --arg kinds "$WORKLOAD_KINDS")
+
     # Build manifest entry
-    manifest=$(jq -n \
+    jq -n \
         --arg path "$path" \
         --argjson valid "$valid" \
         --arg error "$validation_error" \
-        --argjson resources "$resources" \
+        --argjson extracted "$extracted" \
         '{
-            path: $path,
-            valid: $valid,
-            resources: $resources
-        } + (if $error == "" then {} else {error: $error} end)')
-    
-    # Extract workloads
-    workloads=$(echo "$docs" | jq --arg path "$path" --arg kinds "$WORKLOAD_KINDS" '[
-        .[] | 
-        select(.kind | test($kinds)) |
-        {
-            kind: .kind,
-            name: .metadata.name,
-            namespace: (.metadata.namespace // "default"),
-            path: $path,
-            replicas: (.spec.replicas // 1),
-            pod_spec: (
-                if .kind == "CronJob" then .spec.jobTemplate.spec.template.spec
-                elif .kind == "Job" then .spec.template.spec
-                else .spec.template.spec
-                end
-            ),
-            # Pod template labels: what a PodDisruptionBudget selector matches.
-            pod_labels: (
-                (if .kind == "CronJob" then .spec.jobTemplate.spec.template.metadata.labels
-                 else .spec.template.metadata.labels
-                 end) // {}
-            )
-        }
-    ]')
-    
-    # Process containers in workloads
-    workloads_with_containers=$(echo "$workloads" | jq '[
-        .[] |
-        . as $w |
-        {
-            kind: .kind,
-            name: .name,
-            namespace: .namespace,
-            path: .path,
-            replicas: .replicas,
-            pod_labels: .pod_labels,
-            host_users: (if $w.pod_spec.hostUsers == null then true else $w.pod_spec.hostUsers end),
-            host_network: (if $w.pod_spec.hostNetwork == null then false else $w.pod_spec.hostNetwork end),
-            host_pid: (if $w.pod_spec.hostPID == null then false else $w.pod_spec.hostPID end),
-            host_ipc: (if $w.pod_spec.hostIPC == null then false else $w.pod_spec.hostIPC end),
-            containers: [
-                (.pod_spec.containers // [])[] |
-                {
-                    name: .name,
-                    image: (.image // null),
-                    has_resources: ((.resources.requests != null) or (.resources.limits != null)),
-                    has_requests: (.resources.requests != null),
-                    has_limits: (.resources.limits != null),
-                    cpu_request: (.resources.requests.cpu // null),
-                    cpu_limit: (.resources.limits.cpu // null),
-                    memory_request: (.resources.requests.memory // null),
-                    memory_limit: (.resources.limits.memory // null),
-                    has_liveness_probe: (.livenessProbe != null),
-                    has_readiness_probe: (.readinessProbe != null),
-                    runs_as_non_root: (if .securityContext.runAsNonRoot == null then (($w.pod_spec.securityContext.runAsNonRoot == true) // false) else (.securityContext.runAsNonRoot == true) end),
-                    read_only_root_fs: ((.securityContext.readOnlyRootFilesystem == true) // false),
-                    privileged: ((.securityContext.privileged == true) // false)
-                }
-            ]
-        }
-    ]')
-    
-    # Extract PDBs
-    pdbs=$(echo "$docs" | jq --arg path "$path" '[
-        .[] |
-        select(.kind == "PodDisruptionBudget") |
-        {
-            name: .metadata.name,
-            namespace: (.metadata.namespace // "default"),
-            path: $path,
-            # The full LabelSelector (matchLabels + matchExpressions); the pdb
-            # policy matches it against the pod_labels of each workload.
-            selector: (.spec.selector // null),
-            # Deprecated guess at the name of the covered workload; kept for
-            # one release so existing consumers keep working.
-            target_workload: (.spec.selector.matchLabels.app // .spec.selector.matchLabels["app.kubernetes.io/name"] // null),
-            min_available: (.spec.minAvailable // null),
-            max_unavailable: (.spec.maxUnavailable // null)
-        }
-    ]')
-    
-    # Extract HPAs
-    hpas=$(echo "$docs" | jq --arg path "$path" '[
-        .[] |
-        select(.kind == "HorizontalPodAutoscaler") |
-        {
-            name: .metadata.name,
-            namespace: (.metadata.namespace // "default"),
-            path: $path,
-            target_workload: .spec.scaleTargetRef.name,
-            min_replicas: (.spec.minReplicas // 1),
-            max_replicas: .spec.maxReplicas
-        }
-    ]')
-    
-    # Output JSON with all data
-    jq -n \
-        --argjson manifest "$manifest" \
-        --argjson workloads "$workloads_with_containers" \
-        --argjson pdbs "$pdbs" \
-        --argjson hpas "$hpas" \
-        '{manifest: $manifest, workloads: $workloads, pdbs: $pdbs, hpas: $hpas}'
+            manifest: ({
+                path: $path,
+                valid: $valid,
+                resources: $extracted.resources
+            } + (if $error == "" then {} else {error: $error} end))
+        } + ($extracted | del(.resources))'
 }
 
 export -f process_file
 export -f is_helm_template
 export WORKLOAD_KINDS
+EXTRACT_JQ="$(cd "$(dirname "$0")" && pwd)/extract.jq"
+export EXTRACT_JQ
 
 # Command to find K8s manifests (from input or default)
 FIND_CMD="${LUNAR_VAR_FIND_COMMAND:-find . -type f \( -name '*.yaml' -o -name '*.yml' \)}"
@@ -202,7 +103,9 @@ results=$(eval "$FIND_CMD" 2>/dev/null | \
         manifests: [.[].manifest | select(. != null)],
         workloads: [.[].workloads[] | select(. != null)],
         pdbs: [.[].pdbs[] | select(. != null)],
-        hpas: [.[].hpas[] | select(. != null)]
+        hpas: [.[].hpas[] | select(. != null)],
+        scaled_objects: [.[].scaled_objects[] | select(. != null)],
+        network_policies: [.[].network_policies[] | select(. != null)]
     }')
 
 # Only collect if we found at least one manifest

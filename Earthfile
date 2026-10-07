@@ -70,6 +70,7 @@ test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD --pass-args ./collectors/backstage+test-offline
+    BUILD --pass-args ./collectors/ci-archive+test
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
@@ -80,6 +81,10 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD --pass-args ./collectors/pagerduty+test
+    BUILD ./collectors/k8s+test
+    BUILD ./collectors/istio+test
+    BUILD ./collectors/datadog+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
@@ -92,6 +97,7 @@ test:
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
     BUILD ./policies/k8s+test
+    BUILD ./policies/istio+test
     BUILD ./policies/github-actions+test
     BUILD ./policies/sca+test
     BUILD ./policies/container-scan+test
@@ -99,12 +105,14 @@ test:
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
+    BUILD ./policies/sbom+test
+    BUILD ./policies/oncall+test
 
 lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
-    COPY --dir catalogers collectors policies scripts starter-packs .
+    COPY --dir ai-context catalogers collectors policies probes scripts starter-packs .
     COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py
@@ -119,6 +127,9 @@ lint:
     # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
     RUN python scripts/validate_manifest_schema.py --self-test
     RUN python scripts/validate_manifest_schema.py
+    # Every lunar-lib import in the docs lists what it runs with include:
+    RUN python scripts/validate_readme_includes.py --self-test
+    RUN python scripts/validate_readme_includes.py
 
 ai-context:
     COPY --dir ai-context .

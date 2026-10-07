@@ -43,6 +43,12 @@ policies:
   - uses: github://earthly/lunar-lib/policies/java@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
+    include:
+      - build-tool-wrapper-exists
+      - min-java-version
+      - min-maven-version
+      - min-gradle-version
+      - tests-all-modules
     with:
       min_java_version: "17"
       min_maven_version: "3.9.0"

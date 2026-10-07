@@ -48,7 +48,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/container-scan@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, max-severity]  # Only run specific checks
+    include: [executed, max-severity, max-total]
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings

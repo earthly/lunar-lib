@@ -41,6 +41,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/endoflife@v1.0.0
     on: ["domain:your-domain"]
+    include: [runtime]
     with:
       # Override only if you mirror the API internally
       # endoflife_base_url: "https://endoflife.date/api"
@@ -56,6 +57,7 @@ Pair it with the `endoflife` policy to enforce EOL and support guardrails:
 policies:
   - uses: github://earthly/lunar-lib/policies/endoflife@v1.0.0
     enforcement: report-pr
+    include: [runtime-not-eol, runtime-supported]
 ```
 
 No secrets are required.

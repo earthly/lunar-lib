@@ -1,4 +1,15 @@
 VERSION 0.8
+
+test:
+    # Runs the real main.sh and render.sh inside the collector image, so the tests
+    # exercise the helm, yq, jq and parallel it ships. Only `lunar` and
+    # `kubeconform` (which fetches schemas over the network) are stubbed.
+    FROM +image
+    WORKDIR /workspace
+    COPY main.sh helm.sh extract.jq render.sh values_sets.py .
+    COPY --dir test .
+    RUN cd test && python3 -m unittest discover -v
+
 # Build the k8s collector image
 image:
     FROM --pass-args ../../+base-image
@@ -11,6 +22,14 @@ image:
         curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-${ARCH}.tar.gz" | tar xz && \
         mv kubeconform /usr/local/bin/ && \
         chmod +x /usr/local/bin/kubeconform
+
+    # Install helm for the helm sub-collector's chart rendering
+    # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
+    ARG HELM_VERSION=4.3.0
+    RUN curl -sSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | tar xz && \
+        mv "linux-${TARGETARCH}/helm" /usr/local/bin/helm && \
+        rm -rf "linux-${TARGETARCH}" && \
+        helm version --short
 
     # Install GNU parallel for parallel file processing
     RUN apk add --no-cache parallel && \

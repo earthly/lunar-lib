@@ -46,7 +46,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `license-exists` | Verifies LICENSE file exists |
 | `security-exists` | Verifies SECURITY.md file exists |
 | `contributing-exists` | Verifies CONTRIBUTING.md file exists |
-| `editorconfig-exists` | Verifies .editorconfig file exists (use `exclude` if not wanted) |
+| `editorconfig-exists` | Verifies .editorconfig file exists (leave it out of `include` if not wanted) |
 | `changelog-exists` | Verifies a CHANGELOG file exists. Apply only to release-surface repos via `on:` targeting |
 
 ## Required Data
@@ -75,8 +75,22 @@ policies:
   - uses: github://earthly/lunar-lib/policies/repo-boilerplate@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    exclude: [editorconfig-exists, changelog-exists]
-    # include: [readme-exists, codeowners-exists, gitignore-exists, license-exists]
+    include:
+      - readme-exists
+      - readme-min-line-count
+      - readme-required-sections
+      - codeowners-exists
+      - codeowners-valid
+      - codeowners-catchall
+      - codeowners-min-owners
+      - codeowners-team-owners
+      - codeowners-no-individuals-only
+      - codeowners-no-empty-rules
+      - codeowners-max-owners
+      - gitignore-exists
+      - license-exists
+      - security-exists
+      - contributing-exists
     # with:
     #   min_lines: "25"
     #   required_sections: "Installation,Usage"

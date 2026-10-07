@@ -1,0 +1,69 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "avatar": null,
+        "banner": null,
+        "created_at": "2025-03-11T14:02:51.210Z",
+        "description": "Card payments for the EU region",
+        "handle": "payments-eu",
+        "hidden_modules": [],
+        "is_managed": false,
+        "link_count": 0,
+        "modified_at": "2026-04-02T09:15:07.401Z",
+        "name": "Payments EU",
+        "summary": "Card payments for the EU region",
+        "user_count": 4,
+        "visible_modules": []
+      },
+      "id": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+      "relationships": {
+        "team_links": { "links": { "related": "/api/v2/team/1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f/links" } },
+        "user_team_permissions": { "links": { "related": "/api/v2/team/1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f/permission-settings" } }
+      },
+      "type": "team"
+    },
+    {
+      "attributes": {
+        "avatar": null,
+        "banner": null,
+        "created_at": "2024-11-18T10:44:03.918Z",
+        "description": "Payment API and settlement services",
+        "handle": "payments",
+        "hidden_modules": [],
+        "is_managed": false,
+        "link_count": 1,
+        "modified_at": "2026-08-21T16:30:12.022Z",
+        "name": "Payments",
+        "summary": "Payment API and settlement services",
+        "user_count": 6,
+        "visible_modules": []
+      },
+      "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90",
+      "relationships": {
+        "team_links": { "links": { "related": "/api/v2/team/8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90/links" } },
+        "user_team_permissions": { "links": { "related": "/api/v2/team/8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90/permission-settings" } }
+      },
+      "type": "team"
+    }
+  ],
+  "links": {
+    "first": "/api/v2/team?page[number]=0&page[size]=100&filter[keyword]=payments",
+    "last": null,
+    "next": "/api/v2/team?page[number]=1&page[size]=100&filter[keyword]=payments",
+    "prev": null,
+    "self": "/api/v2/team?page[number]=0&page[size]=100&filter[keyword]=payments"
+  },
+  "meta": {
+    "pagination": {
+      "first_offset": 0,
+      "last_offset": 0,
+      "limit": 100,
+      "next_offset": 100,
+      "offset": 0,
+      "prev_offset": 0,
+      "total": 2,
+      "type": "offset_limit"
+    }
+  }
+}

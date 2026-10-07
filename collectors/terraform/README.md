@@ -39,4 +39,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: ["domain:your-domain"]  # Or use tags like [infra, terraform]
+    include:
+      - terraform  # Parses .tf files
+      - cicd       # terraform commands in CI
 ```

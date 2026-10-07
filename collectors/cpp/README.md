@@ -41,5 +41,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/cpp@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project       # Build systems and C++ standard
+      - dependencies  # Conan, vcpkg and CMake dependencies
+      - cppcheck      # Runs cppcheck
+      - cicd          # Compiler commands in CI
+      - cmake-cicd    # CMake commands in CI
 ```

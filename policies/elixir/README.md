@@ -44,7 +44,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/elixir@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [mix-project-exists, dependencies-locked]  # Only run specific checks
+    include:
+      - mix-project-exists
+      - elixir-version-constraint-set
+      - dependencies-locked
+      - test-directory-exists
+      - credo-or-dialyzer-configured
+      - umbrella-app-detected
 ```
 
 ## Examples

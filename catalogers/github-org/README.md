@@ -79,6 +79,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
 ```
@@ -88,6 +89,7 @@ catalogers:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       include_public: "true"
@@ -116,6 +118,7 @@ empty placeholder repositories in the catalog anyway, opt in explicitly:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       include_empty: "true"
@@ -129,6 +132,7 @@ set `github_host` to your GHE hostname:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       github_host: "github.acme.com"
@@ -146,6 +150,7 @@ IDs reflect the host, so a repo on GHE is keyed as `github.acme.com/<org>/<repo>
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       include_repos: "api-*,backend-*,frontend-*"
@@ -163,6 +168,7 @@ catalog by **GitHub topic**. Tag the repos you want cataloged (e.g. add the
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       allowed_topics: "lunar"          # only repos carrying the `lunar` topic

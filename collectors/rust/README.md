@@ -56,7 +56,12 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/rust@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project        # Edition, MSRV and unsafe blocks
+      - dependencies   # Cargo dependencies
+      - clippy         # Runs cargo clippy
+      - cicd           # cargo commands in CI
+      - test-coverage  # tarpaulin or llvm-cov coverage
     # with:
     #   clippy_args: "-- -W clippy::pedantic"
 ```

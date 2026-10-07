@@ -27,6 +27,18 @@ These policies enforce specific branch protection requirements. Use `include` to
 | `disallow-branch-deletion` | Branch deletions must be disallowed |
 | `require-linear-history` | Linear history must be required |
 | `require-signed-commits` | Signed commits must be required |
+| `disallow-bypass-actors` | Nobody can bypass protection: no ruleset bypass actors, admins enforced and no bypass allowances under classic protection (configurable via `allowed_bypass_actors`) |
+
+### Change Evidence Policies
+
+These read what happened on each change rather than the settings: the commits of a pull request, and the commits a release ships.
+
+| Policy | Description |
+|--------|-------------|
+| `pr-commits-signed` | Every commit in a pull request must carry a signature GitHub verified (PRs only) |
+| `release-commits-merged-via-pr` | Every commit since the previous release tag must have reached the default branch through merged pull requests (default branch only; needs the github collector's opt-in `release-range`) |
+
+A commit reached the default branch through merged pull requests when its own pull request merged into it, or merged into a branch that a later pull request carried on into it. Gitflow needs the second route, because GitHub links a feature commit to its pull request into `develop` and not to the release pull request from `develop` into the default branch. A branch that was merged by pull request and then pushed straight to the default branch fails. In a range GitHub couldn't list in full, a commit that can't be traced is unknown, so the check skips rather than fails.
 
 ### Repository Settings Policies
 
@@ -58,6 +70,11 @@ This policy reads from the following Component JSON paths:
 | `.vcs.merge_strategies.allow_merge_commit` | boolean | Whether merge commits are allowed |
 | `.vcs.merge_strategies.allow_squash_merge` | boolean | Whether squash merges are allowed |
 | `.vcs.merge_strategies.allow_rebase_merge` | boolean | Whether rebase merges are allowed |
+| `.vcs.branch_protection.rulesets[]` | array | Rulesets on the default branch; `bypass_actors[]` when the token can see them |
+| `.vcs.branch_protection.enforce_admins` | boolean | Classic protection applies to administrators |
+| `.vcs.branch_protection.bypass_pull_request_allowances` | object | Classic `users`, `teams`, `apps` allowed to skip the pull-request requirement |
+| `.vcs.pr.commits[]` | array | The PR's commits with `signature.verified` and `signature.reason` |
+| `.vcs.release_range` | object | Commits since the previous release tag, each with its merged `pull_request` when there is one |
 
 **Note:** This policy requires a VCS collector (such as `github` or `gitlab`) that populates the `.vcs` data.
 
@@ -67,10 +84,28 @@ Add to your `lunar-config.yml`:
 
 ```yaml
 policies:
-  # Run all policies (default - enforces all branch protection and repository settings)
+  # Every check: branch protection and repository settings
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
     on: "domain:your-domain"  # Or use tags like production, critical
     enforcement: report-pr    # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
+    include:
+      - branch-protection-enabled
+      - require-pull-request
+      - minimum-approvals
+      - require-codeowner-review
+      - dismiss-stale-reviews
+      - require-status-checks
+      - require-branches-up-to-date
+      - disallow-force-push
+      - disallow-branch-deletion
+      - require-linear-history
+      - require-signed-commits
+      - disallow-bypass-actors
+      - pr-commits-signed
+      - release-commits-merged-via-pr
+      - require-private
+      - require-default-branch
+      - allowed-merge-strategies
     with:
       min_approvals: 2
       allowed_merge_strategies: "squash"
@@ -89,6 +124,14 @@ policies:
     enforcement: block-pr
     with:
       min_approvals: 2
+
+  # Gate releases (`lunar policy ok-release`) on every commit arriving by merged PR.
+  # Needs release_tag_pattern set on the github collector.
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
+    include:
+      - release-commits-merged-via-pr
+    on: "domain:your-domain"
+    enforcement: block-release
 
   # Run only repository settings policies
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
@@ -237,6 +280,12 @@ When branch protection policies fail, configure branch protection rules in your 
    - **Require signed commits** - Enable if required by policy
 4. Save the branch protection rule
 5. Re-run the Lunar collector and policy to verify compliance
+
+### Bypass and Change Evidence Policies
+
+- **`disallow-bypass-actors`**: remove the listed bypass actors from each ruleset (Settings → Rules → Rulesets), or under classic protection turn on "Do not allow bypassing the above settings" and clear "Allow specified actors to bypass required pull requests". An actor you accept goes in `allowed_bypass_actors`. A skip means the token can't see a ruleset's bypass list; GitHub shows it only to callers with write access to the ruleset.
+- **`pr-commits-signed`**: sign commits with a GPG, SSH or S/MIME key registered to your GitHub account, then re-sign the listed commits (e.g. `git rebase --exec 'git commit --amend --no-edit -S' <base>`) and force-push the branch.
+- **`release-commits-merged-via-pr`**: the listed commits reached the default branch without a pull request into it. Either they were pushed there directly, or they were merged into another branch that was then pushed straight to the default branch. Land them through a pull request (revert and re-land), or record an exception with a Lunar release bypass. Require pull requests on the default branch so it can't recur.
 
 ### Repository Settings Policies
 

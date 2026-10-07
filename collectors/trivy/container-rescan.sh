@@ -47,23 +47,21 @@ else
   # separate job isn't reflected), so it's the wrong source for "what shipped".
   # (Per Fry review on #221.)
   #
-  # In PR context, pin the lookup to the commit being scanned. get-json does not
-  # default these from the environment: with neither flag it resolves the
-  # default-branch snapshot (`WHERE pr IS NULL`), so on a PR it returns main's
-  # Component JSON — a different commit, whose docker record does not carry this
-  # PR's pushed images — and the scan below skips. --git-sha alongside --pr
-  # narrows to the exact commit instead of the PR's latest, so the results
-  # describe the images this commit actually shipped.
+  # Pin the lookup to the commit being scanned. get-json does not default these
+  # from the environment: with neither flag it resolves the default branch's
+  # LATEST snapshot (`WHERE pr IS NULL`) — a different commit on a PR, and on main
+  # once main has moved on (say, a [skip ci] bot commit seconds after the push).
+  # That commit's docker record lacks this commit's pushed images, so the scan
+  # below skips. --pr narrows to the PR; --git-sha to the exact commit.
   #
-  # Only in PR context. On the default branch — the cron `container-rescan`, and
-  # an after-json run on a push to main — the unpinned default-branch lookup is
-  # already the right one, so it is left untouched. It is also the more robust
-  # one there: the cron's head_sha is the latest *ingested* main commit, which
-  # may not have been collected yet, and pinning to it would resolve nothing and
-  # silently stop the re-scan.
+  # The on-push (after-json) leg is pinned on every branch: its wave fires for one
+  # (component, sha). The cron `container-rescan` is pinned only on a PR — on the
+  # default branch its head_sha is the latest *ingested* main commit, which may
+  # not have been collected yet, so pinning would resolve nothing and silently
+  # stop the re-scan.
   json_args=()
-  if [ -n "${LUNAR_COMPONENT_PR:-}" ]; then
-    json_args=(--pr "$LUNAR_COMPONENT_PR")
+  [ -n "${LUNAR_COMPONENT_PR:-}" ] && json_args=(--pr "$LUNAR_COMPONENT_PR")
+  if [ -n "${LUNAR_COMPONENT_PR:-}" ] || [ "$INTEGRATION" = "after-json" ]; then
     [ -n "${LUNAR_COMPONENT_GIT_SHA:-}" ] && json_args+=(--git-sha "$LUNAR_COMPONENT_GIT_SHA")
   fi
 

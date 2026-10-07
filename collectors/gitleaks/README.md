@@ -58,6 +58,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/gitleaks@main
     on: ["domain:your-domain"]  # Or use tags
+    include:
+      - scan  # Runs Gitleaks on the repo
+      - cicd  # Gitleaks reports from CI
 ```
 
 No configuration or secrets required. The `scan` sub-collector runs Gitleaks automatically using the `gitleaks-main` container image. The `cicd` sub-collector detects existing Gitleaks invocations in CI pipelines and collects their report files.

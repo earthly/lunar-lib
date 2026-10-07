@@ -74,12 +74,51 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
+    include: [terraform]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/terraform@main
     on: [infra]
     enforcement: report-pr
-    # include: [provider-versions-pinned, remote-backend]  # Only run specific checks
+    include:
+      - provider-versions-pinned
+      - module-versions-pinned
+      - remote-backend
+      - min-provider-versions
+      - aws-alb-waf-enabled
+      - aws-cloudtrail-multi-region
+      - aws-security-group-no-public-postgres
+      - aws-security-group-no-public-ssh
+      - aws-eks-control-plane-logging
+      - aws-elb-access-logging
+      - aws-ebs-snapshot-encryption
+      - aws-iam-role-permissions-boundary
+      - aws-imdsv2-required
+      - opentofu-state-encryption
+      - aws-ebs-volume-encryption
+      - aws-elb-https-only
+      - aws-guardduty-enabled
+      - aws-rds-cloudwatch-logging
+      - aws-s3-block-public-access
+      - aws-s3-access-logging
+      - aws-vpc-flow-logs
+      - aws-security-group-no-public-admin-ports
+      - aws-rds-encryption-at-rest
+      - aws-rds-not-publicly-accessible
+      - aws-rds-snapshot-encryption
+      - aws-s3-encryption-at-rest
+      - aws-s3-no-static-website
+      - aws-s3-no-public-acl
+      - aws-iam-password-min-length
+      - aws-iam-no-direct-user-policies
+      - aws-acm-cert-dns-validation
+      - aws-eks-private-endpoint
+      - aws-dynamodb-encryption
+      - aws-lambda-not-public
+      - aws-cloudtrail-log-file-validation
+      - aws-cloudtrail-kms-encryption
+      - aws-tls-policy-approved
+      - aws-stateful-backup-configured
     # with:
     #   required_backend_types: "s3,gcs,remote"  # Restrict allowed backend types
     #   min_provider_versions: '{"aws": "5.0", "random": "3.0"}'  # Enforce minimum versions

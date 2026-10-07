@@ -48,6 +48,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/jira
     on: ["domain:your-domain"]
+    include:
+      - ticket            # Ticket from the PR, via the Jira API
+      - ticket-from-json  # Same, read from .vcs.pr (no GH_TOKEN)
+      - ticket-history    # Ticket reuse across PRs
     with:
       jira_base_url: "https://acme.atlassian.net"
       jira_user: "user@acme.com"
