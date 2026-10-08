@@ -37,6 +37,21 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
+# The release images are rebuilt from HEAD and published as CI builds them, so
+# main's scan of this exact commit is the last check before they ship.
+HEAD_SHA=$(git rev-parse HEAD)
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: gh is required to confirm the CVE scan passed for $HEAD_SHA" >&2
+    exit 1
+fi
+SCAN=$(gh api "repos/earthly/lunar-lib/commits/$HEAD_SHA/check-runs?check_name=CVE%20scan" \
+    --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end' 2>/dev/null) || SCAN="unreadable"
+if [ "$SCAN" != "success" ]; then
+    echo "Error: the CI 'CVE scan' job for $HEAD_SHA is '$SCAN', not success" >&2
+    echo "Release only a main commit whose images scanned clean." >&2
+    exit 1
+fi
+
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

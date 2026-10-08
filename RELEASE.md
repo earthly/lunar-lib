@@ -20,6 +20,7 @@ After that, CI builds and publishes images for the new tag. Consumers can then p
 ## Before you run
 
 - Make sure `HEAD` is what you want to release
+- CI's `CVE scan` job must have passed for `HEAD`. The script checks with `gh` and refuses otherwise
 - The script validates everything else (semver format, clean tree, no duplicate branch/tag, no leftover `-main` refs)
 
 ## AI agents

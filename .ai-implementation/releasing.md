@@ -81,7 +81,7 @@ cd /path/to/lunar-lib    # must be repo root
 The script handles everything:
 
 1. **Validates** the version format (must match `^v[0-9]+\.[0-9]+\.[0-9]+$`)
-2. **Checks** working tree is clean, no duplicate branch/tag
+2. **Checks** working tree is clean, no duplicate branch/tag, and that CI's `CVE scan` job passed for `HEAD`. No green scan, no release.
 3. **Creates** local branch `vX.Y.Z`
 4. **Generates the CHANGELOG section** — `scripts/gen-changelog-section.sh` reads the commits in `<previous-tag>..HEAD` and splices a `## [X.Y.Z]` section plus its compare link into `CHANGELOG.md`, before the pin commit, so the tag carries it
 5. **Rewrites manifests** — all `lunar-*.yml` files: changes `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
@@ -106,12 +106,14 @@ gh run list --branch vX.Y.Z --limit 3
 gh run watch <run-id>
 ```
 
-CI runs three jobs:
+CI runs five jobs:
 - **+test** — runs `earthly --ci +test`
 - **+lint** — runs `earthly --ci +lint`
 - **+all (build-and-push)** — builds every plugin image and pushes to Docker Hub with the `vX.Y.Z` tag
+- **CVE scan** — `scripts/scan-images.sh vX.Y.Z` runs grype on every pushed image and fails on a fixable High or Critical, or on a lunar CLI older than the latest lunar-dist release
+- **record pushed images for CVE scan** — tells the internal Hub which images to scan
 
-All three must pass. If any fail:
+All five must pass. A red **CVE scan** here means the published images carry a fixable High+. Don't create the GitHub Release or announce it; fix it on `main` and cut the next patch. If any job fails:
 
 ```bash
 gh run view <run-id> --log-failed
@@ -271,6 +273,7 @@ On `main` branch only, CI also pushes images tagged with the short git SHA (firs
 | `EARTHLY_TOKEN` | Earthly Cloud auth for builds |
 | `DOCKERHUB_USERNAME` | Docker Hub login |
 | `DOCKERHUB_TOKEN` | Docker Hub auth |
+| `LUNAR_INTERNAL_HUB_TOKEN` | Hub auth for the push record (with the `LUNAR_HUB_HOST` repo *variable*) |
 | `SLACK_BOT_TOKEN` | Slack bot token for posting to #team-eng (agent runtime env, not a GitHub secret) |
 
 The CI secrets (`EARTHLY_TOKEN`, Docker Hub) are configured in GitHub repo settings. `SLACK_BOT_TOKEN` is an agent runtime credential available in the agent's shell environment.
