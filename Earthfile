@@ -182,6 +182,9 @@ base-image:
     # after a pin bump picked up. Release cuts and new branches never had a cache
     # to hit, so they were always fresh; this makes main behave the same.
     RUN --no-cache apk upgrade --no-cache
+    # Replace the CLI and yq the pinned lunar-scripts tag froze in.
+    COPY +lunar-cli/lunar /usr/bin/lunar
+    COPY +yq-bin/yq /usr/local/bin/yq
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     # git: a dozen collectors shell out to it (diff, log, ls-files) and their
@@ -191,3 +194,24 @@ base-image:
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
+
+# Latest released lunar CLI. A lunar-scripts tag freezes the CLI that was current
+# when it was cut, so every image installs this one over it.
+lunar-cli:
+    FROM alpine:3.21
+    RUN apk add --no-cache curl
+    ARG TARGETARCH
+    # --no-cache: resolve "latest" on every build, not from the layer cache.
+    RUN --no-cache curl -fsSL -o /lunar \
+            "https://github.com/earthly/lunar-dist/releases/latest/download/lunar-linux-${TARGETARCH}" && \
+        chmod 755 /lunar && /lunar version
+    SAVE ARTIFACT /lunar
+
+# Built from source so yq carries a current Go stdlib; upstream's release binaries
+# lag the Go patch releases that fix stdlib CVEs.
+yq-bin:
+    FROM golang:1.27-alpine
+    # renovate: datasource=github-releases depName=mikefarah/yq extractVersion=^v(?<version>.*)$
+    ARG YQ_VERSION=4.54.1
+    RUN CGO_ENABLED=0 go install "github.com/mikefarah/yq/v4@v${YQ_VERSION}"
+    SAVE ARTIFACT /go/bin/yq
