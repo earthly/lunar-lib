@@ -106,14 +106,14 @@ gh run list --branch vX.Y.Z --limit 3
 gh run watch <run-id>
 ```
 
-CI runs five jobs:
+CI runs these jobs:
 - **+test** — runs `earthly --ci +test`
 - **+lint** — runs `earthly --ci +lint`
 - **+all (build-and-push)** — builds every plugin image and pushes to Docker Hub with the `vX.Y.Z` tag
 - **release gate** — runs `lunar policy ok-release` on the main commit the branch was cut from, before **+all** runs. It fails if any release-blocking policy fails there (e.g. `image-cve`), or if main never recorded that commit's images
 - **record pushed images for CVE scan** — tells the internal Hub which images to scan
 
-All five must pass. A red **release gate** means Lunar blocked the release and no image was pushed. Don't create the GitHub Release or announce it: fix it on `main` and cut the next patch. If any job fails:
+All must pass. A red **release gate** means Lunar blocked the release and no image was pushed. Don't create the GitHub Release or announce it: fix it on `main` and cut the next patch. If any job fails:
 
 ```bash
 gh run view <run-id> --log-failed
