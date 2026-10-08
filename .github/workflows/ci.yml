@@ -158,6 +158,9 @@ jobs:
   record-pushed-images:
     name: record pushed images for CVE scan
     needs: [build-and-push]
+    # Explicit, because the default success() also fails on the skipped
+    # release-gate upstream, which would skip this on every PR and main build.
+    if: ${{ !cancelled() && needs.build-and-push.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       LUNAR_HUB_HOST: ${{ vars.LUNAR_HUB_HOST }}
