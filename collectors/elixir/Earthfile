@@ -26,10 +26,6 @@ image:
         && rm -rf /var/lib/apt/lists/* \
         && git config --system --add safe.directory '*'
 
-    # Replace the CLI and yq the pinned lunar-scripts tag froze in (see the root base-image).
-    COPY ../../+lunar-cli/lunar /usr/bin/lunar
-    COPY ../../+yq-bin/yq /usr/local/bin/yq
-
     # Verify installations
     RUN elixir --version && mix --version
 

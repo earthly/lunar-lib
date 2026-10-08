@@ -14,10 +14,6 @@ image:
         apt-get install -y --no-install-recommends php-cli php-json php-xml && \
         rm -rf /var/lib/apt/lists/*
 
-    # Replace the CLI and yq the pinned lunar-scripts tag froze in (see the root base-image).
-    COPY ../../+lunar-cli/lunar /usr/bin/lunar
-    COPY ../../+yq-bin/yq /usr/local/bin/yq
-
     # Install Composer
     RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 

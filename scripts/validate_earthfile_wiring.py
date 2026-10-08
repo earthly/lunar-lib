@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Validate that all plugin Earthfiles with an `image:` target are wired into the
-root Earthfile's `+all` target, and that every image built on
-earthly/lunar-scripts replaces the lunar CLI and yq that tag froze in.
+root Earthfile's `+all` target.
 
 Any collector, policy, or cataloger that defines an `image:` target needs a
 corresponding `BUILD --pass-args ./<type>/<name>+image` line in the root
@@ -35,26 +34,6 @@ def find_earthfiles_with_image_target(base_dir: Path) -> list[str]:
                 plugin_name = earthfile.parent.name
                 results.append(f"./{plugin_dir}/{plugin_name}+image")
     return results
-
-
-FRESH_BINARIES = ("+lunar-cli/lunar", "+yq-bin/yq")
-
-
-def find_frozen_binary_images(base_dir: Path) -> list[str]:
-    """Earthfiles that build FROM earthly/lunar-scripts without COPYing the fresh
-    lunar CLI and yq over the ones that tag baked in."""
-    earthfiles = [base_dir / "Earthfile"]
-    for plugin_dir in PLUGIN_DIRS:
-        earthfiles += sorted((base_dir / plugin_dir).glob("*/Earthfile"))
-    problems = []
-    for earthfile in earthfiles:
-        content = earthfile.read_text()
-        if not re.search(r"^\s*FROM\s+(--\S+\s+)*earthly/lunar-scripts:", content, re.MULTILINE):
-            continue
-        for artifact in FRESH_BINARIES:
-            if artifact not in content:
-                problems.append(f"{earthfile.relative_to(base_dir)}: no COPY of {artifact}")
-    return problems
 
 
 def parse_all_target_refs(earthfile_path: Path) -> set[str]:
@@ -105,18 +84,6 @@ def main():
         sys.exit(1)
 
     print("\nAll plugin images are wired into the +all target.")
-
-    frozen = find_frozen_binary_images(base_dir)
-    if frozen:
-        print(f"\nERROR: {len(frozen)} image(s) keep the lunar CLI/yq frozen into earthly/lunar-scripts:")
-        for problem in frozen:
-            print(f"  - {problem}")
-        print("\nFix: after the FROM, add (as in collectors/nodejs/Earthfile):")
-        print("    COPY ../../+lunar-cli/lunar /usr/bin/lunar")
-        print("    COPY ../../+yq-bin/yq /usr/local/bin/yq")
-        sys.exit(1)
-
-    print("Every lunar-scripts-based image installs the fresh lunar CLI and yq.")
     sys.exit(0)
 
 

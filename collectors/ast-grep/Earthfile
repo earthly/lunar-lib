@@ -22,9 +22,5 @@ image:
         apt-get remove -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && \
         echo "${AST_GREP_VERSION}" > /usr/local/bin/ast-grep.version
 
-    # Replace the CLI and yq the pinned lunar-scripts tag froze in (see the root base-image).
-    COPY ../../+lunar-cli/lunar /usr/bin/lunar
-    COPY ../../+yq-bin/yq /usr/local/bin/yq
-
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:ast-grep-$VERSION
