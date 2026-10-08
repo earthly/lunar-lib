@@ -6,16 +6,25 @@ image:
     # Install Gitleaks
     # renovate: datasource=github-releases depName=gitleaks/gitleaks extractVersion=^v(?<version>.*)$
     ARG GITLEAKS_VERSION=8.30.1
-    ARG TARGETARCH
-    LET GITLEAKS_ARCH=${TARGETARCH}
-    IF [ "$TARGETARCH" = "amd64" ]
-        SET GITLEAKS_ARCH=x64
-    END
-    RUN curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" | tar xz -C /usr/local/bin gitleaks && \
-        chmod +x /usr/local/bin/gitleaks
+    COPY (+gitleaks-bin/gitleaks --GITLEAKS_VERSION=$GITLEAKS_VERSION) /usr/local/bin/gitleaks
 
     # Verify installation
     RUN gitleaks version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:gitleaks-$VERSION
+
+# Built from source with current golang.org/x modules: upstream's latest release
+# (8.30.1) still ships go1.24.11 and x/crypto 0.35.0, both with fixable criticals.
+gitleaks-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required GITLEAKS_VERSION
+    RUN git clone --depth 1 --branch "v${GITLEAKS_VERSION}" https://github.com/gitleaks/gitleaks /src
+    WORKDIR /src
+    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest golang.org/x/text@latest golang.org/x/sys@latest && \
+        go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
+            -o /out/gitleaks .
+    SAVE ARTIFACT /out/gitleaks
