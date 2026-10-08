@@ -37,18 +37,19 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-# The release images are rebuilt from HEAD and published as CI builds them, so
-# main's scan of this exact commit is the last check before they ship.
+# CI's release gate runs `lunar policy ok-release` on HEAD before pushing any
+# image, and fails if main never recorded HEAD's images for Lunar to scan. Check
+# that record now, so a release doesn't leave behind a tag that can never publish.
 HEAD_SHA=$(git rev-parse HEAD)
 if ! command -v gh >/dev/null 2>&1; then
-    echo "Error: gh is required to confirm the CVE scan passed for $HEAD_SHA" >&2
+    echo "Error: gh is required to confirm main's CI recorded the images for $HEAD_SHA" >&2
     exit 1
 fi
-SCAN=$(gh api "repos/earthly/lunar-lib/commits/$HEAD_SHA/check-runs?check_name=CVE%20scan" \
-    --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end' 2>/dev/null) || SCAN="unreadable"
-if [ "$SCAN" != "success" ]; then
-    echo "Error: the CI 'CVE scan' job for $HEAD_SHA is '$SCAN', not success" >&2
-    echo "Release only a main commit whose images scanned clean." >&2
+RECORD=$(gh api "repos/earthly/lunar-lib/commits/$HEAD_SHA/check-runs?check_name=record%20pushed%20images%20for%20CVE%20scan" \
+    --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end' 2>/dev/null) || RECORD="unreadable"
+if [ "$RECORD" != "success" ]; then
+    echo "Error: main's 'record pushed images for CVE scan' for $HEAD_SHA is '$RECORD', not success" >&2
+    echo "Release a main commit whose CI finished; Lunar can't vet images it never scanned." >&2
     exit 1
 fi
 

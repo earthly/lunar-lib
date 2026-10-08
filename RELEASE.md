@@ -20,7 +20,8 @@ After that, CI builds and publishes images for the new tag. Consumers can then p
 ## Before you run
 
 - Make sure `HEAD` is what you want to release
-- CI's `CVE scan` job must have passed for `HEAD`. The script checks with `gh` and refuses otherwise
+- `HEAD`'s main CI must have finished, including `record pushed images for CVE scan`. The script checks with `gh` and refuses otherwise
+- On the release branch, CI runs `lunar policy ok-release` on `HEAD` before it pushes any image. If a release-blocking policy fails, nothing publishes
 - The script validates everything else (semver format, clean tree, no duplicate branch/tag, no leftover `-main` refs)
 
 ## AI agents

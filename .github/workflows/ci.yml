@@ -47,12 +47,61 @@ jobs:
       - name: Lint
         run: earthly --ci +lint
 
+  # Lunar's verdict on the main commit a release branch was cut from, before any
+  # vX.Y.Z image is pushed. Push events only reach main and release branches.
+  release-gate:
+    name: release gate (lunar policy ok-release)
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LUNAR_HUB_HOST: ${{ vars.LUNAR_HUB_HOST }}
+      LUNAR_HUB_GRPC_PORT: "443"
+      LUNAR_HUB_HTTP_PORT: "443"
+      LUNAR_HUB_TOKEN: ${{ secrets.LUNAR_INTERNAL_HUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install the Lunar CLI
+        run: |-
+          asset_url=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/earthly/lunar-dist/releases/latest \
+            | jq -r '.assets[] | select(.name == "lunar-linux-amd64") | .url')
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "$asset_url" -o "$RUNNER_TEMP/lunar"
+          chmod +x "$RUNNER_TEMP/lunar"
+      - name: Release-blocking policies pass on the released commit
+        run: |-
+          # release.sh commits exactly one pin commit on top of the main commit it releases.
+          released=$(git rev-parse HEAD^)
+          if ! git merge-base --is-ancestor "$released" origin/main; then
+            echo "::error::$released is not on main; cut releases with scripts/release.sh from main" >&2
+            exit 1
+          fi
+          # image-cve skips (and ok-release passes) a commit whose images were never
+          # recorded, so main's push record for this commit has to have succeeded.
+          record=$(gh api "repos/${{ github.repository }}/commits/$released/check-runs?check_name=record%20pushed%20images%20for%20CVE%20scan" \
+            --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end')
+          if [ "$record" != "success" ]; then
+            echo "::error::main's 'record pushed images for CVE scan' for $released is '$record', so Lunar never scanned its images" >&2
+            exit 1
+          fi
+          "$RUNNER_TEMP/lunar" policy ok-release github.com/earthly/lunar-lib "$released" --timeout 20m
+
   build-and-push:
     name: +all
+    needs: [release-gate]
+    # Every PR and main build, and a release branch only once its gate passed.
+    if: >-
+      !cancelled() &&
+      (needs.release-gate.result == 'success' ||
+       (needs.release-gate.result == 'skipped' && !(github.event_name == 'push' && github.ref != 'refs/heads/main')))
     runs-on: ubuntu-latest
     outputs:
-      # The immutable tag the scan and the push record use: main's short sha,
-      # otherwise the branch tag.
+      # The tag the push record reports: main's short sha, otherwise the branch tag.
       tag: ${{ steps.names.outputs.tag }}
     env:
       FORCE_COLOR: 1
@@ -93,34 +142,6 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |-
           earthly --ci --push +all --VERSION "${GITHUB_SHA::8}"
-
-  # grype every image +all pushed, on every PR, main and release-branch build.
-  # Fails on a fixable High or Critical, or on a lunar CLI older than the latest
-  # lunar-dist release. scripts/release.sh refuses to tag a commit unless this
-  # passed for it.
-  scan-images:
-    name: CVE scan
-    needs: [build-and-push]
-    runs-on: ubuntu-latest
-    env:
-      GRYPE_VERSION: 0.120.1
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TAG: ${{ needs.build-and-push.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Login
-        run: |-
-          echo "${{secrets.DOCKERHUB_TOKEN}}" | docker login -u "${{secrets.DOCKERHUB_USERNAME}}" --password-stdin
-      - name: Install grype
-        run: |-
-          base="https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}"
-          tarball="grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
-          curl -fsSLO "$base/$tarball"
-          curl -fsSL "$base/grype_${GRYPE_VERSION}_checksums.txt" | grep " ${tarball}\$" | sha256sum -c -
-          sudo tar -xzf "$tarball" -C /usr/local/bin grype
-          grype version
-      - name: Scan every pushed image
-        run: scripts/scan-images.sh "$TAG"
 
   # WORKAROUND — remove this job once the Lunar CI tracer can trace an Earthly
   # build. We build and push with `earthly --push +all`, and the tracer doesn't
