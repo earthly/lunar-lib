@@ -4,14 +4,9 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install Helm CLI
-    ARG TARGETARCH
     # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
-    ARG HELM_VERSION=3.21.4
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
-        curl -sSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar xz && \
-        mv "linux-${ARCH}/helm" /usr/local/bin/ && \
-        rm -rf "linux-${ARCH}" && \
-        chmod +x /usr/local/bin/helm
+    ARG HELM_VERSION=3.22.0
+    COPY (+helm-bin/helm --HELM_VERSION=$HELM_VERSION) /usr/local/bin/helm
 
     # Install GNU parallel for parallel chart processing
     RUN apk add --no-cache parallel && \
@@ -19,3 +14,26 @@ image:
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:helm-$VERSION
+
+# Built from source with current x/crypto: the 3.22.0 release binary still ships
+# 0.55.0 (fixable Highs). The k8s version flags mirror upstream's Makefile; without
+# them helm lints and renders against KubeVersion v1.20.
+helm-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required HELM_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${HELM_VERSION}" https://github.com/helm/helm /src
+    WORKDIR /src
+    RUN go get golang.org/x/crypto@latest && \
+        K=$(go list -f '{{.Version}}' -m k8s.io/client-go | sed 's/^v//') && \
+        KMAJ=$(( ${K%%.*} + 1 )) && KMIN=$(echo "$K" | cut -d. -f2) && \
+        CGO_ENABLED=0 go build -trimpath -ldflags "-w -s \
+            -X helm.sh/helm/v3/internal/version.version=v${HELM_VERSION} \
+            -X helm.sh/helm/v3/internal/version.metadata= \
+            -X helm.sh/helm/v3/internal/version.gitTreeState=clean \
+            -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMajor=${KMAJ} \
+            -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMinor=${KMIN} \
+            -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMajor=${KMAJ} \
+            -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMinor=${KMIN}" \
+            -o /out/helm ./cmd/helm
+    SAVE ARTIFACT /out/helm

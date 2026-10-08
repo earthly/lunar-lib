@@ -201,11 +201,32 @@ lunar-cli:
     FROM alpine:3.21
     RUN apk add --no-cache curl
     ARG TARGETARCH
+    # Floats to the newest release on purpose. To roll back a bad one, set a
+    # version here (e.g. 4.9.0) until a fixed release ships.
+    ARG LUNAR_CLI_VERSION=latest
     # --no-cache: resolve "latest" on every build, not from the layer cache.
-    RUN --no-cache curl -fsSL -o /lunar \
-            "https://github.com/earthly/lunar-dist/releases/latest/download/lunar-linux-${TARGETARCH}" && \
-        chmod 755 /lunar && /lunar version
+    RUN --no-cache if [ "$LUNAR_CLI_VERSION" = latest ]; then \
+            url="https://github.com/earthly/lunar-dist/releases/latest/download/lunar-linux-${TARGETARCH}"; \
+        else \
+            url="https://github.com/earthly/lunar-dist/releases/download/v${LUNAR_CLI_VERSION}/lunar-linux-${TARGETARCH}"; \
+        fi && \
+        curl -fsSL -o /lunar "$url" && chmod 755 /lunar && /lunar version
     SAVE ARTIFACT /lunar
+
+# kubeconform for the k8s and argocd images, built from source with a current
+# x/text: the 0.8.0 release binary carries fixable Highs in it and in Go's stdlib.
+kubeconform-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    # renovate: datasource=github-releases depName=yannh/kubeconform extractVersion=^v(?<version>.*)$
+    ARG KUBECONFORM_VERSION=0.8.0
+    RUN git clone --quiet --depth 1 --branch "v${KUBECONFORM_VERSION}" https://github.com/yannh/kubeconform /src
+    WORKDIR /src
+    # The repo vendors its dependencies, so re-vendor after the bump.
+    RUN go get golang.org/x/text@latest && go mod vendor && \
+        CGO_ENABLED=0 go build -trimpath -tags netgo \
+            -ldflags "-s -w -X main.version=v${KUBECONFORM_VERSION}" -o /out/kubeconform ./cmd/kubeconform
+    SAVE ARTIFACT /out/kubeconform
 
 # Built from source so yq carries a current Go stdlib; upstream's release binaries
 # lag the Go patch releases that fix stdlib CVEs.
