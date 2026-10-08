@@ -1,0 +1,10 @@
+# Fixable findings scripts/scan-images.sh accepts. Every entry says why, and when
+# to delete it.
+ignore:
+  # erb 4.0.4 is the default gem of Alpine 3.24's ruby 3.4.9-r0 (ruby image). The
+  # fix ships with ruby 3.4.10, which only Alpine edge has so far. base-image's
+  # `apk upgrade` picks it up once v3.24 does; delete this entry then.
+  - vulnerability: GHSA-q339-8rmv-2mhv
+    package:
+      name: erb
+      type: gem

@@ -38,9 +38,12 @@ dockerfile-json-bin:
     ARG --required DOCKERFILE_JSON_VERSION
     # clone + build rather than `go install pkg@version`: the module's go.mod has
     # replace directives, which `go install` refuses outside the main module.
-    # -tags=dfrunsecurity is what upstream's own Makefile builds with.
+    # -tags=dfrunsecurity is what upstream's own Makefile builds with. buildkit is
+    # bumped past the 0.19.0 upstream pins, which carries fixable Highs; the repo
+    # vendors its dependencies, so re-vendor after the bump.
     RUN apk add --no-cache git && \
         git clone --quiet --depth 1 --branch "v${DOCKERFILE_JSON_VERSION}" https://github.com/keilerkonzept/dockerfile-json /src && \
         cd /src && mkdir -p /out && \
+        go get github.com/moby/buildkit@v0.34.0 && go mod tidy && go mod vendor && \
         CGO_ENABLED=0 go build -trimpath -tags=dfrunsecurity -ldflags "-s -w -X main.version=v${DOCKERFILE_JSON_VERSION}" -o /out/dockerfile-json .
     SAVE ARTIFACT /out/dockerfile-json

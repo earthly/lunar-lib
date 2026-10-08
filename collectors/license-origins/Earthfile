@@ -22,7 +22,7 @@ image:
 
     # Install Syft
     # renovate: datasource=github-releases depName=anchore/syft extractVersion=^v(?<version>.*)$
-    ARG SYFT_VERSION=1.51.1
+    ARG SYFT_VERSION=1.54.1
     RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
         chmod +x /usr/local/bin/syft
 
@@ -52,8 +52,17 @@ image:
     # The npm bundled with Node 22 (10.9.x) vendors tar < 7.5.19, which grype flags
     # critical (GHSA-23hp-3jrh-7fpw); npm 12 depends on tar ^7.5.19.
     # renovate: datasource=npm depName=npm
-    ARG NPM_VERSION=12.0.2
+    ARG NPM_VERSION=12.2.0
     RUN npm install -g "npm@${NPM_VERSION}"
+
+    # npm bundles brace-expansion and undici versions with fixable Highs, and no npm
+    # release ships the fixes yet (npm/cli#10088). Swap in the fixed versions.
+    RUN NPM_DIR="$(npm root -g)/npm" && cd /tmp && \
+        npm pack --silent brace-expansion@5.0.12 undici@6.29.0 && \
+        for p in brace-expansion undici; do \
+            rm -rf "$NPM_DIR/node_modules/$p" && mkdir -p "$NPM_DIR/node_modules/$p" && \
+            tar xzf "/tmp/$p"-*.tgz -C "$NPM_DIR/node_modules/$p" --strip-components=1; \
+        done && rm -f /tmp/*.tgz
 
     # Verify all tools
     RUN syft version && go version && rustc --version && cargo --version && \

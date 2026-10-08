@@ -5,13 +5,7 @@ image:
     FROM --pass-args ../../+base-image
 
     # kubeconform for manifest validation
-    ARG TARGETARCH
-    # renovate: datasource=github-releases depName=yannh/kubeconform extractVersion=^v(?<version>.*)$
-    ARG KUBECONFORM_VERSION=0.8.0
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
-        curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-${ARCH}.tar.gz" | tar xz && \
-        mv kubeconform /usr/local/bin/ && \
-        chmod +x /usr/local/bin/kubeconform
+    COPY ../../+kubeconform-bin/kubeconform /usr/local/bin/kubeconform
 
     # argoproj CRD JSON schemas (datreeio/CRDs-catalog) for offline validation.
     # datreeio filenames are lowercase, which matches what kubeconform's
