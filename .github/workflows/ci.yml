@@ -48,7 +48,9 @@ jobs:
         run: earthly --ci +lint
 
   # Lunar's verdict on the main commit a release branch was cut from, before any
-  # vX.Y.Z image is pushed. Push events only reach main and release branches.
+  # vX.Y.Z image is pushed. It covers main's images: the vX.Y.Z rebuild can pick
+  # up newer OS packages and a newer CLI. Push events only reach main and release
+  # branches.
   release-gate:
     name: release gate (lunar policy ok-release)
     if: github.event_name == 'push' && github.ref != 'refs/heads/main'
