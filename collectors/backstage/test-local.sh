@@ -77,21 +77,28 @@ url="${@: -1}"
 #   else       -> spec.domain: payments, which resolves 200 -> exists:true
 # `namespace` is echoed back from the request so a cross-namespace hop (a bare
 # spec.domain on a System in another namespace) can be asserted.
+#   annotated* -> spec.domain: annotated-domain
+# annotated* entities also carry an annotation naming their own kind, so a test
+# can tell which entity's annotations landed where.
 mock_entity() {
-  local kind="$1" ns="$2" ename="$3" dom=""
+  local kind="$1" ns="$2" ename="$3" dom="" ann=""
   if [ "$kind" = "system" ]; then
     case "$ename" in
       *-nodomain) dom="" ;;
       dangling*)  dom="typo-domain" ;;
+      annotated*) dom="annotated-domain" ;;
       *)          dom="payments" ;;
     esac
   fi
+  case "$ename" in
+    annotated*) ann=",\"annotations\":{\"test/kind\":\"$kind\"}" ;;
+  esac
   if [ -n "$dom" ]; then
-    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"},"spec":{"domain":"%s"}}' \
-      "$kind" "$ename" "$ns" "$dom"
+    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"%s},"spec":{"domain":"%s"}}' \
+      "$kind" "$ename" "$ns" "$ann" "$dom"
   else
-    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"},"spec":{}}' \
-      "$kind" "$ename" "$ns"
+    printf '{"kind":"%s","metadata":{"name":"%s","namespace":"%s"%s},"spec":{}}' \
+      "$kind" "$ename" "$ns" "$ann"
   fi
 }
 
@@ -269,7 +276,7 @@ echo "Backstage collector referential-integrity tests:"
 
 assert_eq "domain exists (200) + system miss (404)" \
   "$(run payments typo-platform http://fake:7007)" \
-  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"domain":{"name":"payments","exists":true,"ref":"domain:default/payments"},"system":{"name":"typo-platform","exists":false}}'
 
 assert_eq "transient 5xx -> error marker, not exists" \
   "$(run '' five http://fake:7007 | jq -c '.system')" \
@@ -281,7 +288,7 @@ assert_eq "connection error -> error marker" \
 
 assert_eq "qualified ns/name ref keeps its own namespace" \
   "$(run prod/payments '' http://fake:7007 compns | jq -c '.domain')" \
-  '{"name":"prod/payments","exists":true}'
+  '{"name":"prod/payments","exists":true,"ref":"domain:prod/payments"}'
 
 assert_eq "unconfigured (no backstage_url) writes no .refs" \
   "$(run payments payment-platform '')" \
@@ -326,7 +333,7 @@ assert_eq "custom prefix is used verbatim" \
 SIGV4_ROOT=$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 LUNAR_VAR_API_PATH_PREFIX= $STATIC_KEYS" \
   payments '' http://fake:7007 | jq -c '.refs.domain')
 assert_eq "sigv4 + root-mounted API resolves the ref" \
-  "$SIGV4_ROOT" '{"name":"payments","exists":true}'
+  "$SIGV4_ROOT" '{"name":"payments","exists":true,"ref":"domain:default/payments"}'
 assert_eq "sigv4 + root-mounted API signs the root path" \
   "$(grep -c 'http://fake:7007/catalog/entities/by-name/domain/default/payments' "$CURL_LOG")" '1'
 
@@ -339,9 +346,9 @@ echo "Backstage collector auth-mode (bearer / sigv4) tests:"
 : > "$CURL_LOG"
 BEARER_REFS=$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" payments '' http://fake:7007 | jq -c '.refs.domain')
 assert_eq "bearer (default) still resolves refs" \
-  "$BEARER_REFS" '{"name":"payments","exists":true}'
-assert_eq "bearer sends the Authorization header" \
-  "$(grep -c 'Authorization: Bearer test-token' "$CURL_LOG")" '1'
+  "$BEARER_REFS" '{"name":"payments","exists":true,"ref":"domain:default/payments"}'
+assert_eq "bearer sends the Authorization header on every lookup" \
+  "$(grep -c 'Authorization: Bearer test-token' "$CURL_LOG")" '2'
 assert_eq "bearer sends NO sigv4 flags" \
   "$(grep -c 'aws-sigv4' "$CURL_LOG" || true)" '0'
 
@@ -352,9 +359,9 @@ SIGV4_REFS=$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 
   payments typo-platform http://fake:7007 | jq -c '.refs')
 assert_eq "sigv4 resolves refs (200 exists / 404 miss) like bearer" \
   "$SIGV4_REFS" \
-  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"domain":{"name":"payments","exists":true,"ref":"domain:default/payments"},"system":{"name":"typo-platform","exists":false}}'
 assert_eq "sigv4 passes the signing flags with the right scope" \
-  "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '2'
+  "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '3'
 assert_eq "sigv4 sends no Bearer header" \
   "$(grep -c 'Authorization: Bearer' "$CURL_LOG" || true)" '0'
 
@@ -363,14 +370,14 @@ assert_eq "sigv4 sends no Bearer header" \
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=eu-west-2 LUNAR_VAR_AWS_SERVICE=lambda $STATIC_KEYS" \
   payments '' http://fake:7007 >/dev/null
 assert_eq "aws_service override reaches the signature scope" \
-  "$(grep -c -- '--aws-sigv4 aws:amz:eu-west-2:lambda' "$CURL_LOG")" '1'
+  "$(grep -c -- '--aws-sigv4 aws:amz:eu-west-2:lambda' "$CURL_LOG")" '2'
 
 # Temporary credentials must also send the session-token header.
 : > "$CURL_LOG"
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_SECRET_AWS_SESSION_TOKEN=tmptok" \
   payments '' http://fake:7007 >/dev/null
 assert_eq "static session token is sent as x-amz-security-token" \
-  "$(grep -c 'x-amz-security-token: tmptok' "$CURL_LOG")" '1'
+  "$(grep -c 'x-amz-security-token: tmptok' "$CURL_LOG")" '2'
 
 # IRSA (chain step 1) wins over the static keys and self-refreshes.
 : > "$CURL_LOG"
@@ -378,9 +385,9 @@ echo "mock-web-identity-token" > "$TEST_DIR/wit"
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS MOCK_STS=1 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/r AWS_WEB_IDENTITY_TOKEN_FILE=$TEST_DIR/wit" \
   payments '' http://fake:7007 >/dev/null
 assert_eq "IRSA web-identity creds take precedence over static keys" \
-  "$(grep -c -- '--user ASIAMOCKKEY:mocksecret' "$CURL_LOG")" '1'
+  "$(grep -c -- '--user ASIAMOCKKEY:mocksecret' "$CURL_LOG")" '2'
 assert_eq "IRSA session token is sent" \
-  "$(grep -c 'x-amz-security-token: mocksessiontoken' "$CURL_LOG")" '1'
+  "$(grep -c 'x-amz-security-token: mocksessiontoken' "$CURL_LOG")" '2'
 
 echo "Backstage collector aws_assume_role_arns (sts:AssumeRole hop) tests:"
 
@@ -399,7 +406,7 @@ assert_eq "no aws_assume_role_arns -> no sts:AssumeRole call" \
 assert_eq "an assumed role resolves refs (200 exists / 404 miss)" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-west-2 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" \
      payments typo-platform http://fake:7007 | jq -c '.refs')" \
-  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"domain":{"name":"payments","exists":true,"ref":"domain:default/payments"},"system":{"name":"typo-platform","exists":false}}'
 STS_CALL=$(grep -- 'Action=AssumeRole ' "$CURL_LOG" || true)
 assert_eq "exactly one sts:AssumeRole call" \
   "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '1'
@@ -411,8 +418,8 @@ assert_eq "AssumeRole names the role and the plugin's session" \
   "$(echo "$STS_CALL" | grep -c -- "RoleArn=$OK_ROLE --data-urlencode RoleSessionName=lunar-backstage-collector" || true)" '1'
 assert_eq "keys without a session token send no x-amz-security-token to STS" \
   "$(echo "$STS_CALL" | grep -c 'x-amz-security-token' || true)" '0'
-assert_eq "both lookups are signed with the assumed role's credentials" \
-  "$(grep -c -- "--aws-sigv4 aws:amz:us-west-2:execute-api $ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2'
+assert_eq "every lookup is signed with the assumed role's credentials" \
+  "$(grep -c -- "--aws-sigv4 aws:amz:us-west-2:execute-api $ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '3'
 assert_eq "the chain's own keys never sign a lookup" \
   "$(grep 'fake:7007' "$CURL_LOG" | grep -c 'AKIATEST' || true)" '0'
 
@@ -422,8 +429,8 @@ run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 MOCK_STS=1 AW
   payments '' http://fake:7007 >/dev/null 2>"$TEST_DIR/err"
 assert_eq "IRSA credentials sign the AssumeRole call, token included" \
   "$(grep -- 'Action=AssumeRole ' "$CURL_LOG" | grep -c -- '--user ASIAMOCKKEY:mocksecret -H x-amz-security-token: mocksessiontoken' || true)" '1'
-assert_eq "and the lookup is signed with the assumed role" \
-  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "and the lookups are signed with the assumed role" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2'
 assert_eq "the auth log line shows both hops" \
   "$(grep -c 'credentials via irsa-web-identity+assume-role' "$TEST_DIR/err" || true)" '1'
 
@@ -447,8 +454,8 @@ assert_eq "a list tries each role in order until one is assumed" \
   "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '3'
 assert_eq "whitespace around list entries is ignored" \
   "$(grep -c -- "RoleArn=$OK_ROLE " "$CURL_LOG" || true)" '1'
-assert_eq "the lookup is signed with the role that was assumed" \
-  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '1'
+assert_eq "the lookups are signed with the role that was assumed" \
+  "$(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2'
 assert_eq "a refused role is logged by position and STS error code" \
   "$(grep -c 'aws_assume_role_arns role 1/3 not assumed (AccessDenied)' "$TEST_DIR/err" || true)" '1'
 assert_eq "an unreachable STS is logged with the curl exit code" \
@@ -462,7 +469,7 @@ LUNAR_VAR_AWS_ASSUME_ROLE_ARNS="$DENIED_ROLE
 $OK_ROLE" run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS" \
   payments '' http://fake:7007 >/dev/null 2>&1
 assert_eq "a newline-separated list is split like a comma-separated one" \
-  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true) $(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2 1'
+  "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true) $(grep -c -- "$ASSUMED_SIG http://fake:7007/" "$CURL_LOG" || true)" '2 2'
 
 : > "$CURL_LOG"
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE,$DENIED_ROLE" \
@@ -475,8 +482,8 @@ run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 $STATIC_KEYS 
   payments '' http://fake:7007 >/dev/null
 assert_eq "a list of only separators is treated as unset" \
   "$(grep -c -- 'Action=AssumeRole ' "$CURL_LOG" || true)" '0'
-assert_eq "so the chain's own keys sign the lookup" \
-  "$(grep -c -- '--user AKIATEST:secret123 http://fake:7007/' "$CURL_LOG" || true)" '1'
+assert_eq "so the chain's own keys sign the lookups" \
+  "$(grep -c -- '--user AKIATEST:secret123 http://fake:7007/' "$CURL_LOG" || true)" '2'
 
 : > "$CURL_LOG"
 run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=$OK_ROLE" payments '' http://fake:7007 >/dev/null
@@ -503,7 +510,7 @@ BQ_REFS=$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query
   payments typo-platform http://fake:7007 | jq -c '.refs')
 assert_eq "by-query resolves exists (non-empty .items) + miss (empty .items)" \
   "$BQ_REFS" \
-  '{"checked":true,"domain":{"name":"payments","exists":true},"system":{"name":"typo-platform","exists":false}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"domain":{"name":"payments","exists":true,"ref":"domain:default/payments"},"system":{"name":"typo-platform","exists":false}}'
 assert_eq "by-query calls the by-query endpoint with the entity filter" \
   "$(grep -c 'http://fake:7007/api/catalog/entities/by-query?limit=1&filter=kind%3Ddomain%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 assert_eq "by-query filters on each reference's own kind" \
@@ -519,7 +526,7 @@ assert_eq "by-query sends no by-name request" \
 : > "$CURL_LOG"
 assert_eq "by-query keeps a qualified ref's own namespace" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=t LUNAR_VAR_REF_LOOKUP=by-query" prod/payments '' http://fake:7007 compns | jq -c '.refs.domain')" \
-  '{"name":"prod/payments","exists":true}'
+  '{"name":"prod/payments","exists":true,"ref":"domain:prod/payments"}'
 assert_eq "by-query puts that namespace in the filter, not the component's" \
   "$(grep -c 'metadata.namespace%3Dprod%2Cmetadata.name%3Dpayments' "$CURL_LOG")" '1'
 
@@ -558,11 +565,11 @@ assert_eq "by-query does not inject a second filter param" \
 assert_eq "by-query + sigv4 + root-mounted API resolves the ref" \
   "$(run_full "LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 LUNAR_VAR_REF_LOOKUP=by-query LUNAR_VAR_API_PATH_PREFIX= $STATIC_KEYS" \
      payments '' http://fake:7007 | jq -c '.refs.domain')" \
-  '{"name":"payments","exists":true}'
+  '{"name":"payments","exists":true,"ref":"domain:default/payments"}'
 assert_eq "by-query + sigv4 signs the by-query URL at the root path" \
   "$(grep -c 'http://fake:7007/catalog/entities/by-query?limit=1&filter=kind%3Ddomain' "$CURL_LOG")" '1'
 assert_eq "by-query + sigv4 passes the signing flags" \
-  "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '1'
+  "$(grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api' "$CURL_LOG")" '2'
 assert_eq "by-query + sigv4 sends no Bearer header" \
   "$(grep -c 'Authorization: Bearer' "$CURL_LOG" || true)" '0'
 
@@ -628,7 +635,7 @@ assert_eq "invalid ref_lookup makes no Backstage request" \
 : > "$CURL_LOG"
 run_full "LUNAR_VAR_AUTH_MODE=sigv4 AWS_REGION=ap-south-1 $STATIC_KEYS" payments '' http://fake:7007 >/dev/null
 assert_eq "aws_region falls back to the AWS_REGION env var" \
-  "$(grep -c -- '--aws-sigv4 aws:amz:ap-south-1:execute-api' "$CURL_LOG")" '1'
+  "$(grep -c -- '--aws-sigv4 aws:amz:ap-south-1:execute-api' "$CURL_LOG")" '2'
 
 # Auth mode is irrelevant when the feature is off — still no network at all.
 : > "$CURL_LOG"
@@ -664,10 +671,10 @@ for mode in by-name by-query; do
   HEALTHY=$(run_full "$MODE_ENV" '' payment-platform http://fake:7007 | jq -c '.refs')
   assert_eq "[$mode] healthy chain -> exists:true" \
     "$(echo "$HEALTHY" | jq -c '.system_domain')" \
-    '{"name":"payments","exists":true,"via_system":"payment-platform"}'
+    '{"name":"payments","exists":true,"ref":"domain:default/payments","via_system":"payment-platform"}'
   assert_eq "[$mode] healthy chain -> has_domain:true" \
     "$(echo "$HEALTHY" | jq -c '.system')" \
-    '{"name":"payment-platform","exists":true,"has_domain":true}'
+    '{"name":"payment-platform","exists":true,"ref":"system:default/payment-platform","has_domain":true}'
 
   # A System that belongs to no domain has nothing to resolve, so no
   # system_domain entry — but it is recorded, for `system-domain-set`.
@@ -676,7 +683,7 @@ for mode in by-name by-query; do
     "$(echo "$NODOMAIN" | jq -c 'has("system_domain")')" 'false'
   assert_eq "[$mode] system belonging to no domain -> has_domain:false" \
     "$(echo "$NODOMAIN" | jq -c '.system')" \
-    '{"name":"team-nodomain","exists":true,"has_domain":false}'
+    '{"name":"team-nodomain","exists":true,"ref":"system:default/team-nodomain","has_domain":false}'
 
   # An unresolvable system has no entity to read a domain off, and the failure
   # is already `system-exists`'s to report — don't double-report it.
@@ -710,13 +717,13 @@ done
 # that couldn't be read.
 assert_eq "an unreadable System body records no has_domain" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' login http://fake:7007 | jq -c '.refs')" \
-  '{"checked":true,"system":{"name":"login","exists":true}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"system":{"name":"login","exists":true}}'
 assert_eq "a JSON body that isn't an entity records no has_domain" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' gatewayerr http://fake:7007 | jq -c '.refs')" \
-  '{"checked":true,"system":{"name":"gatewayerr","exists":true}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"system":{"name":"gatewayerr","exists":true}}'
 assert_eq "a null body records no has_domain" \
   "$(run_full "LUNAR_SECRET_BACKSTAGE_TOKEN=test-token" '' nullbody http://fake:7007 | jq -c '.refs')" \
-  '{"checked":true,"system":{"name":"nullbody","exists":true}}'
+  '{"checked":true,"entity":{"kind":"Component","name":"demo","exists":true,"ref":"component:default/demo"},"system":{"name":"nullbody","exists":true}}'
 
 # The transitive entry is additive: a `kind: System` catalog file still gets its
 # own `.refs.domain` from spec.domain, unchanged by any of the above.
@@ -728,10 +735,55 @@ metadata: {name: orphan-system}
 spec: {owner: team-demo, domain: typo-domain}
 EOF
 )" \
-  '{"checked":true,"domain":{"name":"typo-domain","exists":false}}'
+  '{"checked":true,"entity":{"kind":"System","name":"orphan-system","exists":true,"ref":"system:default/orphan-system"},"domain":{"name":"typo-domain","exists":false}}'
 
 # --- Monorepo: a subdirectory component reading a shared ancestor file -----
 echo
+echo "Live entity (refs.entity, ref, annotations) tests:"
+
+annotated_file() {
+  cat <<EOF
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${1:-annotated-svc}
+  ${2:+namespace: $2}
+spec: {type: service, owner: team-demo, lifecycle: production, system: annotated-platform}
+EOF
+}
+
+for mode in by-name by-query; do
+  LIVE=$(annotated_file | LUNAR_VAR_REF_LOOKUP=$mode run_collect_url http://fake:7007 | jq -c '.refs')
+  assert_eq "[$mode] the component's own entity is looked up, with its annotations" \
+    "$(echo "$LIVE" | jq -c '.entity')" \
+    '{"kind":"Component","name":"annotated-svc","exists":true,"ref":"component:default/annotated-svc","annotations":{"test/kind":"component"}}'
+  assert_eq "[$mode] the System keeps its own annotations" \
+    "$(echo "$LIVE" | jq -c '.system | {ref, annotations}')" \
+    '{"ref":"system:default/annotated-platform","annotations":{"test/kind":"system"}}'
+  assert_eq "[$mode] the System's Domain keeps its own annotations" \
+    "$(echo "$LIVE" | jq -c '.system_domain | {ref, annotations, via_system}')" \
+    '{"ref":"domain:default/annotated-domain","annotations":{"test/kind":"domain"},"via_system":"annotated-platform"}'
+done
+
+: > "$CURL_LOG"
+assert_eq "the entity is looked up in its own namespace" \
+  "$(annotated_file annotated-svc ops | run_collect_url http://fake:7007 | jq -c '.refs.entity.ref')" \
+  '"component:ops/annotated-svc"'
+assert_eq "by its kind, namespace and name" \
+  "$(grep -c 'http://fake:7007/api/catalog/entities/by-name/component/ops/annotated-svc' "$CURL_LOG")" '1'
+
+assert_eq "an entity missing from the catalog is a miss" \
+  "$(annotated_file typo-svc | run_collect_url http://fake:7007 | jq -c '.refs.entity')" \
+  '{"kind":"Component","name":"typo-svc","exists":false}'
+assert_eq "a failed entity lookup records the error" \
+  "$(annotated_file five | run_collect_url http://fake:7007 | jq -c '.refs.entity')" \
+  '{"kind":"Component","name":"five","error":"HTTP 502"}'
+assert_eq "a setup error is recorded on the entity too" \
+  "$(annotated_file | LUNAR_VAR_AUTH_MODE=oauth2 run_collect_url http://fake:7007 2>/dev/null | jq -c '.refs.entity')" \
+  '{"kind":"Component","name":"annotated-svc","error":"invalid auth_mode '"'"'oauth2'"'"' (expected '"'"'bearer'"'"' or '"'"'sigv4'"'"')"}'
+assert_eq "no backstage_url: no lookup, no .refs" \
+  "$(annotated_file | run_collect | jq -c '.refs')" 'null'
+
 echo "Monorepo ancestor catalog file tests:"
 
 # $MONO is a repo root holding the shared fixture. Its `.git` is a file whose
@@ -886,7 +938,7 @@ assert_eq "an unparseable shared file is reported with its path" \
 make_mono
 assert_eq "refs resolve from the selected entity's spec" \
   "$(run_mono services/payments LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 LUNAR_SECRET_BACKSTAGE_TOKEN=t | jq -c '.refs.system')" \
-  '{"name":"payment-platform","exists":true,"has_domain":true}'
+  '{"name":"payment-platform","exists":true,"ref":"system:default/payment-platform","has_domain":true}'
 
 # Real git resolves the root when it can (the hub's worktrees have git).
 if command -v git >/dev/null 2>&1; then

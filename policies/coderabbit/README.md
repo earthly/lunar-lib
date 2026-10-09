@@ -24,12 +24,14 @@ This policy enforces CodeRabbit configuration standards. It validates that a Cod
 collectors:
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
     on: ["domain:your-domain"]
+    include: [config]
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 
 policies:
   - uses: github://earthly/lunar-lib/policies/coderabbit@main
     enforcement: report-pr
+    include: [config-exists]
 ```
 
 ## Examples

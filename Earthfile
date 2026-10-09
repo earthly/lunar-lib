@@ -74,6 +74,7 @@ test:
     BUILD ./collectors/github+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
+    BUILD --pass-args ./collectors/compliance-docs+test
     BUILD ./collectors/package-registries+test
     BUILD ./collectors/trivy+test
     BUILD ./collectors/grype+test
@@ -81,8 +82,11 @@ test:
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
     BUILD ./collectors/java+test
+    BUILD --pass-args ./collectors/pagerduty+test
     BUILD ./collectors/k8s+test
     BUILD ./collectors/istio+test
+    BUILD ./collectors/datadog+test
+    BUILD ./collectors/argocd-deployment-tracking+test
     BUILD ./catalogers/backstage+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
@@ -90,6 +94,7 @@ test:
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
     BUILD ./policies/ai+test
+    BUILD ./policies/compliance-docs+test
     BUILD ./policies/git+test
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
@@ -104,12 +109,14 @@ test:
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
     BUILD ./policies/testing+test
+    BUILD ./policies/oncall+test
+    BUILD ./policies/ticket+test
 
 lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
-    COPY --dir catalogers collectors policies scripts starter-packs .
+    COPY --dir ai-context catalogers collectors policies probes scripts starter-packs .
     COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py
@@ -124,6 +131,9 @@ lint:
     # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
     RUN python scripts/validate_manifest_schema.py --self-test
     RUN python scripts/validate_manifest_schema.py
+    # Every lunar-lib import in the docs lists what it runs with include:
+    RUN python scripts/validate_readme_includes.py --self-test
+    RUN python scripts/validate_readme_includes.py
 
 ai-context:
     COPY --dir ai-context .
@@ -160,7 +170,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.6-alpine
+    ARG SCRIPTS_VERSION=1.1.7-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -183,3 +193,18 @@ base-image:
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
+
+# kubeconform for the k8s and argocd images, built from source with a current
+# x/text: the 0.8.0 release binary carries fixable Highs in it and in Go's stdlib.
+kubeconform-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    # renovate: datasource=github-releases depName=yannh/kubeconform extractVersion=^v(?<version>.*)$
+    ARG KUBECONFORM_VERSION=0.8.0
+    RUN git clone --quiet --depth 1 --branch "v${KUBECONFORM_VERSION}" https://github.com/yannh/kubeconform /src
+    WORKDIR /src
+    # The repo vendors its dependencies, so re-vendor after the bump.
+    RUN go get golang.org/x/text@latest && go mod vendor && \
+        CGO_ENABLED=0 go build -trimpath -tags netgo \
+            -ldflags "-s -w -X main.version=v${KUBECONFORM_VERSION}" -o /out/kubeconform ./cmd/kubeconform
+    SAVE ARTIFACT /out/kubeconform

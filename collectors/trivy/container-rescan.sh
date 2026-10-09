@@ -86,14 +86,14 @@ else
     '
   }
 
-  # The read races the record that dispatched this run, so it is RETRIED.
+  # On Hubs before 4.9.0 the read races the record that dispatched this run, so
+  # it is RETRIED.
   #
   # The after-json wave fires off the LIVE hub.merged_collection_blobs row the
-  # instant the push record lands, but `lunar component get-json` resolves
-  # through public.components[_latest] -> mat.component_json — a copy the Hub's
-  # mat workers drain asynchronously. So this collector can be dispatched by a
-  # record it cannot yet read, and sha-pinning does not help: a pinned read goes
-  # through the same mat copy.
+  # instant the push record lands. Hub 4.9.0+ serves a --git-sha read from that
+  # row. Older Hubs resolve even a pinned read through public.components ->
+  # mat.component_json, a copy their mat workers drain asynchronously, so this
+  # collector can be dispatched by a record it cannot yet read.
   #
   # Measured on an internal Hub, 12 days, 452 container-scan waves on one
   # component: 66 shas had a push record that landed BEFORE the run started and

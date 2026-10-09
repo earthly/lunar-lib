@@ -1,0 +1,67 @@
+{
+  "data": {
+    "attributes": {
+      "name": "Payments escalation",
+      "resolve_page_on_policy_end": true,
+      "retries": 1
+    },
+    "id": "b7a1e2d4-3c5f-4e6a-8b9c-0d1e2f3a4b5c",
+    "relationships": {
+      "steps": {
+        "data": [
+          { "id": "c1a2b3c4-d5e6-4f70-8192-a3b4c5d6e7f8", "type": "steps" },
+          { "id": "c2b3c4d5-e6f7-4081-92a3-b4c5d6e7f809", "type": "steps" }
+        ]
+      },
+      "teams": {
+        "data": [ { "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90", "type": "teams" } ]
+      }
+    },
+    "type": "policies"
+  },
+  "included": [
+    {
+      "attributes": {
+        "avatar": "",
+        "description": "Payment API and settlement services",
+        "handle": "payments",
+        "name": "Payments"
+      },
+      "id": "8f3b4c1e-6d2a-4b7e-9c1f-2a5d8e7b3c90",
+      "type": "teams"
+    },
+    {
+      "attributes": { "assignment": "default", "escalate_after_seconds": 900 },
+      "id": "c1a2b3c4-d5e6-4f70-8192-a3b4c5d6e7f8",
+      "relationships": {
+        "targets": {
+          "data": [ { "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9", "type": "schedules" } ]
+        }
+      },
+      "type": "steps"
+    },
+    {
+      "attributes": { "assignment": "default", "escalate_after_seconds": 1800 },
+      "id": "c2b3c4d5-e6f7-4081-92a3-b4c5d6e7f809",
+      "relationships": {
+        "targets": {
+          "data": [
+            { "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9_previous", "type": "schedule_target" },
+            { "id": "a5b6c7d8-e9f0-4a1b-8c2d-3e4f5a6b7c8d", "type": "users" }
+          ]
+        }
+      },
+      "type": "steps"
+    },
+    { "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9", "type": "schedules" },
+    {
+      "attributes": { "position": "previous" },
+      "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9_previous",
+      "relationships": {
+        "schedule": { "data": { "id": "d4c3b2a1-9f8e-4d7c-a6b5-c4d3e2f1a0b9", "type": "schedules" } }
+      },
+      "type": "schedule_target"
+    },
+    { "id": "a5b6c7d8-e9f0-4a1b-8c2d-3e4f5a6b7c8d", "type": "users" }
+  ]
+}

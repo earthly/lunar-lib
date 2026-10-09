@@ -2,7 +2,7 @@ import ipaddress
 
 from lunar_policy import Check, variable_or_default
 
-from helpers import selector_matches
+from helpers import Findings, entries_or_skip, identity, resolve_labels, same_release, selector_matches
 
 # The instance-metadata service answers plain HTTP on port 80
 # (http://169.254.169.254/latest/meta-data/), so a rule limited to other ports
@@ -78,10 +78,7 @@ def main(node=None):
     """Requires NetworkPolicy to keep pods away from the instance-metadata endpoint."""
     c = Check("metadata-egress-blocked", "Pods should not be able to reach the instance metadata endpoint", node=node)
     with c:
-        workloads = c.get_node(".k8s.workloads")
-        entries = [w.get_value() for w in workloads] if workloads.exists() else []
-        if not entries:
-            c.skip("No Kubernetes workloads found in this repository")
+        entries = entries_or_skip(c, ".k8s.workloads", "No Kubernetes workloads found in this repository")
 
         ips = metadata_ips()
         policies_node = c.get_node(".k8s.network_policies")
@@ -89,16 +86,8 @@ def main(node=None):
         # A pod's egress is restricted only by policies with Egress in policyTypes.
         egress_policies = [p for p in policies if "Egress" in (p.get("policy_types") or [])]
 
-        def identity(w):
-            return (w.get("kind"), w.get("namespace", "default"), w.get("name"))
-
-        # A kustomize patch has no pod template labels; it is selected through
-        # the labels of the definition it patches.
-        labels_of = {}
-        for w in entries:
-            if w.get("pod_labels"):
-                labels_of.setdefault(identity(w), w["pod_labels"])
-
+        labels_of = resolve_labels(entries)
+        findings = Findings(c)
         checked = 0
         for w in entries:
             if w.get("host_network") is True:
@@ -106,13 +95,13 @@ def main(node=None):
             checked += 1
             namespace = w.get("namespace", "default")
             labels = w.get("pod_labels") or labels_of.get(identity(w), {})
-            where = f"{w.get('path', '<unknown>')}: {w.get('kind')} {namespace}/{w.get('name', '<unknown>')}"
+            what = f"{w.get('kind')} {namespace}/{w.get('name', '<unknown>')}"
 
             selecting = [p for p in egress_policies
-                         if p.get("namespace", "default") == namespace
+                         if p.get("namespace", "default") == namespace and same_release(w, p)
                          and selector_matches(p.get("pod_selector") or {}, labels)]
             if not selecting:
-                c.fail(f"{where} can reach {', '.join(map(str, ips))}: no NetworkPolicy selects it for egress")
+                findings.fail(w, f"{what} can reach {', '.join(map(str, ips))}: no NetworkPolicy selects it for egress")
                 continue
 
             # Policies are additive, so one opening in any selecting policy is enough.
@@ -120,11 +109,12 @@ def main(node=None):
                 for policy in selecting:
                     why = next(filter(None, (opening(rule, ip) for rule in policy.get("egress") or [])), None)
                     if why:
-                        c.fail(f"{where} can reach {ip}: NetworkPolicy {namespace}/{policy.get('name')} {why}")
+                        findings.fail(w, f"{what} can reach {ip}: NetworkPolicy {namespace}/{policy.get('name')} {why}")
                         break
 
         if not checked:
             c.skip("Every workload uses hostNetwork, which NetworkPolicy doesn't reliably cover (see host-network)")
+        findings.report()
 
     return c
 

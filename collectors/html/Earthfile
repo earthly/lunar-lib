@@ -6,10 +6,19 @@ image:
     # Node from apk. apk's npm 10.x vendors tar < 7.5.19 (a fixable critical), so
     # install npm 12 with it and then drop the apk copy.
     # renovate: datasource=npm depName=npm
-    ARG NPM_VERSION=12.0.2
+    ARG NPM_VERSION=12.2.0
     RUN apk add --no-cache nodejs npm && \
         npm install -g "npm@${NPM_VERSION}" && \
         apk del npm
+
+    # npm bundles brace-expansion and undici versions with fixable Highs, and no npm
+    # release ships the fixes yet (npm/cli#10088). Swap in the fixed versions.
+    RUN NPM_DIR="$(npm root -g)/npm" && cd /tmp && \
+        npm pack --silent brace-expansion@5.0.12 undici@6.29.0 && \
+        for p in brace-expansion undici; do \
+            rm -rf "$NPM_DIR/node_modules/$p" && mkdir -p "$NPM_DIR/node_modules/$p" && \
+            tar xzf "/tmp/$p"-*.tgz -C "$NPM_DIR/node_modules/$p" --strip-components=1; \
+        done && rm -f /tmp/*.tgz
 
     # Install HTMLHint, Stylelint, and PostCSS syntaxes for SCSS/LESS
     RUN npm install -g htmlhint stylelint stylelint-config-standard postcss-scss postcss-less

@@ -37,7 +37,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/html@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [htmlhint-clean]  # Only run specific checks
+    include: [htmlhint-clean, stylelint-clean]
     with:
       max_htmlhint_warnings: "0"    # Maximum HTMLHint warnings (default: "0")
       max_stylelint_warnings: "0"   # Maximum Stylelint warnings (default: "0")

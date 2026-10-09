@@ -24,10 +24,15 @@ image:
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:terraform-$VERSION
 
-# Built from source so the binary carries a current Go stdlib; upstream's prebuilt
-# release binaries lag the Go patch releases that fix stdlib CVEs.
+# Built from source so the binary carries a current Go stdlib and x/text; upstream's
+# release pins x/text 0.25.0 (a fixable High). Cloned because `go install` can't
+# override a dependency.
 hcl2json-bin:
     FROM golang:1.27-alpine
+    RUN apk add --no-cache git
     ARG --required HCL2JSON_VERSION
-    RUN CGO_ENABLED=0 go install "github.com/tmccombs/hcl2json@v${HCL2JSON_VERSION}"
-    SAVE ARTIFACT /go/bin/hcl2json
+    RUN git clone --quiet --depth 1 --branch "v${HCL2JSON_VERSION}" https://github.com/tmccombs/hcl2json /src
+    WORKDIR /src
+    RUN go get golang.org/x/text@latest && \
+        CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${HCL2JSON_VERSION}" -o /out/hcl2json .
+    SAVE ARTIFACT /out/hcl2json

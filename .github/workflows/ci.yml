@@ -47,9 +47,64 @@ jobs:
       - name: Lint
         run: earthly --ci +lint
 
+  # Lunar's verdict on the main commit a release branch was cut from, before any
+  # vX.Y.Z image is pushed. It covers main's images: the vX.Y.Z rebuild can pick
+  # up newer OS packages and a newer CLI. Push events only reach main and release
+  # branches.
+  release-gate:
+    name: release gate (lunar policy ok-release)
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LUNAR_HUB_HOST: ${{ vars.LUNAR_HUB_HOST }}
+      LUNAR_HUB_GRPC_PORT: "443"
+      LUNAR_HUB_HTTP_PORT: "443"
+      LUNAR_HUB_TOKEN: ${{ secrets.LUNAR_INTERNAL_HUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install the Lunar CLI
+        run: |-
+          asset_url=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/earthly/lunar-dist/releases/latest \
+            | jq -r '.assets[] | select(.name == "lunar-linux-amd64") | .url')
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "$asset_url" -o "$RUNNER_TEMP/lunar"
+          chmod +x "$RUNNER_TEMP/lunar"
+      - name: Release-blocking policies pass on the released commit
+        run: |-
+          # release.sh commits exactly one pin commit on top of the main commit it releases.
+          released=$(git rev-parse HEAD^)
+          if ! git merge-base --is-ancestor "$released" origin/main; then
+            echo "::error::$released is not on main; cut releases with scripts/release.sh from main" >&2
+            exit 1
+          fi
+          # image-cve skips (and ok-release passes) a commit whose images were never
+          # recorded, so main's push record for this commit has to have succeeded.
+          record=$(gh api "repos/${{ github.repository }}/commits/$released/check-runs?check_name=record%20pushed%20images%20for%20CVE%20scan" \
+            --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end')
+          if [ "$record" != "success" ]; then
+            echo "::error::main's 'record pushed images for CVE scan' for $released is '$record', so Lunar never scanned its images" >&2
+            exit 1
+          fi
+          "$RUNNER_TEMP/lunar" policy ok-release github.com/earthly/lunar-lib "$released" --timeout 20m
+
   build-and-push:
     name: +all
+    needs: [release-gate]
+    # Every PR and main build, and a release branch only once its gate passed.
+    if: >-
+      !cancelled() &&
+      (needs.release-gate.result == 'success' ||
+       (needs.release-gate.result == 'skipped' && !(github.event_name == 'push' && github.ref != 'refs/heads/main')))
     runs-on: ubuntu-latest
+    outputs:
+      # The tag the push record reports: main's short sha, otherwise the branch tag.
+      tag: ${{ steps.names.outputs.tag }}
     env:
       FORCE_COLOR: 1
       EARTHLY_TOKEN: "${{ secrets.EARTHLY_TOKEN }}"
@@ -57,6 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set branch name
+        id: names
         # Via env, not ${{ }} interpolated into the script: a branch name is
         # attacker-controlled text.
         env:
@@ -69,6 +125,11 @@ jobs:
             RAW_BRANCH="$REF_NAME"
           fi
           echo "BRANCH_NAME=${RAW_BRANCH//\//-}" >> "$GITHUB_ENV"
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${RAW_BRANCH//\//-}" >> "$GITHUB_OUTPUT"
+          fi
       - name: Setup Earthly
         uses: earthly/actions-setup@v1
         with:
@@ -93,15 +154,15 @@ jobs:
   # here stands in for the tracing we can't do yet — it is not how this is
   # meant to work.
   #
-  # Gated on the LUNAR_HUB_HOST repo *variable*: the host is not hardcoded in
-  # this public file, and until an admin sets the variable plus the
-  # LUNAR_INTERNAL_HUB_TOKEN secret the job is skipped rather than failing every
-  # build. Once configured it fails red — a swallowed error here is how images
-  # ship unscanned.
+  # Needs the LUNAR_HUB_HOST repo *variable* (the host isn't hardcoded in this
+  # public file) and the LUNAR_INTERNAL_HUB_TOKEN secret. Missing either one
+  # fails the job: skipping it silently is how lunar-lib shipped unscanned.
   record-pushed-images:
     name: record pushed images for CVE scan
     needs: [build-and-push]
-    if: vars.LUNAR_HUB_HOST != ''
+    # Explicit, because the default success() also fails on the skipped
+    # release-gate upstream, which would skip this on every PR and main build.
+    if: ${{ !cancelled() && needs.build-and-push.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       LUNAR_HUB_HOST: ${{ vars.LUNAR_HUB_HOST }}
@@ -111,11 +172,7 @@ jobs:
       # On pull_request, GITHUB_SHA is the merge commit — NOT the component's git_sha.
       SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
-      # Via env, not ${{ }} interpolated into the script: a branch name is
-      # attacker-controlled text.
-      HEAD_REF: ${{ github.head_ref }}
-      REF_NAME: ${{ github.ref_name }}
-      IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+      TAG: ${{ needs.build-and-push.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Install the Lunar CLI
@@ -134,19 +191,11 @@ jobs:
           chmod +x "$RUNNER_TEMP/lunar"
       - name: Record pushed images for CVE scanning
         run: |-
-          if [ -z "$LUNAR_HUB_TOKEN" ]; then
-            echo "::error::LUNAR_HUB_HOST is set but the LUNAR_INTERNAL_HUB_TOKEN secret is empty — the container scan for this commit would be missing" >&2
+          if [ -z "$LUNAR_HUB_HOST" ] || [ -z "$LUNAR_HUB_TOKEN" ]; then
+            echo "::error::the LUNAR_HUB_HOST repo variable or the LUNAR_INTERNAL_HUB_TOKEN secret is not set — the Hub's container scan for this commit would be missing" >&2
             exit 1
           fi
-          # main pushes a second, immutable set tagged with the short sha
-          # (+all runs twice); everything else is scanned at its branch tag.
-          if [ "$IS_MAIN" = "true" ]; then
-            tag="${SHA::8}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            tag="${HEAD_REF//\//-}"
-          else
-            tag="${REF_NAME//\//-}"
-          fi
+          tag="$TAG"
           # Into a variable first, not a process substitution: `run:` shells
           # get `bash -e`, which fails the step on a failed assignment but
           # ignores a failed `< <(...)`. Recording nothing has to be red, not

@@ -35,6 +35,8 @@ check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
 check_system_domain_exists = load_policy("system-domain-exists")
 check_system_domain_set = load_policy("system-domain-set")
+check_required_link_types = load_policy("required-link-types")
+check_dependencies_documented = load_policy("dependencies-documented")
 
 from constraints import (
     parse_required_annotations,
@@ -265,6 +267,150 @@ class TestDisallowedTagPatterns(unittest.TestCase):
             )
 
 
+def catalog_node(metadata=None, spec=None):
+    """Finished node with a catalog file carrying the given metadata and spec."""
+    backstage = {"valid": True}
+    if metadata is not None:
+        backstage["metadata"] = metadata
+    if spec is not None:
+        backstage["spec"] = spec
+    return finished_node({"catalog": {"native": {"backstage": backstage}}})
+
+
+RUNBOOK = {"url": "https://wiki.example.com/runbook", "title": "Runbook", "type": "runbook"}
+DASHBOARD = {"url": "https://grafana.example.com/d/abc", "type": "dashboard"}
+
+
+class TestRequiredLinkTypes(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_required_link_types(catalog_node(metadata={"links": []}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("required_link_types", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(required_link_types="runbook"):
+            check = check_required_link_types(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_each_type_present_passes(self):
+        with policy_vars(required_link_types="runbook,dashboard"):
+            node = catalog_node(metadata={"links": [RUNBOOK, DASHBOARD]})
+            self.assertEqual(check_required_link_types(node).status, CheckStatus.PASS)
+
+    def test_missing_type_fails_and_names_it(self):
+        with policy_vars(required_link_types="runbook,dashboard"):
+            check = check_required_link_types(catalog_node(metadata={"links": [DASHBOARD]}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertEqual(len(check.failure_reasons), 1)
+            reason = check.failure_reasons[0]
+            self.assertIn("of type: runbook.", reason)
+            self.assertIn("Present link types: dashboard.", reason)
+
+    def test_title_does_not_stand_in_for_type(self):
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"url": "https://x", "title": "runbook"}]})
+            check = check_required_link_types(node)
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("Present link types: (none)", check.failure_reasons[0])
+
+    def test_url_is_not_checked(self):
+        # Match on type alone: the url isn't consulted.
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"type": "runbook"}]})
+            self.assertEqual(check_required_link_types(node).status, CheckStatus.PASS)
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"url": "https://x", "type": "Runbook"}]})
+            check = check_required_link_types(node)
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("Present link types: Runbook.", check.failure_reasons[0])
+
+    def test_no_links_block_fails(self):
+        with policy_vars(required_link_types="runbook"):
+            check = check_required_link_types(catalog_node(metadata={"name": "x"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_malformed_links_fail_without_crashing(self):
+        with policy_vars(required_link_types="runbook"):
+            for links in ("runbook", {"type": "runbook"}, ["runbook", None, {"type": 3}]):
+                with self.subTest(links=links):
+                    check = check_required_link_types(catalog_node(metadata={"links": links}))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_input_is_trimmed_and_deduplicated(self):
+        with policy_vars(required_link_types=" runbook , runbook,, dashboard "):
+            check = check_required_link_types(catalog_node(metadata={"links": []}))
+            self.assertIn("of type: runbook, dashboard.", check.failure_reasons[0])
+
+
+class TestDependenciesDocumented(unittest.TestCase):
+    def test_off_by_default_skips(self):
+        check = check_dependencies_documented(catalog_node(spec={"type": "service"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("require_dependencies", skip_reason(check))
+
+    def test_annotation_alone_does_not_enable(self):
+        with policy_vars(dependencies_annotation="example.com/dependencies"):
+            check = check_dependencies_documented(catalog_node(spec={"type": "service"}))
+            self.assertTrue(is_skipped(check))
+
+    def test_enable_flag_truthiness(self):
+        for raw, enforced in [("true", True), (" TRUE ", True), ("false", False), ("yes", False), ("", False)]:
+            with self.subTest(value=raw):
+                with policy_vars(require_dependencies=raw):
+                    check = check_dependencies_documented(catalog_node(spec={}))
+                    self.assertEqual(not is_skipped(check), enforced)
+
+    def test_no_catalog_file_fails_when_enabled(self):
+        with policy_vars(require_dependencies="true"):
+            check = check_dependencies_documented(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_depends_on_passes(self):
+        # Targets are not resolved, so any non-empty reference counts.
+        with policy_vars(require_dependencies="true"):
+            node = catalog_node(spec={"dependsOn": ["resource:not-in-any-catalog"]})
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.PASS)
+
+    def test_missing_or_empty_depends_on_fails(self):
+        with policy_vars(require_dependencies="true"):
+            for spec in ({"type": "service"}, {"dependsOn": []}, {"dependsOn": ["", "  "]}, {"dependsOn": "resource:db"}):
+                with self.subTest(spec=spec):
+                    check = check_dependencies_documented(catalog_node(spec=spec))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("declares no dependencies", check.failure_reasons[0])
+
+    def test_annotation_passes_when_configured(self):
+        with policy_vars(require_dependencies="true", dependencies_annotation="example.com/dependencies"):
+            node = catalog_node(
+                metadata={"annotations": {"example.com/dependencies": "resource:db, component:auth"}},
+                spec={"type": "service"},
+            )
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.PASS)
+
+    def test_annotation_ignored_when_not_configured(self):
+        with policy_vars(require_dependencies="true"):
+            node = catalog_node(
+                metadata={"annotations": {"example.com/dependencies": "resource:db"}},
+                spec={"type": "service"},
+            )
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.FAIL)
+
+    def test_blank_annotation_fails_and_names_it(self):
+        with policy_vars(require_dependencies="true", dependencies_annotation="example.com/dependencies"):
+            for value in ("", " , ,", None):
+                with self.subTest(value=value):
+                    annotations = {} if value is None else {"example.com/dependencies": value}
+                    check = check_dependencies_documented(
+                        catalog_node(metadata={"annotations": annotations}, spec={})
+                    )
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("`example.com/dependencies` annotation", check.failure_reasons[0])
+
+
 def refs_node(refs=None):
     """Finished node with an optional .catalog.native.backstage.refs block.
 
@@ -480,21 +626,21 @@ class TestSystemDomainSet(unittest.TestCase):
     def test_no_catalog_file_skips(self):
         self.assertTrue(is_skipped(check_system_domain_set(finished_node({}))))
 
-    def test_no_system_declared_passes(self):
-        # `system-set` owns "should spec.system be set".
-        self.assertEqual(
-            check_system_domain_set(refs_node({"checked": True})).status,
-            CheckStatus.PASS,
-        )
+    def test_no_system_declared_skips(self):
+        # No domain was checked, so not a pass; `system-set` owns "should
+        # spec.system be set", so not a second failure either.
+        check = check_system_domain_set(refs_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("system-set", skip_reason(check))
 
-    def test_system_missing_passes_here(self):
-        # `system-exists` reports an unresolvable system; no second failure.
-        self.assertEqual(
-            check_system_domain_set(
-                refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
-            ).status,
-            CheckStatus.PASS,
+    def test_system_missing_skips(self):
+        # `system-exists` reports an unresolvable system; skip, don't pass.
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
         )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'nope'", skip_reason(check))
+        self.assertIn("system-exists", skip_reason(check))
 
     def test_system_lookup_error_skips(self):
         check = check_system_domain_set(
@@ -798,7 +944,7 @@ class TestRequiredAnnotationsTyped(unittest.TestCase):
 
 
 # Every check in the policy, paired with the inputs it needs to get past its own
-# opt-in gate and reach the catalog-presence gate. Without those inputs the four
+# opt-in gate and reach the catalog-presence gate. Without those inputs the
 # configurable checks skip on "nothing configured" and the assertions below would
 # pass vacuously.
 ALL_CHECKS = [
@@ -831,6 +977,16 @@ ALL_CHECKS = [
         check_disallowed_tag_patterns,
         {"disallowed_tag_patterns": "deprecated/*"},
     ),
+    (
+        "required-link-types",
+        check_required_link_types,
+        {"required_link_types": "runbook"},
+    ),
+    (
+        "dependencies-documented",
+        check_dependencies_documented,
+        {"require_dependencies": "true"},
+    ),
 ]
 
 # What each check resolves to on a missing catalog file with the mode OFF — the
@@ -843,6 +999,8 @@ DEFAULT_NO_CATALOG = {
     "system-set": CheckStatus.FAIL,
     "required-annotations": CheckStatus.FAIL,
     "required-tag-patterns": CheckStatus.FAIL,
+    "required-link-types": CheckStatus.FAIL,
+    "dependencies-documented": CheckStatus.FAIL,
     # Pure deny-checks: nothing present means nothing forbidden.
     "disallowed-annotations": CheckStatus.PASS,
     "disallowed-tag-patterns": CheckStatus.PASS,
@@ -863,7 +1021,7 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
                 with policy_vars(skip_when_no_catalog_info="true", **inputs):
                     check = check_fn(finished_node({}))
                     self.assertTrue(is_skipped(check))
-                    # Assert on the reason, not just the status: the four
+                    # Assert on the reason, not just the status: the
                     # configurable checks have a skip gate of their own.
                     self.assertIn("skip_when_no_catalog_info", skip_reason(check))
 
@@ -900,6 +1058,8 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
             skip_when_no_catalog_info="true",
             required_annotations="backstage.io/source-location",
             disallowed_annotations="backstage.io/skip-checks",
+            required_link_types="runbook",
+            require_dependencies="true",
         ):
             present = finished_node(
                 {
@@ -930,6 +1090,13 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
             )
             self.assertEqual(
                 check_disallowed_annotations(present).status, CheckStatus.FAIL
+            )
+            # No links and no dependsOn on this file.
+            self.assertEqual(
+                check_required_link_types(present).status, CheckStatus.FAIL
+            )
+            self.assertEqual(
+                check_dependencies_documented(present).status, CheckStatus.FAIL
             )
 
     def test_set_still_pends_while_collectors_are_running(self):

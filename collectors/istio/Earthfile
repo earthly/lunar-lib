@@ -14,13 +14,23 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install istioctl for offline Istio config validation (istioctl analyze).
-    ARG TARGETARCH
     # renovate: datasource=github-releases depName=istio/istio
-    ARG ISTIO_VERSION=1.31.0
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
-        curl -sSL "https://github.com/istio/istio/releases/download/${ISTIO_VERSION}/istioctl-${ISTIO_VERSION}-linux-${ARCH}.tar.gz" | tar xz && \
-        mv istioctl /usr/local/bin/ && \
-        chmod +x /usr/local/bin/istioctl
+    ARG ISTIO_VERSION=1.31.1
+    COPY (+istioctl-bin/istioctl --ISTIO_VERSION=$ISTIO_VERSION) /usr/local/bin/istioctl
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:istio-$VERSION
+
+# Built from source with current x/crypto and grpc: the 1.31.1 release binary
+# still carries fixable Highs in both. Drop the grpc pin once istio moves past it.
+istioctl-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required ISTIO_VERSION
+    RUN git clone --quiet --depth 1 --branch "${ISTIO_VERSION}" https://github.com/istio/istio /src
+    WORKDIR /src
+    RUN go get golang.org/x/crypto@latest google.golang.org/grpc@v1.83.2 && \
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X istio.io/istio/pkg/version.buildVersion=${ISTIO_VERSION} -X istio.io/istio/pkg/version.buildStatus=Clean -X istio.io/istio/pkg/version.buildTag=${ISTIO_VERSION}" \
+            -o /out/istioctl ./istioctl/cmd/istioctl
+    SAVE ARTIFACT /out/istioctl

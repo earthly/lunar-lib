@@ -112,9 +112,14 @@ log_failure() {
 # Writes the response body to <out-file>. Retries 429 and 5xx honoring
 # Retry-After; aborts the run on any other non-2xx, because shrinking the
 # reported project set is what silently retires components.
+# A listing that asks for simple=false is retried with simple=true after an
+# HTTP 500. That entity is lighter but has no fork or archived details, so
+# GL_SIMPLE tells the caller which kind of page it got.
+SIMPLE_USABLE=true
 gl_api() {
     local path="$1" out="$2"
     local attempt=1 backoff=$INITIAL_BACKOFF code last_id hdr="$WORK/hdr" err="$WORK/curl.err"
+    GL_SIMPLE=false
 
     while [ "$attempt" -le "$MAX_RETRIES" ]; do
         # Cleared first: curl leaves -o untouched when no response arrives, and
@@ -127,6 +132,16 @@ gl_api() {
 
         case "$code" in
             2*)
+                # Before 18.2 the simple entity has no visibility, which the
+                # filter needs: back to full details for the rest of the run,
+                # without spending an attempt on the unusable page.
+                if [ "$GL_SIMPLE" = "true" ] && ! jq -e 'all(.[]; .visibility != null)' "$out" >/dev/null; then
+                    echo "  simple=true has no project visibility here (GitLab before 18.2), retrying with full details" >&2
+                    SIMPLE_USABLE=false
+                    path="${path/simple=true/simple=false}"
+                    GL_SIMPLE=false
+                    continue
+                fi
                 # Pace against the documented budget instead of discovering it via a 429.
                 local remaining reset now sleep_for
                 remaining=$(sed -n 's/^[Rr]ate[Ll]imit-[Rr]emaining:[[:space:]]*\([0-9]*\).*/\1/p' "$hdr" | tail -1)
@@ -148,6 +163,11 @@ gl_api() {
                 [ -n "$retry_after" ] && backoff="$retry_after"
                 echo "HTTP $code on $path (attempt $attempt/$MAX_RETRIES), retrying in ${backoff}s" >&2
                 log_failure "$out" "$hdr" "$err"
+                if [ "$code" = "500" ] && [ "$SIMPLE_USABLE" = "true" ] && [[ "$path" == *simple=false* ]]; then
+                    path="${path/simple=false/simple=true}"
+                    GL_SIMPLE=true
+                    echo "  Retrying this page with simple=true, without fork or archived details" >&2
+                fi
                 sleep "$backoff"
                 backoff=$((backoff * 2))
                 attempt=$((attempt + 1))
@@ -303,8 +323,11 @@ fi
 # the paging actually keyset — do not switch to following Link: rel="next".
 # Newest first because id DESC is the endpoint's default order; ascending has
 # timed out server-side (a 500 after 60s) even on small groups.
+# simple=false is the default, spelled out so gl_api can swap it for
+# simple=true when a page fails with HTTP 500.
 ARCHIVED_PARAM=""
 [ "$INCLUDE_ARCHIVED" != "true" ] && ARCHIVED_PARAM="&archived=false"
+SIMPLE_PAGES=0
 
 : > "$WORK/projects.ndjson"
 while IFS= read -r group; do
@@ -317,10 +340,11 @@ while IFS= read -r group; do
         # with_shared=false: GitLab includes projects shared INTO the group by
         # default, which are owned elsewhere — they would be cataloged outside
         # the account's groups and duplicated across any group sharing them.
-        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/proj-page.json"
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
+        [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
         jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
         cursor=$(jq -r '.[-1].id' "$WORK/proj-page.json")
@@ -347,10 +371,11 @@ if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
     pages=0
     before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
     while :; do
-        gl_api "/projects?membership=true&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+        gl_api "/projects?membership=true&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
             "$WORK/personal-page.json"
         n=$(jq 'length' "$WORK/personal-page.json")
         [ "$n" -eq 0 ] && break
+        [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
         # Keep only user namespaces: the group projects in this listing are the
         # ones the group sweep already has, and re-adding them would duplicate.
         jq -c '.[] | select(.namespace.kind == "user")
@@ -365,6 +390,9 @@ fi
 
 TOTAL_FETCHED=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
 echo "Total projects fetched: $TOTAL_FETCHED"
+if [ "$SIMPLE_PAGES" -gt 0 ]; then
+    echo "Warning: $SIMPLE_PAGES page(s) listed with simple=true after an HTTP 500 — their projects are cataloged as non-forks, and as unarchived when include_archived is on." >&2
+fi
 
 # --- transform --------------------------------------------------------------
 
@@ -409,7 +437,11 @@ jq -s \
       # Either field satisfies it: gitlab.com currently returns both
       # marked_for_deletion_on and _at in agreement, and reading only one would
       # silently stop filtering if that one is the half that goes away.
-      | select(.pending_deletion | not)
+      # The rename is matched too, because a simple=true page has neither
+      # field: -deletion_scheduled-<id> since GitLab 18.3, -deleted-<id> before.
+      | select((.pending_deletion
+                or (.id as $id | .path_with_namespace
+                    | endswith("-deletion_scheduled-\($id)") or endswith("-deleted-\($id)"))) | not)
       | . + {norm_topics: [(.topics // [])[] | norm] }
       # allow ∩ topics, expressed as set difference twice
       | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)

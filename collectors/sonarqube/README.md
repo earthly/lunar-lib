@@ -62,6 +62,11 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/sonarqube@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - api         # Analysis results from the Web API
+      - config      # Sonar config in the repo
+      - cicd        # sonar-scanner runs in CI
+      - github-app  # SonarCloud check-runs on PRs
     # with:
     #   project_key: "my-org_my-service"        # Optional — falls back to catalog meta annotation
     #   sonarqube_base_url: "https://sonarcloud.io"  # Or your self-hosted SonarQube URL
@@ -84,11 +89,11 @@ The collector resolves the SonarQube project key in this order:
 Three triggers produce the same `.code_quality.*` data — pick the one that
 matches how SonarQube is wired up for your component:
 
-| Trigger | Sub-collectors to include | Sub-collectors to exclude |
-|---------|---------------------------|---------------------------|
-| User runs `sonar-scanner` in CI | `api`, `cicd`, `github-app` | `auto` |
-| Collector auto-runs the scan | `auto`, `github-app` | `api`, `cicd` |
-| Read-only (scan happens elsewhere, not in this CI) | `api` | `auto`, `cicd` |
+| Trigger | Sub-collectors to include |
+|---------|---------------------------|
+| User runs `sonar-scanner` in CI | `api`, `cicd`, `github-app` |
+| Collector auto-runs the scan | `auto`, `github-app` |
+| Read-only (scan happens elsewhere, not in this CI) | `api` |
 
 The `config` sub-collector is orthogonal — it flags whether SonarQube is
 wired up at all — and is safe to include in every configuration.
@@ -103,9 +108,8 @@ only when the `cicd` sub-collector didn't capture a scan for the current
 
 Each of `api` and `auto` runs on both default-branch and PR commits by
 default. Scope narrowing is per sub-collector via the usual platform
-mechanisms (plugin-level `runs_on` on a vendored copy, or excluding the
-sub-collector entirely with `exclude:` when scoping by domain that only
-exercises one side).
+mechanisms (plugin-level `runs_on` on a vendored copy, or leaving the
+sub-collector out of `include` for a domain that only exercises one side).
 
 ### SonarQube vs SonarCloud
 

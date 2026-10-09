@@ -38,7 +38,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/feature-flags@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, frontend]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # include: [feature-flags-age]  # Only run specific checks (omit to run all)
+    include: [feature-flags-age]
     # with:
     #   max_days: "60"  # Override default 90-day threshold
 ```
@@ -137,6 +137,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/feature-flags@v1.0.0
     on: ["all"]
     enforcement: block-pr
+    include: [feature-flags-age]
     with:
       max_days: "120"  # Allow flags up to 120 days old
 ```

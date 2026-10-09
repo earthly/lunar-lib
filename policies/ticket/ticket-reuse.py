@@ -1,10 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
+from helpers import ticket_path
+
 
 def main(node=None):
     c = Check("ticket-reuse", "Ticket should not be reused across too many PRs", node=node)
     with c:
-        if not c.exists(".vcs.pr.ticket.reuse_count"):
+        root = ticket_path()
+        if not c.exists(f"{root}.reuse_count"):
             c.skip("No ticket reuse data available")
 
         try:
@@ -12,8 +15,8 @@ def main(node=None):
         except ValueError:
             c.skip("Invalid max_ticket_reuse configuration")
 
-        reuse_count = c.get_value(".vcs.pr.ticket.reuse_count")
-        ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "unknown")
+        reuse_count = c.get_value(f"{root}.reuse_count")
+        ticket_id = c.get_value_or_default(f"{root}.id", "unknown")
 
         if not isinstance(reuse_count, (int, float)):
             c.skip("Ticket reuse count is not a number")

@@ -40,13 +40,18 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/argocd@v1.0.0
     on: [gitops]
+    include: [parse]
 
 policies:
   # Tool-agnostic GitOps checks
   - uses: github://earthly/lunar-lib/policies/gitops@v1.0.0
     on: [gitops]
     enforcement: report-pr
-    # include: [sync-policy, gitops-managed]  # Only run specific checks
+    include:
+      - sync-policy
+      - source-repo-allowlist
+      - destination-allowlist
+      - gitops-managed
     # with:
     #   allowed_source_repos: "https://github.com/org/gitops.git"
     #   allowed_destinations: "payments,checkout"
@@ -56,6 +61,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/argocd@v1.0.0
     on: [gitops]
     enforcement: report-pr
+    include: [valid, non-default-project]
 ```
 
 ## Examples

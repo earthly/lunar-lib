@@ -32,6 +32,7 @@ and no token — so it behaves the same on any Git platform.
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ticket-coverage@main
+    include: [ticket-coverage]
     with:
       window_days: "30"
 ```

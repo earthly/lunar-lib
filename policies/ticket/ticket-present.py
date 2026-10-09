@@ -1,18 +1,18 @@
 from lunar_policy import Check
 
+from helpers import missing_ticket_message, ticket_path
+
 
 def main(node=None):
     c = Check("ticket-present", "PRs should reference a ticket", node=node)
     with c:
-        if not c.exists(".vcs.pr.ticket"):
-            c.fail("PR does not reference a ticket. "
-                   "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+        root = ticket_path()
+        if not c.exists(root):
+            c.fail(missing_ticket_message(root))
             return c
 
-        ticket_id = c.get_value_or_default(".vcs.pr.ticket.id", "")
-        c.assert_true(bool(ticket_id),
-                      "PR does not reference a ticket. "
-                      "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+        ticket_id = c.get_value_or_default(f"{root}.id", "")
+        c.assert_true(bool(ticket_id), missing_ticket_message(root))
     return c
 
 

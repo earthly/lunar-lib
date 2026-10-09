@@ -95,6 +95,7 @@ Add to your `lunar-config.yml` and list the repositories to scan:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover]
     with:
       repos: "acme/monorepo,acme/platform"
 ```
@@ -114,6 +115,7 @@ Instead of hand-maintaining the `repos` list, you can auto-discover repositories
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover]
     with:
       orgs: "acme"                       # discover every repo in the acme org…
       allowed_topics: "lunar-monorepo"   # …but only those tagged `lunar-monorepo`
@@ -174,15 +176,20 @@ An org often has **both** polyrepos (one service per repo, root `catalog-info.ya
 catalogers:
   # Repo-level components for the whole org, EXCEPT the monorepos.
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme"
       exclude_repos: "big-monorepo"       # no repo-level component for the monorepo
 
   # Polyrepos: augment each root catalog-info onto its repo-level component.
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include:
+      - augment            # Daily, via the GitHub Contents API
+      - augment-on-commit  # On each commit, no token needed
 
   # Monorepos: one component per subdirectory catalog-info, root excluded by default.
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover]
     with:
       repos: "acme/big-monorepo"
 ```

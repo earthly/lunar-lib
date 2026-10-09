@@ -35,6 +35,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/linter@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
+    include: [ran, max-warnings]
     with:
       language: "go"
       max_warnings: "0"
@@ -47,6 +48,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/linter@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: block-pr
+    include: [ran, max-warnings]
     with:
       language: "go"
       max_warnings: "10"  # Allow up to 10 warnings

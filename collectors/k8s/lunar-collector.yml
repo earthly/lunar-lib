@@ -1,7 +1,7 @@
 version: 0
 
 name: k8s
-description: Parses Kubernetes manifests and collects workload, PDB, and HPA metadata
+description: Parses Kubernetes manifests and Helm charts and collects workload, PDB, and autoscaler metadata
 author: earthly
 
 default_image: earthly/lunar-lib:k8s-main
@@ -10,8 +10,8 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Kubernetes Collector"
   long_description: |
-    Parse Kubernetes YAML manifests to extract workloads, containers, resource limits,
-    probes, PodDisruptionBudgets, HorizontalPodAutoscalers, and NetworkPolicies.
+    Parse Kubernetes YAML manifests and render Helm charts to extract workloads, containers,
+    resource limits, probes, PodDisruptionBudgets, autoscalers, and NetworkPolicies.
     Capture kubectl commands in CI for deployment traceability.
   categories: ["orchestration", "containers", "ci-cd"]
   icon: "assets/k8s.svg"
@@ -23,6 +23,9 @@ landing_page:
     - slug: "docker"
       type: "collector"
       reason: "Collects container definitions that K8s workloads reference"
+    - slug: "helm"
+      type: "collector"
+      reason: "Checks Helm charts themselves; this collector checks what they deploy"
 
 collectors:
   - name: k8s
@@ -30,14 +33,30 @@ collectors:
       Parses all Kubernetes manifests in the repository using kubeconform validation and collects:
       - Manifest validity and parse errors
       - Workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs)
-      - Container specs with resource requests/limits and probes
+      - Container specs with resource requests/limits, probes, and shutdown hooks
       - PodDisruptionBudgets (PDBs)
-      - HorizontalPodAutoscalers (HPAs)
+      - HorizontalPodAutoscalers (HPAs) and KEDA ScaledObjects
       - NetworkPolicies (pod selector, policy types, egress rules)
+      Helm chart templates are rendered by the `helm` sub-collector instead.
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa", "networkpolicy"]
+    keywords: ["kubernetes", "k8s", "deployment", "pods", "containers", "resources", "probes", "pdb", "hpa", "keda", "networkpolicy"]
+
+  - name: helm
+    description: |
+      Renders each Helm chart in the repository with `helm template`, once per values
+      set in `helm_values` or derived from its file names with `helm_values_chains`,
+      and parses the output the same way as a static manifest.
+      Rendered objects land in the same `.k8s` arrays, tagged with the chart and values
+      files that produced them. A chart no values set applies to is rendered with its
+      own values.yaml only to check that it builds: it gets a `.k8s.manifests[]` entry
+      and no objects. A chart that fails to render is recorded as an invalid manifest,
+      so the `valid` check fails instead of every check skipping.
+    mainBash: render.sh
+    hook:
+      type: code
+    keywords: ["helm", "helm template", "helm chart", "rendered manifests", "values files", "kubernetes"]
 
   - name: cicd
     description: |
@@ -56,21 +75,54 @@ inputs:
   find_command:
     description: Command to find K8s manifest files (must output one file path per line)
     default: "find . -type f \\( -name '*.yaml' -o -name '*.yml' \\)"
+  helm_find_command:
+    description: Command to find the Helm charts to render, as Chart.yaml paths (one per line). A subchart in another chart's charts/ directory is rendered with its parent, not on its own.
+    default: "find . -type f \\( -name 'Chart.yaml' -o -name 'Chart.yml' \\)"
+  helm_values:
+    description: |
+      Values sets to check each chart's objects with, one per line. A line lists values files, relative to the chart directory, applied in order on top of the chart's values.yaml; a glob gives one render per matching file, and a line of just `values.yaml` checks the defaults. A chart skips lines whose files it doesn't have. A chart no line or chain applies to is only checked to build: its values.yaml render records validity and no objects. `#` starts a comment.
+    default: ""
+  helm_values_chains:
+    description: |
+      Derive values sets from each chart's file names: `overlays` or `all`. Empty (the default) is off. An overlay extends the ones its name continues at a dash (values-prod-eu.yaml extends values-prod.yaml), and each values-*.yaml that nothing extends is one chain: values.yaml, the overlays it extends, then itself. A chart with no values-*.yaml stays build-only under `overlays`, and is checked with values.yaml alone under `all`, which is only right where every chart is a deployed app, not a chart library. Adds to the sets in helm_values.
+    default: ""
+  helm_dependency_build:
+    description: Run `helm dependency build` before rendering a chart whose remote dependencies aren't vendored in its charts/ directory (true/false). Needs network access to the chart repositories. When off, such a chart fails to render and is reported as invalid. Local file:// dependencies are always built.
+    default: "false"
+  helm_api_versions:
+    description: Comma-separated API versions to render charts as if the cluster served them (`helm template --api-versions`), for charts that only render an object when its CRD is installed (e.g. "keda.sh/v1alpha1"). Core Kubernetes APIs are always available.
+    default: ""
 
 example_component_json: |
   {
     "k8s": {
       "source": {
         "tool": "kubeconform",
-        "version": "0.6.7"
+        "version": "0.8.0"
       },
       "manifests": [
         {
           "path": "deploy/deployment.yaml",
           "valid": true,
           "resources": [
-            {"kind": "Deployment", "name": "payment-api", "namespace": "payments"}
+            {"kind": "Deployment", "name": "payment-api", "namespace": "payments", "api_version": "apps/v1"}
           ]
+        },
+        {
+          "path": "charts/worker",
+          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"], "validated_only": false},
+          "valid": true,
+          "resources": [
+            {"kind": "Deployment", "name": "worker", "namespace": "default", "api_version": "apps/v1"},
+            {"kind": "PodDisruptionBudget", "name": "worker", "namespace": "default", "api_version": "policy/v1"},
+            {"kind": "ScaledObject", "name": "worker", "namespace": "default", "api_version": "keda.sh/v1alpha1"}
+          ]
+        },
+        {
+          "path": "charts/reports",
+          "render": {"chart": "charts/reports", "values": ["values.yaml"], "validated_only": true},
+          "valid": false,
+          "error": "helm template: An error occurred while checking for chart dependencies. You may need to run `helm dependency build` to fetch missing dependencies: found in Chart.yaml, but missing in charts/ directory: postgresql"
         }
       ],
       "workloads": [
@@ -79,12 +131,24 @@ example_component_json: |
           "name": "payment-api",
           "namespace": "payments",
           "path": "deploy/deployment.yaml",
-          "replicas": 3,
+          "replicas": 1,
+          "replicas_set": false,
           "pod_labels": {"app": "payment-api", "tier": "api"},
+          "pod_annotations": {"prometheus.io/scrape": "true"},
           "host_users": false,
           "host_network": false,
           "host_pid": false,
           "host_ipc": false,
+          "termination_grace_period_seconds": 60,
+          "topology_spread_constraints": [
+            {
+              "topology_key": "topology.kubernetes.io/zone",
+              "max_skew": 1,
+              "when_unsatisfiable": "ScheduleAnyway",
+              "label_selector": {"matchLabels": {"app": "payment-api"}},
+              "match_label_keys": ["pod-template-hash"]
+            }
+          ],
           "containers": [
             {
               "name": "api",
@@ -98,8 +162,74 @@ example_component_json: |
               "memory_limit": "512Mi",
               "has_liveness_probe": true,
               "has_readiness_probe": true,
+              "liveness_probe": {"handler": "httpGet", "port": 8080, "path": "/livez", "initial_delay_seconds": 0, "period_seconds": 10, "timeout_seconds": 2, "failure_threshold": 3},
+              "readiness_probe": {"handler": "httpGet", "port": 8080, "path": "/readyz", "initial_delay_seconds": 0, "period_seconds": 5, "timeout_seconds": 2, "failure_threshold": 3},
+              "startup_probe": null,
+              "has_prestop": true,
               "runs_as_non_root": true,
               "read_only_root_fs": true,
+              "privileged": false
+            }
+          ],
+          "init_containers": []
+        },
+        {
+          "kind": "Deployment",
+          "name": "worker",
+          "namespace": "default",
+          "path": "charts/worker/templates/deployment.yaml",
+          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
+          "replicas": 1,
+          "replicas_set": false,
+          "pod_labels": {"app.kubernetes.io/name": "worker"},
+          "pod_annotations": {},
+          "host_users": true,
+          "host_network": false,
+          "host_pid": false,
+          "host_ipc": false,
+          "termination_grace_period_seconds": 30,
+          "topology_spread_constraints": [],
+          "containers": [
+            {
+              "name": "worker",
+              "image": "ghcr.io/acme/worker:2.4.0",
+              "has_resources": true,
+              "has_requests": true,
+              "has_limits": true,
+              "cpu_request": "250m",
+              "cpu_limit": "1",
+              "memory_request": "256Mi",
+              "memory_limit": "512Mi",
+              "has_liveness_probe": true,
+              "has_readiness_probe": true,
+              "liveness_probe": {"handler": "httpGet", "port": "http", "path": "/healthz", "initial_delay_seconds": 0, "period_seconds": 10, "timeout_seconds": 1, "failure_threshold": 3},
+              "readiness_probe": {"handler": "httpGet", "port": "http", "path": "/healthz", "initial_delay_seconds": 0, "period_seconds": 10, "timeout_seconds": 1, "failure_threshold": 3},
+              "startup_probe": null,
+              "has_prestop": false,
+              "runs_as_non_root": true,
+              "read_only_root_fs": false,
+              "privileged": false
+            }
+          ],
+          "init_containers": [
+            {
+              "name": "migrate",
+              "image": "ghcr.io/acme/worker:2.4.0",
+              "has_resources": false,
+              "has_requests": false,
+              "has_limits": false,
+              "cpu_request": null,
+              "cpu_limit": null,
+              "memory_request": null,
+              "memory_limit": null,
+              "has_liveness_probe": false,
+              "has_readiness_probe": false,
+              "liveness_probe": null,
+              "readiness_probe": null,
+              "startup_probe": null,
+              "has_prestop": false,
+              "runs_as_non_root": true,
+              "read_only_root_fs": false,
               "privileged": false
             }
           ]
@@ -112,7 +242,18 @@ example_component_json: |
           "path": "deploy/pdb.yaml",
           "selector": {"matchLabels": {"app": "payment-api"}},
           "target_workload": "payment-api",
-          "min_available": 2
+          "min_available": 2,
+          "max_unavailable": null
+        },
+        {
+          "name": "worker",
+          "namespace": "default",
+          "path": "charts/worker/templates/pdb.yaml",
+          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
+          "selector": {"matchLabels": {"app.kubernetes.io/name": "worker"}},
+          "target_workload": "worker",
+          "min_available": null,
+          "max_unavailable": 1
         }
       ],
       "hpas": [
@@ -121,8 +262,21 @@ example_component_json: |
           "namespace": "payments",
           "path": "deploy/hpa.yaml",
           "target_workload": "payment-api",
+          "target_kind": "Deployment",
           "min_replicas": 3,
           "max_replicas": 10
+        }
+      ],
+      "scaled_objects": [
+        {
+          "name": "worker",
+          "namespace": "default",
+          "path": "charts/worker/templates/scaledobject.yaml",
+          "render": {"chart": "charts/worker", "values": ["values.yaml", "values-prod.yaml"]},
+          "target_workload": "worker",
+          "target_kind": "Deployment",
+          "min_replicas": 2,
+          "max_replicas": 20
         }
       ],
       "network_policies": [
@@ -146,4 +300,3 @@ example_component_json: |
       }
     }
   }
-

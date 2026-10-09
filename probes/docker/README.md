@@ -32,8 +32,8 @@ findings inlined.
 
 Probes auto-namespace as `<plugin>.<probe>` at runtime, so this one
 shows up as `docker.hadolint` in `lunar-probe logs`, PR check titles,
-and `lunar-probe lint` output. Consumers can pin to a subset of the
-bundle with `include:` / `exclude:` (see Configuration).
+and `lunar-probe lint` output. Consumers list the sub-probes they run
+with `include:` (see [Installation](#installation)).
 
 ## Skip-safe behaviour
 
@@ -82,6 +82,7 @@ version: 0
 
 probes:
   - uses: github://earthly/lunar-lib/probes/docker@v1.0.0
+    include: [hadolint]
 ```
 
 ## Requirements
@@ -98,16 +99,6 @@ This probe does not currently expose any `inputs:`. hadolint picks up
 its configuration from `.hadolint.yaml` / `.hadolint.yml` in the repo
 root automatically; per-repo rule ignores, trusted registries, and
 override severities all live there.
-
-Because the bundle is a multi-sub-probe plugin, consumers can select a
-subset with the standard `include:` / `exclude:` keys — e.g. once more
-Docker sub-probes ship:
-
-```yaml
-probes:
-  - uses: github://earthly/lunar-lib/probes/docker@v1.0.0
-    include: [hadolint]   # only run the hadolint sub-probe
-```
 
 Surfacing per-sub-probe knobs for severity gating is tracked as future
 work.

@@ -37,6 +37,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
+    include:
+      - api   # SBOM upload and enrichment, via the API
+      - cicd  # manifest-cli runs in CI
 ```
 
 ### Required Secrets
@@ -62,6 +65,7 @@ collectors:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
+    include: [api, cicd]
     with:
       retry_attempts: "20"
 ```
@@ -72,4 +76,5 @@ collectors:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/manifest-cyber@main
     on: ["domain:your-domain"]
+    include: [api, cicd]
 ```

@@ -37,6 +37,22 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
+# CI's release gate runs `lunar policy ok-release` on HEAD before pushing any
+# image, and fails if main never recorded HEAD's images for Lunar to scan. Check
+# that record now, so a release doesn't leave behind a tag that can never publish.
+HEAD_SHA=$(git rev-parse HEAD)
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: gh is required to confirm main's CI recorded the images for $HEAD_SHA" >&2
+    exit 1
+fi
+RECORD=$(gh api "repos/earthly/lunar-lib/commits/$HEAD_SHA/check-runs?check_name=record%20pushed%20images%20for%20CVE%20scan" \
+    --jq '.check_runs[0] | if . == null then "missing" else (.conclusion // .status) end' 2>/dev/null) || RECORD="unreadable"
+if [ "$RECORD" != "success" ]; then
+    echo "Error: main's 'record pushed images for CVE scan' for $HEAD_SHA is '$RECORD', not success" >&2
+    echo "Release a main commit whose CI finished; Lunar can't vet images it never scanned." >&2
+    exit 1
+fi
+
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

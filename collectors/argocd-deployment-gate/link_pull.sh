@@ -84,10 +84,11 @@ if [ "$GITOPS_COMPONENT" = "$LUNAR_COMPONENT_ID" ]; then
     exit 0
 fi
 
-# Pull the GitOps component's live, merged Component JSON. get-json is a direct
-# hub read (authoritative + immediate; the LUNAR_HUB_* conn is already in the
-# runtime). Unset the stdout-capture vars defensively — they only affect
-# `lunar collect`, but keep the read hermetic.
+# Pull the GitOps component's latest merged Component JSON. Unpinned on purpose:
+# this repo has no GitOps sha to pin to, so the read can trail a fresh write
+# there. The LUNAR_HUB_* conn is already in the runtime. Unset the
+# stdout-capture vars defensively — they only affect `lunar collect`, but keep
+# the read hermetic.
 GITOPS_JSON=$(env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX \
     lunar component get-json "$GITOPS_COMPONENT" 2>/tmp/pull-err) || {
     echo "argocd-deployment-gate: get-json '$GITOPS_COMPONENT' failed: $(head -c 300 /tmp/pull-err 2>/dev/null)" >&2

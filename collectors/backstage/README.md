@@ -24,6 +24,7 @@ When a catalog-info file is found, this collector writes to the following Compon
 | `.catalog.native.backstage.entities[]` | array | Every entity declared in the file (each with its own `valid`, `errors`, `apiVersion`, `kind`, `metadata`, `spec`). A single-entity file yields one element |
 | `.catalog.native.backstage.refs` | object | Referential-integrity results; written (as an object) only when `backstage_url` is configured |
 | `.catalog.native.backstage.refs.checked` | boolean | `true` whenever `backstage_url` is set — the "referential integrity ran" signal the policy keys off to distinguish *configured* from *not configured* |
+| `.catalog.native.backstage.refs.entity` | object | The [primary entity](#multiple-entities) itself, looked up in the live catalog: `{ kind, name, exists, ref, annotations }`, or `{ kind, name, error }` on a transient failure |
 | `.catalog.native.backstage.refs.domain` | object | For the declared `spec.domain`: `{ name, exists }` when the lookup resolved (200/404), or `{ name, error }` on a transient failure. Absent when no domain is declared |
 | `.catalog.native.backstage.refs.system` | object | For the declared `spec.system` — same semantics as `refs.domain`, plus `has_domain` (boolean) once the system resolves: whether that System declares a `spec.domain` |
 | `.catalog.native.backstage.refs.system_domain` | object | For the domain the component's *system* belongs to: `{ name, exists, via_system }`, or `{ name, error, via_system }` on a transient failure. Absent unless the system resolved **and** itself declares a `spec.domain` |
@@ -31,11 +32,14 @@ When a catalog-info file is found, this collector writes to the following Compon
 **Referential integrity.** When `backstage_url` is set, the collector resolves each declared grouping reference against the Backstage catalog API (`GET /api/catalog/entities/by-name/<kind>/<namespace>/<name>`) and records the outcome under `.refs`. The `<namespace>` is taken from the reference itself — a qualified ref (`ns/name`) carries its own, otherwise the component's own `metadata.namespace` is used, falling back to `default`, so there is no namespace input to configure:
 
 - `.refs.checked = true` — always written when `backstage_url` is set, regardless of what (if anything) is declared. This is the signal the policy uses to tell "collector configured" from "not configured."
+- the primary entity itself → `.refs.entity = { "kind": "Component", "name": "<metadata.name>", "exists": <bool> }`, looked up by its own kind, namespace and name. The live copy can carry annotations the file doesn't, such as one a Backstage processor copies down from the entity's System.
 - `spec.domain` → `.refs.domain = { "name": "<value>", "exists": <bool> }` on a definitive lookup, or `{ "name": "<value>", "error": "<reason>" }` on a transient failure.
 - `spec.system` → `.refs.system` — same shape and semantics as `refs.domain`. When the system resolves, it also carries `has_domain`: whether that System declares a `spec.domain` at all. It is absent when the System entity Backstage returned could not be read, so "belongs to no domain" is never inferred from a response the collector couldn't parse.
 - the system's own `spec.domain` → `.refs.system_domain = { "name": "<value>", "exists": <bool>, "via_system": "<the declared spec.system>" }` — the *transitive* hop. Written only when `spec.system` resolved **and** that System declares a domain; `via_system` names the System that pointed there, because the entity to fix is the System's own catalog file, not this component's.
 
 The system lookup already returns the resolved System entity, so reading its `spec.domain` costs nothing extra — only the domain itself is a second request. A bare domain reference on the System resolves against the *System's* namespace (not the component's), which can differ.
+
+Every entry that resolves to an entity also carries that entity's canonical `ref` (`system:default/payment-platform`) and its `annotations`, when it has any. Other collectors read annotations from here instead of calling Backstage again: the [pagerduty collector](../pagerduty/README.md) finds a service ID declared on the entity, its System or that System's Domain this way, in its `from-backstage-collector` sub-collector. A `200` whose body isn't an entity gets neither, so nothing is read from a response the collector couldn't parse.
 
 `exists` is `true` on a `200` (the entity was found) and `false` on a `404` (declared but missing). A per-reference entry is written only when that reference is **declared**; an undeclared ref has no entry. On a transient error (timeout, `5xx`) the entry is written with an `error` field instead of `exists`, so a Backstage outage stays distinguishable from a real miss — the policy skips (passes) an errored ref rather than failing it. When `backstage_url` is unset, `.refs` is not written at all (no `checked` marker), and the policy's referential-integrity checks skip (pass) because there is nothing to verify. The `backstage` policy's `domain-exists` and `system-exists` checks consume these fields.
 
@@ -88,6 +92,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     # with:
     #   paths: "catalog-info.yaml,catalog-info.yml"  # Customize search paths
     #   search_parent_dirs: "true"     # Monorepos: fall back to a parent directory's catalog file
@@ -102,6 +107,7 @@ To cross-check the domain and system declared in `catalog-info.yaml` against a l
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -120,7 +126,8 @@ Some Backstage deployments authorize only the catalog **search** endpoint. A gat
 
 ```yaml
 collectors:
-  - uses: earthly/lunar-lib/collectors/backstage@v1.14.0
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.14.0
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       ref_lookup: "by-query"
@@ -162,6 +169,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -200,6 +208,7 @@ Some gateways reject the pod's own role and accept only a role that the pod's ro
 collectors:
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: ["domain:your-domain"]
+    include: [catalog-info]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"

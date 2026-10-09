@@ -47,7 +47,15 @@ policies:
   - uses: github://earthly/lunar-lib/policies/scala@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [build-tool-manifest-exists, scala-version-pinned]  # Only run specific checks
+    include:
+      - build-tool-manifest-exists
+      - scala-version-pinned
+      - min-scala-version
+      - sbt-version-set
+      - min-sbt-version
+      - dependencies-locked
+      - test-module-exists
+      - scalafmt-configured
 ```
 
 ## Examples

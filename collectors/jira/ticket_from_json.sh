@@ -15,22 +15,27 @@ source "$(dirname "$0")/helpers.sh"
 # the ticket with the same shared logic. Needs no GH_TOKEN and works on any VCS
 # provider. Transitional: folds into `ticket` once after-json is stable.
 
+resolve_ticket_path || exit 1
+
 # In PR context the runtime sets LUNAR_COMPONENT_PR. Pass it through so
 # get-json returns the PR-scoped Component JSON (which carries .vcs.pr.*)
 # rather than the main-branch JSON. `lunar component get-json` does not default
 # --pr from the environment (unlike the component id, which falls back to
 # LUNAR_COMPONENT_ID), so without this the PR title is never seen and the
 # collector skips. Empty array when unset → no --pr, same as before.
-pr_arg=()
-[ -n "${LUNAR_COMPONENT_PR:-}" ] && pr_arg=(--pr "$LUNAR_COMPONENT_PR")
-
-# The read races the record that dispatched this run, so in PR context it is
-# RETRIED.
 #
-# The after-json wave fires off the LIVE merged blob the instant .vcs.pr.title
-# lands, but `lunar component get-json` resolves through a copy the Hub's mat
-# workers drain asynchronously — so this collector can be dispatched by a record
-# it cannot yet read.
+# --git-sha pins the commit the wave fired for. --pr alone resolves the PR's
+# latest materialized row, which can be another commit's (old title included).
+json_args=()
+[ -n "${LUNAR_COMPONENT_PR:-}" ] && json_args=(--pr "$LUNAR_COMPONENT_PR")
+[ -n "${LUNAR_COMPONENT_GIT_SHA:-}" ] && json_args+=(--git-sha "$LUNAR_COMPONENT_GIT_SHA")
+
+# On Hubs before 4.9.0 the read races the record that dispatched this run, so in
+# PR context it is RETRIED. The after-json wave fires off the LIVE merged blob
+# the instant .vcs.pr.title lands, but those Hubs serve even a --git-sha read
+# from a copy their mat workers drain asynchronously — so this collector can be
+# dispatched by a record it cannot yet read. Hub 4.9.0+ serves it from the live
+# blob.
 #
 # Here the trigger path IS the input: the hook is `after-json` on .vcs.pr.title,
 # and the Hub dispatches only collectors whose path is PRESENT in that live blob.
@@ -57,7 +62,7 @@ ATTEMPT=0
 WAITED=0
 while :; do
   ATTEMPT=$((ATTEMPT + 1))
-  if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${pr_arg[@]}" 2>"$GETJSON_ERR"); then
+  if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${json_args[@]}" 2>"$GETJSON_ERR"); then
     # `set -e` is on and there is no pipefail, so an assignment from a failing
     # jq would abort the script here on jq's bare exit status — no retry, no
     # explanation. An unparseable blob is one of the shapes this fix exists to
@@ -127,12 +132,12 @@ esac
 
 # Write the ticket reference even when Jira could not confirm it, so an outage
 # does not make the PR look ticket-less.
-lunar collect ".vcs.pr.ticket.id" "$TICKET_KEY"
-jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j ".vcs.pr.ticket.source" -
+lunar collect "${TICKET_PATH}.id" "$TICKET_KEY"
+jq -n '{"tool": "jira", "integration": "api"}' | lunar collect -j "${TICKET_PATH}.source" -
 
 JIRA_BASE_URL="${LUNAR_VAR_JIRA_BASE_URL:-}"
 if [ -n "$JIRA_BASE_URL" ]; then
-  lunar collect ".vcs.pr.ticket.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
+  lunar collect "${TICKET_PATH}.url" "${JIRA_BASE_URL%/}/browse/${TICKET_KEY}"
 fi
 
 if [ -z "$TICKET_VALID" ]; then
@@ -141,7 +146,7 @@ if [ -z "$TICKET_VALID" ]; then
   # the ticket-valid policy why .valid is missing; unset means validation was
   # never configured.
   if [ -n "$TICKET_ERROR" ]; then
-    lunar collect ".vcs.pr.ticket.tracker_error" "$TICKET_ERROR"
+    lunar collect "${TICKET_PATH}.tracker_error" "$TICKET_ERROR"
   else
     echo "Jira API validation not configured, skipping." >&2
   fi
@@ -149,7 +154,7 @@ if [ -z "$TICKET_VALID" ]; then
 fi
 
 # Ticket exists — write normalized fields to generic paths.
-lunar collect -j ".vcs.pr.ticket.valid" true
+lunar collect -j "${TICKET_PATH}.valid" true
 
 TICKET_STATUS="$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name // empty')"
 TICKET_TYPE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.issuetype.name // empty')"
@@ -157,9 +162,9 @@ TICKET_SUMMARY="$(echo "$JIRA_RESPONSE" | jq -r '.fields.summary // empty')"
 TICKET_ASSIGNEE="$(echo "$JIRA_RESPONSE" | jq -r '.fields.assignee.emailAddress // empty')"
 
 lunar collect \
-  ".vcs.pr.ticket.status" "$TICKET_STATUS" \
-  ".vcs.pr.ticket.type" "$TICKET_TYPE" \
-  ".vcs.pr.ticket.summary" "$TICKET_SUMMARY" \
-  ".vcs.pr.ticket.assignee" "$TICKET_ASSIGNEE"
+  "${TICKET_PATH}.status" "$TICKET_STATUS" \
+  "${TICKET_PATH}.type" "$TICKET_TYPE" \
+  "${TICKET_PATH}.summary" "$TICKET_SUMMARY" \
+  "${TICKET_PATH}.assignee" "$TICKET_ASSIGNEE"
 
-echo "$JIRA_RESPONSE" | lunar collect -j ".vcs.pr.ticket.native.jira" -
+echo "$JIRA_RESPONSE" | lunar collect -j "${TICKET_PATH}.native.jira" -

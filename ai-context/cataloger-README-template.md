@@ -54,6 +54,9 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/{path-to-cataloger}@v1.0.0
+    include:
+      - sync-components  # Components from {source}
+      - sync-domains     # Domains from {source}
     with:
       org_name: "your-org"
 ```
@@ -71,4 +74,5 @@ When using this template:
 1. Replace all `{placeholders}` with actual values
 2. Document only the relevant paths (`.components`, `.domains`, or both)
 3. Include the hook type/schedule that the cataloger uses
-4. Remove this "Template Usage Notes" section from the final README
+4. List every sub-cataloger under `include:` with a short comment, or `include: [name]` for a single one. `+lint` fails an install snippet without `include:`
+5. Remove this "Template Usage Notes" section from the final README

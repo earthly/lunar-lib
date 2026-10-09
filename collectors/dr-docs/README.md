@@ -97,6 +97,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/dr-docs@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, production]
+    include:
+      - dr-plan      # DR plan document
+      - dr-exercise  # DR exercise records
     # with:
     #   plan_path: "docs/dr-plan.md"
     #   exercise_dir: "docs/dr-exercises"
