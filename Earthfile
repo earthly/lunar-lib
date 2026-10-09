@@ -168,7 +168,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.6-alpine
+    ARG SCRIPTS_VERSION=1.1.7-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -191,3 +191,18 @@ base-image:
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
+
+# kubeconform for the k8s and argocd images, built from source with a current
+# x/text: the 0.8.0 release binary carries fixable Highs in it and in Go's stdlib.
+kubeconform-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    # renovate: datasource=github-releases depName=yannh/kubeconform extractVersion=^v(?<version>.*)$
+    ARG KUBECONFORM_VERSION=0.8.0
+    RUN git clone --quiet --depth 1 --branch "v${KUBECONFORM_VERSION}" https://github.com/yannh/kubeconform /src
+    WORKDIR /src
+    # The repo vendors its dependencies, so re-vendor after the bump.
+    RUN go get golang.org/x/text@latest && go mod vendor && \
+        CGO_ENABLED=0 go build -trimpath -tags netgo \
+            -ldflags "-s -w -X main.version=v${KUBECONFORM_VERSION}" -o /out/kubeconform ./cmd/kubeconform
+    SAVE ARTIFACT /out/kubeconform
