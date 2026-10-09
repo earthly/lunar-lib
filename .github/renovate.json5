@@ -31,9 +31,11 @@
       allowedVersions: '<4',
     },
     {
-      // All six lunar-scripts references (alpine base + five debian images) move together.
+      // All six lunar-scripts references (alpine base + five debian images) move together,
+      // as soon as one ships: release.sh refuses to cut a release behind the newest.
       matchDepNames: ['earthly/lunar-scripts'],
       groupName: 'lunar-scripts base',
+      schedule: ['at any time'],
     },
     {
       // alpine:/python: only appear in +test / +lint / artifact targets, never in a

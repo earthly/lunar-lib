@@ -53,6 +53,33 @@ if [ "$RECORD" != "success" ]; then
     exit 1
 fi
 
+# Every image builds FROM earthly/lunar-scripts, which bakes the lunar CLI and OS
+# packages, so a release must ship the newest one. Bumping on main (Renovate's
+# "lunar-scripts base" PR) keeps the images the release gate scanned the shipped ones.
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: jq is required to look up the newest earthly/lunar-scripts release" >&2
+    exit 1
+fi
+SCRIPTS_TOKEN=$(curl -fsSL "https://auth.docker.io/token?service=registry.docker.io&scope=repository:earthly/lunar-scripts:pull" | jq -r .token) || SCRIPTS_TOKEN=""
+LATEST_SCRIPTS=$(curl -fsSL -H "Authorization: Bearer $SCRIPTS_TOKEN" "https://registry-1.docker.io/v2/earthly/lunar-scripts/tags/list?n=1000" \
+    | jq -er '[.tags[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) | split(".") | map(tonumber)] | max | map(tostring) | join(".")' 2>/dev/null) || LATEST_SCRIPTS=""
+if [ -z "$LATEST_SCRIPTS" ]; then
+    echo "Error: couldn't look up the newest earthly/lunar-scripts release on Docker Hub" >&2
+    exit 1
+fi
+SCRIPTS_PINS=$(grep -rnE --include=Earthfile '^[[:space:]]*ARG SCRIPTS_VERSION(_DEBIAN)?=' . || true)
+if [ -z "$SCRIPTS_PINS" ]; then
+    echo "Error: found no SCRIPTS_VERSION pins in any Earthfile" >&2
+    exit 1
+fi
+STALE_PINS=$(echo "$SCRIPTS_PINS" | grep -vE "=${LATEST_SCRIPTS//./\\.}-(alpine|debian)[[:space:]]*$" || true)
+if [ -n "$STALE_PINS" ]; then
+    echo "Error: these lunar-scripts pins are behind the newest release, $LATEST_SCRIPTS:" >&2
+    echo "$STALE_PINS" >&2
+    echo "Bump them on main and release that commit." >&2
+    exit 1
+fi
+
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
