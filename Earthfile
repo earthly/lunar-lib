@@ -168,7 +168,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.6-alpine
+    ARG SCRIPTS_VERSION=1.1.7-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
