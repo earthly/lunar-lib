@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Backstage catalog-info Monorepo Discovery Cataloger — SCHEDULED variant (cron).
+# Backstage catalog-info Monorepo Discovery Cataloger — shared by `discover` (cron)
+# and `discover-on-commit` (repo hook on `on_commit_repo`).
 #
-# Runs once per cron tick (global, no repo checkout). Builds a scan list from the
+# Runs once per cron tick or push (global, no repo checkout). Builds a scan list from the
 # explicit `repos` input plus any repos auto-discovered from the `orgs` input
 # (filtered by the `allowed_topics` / `disallowed_topics` GitHub-topic lists), so
 # you can opt monorepos into cataloging with a repo topic instead of a
