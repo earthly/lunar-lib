@@ -81,7 +81,7 @@ cd /path/to/lunar-lib    # must be repo root
 The script handles everything:
 
 1. **Validates** the version format (must match `^v[0-9]+\.[0-9]+\.[0-9]+$`)
-2. **Checks** working tree is clean, no duplicate branch/tag, and that main's CI recorded `HEAD`'s images for Lunar to scan (`record pushed images for CVE scan` succeeded)
+2. **Checks** working tree is clean, no duplicate branch/tag, that main's CI recorded `HEAD`'s images for Lunar to scan (`record pushed images for CVE scan` succeeded), and that every `SCRIPTS_VERSION` pin is the newest `earthly/lunar-scripts` release (if not, merge Renovate's `lunar-scripts base` PR first)
 3. **Creates** local branch `vX.Y.Z`
 4. **Generates the CHANGELOG section** — `scripts/gen-changelog-section.sh` reads the commits in `<previous-tag>..HEAD` and splices a `## [X.Y.Z]` section plus its compare link into `CHANGELOG.md`, before the pin commit, so the tag carries it
 5. **Rewrites manifests** — all `lunar-*.yml` files: changes `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
