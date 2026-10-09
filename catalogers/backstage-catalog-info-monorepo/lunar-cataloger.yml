@@ -66,12 +66,27 @@ catalogers:
       `Component` entity's owner, domain, and tags are written onto
       the created component (identical shaping to the
       `backstage-catalog-info` cataloger), plus a `.domains` stub for
-      every referenced domain. Runs on a fixed cadence.
+      every referenced domain. Runs daily — pair with
+      `discover-on-commit` (below) to also run on every push.
     mainBash: main.sh
     hook:
       type: cron
       schedule: "0 3 * * *"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership", "topics", "org"]
+
+  - name: discover-on-commit
+    description: |
+      Commit-triggered companion to `discover`: the same scan, run on
+      every push to the default branch of `on_commit_repo` instead of
+      on a schedule, so a `catalog-info.yaml` added there becomes a
+      component right away. Each run rescans the whole scan set, so
+      keep `repos` to the monorepo it watches. Idle until
+      `on_commit_repo` is set.
+    mainBash: main.sh
+    hook:
+      type: repo
+      repo: "${{ inputs.on_commit_repo }}"
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "commit-triggered", "real-time"]
 
 inputs:
   repos:
@@ -125,6 +140,16 @@ inputs:
       repos are skipped. Does not affect repos named explicitly in
       `repos`.
     default: "false"
+
+  on_commit_repo:
+    description: |
+      Repository whose default-branch pushes run `discover-on-commit`,
+      in the form a `repo` hook takes: `<host>/<owner>/<repo>` (e.g.
+      `github.com/acme/monorepo`). Usually the monorepo in `repos`.
+      One repository per import; import the cataloger again under
+      another `name` to watch a second one. Empty (the default) leaves
+      `discover-on-commit` idle.
+    default: ""
 
   filenames:
     description: |

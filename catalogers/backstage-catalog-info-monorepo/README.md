@@ -6,7 +6,7 @@ Discovers every `catalog-info.yaml` in a repository — including files in subdi
 
 Where the [`backstage-catalog-info`](../backstage-catalog-info) cataloger *augments components that already exist* (reading one `catalog-info.yaml` per repo), this cataloger *creates* components by discovering **all** the `catalog-info.yaml` files a repository contains and mapping each to its own Lunar component. A monorepo with `services/payments/catalog-info.yaml` and `services/web/catalog-info.yaml` becomes two components, each keyed to the file's directory and populated with the owner, domain, and tags from its Backstage `Component` entity.
 
-It runs on a schedule, walking each configured repository's file tree via the GitHub API. Use it when a single repo holds several Backstage entities in different subdirectories and each should be its own component.
+It runs daily, and optionally on every push to a monorepo, walking each repository's file tree via the GitHub API. Use it when a single repo holds several Backstage entities in different subdirectories and each should be its own component.
 
 ## Synced Data
 
@@ -79,14 +79,16 @@ The common monorepo layout is one `catalog-info.yaml` per service directory, eac
 | Cataloger | Description |
 |-----------|-------------|
 | `discover` | **Scheduled.** Builds a scan set from `repos` plus any topic-matched repos discovered from `orgs`, walks each repo's tree via the Git Trees API, finds every `catalog-info.yaml`, fetches and parses each, and creates one component per file keyed to the file's directory. Writes owner / domain / tags plus `.domains` stubs. Runs on a `cron` schedule. Requires `GH_TOKEN`. |
+| `discover-on-commit` | **Commit-triggered.** The same scan as `discover`, run on every push to the default branch of `on_commit_repo` instead of on a schedule. Idle until `on_commit_repo` is set. Requires `GH_TOKEN`. |
 
 ## Hook Type
 
 | Cataloger | Hook | Schedule / Trigger | Description |
 |-----------|------|--------------------|-------------|
 | `discover` | `cron` | `0 3 * * *` | Runs daily at 03:00 UTC, once per run (global), scanning every repo in the scan set (`repos` plus topic-matched repos from `orgs`) |
+| `discover-on-commit` | `repo` | push to `on_commit_repo`'s default branch | Runs once per push (global), scanning the same scan set |
 
-The `cron` hook is global (once per run, no repo checkout), which is what lets this cataloger *create* components — per-component hooks (`component-cron`, `component-repo`) can only augment components that already exist. Daily at 03:00 is offset from the standard `0 2 * * *` so it lands after component-defining catalogers run. Tighten the cadence by overriding `hook.schedule` in a fork.
+Both hooks are global (once per run, no repo checkout), which is what lets this cataloger *create* components — per-component hooks (`component-cron`, `component-repo`) can only augment components that already exist. Daily at 03:00 is offset from the standard `0 2 * * *` so it lands after component-defining catalogers run. For updates on push, add `discover-on-commit` (see [Cataloging on commit](#cataloging-on-commit)).
 
 ## Installation
 
@@ -106,7 +108,25 @@ Set the GitHub token used to walk each repo's tree and fetch each `catalog-info.
 lunar secret set GH_TOKEN <your-github-token>
 ```
 
-The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `on_commit_repo`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+
+### Cataloging on commit
+
+`discover` runs once a day, so a `catalog-info.yaml` added to a monorepo appears at the next 03:00 UTC run. Add `discover-on-commit` and point `on_commit_repo` at the monorepo to run the same scan on every push to its default branch:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover, discover-on-commit]
+    with:
+      repos: "acme/monorepo"
+      on_commit_repo: "github.com/acme/monorepo"
+```
+
+- **One repository per import.** To watch several monorepos, import the cataloger once per monorepo, each with its own `name`, `repos` and `on_commit_repo`.
+- **Each push rescans the whole scan set**, so keep `repos` to the watched monorepo rather than pairing `discover-on-commit` with an ungated `orgs`.
+- **The hub only acts on pushes to repositories it tracks**, so the monorepo needs a component before the first push counts, from `github-org` or a first `discover` run.
+- **New and edited files take effect on push; removals (a deleted file, a dropped tag) wait for the nightly run.** Each variant keeps its own output, and the catalog merges the two.
 
 ### Discovering repos by topic
 
@@ -207,6 +227,4 @@ Instead of naming each monorepo, you can flip this to **topic-driven** targeting
 
 ### Scope and Roadmap
 
-The cataloger targets the monorepo case that motivated it (a repo whose services each ship a `catalog-info.yaml`), scoped either by an explicit `repos` list or by org discovery with a GitHub-topic allow/blocklist (see [Discovering repos by topic](#discovering-repos-by-topic)). One extension is noted as a follow-up rather than built here:
-
-- **Commit-triggered variant** — a checkout-based companion (mirroring `backstage-catalog-info`'s `augment-on-commit`) for near-real-time updates without the daily cron.
+The cataloger targets the monorepo case that motivated it (a repo whose services each ship a `catalog-info.yaml`), scoped either by an explicit `repos` list or by org discovery with a GitHub-topic allow/blocklist (see [Discovering repos by topic](#discovering-repos-by-topic)).
