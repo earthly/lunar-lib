@@ -9,6 +9,26 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.19.1] — 2026-10-09
+
+### Added
+
+- compliance-docs: add a pen-test report freshness check and a collector for pen-test records (#349)
+- ticket, jira: add a ticket-field check and a ticket_path input for recording a second ticket reference (#350)
+
+### Changed
+
+- READMEs: install snippets list their sub-collectors and checks with include: (#371)
+- Let gitleaks scan this repo clean: allow its test fixtures and one false positive (#365)
+
+### Fixed
+
+- jira ticket-from-json, argocd-deployment-tracking: read Component JSON at the exact commit instead of the latest snapshot (#372)
+
+### Security
+
+- Clear fixable CVEs in plugin images, and gate releases on Lunar's ok-release (#373)
+
 ## [1.19.0] — 2026-10-06
 
 ### Added
@@ -1017,6 +1037,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.19.1]: https://github.com/earthly/lunar-lib/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
 [1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
 [1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
