@@ -62,6 +62,7 @@ This table lists important sub-objects within each category. For full details, s
 | **[`.testing`](cat-testing.md)** | **Test execution results and code coverage** |
 | `.testing.results` | Test results (`total`, `passed`, `failed`, `skipped`) |
 | `.testing.failures[]` | Failure details (`name`, `file`, `line`, `message`) |
+| `.testing.runs[]` | Per-build results (`pipeline`, `run_id`, `attempt`, `job`, `step`, totals, `all_passing`) |
 | `.testing.coverage` | Coverage data (`percentage`, `lines`, `files[]`) |
 | `.testing.coverage.lines` | Line coverage (`covered`, `total`) |
 | **[`.dependencies`](cat-dependencies.md)** | **Where dependencies are resolved from (package registries)** |

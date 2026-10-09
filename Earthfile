@@ -81,6 +81,7 @@ test:
     BUILD ./collectors/docker+test
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
+    BUILD ./collectors/java+test
     BUILD --pass-args ./collectors/pagerduty+test
     BUILD ./collectors/k8s+test
     BUILD ./collectors/istio+test
@@ -107,6 +108,7 @@ test:
     BUILD ./policies/container+test
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
+    BUILD ./policies/testing+test
     BUILD ./policies/oncall+test
     BUILD ./policies/ticket+test
 
