@@ -76,7 +76,7 @@ Guardrails are your engineering standards expressed as code. They verify that ap
 - CODEOWNERS files must be valid
 - SBOMs must be generated for compliance
 
-Lunar includes 200+ pre-built guardrails across categories like testing, security, compliance, operational readiness, and infrastructure. You can also create custom guardrails for your unique standards.
+Lunar includes 300+ pre-built guardrails across categories like testing, security, compliance, operational readiness, and infrastructure. You can also create custom guardrails for your unique standards.
 
 ### Gradual Enforcement
 
