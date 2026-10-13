@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Backstage catalog-info Monorepo Discovery Cataloger — shared by `discover` (cron)
-# and `discover-on-commit` (repo hook on `on_commit_repo`).
+# and `discover-on-commit` (repo hook on the repo in `repos`).
 #
 # Runs once per cron tick or push (global, no repo checkout). Builds a scan list from the
 # explicit `repos` input plus any repos auto-discovered from the `orgs` input
