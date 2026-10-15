@@ -123,9 +123,10 @@ catalogers:
 ```
 
 - **One repository per import.** `discover-on-commit` fires only when `repos` names exactly one repository. To watch several monorepos, import the cataloger once per monorepo, each with its own `name` and `repos`.
-- **Each push rescans the whole scan set**, so don't pair `discover-on-commit` with an ungated `orgs`.
+- **Each push rescans the whole scan set**, so don't pair `discover-on-commit` with an ungated `orgs`. An import with no `include:` runs every variant, `discover-on-commit` included; pin `include: [discover]` to keep only the nightly scan.
 - **The hub only acts on pushes to repositories it tracks**, so the monorepo needs a component before the first push counts, from `github-org` or a first `discover` run.
 - **New and edited files take effect on push; removals (a deleted file, a dropped tag) wait for the nightly run.** Each variant keeps its own output, and the catalog merges the two.
+- **A push that lands while a scan is running can be missed** if the scan already read the repo. The next push picks it up; otherwise it waits for the nightly run.
 
 ### Discovering repos by topic
 
