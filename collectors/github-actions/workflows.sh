@@ -23,16 +23,21 @@ find_repo_root() {
 
 # ── Locate the workflows ────────────────────────────────────────────────────
 # GitHub only runs workflows from the repository root. A monorepo subdirectory
-# component runs from <repo>/<subdir> with the whole repo checked out, so
-# without workflows of its own it reads the root's.
-if [ ! -d ".github/workflows" ]; then
-    REPO_ROOT="$(find_repo_root || true)"
-    if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.github/workflows" ]; then
-        echo "No .github/workflows/ directory found" >&2
-        exit 0
+# component runs from <repo>/<subdir> with the whole repo checked out, so read
+# the root's; a .github/workflows inside the subdirectory never runs.
+COMPONENT_DIR="$(pwd -P)"
+REPO_ROOT="$(find_repo_root || true)"
+if [ -n "$REPO_ROOT" ] && [ "$REPO_ROOT" != "$COMPONENT_DIR" ]; then
+    if [ -d ".github/workflows" ]; then
+        echo "Ignoring ${COMPONENT_DIR#"$REPO_ROOT"/}/.github/workflows/: GitHub only runs the repository root's." >&2
     fi
-    echo "No .github/workflows/ in the component directory; reading the repository root's ($REPO_ROOT)." >&2
+    echo "Reading the repository root's .github/workflows/ ($REPO_ROOT)." >&2
     cd "$REPO_ROOT"
+fi
+
+if [ ! -d ".github/workflows" ]; then
+    echo "No .github/workflows/ directory found" >&2
+    exit 0
 fi
 
 WORKFLOW_FILES=$(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) -type f 2>/dev/null | sort)
@@ -190,11 +195,12 @@ WARNING_COUNT=0
 if command -v actionlint &>/dev/null; then
     ACTIONLINT_VERSION=$(actionlint --version 2>/dev/null | head -1 || echo "unknown")
 
-    # actionlint -format outputs one JSON per error, exits 1 if errors found
+    # The template applies to the whole slice, so this prints one JSON array of
+    # findings (exit 1 when there are any).
     LINT_RAW=$(actionlint -format '{{json .}}' 2>&1 || true)
 
     if [ -n "$LINT_RAW" ]; then
-        LINT_ERRORS=$(echo "$LINT_RAW" | jq -s '[.[] | {
+        LINT_ERRORS=$(echo "$LINT_RAW" | jq '[.[] | {
             file: .filepath,
             line: .line,
             column: .column,

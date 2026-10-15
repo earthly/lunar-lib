@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Tests for where workflows.sh finds .github/workflows, in particular the
-# monorepo repo-root fallback. Drives the real collector against fabricated
-# repo layouts with a stub `lunar` that saves each `lunar collect -j <path> -`
-# payload to $OUT/<path>.json.
+# Tests for which .github/workflows workflows.sh reads (the repository root's,
+# the only ones GitHub runs) and for recording actionlint's findings. Drives
+# the real collector against fabricated repo layouts with a stub `lunar` that
+# saves each `lunar collect -j <path> -` payload to $OUT/<path>.json.
 #
 set -u
 
@@ -47,6 +47,7 @@ run() {
 
 # The workflow files the collector recorded, comma-joined.
 files() { jq -r '[.workflows[].file] | join(",")' "$OUT/.ci.native.github_actions.json" 2>/dev/null; }
+lint() { jq -r "$1" "$OUT/.ci.lint.json" 2>/dev/null; }
 written() {
   local f names=()
   for f in "$OUT"/.[!.]* "$OUT"/*; do
@@ -58,6 +59,13 @@ written() {
 add_workflow() {
   mkdir -p "$1/.github/workflows"
   printf 'name: %s\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n' \
+    "$2" > "$1/.github/workflows/$2.yml"
+}
+
+# A workflow actionlint rejects: "bogus" is not a job key.
+add_broken_workflow() {
+  mkdir -p "$1/.github/workflows"
+  printf 'name: %s\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    bogus: 1\n    steps:\n      - run: echo hi\n' \
     "$2" > "$1/.github/workflows/$2.yml"
 }
 
@@ -75,13 +83,18 @@ check "single repo: reads its workflows" ".github/workflows/ci.yml" "$(files)"
 
 r="$(new_repo)"; add_workflow "$r" build
 run "$STUBS" "$r/apps/gadget"
-check "monorepo subdir: falls back to the root's workflows" ".github/workflows/build.yml" "$(files)"
+check "monorepo subdir: reads the root's workflows" ".github/workflows/build.yml" "$(files)"
 check "monorepo subdir: writes all three paths" ".ci.dependencies.json,.ci.lint.json,.ci.native.github_actions.json" "$(written)"
 check "monorepo subdir: counts the root's actions" "1" "$(jq -r .total "$OUT/.ci.dependencies.json" 2>/dev/null)"
 
+# A subdirectory's own .github/workflows never runs on GitHub.
 r="$(new_repo)"; add_workflow "$r" build; add_workflow "$r/apps/gadget" gadget
 run "$STUBS" "$r/apps/gadget"
-check "monorepo subdir with its own workflows: keeps them" ".github/workflows/gadget.yml" "$(files)"
+check "monorepo subdir with its own workflows: still reads the root's" ".github/workflows/build.yml" "$(files)"
+
+r="$(new_repo)"; add_workflow "$r/apps/gadget" gadget
+run "$STUBS" "$r/apps/gadget"
+check "workflows only in the subdir: writes nothing" "" "$(written)"
 
 r="$(new_repo)"
 run "$STUBS" "$r/apps/gadget"
@@ -96,6 +109,23 @@ check "no git binary: walks up to the .git file" ".github/workflows/build.yml" "
 r="$(mktemp -d)"; mkdir -p "$r/apps/gadget"; add_workflow "$r" build
 run "$STUBS_NOGIT" "$r/apps/gadget"
 check "no repo root: doesn't read a parent's workflows" "" "$(written)"
+
+r="$(mktemp -d)"; add_workflow "$r" own
+run "$STUBS_NOGIT" "$r"
+check "no repo root: reads its own workflows" ".github/workflows/own.yml" "$(files)"
+
+if command -v actionlint >/dev/null; then
+  r="$(new_repo)"; add_workflow "$r" ci
+  run "$STUBS" "$r"
+  check "lint: a clean workflow records no findings" "0" "$(lint .error_count)"
+
+  r="$(new_repo)"; add_broken_workflow "$r" broken
+  run "$STUBS" "$r/apps/gadget"
+  check "lint: records actionlint's findings" "1" "$(lint .error_count)"
+  check "lint: findings carry the repo-relative file" ".github/workflows/broken.yml" "$(lint '.errors[0].file')"
+else
+  echo "SKIP: lint cases (actionlint not installed)"
+fi
 
 echo
 echo "$PASS passed, $FAIL failed"

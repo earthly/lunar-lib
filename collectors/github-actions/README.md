@@ -6,7 +6,7 @@ Parses GitHub Actions workflows, runs actionlint, and detects version pinning st
 
 This collector analyzes all GitHub Actions workflow files (`.github/workflows/*.yml`) in a repository. It extracts structured data from each workflow (name, triggers, jobs, action references), runs [actionlint](https://github.com/rhysd/actionlint) for syntax and type checking, and classifies version pinning status for every action reference. The result is a comprehensive view of GHA workflow quality and supply-chain hygiene.
 
-In a monorepo, a subdirectory component with no `.github/workflows/` of its own reads the repository root's, the only place GitHub runs workflows from. With neither, it skips gracefully.
+It reads the repository root's `.github/workflows/`, the only place GitHub runs workflows from, so every subdirectory component of a monorepo gets the root's workflows. Skips gracefully if there are none.
 
 ## Collected Data
 
