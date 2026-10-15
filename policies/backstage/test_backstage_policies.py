@@ -37,6 +37,8 @@ check_system_domain_exists = load_policy("system-domain-exists")
 check_system_domain_set = load_policy("system-domain-set")
 check_required_link_types = load_policy("required-link-types")
 check_dependencies_documented = load_policy("dependencies-documented")
+check_allowed_types = load_policy("allowed-types")
+check_allowed_lifecycles = load_policy("allowed-lifecycles")
 
 from constraints import (
     parse_required_annotations,
@@ -423,6 +425,130 @@ def refs_node(refs=None):
         backstage["refs"] = refs
     data = {"catalog": {"native": {"backstage": backstage}}}
     return Node.from_component_json(data, {"workflows_finished": True})
+
+
+class TestAllowedTypes(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_allowed_types(catalog_node(spec={"type": "anything"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("allowed_types", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(Node.from_component_json({}))
+            self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_allowed_value_passes(self):
+        with policy_vars(allowed_types="service,website,library"):
+            for value in ("service", "library"):
+                with self.subTest(value=value):
+                    node = catalog_node(spec={"type": value})
+                    self.assertEqual(check_allowed_types(node).status, CheckStatus.PASS)
+
+    def test_value_not_in_list_fails_and_names_it(self):
+        with policy_vars(allowed_types="service,library"):
+            check = check_allowed_types(catalog_node(spec={"type": "website"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertEqual(len(check.failure_reasons), 1)
+            self.assertIn(
+                "spec.type 'website' is not one of the allowed types: service, library.",
+                check.failure_reasons[0],
+            )
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(catalog_node(spec={"type": "Service"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("'Service'", check.failure_reasons[0])
+
+    def test_missing_type_fails(self):
+        # Nothing else in the policy checks that spec.type is set.
+        with policy_vars(allowed_types="service"):
+            for spec in (None, {"owner": "team-a"}, {"type": ""}, {"type": "  "}, {"type": 3}):
+                with self.subTest(spec=spec):
+                    check = check_allowed_types(catalog_node(spec=spec))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("spec.type is not set", check.failure_reasons[0])
+
+    def test_value_and_input_are_trimmed_and_deduplicated(self):
+        with policy_vars(allowed_types=" service , service,, library "):
+            self.assertEqual(
+                check_allowed_types(catalog_node(spec={"type": " library "})).status,
+                CheckStatus.PASS,
+            )
+            check = check_allowed_types(catalog_node(spec={"type": "website"}))
+            self.assertIn("allowed types: service, library.", check.failure_reasons[0])
+
+
+class TestAllowedLifecycles(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "anything"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("allowed_lifecycles", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(Node.from_component_json({}))
+            self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_allowed_value_passes(self):
+        with policy_vars(allowed_lifecycles="production,experimental"):
+            node = catalog_node(spec={"lifecycle": "experimental"})
+            self.assertEqual(check_allowed_lifecycles(node).status, CheckStatus.PASS)
+
+    def test_value_not_in_list_fails_and_names_it(self):
+        with policy_vars(allowed_lifecycles="production,experimental"):
+            check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "prod"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn(
+                "spec.lifecycle 'prod' is not one of the allowed lifecycles: "
+                "production, experimental.",
+                check.failure_reasons[0],
+            )
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "Production"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_missing_lifecycle_skips_and_names_lifecycle_set(self):
+        with policy_vars(allowed_lifecycles="production"):
+            for spec in (None, {"type": "service"}, {"lifecycle": ""}, {"lifecycle": 3}):
+                with self.subTest(spec=spec):
+                    check = check_allowed_lifecycles(catalog_node(spec=spec))
+                    self.assertTrue(is_skipped(check))
+                    self.assertIn("lifecycle-set", skip_reason(check))
+
+    def test_exactly_one_failure_with_lifecycle_set(self):
+        # The pair splits the work: lifecycle-set owns presence, this check owns
+        # the value. A bad lifecycle fails exactly one of them; a good one, neither.
+        with policy_vars(allowed_lifecycles="production"):
+            for spec, failing in [
+                ({"lifecycle": "production"}, 0),
+                ({"lifecycle": "prod"}, 1),
+                ({"lifecycle": ""}, 1),
+                ({"lifecycle": 3}, 1),
+                ({"type": "service"}, 1),
+            ]:
+                with self.subTest(spec=spec):
+                    node = catalog_node(spec=spec)
+                    statuses = [
+                        check_lifecycle_set(node).status,
+                        check_allowed_lifecycles(node).status,
+                    ]
+                    self.assertEqual(statuses.count(CheckStatus.FAIL), failing)
 
 
 class TestDomainExists(unittest.TestCase):
@@ -987,6 +1113,12 @@ ALL_CHECKS = [
         check_dependencies_documented,
         {"require_dependencies": "true"},
     ),
+    ("allowed-types", check_allowed_types, {"allowed_types": "service"}),
+    (
+        "allowed-lifecycles",
+        check_allowed_lifecycles,
+        {"allowed_lifecycles": "production"},
+    ),
 ]
 
 # What each check resolves to on a missing catalog file with the mode OFF — the
@@ -1001,6 +1133,8 @@ DEFAULT_NO_CATALOG = {
     "required-tag-patterns": CheckStatus.FAIL,
     "required-link-types": CheckStatus.FAIL,
     "dependencies-documented": CheckStatus.FAIL,
+    "allowed-types": CheckStatus.FAIL,
+    "allowed-lifecycles": CheckStatus.FAIL,
     # Pure deny-checks: nothing present means nothing forbidden.
     "disallowed-annotations": CheckStatus.PASS,
     "disallowed-tag-patterns": CheckStatus.PASS,
@@ -1060,6 +1194,7 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
             disallowed_annotations="backstage.io/skip-checks",
             required_link_types="runbook",
             require_dependencies="true",
+            allowed_types="website",
         ):
             present = finished_node(
                 {
@@ -1098,6 +1233,8 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
             self.assertEqual(
                 check_dependencies_documented(present).status, CheckStatus.FAIL
             )
+            # spec.type is "service", outside the allowed list.
+            self.assertEqual(check_allowed_types(present).status, CheckStatus.FAIL)
 
     def test_set_still_pends_while_collectors_are_running(self):
         # Absent data is only "no catalog file" once the collector has finished.
