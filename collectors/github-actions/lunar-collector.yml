@@ -24,10 +24,12 @@ collectors:
       Parses all GitHub Actions workflow files in .github/workflows/,
       runs actionlint for lint errors, and classifies action version
       pinning (SHA, tag, branch, unpinned) for supply-chain hygiene.
+      A monorepo subdirectory component with no .github/workflows/ of its
+      own reads the repository root's, where GitHub runs them from.
     mainBash: workflows.sh
     hook:
       type: code
-    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint"]
+    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint", "monorepo"]
 
 example_component_json: |
   {

@@ -1,10 +1,38 @@
 #!/bin/bash
 set -e
 
-# ── Early exit if no GHA workflows ──────────────────────────────────────────
+# Same lookup as collectors/repo-boilerplate/codeowners.sh: git, else the
+# nearest .git entry (a file in the hub's per-snippet worktrees).
+find_repo_root() {
+    local root dir
+    root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$root" ] && [ -d "$root" ]; then
+        printf '%s\n' "$root"
+        return 0
+    fi
+    dir="$(pwd -P)"
+    while [ "$dir" != "/" ]; do
+        if [ -e "$dir/.git" ]; then
+            printf '%s\n' "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+# ── Locate the workflows ────────────────────────────────────────────────────
+# GitHub only runs workflows from the repository root. A monorepo subdirectory
+# component runs from <repo>/<subdir> with the whole repo checked out, so
+# without workflows of its own it reads the root's.
 if [ ! -d ".github/workflows" ]; then
-    echo "No .github/workflows/ directory found" >&2
-    exit 0
+    REPO_ROOT="$(find_repo_root || true)"
+    if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.github/workflows" ]; then
+        echo "No .github/workflows/ directory found" >&2
+        exit 0
+    fi
+    echo "No .github/workflows/ in the component directory; reading the repository root's ($REPO_ROOT)." >&2
+    cd "$REPO_ROOT"
 fi
 
 WORKFLOW_FILES=$(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) -type f 2>/dev/null | sort)

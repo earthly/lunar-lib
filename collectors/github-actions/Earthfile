@@ -27,3 +27,12 @@ actionlint-bin:
     ARG --required ACTIONLINT_VERSION
     RUN CGO_ENABLED=0 go install "github.com/rhysd/actionlint/cmd/actionlint@v${ACTIONLINT_VERSION}"
     SAVE ARTIFACT /go/bin/actionlint
+
+# Drives workflows.sh against fabricated repo layouts in the collector's own
+# image, with `lunar` stubbed.
+test:
+    FROM --pass-args +image
+    WORKDIR /workspace
+    COPY workflows.sh .
+    COPY --dir test .
+    RUN bash test/test_workflows.sh

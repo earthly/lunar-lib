@@ -72,6 +72,7 @@ test:
     BUILD --pass-args ./collectors/backstage+test-offline
     BUILD --pass-args ./collectors/ci-archive+test
     BUILD ./collectors/github+test
+    BUILD --pass-args ./collectors/github-actions+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
     BUILD --pass-args ./collectors/compliance-docs+test
