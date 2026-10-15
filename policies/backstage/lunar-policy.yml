@@ -196,6 +196,27 @@ policies:
     mainPython: ./dependencies-documented.py
     keywords: ["backstage", "dependencies", "dependsOn", "dependency mapping", "metadata"]
 
+  - name: allowed-types
+    description: |
+      Verifies that catalog-info.yaml `spec.type` is one of the values in the
+      `allowed_types` input (e.g. `service,website,library`), matched exactly
+      and case-sensitively. Skipped when no types are configured (the
+      default). Fails if the catalog file is missing, or `spec.type` is
+      missing or not in the list.
+    mainPython: ./allowed-types.py
+    keywords: ["backstage", "type", "spec.type", "allowed values", "taxonomy"]
+
+  - name: allowed-lifecycles
+    description: |
+      Verifies that catalog-info.yaml `spec.lifecycle` is one of the values in
+      the `allowed_lifecycles` input (e.g. `production,experimental`), matched
+      exactly and case-sensitively. Skipped when no lifecycles are configured
+      (the default), and when `spec.lifecycle` is missing, which
+      `lifecycle-set` reports. Fails if the catalog file is missing or the
+      value is not in the list.
+    mainPython: ./allowed-lifecycles.py
+    keywords: ["backstage", "lifecycle", "spec.lifecycle", "allowed values", "taxonomy"]
+
 inputs:
   skip_when_no_catalog_info:
     description: |
@@ -208,8 +229,9 @@ inputs:
       behaviour is described. With the default (`"false"`) a missing catalog
       file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
       `lifecycle-set` and `system-set`; fails `required-annotations`,
-      `required-tag-patterns`, `required-link-types` and
-      `dependencies-documented` when those are configured; passes the two
+      `required-tag-patterns`, `required-link-types`,
+      `dependencies-documented`, `allowed-types` and `allowed-lifecycles`
+      when those are configured; passes the two
       `disallowed-*` deny-checks, since nothing forbidden can be present
       without a file; and skips the referential-integrity checks, which
       have nothing to cross-check. With `"true"` every check skips instead —
@@ -291,4 +313,19 @@ inputs:
       dependencies there instead of in `spec.dependsOn`. Example:
       `example.com/dependencies`. Empty (the default) checks
       `spec.dependsOn` only.
+    default: ""
+  allowed_types:
+    description: |
+      Comma-separated list of allowed `spec.type` values. Example:
+      `service,website,library`. Matching is exact and case-sensitive, and
+      applies to the primary entity whatever its kind, so an `API` entity's
+      type (e.g. `openapi`) needs listing too. Empty (the default) disables
+      the `allowed-types` check.
+    default: ""
+  allowed_lifecycles:
+    description: |
+      Comma-separated list of allowed `spec.lifecycle` values. Example:
+      `production,experimental,deprecated`. Matching is exact and
+      case-sensitive. Empty (the default) disables the `allowed-lifecycles`
+      check.
     default: ""

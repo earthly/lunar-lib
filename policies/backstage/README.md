@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The opt-in checks (`required-*`, `disallowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
+The five core checks fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a fleet where only some repositories are catalogued. The opt-in checks (`required-*`, `disallowed-*`, `allowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-exists`, `system-domain-set`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
 
 ## Policies
 
@@ -29,6 +29,8 @@ This plugin provides the following policies (use `include` to select a subset):
 | `disallowed-annotations` | Fails if any forbidden annotation key is present (opt-in via the `disallowed_annotations` input) |
 | `disallowed-tag-patterns` | Fails if any tag matches a forbidden glob pattern (opt-in via the `disallowed_tag_patterns` input) |
 | `dependencies-documented` | Validates that `spec.dependsOn`, or a configured annotation, lists at least one dependency (opt-in via the `require_dependencies` input) |
+| `allowed-types` | Validates that `spec.type` is one of the configured values (opt-in via the `allowed_types` input) |
+| `allowed-lifecycles` | Validates that `spec.lifecycle` is one of the configured values (opt-in via the `allowed_lifecycles` input) |
 
 ## Required Data
 
@@ -40,7 +42,8 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.valid` | boolean | `backstage` collector |
 | `.catalog.native.backstage.errors[]` | array | `backstage` collector |
 | `.catalog.native.backstage.spec.owner` | string | `backstage` collector |
-| `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector |
+| `.catalog.native.backstage.spec.type` | string | `backstage` collector (read by `allowed-types`) |
+| `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector (read by `lifecycle-set` / `allowed-lifecycles`) |
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 | `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
 | `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
@@ -78,6 +81,8 @@ policies:
       - disallowed-annotations
       - disallowed-tag-patterns
       - dependencies-documented
+      - allowed-types
+      - allowed-lifecycles
     with:
       # Leave the rest of the fleet alone when it has no catalog-info.yaml:
       skip_when_no_catalog_info: "true"
@@ -88,11 +93,13 @@ policies:
       disallowed_tag_patterns: "deprecated/*"
       required_link_types: "runbook"
       require_dependencies: "true"
+      allowed_types: "service,website,library"
+      allowed_lifecycles: "production,experimental,deprecated"
 ```
 
 `skip_when_no_catalog_info` defaults to `"false"`: a component with no `catalog-info.yaml` fails, because importing the policy is itself the statement that the component should be catalogued. Set it to `"true"` to scope enforcement to the repositories that are already in Backstage — every check then skips on a component with no catalog file, and a component that *has* one is held to every check exactly as before.
 
-The list inputs are comma-separated; leave one unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all. `required-link-types` needs a `metadata.links` entry whose `type` exactly equals each listed type; the link's title and URL aren't checked.
+The list inputs are comma-separated; leave one unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all. `required-link-types` needs a `metadata.links` entry whose `type` exactly equals each listed type; the link's title and URL aren't checked. `allowed-types` and `allowed-lifecycles` need `spec.type` / `spec.lifecycle` to exactly equal one of the listed values, case-sensitively. They read the file's first `Component`, else its first entity, whatever its `kind`: if that is an `API` (`spec.type: openapi`), list its type too or scope the component out with `on:`. A missing `spec.type` fails `allowed-types`. A missing `spec.lifecycle` skips `allowed-lifecycles`, because `lifecycle-set` already fails it.
 
 `dependencies-documented` is off until `require_dependencies` is `"true"`, so a whole-policy import doesn't fail every component that lists no dependencies. Once on, it passes on any non-empty `spec.dependsOn` (targets are not looked up in Backstage) or, when `dependencies_annotation` names an annotation, on a non-empty comma-separated value there. A component with nothing to depend on fails too, so leave such components out with `on:`.
 
@@ -151,7 +158,7 @@ The list inputs are comma-separated; leave one unset (the default) and the corre
 {}
 ```
 
-The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks and `dependencies-documented` fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All of them are skipped if unconfigured.
+The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` and `allowed-*` checks and `dependencies-documented` fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All of them are skipped if unconfigured.
 
 With `skip_when_no_catalog_info: "true"` every check **skips** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
 
@@ -367,3 +374,4 @@ When this policy fails, resolve it by updating your `catalog-info.yaml`:
 7. **System has no domain** (`system-domain-set`) - Set `spec.domain` on the named System entity, in that System's own catalog file
 8. **Missing link type** (`required-link-types`) - Add a `metadata.links` entry with the missing `type` and its `url`
 9. **No dependencies** (`dependencies-documented`) - List the entities the component depends on under `spec.dependsOn` (e.g. `resource:payments-db`), or in the annotation named by `dependencies_annotation`
+10. **Type or lifecycle not allowed** (`allowed-types` / `allowed-lifecycles`) - Set `spec.type` or `spec.lifecycle` to one of the values the failure lists, matching case
