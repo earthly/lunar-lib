@@ -66,12 +66,27 @@ catalogers:
       `Component` entity's owner, domain, and tags are written onto
       the created component (identical shaping to the
       `backstage-catalog-info` cataloger), plus a `.domains` stub for
-      every referenced domain. Runs on a fixed cadence.
+      every referenced domain. Runs daily — pair with
+      `discover-on-commit` (below) to also run on every push.
     mainBash: main.sh
     hook:
       type: cron
       schedule: "0 3 * * *"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership", "topics", "org"]
+
+  - name: discover-on-commit
+    description: |
+      Commit-triggered companion to `discover`: the same scan, run on
+      every push to the default branch of the repository in `repos`
+      instead of on a schedule, so a `catalog-info.yaml` added there
+      becomes a component right away. Fires only when `repos` names
+      exactly one repository; import the cataloger again under another
+      `name` to watch a second one.
+    mainBash: main.sh
+    hook:
+      type: repo
+      repo: "github.com/${{ inputs.repos }}"
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "commit-triggered", "real-time"]
 
 inputs:
   repos:
@@ -81,7 +96,8 @@ inputs:
       `catalog-info.yaml` files, and is ALWAYS scanned (topic filters
       apply only to org-discovered repos, not to ones you name here).
       Either `repos` or `orgs` must be set — leave both empty and the
-      cataloger has nothing to scan.
+      cataloger has nothing to scan. `discover-on-commit` needs exactly
+      one repository here; pushes to it trigger the scan.
     default: ""
 
   orgs:
