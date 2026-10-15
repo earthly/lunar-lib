@@ -317,8 +317,10 @@ inputs:
   allowed_types:
     description: |
       Comma-separated list of allowed `spec.type` values. Example:
-      `service,website,library`. Matching is exact and case-sensitive.
-      Empty (the default) disables the `allowed-types` check.
+      `service,website,library`. Matching is exact and case-sensitive, and
+      applies to the primary entity whatever its kind, so an `API` entity's
+      type (e.g. `openapi`) needs listing too. Empty (the default) disables
+      the `allowed-types` check.
     default: ""
   allowed_lifecycles:
     description: |
