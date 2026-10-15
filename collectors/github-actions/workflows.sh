@@ -188,46 +188,49 @@ while IFS= read -r file; do
 done <<< "$WORKFLOW_FILES"
 
 # ── Run actionlint ──────────────────────────────────────────────────────────
-LINT_ERRORS="[]"
-ERROR_COUNT=0
-WARNING_COUNT=0
-
+# .ci.lint is only written when actionlint actually ran, so a zero error_count
+# always means clean to ci.lint-clean.
+LINT_ERRORS=""
 if command -v actionlint &>/dev/null; then
     ACTIONLINT_VERSION=$(actionlint --version 2>/dev/null | head -1 || echo "unknown")
 
-    # The template applies to the whole slice, so this prints one JSON array of
-    # findings (exit 1 when there are any).
-    LINT_RAW=$(actionlint -format '{{json .}}' 2>&1 || true)
+    # Lint exactly the files parsed above, which also skips actionlint's own
+    # project detection. stdout is one JSON array of findings; exit 1 means
+    # findings, 2 and up means actionlint itself failed.
+    mapfile -t WORKFLOW_ARGS <<< "$WORKFLOW_FILES"
+    LINT_STATUS=0
+    LINT_RAW=$(actionlint -format '{{json .}}' "${WORKFLOW_ARGS[@]}" 2>/tmp/gha-actionlint.err) || LINT_STATUS=$?
 
-    if [ -n "$LINT_RAW" ]; then
-        LINT_ERRORS=$(echo "$LINT_RAW" | jq '[.[] | {
+    if [ "$LINT_STATUS" -le 1 ]; then
+        LINT_ERRORS=$(printf '%s' "$LINT_RAW" | jq -e '[.[] | {
             file: .filepath,
             line: .line,
             column: .column,
             message: .message,
             rule: .kind
-        }]' 2>/dev/null || echo '[]')
-        ERROR_COUNT=$(echo "$LINT_ERRORS" | jq 'length')
+        }]' 2>/dev/null) || LINT_ERRORS=""
+    fi
+    if [ -z "$LINT_ERRORS" ]; then
+        echo "actionlint failed (exit $LINT_STATUS), not recording lint results: $(head -c 500 /tmp/gha-actionlint.err)" >&2
     fi
 else
-    ACTIONLINT_VERSION="not-installed"
     echo "actionlint not found, skipping lint" >&2
 fi
 
 # ── Write normalized .ci.lint ───────────────────────────────────────────────
 # $LINT_ERRORS grows with the number of actionlint findings, so it goes on
 # stdin; only the scalars stay on argv.
-printf '%s' "$LINT_ERRORS" | jq \
-    --argjson error_count "$ERROR_COUNT" \
-    --argjson warning_count "$WARNING_COUNT" \
-    --arg tool "actionlint" \
-    --arg version "$ACTIONLINT_VERSION" \
-    '{
-        source: {tool: $tool, version: $version, integration: "code"},
-        errors: .,
-        error_count: $error_count,
-        warning_count: $warning_count
-    }' | lunar collect -j ".ci.lint" -
+if [ -n "$LINT_ERRORS" ]; then
+    printf '%s' "$LINT_ERRORS" | jq \
+        --arg tool "actionlint" \
+        --arg version "$ACTIONLINT_VERSION" \
+        '{
+            source: {tool: $tool, version: $version, integration: "code"},
+            errors: .,
+            error_count: length,
+            warning_count: 0
+        }' | lunar collect -j ".ci.lint" -
+fi
 
 # ── Write normalized .ci.dependencies ───────────────────────────────────────
 # -s slurps the dependency stream into an array; the counts are derived from it

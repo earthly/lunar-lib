@@ -123,6 +123,26 @@ if command -v actionlint >/dev/null; then
   run "$STUBS" "$r/apps/gadget"
   check "lint: records actionlint's findings" "1" "$(lint .error_count)"
   check "lint: findings carry the repo-relative file" ".github/workflows/broken.yml" "$(lint '.errors[0].file')"
+
+  # Left to find the files itself, actionlint fails outright on these two.
+  r="$(new_repo)"; add_broken_workflow "$r" broken; ln -s /nonexistent "$r/.github/workflows/dangling.yml"
+  run "$STUBS" "$r"
+  check "lint: a dangling symlink in workflows/ doesn't hide findings" "1" "$(lint .error_count)"
+
+  r="$(mktemp -d)"; add_broken_workflow "$r" broken
+  run "$STUBS_NOGIT" "$r"
+  check "lint: no repo root still lints" "1" "$(lint .error_count)"
+
+  # GitHub doesn't run workflows in subdirectories of .github/workflows.
+  r="$(new_repo)"; add_workflow "$r" ci; add_broken_workflow "$r" broken
+  mkdir -p "$r/.github/workflows/nested"; mv "$r/.github/workflows/broken.yml" "$r/.github/workflows/nested/"
+  run "$STUBS" "$r"
+  check "lint: skips files GitHub doesn't run (workflows/nested/)" "0" "$(lint .error_count)"
+
+  # A run that fails outright records nothing rather than a clean zero.
+  r="$(new_repo)"; add_workflow "$r" ci; printf 'self-hosted-runner: [\n' > "$r/.github/actionlint.yaml"
+  run "$STUBS" "$r"
+  check "lint: actionlint failing writes no .ci.lint" ".ci.dependencies.json,.ci.native.github_actions.json" "$(written)"
 else
   echo "SKIP: lint cases (actionlint not installed)"
 fi
