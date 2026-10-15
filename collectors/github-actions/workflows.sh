@@ -23,16 +23,21 @@ find_repo_root() {
 
 # ── Locate the workflows ────────────────────────────────────────────────────
 # GitHub only runs workflows from the repository root. A monorepo subdirectory
-# component runs from <repo>/<subdir> with the whole repo checked out, so
-# without workflows of its own it reads the root's.
-if [ ! -d ".github/workflows" ]; then
-    REPO_ROOT="$(find_repo_root || true)"
-    if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/.github/workflows" ]; then
-        echo "No .github/workflows/ directory found" >&2
-        exit 0
+# component runs from <repo>/<subdir> with the whole repo checked out, so read
+# the root's; a .github/workflows inside the subdirectory never runs.
+COMPONENT_DIR="$(pwd -P)"
+REPO_ROOT="$(find_repo_root || true)"
+if [ -n "$REPO_ROOT" ] && [ "$REPO_ROOT" != "$COMPONENT_DIR" ]; then
+    if [ -d ".github/workflows" ]; then
+        echo "Ignoring ${COMPONENT_DIR#"$REPO_ROOT"/}/.github/workflows/: GitHub only runs the repository root's." >&2
     fi
-    echo "No .github/workflows/ in the component directory; reading the repository root's ($REPO_ROOT)." >&2
+    echo "Reading the repository root's .github/workflows/ ($REPO_ROOT)." >&2
     cd "$REPO_ROOT"
+fi
+
+if [ ! -d ".github/workflows" ]; then
+    echo "No .github/workflows/ directory found" >&2
+    exit 0
 fi
 
 WORKFLOW_FILES=$(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) -type f 2>/dev/null | sort)
@@ -183,45 +188,49 @@ while IFS= read -r file; do
 done <<< "$WORKFLOW_FILES"
 
 # ── Run actionlint ──────────────────────────────────────────────────────────
-LINT_ERRORS="[]"
-ERROR_COUNT=0
-WARNING_COUNT=0
-
+# .ci.lint is only written when actionlint actually ran, so a zero error_count
+# always means clean to ci.lint-clean.
+LINT_ERRORS=""
 if command -v actionlint &>/dev/null; then
     ACTIONLINT_VERSION=$(actionlint --version 2>/dev/null | head -1 || echo "unknown")
 
-    # actionlint -format outputs one JSON per error, exits 1 if errors found
-    LINT_RAW=$(actionlint -format '{{json .}}' 2>&1 || true)
+    # Lint exactly the files parsed above, which also skips actionlint's own
+    # project detection. stdout is one JSON array of findings; exit 1 means
+    # findings, 2 and up means actionlint itself failed.
+    mapfile -t WORKFLOW_ARGS <<< "$WORKFLOW_FILES"
+    LINT_STATUS=0
+    LINT_RAW=$(actionlint -format '{{json .}}' "${WORKFLOW_ARGS[@]}" 2>/tmp/gha-actionlint.err) || LINT_STATUS=$?
 
-    if [ -n "$LINT_RAW" ]; then
-        LINT_ERRORS=$(echo "$LINT_RAW" | jq -s '[.[] | {
+    if [ "$LINT_STATUS" -le 1 ]; then
+        LINT_ERRORS=$(printf '%s' "$LINT_RAW" | jq -e '[.[] | {
             file: .filepath,
             line: .line,
             column: .column,
             message: .message,
             rule: .kind
-        }]' 2>/dev/null || echo '[]')
-        ERROR_COUNT=$(echo "$LINT_ERRORS" | jq 'length')
+        }]' 2>/dev/null) || LINT_ERRORS=""
+    fi
+    if [ -z "$LINT_ERRORS" ]; then
+        echo "actionlint failed (exit $LINT_STATUS), not recording lint results: $(head -c 500 /tmp/gha-actionlint.err)" >&2
     fi
 else
-    ACTIONLINT_VERSION="not-installed"
     echo "actionlint not found, skipping lint" >&2
 fi
 
 # ── Write normalized .ci.lint ───────────────────────────────────────────────
 # $LINT_ERRORS grows with the number of actionlint findings, so it goes on
 # stdin; only the scalars stay on argv.
-printf '%s' "$LINT_ERRORS" | jq \
-    --argjson error_count "$ERROR_COUNT" \
-    --argjson warning_count "$WARNING_COUNT" \
-    --arg tool "actionlint" \
-    --arg version "$ACTIONLINT_VERSION" \
-    '{
-        source: {tool: $tool, version: $version, integration: "code"},
-        errors: .,
-        error_count: $error_count,
-        warning_count: $warning_count
-    }' | lunar collect -j ".ci.lint" -
+if [ -n "$LINT_ERRORS" ]; then
+    printf '%s' "$LINT_ERRORS" | jq \
+        --arg tool "actionlint" \
+        --arg version "$ACTIONLINT_VERSION" \
+        '{
+            source: {tool: $tool, version: $version, integration: "code"},
+            errors: .,
+            error_count: length,
+            warning_count: 0
+        }' | lunar collect -j ".ci.lint" -
+fi
 
 # ── Write normalized .ci.dependencies ───────────────────────────────────────
 # -s slurps the dependency stream into an array; the counts are derived from it
