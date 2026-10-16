@@ -167,14 +167,12 @@ inputs:
     default: "0"
   db_auto_update:
     description: |
-      Download the latest Grype vulnerability database at scan time so scans pick
-      up CVEs published since the collector image was built. Disabled by default
-      for now: enabling it fetches a runtime DB that decompresses to ~1.7GB, which
-      needs the size: large profile the auto/rescan collectors declare — and that
-      only helps on a Hub that honors size (ENG-983), so it's kept off until
-      size-aware Hub builds ship everywhere. Set to "true" on a size-aware Hub to
-      scan the fresh DB; left "false" it scans the lighter image-baked DB, whose
-      freshness tracks the image rebuild cadence.
+      Download the latest Grype vulnerability database before every scan, both
+      dependency (auto, rescan) and image (container-scan, container-rescan), so
+      CVEs published since the collector image was built are found. The database
+      decompresses to ~1.7GB, so it needs a Hub that honors the size: large
+      profile these collectors declare. Left "false", scans use the database
+      baked into the collector image, which is only as fresh as its build.
     default: "false"
   container_image:
     description: |

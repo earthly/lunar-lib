@@ -6,7 +6,7 @@ set -eo pipefail
 #
 # Shared by two sub-collectors: the on-push `container-scan` (after-json hook)
 # and the scheduled `container-rescan` (cron). Both run in the Grype collector
-# image (baked-in DB), no code clone. The images are resolved from the docker
+# image, no code clone. The images are resolved from the docker
 # collector's pushed-image record (.containers.native.docker.cicd.cmds[]) via
 # `lunar component get-json`, or pinned with the `container_image` input. Only
 # source.integration differs between the two.
@@ -247,10 +247,25 @@ if [ -n "$REG_USER" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
   export GRYPE_REGISTRY_AUTH_PASSWORD="$LUNAR_SECRET_REGISTRY_PASSWORD"
 fi
 
-# Scan against the DB baked into the image (same default as auto.sh).
-export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+# Vulnerability DB, per the `db_auto_update` input (same as auto.sh). Off: scan
+# against the DB baked into the image. On: download the current DB once, then
+# scan every image against it. A failed download fails the run instead of
+# falling back to the baked DB, since a stale scan reads as clean.
+if [ "${LUNAR_VAR_DB_AUTO_UPDATE:-false}" = "true" ]; then
+  export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
+  for attempt in 1 2 3; do
+    grype db update >&2 && break
+    if [ "$attempt" -eq 3 ]; then
+      echo "Could not download the Grype vulnerability DB (db_auto_update=true) — not scanning against the stale image-baked DB" >&2
+      exit 1
+    fi
+    sleep $((attempt * ${LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP:-10}))
+  done
+else
+  export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+  export GRYPE_DB_VALIDATE_AGE=false
+fi
 export GRYPE_DB_AUTO_UPDATE=false
-export GRYPE_DB_VALIDATE_AGE=false
 export GOGC=40
 
 # --- 3. Scan each image, normalizing as we go ---
