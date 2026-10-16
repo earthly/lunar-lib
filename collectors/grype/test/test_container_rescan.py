@@ -786,5 +786,98 @@ class ResolveRaceTest(Base):
         self.assertNotIn("Usage:", result.stderr)
         self.assertNotIn("--git-sha string", result.stderr)
 
+class DbSourceTest(Base):
+    """`db_auto_update` decides which vulnerability DB the image scans use. Off
+    (the default) they scan the DB baked into the image. On, they download the
+    current DB once per run and scan every image against it. A download that
+    keeps failing fails the run, because a scan against the stale baked DB reads
+    as clean."""
+
+    IMAGES = ["earthly/lunar-hub:abc12345", "earthly/lunar-dashboards:abc12345"]
+    TWO_IMAGE_JSON = json.dumps(
+        {"containers": {"native": {"docker": {"cicd": {"cmds": [
+            {"cmd": f"docker push {IMAGES[0]}"},
+            {"cmd": f"docker push {IMAGES[1]}"},
+        ]}}}}}
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.fixture("main.json", self.TWO_IMAGE_JSON)
+        # Logs the DB env on every call. `db update` fails while the countdown in
+        # $DB_UPDATE_FAIL is non-zero (-1 = always).
+        self._stub(
+            "grype",
+            textwrap.dedent(
+                """\
+                #!/bin/sh
+                printf 'GRYPE: %s | cache=%s auto=%s\\n' "$*" "$GRYPE_DB_CACHE_DIR" "$GRYPE_DB_AUTO_UPDATE" >> "$CAPTURE"
+                if [ "$1" = "db" ] && [ "$2" = "update" ]; then
+                  if [ -n "$DB_UPDATE_FAIL" ] && [ -f "$DB_UPDATE_FAIL" ]; then
+                    n=$(cat "$DB_UPDATE_FAIL")
+                    if [ "$n" -ne 0 ]; then
+                      [ "$n" -gt 0 ] && echo $((n - 1)) > "$DB_UPDATE_FAIL"
+                      echo "failed to download the vulnerability DB" >&2
+                      exit 1
+                    fi
+                  fi
+                  exit 0
+                fi
+                cat "$MOCK_DIR/grype-results.json"
+                """
+            ),
+        )
+
+    def failing_db_updates(self, n):
+        path = os.path.join(self.tmp, "db-update-fail")
+        with open(path, "w") as f:
+            f.write(str(n))
+        return {"DB_UPDATE_FAIL": path}
+
+    @staticmethod
+    def grype_calls(log):
+        return [ln[len("GRYPE: "):] for ln in log.splitlines() if ln.startswith("GRYPE:")]
+
+    def env(self, **extra):
+        return dict(self.CRON_ENV, LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP="1", **extra)
+
+    def test_baked_db_by_default(self):
+        result, log = self.run_script(self.env())
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(self.grype_calls(log), [
+            f"{ref} -o json | cache=/opt/grype/db auto=false" for ref in self.IMAGES])
+
+    def test_auto_update_downloads_once_then_scans_every_image_against_it(self):
+        result, log = self.run_script(self.env(LUNAR_VAR_DB_AUTO_UPDATE="true"))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(self.grype_calls(log), [
+            "db update | cache=/var/tmp/lunar-grype-db auto=",
+        ] + [f"{ref} -o json | cache=/var/tmp/lunar-grype-db auto=false" for ref in self.IMAGES])
+        scan = self.collected(log, ".container_scan")
+        self.assertEqual([i["image"] for i in scan["images"]], self.IMAGES)
+
+    def test_a_transient_download_failure_is_retried(self):
+        env = self.env(LUNAR_VAR_DB_AUTO_UPDATE="true", **self.failing_db_updates(1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        calls = self.grype_calls(log)
+        self.assertEqual([c.split(" | ")[0] for c in calls],
+                         ["db update", "db update"] + [f"{ref} -o json" for ref in self.IMAGES])
+
+    def test_a_failed_download_fails_the_run_instead_of_scanning_stale(self):
+        env = self.env(LUNAR_VAR_DB_AUTO_UPDATE="true", **self.failing_db_updates(-1))
+        result, log = self.run_script(env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("not scanning against the stale image-baked DB", result.stderr)
+        self.assertEqual([c.split(" | ")[0] for c in self.grype_calls(log)], ["db update"] * 3)
+        self.assertIsNone(self.collected(log, ".container_scan"))
+
+    def test_nothing_pushed_downloads_nothing(self):
+        self.fixture("main.json", self.NO_PUSH_JSON)
+        result, log = self.run_script(self.env(LUNAR_VAR_DB_AUTO_UPDATE="true"))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(self.grype_calls(log), [])
+
+
 if __name__ == "__main__":
     unittest.main()
