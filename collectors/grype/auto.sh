@@ -64,7 +64,7 @@ fi
 #     image build. VALIDATE_AGE is off so a slightly-older image's DB isn't
 #     rejected.
 #   - true: download the current DB at scan time so the scan sees CVEs published
-#     since the image was built. Grype's DB decompresses to ~1.7GB, so the
+#     since the image was built. Grype's DB decompresses to ~2.3GB, so the
 #     auto/rescan collectors declare `size: large` to give the container the
 #     memory + ephemeral storage the runtime DB needs. Without that headroom the
 #     download OOM-kills the collector (exit 137), so this requires a Hub that

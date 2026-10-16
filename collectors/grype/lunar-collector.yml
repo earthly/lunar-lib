@@ -29,7 +29,7 @@ collectors:
       using Grype. Writes normalized findings to .sca with severity counts,
       CVE IDs, affected packages, and fix versions.
     mainBash: auto.sh
-    # Grype materializes a ~1.7GB vulnerability DB when db_auto_update is enabled
+    # Grype materializes a ~2.3GB vulnerability DB when db_auto_update is enabled
     # (opt-in; default off until size-aware Hub builds ship). large gives the
     # container the memory + ephemeral-storage headroom that update needs; at the
     # default profile the DB download OOM-kills the scan (exit 137). Kept here so
@@ -100,8 +100,8 @@ collectors:
       a consumer can tell a scan of the artifact it promotes from a scan of
       whatever the floating tag pointed at that day.
     mainBash: container-rescan.sh
-    # grype can sometimes exceed the 1Gi default.
-    size: large
+    # Image unpack plus a db_auto_update DB peaks at ~6.5GB, over large's 4Gi.
+    size: xlarge
     hook:
       type: after-json
       path: .containers.native.docker.cicd.cmds
@@ -125,8 +125,8 @@ collectors:
       current .container_scan into a bounded .container_scan.history[] before
       overwriting it, so the scan a release shipped with stays readable.
     mainBash: container-rescan.sh
-    # Same image pull + unpack as `container-scan`, so the same large profile.
-    size: large
+    # Same image pull + unpack as `container-scan`, so the same xlarge profile.
+    size: xlarge
     # Cron-only sub-collector: set runs_on here, on the sub-collector (mirrors
     # the .sca `rescan` collector). Default-branch only — one re-scan per
     # component per tick. Offset to 03:00 so it doesn't pile onto the .sca
@@ -170,9 +170,9 @@ inputs:
       Download the latest Grype vulnerability database before every scan, both
       dependency (auto, rescan) and image (container-scan, container-rescan), so
       CVEs published since the collector image was built are found. The database
-      decompresses to ~1.7GB, so it needs a Hub that honors the size: large
-      profile these collectors declare. Left "false", scans use the database
-      baked into the collector image, which is only as fresh as its build.
+      decompresses to ~2.3GB, so it needs a Hub that honors the size profiles
+      these collectors declare. Left "false", scans use the database baked into
+      the collector image, which is only as fresh as its build.
     default: "false"
   container_image:
     description: |
