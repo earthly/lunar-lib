@@ -35,6 +35,7 @@ check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
 check_system_domain_exists = load_policy("system-domain-exists")
 check_system_domain_set = load_policy("system-domain-set")
+check_system_domain_valid = load_policy("system-domain-valid")
 check_required_link_types = load_policy("required-link-types")
 check_dependencies_documented = load_policy("dependencies-documented")
 check_allowed_types = load_policy("allowed-types")
@@ -830,6 +831,161 @@ class TestSystemDomainSet(unittest.TestCase):
         self.assertIn("predates", skip_reason(check))
 
 
+def chain_node(refs=None, system="payment-platform"):
+    """Finished node for a Component declaring `system`, with optional .refs."""
+    backstage = {"valid": True, "kind": "Component"}
+    if system is not None:
+        backstage["spec"] = {"system": system}
+    if refs is not None:
+        backstage["refs"] = refs
+    return finished_node({"catalog": {"native": {"backstage": backstage}}})
+
+
+# The collector's .refs for each step of component -> System -> Domain.
+HEALTHY_CHAIN = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "payments", "exists": True, "via_system": "payment-platform"},
+}
+SYSTEM_MISSING = {"checked": True, "system": {"name": "payment-platform", "exists": False}}
+SYSTEM_ERROR = {"checked": True, "system": {"name": "payment-platform", "error": "HTTP 403"}}
+SYSTEM_NO_DOMAIN = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": False},
+}
+DOMAIN_MISSING = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "tbd", "exists": False, "via_system": "payment-platform"},
+}
+DOMAIN_ERROR = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "payments", "error": "HTTP 502", "via_system": "payment-platform"},
+}
+
+
+class TestSystemDomainValid(unittest.TestCase):
+    """The whole component -> System -> Domain chain in one check."""
+
+    def test_whole_chain_passes(self):
+        check = check_system_domain_valid(chain_node(HEALTHY_CHAIN))
+        self.assertEqual(check.status, CheckStatus.PASS)
+        self.assertFalse(is_skipped(check))
+
+    def test_no_catalog_file_fails(self):
+        # Same as `system-set`: importing the policy says the component
+        # should be catalogued.
+        check = check_system_domain_valid(finished_node({}))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("No catalog-info.yaml found", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        check = check_system_domain_valid(Node.from_component_json({}))
+        self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_no_system_declared_skips(self):
+        # `system-set` reports a missing spec.system. This holds whether or not
+        # the collector has a backstage_url.
+        for system in (None, "", "   ", 123):
+            for refs in ({"checked": True}, None):
+                with self.subTest(system=system, refs=refs):
+                    check = check_system_domain_valid(chain_node(refs, system=system))
+                    self.assertTrue(is_skipped(check))
+                    self.assertIn("system-set", skip_reason(check))
+
+    def test_unconfigured_skips(self):
+        check = check_system_domain_valid(chain_node(None))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("backstage_url", skip_reason(check))
+
+    def test_no_recorded_system_lookup_skips(self):
+        check = check_system_domain_valid(chain_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payment-platform'", skip_reason(check))
+
+    def test_system_lookup_error_skips(self):
+        # A 403 or an STS failure isn't proof the System is missing.
+        check = check_system_domain_valid(chain_node(SYSTEM_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_system_missing_fails_and_names_it(self):
+        check = check_system_domain_valid(chain_node(SYSTEM_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 1)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not exist in the Backstage catalog", reason)
+
+    def test_system_without_domain_fails_and_names_it(self):
+        check = check_system_domain_valid(chain_node(SYSTEM_NO_DOMAIN))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not belong to any domain", reason)
+
+    def test_domain_lookup_error_skips(self):
+        check = check_system_domain_valid(chain_node(DOMAIN_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payments'", skip_reason(check))
+        self.assertIn("HTTP 502", skip_reason(check))
+
+    def test_missing_domain_fails_and_names_domain_and_system(self):
+        check = check_system_domain_valid(chain_node(DOMAIN_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        self.assertIn("belongs to domain 'tbd', which does not exist", reason)
+        self.assertIn("'payment-platform' System entity", reason)
+
+    def test_older_collector_still_checks_a_recorded_domain(self):
+        # Collectors before has_domain still write system_domain for a System
+        # that has a domain.
+        for system_domain, expected in (
+            (DOMAIN_MISSING["system_domain"], CheckStatus.FAIL),
+            (HEALTHY_CHAIN["system_domain"], CheckStatus.PASS),
+        ):
+            with self.subTest(domain=system_domain["name"]):
+                check = check_system_domain_valid(chain_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True},
+                    "system_domain": system_domain,
+                }))
+                self.assertEqual(check.status, expected)
+                self.assertFalse(is_skipped(check))
+
+    def test_older_collector_without_domain_entry_skips(self):
+        # Without has_domain, a System with no domain and a collector that
+        # never checked look the same.
+        check = check_system_domain_valid(chain_node({
+            "checked": True,
+            "system": {"name": "payment-platform", "exists": True},
+        }))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("predates", skip_reason(check))
+
+    def test_fails_exactly_where_a_separate_check_fails(self):
+        # One check for what system-exists, system-domain-set and
+        # system-domain-exists report separately.
+        separate = (check_system_exists, check_system_domain_set, check_system_domain_exists)
+        for label, refs, system in (
+            ("healthy", HEALTHY_CHAIN, "payment-platform"),
+            ("system missing", SYSTEM_MISSING, "payment-platform"),
+            ("system error", SYSTEM_ERROR, "payment-platform"),
+            ("system without domain", SYSTEM_NO_DOMAIN, "payment-platform"),
+            ("domain missing", DOMAIN_MISSING, "payment-platform"),
+            ("domain error", DOMAIN_ERROR, "payment-platform"),
+            ("unconfigured", None, "payment-platform"),
+            ("no spec.system", {"checked": True}, None),
+        ):
+            with self.subTest(case=label):
+                node = chain_node(refs, system=system)
+                self.assertEqual(
+                    check_system_domain_valid(node).status == CheckStatus.FAIL,
+                    any(fn(node).status == CheckStatus.FAIL for fn in separate),
+                )
+
+
 class TestConstraintParsing(unittest.TestCase):
     """Parsing the required_annotations input into normalized entries."""
 
@@ -1083,6 +1239,7 @@ ALL_CHECKS = [
     ("system-exists", check_system_exists, {}),
     ("system-domain-exists", check_system_domain_exists, {}),
     ("system-domain-set", check_system_domain_set, {}),
+    ("system-domain-valid", check_system_domain_valid, {}),
     (
         "required-annotations",
         check_required_annotations,
@@ -1129,6 +1286,7 @@ DEFAULT_NO_CATALOG = {
     "owner-set": CheckStatus.FAIL,
     "lifecycle-set": CheckStatus.FAIL,
     "system-set": CheckStatus.FAIL,
+    "system-domain-valid": CheckStatus.FAIL,
     "required-annotations": CheckStatus.FAIL,
     "required-tag-patterns": CheckStatus.FAIL,
     "required-link-types": CheckStatus.FAIL,
