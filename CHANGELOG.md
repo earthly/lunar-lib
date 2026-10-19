@@ -9,6 +9,32 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.20.0] — 2026-10-19
+
+### Added
+
+- backstage: add a system-valid check that fails when spec.system is unset or doesn't resolve to a System (#386)
+- backstage: add a system-domain-valid check that fails at the first broken step from spec.system to its Domain (#384)
+- backstage: add allowed-types and allowed-lifecycles checks (#381)
+- backstage-catalog-info-monorepo: add discover-on-commit to catalog a monorepo on every push (#377)
+- java, testing: add a JUnit XML test-results sub-collector, and make testing.passing check every CI build (#348)
+
+### Changed
+
+- docs: reflect 300+ built-in guardrails in AI context (#378)
+- release: refuse to cut a release behind the newest lunar-scripts, and have Renovate bump it as soon as it ships (#375)
+
+### Fixed
+
+- grype: image scans honor db_auto_update instead of always using the image-baked DB (#383)
+- github-actions: fix lint errors never being recorded, and read only the root's workflows in monorepos (#380)
+- github-actions: fix monorepo subdirectory components missing the repository root's workflows (#379)
+
+### Security
+
+- images: move to lunar-scripts 1.1.10 and use its yq in github-actions to clear the last Go stdlib CVEs (#385)
+- images: rebuild vendored Go tools on Go 1.27.2 to clear stdlib CVEs, move to lunar-scripts 1.1.9, and run grype image scans at size xlarge (#382)
+
 ## [1.19.1] — 2026-10-09
 
 ### Added
@@ -1037,6 +1063,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.20.0]: https://github.com/earthly/lunar-lib/compare/v1.19.1...v1.20.0
 [1.19.1]: https://github.com/earthly/lunar-lib/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
 [1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
