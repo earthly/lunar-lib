@@ -36,6 +36,7 @@ check_system_exists = load_policy("system-exists")
 check_system_domain_exists = load_policy("system-domain-exists")
 check_system_domain_set = load_policy("system-domain-set")
 check_system_domain_valid = load_policy("system-domain-valid")
+check_system_valid = load_policy("system-valid")
 check_required_link_types = load_policy("required-link-types")
 check_dependencies_documented = load_policy("dependencies-documented")
 check_allowed_types = load_policy("allowed-types")
@@ -986,6 +987,83 @@ class TestSystemDomainValid(unittest.TestCase):
                 )
 
 
+class TestSystemValid(unittest.TestCase):
+    """spec.system is set, then it resolves to a System, in one check."""
+
+    def test_set_and_resolved_passes(self):
+        check = check_system_valid(chain_node(HEALTHY_CHAIN))
+        self.assertEqual(check.status, CheckStatus.PASS)
+        self.assertFalse(is_skipped(check))
+
+    def test_no_catalog_file_fails(self):
+        check = check_system_valid(finished_node({}))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("No catalog-info.yaml found", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        check = check_system_valid(Node.from_component_json({}))
+        self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_unset_system_fails_with_or_without_backstage_url(self):
+        # Step one needs no Backstage lookup, so it fails even unconfigured.
+        for system in (None, "", "   ", 123):
+            for refs in ({"checked": True}, None):
+                with self.subTest(system=system, refs=refs):
+                    check = check_system_valid(chain_node(refs, system=system))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertEqual(len(check.failure_reasons), 1)
+                    self.assertIn("spec.system is not set", check.failure_reasons[0])
+
+    def test_unconfigured_skips_a_set_system(self):
+        check = check_system_valid(chain_node(None))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("backstage_url", skip_reason(check))
+
+    def test_no_recorded_system_lookup_skips(self):
+        check = check_system_valid(chain_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payment-platform'", skip_reason(check))
+
+    def test_lookup_error_skips(self):
+        # A 403 or an STS failure isn't proof the System is missing.
+        check = check_system_valid(chain_node(SYSTEM_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_unresolved_system_fails_and_names_it(self):
+        check = check_system_valid(chain_node(SYSTEM_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 1)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not exist in the Backstage catalog", reason)
+
+    def test_domain_steps_are_not_its_business(self):
+        # A resolved System passes however its domain looks;
+        # system-domain-valid owns the domain chain.
+        for refs in (SYSTEM_NO_DOMAIN, DOMAIN_MISSING, DOMAIN_ERROR):
+            with self.subTest(refs=refs):
+                self.assertEqual(check_system_valid(chain_node(refs)).status, CheckStatus.PASS)
+
+    def test_fails_exactly_where_system_set_or_system_exists_fails(self):
+        separate = (check_system_set, check_system_exists)
+        for label, refs, system in (
+            ("healthy", HEALTHY_CHAIN, "payment-platform"),
+            ("system missing", SYSTEM_MISSING, "payment-platform"),
+            ("system error", SYSTEM_ERROR, "payment-platform"),
+            ("unconfigured", None, "payment-platform"),
+            ("no recorded lookup", {"checked": True}, "payment-platform"),
+            ("no spec.system", {"checked": True}, None),
+            ("no spec.system, unconfigured", None, None),
+        ):
+            with self.subTest(case=label):
+                node = chain_node(refs, system=system)
+                self.assertEqual(
+                    check_system_valid(node).status == CheckStatus.FAIL,
+                    any(fn(node).status == CheckStatus.FAIL for fn in separate),
+                )
+
+
 class TestConstraintParsing(unittest.TestCase):
     """Parsing the required_annotations input into normalized entries."""
 
@@ -1240,6 +1318,7 @@ ALL_CHECKS = [
     ("system-domain-exists", check_system_domain_exists, {}),
     ("system-domain-set", check_system_domain_set, {}),
     ("system-domain-valid", check_system_domain_valid, {}),
+    ("system-valid", check_system_valid, {}),
     (
         "required-annotations",
         check_required_annotations,
@@ -1287,6 +1366,7 @@ DEFAULT_NO_CATALOG = {
     "lifecycle-set": CheckStatus.FAIL,
     "system-set": CheckStatus.FAIL,
     "system-domain-valid": CheckStatus.FAIL,
+    "system-valid": CheckStatus.FAIL,
     "required-annotations": CheckStatus.FAIL,
     "required-tag-patterns": CheckStatus.FAIL,
     "required-link-types": CheckStatus.FAIL,
