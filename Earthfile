@@ -171,7 +171,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.7-alpine
+    ARG SCRIPTS_VERSION=1.1.9-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -194,6 +194,20 @@ base-image:
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
+
+# syft for the syft and license-origins images, built from source: the 1.54.1
+# release ships go1.26.8 and x/net 0.59.0, both with fixable criticals.
+syft-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required SYFT_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${SYFT_VERSION}" https://github.com/anchore/syft /src
+    WORKDIR /src
+    RUN go get golang.org/x/net@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
+            -ldflags "-s -w -X main.version=${SYFT_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${SYFT_VERSION}" \
+            -o /out/syft ./cmd/syft
+    SAVE ARTIFACT /out/syft
 
 # kubeconform for the k8s and argocd images, built from source with a current
 # x/text: the 0.8.0 release binary carries fixable Highs in it and in Go's stdlib.

@@ -14,14 +14,24 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install GitHub CLI
-    ARG TARGETARCH
     # renovate: datasource=github-releases depName=cli/cli extractVersion=^v(?<version>.*)$
     ARG GH_VERSION=2.102.0
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/amd64/; s/arm64/arm64/') && \
-        curl -sSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${ARCH}.tar.gz" | tar xz && \
-        mv gh_${GH_VERSION}_linux_${ARCH}/bin/gh /usr/local/bin/ && \
-        rm -rf gh_${GH_VERSION}_linux_${ARCH} && \
-        echo "${GH_VERSION}" > /usr/local/bin/gh.version
+    COPY (+gh-bin/gh --GH_VERSION=$GH_VERSION) /usr/local/bin/gh
+    RUN echo "${GH_VERSION}" > /usr/local/bin/gh.version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:github-org-$VERSION
+
+# Built from source: the 2.102.0 release ships go1.27.1 and x/net 0.58.0, both
+# with fixable criticals.
+gh-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required GH_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${GH_VERSION}" https://github.com/cli/cli /src
+    WORKDIR /src
+    RUN go get golang.org/x/net@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X github.com/cli/cli/v2/internal/build.Version=${GH_VERSION} -X github.com/cli/cli/v2/internal/build.Date=$(git log -1 --format=%cs)" \
+            -o /out/gh ./cmd/gh
+    SAVE ARTIFACT /out/gh

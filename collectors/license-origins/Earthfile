@@ -2,7 +2,7 @@ VERSION 0.8
 
 image:
     # Use Debian variant for glibc compatibility (required by Node.js binaries)
-    ARG SCRIPTS_VERSION=1.1.7-debian
+    ARG SCRIPTS_VERSION=1.1.9-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
@@ -19,12 +19,11 @@ image:
     # Install Syft
     # renovate: datasource=github-releases depName=anchore/syft extractVersion=^v(?<version>.*)$
     ARG SYFT_VERSION=1.54.1
-    RUN curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin syft && \
-        chmod +x /usr/local/bin/syft
+    COPY (../../+syft-bin/syft --SYFT_VERSION=$SYFT_VERSION) /usr/local/bin/syft
 
     # Install Go
     # renovate: datasource=golang-version depName=golang
-    ARG GO_VERSION=1.27.1
+    ARG GO_VERSION=1.27.2
     RUN wget -q "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
         tar -C /usr/local -xzf "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
         rm "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz"
