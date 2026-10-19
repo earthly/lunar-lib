@@ -132,6 +132,19 @@ policies:
     mainPython: ./system-domain-set.py
     keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
 
+  - name: system-domain-valid
+    description: |
+      Follows spec.system to its System in the Backstage catalog and on to
+      that System's domain, and fails at the first broken step: the System
+      does not exist, it belongs to no domain, or its domain does not exist.
+      Each failure names the System. One check for what `system-exists`,
+      `system-domain-set` and `system-domain-exists` report separately.
+      Fails if the catalog file is missing, like `system-set`. Skips when no
+      `spec.system` is declared (`system-set` reports that), when the
+      collector has no `backstage_url`, or when a lookup errored.
+    mainPython: ./system-domain-valid.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
+
   - name: required-annotations
     description: |
       Verifies that catalog-info.yaml declares a configurable set of
@@ -228,12 +241,12 @@ inputs:
       One switch for the whole family, and the only place their missing-file
       behaviour is described. With the default (`"false"`) a missing catalog
       file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
-      `lifecycle-set` and `system-set`; fails `required-annotations`,
-      `required-tag-patterns`, `required-link-types`,
+      `lifecycle-set`, `system-set` and `system-domain-valid`; fails
+      `required-annotations`, `required-tag-patterns`, `required-link-types`,
       `dependencies-documented`, `allowed-types` and `allowed-lifecycles`
       when those are configured; passes the two
       `disallowed-*` deny-checks, since nothing forbidden can be present
-      without a file; and skips the referential-integrity checks, which
+      without a file; and skips the other referential-integrity checks, which
       have nothing to cross-check. With `"true"` every check skips instead —
       the `disallowed-*` pair included, so a component that is not in the
       catalog reports no green passes it did not earn.
