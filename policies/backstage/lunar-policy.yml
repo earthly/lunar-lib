@@ -94,6 +94,17 @@ policies:
     mainPython: ./system-exists.py
     keywords: ["backstage", "system", "referential integrity", "catalog", "cross-reference"]
 
+  - name: system-valid
+    description: |
+      Checks spec.system in two steps and fails at the first broken one: it
+      is not set, or it does not resolve to a System in the Backstage catalog.
+      One check for what `system-set` and `system-exists` report separately.
+      Fails if the catalog file is missing, like `system-set`. Skips when
+      spec.system is set but can't be looked up: the collector has no
+      `backstage_url`, or the lookup errored.
+    mainPython: ./system-valid.py
+    keywords: ["backstage", "system", "referential integrity", "catalog", "grouping"]
+
   - name: system-domain-exists
     description: |
       Verifies that the domain the component's system belongs to actually
