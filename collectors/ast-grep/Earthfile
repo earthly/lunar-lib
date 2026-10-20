@@ -2,7 +2,7 @@ VERSION 0.8
 
 image:
     # Use Debian variant for glibc compatibility with ast-grep binary
-    ARG SCRIPTS_VERSION=1.1.10-debian
+    ARG SCRIPTS_VERSION=1.1.11-debian
     FROM --platform=linux/amd64 earthly/lunar-scripts:$SCRIPTS_VERSION
 
     # Install ast-grep CLI
