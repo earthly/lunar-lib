@@ -72,6 +72,7 @@ ATTEMPTS = {(a["id"], a["run_attempt"]): a for a in [
     attempt(201, 1),
     attempt(301, 1),
     attempt(401, 1),
+    attempt(402, 1),
     attempt(501, 1, jobs=150),
     attempt(601, 1, name="promote", event="workflow_run"),
     attempt(701, 1, name="broken", conclusion="startup_failure", jobs=0),
@@ -92,6 +93,10 @@ NO_LOGS = {701, 806}            # logs endpoint answers 404: the run started no 
 BIG = {201: 1_500_000}          # bytes of incompressible log
 flaky_left = {301: 1}           # the attempt endpoint 502s this many times first
 lagging_left = {401: 1}         # the logs endpoint 404s this many times first
+dropped_left = {402: 1}         # the blob drops mid-body this many times first
+SINGLE_USE = {402}              # each signed link for these runs works once
+links_issued = {}
+used_links = set()
 lock = threading.Lock()
 
 # Repository -> [(run id, hours before the stand-in started that it was created)].
@@ -165,7 +170,24 @@ class GitHub(BaseHTTPRequestHandler):
             if "Authorization" in self.headers:
                 return self.send(400, b'{"message":"token sent to blob host"}')
             run_id, n = (int(x) for x in parts[1].split(".")[0].split("-"))
-            return self.send(200, logs_zip(run_id, n, BIG.get(run_id, 0)), "application/zip")
+            body = logs_zip(run_id, n, BIG.get(run_id, 0))
+            with lock:
+                if run_id in SINGLE_USE:
+                    if self.path in used_links:
+                        return self.send(403, b"<Error><Code>AuthenticationFailed</Code></Error>", "application/xml")
+                    used_links.add(self.path)
+                drop = dropped_left.get(run_id, 0) > 0
+                if drop:
+                    dropped_left[run_id] -= 1
+            if drop:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body[: len(body) // 2])
+                self.close_connection = True
+                return
+            return self.send(200, body, "application/zip")
         if self.headers.get("Authorization") != f"Bearer {TOKEN}":
             return self.send(401, b'{"message":"Bad credentials"}')
         # /api/v3/repos/<owner>/<repo>[/actions/runs[/<id>/attempts/<n>[/jobs|/logs]]]
@@ -208,7 +230,10 @@ class GitHub(BaseHTTPRequestHandler):
                 if lagging_left.get(run_id, 0) > 0:
                     lagging_left[run_id] -= 1
                     return self.send(404, b'{"message":"Not Found"}')
-            return self.send(302, headers={"Location": f"{BASE}/blob/{run_id}-{n}.zip?sig=abc"})
+            with lock:
+                links_issued[run_id] = links_issued.get(run_id, 0) + 1
+                sig = f"abc{links_issued[run_id]}"
+            return self.send(302, headers={"Location": f"{BASE}/blob/{run_id}-{n}.zip?sig={sig}"})
         return self.send(404, b'{"message":"Not Found"}')
 
 

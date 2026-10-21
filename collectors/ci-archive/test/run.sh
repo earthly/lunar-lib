@@ -284,6 +284,11 @@ run_case log-lag 401 1
 expect_exit 0
 expect "waits out a log archive that is not ready yet" receipt '.ci.archive.runs[0].id == 401'
 
+run_case log-drop 402 1
+expect_exit 0
+expect "retries a dropped log download from a fresh link" receipt '.ci.archive.runs[0].id == 402'
+expect "says it retried" stderr_has "retrying with a fresh link"
+
 run_case paged-jobs 501 1
 expect_exit 0
 expect "follows job pagination past 100" receipt '.ci.archive.runs[0].jobs | length == 150'
