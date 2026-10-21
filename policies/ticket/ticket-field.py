@@ -1,6 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import checked, field_values, is_empty, parse_list, ticket_path
+from helpers import (checked, field_values, is_empty, parse_list, skip_listed_author,
+                     ticket_path)
 
 
 def main(node=None):
@@ -15,6 +16,7 @@ def main(node=None):
         root = ticket_path()
         sep = "" if field.startswith("[") else "."
         path = checked(f"{root}{sep}{field}")
+        skip_listed_author(c)
 
         # A missing or unconfirmed ticket is ticket-present's and ticket-valid's
         # failure to report; failing here as well would only repeat it.

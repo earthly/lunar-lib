@@ -1,12 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import ticket_path
+from helpers import skip_listed_author, ticket_path
 
 
 def main(node=None):
     c = Check("ticket-status", "Ticket should be in an acceptable status", node=node)
     with c:
         root = ticket_path()
+        skip_listed_author(c)
         if not c.exists(f"{root}.status"):
             c.skip("No ticket status data available")
 

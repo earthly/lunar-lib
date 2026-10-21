@@ -76,8 +76,10 @@ def with_fields(issue, **fields):
     return copy
 
 
-def component(ticket=None, second=None):
+def component(ticket=None, second=None, author=None):
     pr = {"number": 8, "title": "[TP-1] Add payment retries"}
+    if author is not None:
+        pr["author"] = author
     if ticket is not None:
         pr["ticket"] = ticket
     if second is not None:
@@ -389,6 +391,83 @@ class TestSecondReference(unittest.TestCase):
                                  ticket_field="status"):
                     with self.assertRaisesRegex(ValueError, "Invalid path format"):
                         check(node(component(record(TP), record(ARB))))
+
+
+BOT = "dependabot[bot]"
+
+
+class TestSkipAuthors(unittest.TestCase):
+    """skip_authors skips every check on a PR opened by a listed login."""
+
+    # A failing case per check, so a skip can only come from skip_authors.
+    CASES = (
+        (ticket_present, None, {}),
+        (ticket_valid, {"id": "TP-9", "tracker_error": "not_found"}, {}),
+        (ticket_source, record(TP), {"allowed_sources": "linear"}),
+        (ticket_status, record(TP), {"allowed_statuses": "Done"}),
+        (ticket_type, record(TP), {"allowed_types": "Bug"}),
+        (ticket_reuse, record(TP, reuse_count=4), {}),
+        (ticket_field, record(TP), {"ticket_field": TestTicketField.OPTION}),
+    )
+
+    def run_check(self, check, data, finished=True, **vars):
+        with policy_vars(**vars):
+            return check(node(data, finished))
+
+    def test_listed_author_skips_every_check(self):
+        for check, ticket, vars in self.CASES:
+            with self.subTest(check=check.__module__):
+                data = component(ticket, author=BOT)
+                self.assertEqual(outcome(self.run_check(check, data, **vars)), "fail")
+                result = self.run_check(check, data, skip_authors=BOT, **vars)
+                self.assertEqual(outcome(result), "skip")
+                self.assertEqual(message(result), "PR author dependabot[bot] is in skip_authors")
+
+    def test_other_authors_are_checked(self):
+        for check, ticket, vars in self.CASES:
+            with self.subTest(check=check.__module__):
+                result = self.run_check(check, component(ticket, author="octocat"),
+                                        skip_authors=BOT, **vars)
+                self.assertEqual(outcome(result), "fail")
+
+    def test_login_matches_exactly_ignoring_case(self):
+        for listed, expected in (("Dependabot[Bot]", "skip"), ("dependabot", "fail"),
+                                 ("dependabot[bot]-preview", "fail")):
+            with self.subTest(listed=listed):
+                check = self.run_check(ticket_present, component(author=BOT),
+                                       skip_authors=listed)
+                self.assertEqual(outcome(check), expected)
+
+    def test_list_forms(self):
+        for listed in ("dependabot[bot], renovate[bot]", "dependabot[bot]\nrenovate[bot]\n",
+                       '["dependabot[bot]", "renovate[bot]"]'):
+            with self.subTest(listed=listed):
+                check = self.run_check(ticket_present, component(author="renovate[bot]"),
+                                       skip_authors=listed)
+                self.assertEqual(outcome(check), "skip")
+
+    def test_pends_until_the_author_is_collected(self):
+        # The ticket can land before the author. Without skip_authors the check
+        # fails right away, as it always has; with it, it waits for the author
+        # instead of failing and then flipping to a skip.
+        data = component({"id": "TP-9", "tracker_error": "not_found"})
+        self.assertEqual(outcome(self.run_check(ticket_valid, data, finished=False)), "fail")
+        self.assertEqual(outcome(self.run_check(ticket_valid, data, finished=False,
+                                                skip_authors=BOT)), "pending")
+
+    def test_pr_without_a_collected_author_is_checked(self):
+        check = self.run_check(ticket_present, component(), skip_authors=BOT)
+        self.assertEqual(outcome(check), "fail")
+
+    def test_second_reference_import(self):
+        data = component(record(TP), author=BOT)
+        check = self.run_check(ticket_present, data, ticket_path=SECOND, skip_authors=BOT)
+        self.assertEqual(outcome(check), "skip")
+
+    def test_malformed_list_errors(self):
+        with policy_vars(skip_authors='["dependabot[bot]"'):
+            with self.assertRaisesRegex(ValueError, "skip_authors: invalid JSON array"):
+                ticket_present(node(component(author=BOT)))
 
 
 if __name__ == "__main__":

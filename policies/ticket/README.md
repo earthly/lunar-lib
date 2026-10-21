@@ -34,6 +34,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.pr.ticket.type` | string | Issue type (e.g. Story, Bug) |
 | `.vcs.pr.ticket.reuse_count` | number | Count of other PRs using same ticket |
 | `.vcs.pr.ticket.native` | object | Raw tracker data (e.g. `.native.jira`), read by `ticket-field` |
+| `.vcs.pr.author` | string | PR author login, read only when `skip_authors` is set (github and gitlab collectors) |
 
 Every check reads from `ticket_path` instead of `.vcs.pr.ticket` when it is set.
 
@@ -60,6 +61,17 @@ policies:
       max_ticket_reuse: "3"
       # ticket_field: "native.jira.fields.customfield_10042"  # Optional: enables ticket-field
 ```
+
+### Skipping bot PRs
+
+Bots such as Dependabot open PRs without a ticket. List their logins in `skip_authors` and every check skips their PRs instead of failing them:
+
+```yaml
+    with:
+      skip_authors: "dependabot[bot],renovate[bot]"
+```
+
+A login matches `.vcs.pr.author` exactly, ignoring case, so use the one GitHub shows, including an app's `[bot]` suffix. The skip covers the whole PR, including any commits someone else pushes to the bot's branch.
 
 ### Checking a second reference
 
