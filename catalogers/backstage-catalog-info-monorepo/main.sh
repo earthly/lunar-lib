@@ -34,12 +34,16 @@
 # annotation when `allow_ignore_annotation` is enabled (handled in helpers.sh).
 #
 # Silent skips (exit 0 with a log line, no write):
-#   - No GH_TOKEN, or both `repos` and `orgs` empty (nothing to do)
+#   - No token, or both `repos` and `orgs` empty (nothing to do)
 #   - Org discovery API error for an org (logged, that org skipped)
 #   - A repo id that isn't `<owner>/<repo>`
 #   - Git Trees / Contents API errors for a repo (logged, repo skipped)
 #   - Per-file: parse error / not exactly one Component (handled in helpers.sh)
-#   - A hierarchy_repos entry that can't be read (logged, repo skipped)
+#
+# Failures (exit 1, so a hub on v4.4.0+ keeps the last good catalog instead of
+# saving an empty one): no repo in the scan set could be read (including org
+# discovery that failed with nothing else left to scan), or a hierarchy_repos
+# entry can't be read — a wrong github_host or token looks exactly like this.
 #
 # Inputs (LUNAR_VAR_*):
 #   repos                (comma-separated <owner>/<repo>; always scanned)
@@ -52,14 +56,17 @@
 #   filenames            (default catalog-info.yaml,catalog-info.yml)
 #   branch               (default empty -> each repo's default branch)
 #   exclude_paths        (default catalog-info.yaml,catalog-info.yml)
-#   component_id_prefix  (default github.com/)
+#   github_host          (default github.com; or a GitHub Enterprise Server host)
+#   component_id_prefix  (default empty -> <github_host>/)
 #   ...transform + ignore-annotation inputs are read in helpers.sh
 #
 # Either `repos` or `orgs` (or both) must be set. Topic filters apply to the
 # org-discovered set only; explicitly-listed `repos` are always scanned.
 #
 # Secrets:
-#   GH_TOKEN — required, fetched as LUNAR_SECRET_GH_TOKEN
+#   GH_TOKEN — required for github.com, fetched as LUNAR_SECRET_GH_TOKEN
+#   GH_ENTERPRISE_TOKEN — preferred for a GHES github_host, fetched as
+#     LUNAR_SECRET_GH_ENTERPRISE_TOKEN (falls back to GH_TOKEN)
 
 set -euo pipefail
 
@@ -77,13 +84,30 @@ BRANCH="${LUNAR_VAR_BRANCH:-}"
 # to the manifest default when unset in config, or to the user's value (including
 # "") when set — so the default only fires for a truly-unset var (local runs).
 EXCLUDE_PATHS="${LUNAR_VAR_EXCLUDE_PATHS-catalog-info.yaml,catalog-info.yml}"
-COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
-
-if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
-    export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
+# GitHub host: github.com or a GitHub Enterprise Server hostname. A full URL is
+# reduced to the bare host, as in github-org.
+GITHUB_HOST=$(echo "${LUNAR_VAR_GITHUB_HOST:-github.com}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#/.*$##')
+GITHUB_HOST="${GITHUB_HOST:-github.com}"
+if [ "$GITHUB_HOST" = "github.com" ]; then
+    API_BASE="https://api.github.com"
+else
+    API_BASE="https://$GITHUB_HOST/api/v3"
 fi
-if [ -z "${GH_TOKEN:-}" ]; then
-    echo "GH_TOKEN or LUNAR_SECRET_GH_TOKEN must be set — skipping" >&2
+# Default ids to the host so GHES subcomponents line up with github-org's
+# repo-level `<host>/<owner>/<repo>` ids.
+COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-$GITHUB_HOST/}"
+
+# github.com uses GH_TOKEN. A GHES host prefers GH_ENTERPRISE_TOKEN and falls
+# back to GH_TOKEN, so single-token setups keep working (as github-org does).
+if [ "$GITHUB_HOST" = "github.com" ]; then
+    GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
+    TOKEN_NAMES="GH_TOKEN or LUNAR_SECRET_GH_TOKEN"
+else
+    GH_AUTH_TOKEN="${LUNAR_SECRET_GH_ENTERPRISE_TOKEN:-${LUNAR_SECRET_GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-${GH_TOKEN:-}}}}"
+    TOKEN_NAMES="LUNAR_SECRET_GH_ENTERPRISE_TOKEN or LUNAR_SECRET_GH_TOKEN"
+fi
+if [ -z "$GH_AUTH_TOKEN" ]; then
+    echo "$TOKEN_NAMES must be set for $GITHUB_HOST — skipping" >&2
     exit 0
 fi
 
@@ -92,6 +116,7 @@ if [ -z "$REPOS" ] && [ -z "$ORGS" ]; then
     exit 0
 fi
 
+echo "GitHub host: $GITHUB_HOST (API $API_BASE)"
 [ -n "$REPOS" ] && echo "Explicit repos: $REPOS"
 [ -n "$ORGS" ] && echo "Discover orgs: $ORGS"
 [ -n "$HIERARCHY_REPOS" ] && echo "Hierarchy repos: $HIERARCHY_REPOS"
@@ -116,7 +141,7 @@ trap 'rm -rf "$BODY_FILE" "$ERR_FILE" "$WORK_DIR"' EXIT
 # gh_get <url> — GET with auth, body written to $BODY_FILE, prints HTTP code.
 gh_get() {
     curl -sS -o "$BODY_FILE" -w '%{http_code}' \
-        -H "Authorization: Bearer $GH_TOKEN" \
+        -H "Authorization: Bearer $GH_AUTH_TOKEN" \
         -H "Accept: $1" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "$2" 2>"$ERR_FILE" || echo "000"
@@ -131,9 +156,11 @@ discover_org_repos() {
     local org="$1" page=1 code count
     while :; do
         code=$(gh_get "application/vnd.github+json" \
-            "https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=all")
+            "$API_BASE/orgs/${org}/repos?per_page=100&page=${page}&type=all")
         if [ "$code" != "200" ]; then
             echo "Org discovery for '$org' failed (HTTP $code): $(head -c 200 "$BODY_FILE" 2>/dev/null) — skipping org" >&2
+            # Runs in a process substitution, so signal through the filesystem.
+            touch "$WORK_DIR/org-discovery-failed"
             return 0
         fi
         count=$(jq 'length' "$BODY_FILE")
@@ -253,6 +280,10 @@ fi
 
 if [ ${#REPO_ARRAY[@]} -eq 0 ]; then
     echo ""
+    if [ -e "$WORK_DIR/org-discovery-failed" ]; then
+        echo "Org discovery failed and nothing else is left to scan on $GITHUB_HOST — failing the run rather than writing an empty catalog (check github_host and the token)" >&2
+        exit 1
+    fi
     echo "No repositories to scan (no explicit 'repos', and org discovery matched none) — nothing to do"
     exit 0
 fi
@@ -265,6 +296,19 @@ PENDING_FILE="$WORK_DIR/pending.tsv"
 : > "$PENDING_FILE"
 SCANNED=0
 FETCHED=0
+SCAN_OK=0
+SCAN_FAILED=0
+HIER_FAILED=0
+
+# repo_failed <create> — count a repo that couldn't be read, for the checks
+# after pass 1.
+repo_failed() {
+    if [ "$1" = "true" ]; then
+        SCAN_FAILED=$((SCAN_FAILED + 1))
+    else
+        HIER_FAILED=$((HIER_FAILED + 1))
+    fi
+}
 
 # scan_repo <owner/repo> <create: true|false> — pass 1 for one repo. Fetches
 # every catalog-info file (and hierarchy_paths match), collects its Domain /
@@ -275,6 +319,7 @@ scan_repo() {
     local slug="$1" create="$2" ref code path dir id catalog hier queue body
     if [[ "$slug" != */* ]] || [[ "$slug" == */*/* ]]; then
         echo "Repo '$slug' is not in '<owner>/<repo>' form — skipping" >&2
+        repo_failed "$create"
         return 0
     fi
     echo ""
@@ -287,9 +332,10 @@ scan_repo() {
     # Resolve the ref: explicit branch, or the repo's default branch.
     ref="$BRANCH"
     if [ -z "$ref" ]; then
-        code=$(gh_get "application/vnd.github+json" "https://api.github.com/repos/$slug")
+        code=$(gh_get "application/vnd.github+json" "$API_BASE/repos/$slug")
         if [ "$code" != "200" ]; then
             echo "Could not read repo $slug (HTTP $code): $(head -c 200 "$BODY_FILE" 2>/dev/null) — skipping" >&2
+            repo_failed "$create"
             return 0
         fi
         ref=$(jq -r '.default_branch // "main"' "$BODY_FILE")
@@ -297,11 +343,13 @@ scan_repo() {
     echo "Ref: $ref"
 
     # One recursive Git Trees call enumerates the whole repo.
-    code=$(gh_get "application/vnd.github+json" "https://api.github.com/repos/$slug/git/trees/$ref?recursive=1")
+    code=$(gh_get "application/vnd.github+json" "$API_BASE/repos/$slug/git/trees/$ref?recursive=1")
     if [ "$code" != "200" ]; then
         echo "Git Trees API returned $code for $slug@$ref: $(head -c 200 "$BODY_FILE" 2>/dev/null) — skipping" >&2
+        repo_failed "$create"
         return 0
     fi
+    [ "$create" = "true" ] && SCAN_OK=$((SCAN_OK + 1))
     if [ "$(jq -r '.truncated // false' "$BODY_FILE")" = "true" ]; then
         echo "WARNING: tree for $slug@$ref is truncated — some catalog-info files may be missed" >&2
     fi
@@ -327,7 +375,7 @@ scan_repo() {
         fi
 
         # Fetch the file body (raw). Skip this file on any non-200.
-        code=$(gh_get "application/vnd.github.raw" "https://api.github.com/repos/$slug/contents/$path?ref=$ref")
+        code=$(gh_get "application/vnd.github.raw" "$API_BASE/repos/$slug/contents/$path?ref=$ref")
         if [ "$code" != "200" ]; then
             echo "Could not fetch $path from $slug (HTTP $code) — skipping file" >&2
             continue
@@ -369,6 +417,18 @@ if [ -n "$HIERARCHY_REPOS" ]; then
         _seen[$r]=1
         scan_repo "$r" false
     done
+fi
+
+# A run that reads nothing would save an empty catalog and retire every
+# component this cataloger created; fail instead so the last good one stays.
+if [ "$SCAN_OK" -eq 0 ] && [ "$SCAN_FAILED" -gt 0 ]; then
+    echo "None of the $SCAN_FAILED repo(s) in the scan set could be read from $GITHUB_HOST — failing the run rather than writing an empty catalog (check github_host and the token)" >&2
+    exit 1
+fi
+# Without its hierarchy repos every component would fall back to bare names.
+if [ "$HIER_FAILED" -gt 0 ]; then
+    echo "Could not read $HIER_FAILED hierarchy_repos repo(s) from $GITHUB_HOST — failing the run rather than resolving domains without them" >&2
+    exit 1
 fi
 
 # --- Resolve the hierarchy once ------------------------------------------

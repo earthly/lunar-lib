@@ -94,9 +94,12 @@ catalogers:
       exactly one repository; import the cataloger again under another
       `name` to watch a second one.
     mainBash: main.sh
-    hook:
-      type: repo
-      repo: "github.com/${{ inputs.repos }}"
+    # The hub keys repo hooks by its own GitHub host (HUB_GITHUB_HOST), which a GHES import may not share.
+    hooks:
+      - type: repo
+        repo: "${{ inputs.github_host }}/${{ inputs.repos }}"
+      - type: repo
+        repo: "github.com/${{ inputs.repos }}"
     keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "commit-triggered", "real-time"]
 
 inputs:
@@ -207,12 +210,27 @@ inputs:
       so dev teams can't override it from their repos.
     default: "catalog-info.yaml,catalog-info.yml"
 
+  github_host:
+    description: |
+      GitHub hostname to read repositories from: `github.com` (the
+      default) or a GitHub Enterprise Server hostname such as
+      `github.acme.com`. Use the bare hostname; `discover-on-commit`
+      matches pushes on it. github.com authenticates with
+      `GH_TOKEN`; a GitHub Enterprise Server host authenticates with
+      `GH_ENTERPRISE_TOKEN`, falling back to `GH_TOKEN`. One import
+      reads one host, so a fleet on both imports the cataloger once
+      per host, each with its own `name`.
+    default: "github.com"
+
   component_id_prefix:
     description: |
       String prepended to `<owner>/<repo>[/<dir>]` when constructing
-      the created component's id. `github.com/` yields ids like
-      `github.com/acme/monorepo/services/payments`.
-    default: "github.com/"
+      the created component's id. Empty (the default) uses
+      `<github_host>/`, which yields ids like
+      `github.com/acme/monorepo/services/payments` and matches the
+      repo-level ids the `github-org` cataloger creates for the same
+      host.
+    default: ""
 
   domain_annotation:
     description: |
@@ -294,4 +312,11 @@ secrets:
       or `Metadata: Read` on a fine-grained PAT / App installation).
       Reused across most lunar-lib GitHub plugins, so if `GH_TOKEN` is
       already set for `github-org` this cataloger picks it up
-      automatically.
+      automatically. Used for every host when `GH_ENTERPRISE_TOKEN`
+      isn't set.
+  GH_ENTERPRISE_TOKEN:
+    description: |
+      Token for a GitHub Enterprise Server `github_host`, with the same
+      read access `GH_TOKEN` needs on github.com. Optional: without it
+      the cataloger uses `GH_TOKEN` for the enterprise host too. The
+      `github-org` cataloger reads the same secret.

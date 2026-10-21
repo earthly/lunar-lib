@@ -170,10 +170,10 @@ catalogers:
 Set the GitHub token used to walk each repo's tree and fetch each `catalog-info.yaml`:
 
 ```sh
-lunar secret set GH_TOKEN <your-github-token>
+lunar secret set GH_TOKEN <your-github-token> --scope cataloger
 ```
 
-The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `hierarchy_repos`, `hierarchy_paths`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `hierarchy_repos`, `hierarchy_paths`, `github_host`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
 
 ### Cataloging on commit
 
@@ -192,6 +192,29 @@ catalogers:
 - **The hub only acts on pushes to repositories it tracks**, so the monorepo needs a component before the first push counts, from `github-org` or a first `discover` run.
 - **New and edited files take effect on push; removals (a deleted file, a dropped tag) wait for the nightly run.** Each variant keeps its own output, and the catalog merges the two.
 - **A push that lands while a scan is running can be missed** if the scan already read the repo. The next push picks it up; otherwise it waits for the nightly run.
+
+### GitHub Enterprise Server
+
+Set `github_host` to read repositories from a GitHub Enterprise Server instance instead of github.com:
+
+```yaml
+catalogers:
+  - name: monorepo-ghes
+    uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover, discover-on-commit]
+    with:
+      github_host: "github.acme.com"
+      repos: "platform/monorepo"
+```
+
+```sh
+lunar secret set GH_ENTERPRISE_TOKEN <your-ghes-token> --scope cataloger
+```
+
+- API calls go to `https://<github_host>/api/v3`, authenticated with `GH_ENTERPRISE_TOKEN`, or with `GH_TOKEN` when that isn't set.
+- Component ids default to `<github_host>/<owner>/<repo>/<dir>`, matching the repo-level ids [`github-org`](../github-org) creates with the same `github_host`. An explicit `component_id_prefix` wins.
+- One import reads one host. For repos on both github.com and GHES, import the cataloger once per host, each with its own `name`. `hierarchy_repos` must be on the import's host.
+- `discover-on-commit` listens for pushes under both `<github_host>/<repo>` and `github.com/<repo>`, because the hub keys repo hooks by its own GitHub host (`HUB_GITHUB_HOST`). Give `github_host` as a bare hostname.
 
 ### Discovering repos by topic
 
@@ -285,10 +308,11 @@ Instead of naming each monorepo, you can flip this to **topic-driven** targeting
 
 ## Source System
 
-[GitHub](https://github.com) — when `orgs` is set the cataloger calls the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) (paged, 100/page) to enumerate candidate repos and filter them by topic; then, for every repo in the scan set and in `hierarchy_repos`, it calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once to enumerate files and the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml` or `hierarchy_paths` match. Requirements:
+[GitHub](https://github.com) or GitHub Enterprise Server (`github_host`) — when `orgs` is set the cataloger calls the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) (paged, 100/page) to enumerate candidate repos and filter them by topic; then, for every repo in the scan set and in `hierarchy_repos`, it calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once to enumerate files and the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml` or `hierarchy_paths` match. Requirements:
 
-- **`GH_TOKEN` secret** with `Contents: Read` on every repo in the scan set and in `hierarchy_repos`. When `orgs` is set, it must also be able to list the org's repositories (`read:org` / org membership for private repos, or `Metadata: Read` on a fine-grained PAT / App installation).
-- **GitHub-hosted repos.** Component ids are constructed as `<component_id_prefix><owner>/<repo>[/<dir>]`; the default prefix is `github.com/`.
+- **`GH_TOKEN` secret** (or `GH_ENTERPRISE_TOKEN` for a GHES `github_host`) with `Contents: Read` on every repo in the scan set and in `hierarchy_repos`. When `orgs` is set, it must also be able to list the org's repositories (`read:org` / org membership for private repos, or `Metadata: Read` on a fine-grained PAT / App installation).
+- **Component ids** are `<component_id_prefix><owner>/<repo>[/<dir>]`; the prefix defaults to `<github_host>/`.
+- **A run that can't read anything fails.** If no repo in the scan set can be read, or a `hierarchy_repos` entry can't, the run exits non-zero instead of writing an empty catalog, so a hub on v4.4.0 or later keeps the last good one. A wrong `github_host` or token looks exactly like this. A single unreadable repo among readable ones is still just skipped.
 
 ### Scope and Roadmap
 

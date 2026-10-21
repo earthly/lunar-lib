@@ -9,7 +9,9 @@
 #   - GET /repos/<slug>/contents/<path>    -> the file at that path in the dir
 # `lunar catalog raw` is mocked to capture writes to per-path .out files.
 # A repo with its own directory under MOCK_REPOS_ROOT/<owner>/<repo> is served
-# from there; every other repo is served from MOCK_REPO_DIR.
+# from there; every other repo is served from MOCK_REPO_DIR. Each request's URL
+# and Authorization header go to curl.log; MOCK_FAIL_REPOS / MOCK_FAIL_ORGS
+# (comma-separated) answer 404 for those repos / orgs.
 #
 # Each scenario lays out catalog-info files at chosen paths in a fresh fake
 # repo, runs main.sh, and asserts the created components / domains. Any failure
@@ -34,16 +36,27 @@ set -euo pipefail
 REPO_DIR_ENV="${MOCK_REPO_DIR:?MOCK_REPO_DIR must be set}"
 OUT=""
 URL=""
+AUTH=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -o) OUT="$2"; shift 2 ;;
-        -H|-w) shift 2 ;;
+        -H) case "$2" in Authorization:*) AUTH="$2" ;; esac; shift 2 ;;
+        -w) shift 2 ;;
         -sS|-s|-S|-L|-sSL) shift ;;
         http*|https*) URL="$1"; shift ;;
         *) shift ;;
     esac
 done
 [ -z "$OUT" ] && { echo "mock curl: -o required" >&2; exit 1; }
+printf '%s\t%s\n' "$URL" "$AUTH" >> "$MOCK_LUNAR_TEST_DIR/curl.log"
+not_found() { printf '{"message":"Not Found"}' > "$OUT"; printf '404'; exit 0; }
+if [[ "$URL" == *"/orgs/"* ]]; then
+    org="${URL#*/orgs/}"; org="${org%%/*}"
+    [[ ",${MOCK_FAIL_ORGS:-}," == *",$org,"* ]] && not_found
+elif [[ "$URL" == *"/repos/"* ]]; then
+    rest="${URL#*/repos/}"; slug="${rest%%/*}/"; rest="${rest#*/}"; slug="$slug${rest%%[/?]*}"
+    [[ ",${MOCK_FAIL_REPOS:-}," == *",$slug,"* ]] && not_found
+fi
 # repo_dir — the fake checkout for the <owner>/<repo> in $URL.
 repo_dir() {
     local rest="${URL#*/repos/}" owner repo
@@ -128,7 +141,8 @@ reset_env() {
           LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN \
           LUNAR_VAR_ALLOW_IGNORE_ANNOTATION LUNAR_VAR_IGNORE_ANNOTATION \
           LUNAR_VAR_HIERARCHY_REPOS LUNAR_VAR_HIERARCHY_PATHS \
-          MOCK_LUNAR_FAIL MOCK_ORG_REPOS 2>/dev/null || true
+          LUNAR_VAR_GITHUB_HOST LUNAR_SECRET_GH_ENTERPRISE_TOKEN GH_ENTERPRISE_TOKEN \
+          MOCK_LUNAR_FAIL MOCK_ORG_REPOS MOCK_FAIL_REPOS MOCK_FAIL_ORGS 2>/dev/null || true
     export LUNAR_VAR_REPOS="acme/monorepo"
     export LUNAR_SECRET_GH_TOKEN="stub-token"
 }
@@ -149,7 +163,7 @@ place_in() {
 }
 
 fresh_repo() { rm -rf "$REPO_DIR" "$MOCK_REPOS_ROOT"; mkdir -p "$REPO_DIR"; }
-reset_out()  { : > "$TEST_DIR/components.out"; : > "$TEST_DIR/domains.out"; }
+reset_out()  { : > "$TEST_DIR/components.out"; : > "$TEST_DIR/domains.out"; : > "$TEST_DIR/curl.log"; }
 
 merged_components() {
     if [ -s "$TEST_DIR/components.out" ]; then jq -s 'add // {}' "$TEST_DIR/components.out" 2>/dev/null || echo '{}'; else echo '{}'; fi
@@ -180,6 +194,18 @@ run_main() {
         echo "  main.sh exited non-zero:"; echo "$log" | indent; FAILED=$((FAILED+1)); return 1
     fi
     printf '%s\n' "$log" > "$TEST_DIR/main.log"
+}
+
+# assert_curl <label> <URL prefix> <Authorization header> — every request the
+# last run made used that API base and that token.
+assert_curl() {
+    local bad
+    bad=$(awk -F'\t' -v p="$2" -v a="$3" 'index($1, p) != 1 || $2 != a' "$TEST_DIR/curl.log")
+    if [ -s "$TEST_DIR/curl.log" ] && [ -z "$bad" ]; then
+        echo "  [$1] OK"; PASSED=$((PASSED+1))
+    else
+        echo "  [$1] FAIL — not every request was $2 with '$3':"; indent < "$TEST_DIR/curl.log"; FAILED=$((FAILED+1))
+    fi
 }
 
 # assert_log <label> <grep -E pattern> — the last successful run logged it.
@@ -527,6 +553,94 @@ run_main
 assert "domain_annotation is used as-is even when the chain resolves" \
     ".[\"$SD\"].domain == \"platform.builds\"" \
     "(.[\"platform.builds\"] == {}) and has(\"$FULL\")"
+
+# ── GitHub Enterprise Server (github_host) ───────────────────────────────
+echo "── ghes_host ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_GITHUB_HOST="ghes.example.com" LUNAR_VAR_COMPONENT_ID_PREFIX="" \
+       LUNAR_SECRET_GH_ENTERPRISE_TOKEN="ent-token"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "component ids default to the GHES host" \
+    '(.["ghes.example.com/acme/monorepo/services/payments"].owner == "group:default/team-payments") and (keys | length == 1)' ''
+assert_curl "every request goes to the GHES API with the enterprise token" \
+    "https://ghes.example.com/api/v3/" "Authorization: Bearer ent-token"
+
+echo "── ghes_host_url_and_token_fallback ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_GITHUB_HOST="https://ghes.example.com/" LUNAR_VAR_COMPONENT_ID_PREFIX=""
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "a URL github_host is reduced to the host" \
+    'has("ghes.example.com/acme/monorepo/services/payments")' ''
+assert_curl "without GH_ENTERPRISE_TOKEN the GHES calls use GH_TOKEN" \
+    "https://ghes.example.com/api/v3/" "Authorization: Bearer stub-token"
+
+echo "── github_com_default_host ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_COMPONENT_ID_PREFIX="" LUNAR_SECRET_GH_ENTERPRISE_TOKEN="ent-token"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "github.com ids are unchanged" \
+    'has("github.com/acme/monorepo/services/payments")' ''
+assert_curl "github.com stays on api.github.com with GH_TOKEN" \
+    "https://api.github.com/" "Authorization: Bearer stub-token"
+
+echo "── ghes_explicit_prefix ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_GITHUB_HOST="ghes.example.com" LUNAR_VAR_COMPONENT_ID_PREFIX="git.acme.internal/"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "an explicit component_id_prefix wins over the host" \
+    'has("git.acme.internal/acme/monorepo/services/payments")' ''
+
+echo "── ghes_hierarchy_repo ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_GITHUB_HOST="ghes.example.com" LUNAR_VAR_COMPONENT_ID_PREFIX="" \
+       LUNAR_SECRET_GH_ENTERPRISE_TOKEN="ent-token" \
+       LUNAR_VAR_HIERARCHY_REPOS="acme/catalog" LUNAR_VAR_HIERARCHY_PATHS="domains/*.yaml,systems/*.yaml"
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place_in acme/catalog hier_domain_engineering.yaml "domains/engineering.yaml"
+place_in acme/catalog hier_domain_platform.yaml    "domains/developer-platform.yaml"
+place_in acme/catalog hier_system.yaml             "systems/build-tools.yaml"
+run_main
+assert "hierarchy_repos are read from the same GHES host" \
+    ".[\"ghes.example.com/acme/monorepo/services/build-api\"].domain == \"$FULL\"" ''
+assert_curl "hierarchy repo calls use the GHES API too" \
+    "https://ghes.example.com/api/v3/" "Authorization: Bearer ent-token"
+
+# ── A run that can read nothing fails instead of writing an empty catalog ─
+echo "── all_repos_unreadable_fails ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="acme/gone" MOCK_FAIL_REPOS="acme/gone"
+assert_main_fails "no readable repo in the scan set → non-zero exit"
+assert "…and nothing is written" "" ""
+
+echo "── partial_repo_failure_still_runs ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="acme/monorepo,acme/gone" MOCK_FAIL_REPOS="acme/gone"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "one unreadable repo is skipped; the rest are cataloged" \
+    '(has("github.com/acme/monorepo/services/payments")) and (keys | length == 1)' ''
+
+echo "── hierarchy_repo_unreadable_fails ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_HIERARCHY_REPOS="acme/gone" MOCK_FAIL_REPOS="acme/gone"
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+assert_main_fails "an unreadable hierarchy_repos entry → non-zero exit"
+assert "…and nothing is written" "" ""
+
+echo "── org_discovery_failure ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="" LUNAR_VAR_ORGS="acme-x" MOCK_FAIL_ORGS="acme-x"
+assert_main_fails "org discovery fails with nothing else to scan → non-zero exit"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_ORGS="acme-x" MOCK_FAIL_ORGS="acme-x"
+place payments.yaml "services/payments/catalog-info.yaml"
+run_main
+assert "a failed org beside explicit repos still catalogs those repos" \
+    'has("github.com/acme/monorepo/services/payments")' ''
 
 # ── Scenario: hard write failure propagates (non-zero exit → hub retries) ──
 # Regression guard for the `if create_component` bug: a failed `lunar catalog
