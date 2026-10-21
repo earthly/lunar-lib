@@ -431,10 +431,12 @@ class TestSkipAuthors(unittest.TestCase):
                 self.assertEqual(outcome(result), "fail")
 
     def test_login_matches_exactly_ignoring_case(self):
-        for listed, expected in (("Dependabot[Bot]", "skip"), ("dependabot", "fail"),
-                                 ("dependabot[bot]-preview", "fail")):
-            with self.subTest(listed=listed):
-                check = self.run_check(ticket_present, component(author=BOT),
+        for author, listed, expected in ((BOT, "Dependabot[Bot]", "skip"),
+                                         ("AcmeReleaseBot", "acmereleasebot", "skip"),
+                                         (BOT, "dependabot", "fail"),
+                                         (BOT, "dependabot[bot]-preview", "fail")):
+            with self.subTest(author=author, listed=listed):
+                check = self.run_check(ticket_present, component(author=author),
                                        skip_authors=listed)
                 self.assertEqual(outcome(check), expected)
 
