@@ -1,12 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import ticket_path
+from helpers import skip_listed_author, ticket_path
 
 
 def main(node=None):
     c = Check("ticket-reuse", "Ticket should not be reused across too many PRs", node=node)
     with c:
         root = ticket_path()
+        skip_listed_author(c)
         if not c.exists(f"{root}.reuse_count"):
             c.skip("No ticket reuse data available")
 

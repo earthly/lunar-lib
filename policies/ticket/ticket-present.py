@@ -1,12 +1,13 @@
 from lunar_policy import Check
 
-from helpers import missing_ticket_message, ticket_path
+from helpers import missing_ticket_message, skip_listed_author, ticket_path
 
 
 def main(node=None):
     c = Check("ticket-present", "PRs should reference a ticket", node=node)
     with c:
         root = ticket_path()
+        skip_listed_author(c)
         if not c.exists(root):
             c.fail(missing_ticket_message(root))
             return c

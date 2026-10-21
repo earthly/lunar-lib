@@ -6,6 +6,7 @@ from lunar_policy import variable_or_default
 from lunar_policy.nodepath import NodePath
 
 DEFAULT_TICKET_PATH = ".vcs.pr.ticket"
+AUTHOR_PATH = ".vcs.pr.author"
 
 # Jira returns a select-list option as {"value": ...}, a status, priority or
 # component as {"name": ...} and a user as {"displayName": ...}. A user can
@@ -29,6 +30,22 @@ def checked(path):
     typo into "no ticket" or "no value" instead of an error."""
     NodePath.parse(path)
     return path
+
+
+def skip_listed_author(c):
+    """Skips the check when the PR author is in `skip_authors`, such as a bot
+    like dependabot[bot]. Logins match exactly, ignoring case, since GitHub
+    treats them case-insensitively."""
+    authors = {a.lower() for a in parse_list(
+        "skip_authors", variable_or_default("skip_authors", ""))}
+    if not authors:
+        return
+    # Pends until the author is collected, so a check never fails first and
+    # then flips to a skip.
+    if c.exists(AUTHOR_PATH):
+        author = str(c.get_value(AUTHOR_PATH))
+        if author.lower() in authors:
+            c.skip(f"PR author {author} is in skip_authors")
 
 
 def missing_ticket_message(path):

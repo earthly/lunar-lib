@@ -111,3 +111,10 @@ inputs:
       policy at the path a second jira collector import records to (e.g.
       .vcs.pr.architecture_review) to check that reference as well.
     default: ".vcs.pr.ticket"
+  skip_authors:
+    description: |
+      PR author logins whose PRs every check skips, such as dependency bots
+      (e.g. dependabot[bot], renovate[bot]). Comma-separated or one per line;
+      matched exactly, ignoring case, so keep the [bot] suffix GitHub gives an
+      app. Empty skips no one.
+    default: ""

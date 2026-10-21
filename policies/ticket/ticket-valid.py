@@ -1,12 +1,13 @@
 from lunar_policy import Check
 
-from helpers import ticket_path
+from helpers import skip_listed_author, ticket_path
 
 
 def main(node=None):
     c = Check("ticket-valid", "Referenced Jira ticket should be valid", node=node)
     with c:
         root = ticket_path()
+        skip_listed_author(c)
         if not c.exists(root):
             c.skip("No ticket referenced in PR")
 

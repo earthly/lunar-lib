@@ -1,12 +1,13 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import ticket_path
+from helpers import skip_listed_author, ticket_path
 
 
 def main(node=None):
     c = Check("ticket-source", "Ticket should come from an approved issue tracker", node=node)
     with c:
         root = ticket_path()
+        skip_listed_author(c)
         if not c.exists(f"{root}.source"):
             c.skip("No ticket source data available")
 
