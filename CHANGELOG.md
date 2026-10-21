@@ -9,6 +9,17 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.21.0] — 2026-10-21
+
+### Added
+
+- ticket: add skip_authors to skip PRs from bots like dependabot (#389)
+
+### Changed
+
+- Refresh pip certifi bundles in the shared image base (#390)
+- Bump lunar-scripts base images to 1.1.11 (#388)
+
 ## [1.20.0] — 2026-10-19
 
 ### Added
@@ -1063,6 +1074,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.21.0]: https://github.com/earthly/lunar-lib/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/earthly/lunar-lib/compare/v1.19.1...v1.20.0
 [1.19.1]: https://github.com/earthly/lunar-lib/compare/v1.19.0...v1.19.1
 [1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
