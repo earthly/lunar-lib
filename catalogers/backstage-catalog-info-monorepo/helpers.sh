@@ -217,13 +217,15 @@ create_component() {
     # More than one Component in a single file is ambiguous under the
     # one-component-per-file contract, so skip and log rather than guess.
     local COMPONENT_COUNT
-    COMPONENT_COUNT=$(echo "$ENTITIES" | jq '[.[] | select((.kind // "") == "Component")] | length')
+    # Non-object documents (a bare string, a list) are not entities; filter them
+    # first so one odd file can't crash the jq and abort the whole run.
+    COMPONENT_COUNT=$(echo "$ENTITIES" | jq '[.[] | select(type == "object") | select((.kind // "") == "Component")] | length')
     if [ "$COMPONENT_COUNT" != "1" ]; then
         echo "Expected exactly one Component in $SRC_PATH (found $COMPONENT_COUNT) — skipping"
         return 0
     fi
     local ENTITY
-    ENTITY=$(echo "$ENTITIES" | jq 'first(.[] | select((.kind // "") == "Component"))')
+    ENTITY=$(echo "$ENTITIES" | jq 'first(.[] | select(type == "object") | select((.kind // "") == "Component"))')
 
     # --- Honor the lunar.io/ignore annotation (gated) -------------------------
     # When allow_ignore_annotation is on, a Component that carries the ignore

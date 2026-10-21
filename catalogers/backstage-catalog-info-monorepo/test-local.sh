@@ -544,6 +544,14 @@ run_main
 assert "a malformed System is dropped; the rest still resolves" \
     ".[\"$SD\"].domain == \"$FULL\"" '(has("broken") | not) and (keys | length == 3)'
 
+echo "── non_entity_document ──"
+fresh_repo; reset_out; reset_env
+place not_an_entity.yaml "services/notes/catalog-info.yaml"
+place payments.yaml      "services/payments/catalog-info.yaml"
+run_main
+assert "a catalog-info file that isn't an entity is skipped, not fatal" \
+    '(has("github.com/acme/monorepo/services/payments")) and (has("github.com/acme/monorepo/services/notes") | not)' ''
+
 echo "── hierarchy_annotation_wins ──"
 fresh_repo; reset_out; reset_env
 export LUNAR_VAR_DOMAIN_ANNOTATION="acme.com/lunar-domain"
