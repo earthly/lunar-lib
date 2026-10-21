@@ -17,8 +17,11 @@ the next version ships.
 
 ### Changed
 
-- Refresh pip certifi bundles in the shared image base (#390)
 - Bump lunar-scripts base images to 1.1.11 (#388)
+
+### Security
+
+- Refresh pip certifi bundles in the shared image base (#390)
 
 ## [1.20.0] — 2026-10-19
 
