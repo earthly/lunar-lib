@@ -8,6 +8,8 @@
 #   - GET /repos/<slug>/git/trees/<ref>    -> a tree built from the fake repo dir
 #   - GET /repos/<slug>/contents/<path>    -> the file at that path in the dir
 # `lunar catalog raw` is mocked to capture writes to per-path .out files.
+# A repo with its own directory under MOCK_REPOS_ROOT/<owner>/<repo> is served
+# from there; every other repo is served from MOCK_REPO_DIR.
 #
 # Each scenario lays out catalog-info files at chosen paths in a fresh fake
 # repo, runs main.sh, and asserts the created components / domains. Any failure
@@ -42,6 +44,16 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ -z "$OUT" ] && { echo "mock curl: -o required" >&2; exit 1; }
+# repo_dir — the fake checkout for the <owner>/<repo> in $URL.
+repo_dir() {
+    local rest="${URL#*/repos/}" owner repo
+    owner="${rest%%/*}"; rest="${rest#*/}"; repo="${rest%%/*}"; repo="${repo%%\?*}"
+    if [ -n "${MOCK_REPOS_ROOT:-}" ] && [ -d "$MOCK_REPOS_ROOT/$owner/$repo" ]; then
+        echo "$MOCK_REPOS_ROOT/$owner/$repo"
+    else
+        echo "$REPO_DIR_ENV"
+    fi
+}
 case "$URL" in
     *"/orgs/"*"/repos"*)
         # Org discovery: emit the fake repo list (with topics) on page 1, an
@@ -53,15 +65,16 @@ case "$URL" in
         esac
         ;;
     *"/git/trees/"*)
-        ( cd "$REPO_DIR_ENV" && find . -type f | sed 's|^\./||' ) \
+        # Sorted, like the Trees API (git tree order), so "last read" is stable.
+        ( cd "$(repo_dir)" && find . -type f | sed 's|^\./||' | LC_ALL=C sort ) \
             | jq -R -s 'split("\n") | map(select(length > 0))
                         | {tree: map({path: ., type: "blob"}), truncated: false}' > "$OUT"
         printf '200'
         ;;
     *"/contents/"*)
-        p="${URL#*/contents/}"; p="${p%%\?*}"
-        if [ -f "$REPO_DIR_ENV/$p" ]; then
-            cat "$REPO_DIR_ENV/$p" > "$OUT"; printf '200'
+        p="${URL#*/contents/}"; p="${p%%\?*}"; d="$(repo_dir)"
+        if [ -f "$d/$p" ]; then
+            cat "$d/$p" > "$OUT"; printf '200'
         else
             printf '{"message":"Not Found"}' > "$OUT"; printf '404'
         fi
@@ -97,6 +110,7 @@ chmod +x "$TEST_DIR/lunar"
 
 export PATH="$TEST_DIR:$PATH"
 export MOCK_REPO_DIR="$REPO_DIR"
+export MOCK_REPOS_ROOT="$TEST_DIR/repos"
 export MOCK_LUNAR_TEST_DIR="$TEST_DIR"
 
 FAILED=0
@@ -113,6 +127,7 @@ reset_env() {
           LUNAR_VAR_INCLUDE_DERIVED_TAGS LUNAR_VAR_OWNER_FORMAT \
           LUNAR_VAR_DEFAULT_OWNER LUNAR_VAR_DEFAULT_DOMAIN \
           LUNAR_VAR_ALLOW_IGNORE_ANNOTATION LUNAR_VAR_IGNORE_ANNOTATION \
+          LUNAR_VAR_HIERARCHY_REPOS LUNAR_VAR_HIERARCHY_PATHS \
           MOCK_LUNAR_FAIL MOCK_ORG_REPOS 2>/dev/null || true
     export LUNAR_VAR_REPOS="acme/monorepo"
     export LUNAR_SECRET_GH_TOKEN="stub-token"
@@ -125,7 +140,15 @@ place() {
     cp "$FIXTURES_DIR/$1" "$dest"
 }
 
-fresh_repo() { rm -rf "$REPO_DIR"; mkdir -p "$REPO_DIR"; }
+# place_in <owner/repo> <fixture-basename> <path-in-repo> — a file in a repo
+# other than the default one (served from MOCK_REPOS_ROOT).
+place_in() {
+    local dest="$MOCK_REPOS_ROOT/$1/$3"
+    mkdir -p "$(dirname "$dest")"
+    cp "$FIXTURES_DIR/$2" "$dest"
+}
+
+fresh_repo() { rm -rf "$REPO_DIR" "$MOCK_REPOS_ROOT"; mkdir -p "$REPO_DIR"; }
 reset_out()  { : > "$TEST_DIR/components.out"; : > "$TEST_DIR/domains.out"; }
 
 merged_components() {
@@ -155,6 +178,16 @@ run_main() {
     local log
     if log=$("$SCRIPT_DIR/main.sh" 2>&1); then :; else
         echo "  main.sh exited non-zero:"; echo "$log" | indent; FAILED=$((FAILED+1)); return 1
+    fi
+    printf '%s\n' "$log" > "$TEST_DIR/main.log"
+}
+
+# assert_log <label> <grep -E pattern> — the last successful run logged it.
+assert_log() {
+    if grep -qE "$2" "$TEST_DIR/main.log"; then
+        echo "  [$1] OK"; PASSED=$((PASSED+1))
+    else
+        echo "  [$1] FAIL — log has no match for: $2"; indent < "$TEST_DIR/main.log"; FAILED=$((FAILED+1))
     fi
 }
 
@@ -387,6 +420,113 @@ assert "explicit repo scanned regardless of topic; discovery still topic-gated" 
     '(has("github.com/acme/explicit/services/payments"))
      and (has("github.com/acme/svc-a/services/payments"))
      and (has("github.com/acme/svc-b/services/payments") | not)' ''
+
+# ── Hierarchy: Component → System (spec.domain) → Domain (subdomainOf) ────
+# The hierarchy is collected from every file in the scan set before any
+# component is created, so a chain declared outside the Component's file still
+# resolves to one dotted domain path.
+SD='github.com/acme/monorepo/services/build-api'
+FULL='engineering.developer-platform.build-tools'
+
+echo "── hierarchy_separate_file ──"
+fresh_repo; reset_out; reset_env
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place hier_chain.yaml     "catalog/catalog-info.yaml"      # no Component: skipped as a component, read for the chain
+run_main
+assert "chain in another file resolves to the full dotted path" \
+    "(.[\"$SD\"].domain == \"$FULL\")
+     and (has(\"github.com/acme/monorepo/catalog\") | not)" \
+    "(.[\"engineering\"] == {description: \"All engineering\", owner: \"group:default/platform\"})
+     and (.[\"engineering.developer-platform\"] == {owner: \"group:default/platform\"})
+     and (.[\"$FULL\"] == {description: \"Build and release tooling\", owner: \"group:default/team-build\"})
+     and (keys | length == 3)"
+
+echo "── hierarchy_in_excluded_root ──"
+fresh_repo; reset_out; reset_env
+place hier_colocated.yaml "catalog-info.yaml"               # root: excluded from component creation by default
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+run_main
+assert "excluded root still supplies the chain; root is not a component" \
+    "(.[\"$SD\"].domain == \"$FULL\") and (has(\"github.com/acme/monorepo\") | not)" \
+    "has(\"$FULL\")"
+
+echo "── hierarchy_colocated ──"
+fresh_repo; reset_out; reset_env
+place hier_colocated.yaml "services/build-api/catalog-info.yaml"
+run_main
+assert "chain in the Component's own file resolves" \
+    ".[\"$SD\"].domain == \"$FULL\"" "has(\"engineering\") and has(\"engineering.developer-platform\")"
+
+echo "── hierarchy_repos_with_paths ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_HIERARCHY_REPOS="acme/catalog" LUNAR_VAR_HIERARCHY_PATHS="domains/*.yaml,systems/*.yaml"
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place_in acme/catalog hier_domain_engineering.yaml "domains/engineering.yaml"
+place_in acme/catalog hier_domain_platform.yaml  "domains/developer-platform.yaml"
+place_in acme/catalog hier_system.yaml             "systems/build-tools.yaml"
+place_in acme/catalog payments.yaml                "services/payments/catalog-info.yaml"   # never a component here
+run_main
+assert "central repo supplies the chain (full refs normalized); it creates no components" \
+    "(.[\"$SD\"].domain == \"$FULL\")
+     and ([keys[] | select(startswith(\"github.com/acme/catalog\"))] | length == 0)" \
+    "(.[\"$FULL\"].description == \"Build and release tooling\") and has(\"engineering.developer-platform\")"
+
+echo "── hierarchy_repos_without_paths (control) ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_HIERARCHY_REPOS="acme/catalog"
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place_in acme/catalog hier_domain_engineering.yaml "domains/engineering.yaml"
+place_in acme/catalog hier_domain_platform.yaml  "domains/developer-platform.yaml"
+place_in acme/catalog hier_system.yaml             "systems/build-tools.yaml"
+run_main
+assert "without hierarchy_paths the non-catalog-info files are not read" \
+    ".[\"$SD\"].domain == \"build-tools\"" '.["build-tools"] == {}'
+
+echo "── hierarchy_partial_chain ──"
+fresh_repo; reset_out; reset_env
+place hier_component.yaml   "services/build-api/catalog-info.yaml"
+place hier_system_only.yaml "catalog/catalog-info.yaml"
+run_main
+assert "a parent declared nowhere contributes its bare name and stops the walk" \
+    ".[\"$SD\"].domain == \"developer-platform.build-tools\"" \
+    '(.["developer-platform.build-tools"].owner == "group:default/team-build") and (keys | length == 1)'
+
+echo "── hierarchy_cycle ──"
+fresh_repo; reset_out; reset_env
+place hier_cycle.yaml "services/loop/catalog-info.yaml"
+run_main
+assert "a subdomainOf cycle is broken, not looped" \
+    '.["github.com/acme/monorepo/services/loop"].domain == "beta.alpha.loop"' ''
+
+echo "── hierarchy_conflict ──"
+fresh_repo; reset_out; reset_env
+place hier_component.yaml        "services/build-api/catalog-info.yaml"
+place hier_chain.yaml            "catalog/catalog-info.yaml"
+place hier_conflict_system.yaml  "zz-other/catalog-info.yaml"     # read after catalog/: the last one wins
+run_main
+assert "conflicting System definitions: the last read wins" \
+    ".[\"$SD\"].domain == \"data-platform.build-tools\"" ''
+assert_log "conflict is logged with both sources" \
+    'System build-tools has different parents: .*catalog/catalog-info.yaml.*zz-other/catalog-info.yaml'
+
+echo "── hierarchy_malformed_entity ──"
+fresh_repo; reset_out; reset_env
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place hier_chain.yaml     "catalog/catalog-info.yaml"
+place hier_malformed.yaml "broken/catalog-info.yaml"
+run_main
+assert "a malformed System is dropped; the rest still resolves" \
+    ".[\"$SD\"].domain == \"$FULL\"" '(has("broken") | not) and (keys | length == 3)'
+
+echo "── hierarchy_annotation_wins ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_DOMAIN_ANNOTATION="acme.com/lunar-domain"
+place hier_annotated.yaml "services/build-api/catalog-info.yaml"
+place hier_chain.yaml     "catalog/catalog-info.yaml"
+run_main
+assert "domain_annotation is used as-is even when the chain resolves" \
+    ".[\"$SD\"].domain == \"platform.builds\"" \
+    "(.[\"platform.builds\"] == {}) and has(\"$FULL\")"
 
 # ── Scenario: hard write failure propagates (non-zero exit → hub retries) ──
 # Regression guard for the `if create_component` bug: a failed `lunar catalog

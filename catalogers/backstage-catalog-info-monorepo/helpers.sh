@@ -1,22 +1,22 @@
 #!/bin/bash
 #
-# helpers.sh — shared create pipeline for the backstage-catalog-info-monorepo
+# helpers.sh — shared pipeline for the backstage-catalog-info-monorepo
 # cataloger.
 #
-# The entrypoint (main.sh) discovers every catalog-info.yaml in a repo and, for
-# each one, calls `create_component` with a component id it built from the
-# file's path (repo-level for a root file, `…/<dir>` for a file in a
-# subdirectory) and the file body. `create_component` parses the file, picks
-# its single `Component` entity, and writes owner / domain / tags to
-# `.components["<id>"]` (plus a `.domains` stub) in the Catalog JSON.
+# main.sh runs two passes over the scan set. Pass 1 hands every fetched file to
+# `collect_hierarchy`, which keeps its `Domain` / `System` entities. main.sh
+# then resolves the hierarchy once (`resolve_hierarchy`), writes a `.domains`
+# row per declared Domain / System (`hierarchy_domain_rows`), and in pass 2
+# calls `create_component` for each catalog-info file, which picks the file's
+# single `Component` and writes owner / domain / tags to `.components["<id>"]`.
 #
-# The owner/domain/tags transform and the domain-stub write are intentionally
-# identical to the `backstage-catalog-info` cataloger's `helpers.sh` — this
-# cataloger CREATES the component (keyed to the discovered file's path) instead
-# of augmenting an existing one, but the projection of a Backstage `Component`
-# into Lunar catalog fields is the same. The two plugins are distributed
-# independently (each `uses:` pulls only its own directory), so the shared logic
-# is duplicated here rather than sourced across plugins.
+# The owner / tag transform and the dotted-path resolver match the
+# `backstage-catalog-info` cataloger's helpers.sh and catalogers/backstage —
+# change them together. The difference is scope: this cataloger resolves a
+# Component's System / Domain chain across every file it scans, not just the
+# file the Component is in. The plugins are distributed independently (each
+# `uses:` pulls only its own directory), so the logic is duplicated rather than
+# sourced across plugins.
 #
 # Transform inputs read here (LUNAR_VAR_*):
 #   domain_annotation        (default empty → use spec.domain / spec.system)
@@ -28,9 +28,142 @@
 #   allow_ignore_annotation  (default false)
 #   ignore_annotation        (default lunar.io/ignore)
 #
-# Discovery inputs (repos, filenames, branch, exclude_paths,
-# component_id_prefix) and the secret (GH_TOKEN) are handled by the entrypoint,
-# not here.
+# Discovery inputs (repos, orgs, hierarchy_repos, hierarchy_paths, filenames,
+# branch, exclude_paths, component_id_prefix) and the secret (GH_TOKEN) are
+# handled by the entrypoint, not here.
+
+# Resolved hierarchy, set by main.sh after pass 1. Empty maps (a scan with no
+# Domain / System entities) make every lookup fall back to the bare name.
+HIERARCHY_MAP='{"domains":{},"systems":{}}'
+HIERARCHY_ROWS='{}'
+
+# collect_hierarchy <yaml_file> <source_path> <out_jsonl>
+#
+# Appends each `Domain` / `System` entity in the file to <out_jsonl>, one JSON
+# object per line, tagged with its source path for conflict warnings. Reads
+# every file it's given — including files skipped for component creation — so
+# a hierarchy declared anywhere in the scan set resolves. Unparseable files are
+# logged and skipped.
+collect_hierarchy() {
+    local file="$1" src="$2" out="$3" entities
+    if ! entities=$(yq ea '[.]' -o=json "$file" 2>/dev/null); then
+        echo "yq parse failed for $src — not reading its Domain/System entities"
+        return 0
+    fi
+    # Malformed entities (non-object metadata / spec) are dropped here so they
+    # can't break the resolver for the whole run.
+    if ! echo "$entities" | jq -c --arg src "$src" '
+        .[]
+        | select(type == "object")
+        | select((.kind // "") == "Domain" or (.kind // "") == "System")
+        | select(((.metadata // {}) | type) == "object" and ((.spec // {}) | type) == "object")
+        | select(((.metadata.name // "") | tostring | length) > 0)
+        | . + {__src: $src}' >> "$out"; then
+        echo "Could not read Domain/System entities from $src — skipping"
+    fi
+}
+
+# resolve_hierarchy <entities_json_array_file>
+#
+# Prints {domains: {name: dotted-path}, systems: {name: dotted-path}}. Lunar
+# encodes hierarchy as dotted names (`a.b.c` is a child of `a.b`): a Domain's
+# key is its full `spec.subdomainOf` ancestry, and a System nests under the
+# domain it belongs to (`spec.domain`). A reference to a parent that wasn't
+# collected contributes its bare name as one segment and stops the walk there.
+# Cycles are broken defensively so a malformed catalog can't hang the run.
+resolve_hierarchy() {
+    jq '
+        def bare(s):
+            if (s | type) != "string" or s == "" then s
+            elif (s | contains("/")) then (s | split("/") | last)
+            else s
+            end;
+
+        ( [ .[] | select(.kind == "Domain")
+            | { key: (.metadata.name | tostring),
+                value: ((.spec.subdomainOf // "") | tostring | if . == "" then null else bare(.) end) } ]
+          | from_entries ) as $domain_parent
+        | ( [ .[] | select(.kind == "System")
+              | { key: (.metadata.name | tostring),
+                  value: ((.spec.domain // "") | tostring | if . == "" then null else bare(.) end) } ]
+            | from_entries ) as $system_parent
+        | ( def dpath($n; $seen):
+              if $n == null or $n == "" then []
+              elif ($seen | index($n)) then []
+              else ($domain_parent[$n] // null) as $p
+                   | (if $p == null then [$n] else dpath($p; $seen + [$n]) + [$n] end)
+              end;
+            {
+              domains: ( [ $domain_parent | keys[] as $k
+                           | { key: $k, value: (dpath($k; []) | join(".")) } ] | from_entries ),
+              systems: ( [ $system_parent | to_entries[] | .key as $k | (.value) as $dom
+                           | { key: $k,
+                               value: (if $dom == null then $k
+                                       else (dpath($dom; []) | join(".")) as $dp
+                                            | (if $dp == "" then $k else $dp + "." + $k end)
+                                       end) } ] | from_entries )
+            } )
+        ' "$1"
+}
+
+# hierarchy_domain_rows <entities_json_array_file> <hierarchy_map_json>
+#
+# Prints one `.domains` row per declared Domain / System, keyed by its dotted
+# path and carrying its description / owner.
+hierarchy_domain_rows() {
+    local OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
+    local DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+    jq \
+        --argjson paths "$2" \
+        --arg owner_format "$OWNER_FORMAT" \
+        --arg default_owner "$DEFAULT_OWNER" \
+        '
+        def bare(s):
+            if (s | type) != "string" or s == "" then s
+            elif (s | contains("/")) then (s | split("/") | last)
+            else s
+            end;
+
+        def format_owner(o):
+            if $owner_format == "bare-name" then bare(o) else o end;
+
+        [ .[]
+          | (.metadata.name | tostring) as $name
+          | (if .kind == "System" then ($paths.systems[$name] // $name)
+             else ($paths.domains[$name] // $name) end) as $key
+          | (.spec.owner // "" | tostring) as $raw_owner
+          | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
+          | (.metadata.description // "" | tostring) as $desc
+          | { key: $key, value:
+              ({}
+               + (if $desc != "" then {description: $desc} else {} end)
+               + (if $owner != "" then {owner: $owner} else {} end)) } ]
+        | from_entries
+        ' "$1"
+}
+
+# hierarchy_conflicts <entities_json_array_file>
+#
+# Prints one line per Domain / System name declared with different parents in
+# different files. The resolver keeps the last one read.
+hierarchy_conflicts() {
+    jq -r '
+        def bare(s):
+            if (s | type) != "string" or s == "" then s
+            elif (s | contains("/")) then (s | split("/") | last)
+            else s
+            end;
+        def parent:
+            (if .kind == "System" then .spec.domain else .spec.subdomainOf end) // ""
+            | tostring | bare(.);
+
+        group_by([.kind, (.metadata.name | tostring)])[]
+        | select((map(parent) | unique | length) > 1)
+        | "\(.[0].kind) \(.[0].metadata.name) has different parents: "
+          + (map("\(parent | if . == "" then "<none>" else . end) (\(.__src))") | join(", "))
+          + " — using the last"
+        ' "$1"
+}
 
 # create_component <component_id> <catalog_info_yaml> [source_path]
 #
@@ -119,6 +252,7 @@ create_component() {
         --arg default_owner "$DEFAULT_OWNER" \
         --arg domain_annotation "$DOMAIN_ANNOTATION" \
         --arg default_domain "$DEFAULT_DOMAIN" \
+        --argjson paths "$HIERARCHY_MAP" \
         '
         def bare(s):
             if (s | type) != "string" or s == "" then s
@@ -137,9 +271,12 @@ create_component() {
             else "" end) as $annotated_domain
         | (.spec.domain // "" | tostring) as $raw_domain
         | (.spec.system // "" | tostring) as $raw_system
+        # Explicit overrides (domain annotation, default_domain) are used as-is;
+        # spec.domain / spec.system resolve to their dotted path when the
+        # hierarchy declares them, else fall back to the bare name.
         | (if ($annotated_domain | length) > 0 then $annotated_domain
-            elif ($raw_domain | length) > 0 then $raw_domain
-            elif ($raw_system | length) > 0 then bare($raw_system)
+            elif ($raw_domain | length) > 0 then ($paths.domains[bare($raw_domain)] // $raw_domain)
+            elif ($raw_system | length) > 0 then (bare($raw_system) as $sn | $paths.systems[$sn] // $sn)
             elif ($default_domain | length) > 0 then $default_domain
             else "" end) as $domain
         | (.metadata.tags // []) as $base_tags
@@ -160,46 +297,15 @@ create_component() {
     echo "$ENTRY" | jq .
 
     # --- Write to Catalog JSON -------------------------------------------------
-    # Hub `validateDomainRefs` rejects (and silently drops) the entire catalog
-    # merge save if a component references a domain that isn't present under
-    # `.domains`. Write the domain stub first. If the same file carries a
-    # `kind: Domain` / `kind: System` entity with a matching `metadata.name`,
-    # propagate its description + owner so the domain row is informative.
+    # Hub domain validation drops a component whose domain isn't declared under
+    # `.domains`. main.sh already wrote a row for every declared Domain /
+    # System; add an empty stub only for a domain that isn't one of them (an
+    # annotation, a literal spec.domain, default_domain, or an unresolved ref).
     local DOMAIN_NAME
     DOMAIN_NAME=$(echo "$ENTRY" | jq -r '.domain // ""')
-    if [ -n "$DOMAIN_NAME" ]; then
-        local DOMAIN_VALUE
-        DOMAIN_VALUE=$(echo "$ENTITIES" | jq \
-            --arg name "$DOMAIN_NAME" \
-            --arg owner_format "$OWNER_FORMAT" \
-            --arg default_owner "$DEFAULT_OWNER" \
-            '
-            def bare(s):
-                if (s | type) != "string" or s == "" then s
-                elif (s | contains("/")) then (s | split("/") | last)
-                else s
-                end;
-
-            def format_owner(o):
-                if $owner_format == "bare-name" then bare(o) else o end;
-
-            ([.[]
-              | select((.kind // "") == "Domain" or (.kind // "") == "System")
-              | select(((.metadata.name // "") | tostring) == $name)]
-             | first) as $d
-            | if $d == null then {}
-              else
-                (($d.spec.owner // "" | tostring) as $raw_owner
-                 | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
-                 | ($d.metadata.description // "" | tostring) as $desc
-                 | ({}
-                    + (if $desc != "" then {description: $desc} else {} end)
-                    + (if $owner != "" then {owner: $owner} else {} end)))
-              end
-            ')
-        echo "Writing domain '$DOMAIN_NAME':"
-        echo "$DOMAIN_VALUE" | jq .
-        if echo "$DOMAIN_VALUE" | jq --arg name "$DOMAIN_NAME" '{($name): .}' | lunar catalog raw --json '.domains' -; then
+    if [ -n "$DOMAIN_NAME" ] && ! echo "$HIERARCHY_ROWS" | jq -e --arg d "$DOMAIN_NAME" 'has($d)' >/dev/null; then
+        echo "Writing domain stub '$DOMAIN_NAME'"
+        if jq -n --arg name "$DOMAIN_NAME" '{($name): {}}' | lunar catalog raw --json '.domains' -; then
             echo "Wrote domain '$DOMAIN_NAME'"
         else
             echo "Failed to write domain '$DOMAIN_NAME'" >&2

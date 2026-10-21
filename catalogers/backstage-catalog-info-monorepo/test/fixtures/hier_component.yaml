@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: build-api
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/team-build
+  system: build-tools

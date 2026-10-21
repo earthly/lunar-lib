@@ -89,6 +89,7 @@ test:
     BUILD ./collectors/datadog+test
     BUILD ./collectors/argocd-deployment-tracking+test
     BUILD ./catalogers/backstage+test
+    BUILD --pass-args ./catalogers/backstage-catalog-info-monorepo+test
     BUILD --pass-args ./catalogers/github-org+test
     BUILD --pass-args ./catalogers/moon+test
     BUILD ./probes/pr-title-ticket-ref+test

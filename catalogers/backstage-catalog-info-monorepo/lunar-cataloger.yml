@@ -42,8 +42,17 @@ example_catalog_json: |
       }
     },
     "domains": {
-      "platform.payments": {},
-      "platform.frontend": {}
+      "platform": {
+        "description": "Platform engineering",
+        "owner": "group:default/team-platform"
+      },
+      "platform.payments": {
+        "description": "Payments platform — billing, ledger, settlement",
+        "owner": "group:default/team-payments"
+      },
+      "platform.frontend": {
+        "owner": "group:default/team-web"
+      }
     }
   }
 
@@ -64,15 +73,17 @@ catalogers:
       `<dir>/catalog-info.yaml` maps to the monorepo subcomponent
       `<component_id_prefix><owner>/<repo>/<dir>`. The matching
       `Component` entity's owner, domain, and tags are written onto
-      the created component (identical shaping to the
-      `backstage-catalog-info` cataloger), plus a `.domains` stub for
-      every referenced domain. Runs daily — pair with
-      `discover-on-commit` (below) to also run on every push.
+      the created component. Its domain resolves to a dotted path
+      through the Backstage System / Domain hierarchy declared in any
+      scanned file (`spec.system` → System `spec.domain` → Domain
+      `spec.subdomainOf`), and every declared Domain / System gets a
+      `.domains` row. Runs daily — pair with `discover-on-commit`
+      (below) to also run on every push.
     mainBash: main.sh
     hook:
       type: cron
       schedule: "0 3 * * *"
-    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership", "topics", "org"]
+    keywords: ["service catalog", "backstage", "catalog-info", "components", "discovery", "monorepo", "create", "ownership", "topics", "org", "domain hierarchy"]
 
   - name: discover-on-commit
     description: |
@@ -111,6 +122,28 @@ inputs:
       instead of maintaining a `repos` list. Empty (the default)
       disables discovery. The `GH_TOKEN` secret must be able to list
       the org's repos.
+    default: ""
+
+  hierarchy_repos:
+    description: |
+      Comma-separated list of `<owner>/<repo>` repositories read only
+      for Backstage `Domain` / `System` entities, never for components
+      (e.g. a central catalog repo, `acme/software-catalog`). Their
+      catalog-info files and `hierarchy_paths` matches feed the domain
+      hierarchy that scanned Components resolve against. A push to one
+      of these repos doesn't trigger `discover-on-commit`. Empty (the
+      default) reads the hierarchy from the scanned repos only.
+    default: ""
+
+  hierarchy_paths:
+    description: |
+      Comma-separated list of path globs, relative to each repo root,
+      for files to read for Backstage `Domain` / `System` entities in
+      addition to `filenames` (e.g. `catalog/domains/*.yaml,catalog/systems/*.yaml`).
+      Matched like `exclude_paths`, and `*` also matches `/`. Applies
+      to the scanned repos and `hierarchy_repos`. Files matched only
+      here never become components. Empty (the default) reads only
+      catalog-info files.
     default: ""
 
   allowed_topics:

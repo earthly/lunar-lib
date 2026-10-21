@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: build-tools
+  description: Build and release tooling
+spec:
+  owner: group:default/team-build
+  domain: domain:default/developer-platform
