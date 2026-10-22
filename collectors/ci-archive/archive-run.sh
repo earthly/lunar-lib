@@ -123,20 +123,33 @@ if [ "$(jq 'length' "$WORK/jobs.json")" -eq 0 ]; then
 else
   # GitHub creates a job's log only when the job completes, so allow a short
   # lag after the run finishes. The 302 target is fetched without the token.
-  code=""; loc=""
-  for attempt in 1 2 3 4 5 6; do
-    out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 60 \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer ${GH_TOKEN}" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      "${API_BASE}/repos/${REPO}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/logs" 2>/dev/null) || out="000 "
-    code="${out%% *}"; loc="${out#* }"
-    case "$code" in 000|404|429|5??) sleep $((attempt * 5)); continue ;; esac
-    break
+  logs_link() {
+    local attempt out
+    code=""; loc=""
+    for attempt in 1 2 3 4 5 6; do
+      out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 60 \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${GH_TOKEN}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "${API_BASE}/repos/${REPO}/actions/runs/${RUN_ID}/attempts/${ATTEMPT}/logs" 2>/dev/null) || out="000 "
+      code="${out%% *}"; loc="${out#* }"
+      case "$code" in 000|404|429|5??) sleep $((attempt * 5)); continue ;; esac
+      break
+    done
+    [ "$code" = "302" ] || { log "ERROR: downloading logs for run ${RUN_ID} attempt ${ATTEMPT} returned HTTP ${code}."; exit 1; }
+  }
+  # GitHub's storage can drop a large archive partway through (curl exit 92,
+  # an HTTP/2 stream reset, which --retry doesn't cover), and the signed link
+  # is short-lived, so each retry starts from a fresh link.
+  for download in 1 2 3; do
+    logs_link
+    status=0
+    curl -sS -f -o "$WORK/logs.zip" --max-time 900 --retry 2 --max-filesize "$MAX_BYTES" "$loc" 2>/dev/null || status=$?
+    case "$status" in 0|63) break ;; esac
+    [ "$download" -lt 3 ] || break
+    log "log archive download failed (curl exit ${status}); retrying with a fresh link."
+    sleep $((download * 5))
   done
-  [ "$code" = "302" ] || { log "ERROR: downloading logs for run ${RUN_ID} attempt ${ATTEMPT} returned HTTP ${code}."; exit 1; }
-  status=0
-  curl -sS -f -o "$WORK/logs.zip" --max-time 900 --retry 2 --max-filesize "$MAX_BYTES" "$loc" 2>/dev/null || status=$?
   if [ "$status" -eq 63 ]; then
     log "ERROR: the log archive is over max-archive-mb (${MAX_ARCHIVE_MB} MB); nothing uploaded."
     exit 1
