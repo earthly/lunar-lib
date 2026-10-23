@@ -82,7 +82,7 @@
   "github.com/earthly/lunar-actions": {
     "tags": [],
     "meta": {
-      "description": "Installs the Lunar agent in a GHA job",
+      "description": "Installs the Lunar CI/CD Tracer in a GHA job",
       "visibility": "PUBLIC",
       "archived": "false"
     }

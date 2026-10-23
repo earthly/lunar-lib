@@ -27,7 +27,7 @@ Lunar connects to your engineering ecosystem through two integration points:
 
 1. **GitHub App**: A one-click installation that monitors your code repositories, reacts to code changes, and provides PR feedback.
 
-2. **CI/CD Agent**: A lightweight agent that runs alongside your CI/CD runners and detects pipeline processes via syscalls. Compatible with all major CI vendors.
+2. **CI/CD Tracer**: A lightweight tracer that runs alongside your CI/CD runners and detects pipeline processes via syscalls. Compatible with all major CI vendors.
 
 Both integrations are centralized—no repo-by-repo setup required.
 
