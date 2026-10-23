@@ -37,9 +37,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ### `entity-ref-valid` — entity references on infrastructure resources
 
-Unlike the other checks, `entity-ref-valid` does not read `catalog-info.yaml`, so `skip_when_no_catalog_info` doesn't affect it. It reads `.catalog.entity_refs`, written by the collector's `entity-refs` sub-collector from the resource tags an IaC collector recorded, and enforces that those references are well-formed (`[<kind>:][<namespace>/]<name>`) and resolve in the Backstage catalog. Optionally require a specific kind via the `entity_ref_kind` input (e.g. `component`).
-
-Concern split: whether a resource *carries* the tag at all is owned by the `terraform` policy's `aws-resources-tagged` check; whether the tag's *value* is a valid, existing Backstage entity is owned by this check. It skips (passes) when resolution didn't run — no `backstage_url`, or no IaC tag data — and skips an individual reference the collector couldn't resolve due to a transient Backstage error, so neither an unconfigured collector nor an outage turns it red. Unresolved Terraform expressions (`${var.x}`) are reported as skipped, since without `terraform plan` there is no concrete value to verify.
+`entity-ref-valid` reads `.catalog.entity_refs`, not `catalog-info.yaml`, so `skip_when_no_catalog_info` doesn't affect it. It fails when a reference is malformed (`[<kind>:][<namespace>/]<name>`), doesn't exist in Backstage, or isn't the `entity_ref_kind` you set. It skips when resolution didn't run (no `backstage_url` or no IaC tag data), and skips a reference whose lookup errored or whose value is an unresolved Terraform expression. Whether a resource carries the tag at all is checked by the `terraform` policy's `aws-resources-tagged`.
 
 ## Required Data
 

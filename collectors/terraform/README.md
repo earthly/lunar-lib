@@ -35,23 +35,17 @@ Each `.iac.modules[].resources[]` entry:
 | `category` | string | `datastore` / `compute` / `network` / `security` / `other` |
 | `has_prevent_destroy` | bool | Whether the resource sets `lifecycle { prevent_destroy = true }` |
 | `internet_facing` | bool | Present (`true`) only for internet-facing load balancers / gateways |
-| `tags` | object | The literal `tags = {}` map declared on the resource. Present only when the resource declares a literal tag map. Values are as-written — an interpolated value (`${var.x}`) is kept verbatim. |
-| `tags_unresolved` | array | Tag keys in `tags` whose **value** is an unresolved expression (`${...}`). Present only when non-empty. A policy should skip/warn on the value of these keys (the key is present, but the value can't be verified without `terraform plan`). |
-| `tags_expression` | bool | Present (`true`) only when the resource's `tags` attribute is itself a non-object expression (e.g. `tags = merge(local.common, {...})`). In this case no keys can be extracted; a policy should skip/warn rather than treat the resource as untagged. |
+| `tags` | object | The literal `tags = {}` map, as written: an interpolated value stays `${var.x}`. Present only when the resource declares a literal map. |
+| `tags_unresolved` | array | Keys in `tags` whose value is an unresolved expression (`${...}`). Present only when non-empty. |
+| `tags_expression` | bool | `true` when `tags` is itself an expression (e.g. `merge(local.common, {...})`), so no keys can be read. Present only when true. |
 
-### Why tag values may be unresolved (hcl2json never evaluates)
+### Tags are not evaluated
 
-`hcl2json` is a purely syntactic HCL→JSON transform; it does **not** run `terraform plan`. As a result:
+`hcl2json` parses HCL without running `terraform plan`, so:
 
-- **Provider `default_tags` are invisible per-resource.** They live on the `provider "aws"` block, not on each resource. This collector captures them once per module at `.iac.modules[].default_tags` so a policy can treat every resource in the module as carrying those keys by default (and not false-positive on a repo that correctly uses `default_tags`).
-- **Interpolated values arrive as literal strings.** `tags = { "k" = var.v }` comes through as `"k": "${var.v}"`, and `tags = merge(...)` comes through as the whole value being a string. The collector flags these (`tags_unresolved`, `tags_expression`) so value-level checks skip/warn instead of mis-verifying.
-- **Module-provisioned resources aren't in the HCL.** Resources created inside a called module are module inputs, not `resource` blocks, so they don't appear in `.iac.modules[].resources[]` at all.
-
-### Interpreting tag values
-
-Tags are collected **generically** — this collector records the tag keys and values a resource declares and assigns **no meaning to any particular key**. It knows nothing about service catalogs, cost-allocation schemes, or any other tagging convention.
-
-Interpreting a tag *value* is a separate concern owned by the collector for that system. For example, resolving a Backstage entity-reference tag (`[<kind>:][<namespace>/]<name>`) against a live Backstage catalog is done by the [`backstage` collector](../backstage/README.md)'s `entity-refs` sub-collector, which reads the tags this collector wrote and records the lookup results under `.catalog.entity_refs`. That keeps Terraform parsing and catalog resolution independently useful and independently configurable.
+- Provider `default_tags` sit on the `provider "aws"` block, not on each resource; they're recorded once per module at `.iac.modules[].default_tags`.
+- Interpolated values arrive as literal strings (`"${var.v}"`) and `tags = merge(...)` as a single string; both are flagged (`tags_unresolved`, `tags_expression`).
+- Resources created inside a called module aren't `resource` blocks in this repo, so they're absent from `resources[]`.
 
 ## Collectors
 

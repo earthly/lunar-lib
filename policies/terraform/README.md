@@ -62,11 +62,11 @@ The check below governs **resource tagging**. It reads the normalized `.iac.modu
 |--------|-------------|-----------------|
 | `aws-resources-tagged` | Every taggable AWS resource carries the required tag key(s) | A non-exempt resource is missing a `required_tags` key (on neither its own `tags` nor the module's `default_tags`) |
 
-This check is about tag **presence** only — it assigns no meaning to any tag value. Validating what a tag *value* means (for example that a service-catalog entity reference resolves) belongs to the policy for that system: see the `backstage` policy's `entity-ref-valid` check.
+It checks only that the key is present. To check that an entity-reference value resolves, use the `backstage` policy's `entity-ref-valid`.
 
 ### How `aws-resources-tagged` handles unresolvable data
 
-`hcl2json` never runs `terraform plan`, so the collector flags values it cannot resolve and this check **skips rather than mis-verifies** them:
+The collector doesn't evaluate HCL, so:
 
 - A resource whose `tags` attribute is an expression (`tags = merge(...)`, flagged `tags_expression`) is skipped — its keys can't be listed, so it can't be judged missing.
 - A tag key present but with an interpolated value (`${var.x}`, listed in `tags_unresolved`) counts as **present**: this check tests presence, and the key is genuinely there.
@@ -81,7 +81,7 @@ This policy reads from the following Component JSON paths:
 | `.iac.native.terraform.files[]` | array | `terraform` collector (all checks except `aws-resources-tagged`) |
 | `.iac.modules[]` | array | `terraform` collector (`aws-resources-tagged`) |
 
-**Note:** Ensure the `terraform` collector is configured before enabling this policy. All inputs (including the tagging inputs `required_tags` and `exempt_resource_types`) are documented in `lunar-policy.yml`.
+**Note:** Ensure the `terraform` collector is configured before enabling this policy.
 
 ## Installation
 
@@ -160,11 +160,9 @@ policies:
       required_tags: "backstage.com/entity_ref,cost-center"
 ```
 
-To additionally verify that a service-catalog entity-reference tag *resolves* in
-Backstage, add the `backstage` collector (with `backstage_url`) and enable the
-`backstage` policy's `entity-ref-valid` check — see the
-[`backstage` policy](../backstage/README.md). Presence and value-validity are
-deliberately separate checks in separate plugins.
+To also check that the entity-reference tag resolves, add the `backstage`
+collector (with `backstage_url`) and the [`backstage` policy](../backstage/README.md)'s
+`entity-ref-valid`.
 
 ## Examples
 
@@ -273,9 +271,6 @@ With `required_tags: backstage.com/entity_ref`, given the normalized module view
 - `aws_db_instance.main` — **passes** (required tag key present).
 - `aws_s3_bucket.logs` — **fails** (no `backstage.com/entity_ref`, and none via `default_tags`).
 - `aws_lb.api` — **skipped** (`tags_expression`: keys can't be extracted from `merge(...)`).
-
-Whether `component:default/payment-api` actually exists in Backstage is checked
-separately by the `backstage` policy's `entity-ref-valid`.
 
 ## Remediation
 

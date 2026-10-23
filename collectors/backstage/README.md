@@ -51,7 +51,7 @@ By default the lookup is a direct `by-name` fetch, whose HTTP status is the answ
 
 ### Entity references on infrastructure resources (`.catalog.entity_refs`)
 
-The `entity-refs` sub-collector resolves Backstage entity references that were tagged onto infrastructure resources. It is the Backstage-specific counterpart to generic IaC tag collection: the [`terraform` collector](../terraform/README.md) records resource tags without assigning meaning to any key, and this sub-collector interprets one of those keys as a Backstage entity reference.
+The `entity-refs` sub-collector resolves the entity references tagged onto infrastructure resources, reading the `entity_ref_tag_key` tag that the [`terraform` collector](../terraform/README.md) records.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -63,15 +63,12 @@ The `entity-refs` sub-collector resolves Backstage entity references that were t
 
 How it works:
 
-- Fires on the **`after-json`** hook with `path: .iac.modules`, so it runs at the doneness gate once an IaC collector has written its normalized modules. It reads the merged Component JSON via `lunar component get-json` — no repo checkout needed.
-- Collects every distinct value of the `entity_ref_tag_key` tag across `.iac.modules[].resources[].tags` and `.iac.modules[].default_tags`, then resolves each **once** with the same lookup as `.refs`: [`ref_lookup`](#lookup-endpoint-ref_lookup), [`api_path_prefix`](#api-path-prefix) and [`auth_mode`](#aws-sigv4-authentication-iam-role-signed) all apply. Deduplicating means one lookup per reference no matter how many resources share it.
-- `exists` follows the same rules as `.refs`. A non-definitive lookup (timeout, `5xx`, auth failure) records `error` instead, so a Backstage outage stays distinguishable from a real miss and the policy skips rather than fails.
-- `resources[]` lists the `<type>.<name>` resources carrying the reference, so a policy failure can name the offending resources.
-- A value like `${var.entity_ref}` is an unresolved Terraform expression — `hcl2json` never runs `terraform plan`, so there is no concrete value. Those are reported under `unresolved[]` and never looked up.
-- Namespace resolution mirrors Backstage's own: a qualified ref (`ns/name`) carries its own namespace, a bare ref uses `default`.
-- When `backstage_url` is unset, or the component has no IaC tag data, nothing is written and the policy's `entity-ref-valid` check skips (passes).
-
-> **Why `.catalog.entity_refs` and not `.catalog.native.backstage.*`?** The presence of `.catalog.native.backstage` is the "a `catalog-info.yaml` exists" signal that several checks (`catalog-info-exists`, `owner-set`, `lifecycle-set`, …) key off. Writing entity-ref results under it would make that object exist on a repo with no catalog file, silently flipping those checks. `.catalog.entity_refs` sits at the normalized category level alongside `.catalog.entity` and `.catalog.annotations`, so the two concerns stay independent.
+- Runs on the `after-json` hook (`path: .iac.modules`) once an IaC collector has written its modules, and reads the merged Component JSON, so no repo checkout is needed.
+- Resolves each distinct tag value across resource `tags` and module `default_tags` once, with the same [`ref_lookup`](#lookup-endpoint-ref_lookup), [`api_path_prefix`](#api-path-prefix) and [`auth_mode`](#aws-sigv4-authentication-iam-role-signed) as `.refs`. A bare ref uses the `default` namespace.
+- A lookup that fails (timeout, `5xx`, auth) records `error` instead of `exists`, so the policy skips rather than fails.
+- `resources[]` names the `<type>.<name>` resources carrying each reference.
+- Unresolved Terraform expressions (`${var.entity_ref}`) go to `unresolved[]` and are never looked up.
+- With no `backstage_url`, or no IaC tag data, nothing is written.
 
 ### Multiple entities
 
@@ -263,16 +260,14 @@ The `backstage` policy treats `{name, error}` as "couldn't determine" rather tha
 
 ### Entity-reference tags on infrastructure (optional)
 
-The same `backstage_url` also enables the `entity-refs` sub-collector, which resolves the entity-reference tag on infrastructure resources. Its lookups use the `ref_lookup`, `api_path_prefix` and `auth_mode` settings above. Pair it with an IaC collector that records resource tags:
+`backstage_url` also enables `entity-refs`. Pair it with an IaC collector that records resource tags:
 
 ```yaml
 collectors:
-  # Records resource tags generically — knows nothing of Backstage
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
     include: [terraform]
 
-  # Interprets one of those tag keys as a Backstage entity reference
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: [infra]
     include: [entity-refs]

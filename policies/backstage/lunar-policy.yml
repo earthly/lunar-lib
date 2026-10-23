@@ -159,23 +159,10 @@ policies:
 
   - name: entity-ref-valid
     description: |
-      Verifies that the Backstage entity references tagged onto infrastructure
-      resources are well-formed and actually exist in the Backstage catalog.
-      Reads `.catalog.entity_refs`, written by the `backstage` collector's
-      `entity-refs` sub-collector from the tags an IaC collector recorded.
-      Validates each distinct reference against the Backstage form
-      `[<kind>:][<namespace>/]<name>` and, since the collector already resolved
-      it, fails when the referenced entity is absent (`exists: false`), naming
-      the offending resources. Optionally requires a specific kind (e.g.
-      `component`) via `entity_ref_kind`. Skips (passes) when resolution was not
-      performed — the collector has no `backstage_url`, or there is no IaC tag
-      data (no `.catalog.entity_refs.checked`) — and skips an individual
-      reference the collector could not resolve due to a transient Backstage
-      error, so neither an unconfigured collector nor an outage turns this red.
-      Unresolved Terraform expressions (`${var.x}`) are reported as skipped, not
-      failed: without `terraform plan` there is no concrete value to verify.
-      Whether a resource carries the tag at all is a separate concern owned by
-      the `terraform` policy's `aws-resources-tagged` check.
+      Fails when an entity reference tagged onto an infrastructure resource is
+      malformed or doesn't exist in Backstage, naming the resources that carry
+      it. Skips until `.catalog.entity_refs` is collected, and skips references
+      that hit a lookup error or are unresolved Terraform expressions.
     mainPython: ./entity-ref-valid.py
     keywords: ["backstage", "entity_ref", "referential integrity", "terraform", "iac", "tags", "catalog"]
 
@@ -287,17 +274,13 @@ inputs:
 
       Only the file's absence is affected: a component that has a
       catalog-info.yaml is held to every check either way.
-
-      `entity-ref-valid` never skips on a missing catalog file: it reads
-      infrastructure tags, not catalog-info.yaml, and an infrastructure repo
-      usually has no catalog file of its own.
+      `entity-ref-valid` doesn't read the file, so this doesn't affect it.
     default: "false"
   entity_ref_kind:
     description: |
-      When set, `entity-ref-valid` requires each infrastructure entity-reference
-      tag to name this Backstage kind (e.g. `component`). A reference may state
-      its kind explicitly (`component:default/foo`) or omit it; when omitted this
-      expected kind is assumed. Empty (the default) accepts any kind.
+      When set, `entity-ref-valid` requires each reference to be this kind
+      (e.g. `component`); a reference with no kind is assumed to be it. Empty
+      (the default) accepts any kind.
     default: ""
   required_annotations:
     description: |
