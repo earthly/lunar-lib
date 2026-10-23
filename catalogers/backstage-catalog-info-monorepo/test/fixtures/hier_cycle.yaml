@@ -1,0 +1,29 @@
+# Malformed: two Domains that are each other's parent.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: loop-svc
+spec:
+  owner: team-loop
+  system: loop
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: loop
+spec:
+  domain: alpha
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: alpha
+spec:
+  subdomainOf: beta
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: beta
+spec:
+  subdomainOf: alpha

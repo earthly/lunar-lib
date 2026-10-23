@@ -1,0 +1,6 @@
+# Malformed System (spec is a string) next to a valid chain: dropped, not fatal.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: broken
+spec: "not-an-object"

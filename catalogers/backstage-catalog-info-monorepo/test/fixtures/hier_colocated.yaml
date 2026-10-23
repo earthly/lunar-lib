@@ -1,0 +1,35 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: build-api
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/team-build
+  system: build-tools
+---
+# The System and its Domain chain, with no Component: a hierarchy-only file.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: build-tools
+  description: Build and release tooling
+spec:
+  owner: group:default/team-build
+  domain: developer-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: developer-platform
+spec:
+  owner: group:default/platform
+  subdomainOf: engineering
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: engineering
+  description: All engineering
+spec:
+  owner: group:default/platform

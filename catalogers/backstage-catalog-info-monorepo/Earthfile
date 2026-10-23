@@ -1,0 +1,12 @@
+VERSION 0.8
+
+# Offline test: test-local.sh stubs curl (GitHub API, served from fake repos)
+# and lunar on PATH and drives main.sh, so no network or Lunar Hub is needed.
+# Runs on +base-image, the cataloger's real runtime, for its bash, BusyBox,
+# jq and yq. No image: target — the plugin uses base-main.
+test:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY main.sh helpers.sh test-local.sh .
+    COPY --dir test .
+    RUN ./test-local.sh

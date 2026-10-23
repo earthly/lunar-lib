@@ -1,0 +1,8 @@
+# The System alone: its Domain chain is declared nowhere in the scan set.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: build-tools
+spec:
+  owner: group:default/team-build
+  domain: developer-platform

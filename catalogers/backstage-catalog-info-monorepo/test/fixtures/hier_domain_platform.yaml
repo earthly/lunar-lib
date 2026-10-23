@@ -1,0 +1,8 @@
+# Full entity refs, as Backstage allows; the resolver strips them to the name.
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: developer-platform
+spec:
+  owner: group:default/platform
+  subdomainOf: domain:default/engineering

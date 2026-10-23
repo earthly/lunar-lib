@@ -16,14 +16,14 @@ This cataloger writes to the following Catalog JSON paths, once per discovered `
 |------|------|-------------|
 | `.components["<id>"]` | object | **Created** for each discovered file. `<id>` is `<component_id_prefix><owner>/<repo>` for a root file, or `<component_id_prefix><owner>/<repo>/<dir>` for a file at `<dir>/catalog-info.yaml` |
 | `.components["<id>"].owner` | string | `spec.owner` of the matched Backstage `Component` (or `default_owner` fallback) |
-| `.components["<id>"].domain` | string | `metadata.annotations[<domain_annotation>]` when configured and present; otherwise `spec.domain`, falling back to `spec.system`, then to `default_domain` |
+| `.components["<id>"].domain` | string | `metadata.annotations[<domain_annotation>]` when configured and present; otherwise `spec.domain`, falling back to `spec.system`, then to `default_domain`. A `spec.domain` / `spec.system` that names a `Domain` / `System` declared anywhere in the scanned files resolves to its full dotted path — see [Domain Hierarchy](#domain-hierarchy) |
 | `.components["<id>"].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
-| `.domains["<domain>"]` | object | Stub entry (`{}`) for each domain a created component references, so hub catalog validation accepts the reference. When the same `catalog-info.yaml` declares a matching `kind: Domain` / `kind: System` entity, its `description` and `owner` are propagated |
+| `.domains["<domain>"]` | object | One row per `Domain` / `System` entity declared in the scanned files, keyed by its dotted path, with its `description` and `owner`. Any other domain a created component references gets an empty stub (`{}`), so hub catalog validation accepts the reference |
 
-The owner / domain / tag shaping is identical to the [`backstage-catalog-info`](../backstage-catalog-info) cataloger — the same inputs (`domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`) apply. The difference is that this cataloger **creates** the component keyed to the discovered file's path, rather than augmenting an existing one.
+The owner / tag shaping and the `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner` and `default_domain` inputs match the [`backstage-catalog-info`](../backstage-catalog-info) cataloger. The differences: this cataloger **creates** the component keyed to the discovered file's path, and it resolves the Domain / System hierarchy across every file it scans, not just the Component's own file.
 
 <details>
-<summary>Example Catalog JSON output (a monorepo with two services)</summary>
+<summary>Example Catalog JSON output (the monorepo in <a href="#domain-hierarchy">Domain Hierarchy</a>)</summary>
 
 ```json
 {
@@ -40,11 +40,17 @@ The owner / domain / tag shaping is identical to the [`backstage-catalog-info`](
     }
   },
   "domains": {
+    "platform": {
+      "description": "Platform engineering",
+      "owner": "group:default/team-platform"
+    },
     "platform.payments": {
       "description": "Payments platform — billing, ledger, settlement",
       "owner": "group:default/team-payments"
     },
-    "platform.frontend": {}
+    "platform.frontend": {
+      "owner": "group:default/team-web"
+    }
   }
 }
 ```
@@ -66,19 +72,78 @@ The owner / domain / tag shaping is identical to the [`backstage-catalog-info`](
 
 4. **Entity selection.** One component is created per discovered file. If a file declares exactly one `kind: Component`, that entity is used.
 
+### Domain Hierarchy
+
+Backstage nests by reference: a `Component` names its `spec.system`, a `System` names its `spec.domain`, and a `Domain` names its parent with `spec.subdomainOf`. Lunar nests by name: `a.b.c` is a child of `a.b`. Before creating any component, the cataloger reads every `Domain` and `System` entity in the files listed below, then resolves each Component's `spec.system` (or `spec.domain`) to the full dotted path. A policy on `domain:platform` then applies to everything under `platform.payments`.
+
+The System and Domain entities don't have to sit in the Component's file. With this layout:
+
+```yaml
+# catalog-info.yaml (repo root: excluded from component creation by default, still read for the hierarchy)
+kind: Domain
+metadata: { name: platform, description: Platform engineering }
+spec: { owner: group:default/team-platform }
+---
+kind: System
+metadata: { name: payments, description: "Payments platform — billing, ledger, settlement" }
+spec: { owner: group:default/team-payments, domain: platform }
+---
+kind: System
+metadata: { name: frontend }
+spec: { owner: group:default/team-web, domain: platform }
+
+# services/payments/catalog-info.yaml
+kind: Component
+metadata: { name: payment-api, tags: [payments] }
+spec: { type: service, lifecycle: production, owner: group:default/team-payments, system: payments }
+
+# services/web/catalog-info.yaml
+kind: Component
+metadata: { name: web-app, tags: [frontend] }
+spec: { type: website, lifecycle: production, owner: group:default/team-web, system: frontend }
+```
+
+`payment-api` lands in `platform.payments` and `web-app` in `platform.frontend`, with a `.domains` row for `platform`, `platform.payments` and `platform.frontend` (the example output above).
+
+Where the hierarchy is read from:
+
+- **Every catalog-info file in the scan set**, including files that don't become components: files matched by `exclude_paths`, and files without exactly one `Component` (a file of only `System` / `Domain` entities, say).
+- **`hierarchy_paths`**: path globs for System / Domain YAML with other names, such as `catalog/domains/*.yaml`. Matched like `exclude_paths`, against the full repo-relative path in the scanned repos and `hierarchy_repos` (`*` also matches `/`). Files matched only by `hierarchy_paths` never become components.
+- **`hierarchy_repos`**: repos read only for System / Domain entities, never for components, always from their default branch. Use it for a central catalog repo:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover, discover-on-commit]
+    with:
+      repos: "acme/monorepo"
+      hierarchy_repos: "acme/software-catalog"
+      hierarchy_paths: "domains/*.yaml,systems/*.yaml"
+```
+
+Resolution rules:
+
+- `domain_annotation` and `default_domain` values are used as written, never resolved.
+- A parent that isn't declared in any file the cataloger reads contributes its bare name and stops the walk. A System under an undeclared `developer-platform` resolves to `developer-platform.build-tools`, so declare the whole chain.
+- A name declared twice with different parents logs a warning, and the last file read wins.
+- Entity refs such as `domain:default/platform` resolve by name. `kind: Location` targets aren't followed, so point `hierarchy_paths` at the files they list.
+- A push to a `hierarchy_repos` repo doesn't trigger `discover-on-commit`. Changes there are picked up by the next run.
+
+**Upgrade note.** A component whose System or Domain is declared in a file the cataloger reads re-keys from the bare name (`payments`) to the dotted path (`platform.payments`), and every declared Domain / System now gets its own `.domains` row. Update any policy or initiative that targets the old domain name. Scans with no `Domain` / `System` entities produce the same output as before.
+
 ### Restricting Synced Kinds
 
-This cataloger only creates components from `kind: Component` entities. `Domain`, `System`, `API`, `Resource`, `User`, `Group`, `Location`, etc. are ignored for component creation — a `Domain` / `System` matching a created component's domain is still read to enrich the `.domains` stub (description + owner).
+This cataloger only creates components from `kind: Component` entities. `Domain`, `System`, `API`, `Resource`, `User`, `Group`, `Location`, etc. are ignored for component creation. `Domain` and `System` entities feed the [Domain Hierarchy](#domain-hierarchy) instead.
 
 ### Files With Multiple Components
 
-The common monorepo layout is one `catalog-info.yaml` per service directory, each declaring a single `Component` — one file, one component. A file that declares **zero** `Component` entities (e.g. only a `System` or `Domain`) or **more than one** `Component` is skipped, with a log line. This cataloger creates exactly one component per file and keys it to the file's directory, so it won't guess which of several `Component`s a multi-Component file maps to — give each `Component` its own directory's `catalog-info.yaml` to have it discovered. (A `Domain` / `System` alongside the single `Component` is still read to enrich the `.domains` stub.)
+The common monorepo layout is one `catalog-info.yaml` per service directory, each declaring a single `Component` — one file, one component. A file that declares **zero** `Component` entities (e.g. only a `System` or `Domain`) or **more than one** `Component` is skipped, with a log line. This cataloger creates exactly one component per file and keys it to the file's directory, so it won't guess which of several `Component`s a multi-Component file maps to — give each `Component` its own directory's `catalog-info.yaml` to have it discovered. A skipped file's `Domain` / `System` entities still feed the [Domain Hierarchy](#domain-hierarchy).
 
 ## Catalogers
 
 | Cataloger | Description |
 |-----------|-------------|
-| `discover` | **Scheduled.** Builds a scan set from `repos` plus any topic-matched repos discovered from `orgs`, walks each repo's tree via the Git Trees API, finds every `catalog-info.yaml`, fetches and parses each, and creates one component per file keyed to the file's directory. Writes owner / domain / tags plus `.domains` stubs. Runs on a `cron` schedule. Requires `GH_TOKEN`. |
+| `discover` | **Scheduled.** Builds a scan set from `repos` plus any topic-matched repos discovered from `orgs`, walks each repo's tree via the Git Trees API, finds every `catalog-info.yaml`, fetches and parses each, and creates one component per file keyed to the file's directory. Writes owner / domain / tags plus `.domains` rows. Runs on a `cron` schedule. Requires `GH_TOKEN`. |
 | `discover-on-commit` | **Commit-triggered.** The same scan as `discover`, run on every push to the default branch of the repository in `repos` instead of on a schedule. Fires only when `repos` names exactly one repository. Requires `GH_TOKEN`. |
 
 ## Hook Type
@@ -105,10 +170,10 @@ catalogers:
 Set the GitHub token used to walk each repo's tree and fetch each `catalog-info.yaml`:
 
 ```sh
-lunar secret set GH_TOKEN <your-github-token>
+lunar secret set GH_TOKEN <your-github-token> --scope cataloger
 ```
 
-The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
+The token needs `Contents: Read` on every repo in `repos` (`repo` scope on a classic PAT; `contents: read` on a fine-grained PAT or GitHub App installation token). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you've already set it for `github-org` or the GitHub-API collectors, this cataloger picks it up automatically. All other inputs (`orgs`, `allowed_topics`, `disallowed_topics`, `include_archived`, `hierarchy_repos`, `hierarchy_paths`, `github_host`, `filenames`, `branch`, `exclude_paths`, `component_id_prefix`, `domain_annotation`, `tag_prefix`, `include_derived_tags`, `owner_format`, `default_owner`, `default_domain`, `allow_ignore_annotation`, `ignore_annotation`) are documented in `lunar-cataloger.yml`.
 
 ### Cataloging on commit
 
@@ -127,6 +192,29 @@ catalogers:
 - **The hub only acts on pushes to repositories it tracks**, so the monorepo needs a component before the first push counts, from `github-org` or a first `discover` run.
 - **New and edited files take effect on push; removals (a deleted file, a dropped tag) wait for the nightly run.** Each variant keeps its own output, and the catalog merges the two.
 - **A push that lands while a scan is running can be missed** if the scan already read the repo. The next push picks it up; otherwise it waits for the nightly run.
+
+### GitHub Enterprise Server
+
+Set `github_host` to read repositories from a GitHub Enterprise Server instance instead of github.com:
+
+```yaml
+catalogers:
+  - name: monorepo-ghes
+    uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info-monorepo@v1.0.0
+    include: [discover, discover-on-commit]
+    with:
+      github_host: "github.acme.com"
+      repos: "platform/monorepo"
+```
+
+```sh
+lunar secret set GH_ENTERPRISE_TOKEN <your-ghes-token> --scope cataloger
+```
+
+- API calls go to `https://<github_host>/api/v3`, authenticated with `GH_ENTERPRISE_TOKEN`, or with `GH_TOKEN` when that isn't set.
+- Component ids default to `<github_host>/<owner>/<repo>/<dir>`, matching the repo-level ids [`github-org`](../github-org) creates with the same `github_host`. An explicit `component_id_prefix` wins.
+- One import reads one host. For repos on both github.com and GHES, import the cataloger once per host, each with its own `name`. `hierarchy_repos` must be on the import's host.
+- `discover-on-commit` listens for pushes under both `<github_host>/<repo>` and `github.com/<repo>`, because the hub keys repo hooks by its own GitHub host (`HUB_GITHUB_HOST`). Give `github_host` as a bare hostname.
 
 ### Discovering repos by topic
 
@@ -185,7 +273,7 @@ If you instead run this cataloger **on its own** and want the root file to produ
 
 Two mechanisms decide what does **not** become a component, at different levels of control:
 
-- **`exclude_paths`** (platform-controlled) — a list of repo-relative paths/globs skipped before a component is ever created. It lives in `lunar-config.yml`, so dev teams can't override it. The default excludes the root `catalog-info.yaml`; add globs like `legacy/*/catalog-info.yaml` to fence off more.
+- **`exclude_paths`** (platform-controlled) — a list of repo-relative paths/globs skipped before a component is ever created. It lives in `lunar-config.yml`, so dev teams can't override it. The default excludes the root `catalog-info.yaml`; add globs like `legacy/*/catalog-info.yaml` to fence off more. An excluded file's `Domain` / `System` entities are still read for the [Domain Hierarchy](#domain-hierarchy).
 - **`lunar.io/ignore` annotation** (dev-delegated, gated) — set `allow_ignore_annotation: true` and any `Component` whose `catalog-info.yaml` carries `lunar.io/ignore: "true"` (key configurable via `ignore_annotation`) opts itself out. Left off by default, so opt-out stays platform-controlled unless you choose to delegate it.
 
 ### Targeting monorepos in a mixed fleet (monorepo + polyrepo)
@@ -220,10 +308,11 @@ Instead of naming each monorepo, you can flip this to **topic-driven** targeting
 
 ## Source System
 
-[GitHub](https://github.com) — when `orgs` is set the cataloger calls the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) (paged, 100/page) to enumerate candidate repos and filter them by topic; then, for every repo in the scan set, it calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once to enumerate files and the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml`. Requirements:
+[GitHub](https://github.com) or GitHub Enterprise Server (`github_host`) — when `orgs` is set the cataloger calls the [List organization repositories API](https://docs.github.com/en/rest/repos/repos#list-organization-repositories) (paged, 100/page) to enumerate candidate repos and filter them by topic; then, for every repo in the scan set and in `hierarchy_repos`, it calls the [Git Trees API](https://docs.github.com/en/rest/git/trees) once to enumerate files and the [Contents API](https://docs.github.com/en/rest/repos/contents) once per discovered `catalog-info.yaml` or `hierarchy_paths` match. Requirements:
 
-- **`GH_TOKEN` secret** with `Contents: Read` on every repo in the scan set. When `orgs` is set, it must also be able to list the org's repositories (`read:org` / org membership for private repos, or `Metadata: Read` on a fine-grained PAT / App installation).
-- **GitHub-hosted repos.** Component ids are constructed as `<component_id_prefix><owner>/<repo>[/<dir>]`; the default prefix is `github.com/`.
+- **`GH_TOKEN` secret** (or `GH_ENTERPRISE_TOKEN` for a GHES `github_host`) with `Contents: Read` on every repo in the scan set and in `hierarchy_repos`. When `orgs` is set, it must also be able to list the org's repositories (`read:org` / org membership for private repos, or `Metadata: Read` on a fine-grained PAT / App installation).
+- **Component ids** are `<component_id_prefix><owner>/<repo>[/<dir>]`; the prefix defaults to `<github_host>/`.
+- **A run that can't read anything fails.** If no repo in the scan set can be read, or a `hierarchy_repos` entry can't, the run exits non-zero instead of writing an empty catalog, so a hub on v4.4.0 or later keeps the last good one. A wrong `github_host` or token looks exactly like this. A single unreadable repo among readable ones is still just skipped.
 
 ### Scope and Roadmap
 

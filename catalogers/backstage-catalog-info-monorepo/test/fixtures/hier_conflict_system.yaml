@@ -1,0 +1,8 @@
+# Same System name as hier_chain.yaml, under a different Domain.
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: build-tools
+spec:
+  owner: group:default/team-build
+  domain: data-platform
