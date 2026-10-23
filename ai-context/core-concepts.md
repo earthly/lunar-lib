@@ -114,12 +114,12 @@ Key points:
 |-----------|---------|---------|
 | `code` | New commits pushed | Lunar Runner (with repo clone) |
 | `cron` | Scheduled time | Lunar Runner |
-| `ci-before-job` | Before CI job starts | CI Agent (in-pipeline) |
-| `ci-after-job` | After CI job completes | CI Agent (in-pipeline) |
-| `ci-before-step` | Before CI step | CI Agent (in-pipeline) |
-| `ci-after-step` | After CI step | CI Agent (in-pipeline) |
-| `ci-before-command` | Before specific command runs | CI Agent (process-level) |
-| `ci-after-command` | After specific command runs | CI Agent (process-level) |
+| `ci-before-job` | Before CI job starts | CI Tracer (in-pipeline) |
+| `ci-after-job` | After CI job completes | CI Tracer (in-pipeline) |
+| `ci-before-step` | Before CI step | CI Tracer (in-pipeline) |
+| `ci-after-step` | After CI step | CI Tracer (in-pipeline) |
+| `ci-before-command` | Before specific command runs | CI Tracer (process-level) |
+| `ci-after-command` | After specific command runs | CI Tracer (process-level) |
 
 Example collector definition:
 
@@ -209,7 +209,7 @@ Here's the complete flow when a developer pushes code:
 3a. Code-based collectors run              3b. CI pipeline starts
     on Lunar Runner                             │
            │                                    ▼
-           │                            4. CI Agent instruments
+           │                            4. CI Tracer instruments
            │                               the pipeline
            │                                    │
            │                                    ▼

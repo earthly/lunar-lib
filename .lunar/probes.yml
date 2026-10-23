@@ -103,7 +103,7 @@ probes:
     check: .lunar/hooks/cronos-runner-check.sh {file}
     message: >-
       Workflow file in a cronos-org repo (e.g. pantalasa-cronos/*) has no
-      job using `runs-on: cronos`. The lunar agent only traces CI commands
+      job using `runs-on: cronos`. The Lunar CI Tracer only traces CI commands
       on the cronos self-hosted runner — without it, every CI-hook collector
       registered for this component will silently never fire, and the
       component will look "stuck" in the hub even though it is registered

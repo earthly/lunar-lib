@@ -4,7 +4,7 @@
 # Fires when a `.github/workflows/*.yml` file is edited. If the file's
 # repo lives in a cronos org (e.g. `pantalasa-cronos/<repo>`), the
 # workflow MUST have at least one job with `runs-on: cronos` (or a
-# matrix list that includes `cronos`). Otherwise the lunar agent never
+# matrix list that includes `cronos`). Otherwise the Lunar CI Tracer never
 # sees the CI runs and any CI-hook collectors registered for the repo
 # silently never fire — which has bitten ENG-543: a worker shipped a
 # scala-service repo with no workflow at all and then invented a
@@ -60,7 +60,7 @@ fi
 
 cat >&2 <<EOF
 Workflow $FILE_PATH lives in cronos org "$ORG" but no job uses
-\`runs-on: cronos\`. The lunar agent only traces CI commands on the
+\`runs-on: cronos\`. The Lunar CI Tracer only traces CI commands on the
 cronos self-hosted runner — without it, every CI-hook collector
 registered for this component will silently never fire, and the
 component will look "stuck" in the hub even though the repo is
