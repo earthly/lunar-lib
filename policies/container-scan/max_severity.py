@@ -13,10 +13,15 @@ upgrade target, so an unfixable base-image CVE cannot hold a gate closed
 indefinitely. The default (`"false"`) fails on every finding at or above the
 threshold, fixable or not. Unfixable findings are always still recorded in the
 component JSON — the option changes the *verdict*, never what is collected.
+
+`exempt_findings` lists vulnerabilities that were reviewed and accepted, by id
+and exact package version, optionally limited to some images (see
+exemptions.py). Exempt findings drop out of the verdict the same way.
 """
 
 import sys
 
+from exemptions import find_exemption, format_exemptions, parse_exempt_findings
 from helpers import no_scan_data_reasons, pushed_image_refs
 from lunar_policy import Check, variable_or_default
 
@@ -89,17 +94,21 @@ def _dedupe_findings(findings):
     return out
 
 
-def _collect_findings(scan_node, in_scope):
-    """Return findings at/above threshold from `.container_scan.findings[]`.
+def _collect_findings(scan_node, in_scope, exemptions=()):
+    """Return `(findings, exempted)` at/above threshold from
+    `.container_scan.findings[]`.
 
-    Returns [] when the collector did not emit per-finding detail (e.g. a
+    Both are empty when the collector did not emit per-finding detail (e.g. a
     summary-only scan) — the failure message then stays the headline alone,
-    same as the `sca` policy.
+    same as the `sca` policy. Exemptions are matched per image, before the
+    dedupe merges images, so a vulnerability exempted in one image still fails
+    in another. Each exempted finding carries the `exemption` it matched.
     """
     findings_node = scan_node.get_node(".findings")
     if not findings_node.exists():
-        return []
+        return [], []
     out = []
+    exempted = []
     for finding in findings_node:
         severity = (finding.get_value_or_default(".severity", "") or "").lower()
         if severity not in in_scope:
@@ -111,18 +120,35 @@ def _collect_findings(scan_node, in_scope):
             # available proxy. It is exactly how trivy computes it, and grype
             # only carries a fix version for findings it marks fixed.
             fixable = bool(fix_version)
-        out.append(
-            {
-                "id": finding.get_value_or_default(".cve", None),
-                "severity": severity,
-                "package": finding.get_value_or_default(".package", None),
-                "fix_version": fix_version,
-                "fixable": bool(fixable),
-                # Set by multi-image scans; absent on single-image blobs.
-                "images": [i for i in [finding.get_value_or_default(".image", None)] if i],
-            }
+        entry = {
+            "id": finding.get_value_or_default(".cve", None),
+            "severity": severity,
+            "package": finding.get_value_or_default(".package", None),
+            "version": finding.get_value_or_default(".version", None),
+            "fix_version": fix_version,
+            "fixable": bool(fixable),
+            # Set by multi-image scans; absent on single-image blobs.
+            "images": [i for i in [finding.get_value_or_default(".image", None)] if i],
+        }
+        exemption = find_exemption(
+            exemptions,
+            entry["id"],
+            entry["package"],
+            entry["version"],
+            entry["images"][0] if entry["images"] else None,
         )
-    return _dedupe_findings(out)
+        if exemption:
+            exempted.append(dict(entry, exemption=exemption))
+        else:
+            out.append(entry)
+    return _dedupe_findings(out), _dedupe_findings(exempted)
+
+
+def _exempted_suffix(exempted):
+    return (
+        f" — {len(exempted)} exempted by exempt_findings: "
+        f"{format_exemptions([f['exemption'] for f in exempted])}"
+    )
 
 
 def _most_severe(findings):
@@ -146,6 +172,10 @@ def _rank(finding):
 def main(node=None):
     c = Check("max-severity", "No findings at or above severity threshold", node=node)
     with c:
+        # Parsed before any data is read: a malformed list must fail the check
+        # rather than exempt anything.
+        exemptions = parse_exempt_findings(variable_or_default("exempt_findings", ""))
+
         containers = c.get_node(".containers")
         if not containers.exists():
             c.skip("No container definitions detected in this component")
@@ -194,14 +224,14 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            findings = _collect_findings(scan_node, set(in_scope))
+            findings, exempted = _collect_findings(scan_node, set(in_scope), exemptions)
             if ignore_unfixable:
                 # Narrow the failure to findings that carry an upgrade target, so
                 # an unfixable base-image CVE cannot hold a release gate closed
                 # forever. Deliberately applied *after* the summary/count path has
                 # already decided this is a failure: the option can only suppress
                 # a failure, never create one.
-                if not findings:
+                if not findings and not exempted:
                     # Summary-only scan: fixability is not knowable per finding.
                     # `.container_scan.summary.all_fixable` cannot answer this —
                     # it is a single boolean across *all* severities, not the
@@ -212,12 +242,22 @@ def main(node=None):
                         "detail, so fixability could not be verified)"
                     )
                 else:
+                    in_scope_count = len(findings) + len(exempted)
+                    # An unfixable finding would not have failed, so exempting it
+                    # changed nothing worth reporting.
+                    exempted = [f for f in exempted if f["fixable"]]
                     fixable = [f for f in findings if f["fixable"]]
                     if not fixable:
+                        if exempted:
+                            c.skip(
+                                f"{len(exempted)} finding(s) at or above '{min_severity}' with "
+                                f"an available fix, all exempted by exempt_findings — "
+                                f"{format_exemptions([f['exemption'] for f in exempted])}"
+                            )
                         # Every in-scope finding is unfixable — nothing actionable
                         # to gate on. They remain in the component JSON.
                         print(
-                            f"[ignore_unfixable] passing: all {len(findings)} finding(s) at or "
+                            f"[ignore_unfixable] passing: all {in_scope_count} finding(s) at or "
                             f"above '{min_severity}' have no fix available",
                             file=sys.stderr,
                         )
@@ -228,6 +268,18 @@ def main(node=None):
                         f"{severity.capitalize()} container vulnerabilities with an available fix "
                         f"detected (findings with no available fix ignored)"
                     )
+            elif exempted:
+                if not findings:
+                    c.skip(
+                        f"{len(exempted)} finding(s) at or above '{min_severity}', all exempted "
+                        f"by exempt_findings — {format_exemptions([f['exemption'] for f in exempted])}"
+                    )
+                # The summary's headline may name a severity only exempt findings had.
+                fail_message = (
+                    f"{_most_severe(findings).capitalize()} container vulnerabilities detected"
+                )
+            if exempted:
+                fail_message += _exempted_suffix(exempted)
 
             # Multiple failing assertions on a single check — same treatment as
             # the `sca` policy: the headline first (the threshold that tripped
