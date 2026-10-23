@@ -521,5 +521,160 @@ class MultiImageTests(unittest.TestCase):
         self.assertNotIn("[", failure_message(c))
 
 
+
+# pip's bundled urllib3 in two images (only one of them keeps pip on purpose), a
+# fixable Go stdlib finding, and an unfixable one.
+SYFT = "earthly/lunar-lib:syft-abc12345"
+BASE = "earthly/lunar-lib:base-abc12345"
+CS_PIP_BUNDLED = {
+    "source": {"tool": "trivy", "integration": "after-json"},
+    "vulnerabilities": {"critical": 0, "high": 4, "medium": 0, "low": 0, "total": 4},
+    "findings": [
+        {"severity": "high", "package": "urllib3", "version": "2.7.0", "ecosystem": "python-pkg",
+         "cve": "CVE-2026-97687", "fix_version": "2.8.0", "fixable": True, "image": SYFT},
+        {"severity": "high", "package": "urllib3", "version": "2.7.0", "ecosystem": "python-pkg",
+         "cve": "CVE-2026-97687", "fix_version": "2.8.0", "fixable": True, "image": BASE},
+        {"severity": "high", "package": "stdlib", "version": "v1.27.2", "ecosystem": "gobinary",
+         "cve": "CVE-2026-111943", "fix_version": "1.27.3", "fixable": True, "image": SYFT},
+        {"severity": "high", "package": "github.com/docker/docker", "version": "v28.4.0+incompatible",
+         "ecosystem": "gobinary", "cve": "CVE-2026-41567", "fix_version": None, "fixable": False,
+         "image": SYFT},
+    ],
+    "summary": {"has_critical": False, "has_high": True, "all_fixable": False},
+}
+
+URLLIB3 = "CVE-2026-97687 urllib3@2.7.0"
+STDLIB = "CVE-2026-111943 stdlib@v1.27.2"
+
+
+class ExemptFindingsTests(unittest.TestCase):
+    def check(self, exempt, scan=CS_PIP_BUNDLED, **env):
+        return run_check(
+            node(container_scan=scan),
+            LUNAR_VAR_min_severity="high",
+            LUNAR_VAR_exempt_findings=exempt,
+            **env,
+        )
+
+    def test_unscoped_entry_exempts_it_in_every_image(self):
+        c = self.check(URLLIB3)
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        reasons = c.failure_reasons
+        self.assertEqual(
+            reasons[0],
+            "High container vulnerabilities detected — 1 exempted by exempt_findings: "
+            "CVE-2026-97687 urllib3@2.7.0",
+        )
+        self.assertNotIn("urllib3", "\n".join(reasons[1:]))
+        self.assertIn("high: stdlib — CVE-2026-111943 (fix: 1.27.3)", failure_message(c))
+
+    def test_image_glob_keeps_the_finding_in_other_images(self):
+        c = self.check(f"{URLLIB3} earthly/lunar-lib:syft-*")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        lines = [r for r in c.failure_reasons if "urllib3 —" in r]
+        self.assertEqual(lines, [f"high: urllib3 — CVE-2026-97687 (fix: 2.8.0) [{BASE}]"])
+
+    def test_several_globs_on_one_entry(self):
+        c = self.check(f"{URLLIB3} earthly/lunar-scripts:* earthly/lunar-lib:base-*\n"
+                       f"{URLLIB3} earthly/lunar-lib:syft-*")
+        self.assertNotIn("urllib3 —", failure_message(c))
+
+    def test_version_must_match_exactly(self):
+        c = self.check("CVE-2026-97687 urllib3@2.7.1")
+        self.assertIn(f"high: urllib3 — CVE-2026-97687 (fix: 2.8.0) [{SYFT}, {BASE}]",
+                      failure_message(c))
+        self.assertNotIn("exempted", failure_message(c))
+
+    def test_package_must_match(self):
+        c = self.check("CVE-2026-97687 requests@2.7.0")
+        self.assertIn("urllib3 —", failure_message(c))
+
+    def test_id_match_ignores_case(self):
+        c = self.check("cve-2026-97687 urllib3@2.7.0")
+        self.assertNotIn("urllib3 —", failure_message(c))
+
+    def test_all_exempt_resolves_to_skip_not_pass(self):
+        # The docker finding has no fix, so with ignore_unfixable it never counted.
+        c = self.check(f"{URLLIB3}, {STDLIB}", LUNAR_VAR_ignore_unfixable="true")
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+        reason = c._results[0].failure_message
+        self.assertIn("2 finding(s) at or above 'high' with an available fix, all exempted", reason)
+        self.assertIn("CVE-2026-97687 urllib3@2.7.0; CVE-2026-111943 stdlib@v1.27.2", reason)
+
+    def test_unfixable_finding_still_fails_without_ignore_unfixable(self):
+        c = self.check(f"{URLLIB3}, {STDLIB}")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertEqual(
+            c.failure_reasons,
+            [
+                "High container vulnerabilities detected — 2 exempted by exempt_findings: "
+                "CVE-2026-97687 urllib3@2.7.0; CVE-2026-111943 stdlib@v1.27.2",
+                f"high: github.com/docker/docker — CVE-2026-41567 (no fix available) [{SYFT}]",
+            ],
+        )
+
+    def test_exempting_everything_without_ignore_unfixable_skips(self):
+        c = self.check(f"{URLLIB3}\n{STDLIB}\nCVE-2026-41567 github.com/docker/docker@v28.4.0+incompatible")
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+
+    def test_exempting_an_unfixable_finding_is_not_reported(self):
+        c = self.check("CVE-2026-41567 github.com/docker/docker@v28.4.0+incompatible",
+                       LUNAR_VAR_ignore_unfixable="true")
+        self.assertEqual(resolved_status(c), CheckStatus.FAIL)
+        self.assertNotIn("exempted", failure_message(c))
+
+    def test_headline_follows_what_is_left(self):
+        # The only critical is exempt; the headline must not still say Critical.
+        c = run_check(node(container_scan=CS_MIXED),
+                      LUNAR_VAR_min_severity="high",
+                      LUNAR_VAR_exempt_findings="CVE-CRIT pkg-crit@2.0")
+        self.assertEqual(c.failure_reasons[0],
+                         "High container vulnerabilities detected — 1 exempted by "
+                         "exempt_findings: CVE-CRIT pkg-crit@2.0")
+
+    def test_glob_entry_never_matches_a_finding_without_an_image(self):
+        scoped = run_check(node(container_scan=CS_WITH_HIGH), LUNAR_VAR_min_severity="high",
+                           LUNAR_VAR_exempt_findings="GHSA-4f99-4q7p-p3gh github.com/sirupsen/logrus@1.9.0 *")
+        self.assertIn("high: github.com/sirupsen/logrus —", failure_message(scoped))
+        unscoped = run_check(node(container_scan=CS_WITH_HIGH), LUNAR_VAR_min_severity="high",
+                             LUNAR_VAR_exempt_findings="GHSA-4f99-4q7p-p3gh github.com/sirupsen/logrus@1.9.0")
+        self.assertNotIn("high: github.com/sirupsen/logrus —", failure_message(unscoped))
+
+    def test_comments_and_commas(self):
+        c = self.check(
+            "# pip bundles these, and no pip release ships the fixes yet\n"
+            f"{URLLIB3},{STDLIB}  # accepted, see the ticket\n"
+            "\n"
+        )
+        self.assertNotIn("urllib3 —", failure_message(c))
+        self.assertNotIn("stdlib —", failure_message(c))
+
+    def test_scoped_npm_package(self):
+        scan = {
+            "vulnerabilities": {"critical": 0, "high": 1, "medium": 0, "low": 0, "total": 1},
+            "findings": [{"severity": "high", "package": "@babel/traverse", "version": "7.22.0",
+                          "cve": "CVE-2023-45133", "fix_version": "7.23.2", "fixable": True}],
+            "summary": {"has_critical": False, "has_high": True},
+        }
+        c = self.check("CVE-2023-45133 @babel/traverse@7.22.0", scan=scan)
+        self.assertEqual(resolved_status(c), CheckStatus.SKIPPED)
+
+    def test_summary_only_scan_is_unaffected(self):
+        c = self.check(URLLIB3, scan=CS_SUMMARY_ONLY)
+        self.assertEqual(c.failure_reasons, ["Critical container vulnerabilities detected"])
+
+    def test_malformed_entry_exempts_nothing(self):
+        for bad in ["CVE-2026-97687 urllib3", "urllib3@2.7.0", "CVE-1 @2.7.0", "CVE-1 urllib3@",
+                    f"{URLLIB3}\nCVE-2026-111943"]:
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    self.check(bad)
+
+    def test_malformed_entry_fails_even_without_container_data(self):
+        with self.assertRaises(ValueError):
+            run_check(node(container_scan=None, containers=False),
+                      LUNAR_VAR_exempt_findings="urllib3@2.7.0")
+
+
 if __name__ == "__main__":
     unittest.main()

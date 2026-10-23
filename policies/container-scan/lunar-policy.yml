@@ -51,5 +51,29 @@ inputs:
   ignore_unfixable:
     description: "Only fail max-severity on findings that have a fix available. Unfixable findings are still reported in the component JSON."
     default: "false"
+  exempt_findings:
+    description: |
+      Vulnerabilities `max-severity` ignores because the risk was reviewed and
+      accepted. Entries are `<id> <package>@<version>`, optionally followed by
+      image globs, separated by newlines or commas:
+
+      ```yaml
+      with:
+        exempt_findings: |
+          # bundled inside pip; no pip release ships urllib3 2.8.0 yet
+          CVE-2026-97687 urllib3@2.7.0 registry.example.com/tools:*
+      ```
+
+      Id, package and version must match the finding exactly (the id ignores
+      case), so an entry stops matching once the package is upgraded. With
+      globs, only findings in a matching image are exempt, and a finding with no
+      recorded image never is. `#` comments are ignored.
+
+      Exempt findings stay in the component JSON. The check still fails on the
+      rest, and resolves to `skip`, naming the entries that matched, only when
+      every finding that would have failed was exempt. An entry that cannot be
+      parsed fails the check without exempting anything. `max-total` ignores
+      this input.
+    default: ""
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"

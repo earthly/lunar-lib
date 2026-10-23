@@ -33,7 +33,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
 | `.containers.native.docker.cicd.cmds[]` | array | `docker` collector, plus any CI step that records a pushed image — the pushed refs decide whether `max-severity` / `max-total` apply |
-| `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
+| `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` and `exempt_findings` (`cve`, `severity`, `package`, `version`, `fix_version`, `fixable`, `image`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
@@ -53,6 +53,7 @@ policies:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
       # ignore_unfixable: "true"  # Optional: only fail on findings that have a fix
+      # exempt_findings: ""       # Optional: accepted risks, see below
 ```
 
 ### Only failing on fixable findings
@@ -89,6 +90,27 @@ Two behaviours worth knowing:
   `.container_scan.summary.all_fixable` is not a substitute: it is a single
   boolean across *all* severities, so it cannot answer whether the in-scope
   findings are fixable.
+
+### Exempting accepted findings
+
+A scanner marks a finding fixable when the library has a fixed release, even if
+you can't take it. A copy of urllib3 bundled inside pip is one example: urllib3
+has the fix, but no pip release ships it yet. List those in `exempt_findings`,
+one `<id> <package>@<version>` per line, optionally limited to some images:
+
+```yaml
+    with:
+      min_severity: "high"
+      ignore_unfixable: "true"
+      exempt_findings: |
+        # bundled inside pip; no pip release ships urllib3 2.8.0 yet
+        CVE-2026-97687 urllib3@2.7.0 registry.example.com/tools:*
+```
+
+The version must match exactly, so the entry stops applying once the package is
+upgraded. An exemption never turns a finding into a pass: other findings still
+fail, and the check resolves to `skip`, naming what it exempted, only when
+nothing else would have failed.
 
 ## Examples
 
@@ -142,5 +164,5 @@ When this policy fails, you can resolve it by:
 1. **`executed` failure:** Configure a container scanner (Trivy, Grype, Snyk Container) in your CI pipeline.
    If one is already configured, check its run for this commit — a scanner that ran but recorded nothing
    leaves the same empty `.container_scan`.
-2. **`max-severity` failure:** Review and remediate flagged vulnerabilities by updating base images or using vulnerability suppression for accepted risks.
+2. **`max-severity` failure:** Review and remediate flagged vulnerabilities by updating base images, or list a reviewed, accepted risk in `exempt_findings`.
 3. **`max-total` failure:** Reduce total vulnerability count by updating base images and dependencies.
