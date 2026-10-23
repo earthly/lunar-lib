@@ -58,13 +58,13 @@ The `entity-refs` sub-collector resolves the entity references tagged onto infra
 | `.catalog.entity_refs` | object | Resolution results; written only when `backstage_url` is set **and** IaC tag data is present |
 | `.catalog.entity_refs.checked` | boolean | `true` whenever resolution ran — the signal the policy uses to tell *configured* from *not configured* |
 | `.catalog.entity_refs.source` | object | Tool metadata (`tool: backstage`, `integration: api`) |
-| `.catalog.entity_refs.refs[]` | array | One entry per distinct concrete reference: `{name, exists, resources[]}` on a definitive lookup, or `{name, error, resources[]}` on a transient failure |
+| `.catalog.entity_refs.refs[]` | array | One entry per distinct concrete reference: `{name, kind, exists, resources[]}` on a definitive lookup, or `{name, kind, error, resources[]}` on a transient failure. `kind` is the kind looked up. |
 | `.catalog.entity_refs.unresolved[]` | array | Tag values that were unresolved Terraform expressions: `{value, resources[]}` — nothing concrete to look up |
 
 How it works:
 
 - Runs on the `after-json` hook (`path: .iac.modules`) once an IaC collector has written its modules, and reads the merged Component JSON, so no repo checkout is needed.
-- Resolves each distinct tag value across resource `tags` and module `default_tags` once, with the same [`ref_lookup`](#lookup-endpoint-ref_lookup), [`api_path_prefix`](#api-path-prefix) and [`auth_mode`](#aws-sigv4-authentication-iam-role-signed) as `.refs`. A bare ref uses the `default` namespace.
+- Resolves each distinct tag value across resource `tags` and module `default_tags` once, with the same [`ref_lookup`](#lookup-endpoint-ref_lookup), [`api_path_prefix`](#api-path-prefix) and [`auth_mode`](#aws-sigv4-authentication-iam-role-signed) as `.refs`. The lookup uses the kind the value declares (`component:payment-api`), or `entity_ref_default_kind` (default `component`) when it declares none; a bare ref uses the `default` namespace.
 - A lookup that fails (timeout, `5xx`, auth) records `error` instead of `exists`, so the policy skips rather than fails.
 - `resources[]` names the `<type>.<name>` resources carrying each reference.
 - Unresolved Terraform expressions (`${var.entity_ref}`) go to `unresolved[]` and are never looked up.

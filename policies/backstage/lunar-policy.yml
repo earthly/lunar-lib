@@ -278,9 +278,9 @@ inputs:
     default: "false"
   entity_ref_kind:
     description: |
-      When set, `entity-ref-valid` requires each reference to be this kind
-      (e.g. `component`); a reference with no kind is assumed to be it. Empty
-      (the default) accepts any kind.
+      When set, `entity-ref-valid` fails references whose `kind`, as the
+      collector looked it up, isn't this one (e.g. `component`). Empty (the
+      default) accepts any kind.
     default: ""
   required_annotations:
     description: |

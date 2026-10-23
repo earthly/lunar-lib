@@ -63,7 +63,8 @@ example_component_json: |
       "source": {"tool": "hcl2json", "version": "0.6.8"},
       "files": [
         {"path": "deploy/terraform/main.tf", "valid": true},
-        {"path": "deploy/terraform/variables.tf", "valid": true}
+        {"path": "deploy/terraform/variables.tf", "valid": true},
+        {"path": "deploy/terraform/modules/queue/main.tf", "valid": true}
       ],
       "modules": [
         {
@@ -82,6 +83,15 @@ example_component_json: |
             "internet_accessible": true,
             "has_waf": false
           }
+        },
+        {
+          "path": "deploy/terraform/modules/queue",
+          "resources": [
+            {"type": "aws_sqs_queue", "name": "jobs", "category": "other", "has_prevent_destroy": false}
+          ],
+          "default_tags": {"team": "payments"},
+          "default_tags_inherited_from": ["deploy/terraform"],
+          "analysis": {"internet_accessible": false, "has_waf": false}
         }
       ],
       "native": {

@@ -338,10 +338,10 @@ policies:
   # --- Resource tagging (reads the normalized .iac.modules[] view) ---
   - name: aws-resources-tagged
     description: |
-      Requires every AWS resource not in `exempt_resource_types` to carry the
-      `required_tags` keys, on its own `tags` or the provider's `default_tags`.
-      Skips resources whose `tags` is an unevaluated expression (`merge(...)`).
-      Skipped when `required_tags` is empty (the default).
+      Requires every taggable `aws_*` resource to carry the `required_tags`
+      keys, on its own `tags` or its module's `default_tags`. Skips resources
+      whose `tags` is an unevaluated expression (`merge(...)`). Skipped when
+      `required_tags` is empty (the default).
     mainPython: aws_resources_tagged.py
     keywords: ["aws", "tags", "resource tagging", "default_tags", "required tags", "governance", "cost allocation"]
 
@@ -384,6 +384,6 @@ inputs:
     default: ""
   exempt_resource_types:
     description: |
-      Comma-separated untaggable resource types aws-resources-tagged ignores.
-      Setting it replaces the default list.
-    default: "aws_wafv2_web_acl_association,aws_iam_role_policy_attachment,aws_iam_user_policy_attachment,aws_iam_group_policy_attachment,aws_iam_policy_attachment,aws_route_table_association,aws_subnet_route_table_association,aws_security_group_rule,aws_vpc_security_group_ingress_rule,aws_vpc_security_group_egress_rule,aws_lb_listener_certificate,aws_route53_record,aws_s3_bucket_policy,aws_s3_bucket_public_access_block,aws_s3_bucket_server_side_encryption_configuration"
+      Comma-separated taggable resource types aws-resources-tagged should
+      also ignore.
+    default: ""

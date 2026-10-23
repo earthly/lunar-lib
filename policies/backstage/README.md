@@ -61,7 +61,7 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`, plus `has_domain` once the system resolves; read by `system-exists`, `system-valid`, `system-domain-set` and `system-domain-valid` |
 | `.catalog.native.backstage.refs.system_domain` | object | `backstage` collector — `{ name, exists, via_system }` (or `{ name, error, via_system }`) for the domain the component's system belongs to; read by `system-domain-exists` and `system-domain-valid` |
 | `.catalog.entity_refs.checked` | boolean | `backstage` collector (`entity-refs`) — `true` when entity-ref resolution ran; `entity-ref-valid` skips (passes) when absent |
-| `.catalog.entity_refs.refs[]` | array | `backstage` collector (`entity-refs`) — `{name, exists, resources[]}` (or `{name, error, resources[]}`); read by `entity-ref-valid` |
+| `.catalog.entity_refs.refs[]` | array | `backstage` collector (`entity-refs`) — `{name, kind, exists, resources[]}` (or `{name, kind, error, resources[]}`); read by `entity-ref-valid` |
 | `.catalog.entity_refs.unresolved[]` | array | `backstage` collector (`entity-refs`) — `{value, resources[]}` for tag values that were unresolved Terraform expressions |
 
 **Note:** Ensure the `backstage` collector is configured before enabling this policy. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`) additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they **skip (and pass)** rather than fail, since referential integrity cannot be verified. `system-valid` needs it only for its second step: without it, an unset `spec.system` still fails and a set one skips. (A durable "pending" state isn't available — post-collection the SDK resolves a data-less check to fail/error, not pending — so these checks skip to pass when unverified, mirroring the opt-in `required-*` / `disallowed-*` checks.)
@@ -392,9 +392,9 @@ Given collected data:
     "entity_refs": {
       "checked": true,
       "refs": [
-        {"name": "component:default/payment-api", "exists": true,
+        {"name": "component:default/payment-api", "kind": "component", "exists": true,
          "resources": ["aws_db_instance.main", "aws_s3_bucket.logs"]},
-        {"name": "component:default/legacy-svc", "exists": false,
+        {"name": "legacy-svc", "kind": "component", "exists": false,
          "resources": ["aws_instance.web"]}
       ],
       "unresolved": [
@@ -408,7 +408,7 @@ Given collected data:
 `entity-ref-valid` **fails**, naming the offender:
 
 - `component:default/payment-api` — passes (well-formed, resolves, correct kind).
-- `component:default/legacy-svc` — **fails**: does not exist in the Backstage catalog (tagged on `aws_instance.web`).
+- `legacy-svc` — **fails**: no such `component` (the collector's default kind for a bare ref) in the Backstage catalog (tagged on `aws_instance.web`).
 - `${var.entity_ref}` — **skipped**: an unresolved Terraform expression has no concrete value to verify.
 
 **Not configured / transient outage — skips (pass).** With no `backstage_url` (or no IaC tag data) `.catalog.entity_refs` is absent, so the check skips. A single ref recorded as `{"name": "...", "error": "503"}` is skipped individually rather than failed.

@@ -224,6 +224,11 @@ inputs:
       Resource tag key whose value `entity-refs` resolves as a Backstage
       entity reference (`[<kind>:][<namespace>/]<name>`).
     default: "backstage.com/entity_ref"
+  entity_ref_default_kind:
+    description: |
+      Kind `entity-refs` looks up for a reference that doesn't declare one
+      (`payment-api` rather than `component:payment-api`).
+    default: "component"
 
 secrets:
   BACKSTAGE_TOKEN:
@@ -338,11 +343,13 @@ example_component_json: |
         "refs": [
           {
             "name": "component:default/payment-api",
+            "kind": "component",
             "exists": true,
             "resources": ["aws_db_instance.main", "aws_s3_bucket.logs"]
           },
           {
-            "name": "component:default/legacy-svc",
+            "name": "legacy-svc",
+            "kind": "component",
             "exists": false,
             "resources": ["aws_instance.web"]
           }

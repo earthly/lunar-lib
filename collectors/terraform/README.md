@@ -20,7 +20,8 @@ This collector writes to the following Component JSON paths:
 | `.iac.files[]` | array | File validity: `{path, valid, error?}` |
 | `.iac.modules[]` | array | Normalized modules: `{path, resources[], default_tags?, analysis}` |
 | `.iac.modules[].resources[]` | array | Normalized resources (see below) |
-| `.iac.modules[].default_tags` | object | Provider-level default tags for the module (present only if a `provider` block sets `default_tags`) |
+| `.iac.modules[].default_tags` | object | Provider `default_tags` that apply to the module's resources: from its own `provider "aws"` blocks, or, if it has none, from the modules that call it by local path. Present only when non-empty. |
+| `.iac.modules[].default_tags_inherited_from` | array | Paths of the calling modules the `default_tags` came from. Present only when inherited. |
 | `.iac.native.terraform.files[]` | array | Full parsed HCL per file: `{path, hcl}` |
 | `.iac.native.terraform.cicd` | object | CI command tracking: `{cmds[], source}` |
 
@@ -43,9 +44,9 @@ Each `.iac.modules[].resources[]` entry:
 
 `hcl2json` parses HCL without running `terraform plan`, so:
 
-- Provider `default_tags` sit on the `provider "aws"` block, not on each resource; they're recorded once per module at `.iac.modules[].default_tags`.
+- Provider `default_tags` sit on the `provider "aws"` block, not on each resource; they're recorded once per module at `.iac.modules[].default_tags`. A module directory with no `provider "aws"` block inherits them, as Terraform does, from the modules that call it with a local `source` (`./modules/queue`), following the call chain; with several callers it takes their union. A provider-less module nothing in the repo calls gets none.
 - Interpolated values arrive as literal strings (`"${var.v}"`) and `tags = merge(...)` as a single string; both are flagged (`tags_unresolved`, `tags_expression`).
-- Resources created inside a called module aren't `resource` blocks in this repo, so they're absent from `resources[]`.
+- Resources inside a remote module (a registry or Git `source`) aren't in this repo, so they're absent from `resources[]`. Local modules are ordinary directories and do appear.
 
 ## Collectors
 

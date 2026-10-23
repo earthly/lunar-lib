@@ -60,9 +60,11 @@ The check below governs **resource tagging**. It reads the normalized `.iac.modu
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `aws-resources-tagged` | Every taggable AWS resource carries the required tag key(s) | A non-exempt resource is missing a `required_tags` key (on neither its own `tags` nor the module's `default_tags`) |
+| `aws-resources-tagged` | Every taggable AWS resource carries the required tag key(s) | A taggable resource is missing a `required_tags` key (on neither its own `tags` nor the module's `default_tags`) |
 
 It checks only that the key is present. To check that an entity-reference value resolves, use the `backstage` policy's `entity-ref-valid`.
+
+Only `aws_*` resource types that accept a `tags` argument are checked. The policy ships that list, generated from the AWS provider schema, so sub-resources such as `aws_s3_bucket_versioning` or `aws_iam_role_policy_attachment`, and non-AWS types such as `random_id`, are never flagged. Use `exempt_resource_types` to ignore more types.
 
 ### How `aws-resources-tagged` handles unresolvable data
 
@@ -70,7 +72,7 @@ The collector doesn't evaluate HCL, so:
 
 - A resource whose `tags` attribute is an expression (`tags = merge(...)`, flagged `tags_expression`) is skipped — its keys can't be listed, so it can't be judged missing.
 - A tag key present but with an interpolated value (`${var.x}`, listed in `tags_unresolved`) counts as **present**: this check tests presence, and the key is genuinely there.
-- Provider-level `default_tags` (`.iac.modules[].default_tags`) count toward the requirement, so a repo that tags everything via `default_tags` is not flagged.
+- Provider-level `default_tags` (`.iac.modules[].default_tags`) count toward the requirement, including those a local module inherits from its caller, so a repo that tags everything via `default_tags` is not flagged.
 
 ## Required Data
 
