@@ -1,10 +1,21 @@
 VERSION 0.8
 
+test:
+    FROM python:3.12-alpine
+    # container-rescan.sh is bash and shells out to jq. The tests stub `lunar`
+    # and `trivy` on PATH and drive the real script as a subprocess.
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY container-rescan.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v
+
 image:
     FROM --pass-args ../../+base-image
 
     # Install Trivy
-    ARG TRIVY_VERSION=0.69.3
+    # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
+    ARG TRIVY_VERSION=0.76.0
     ARG TARGETARCH
     RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/64bit/; s/arm64/ARM64/') && \
         curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz" | tar xz -C /usr/local/bin trivy && \

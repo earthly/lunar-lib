@@ -35,4 +35,5 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/dependabot@v1.0.0
     on: ["domain:your-domain"]
+    include: [config]
 ```

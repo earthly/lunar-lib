@@ -1,0 +1,40 @@
+# Copy to .github/workflows/ on your default branch (workflow_run only fires
+# from there). Archives every finished attempt of the listed workflows,
+# re-runs included, to your bucket, and records each one in Lunar.
+name: Archive CI runs
+on:
+  workflow_run:
+    workflows: [CI]           # the workflows to archive, by name
+    types: [completed]
+
+permissions:
+  actions: read               # read the run and download its logs
+  id-token: write             # OIDC for AWS and for the Lunar Hub
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/ci-archive   # needs s3:PutObject on the prefix
+          aws-region: us-east-1
+
+      - name: Lunar Hub token from the job's OIDC identity
+        run: |
+          token="$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=lunar.example.com" | jq -r .value)"
+          echo "::add-mask::$token"
+          echo "LUNAR_HUB_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - uses: earthly/lunar-ci-tracer@v4.4.0   # puts the lunar CLI on PATH
+        env:
+          LUNAR_HUB_HOST: lunar.example.com
+          LUNAR_GITHUB_TOKEN: ${{ github.token }}
+
+      - uses: earthly/lunar-lib/collectors/ci-archive@main
+        with:
+          s3-bucket: acme-ci-archive
+        env:
+          LUNAR_HUB_HOST: lunar.example.com

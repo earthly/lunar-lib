@@ -241,14 +241,12 @@ PR metadata lives in `.vcs.pr`:
       "description": "This PR adds validation for...",
       "author": "jdoe",
       "labels": ["enhancement", "payments"],
-      "reviewers": ["alice", "bob"],
-      "approved": true,
+      "reviews": [{"reviewer": "alice", "state": "APPROVED", "submitted_at": "2024-05-02T15:40:51Z", "commit_sha": "9f1c2e7d..."}],
+      "commits": [{"sha": "9f1c2e7d...", "author": "jdoe", "signature": {"verified": true, "reason": "valid"}}],
       "ticket": {
         "id": "ABC-456",
         "source": "jira"
-      },
-      "commits": 3,
-      "files_changed": 12
+      }
     }
   }
 }

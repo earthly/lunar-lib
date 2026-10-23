@@ -6,21 +6,94 @@ SCRIPT_DIR="$(dirname "$0")"
 
 IFS=',' read -ra CANDIDATES <<< "$LUNAR_VAR_PATHS"
 
-CATALOG_FILE=""
-for candidate in "${CANDIDATES[@]}"; do
-  if [ -f "./$candidate" ]; then
-    CATALOG_FILE="./$candidate"
-    break
+# Prints the first `paths` candidate that exists in directory $1.
+first_catalog_in() {
+  local candidate
+  for candidate in "${CANDIDATES[@]}"; do
+    if [ -f "$1/$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Same lookup as collectors/repo-boilerplate/codeowners.sh: git, else the
+# nearest .git entry (a file in the hub's per-snippet worktrees).
+find_repo_root() {
+  local root dir
+  root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "$root" ] && [ -d "$root" ]; then
+    printf '%s\n' "$root"
+    return 0
   fi
-done
+  dir="$(pwd -P)"
+  while [ "$dir" != "/" ]; do
+    if [ -e "$dir/.git" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+# Parent-directory lookup inputs; fallbacks match the manifest defaults.
+SEARCH_PARENT_DIRS="${LUNAR_VAR_SEARCH_PARENT_DIRS:-false}"
+MATCH=""
+if [ "${LUNAR_VAR_MATCH_SOURCE_LOCATION:-false}" = "true" ]; then
+  MATCH="source-location"
+fi
+if [ "${LUNAR_VAR_MATCH_LINKS:-false}" = "true" ]; then
+  MATCH="${MATCH:+$MATCH,}links"
+fi
+
+CATALOG_FILE=""
+LINT_ARGS=()
+if CANDIDATE=$(first_catalog_in .); then
+  CATALOG_FILE="./$CANDIDATE"
+  PATH_NORMALIZED="$CANDIDATE"
+elif [ "$SEARCH_PARENT_DIRS" = "true" ] && [ -z "$MATCH" ]; then
+  echo "search_parent_dirs is on, but match_source_location and match_links are both off, so no entity can match." >&2
+elif [ "$SEARCH_PARENT_DIRS" = "true" ]; then
+  # A monorepo subdirectory component (the hub runs collectors from
+  # <repo>/<subdir>, whole repo checked out) whose entity lives in a file shared
+  # higher up. Walk up to the repo root; the nearest file wins, and the linter
+  # keeps only the entities that point at this directory.
+  HERE="$(pwd -P)"
+  REPO_ROOT="$(find_repo_root || true)"
+  if [ -n "$REPO_ROOT" ] && [[ "$HERE" == "$REPO_ROOT"/* ]]; then
+    COMPONENT_DIR="${HERE#"$REPO_ROOT"/}"
+    # The component id is <repo>/<subdir> (GitLab: <repo>/-/<subdir>). URLs are
+    # matched against that repo, so no repo means no match.
+    REPO_ID=""
+    case "${LUNAR_COMPONENT_ID:-}" in
+      */"$COMPONENT_DIR")
+        REPO_ID="${LUNAR_COMPONENT_ID%/"$COMPONENT_DIR"}"
+        REPO_ID="${REPO_ID%/-}"
+        ;;
+    esac
+    dir="$HERE"
+    up=""
+    while [ -n "$REPO_ID" ] && [ "$dir" != "$REPO_ROOT" ] && [ "$dir" != "/" ]; do
+      dir="$(dirname "$dir")"
+      up="../$up"
+      if CANDIDATE=$(first_catalog_in "$dir"); then
+        CATALOG_FILE="$dir/$CANDIDATE"
+        PATH_NORMALIZED="$up$CANDIDATE"
+        LINT_ARGS=(--component-dir "$COMPONENT_DIR" --repo "$REPO_ID" --match "$MATCH")
+        echo "No catalog file in $COMPONENT_DIR; reading $PATH_NORMALIZED for entities that point at it ($MATCH)." >&2
+        break
+      fi
+    done
+  fi
+fi
 
 if [ -z "$CATALOG_FILE" ]; then
   # No catalog-info.yaml found — write nothing. Absence of `.catalog.native.backstage`
   # IS the signal. Policies use Check.exists(".catalog.native.backstage") to detect.
   exit 0
 fi
-
-PATH_NORMALIZED="${CATALOG_FILE#./}"
 
 YQ_ERR=$(mktemp)
 trap 'rm -f "$YQ_ERR"' EXIT
@@ -34,8 +107,13 @@ trap 'rm -f "$YQ_ERR"' EXIT
 # YAML still exits non-zero and drops to the parse-error branch below.
 PARSE_OK=false
 if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
-  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED")
+  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED" "${LINT_ARGS[@]}")
   PARSE_OK=true
+  if [ "$RESULT" = "null" ]; then
+    # A shared file that doesn't describe this directory: same as no file.
+    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR ($MATCH); nothing collected." >&2
+    exit 0
+  fi
 else
   ERR_MSG=$(tr '\n' ' ' < "$YQ_ERR" | sed 's/[[:space:]]*$//' | head -c 500)
   [ -z "$ERR_MSG" ] && ERR_MSG="YAML parse error"
@@ -62,16 +140,347 @@ fi
 # the first document), which the linter hoists to the top level of $RESULT as
 # .spec/.metadata — so we read those here rather than $PARSED_JSON, which is now
 # a JSON array of all documents.
+#
+# The three AWS helpers below (parse_sts_credentials, resolve_aws_credentials,
+# assume_role_chain) are deliberately kept in sync with
+# catalogers/backstage/main.sh — both plugins run in the same snippet pods under
+# the same service account, so credentials must resolve identically. A fix here
+# belongs there too, and vice versa.
+
+# parse_sts_credentials reads an STS query-protocol (XML) response on stdin and
+# prints AccessKeyId, SecretAccessKey and SessionToken, one per line. Exits 1
+# when the response carries no credentials (an <ErrorResponse>, or not XML).
+parse_sts_credentials() {
+  python3 -c '
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.fromstring(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+def find(tag):
+    for el in root.iter():
+        if el.tag.split("}")[-1] == tag:
+            return el.text or ""
+    return ""
+kid, sec, tok = find("AccessKeyId"), find("SecretAccessKey"), find("SessionToken")
+if not (kid and sec):
+    sys.exit(1)
+print(kid); print(sec); print(tok)
+' 2>/dev/null
+}
+
+# resolve_aws_credentials walks the AWS credential provider chain and sets
+# AWS_SIGV4_KEY / AWS_SIGV4_SECRET / AWS_SIGV4_TOKEN / CRED_SOURCE.
+#
+# Role-based sources are tried FIRST so an attached role always wins and stays
+# self-refreshing; explicit static keys (LUNAR_SECRET_AWS_*) are the last-resort
+# escape hatch for runners with no IAM identity. We deliberately do NOT read the
+# ambient AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env — a stray env var (from a
+# sidecar, a Secret mount, dev tooling) must not silently preempt an annotated
+# role, which would break the self-refresh guarantee the docs promise. This
+# matches the README's numbering (IRSA #1 recommended ... static #4 escape hatch).
+# Order: IRSA / EKS Pod Identity -> ECS task role -> EC2 IMDSv2 -> static secret.
+# Uses only curl + jq + python3 (all in base-main); no aws CLI / botocore.
+resolve_aws_credentials() {
+  AWS_SIGV4_KEY=""; AWS_SIGV4_SECRET=""; AWS_SIGV4_TOKEN=""; CRED_SOURCE=""
+
+  # 1. IRSA / web identity: exchange the projected token for temp creds via
+  #    STS AssumeRoleWithWebIdentity (token-authenticated POST, no signing).
+  if [ -n "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" ] && [ -n "${AWS_ROLE_ARN:-}" ] \
+     && [ -f "${AWS_WEB_IDENTITY_TOKEN_FILE}" ]; then
+    local wit resp parsed
+    wit="$(cat "$AWS_WEB_IDENTITY_TOKEN_FILE")"
+    resp="$(curl -sS -X POST "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
+      --data-urlencode "Action=AssumeRoleWithWebIdentity" \
+      --data-urlencode "Version=2011-06-15" \
+      --data-urlencode "RoleArn=${AWS_ROLE_ARN}" \
+      --data-urlencode "RoleSessionName=${AWS_ROLE_SESSION_NAME:-lunar-backstage-collector}" \
+      --data-urlencode "DurationSeconds=3600" \
+      --data-urlencode "WebIdentityToken=${wit}" 2>/dev/null)" || true
+    parsed="$(printf '%s' "$resp" | parse_sts_credentials)" || true
+    if [ -n "$parsed" ]; then
+      AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+      AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+      AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+      CRED_SOURCE="irsa-web-identity"; return 0
+    fi
+    echo "ERROR: sigv4 web-identity (IRSA) credential resolution failed. STS response head:" >&2
+    printf '%s' "$resp" | head -c 300 >&2; echo "" >&2
+    return 1
+  fi
+
+  # 2. ECS task role / EKS Pod Identity — container credentials endpoint (JSON).
+  #    ECS sets AWS_CONTAINER_CREDENTIALS_RELATIVE_URI + a direct-value token env;
+  #    Pod Identity (AWS's successor to IRSA) sets AWS_CONTAINER_CREDENTIALS_FULL_URI
+  #    + a token FILE that rotates, so read the file fresh at resolve time.
+  if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ] || [ -n "${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI:-}" ]; then
+    local ecs_url resp auth_val=""; local hdr=()
+    if [ -n "${AWS_CONTAINER_CREDENTIALS_FULL_URI:-}" ]; then
+      ecs_url="$AWS_CONTAINER_CREDENTIALS_FULL_URI"
+    else
+      ecs_url="http://169.254.170.2${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI}"
+    fi
+    if [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE:-}" ] && [ -f "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE}" ]; then
+      auth_val="$(cat "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE}")"
+    elif [ -n "${AWS_CONTAINER_AUTHORIZATION_TOKEN:-}" ]; then
+      auth_val="${AWS_CONTAINER_AUTHORIZATION_TOKEN}"
+    fi
+    [ -n "$auth_val" ] && hdr=(-H "Authorization: $auth_val")
+    resp="$(curl -sS --connect-timeout 3 "${hdr[@]}" "$ecs_url" 2>/dev/null)" || true
+    AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
+    AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
+    AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
+    if [ -n "$AWS_SIGV4_KEY" ] && [ -n "$AWS_SIGV4_SECRET" ]; then
+      CRED_SOURCE="container-credentials"; return 0
+    fi
+    echo "ERROR: sigv4 container-credentials (ECS / EKS Pod Identity) resolution failed." >&2
+    return 1
+  fi
+
+  # 3. EC2 instance profile via IMDSv2 (PUT token, then GET creds).
+  local imds_token role resp
+  imds_token="$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 300" --connect-timeout 2 2>/dev/null)" || true
+  if [ -n "$imds_token" ]; then
+    role="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+      "http://169.254.169.254/latest/meta-data/iam/security-credentials/" 2>/dev/null)" || true
+    if [ -n "$role" ]; then
+      resp="$(curl -sS --connect-timeout 2 -H "X-aws-ec2-metadata-token: $imds_token" \
+        "http://169.254.169.254/latest/meta-data/iam/security-credentials/${role}" 2>/dev/null)" || true
+      AWS_SIGV4_KEY="$(printf '%s' "$resp" | jq -r '.AccessKeyId // empty' 2>/dev/null)"
+      AWS_SIGV4_SECRET="$(printf '%s' "$resp" | jq -r '.SecretAccessKey // empty' 2>/dev/null)"
+      AWS_SIGV4_TOKEN="$(printf '%s' "$resp" | jq -r '.Token // empty' 2>/dev/null)"
+      if [ -n "$AWS_SIGV4_KEY" ] && [ -n "$AWS_SIGV4_SECRET" ]; then
+        CRED_SOURCE="ec2-instance-profile"; return 0
+      fi
+    fi
+  fi
+
+  # 4. Static keys — deliberate opt-in escape hatch via LUNAR_SECRET_AWS_*
+  #    (NOT ambient AWS_* env). Last resort; these do not self-refresh.
+  if [ -n "${LUNAR_SECRET_AWS_ACCESS_KEY_ID:-}" ] && [ -n "${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY:-}" ]; then
+    AWS_SIGV4_KEY="${LUNAR_SECRET_AWS_ACCESS_KEY_ID}"
+    AWS_SIGV4_SECRET="${LUNAR_SECRET_AWS_SECRET_ACCESS_KEY}"
+    AWS_SIGV4_TOKEN="${LUNAR_SECRET_AWS_SESSION_TOKEN:-}"
+    CRED_SOURCE="static-keys"; return 0
+  fi
+
+  echo "ERROR: auth_mode=sigv4 but no AWS credentials could be resolved." >&2
+  echo "  Tried (in order): IRSA / EKS Pod Identity web-identity, ECS / Pod Identity" >&2
+  echo "  container credentials, EC2 IMDSv2, then static LUNAR_SECRET_AWS_* keys." >&2
+  echo "  Attach an IAM role to the collector's snippet-pod service account (see" >&2
+  echo "  README), or set the LUNAR_SECRET_AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY secrets." >&2
+  return 1
+}
+
+# assume_role_chain is the optional aws_assume_role_arns hop, for a gateway that
+# only trusts a role the base identity can assume (usually cross-account). The
+# first candidate STS accepts replaces the credentials, so one config can span
+# environments whose base roles each assume only their own. No DurationSeconds:
+# STS's 1h default is the chained-role maximum. ARNs carry an account id, so
+# failures are logged by position and STS error code only.
+assume_role_chain() {
+  local raw=() arns=() arn resp status parsed reason i=0
+  local token_hdr=()
+  # Commas or whitespace separate entries; an ARN never contains whitespace.
+  IFS=',' read -ra raw <<< "${AWS_ASSUME_ROLE_ARNS//[[:space:]]/,}"
+  for arn in "${raw[@]}"; do
+    if [ -n "$arn" ]; then arns+=("$arn"); fi
+  done
+  if [ "${#arns[@]}" -eq 0 ]; then return 0; fi
+
+  if [ -n "$AWS_SIGV4_TOKEN" ]; then
+    token_hdr=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+  fi
+  for arn in "${arns[@]}"; do
+    i=$((i + 1))
+    status=0
+    resp="$(curl -sS --max-time 15 --get "https://sts.${AWS_SIGV4_REGION}.amazonaws.com/" \
+      --aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:sts" \
+      --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}" \
+      "${token_hdr[@]}" \
+      --data-urlencode "Action=AssumeRole" \
+      --data-urlencode "Version=2011-06-15" \
+      --data-urlencode "RoleArn=${arn}" \
+      --data-urlencode "RoleSessionName=lunar-backstage-collector" 2>/dev/null)" || status=$?
+    if [ "$status" -eq 0 ] && parsed="$(printf '%s' "$resp" | parse_sts_credentials)"; then
+      AWS_SIGV4_KEY="$(printf '%s\n' "$parsed" | sed -n 1p)"
+      AWS_SIGV4_SECRET="$(printf '%s\n' "$parsed" | sed -n 2p)"
+      AWS_SIGV4_TOKEN="$(printf '%s\n' "$parsed" | sed -n 3p)"
+      CRED_SOURCE="${CRED_SOURCE}+assume-role"
+      return 0
+    fi
+    if [ "$status" -ne 0 ]; then
+      reason="request failed, curl exit ${status}"
+    elif [[ "$resp" == *"<Code>"*"</Code>"* ]]; then
+      reason="${resp#*<Code>}"; reason="${reason%%</Code>*}"
+    else
+      reason="unrecognized STS response"
+    fi
+    echo "Backstage auth: aws_assume_role_arns role ${i}/${#arns[@]} not assumed (${reason})" >&2
+  done
+  echo "ERROR: sts:AssumeRole failed for every role in aws_assume_role_arns. The base identity" >&2
+  echo "  (${CRED_SOURCE}) needs sts:AssumeRole on the role, and the role's trust policy must allow it." >&2
+  return 1
+}
+
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:-}"
 if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   BASE_URL="${BACKSTAGE_URL%/}"
   DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
 
+  # Path prefix before /catalog/entities — `/api` for a standard Backstage
+  # layout, "" for an instance whose catalog API is mounted at the root (e.g.
+  # behind an API gateway that strips the `/api` hop, where /api/catalog/…
+  # returns 403/404). This matters most under auth_mode: sigv4, since an
+  # IAM-fronted Backstage is usually behind Amazon API Gateway — exactly the
+  # shape that strips the hop — so leaving this at the default there can 403 on
+  # every lookup despite perfectly correct signing.
+  # `-` not `:-`: an explicit empty value must survive so it can disable the
+  # prefix. The hub always sets LUNAR_VAR_API_PATH_PREFIX — to the manifest
+  # default `/api` when unset in config, or the user's value (including "")
+  # when set — so `-/api` only fires for a truly-unset var (direct local
+  # invocation), not a config-supplied "".
+  API_PATH_PREFIX="${LUNAR_VAR_API_PATH_PREFIX-/api}"
+  # Normalize: drop any trailing slash, and ensure a non-empty value leads with
+  # a slash — so `api`, `/api`, and `/api/` all resolve to `/api`, and "" stays "".
+  API_PATH_PREFIX="${API_PATH_PREFIX%/}"
+  if [ -n "$API_PATH_PREFIX" ] && [ "${API_PATH_PREFIX#/}" = "$API_PATH_PREFIX" ]; then
+    API_PATH_PREFIX="/$API_PATH_PREFIX"
+  fi
+
+  # Which catalog endpoint resolves each reference. Both modes produce an
+  # identical `.refs` shape, so no policy changes with this input.
+  #   by-name  (default) — GET /catalog/entities/by-name/<kind>/<ns>/<name>.
+  #                        A direct key lookup whose status IS the answer:
+  #                        200 = exists, 404 = miss.
+  #   by-query           — GET /catalog/entities/by-query?limit=1&filter=…
+  #                        A search, so existence lives in the body rather than
+  #                        the status: a 200 with a non-empty `.items` = exists,
+  #                        an empty `.items` = miss.
+  # by-query is for an instance that only authorizes that endpoint. A gateway in
+  # front of Backstage can expose the catalog search API and reject by-name
+  # outright, in which case every by-name lookup fails no matter how correct the
+  # auth is — the failure mode looks identical to an outage. It is the same
+  # endpoint the backstage *cataloger* has always used.
+  REF_LOOKUP="${LUNAR_VAR_REF_LOOKUP:-by-name}"
+
+  # --- Authentication ---
+  # AUTH_ARGS holds the curl arguments used for every lookup: a Bearer header
+  # (bearer mode) or the SigV4 signing flags + session-token header (sigv4).
+  # Credentials are resolved ONCE here and reused across both lookups.
+  #
+  # SETUP_ERROR is the degrade-not-fail channel, and the one deliberate divergence
+  # from the cataloger. For the cataloger, fetching the catalog IS the job, so it
+  # exits non-zero when credentials can't be resolved. Here, referential integrity
+  # is an optional add-on layered on parse-and-lint: discarding valid lint results
+  # over an auth misconfiguration would regress the collector's primary function.
+  # So a config/credential problem is logged to stderr and recorded per-reference
+  # as {name, error} — which the policy already reads as "couldn't determine"
+  # rather than "doesn't exist" — and the parse/lint output is always written.
+  AUTH_ARGS=()
+  SETUP_ERROR=""
+  AUTH_MODE="${LUNAR_VAR_AUTH_MODE:-bearer}"
+
+  case "$AUTH_MODE" in
+    bearer)
+      if [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ]; then
+        AUTH_ARGS=(-H "Authorization: Bearer ${LUNAR_SECRET_BACKSTAGE_TOKEN}")
+      fi
+      ;;
+    sigv4)
+      AWS_SIGV4_REGION="${LUNAR_VAR_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
+      AWS_SIGV4_SERVICE="${LUNAR_VAR_AWS_SERVICE:-execute-api}"
+      AWS_ASSUME_ROLE_ARNS="${LUNAR_VAR_AWS_ASSUME_ROLE_ARNS:-}"
+      if [ -z "$AWS_SIGV4_REGION" ]; then
+        SETUP_ERROR="aws_region required for sigv4"
+        echo "ERROR: $SETUP_ERROR (set the aws_region input or the AWS_REGION env var)" >&2
+      elif ! resolve_aws_credentials; then
+        SETUP_ERROR="sigv4 credential resolution failed"
+      elif ! assume_role_chain; then
+        SETUP_ERROR="sts:AssumeRole failed for every role in aws_assume_role_arns"
+      else
+        AUTH_ARGS=(--aws-sigv4 "aws:amz:${AWS_SIGV4_REGION}:${AWS_SIGV4_SERVICE}" \
+                   --user "${AWS_SIGV4_KEY}:${AWS_SIGV4_SECRET}")
+        if [ -n "${AWS_SIGV4_TOKEN:-}" ]; then
+          AUTH_ARGS+=(-H "x-amz-security-token: ${AWS_SIGV4_TOKEN}")
+        fi
+        echo "Backstage auth: SigV4 (region=$AWS_SIGV4_REGION service=$AWS_SIGV4_SERVICE, credentials via $CRED_SOURCE)" >&2
+      fi
+      ;;
+    *)
+      SETUP_ERROR="invalid auth_mode '$AUTH_MODE' (expected 'bearer' or 'sigv4')"
+      echo "ERROR: $SETUP_ERROR" >&2
+      ;;
+  esac
+
+  # Validated after auth so that when both are misconfigured the auth problem —
+  # the more fundamental one — keeps its more specific message.
+  if [ -z "$SETUP_ERROR" ]; then
+    case "$REF_LOOKUP" in
+      by-name|by-query) ;;
+      *)
+        SETUP_ERROR="invalid ref_lookup '$REF_LOOKUP' (expected 'by-name' or 'by-query')"
+        echo "ERROR: $SETUP_ERROR" >&2
+        ;;
+    esac
+  fi
+
+  # Percent-encode a whole query-param value, the filter grammar's own `=` and
+  # `,` included: Backstage decodes the param before parsing it, so the meaning
+  # is unchanged, but curl < 8.14 signs a literal `=` inside a value differently
+  # from AWS, so under sigv4 the literal form 403s there (host-native runs; the
+  # plugin image ships a newer curl). Encoding `&` also keeps a hand-written
+  # `spec.domain: "a&filter=kind=system"` inside this one param instead of
+  # injecting a second filter, which Backstage would OR in.
+  url_escape() { jq -rn --arg s "$1" '$s|@uri'; }
+
+  # The canonical ref and the annotations of the entity in $ENTITY_BODY_FILE,
+  # as JSON to merge into a ref entry. Other collectors read annotations from
+  # here (pagerduty finds its service ID this way) instead of calling Backstage
+  # again. `{}` when the body isn't an entity: nothing is inferred from a
+  # response we couldn't read.
+  entity_facts() {
+    local facts
+    facts=$(jq -c '
+      if type == "object" and (.kind | type) == "string"
+         and (.metadata | type) == "object" and (.metadata.name | type) == "string"
+      then {ref: "\(.kind | ascii_downcase):\(.metadata.namespace // "default")/\(.metadata.name)"}
+           + (if (.metadata.annotations | type) == "object" and (.metadata.annotations | length) > 0
+              then {annotations: .metadata.annotations} else {} end)
+      else {} end' "$ENTITY_BODY_FILE" 2>/dev/null) || facts=""
+    [ -n "$facts" ] || facts='{}'
+    printf '%s\n' "$facts"
+  }
+
   resolve_ref() {
     # $1 = Backstage kind (domain|system); $2 = declared reference value.
-    # Emits a JSON object: {name, exists} on a definitive 200/404, or
-    # {name, error} on a transient failure (connection error / 5xx).
-    local kind="$1" value="$2" ref ns name http_code curl_status
+    # Emits a JSON object: {name, exists} on a definitive answer, or
+    # {name, error} on a non-definitive outcome — a transient failure
+    # (connection error / 5xx) or a config problem that stopped us issuing a
+    # meaningful request at all (see SETUP_ERROR above).
+    #
+    # Side effect: on a definitive hit the resolved entity's JSON is written to
+    # $ENTITY_BODY_FILE, so the caller can read fields off the entity it just
+    # confirmed (the system -> spec.domain hop below). A *file* is the channel
+    # because resolve_ref is always invoked as `$(resolve_ref ...)` — a command
+    # substitution runs in a subshell, so a variable assigned here would be
+    # discarded on return and the hop would silently never fire. The file is
+    # truncated on entry so a previous lookup's entity can never be misread as
+    # this one's.
+    local kind="$1" value="$2" ref ns name http_code curl_status response body item_count
+
+    : > "$ENTITY_BODY_FILE"
+
+    # Setup never completed (bad auth_mode or ref_lookup, missing aws_region,
+    # unresolvable credentials). Report it per-reference instead of firing a
+    # request we know cannot succeed — and without discarding the parse/lint
+    # results.
+    if [ -n "$SETUP_ERROR" ]; then
+      jq -n --arg name "$value" --arg err "$SETUP_ERROR" '{name: $name, error: $err}'
+      return 0
+    fi
+
     # Strip an explicit "kind:" prefix, then split an optional "namespace/"
     # prefix; a bare value uses the component's namespace (falling back to
     # "default"). Mirrors Backstage's own reference resolution.
@@ -84,21 +493,55 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
       name="$ref"
     fi
 
-    local auth=()
-    [ -n "${LUNAR_SECRET_BACKSTAGE_TOKEN:-}" ] && auth=(-H "Authorization: Bearer ${LUNAR_SECRET_BACKSTAGE_TOKEN}")
-
     set +e
-    http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
-      "${auth[@]}" \
-      "${BASE_URL}/api/catalog/entities/by-name/${kind}/${ns}/${name}")
-    curl_status=$?
+    if [ "$REF_LOOKUP" = "by-query" ]; then
+      # by-query needs the response *body* (existence is `.items`, not the
+      # status), so `-w '\n%{http_code}'` appends the status after it and one
+      # request yields both. `limit=1` — we only ask whether anything matches.
+      response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
+        "${AUTH_ARGS[@]}" \
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-query?limit=1&filter=$(url_escape "kind=${kind},metadata.namespace=${ns},metadata.name=${name}")")
+      curl_status=$?
+      http_code="${response##*$'\n'}"
+      body="${response%$'\n'*}"
+    else
+      # by-name's status alone is the existence answer, but the body carries the
+      # resolved entity — which the system -> spec.domain hop needs — so keep it
+      # instead of discarding it to /dev/null. Same `-w '\n%{http_code}'` shape
+      # as the by-query branch, so one request still yields body and status.
+      response=$(curl -sS -w '\n%{http_code}' --max-time 15 \
+        "${AUTH_ARGS[@]}" \
+        "${BASE_URL}${API_PATH_PREFIX}/catalog/entities/by-name/${kind}/${ns}/${name}")
+      curl_status=$?
+      http_code="${response##*$'\n'}"
+      body="${response%$'\n'*}"
+    fi
     set -e
 
     if [ "$curl_status" -ne 0 ]; then
       jq -n --arg name "$value" --arg err "request failed (curl exit ${curl_status})" \
         '{name: $name, error: $err}'
+    elif [ "$REF_LOOKUP" = "by-query" ]; then
+      # A search reports "no match" as an empty result set, so only a 200 is
+      # meaningful and the body decides. A 200 we cannot parse (an HTML login
+      # page from a gateway, a truncated response) is NOT a miss: inferring
+      # "doesn't exist" from a response we couldn't read would turn our own
+      # misconfiguration into a policy failure against the user's file.
+      if [ "$http_code" != "200" ]; then
+        jq -n --arg name "$value" --arg err "HTTP ${http_code}" '{name: $name, error: $err}'
+      elif ! item_count=$(printf '%s' "$body" \
+             | jq -e 'if (.items | type) == "array" then (.items | length) else null end' 2>/dev/null); then
+        jq -n --arg name "$value" --arg err "unparseable by-query response" \
+          '{name: $name, error: $err}'
+      elif [ "$item_count" -gt 0 ]; then
+        printf '%s' "$body" | jq -c '.items[0]' > "$ENTITY_BODY_FILE" 2>/dev/null || :
+        jq -n --arg name "$value" --argjson facts "$(entity_facts)" '{name: $name, exists: true} + $facts'
+      else
+        jq -n --arg name "$value" '{name: $name, exists: false}'
+      fi
     elif [ "$http_code" = "200" ]; then
-      jq -n --arg name "$value" '{name: $name, exists: true}'
+      printf '%s' "$body" > "$ENTITY_BODY_FILE"
+      jq -n --arg name "$value" --argjson facts "$(entity_facts)" '{name: $name, exists: true} + $facts'
     elif [ "$http_code" = "404" ]; then
       jq -n --arg name "$value" '{name: $name, exists: false}'
     else
@@ -107,6 +550,21 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   }
 
   REFS='{"checked":true}'
+
+  # Scratch file resolve_ref writes the resolved entity to; see the note there
+  # for why this can't be a variable.
+  ENTITY_BODY_FILE=$(mktemp)
+  trap 'rm -f "$YQ_ERR" "$ENTITY_BODY_FILE"' EXIT
+
+  # The primary entity itself, as the live catalog has it. Backstage processors
+  # can add annotations the file doesn't carry, such as an ID inherited from
+  # the entity's System, so readers of annotations want this copy.
+  ENTITY_KIND=$(echo "$RESULT" | jq -r '.kind | strings')
+  ENTITY_NAME=$(echo "$RESULT" | jq -r '.metadata.name | strings')
+  if [ -n "$ENTITY_KIND" ] && [ -n "$ENTITY_NAME" ]; then
+    ENTITY_ENTRY=$(resolve_ref "${ENTITY_KIND,,}" "$ENTITY_NAME")
+    REFS=$(echo "$REFS" | jq --arg kind "$ENTITY_KIND" --argjson e "$ENTITY_ENTRY" '. + {entity: ({kind: $kind} + $e)}')
+  fi
 
   DOMAIN_REF=$(echo "$RESULT" | jq -r '.spec.domain // empty')
   if [ -n "$DOMAIN_REF" ]; then
@@ -118,6 +576,58 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   if [ -n "$SYSTEM_REF" ]; then
     SYSTEM_ENTRY=$(resolve_ref system "$SYSTEM_REF")
     REFS=$(echo "$REFS" | jq --argjson s "$SYSTEM_ENTRY" '. + {system: $s}')
+
+    # Transitive hop: component -> its system -> that system's domain.
+    #
+    # A Component has no domain of its own in the Backstage model — domain
+    # membership is a property of the System it belongs to (`System.spec.domain`
+    # is what produces the `partOf -> domain:...` relation; a `spec.domain`
+    # written on a Component is inert and Backstage generates nothing from it).
+    # So for the ordinary one-Component-per-repo file, "is my domain real?"
+    # can only be answered through the system, which is what this records at
+    # `.refs.system_domain`. `.refs.domain` keeps its existing meaning: the
+    # domain THIS entity declares directly (a `kind: System` catalog file).
+    #
+    # Only hop on a confirmed system: if the system is missing or its lookup
+    # errored there is no entity to read a domain off, and reporting a second
+    # failure for the same root cause would just double the noise.
+    #
+    # Belt-and-braces: resolve_ref only writes the body on a definitive hit and
+    # truncates on entry, so today a non-existent system already leaves the file
+    # empty and the hop would no-op anyway. The explicit guard states the
+    # invariant so that stays true if resolve_ref ever starts capturing error
+    # bodies too.
+    if [ "$(echo "$SYSTEM_ENTRY" | jq -r '.exists // false')" = "true" ]; then
+      # Record whether the System declares a domain: without it, "belongs to
+      # no domain" looks the same as a collector that never checked. Left unset
+      # when the body isn't an entity, so nothing is inferred from a response
+      # we couldn't read.
+      if SYSTEM_DOMAIN_REF=$(jq -er 'if type == "object" and has("kind") then (.spec.domain // "" | tostring) else error("not an entity") end' \
+           "$ENTITY_BODY_FILE" 2>/dev/null); then
+        HAS_DOMAIN=false
+        [ -n "$SYSTEM_DOMAIN_REF" ] && HAS_DOMAIN=true
+        REFS=$(echo "$REFS" | jq --argjson has "$HAS_DOMAIN" '.system += {has_domain: $has}')
+      else
+        SYSTEM_DOMAIN_REF=""
+      fi
+      if [ -n "$SYSTEM_DOMAIN_REF" ]; then
+        # A bare reference on the System resolves against the SYSTEM's namespace,
+        # not the component's — they can differ — so borrow it for this lookup.
+        # (Backstage normalizes metadata.namespace on read, so it is present;
+        # fall back to the component's namespace if an instance ever omits it.)
+        SYSTEM_NS=$(jq -r '.metadata.namespace // empty' "$ENTITY_BODY_FILE" 2>/dev/null || :)
+        SAVED_DEFAULT_NS="$DEFAULT_NS"
+        DEFAULT_NS="${SYSTEM_NS:-$DEFAULT_NS}"
+        SYSTEM_DOMAIN_ENTRY=$(resolve_ref domain "$SYSTEM_DOMAIN_REF")
+        DEFAULT_NS="$SAVED_DEFAULT_NS"
+        # Carry the system that pointed here: the entity to fix lives in the
+        # System's own catalog file, which is usually another team's repo, so a
+        # bare domain name would not tell anyone where to go.
+        SYSTEM_DOMAIN_ENTRY=$(echo "$SYSTEM_DOMAIN_ENTRY" \
+          | jq --arg via "$SYSTEM_REF" '. + {via_system: $via}')
+        REFS=$(echo "$REFS" | jq --argjson sd "$SYSTEM_DOMAIN_ENTRY" '. + {system_domain: $sd}')
+      fi
+    fi
   fi
 
   RESULT=$(echo "$RESULT" | jq --argjson refs "$REFS" '. + {refs: $refs}')

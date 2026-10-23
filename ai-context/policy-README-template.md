@@ -41,7 +41,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/{path-to-policy}@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
     enforcement: report-pr      # Options: draft, score, report-pr, block-pr, block-release, block-pr-and-release
-    # include: [example-check-1]  # Only run specific checks (omit to run all)
+    include: [example-check-1, example-check-2]
     # with:                       # Uncomment if inputs are needed
     #   minThreshold: "90"
 ```
@@ -95,4 +95,5 @@ When using this template:
 2. Be specific about guardrail IDs - these appear in the Lunar UI
 3. Always document the required Component JSON paths and which integration provides them
 4. Include remediation steps - help developers fix issues
-5. Remove this "Template Usage Notes" section from the final README
+5. List every check under `include:`, one per line once they don't fit on one. `+lint` fails an install snippet without `include:`
+6. Remove this "Template Usage Notes" section from the final README

@@ -33,6 +33,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
     on: ["domain:your-domain"]
+    include:
+      - code-reviewer  # CodeRabbit check-runs on PRs
+      - config         # .coderabbit.yaml
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 ```

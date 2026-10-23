@@ -37,7 +37,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/api-docs@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [spec-exists]  # Only run specific checks (omit to run all)
+    include: [spec-exists, spec-valid, has-docs]
 ```
 
 ## Examples

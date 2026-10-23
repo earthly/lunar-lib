@@ -32,6 +32,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/license-origins@main
     on: ["domain:engineering"]
+    include: [scan]
 ```
 
 To disable caching (scan fresh every time):
@@ -40,6 +41,7 @@ To disable caching (scan fresh every time):
 collectors:
   - uses: github://earthly/lunar-lib/collectors/license-origins@main
     on: ["domain:engineering"]
+    include: [scan]
     with:
       cache_enabled: "false"
 ```

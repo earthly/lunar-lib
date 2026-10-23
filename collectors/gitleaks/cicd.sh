@@ -50,19 +50,35 @@ fi
 if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
   echo "Collecting gitleaks report from $REPORT_FILE" >&2
 
-  # Collect raw report
-  cat "$REPORT_FILE" | lunar collect -j ".secrets.native.gitleaks.cicd.report" - || \
-    echo "Warning: Failed to collect raw report" >&2
-
-  # Normalize findings into .secrets.cicd
+  # The report is produced by the customer's own gitleaks command, so we cannot
+  # add --redact to it — .Secret and .Match may hold the live credential. Strip
+  # both before anything is collected. This fails closed: if the report is not
+  # a recognizable gitleaks JSON array, or the strip fails for any reason
+  # (including jq being absent from the runner), the raw report is dropped
+  # rather than collected unmasked.
+  MASKED=""
   if jq -e 'type == "array"' "$REPORT_FILE" >/dev/null 2>&1; then
-    jq '[.[] | {
+    MASKED=$(jq -c '[.[] | if type == "object" then del(.Secret, .Match) else . end]' \
+      "$REPORT_FILE" 2>/dev/null) || MASKED=""
+  else
+    echo "Report at $REPORT_FILE could not be read as a gitleaks JSON array; dropping raw report" >&2
+  fi
+
+  if [ -n "$MASKED" ]; then
+    # Collect raw report, minus the secret-bearing fields
+    printf '%s' "$MASKED" | lunar collect -j ".secrets.native.gitleaks.cicd.report" - || \
+      echo "Warning: Failed to collect raw report" >&2
+
+    # Normalize findings into .secrets.cicd
+    printf '%s' "$MASKED" | jq '[.[] | {
       rule: .RuleID,
       file: .File,
       line: .StartLine,
       secret_type: .Description
-    }]' "$REPORT_FILE" | lunar collect -j ".secrets.cicd" - || \
+    }]' | lunar collect -j ".secrets.cicd" - || \
       echo "Warning: Failed to normalize report" >&2
+  else
+    echo "Could not mask secrets in $REPORT_FILE; skipping report collection" >&2
   fi
 elif [ -n "$REPORT_FILE" ]; then
   echo "Report file $REPORT_FILE not found" >&2

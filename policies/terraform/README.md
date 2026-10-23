@@ -15,6 +15,7 @@ This policy provides the following guardrails (use `include` to select a subset)
 | `provider-versions-pinned` | Providers specify version constraints | Provider in `required_providers` has no `version` field |
 | `module-versions-pinned` | Modules use pinned versions | Module missing `version` or `?ref=` in source |
 | `remote-backend` | Remote backend configured | No `terraform { backend {} }` block found |
+| `opentofu-state-encryption` | OpenTofu state encryption configured and enforced | No `terraform { encryption {} }` block, or `state.enforced` is not `true` |
 | `min-provider-versions` | Providers meet minimum version requirements | Provider version constraint below required minimum |
 
 The checks below are AWS resource security guardrails relevant to SOC 2 (tagged with the `soc2` keyword). Each is individually includable — a future SOC 2 starter-pack can bundle them all:
@@ -34,6 +35,8 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
 | `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |
 | `aws-s3-access-logging` | S3 buckets log access requests | Bucket without server access logging configured |
+| `aws-tls-policy-approved` | TLS uses an approved policy | Listener `ssl_policy`, CloudFront `minimum_protocol_version` or API Gateway `security_policy` outside `approved_tls_policies` |
+| `aws-stateful-backup-configured` | Stateful resources declare a backup | RDS with no/zero `backup_retention_period`, DynamoDB without PITR, EFS without an enabled `backup_policy` |
 | `aws-vpc-flow-logs` | VPCs have flow logs enabled | `aws_vpc` without a matching `aws_flow_log` |
 | `aws-security-group-no-public-admin-ports` | No public ingress to sensitive admin/database ports | A security group allows `0.0.0.0/0` to a port like RDP, MySQL, MSSQL, or Telnet |
 | `aws-rds-encryption-at-rest` | RDS storage is encrypted at rest | `aws_db_instance` / `aws_rds_cluster` without `storage_encrypted = true` |
@@ -44,6 +47,8 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-s3-no-public-acl` | S3 buckets do not grant public ACL access | Bucket with a `public-read`/`public-read-write` ACL or AllUsers grant |
 | `aws-iam-password-min-length` | IAM password policy enforces a minimum length | No `aws_iam_account_password_policy`, or length below the minimum |
 | `aws-iam-no-direct-user-policies` | No IAM policies attached directly to users | Inline/managed policy attached to a user instead of a group or role |
+| `aws-iam-role-permissions-boundary` | IAM roles set a permissions boundary | `aws_iam_role` without a non-empty `permissions_boundary` |
+| `aws-imdsv2-required` | EC2 metadata requires IMDSv2, no extra hops | `aws_instance`/`aws_launch_template` without `http_tokens = "required"`, or with an explicit `http_put_response_hop_limit` above 1 |
 | `aws-acm-cert-dns-validation` | ACM certificates use DNS validation | `aws_acm_certificate` using EMAIL (or unset) validation |
 | `aws-eks-private-endpoint` | EKS clusters enable private endpoint access | Cluster without `endpoint_private_access` / `cluster_endpoint_private_access` |
 | `aws-dynamodb-encryption` | DynamoDB tables declare encryption at rest | Table without a `server_side_encryption { enabled = true }` block |
@@ -86,12 +91,51 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
+    include: [terraform]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/terraform@main
     on: [infra]
     enforcement: report-pr
-    # include: [provider-versions-pinned, remote-backend]  # Only run specific checks
+    include:
+      - provider-versions-pinned
+      - module-versions-pinned
+      - remote-backend
+      - min-provider-versions
+      - aws-alb-waf-enabled
+      - aws-cloudtrail-multi-region
+      - aws-security-group-no-public-postgres
+      - aws-security-group-no-public-ssh
+      - aws-eks-control-plane-logging
+      - aws-elb-access-logging
+      - aws-ebs-snapshot-encryption
+      - aws-iam-role-permissions-boundary
+      - aws-imdsv2-required
+      - opentofu-state-encryption
+      - aws-ebs-volume-encryption
+      - aws-elb-https-only
+      - aws-guardduty-enabled
+      - aws-rds-cloudwatch-logging
+      - aws-s3-block-public-access
+      - aws-s3-access-logging
+      - aws-vpc-flow-logs
+      - aws-security-group-no-public-admin-ports
+      - aws-rds-encryption-at-rest
+      - aws-rds-not-publicly-accessible
+      - aws-rds-snapshot-encryption
+      - aws-s3-encryption-at-rest
+      - aws-s3-no-static-website
+      - aws-s3-no-public-acl
+      - aws-iam-password-min-length
+      - aws-iam-no-direct-user-policies
+      - aws-acm-cert-dns-validation
+      - aws-eks-private-endpoint
+      - aws-dynamodb-encryption
+      - aws-lambda-not-public
+      - aws-cloudtrail-log-file-validation
+      - aws-cloudtrail-kms-encryption
+      - aws-tls-policy-approved
+      - aws-stateful-backup-configured
     # with:
     #   required_backend_types: "s3,gcs,remote"  # Restrict allowed backend types
     #   min_provider_versions: '{"aws": "5.0", "random": "3.0"}'  # Enforce minimum versions
@@ -105,6 +149,7 @@ Block a PR (or score a component) when any AWS resource is missing a required ta
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
+    include: [terraform]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/terraform@main

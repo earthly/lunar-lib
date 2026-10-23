@@ -56,5 +56,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/scala@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project        # Project structure and versions
+      - dependencies   # sbt, mill or Maven dependencies
+      - cicd           # sbt and mill commands in CI
+      - test-coverage  # scoverage coverage
 ```

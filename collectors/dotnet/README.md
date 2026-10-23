@@ -34,5 +34,8 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/dotnet@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project       # Project structure and target frameworks
+      - dependencies  # NuGet dependencies
+      - cicd          # dotnet commands in CI
 ```

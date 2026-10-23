@@ -36,7 +36,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/ci@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [lint-clean, dependencies-pinned]  # Only run specific checks
+    include: [lint-clean, dependencies-pinned, no-mutable-refs]
 ```
 
 ## Examples

@@ -105,6 +105,11 @@ policies:
 
 Default is `[prs, default-branch]`. Use `runs_on: [prs]` to run only on PRs, or `runs_on: [default-branch]` to run only on the main branch.
 
+> **`runs_on` is a policy key, not a hook key.** Plugin manifests are not
+> decoded with unknown-key rejection, so a `runs_on` nested under `hook:` is
+> dropped silently and the default `[prs, default-branch]` applies instead.
+> `scripts/validate_manifest_schema.py` fails `+lint` on this.
+
 #### `initiative`
 
 Groups related policies for management and reporting:
@@ -482,6 +487,11 @@ with Check("optional-coverage") as c:
     # If .coverage doesn't exist: check passes (no assertions made)
 ```
 
+A check that makes no assertions resolves to `PASS`, which is indistinguishable
+from one that ran and succeeded. When the reason nothing was checked is that the
+check doesn't *apply* to this component, say so with `c.skip(reason)` instead —
+see [Technology Detection: Skip vs Fail](#technology-detection-skip-vs-fail).
+
 ### Pattern: Required Data with assert_exists()
 
 ```python
@@ -549,9 +559,12 @@ The choice between skip and fail depends on whether the policy is **universal** 
 | Wrong tech stack entirely | `c.skip(reason)` | Go policy on a Python repo |
 | Technology confirmed present, required sub-data missing | `c.fail(reason)` | Go project with no test coverage data |
 | Required artifact should exist for all components | `c.assert_exists(path, msg)` | SAST scanner should run in every CI pipeline |
-| Nothing to check, absence is acceptable | `return c` (pass) | No containers found — pass, not skip |
+| Technology-specific policy, technology not present | `c.skip(reason)` | Container policies on a repo with no Dockerfiles |
+| Opt-in check, its configuration variable unset | `c.skip(reason)` | `container/required-labels` with no `required_labels` set |
 
 **Rule of thumb:** Skip = "this check doesn't apply to this component" (applicability). Fail = "this check applies and the component doesn't meet it" (violation). When in doubt: if the user has to explicitly opt into the policy, absent data is a fail. If the policy is auto-applied broadly, absent data for a specific tool is a skip.
+
+**Don't pass silently when you checked nothing.** A check that returns without making any assertion resolves to `PASS`, which renders identically to a check that ran and genuinely succeeded. That's a false green: it tells the user "your Dockerfiles are fine" on a repo that has no Dockerfiles. Prefer `c.skip(reason)` — it's a terminal state, it doesn't fail enforcement, and it says *why* the check didn't apply.
 
 ### Examples from Existing Policies
 
@@ -589,12 +602,17 @@ if not c.get_node(".lang").exists():
 c.assert_exists(".sast", "No SAST scanning data found. Ensure a scanner is configured.")
 ```
 
-**Pass — absence is acceptable:**
+**Skip — technology-specific, technology not present:**
 ```python
 # From: policies/container/no_latest.py
+# The docker collector writes nothing when the repo has no Dockerfiles, so
+# absent `.containers.definitions` means "not a container component". Skipping
+# says that; returning here would report a green pass on a repo with no
+# Dockerfiles at all.
 definitions = c.get_node(".containers.definitions")
 if not definitions.exists():
-    return  # No containers — nothing to check, passes silently
+    c.skip("No Dockerfiles found in this component")
+    return c
 ```
 
 ## Environment Variables
@@ -916,13 +934,15 @@ def check_pdb_coverage():
         if not workloads.exists():
             return
         
-        # Get list of workloads that have PDBs (by target_workload reference)
-        pdb_targets = set()
+        # A PDB covers a workload when its selector matches the pod template
+        # labels. (matchLabels only here; policies/k8s/pdb.py also handles
+        # matchExpressions and namespaces.)
+        selectors = []
         if pdbs.exists():
             for pdb in pdbs:
-                target = pdb.get_value_or_default(".target_workload", "")
-                if target:
-                    pdb_targets.add(target)
+                match_labels = pdb.get_value_or_default(".selector.matchLabels", None)
+                if match_labels:
+                    selectors.append(match_labels)
         
         # Check each Deployment has a matching PDB
         for workload in workloads:
@@ -932,8 +952,9 @@ def check_pdb_coverage():
             
             name = workload.get_value_or_default(".name", "<unknown>")
             path = workload.get_value_or_default(".path", "")
+            labels = workload.get_value_or_default(".pod_labels", {})
             
-            has_pdb = name in pdb_targets
+            has_pdb = any(sel.items() <= labels.items() for sel in selectors)
             c.assert_true(has_pdb, f"Deployment {name} ({path}) has no matching PDB")
 ```
 

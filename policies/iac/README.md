@@ -38,12 +38,17 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
+    include: [terraform]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/iac@main
     on: [infra]
     enforcement: report-pr
-    # include: [valid, waf-protection, datastore-destroy-protection]  # Only run specific checks
+    include:
+      - valid
+      - waf-protection
+      - datastore-destroy-protection
+      - resource-destroy-protection
 ```
 
 ## Examples

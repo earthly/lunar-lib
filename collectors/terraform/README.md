@@ -1,10 +1,14 @@
 # Terraform Collector
 
-Parses Terraform HCL files and collects IaC configuration data for policy analysis.
+Parses Terraform and OpenTofu configuration files and collects IaC configuration data for policy analysis.
 
 ## Overview
 
-This collector finds all `.tf` files in a repository and parses them using [hcl2json](https://github.com/tmccombs/hcl2json). It writes file validity status, a normalized inventory of resources (with their tags and provider-level `default_tags`), and the full parsed HCL JSON, enabling downstream policies to analyze providers, modules, backend configuration, resource inventory, tagging, and infrastructure security posture.
+This collector finds all `.tf` and `.tofu` files in a repository and parses them using [hcl2json](https://github.com/tmccombs/hcl2json). It writes file validity status, normalized resources (with their tags and provider-level `default_tags`), and the full parsed HCL JSON, enabling downstream policies to analyze providers, modules, backend configuration, resource inventory, tagging, and infrastructure security posture.
+
+**OpenTofu precedence.** Where a directory holds both `<base>.tf` and `<base>.tofu`, OpenTofu [uses the `.tofu` file and ignores the `.tf`](https://opentofu.org/docs/language/files/), and this collector does the same. Without that rule a policy would be evaluating configuration that is never applied.
+
+The JSON syntax variants (`.tf.json`, `.tofu.json`) are not parsed yet.
 
 ## Collected Data
 
@@ -66,6 +70,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: ["domain:your-domain"]  # Or use tags like [infra, terraform]
+    include:
+      - terraform  # Parses .tf files
+      - cicd       # terraform commands in CI
 ```
 
 To also resolve a service-catalog entity-reference tag against Backstage, add the

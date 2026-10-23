@@ -4,7 +4,7 @@ Catalogs all repositories from a GitHub organization as Lunar components.
 
 ## Overview
 
-This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility, repository name patterns, and repository topics (allow/blocklist), and can optionally stamp a default owner and domain on all components. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
+This cataloger syncs repositories from a GitHub organization into the Lunar catalog. It maps GitHub topics to Lunar tags (with a configurable prefix), supports filtering by visibility, repository name patterns, and repository topics (allow/blocklist), and can optionally stamp a default owner and domain on all components. Empty repositories are skipped by default because they have no commit for Lunar to collect or evaluate. It works against github.com as well as GitHub Enterprise Server (via the `github_host` input).
 
 ## Synced Data
 
@@ -79,6 +79,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
 ```
@@ -88,12 +89,14 @@ catalogers:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       include_public: "true"
       include_private: "true"
       include_internal: "false"
       include_archived: "false"
+      include_empty: "false"
       exclude_repos: "sandbox-*,deprecated-*,*-archive"
       tag_prefix: "gh-"
       default_owner: "platform-team@acme.com"
@@ -106,6 +109,21 @@ passes the hub's domain-reference validation. A domain definition in
 `lunar-config.yml` (or a later cataloger) takes precedence on merge, so you can
 set a richer description/owner there and this cataloger won't clobber it.
 
+### Empty Repositories
+
+Repositories with no commits are excluded by default. They cannot produce
+collector or policy results because Lunar has no Git SHA to evaluate. To include
+empty placeholder repositories in the catalog anyway, opt in explicitly:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
+    with:
+      org_name: "acme-corp"
+      include_empty: "true"
+```
+
 ### GitHub Enterprise Server
 
 To catalog from a self-hosted GitHub Enterprise Server instead of github.com,
@@ -114,6 +132,7 @@ set `github_host` to your GHE hostname:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       github_host: "github.acme.com"
@@ -131,10 +150,14 @@ IDs reflect the host, so a repo on GHE is keyed as `github.acme.com/<org>/<repo>
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       include_repos: "api-*,backend-*,frontend-*"
 ```
+
+Patterns match the repository name — not the `org/repo` path — and support `*`
+(any run of characters) and `?` (exactly one).
 
 ### Filter by Topic (allowlist / blocklist)
 
@@ -145,6 +168,7 @@ catalog by **GitHub topic**. Tag the repos you want cataloged (e.g. add the
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme-corp"
       allowed_topics: "lunar"          # only repos carrying the `lunar` topic
@@ -176,4 +200,8 @@ This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:
    CLI as `GH_ENTERPRISE_TOKEN`. If that secret is unset it falls back to
    `LUNAR_SECRET_GH_TOKEN`, so existing single-token setups keep working.
 
-The cataloger makes API calls to list repositories and their topics. For large organizations, it fetches up to 10,000 repositories per visibility level.
+The cataloger lists the organization's repositories in one unfiltered pass through GitHub's
+cursor-paginated GraphQL repositories connection, 100 per page, up to `max_repos` (default
+10,000). Visibility and archived state are filtered after fetching rather than by the API:
+`gh repo list` falls back to GitHub's search API — which returns at most 1000 results — if it
+is given `--no-archived`, `--visibility internal`, `--topic` or `--language`.

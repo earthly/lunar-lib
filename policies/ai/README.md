@@ -13,7 +13,7 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 | `code-reviewer` | error | At least one AI code reviewer must be active (`ai.code_reviewers[]`) |
 | `instruction-file-exists` | error | An agent instruction file must exist at the repo root |
 | `canonical-naming` | warning | Root instruction file should use the vendor-neutral name (AGENTS.md) |
-| `instruction-file-length` | warning | Root instruction file must be within configured length bounds |
+| `instruction-file-length` | warning | Every instruction file must be within the configured line and byte caps |
 | `instruction-file-sections` | warning | Root instruction file must contain required section headings |
 | `plans-dir-exists` | warning | A dedicated AI plans directory should exist |
 | `ai-authorship-annotated` | warning | Commits should include AI authorship annotations |
@@ -34,12 +34,21 @@ This policy enforces cross-tool AI standards using data from the `ai.*` namespac
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ai@main
     on: ["domain:your-domain"]
+    include:
+      - instruction-files  # AGENTS.md files
+      - plans-dir          # AI plans directory
+      - ai-authorship      # AI authorship from commits
   - uses: github://earthly/lunar-lib/collectors/coderabbit@main
     on: ["domain:your-domain"]
+    include: [code-reviewer]
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
   - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
+    include:
+      - code-reviewer     # Claude Code Review check-runs on PRs
+      - cicd              # Claude CLI runs in CI
+      - instruction-file  # CLAUDE.md files
     secrets:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 
@@ -47,6 +56,14 @@ collectors:
 policies:
   - uses: github://earthly/lunar-lib/policies/ai@main
     enforcement: report-pr
+    include:
+      - code-reviewer
+      - instruction-file-exists
+      - canonical-naming
+      - instruction-file-length
+      - instruction-file-sections
+      - plans-dir-exists
+      - ai-authorship-annotated
 ```
 
 ## Examples

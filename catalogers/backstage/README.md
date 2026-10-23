@@ -73,6 +73,7 @@ Add to your `lunar-config.yml`:
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -94,6 +95,7 @@ Some Backstage APIs sit behind AWS IAM authentication (commonly Amazon API Gatew
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       auth_mode: "sigv4"
@@ -121,6 +123,26 @@ metadata:
 
 The role's trust policy must allow the snippet-pod service account to assume it, and its permissions must allow `execute-api:Invoke` (or the appropriate action) on your Backstage API. Annotating the hub service account instead is the most common setup mistake — the hub doesn't make the catalog request.
 
+#### Cross-account role (`aws_assume_role_arns`)
+
+Some gateways reject the pod's own role and accept only a role that the pod's role can *assume*, usually one in another account. List that role in `aws_assume_role_arns`. The cataloger resolves credentials as above, calls `sts:AssumeRole` with them, and signs every catalog request with the assumed role's credentials:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/backstage@v1.1.0
+    include: [sync]
+    with:
+      backstage_url: "https://backstage.example.com"
+      auth_mode: "sigv4"
+      aws_region: "us-west-2"
+      aws_assume_role_arns: "arn:aws:iam::210987654321:role/backstage-api-reader"
+```
+
+- The pod's role needs `sts:AssumeRole` on the target role, and the target role's trust policy must trust the pod's role. Only the target role needs `execute-api:Invoke`.
+- Several comma-separated ARNs are tried in order, and the first one STS accepts is used. This lets one config run in environments whose pod roles can each assume only their own target.
+- The call goes to the regional STS endpoint for `aws_region`. The session is named `lunar-backstage-cataloger` in CloudTrail and lasts STS's default hour, which is also the limit for a chained role.
+- If no listed role can be assumed, the cataloger exits with an error before fetching anything. The log names each role that failed by its position in the list and the STS error code (e.g. `AccessDenied`), never by ARN.
+
 #### Alternative: a standalone `aws-sigv4-proxy` service (no plugin config)
 
 If you'd rather keep signing out of the cataloger entirely, run AWS's [`aws-sigv4-proxy`](https://github.com/awslabs/aws-sigv4-proxy) as its **own** Kubernetes `Deployment` + `Service`, leave `auth_mode: bearer` with no token, and point `backstage_url` at the proxy's in-cluster DNS name:
@@ -143,6 +165,7 @@ By default the cataloger calls `<backstage_url>/api/catalog/entities`, matching 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       api_path_prefix: ""   # gateway is mounted at root — no /api hop
@@ -157,10 +180,12 @@ For organisations that already run [`github-org`](../github-org) to enumerate re
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme"
 
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
 ```
@@ -174,6 +199,7 @@ Backstage components are matched to Lunar components by reading an annotation on
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.0.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       component_id_annotation: "github.com/project-slug"  # value: "acme/payment-api"
@@ -187,6 +213,54 @@ with:
   component_id_annotation: "gitlab.com/project-slug"
   component_id_prefix: "gitlab.com/"
 ```
+
+### Verifying Repos Exist (`verify_repos`)
+
+That annotation is a *claim* about a repo, not a fact. Backstage catalogs are maintained by hand, so renamed, deleted and typo'd slugs are routine — and Lunar doesn't validate repo existence when the catalog is saved, so the component gets created anyway and then sits there with nothing behind it: no collector and no policy can ever run against it.
+
+`verify_repos` (on by default) checks each component's repo before writing it and skips the ones that don't exist, naming them in the run log:
+
+```text
+github.com: 411/412 repo(s) exist (5 request(s))
+Repo does not exist (or GH_TOKEN cannot see it) — skipping:
+  github.com/acme/retired-service
+Repo verification dropped 1 of 415 component(s)
+```
+
+**In practice it's off until you set `GH_TOKEN`** — without the secret the cataloger logs one line and writes every component exactly as before, so upgrading changes nothing until you opt in:
+
+```sh
+lunar secret set GH_TOKEN <your-github-token>
+```
+
+`Metadata: Read` on a fine-grained PAT or GitHub App installation token is enough (`repo` on a classic PAT). Many lunar-lib plugins reuse the same `GH_TOKEN`, so if you already set it for `github-org` or the GitHub-API collectors this picks it up automatically. Lookups are batched ~100 repos per GraphQL request, so a few thousand components cost a few hundred requests per run rather than one per component.
+
+#### Multiple hosts
+
+The host is read from each component id (`<host>/<owner>/<repo>`), so a catalog spanning github.com and one or more GitHub Enterprise Server hosts needs **no extra configuration** — each host is checked against its own API (`https://<host>/api/graphql`, or `api.github.com` for the public one).
+
+To mix hosts in one catalog, leave `component_id_prefix` empty and let the annotation value carry the host:
+
+```yaml
+with:
+  component_id_prefix: ""      # annotation value is already ghes.example.com/org/repo
+```
+
+#### What happens when it can't tell
+
+Verification is **fail-open, per host**. The catalog only ever shrinks on a repo GitHub positively reports as absent; every "we don't know" leaves things alone:
+
+| Situation | Behaviour |
+|---|---|
+| No `GH_TOKEN` | Writes everything, logs one line |
+| Request fails, or a 200 with an unparseable body | That host's components all kept |
+| Nothing resolves for a host | That host's components all kept |
+
+Because hosts are independent, one bad host never affects the others.
+
+**Only GitHub hosts are supported.** Components on any other forge — GitLab, Bitbucket — are left unverified: that host resolves nothing, so it's treated as inconclusive and its components pass through untouched. GitHub components in the same catalog are still verified normally. Note also that a repo the token *cannot see* reads the same as one that doesn't exist, so scope `GH_TOKEN` to every org the catalog references.
+
+Verification covers this cataloger only. The file-based siblings don't need it: [`backstage-catalog-info-monorepo`](../backstage-catalog-info-monorepo) derives ids from repos it enumerated through the GitHub API, and [`backstage-catalog-info`](../backstage-catalog-info) only augments components Lunar already has.
 
 ### Restricting Synced Kinds
 
@@ -216,6 +290,7 @@ A catalog that doesn't use these fields is unaffected: a `Domain` with no `subdo
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage@v1.2.0
+    include: [sync]
     with:
       backstage_url: "https://backstage.example.com"
       entity_kinds: "Component,Domain,System"   # include System to nest systems under their domain
@@ -339,3 +414,10 @@ This cataloger calls the [Backstage Catalog REST API](https://backstage.io/docs/
 3. **Read access** to the kinds configured in `entity_kinds`
 
 Pagination is handled automatically; the cataloger streams pages until all matching entities are fetched.
+
+When `verify_repos` is on (the default) it additionally calls the [GitHub GraphQL API](https://docs.github.com/en/graphql) — one batched query per ~100 repos, resolving each candidate component's `<owner>/<repo>` — and needs:
+
+- **`GH_TOKEN` secret** with repository metadata read access on every org the Backstage catalog references. A repo the token cannot see is reported as absent, so an under-scoped token drops real components.
+- **Network reach** from the Lunar Runner to each host in the catalog (`api.github.com`, plus `https://<host>/api/graphql` for any GitHub Enterprise Server host).
+
+See [Verifying Repos Exist](#verifying-repos-exist-verify_repos) for the fail-open behaviour when either is missing.

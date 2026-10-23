@@ -69,24 +69,55 @@ plugin-source:
 test:
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
+    BUILD --pass-args ./collectors/backstage+test-offline
+    BUILD --pass-args ./collectors/ci-archive+test
     BUILD ./collectors/github+test
+    BUILD --pass-args ./collectors/github-actions+test
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
+    BUILD --pass-args ./collectors/compliance-docs+test
+    BUILD ./collectors/package-registries+test
+    BUILD ./collectors/trivy+test
+    BUILD ./collectors/grype+test
+    BUILD ./collectors/docker+test
+    BUILD ./collectors/codeql+test
+    BUILD ./collectors/terraform+test
+    BUILD ./collectors/java+test
+    BUILD --pass-args ./collectors/pagerduty+test
+    BUILD ./collectors/k8s+test
+    BUILD ./collectors/istio+test
+    BUILD ./collectors/datadog+test
+    BUILD ./collectors/argocd-deployment-tracking+test
     BUILD ./catalogers/backstage+test
+    BUILD --pass-args ./catalogers/github-org+test
+    BUILD --pass-args ./catalogers/moon+test
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
     BUILD ./policies/ai+test
+    BUILD ./policies/compliance-docs+test
     BUILD ./policies/git+test
     BUILD ./policies/vcs+test
     BUILD ./policies/backstage+test
+    BUILD ./policies/k8s+test
+    BUILD ./policies/istio+test
+    BUILD ./policies/github-actions+test
+    BUILD ./policies/sca+test
+    BUILD ./policies/container-scan+test
     BUILD ./policies/repo-boilerplate+test
+    BUILD ./policies/dependencies+test
+    BUILD ./policies/container+test
+    BUILD ./policies/terraform+test
+    BUILD ./policies/sbom+test
+    BUILD ./policies/testing+test
+    BUILD ./policies/oncall+test
+    BUILD ./policies/ticket+test
 
 lint:
     FROM python:3.12-alpine
     WORKDIR /workspace
     RUN pip install --quiet pyyaml
-    COPY --dir catalogers collectors policies scripts .
+    COPY --dir ai-context catalogers collectors policies probes scripts starter-packs .
     COPY Earthfile .
     # Unified README structure validation for all plugin types
     RUN python scripts/validate_readme_structure.py
@@ -98,6 +129,12 @@ lint:
     RUN python scripts/validate_earthfile_wiring.py
     # Validate earthly/lunar-lib image tags are canonical (-main / -vX.Y.Z), not dev/personal builds
     RUN python scripts/validate_image_tags.py
+    # Unknown snippet/hook keys in plugin manifests (the hub drops them silently)
+    RUN python scripts/validate_manifest_schema.py --self-test
+    RUN python scripts/validate_manifest_schema.py
+    # Every lunar-lib import in the docs lists what it runs with include:
+    RUN python scripts/validate_readme_includes.py --self-test
+    RUN python scripts/validate_readme_includes.py
 
 ai-context:
     COPY --dir ai-context .
@@ -130,12 +167,63 @@ all:
     BUILD --pass-args ./collectors/elixir+image
     BUILD --pass-args ./collectors/checkov+image
     BUILD --pass-args ./catalogers/github-org+image
+    BUILD --pass-args ./catalogers/moon+image
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.5-alpine
+    ARG SCRIPTS_VERSION=1.1.11-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
+    # Pull in every OS-package security fix Alpine has published for the pinned
+    # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
+    # so its tags ship whatever package set that base had when it was cut — e.g.
+    # openssl 3.5.7-r0 with two fixable criticals while 3.5.8-r0 was already in
+    # the 3.24 repo. Upgrading here is what keeps that out of every image built
+    # on this base (21 of the 27 published images).
+    # RUN --no-cache: re-run the upgrade on every build. Without it the layer is
+    # served from the inline cache (--ci imports it from the previously pushed
+    # base-<tag>), so -main images would stay frozen at whatever the first build
+    # after a pin bump picked up. Release cuts and new branches never had a cache
+    # to hit, so they were always fresh; this makes main behave the same.
+    RUN --no-cache apk upgrade --no-cache
+    # pip vendors certifi: upgrading certifi alone leaves GHSA-6q48-6c7w-9gw2
+    # in pip's bundle. Keep the active venv pip current and remove the unused
+    # Alpine system pip, which carries a second vulnerable copy.
+    RUN --no-cache python3 -m pip install --no-cache-dir --upgrade 'pip>=26.2.2' && apk del py3-pip
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
+    # git: a dozen collectors shell out to it (diff, log, ls-files) and their
+    # call sites swallow the failure, so without it they silently write nothing.
+    # safe.directory: the snippet checkout is owned by a different uid than the
+    # process running the script, which git otherwise refuses to read.
+    RUN apk add --no-cache git && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
+
+# syft for the syft and license-origins images, built from source: the 1.54.1
+# release ships go1.26.8 and x/net 0.59.0, both with fixable criticals.
+syft-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required SYFT_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${SYFT_VERSION}" https://github.com/anchore/syft /src
+    WORKDIR /src
+    RUN go get golang.org/x/net@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
+            -ldflags "-s -w -X main.version=${SYFT_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${SYFT_VERSION}" \
+            -o /out/syft ./cmd/syft
+    SAVE ARTIFACT /out/syft
+
+# kubeconform for the k8s and argocd images, built from source with a current
+# x/text: the 0.8.0 release binary carries fixable Highs in it and in Go's stdlib.
+kubeconform-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    # renovate: datasource=github-releases depName=yannh/kubeconform extractVersion=^v(?<version>.*)$
+    ARG KUBECONFORM_VERSION=0.8.0
+    RUN git clone --quiet --depth 1 --branch "v${KUBECONFORM_VERSION}" https://github.com/yannh/kubeconform /src
+    WORKDIR /src
+    # The repo vendors its dependencies, so re-vendor after the bump.
+    RUN go get golang.org/x/text@latest && go mod vendor && \
+        CGO_ENABLED=0 go build -trimpath -tags netgo \
+            -ldflags "-s -w -X main.version=v${KUBECONFORM_VERSION}" -o /out/kubeconform ./cmd/kubeconform
+    SAVE ARTIFACT /out/kubeconform

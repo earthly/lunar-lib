@@ -12,9 +12,12 @@ if [ -n "$GITLEAKS_VERSION" ]; then
 fi
 
 # Run gitleaks in --no-git mode (no git history needed, scan working directory)
+# --redact blanks the detected credential in the report: .Secret becomes
+# "REDACTED" and the same substring is masked inside .Match. Without it the
+# report ships the live secret to Component JSON.
 REPORT_FILE="/tmp/gitleaks-report.json"
 EXIT_CODE=0
-gitleaks detect --no-git --source . --report-path "$REPORT_FILE" --report-format json 2>&1 >&2 || EXIT_CODE=$?
+gitleaks detect --no-git --source . --redact --report-path "$REPORT_FILE" --report-format json 2>&1 >&2 || EXIT_CODE=$?
 
 # Exit code 1 = leaks found, 0 = clean, anything else = error
 if [ "$EXIT_CODE" -gt 1 ]; then
@@ -34,8 +37,16 @@ if [ -f "$REPORT_FILE" ] && [ -s "$REPORT_FILE" ]; then
     mv /tmp/gitleaks-capped.json "$REPORT_FILE"
   fi
 
-  # Collect raw report to native path
-  cat "$REPORT_FILE" | lunar collect -j ".secrets.native.gitleaks.auto.report" -
+  # Collect raw report to native path. Only ship it once --redact is confirmed
+  # to have taken effect — the flag's help text only promises redaction of
+  # "logs and stdout", so treat a report that still carries a live .Secret as a
+  # failure and drop the raw report rather than leaking it. The normalized
+  # .secrets.issues below is unaffected, so policies keep working either way.
+  if jq -e 'all(.[]; .Secret == "REDACTED")' "$REPORT_FILE" >/dev/null 2>&1; then
+    lunar collect -j ".secrets.native.gitleaks.auto.report" - < "$REPORT_FILE"
+  else
+    echo "Report is not redacted as expected; dropping raw report to avoid storing plaintext secrets" >&2
+  fi
 
   # Normalize findings into .secrets.issues
   jq '[.[] | {

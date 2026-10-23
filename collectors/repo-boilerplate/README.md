@@ -44,6 +44,15 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/repo-boilerplate@main
     on: ["domain:your-domain"]
+    include:
+      - readme        # README length and sections
+      - codeowners    # CODEOWNERS rules
+      - gitignore     # .gitignore patterns
+      - license       # LICENSE type
+      - security      # SECURITY.md
+      - contributing  # CONTRIBUTING.md
+      - editorconfig  # .editorconfig
+      - changelog     # CHANGELOG versions
     # with:
     #   readme_paths: "README.md,README,README.txt,README.rst"
     #   codeowners_paths: "CODEOWNERS,.github/CODEOWNERS,docs/CODEOWNERS"

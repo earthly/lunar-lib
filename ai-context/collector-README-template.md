@@ -38,6 +38,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/{path-to-collector}@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
+    include:
+      - example-collector-1  # Existence of X
+      - example-collector-2  # More data about Y
     # with:                     # Uncomment if inputs are needed
     #   threshold: "20"
 ```
@@ -50,4 +53,5 @@ When using this template:
 
 1. Replace all `{placeholders}` with actual values
 2. Only list top-level paths in the table (e.g., `.example.items[]`, `.example.summary`)
-3. Remove this "Template Usage Notes" section from the final README
+3. List every sub-collector under `include:` with a short comment, or `include: [name]` for a single one. `+lint` fails an install snippet without `include:`
+4. Remove this "Template Usage Notes" section from the final README

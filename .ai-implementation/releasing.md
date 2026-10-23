@@ -81,17 +81,20 @@ cd /path/to/lunar-lib    # must be repo root
 The script handles everything:
 
 1. **Validates** the version format (must match `^v[0-9]+\.[0-9]+\.[0-9]+$`)
-2. **Checks** working tree is clean, no duplicate branch/tag
+2. **Checks** working tree is clean, no duplicate branch/tag, that main's CI recorded `HEAD`'s images for Lunar to scan (`record pushed images for CVE scan` succeeded), and that every `SCRIPTS_VERSION` pin is the newest `earthly/lunar-scripts` release (if not, merge Renovate's `lunar-scripts base` PR first)
 3. **Creates** local branch `vX.Y.Z`
-4. **Rewrites manifests** — all `lunar-*.yml` files: changes `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
-5. **Rewrites starter packs** — all `starter-packs/**/*.yml` files: changes `@<anything>` → `@vX.Y.Z`
-6. **Verifies** no unrewritten `-main` image refs or unpinned starter-pack refs remain
-7. **Commits** with message `Pin images for vX.Y.Z`
-8. **Creates** git tag `vX.Y.Z`
-9. **Pushes** both the branch and tag to origin
-10. **Restores** your previous branch
+4. **Generates the CHANGELOG section** — `scripts/gen-changelog-section.sh` reads the commits in `<previous-tag>..HEAD` and splices a `## [X.Y.Z]` section plus its compare link into `CHANGELOG.md`, before the pin commit, so the tag carries it
+5. **Rewrites manifests** — all `lunar-*.yml` files: changes `earthly/lunar-lib:*-main` → `earthly/lunar-lib:*-vX.Y.Z`
+6. **Rewrites starter packs** — all `starter-packs/**/*.yml` files: changes `@<anything>` → `@vX.Y.Z`
+7. **Verifies** no unrewritten `-main` image refs or unpinned starter-pack refs remain
+8. **Commits** with message `Pin images for vX.Y.Z`
+9. **Creates** git tag `vX.Y.Z`
+10. **Pushes** both the branch and tag to origin
+11. **Restores** your previous branch, then pushes `release-changelog-vX.Y.Z` — the same CHANGELOG change, for main
 
 If the script exits non-zero, do **not** re-run it. See [Troubleshooting](#troubleshooting).
+
+**Do not hand-edit `CHANGELOG.md`.** There is no `[Unreleased]` section and feature PRs never touch the file — an entry is a PR title, recorded when the version ships. A probe blocks agent edits to it. Hand-appending is what put six entries under an already-released heading: the version roll inserted a `## [X.Y.Z]` header directly above the list an in-flight PR was written against, so it merged into the shipped section with no conflict and nothing to flag it.
 
 ### Step 3: Monitor CI
 
@@ -103,12 +106,14 @@ gh run list --branch vX.Y.Z --limit 3
 gh run watch <run-id>
 ```
 
-CI runs three jobs:
+CI runs these jobs:
 - **+test** — runs `earthly --ci +test`
 - **+lint** — runs `earthly --ci +lint`
 - **+all (build-and-push)** — builds every plugin image and pushes to Docker Hub with the `vX.Y.Z` tag
+- **release gate** — runs `lunar policy ok-release` on the main commit the branch was cut from, before **+all** runs. It fails if any release-blocking policy fails there (e.g. `image-cve`), or if main never recorded that commit's images
+- **record pushed images for CVE scan** — tells the internal Hub which images to scan
 
-All three must pass. If any fail:
+All must pass. A red **release gate** means Lunar blocked the release and no image was pushed. Don't create the GitHub Release or announce it: fix it on `main` and cut the next patch. If any job fails:
 
 ```bash
 gh run view <run-id> --log-failed
@@ -118,14 +123,18 @@ Read the logs, diagnose, and report to the human. **Do not attempt fixes on the 
 
 ### Step 4: Verify images exist
 
-After CI passes, confirm the images were published to Docker Hub. **Do not pull them** — just check they exist via the API (no auth needed for public images):
+After CI passes, confirm the images were published to Docker Hub. **Do not pull them** — just check each manifest exists:
 
 ```bash
-# List all tags matching this version
-curl -s "https://hub.docker.com/v2/repositories/earthly/lunar-lib/tags/?name=vX.Y.Z&page_size=100" | jq '.count, [.results[].name]'
+scripts/pushed-image-refs.sh vX.Y.Z | while read -r ref; do
+  docker manifest inspect "$ref" >/dev/null 2>&1 || echo "MISSING $ref"
+done
 ```
 
-Verify the count matches the number of `+image` targets in the root `Earthfile` `+all` target (base image + all plugins). If any are missing, check the CI build logs for that specific plugin.
+Silence means every image published. Ask the registry, not
+`hub.docker.com/v2/.../tags/?name=`: that API is a search index that lags, and
+at v1.14.5 it returned zero matches for a release whose 27 images had all
+published. If a ref really is missing, check the CI build logs for that plugin.
 
 ### Step 5: Create a GitHub Release with release notes
 
@@ -136,6 +145,8 @@ After CI passes and images are verified, create a GitHub Release to document wha
    ```bash
    git log --oneline <previous-tag>..vX.Y.Z
    ```
+
+   This is the same range `gen-changelog-section.sh` used in Step 2, so read the generated `## [X.Y.Z]` section alongside these notes. Its bucketing is inferred from commit subjects — move any misfiled line, and keep the two renderings saying the same thing.
 
 2. **Categorize changes** into these sections:
    - **New Collectors** — newly added collectors (include status: beta, experimental, stable)
@@ -168,6 +179,8 @@ After CI passes and images are verified, create a GitHub Release to document wha
    **Important:** When running this, the `EOF` delimiter must be at column 0 (no leading spaces). The indentation above is for markdown readability only — in your actual shell command, left-align `EOF`.
 
    Omit empty sections. Link PR numbers where applicable.
+
+4. **Open the CHANGELOG PR into main.** The tag already carries the section; main does not, because the release branch is never merged back. `release.sh` pushed `release-changelog-vX.Y.Z` for exactly this. Fix any bucketing you corrected above on that branch first, then open it against `main` with your usual PR tool and add the release requester as reviewer. Nothing else touches `CHANGELOG.md`, so it cannot conflict.
 
 ### Step 6: Notify
 
@@ -260,6 +273,7 @@ On `main` branch only, CI also pushes images tagged with the short git SHA (firs
 | `EARTHLY_TOKEN` | Earthly Cloud auth for builds |
 | `DOCKERHUB_USERNAME` | Docker Hub login |
 | `DOCKERHUB_TOKEN` | Docker Hub auth |
+| `LUNAR_INTERNAL_HUB_TOKEN` | Hub auth for the push record and the release gate (with the `LUNAR_HUB_HOST` repo *variable*) |
 | `SLACK_BOT_TOKEN` | Slack bot token for posting to #team-eng (agent runtime env, not a GitHub secret) |
 
 The CI secrets (`EARTHLY_TOKEN`, Docker Hub) are configured in GitHub repo settings. `SLACK_BOT_TOKEN` is an agent runtime credential available in the agent's shell environment.
@@ -267,6 +281,10 @@ The CI secrets (`EARTHLY_TOKEN`, Docker Hub) are configured in GitHub repo setti
 ---
 
 ## File Changes Made by the Release Script
+
+### CHANGELOG section (`CHANGELOG.md`)
+
+`scripts/gen-changelog-section.sh vX.Y.Z --write` adds the version's section and compare link. Run it without `--write` to preview. Commit subjects become entries with `[ENG-NNNN]` and workflow markers stripped — this is a public repo, ticket ids stay out of the file. The `Pin images` commit and any legacy `CHANGELOG:` roll commit are skipped.
 
 ### Manifest rewrites (`lunar-*.yml`)
 

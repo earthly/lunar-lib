@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.AllPassTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-26T17:22:46" hostname="e0bfb433eabc" time="0.013">
+  <properties/>
+  <testcase name="one()" classname="com.example.AllPassTest" time="0.011"/>
+  <testcase name="two()" classname="com.example.AllPassTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

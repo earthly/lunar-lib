@@ -1,12 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
-# Scan the most recently shipped container image for this component and write
-# normalized results to .container_scan.
+# Scan every container image this component shipped and write normalized,
+# per-image results to .container_scan.
 #
 # Shared by two sub-collectors: the on-push `container-scan` (after-json hook)
 # and the scheduled `container-rescan` (cron). Both run in the Grype collector
-# image (baked-in DB), no code clone. The image is resolved from the docker
+# image, no code clone. The images are resolved from the docker
 # collector's pushed-image record (.containers.native.docker.cicd.cmds[]) via
 # `lunar component get-json`, or pinned with the `container_image` input. Only
 # source.integration differs between the two.
@@ -21,21 +21,54 @@ case "${LUNAR_COLLECTOR_NAME:-}" in
   *)               INTEGRATION="cron" ;;
 esac
 
-# --- 1. Resolve the image reference to scan ---
-IMAGE_REF="${LUNAR_VAR_CONTAINER_IMAGE:-}"
-
-if [ -z "$IMAGE_REF" ]; then
-  # Derive the image from what the component actually PUSHED, not just what it
+# --- 1. Resolve the image references to scan ---
+# `container_image` pins one ref, or a comma/whitespace-separated list.
+IMAGE_REFS=()
+# Hoisted so the scan-history read below can reuse the blob the resolve loop
+# already fetched; a pinned container_image skips that read and leaves it empty.
+COMPONENT_JSON=""
+# Bookkeeping for the skip-vs-fail decision at the end of this section, so it is
+# total: `pinned` means the container_image input supplied the refs and no Hub
+# read ever happened.
+RESOLVE_STATE=pinned
+ATTEMPT=0
+WAITED=0
+if [ -n "${LUNAR_VAR_CONTAINER_IMAGE:-}" ]; then
+  # shellcheck disable=SC2206
+  IMAGE_REFS=(${LUNAR_VAR_CONTAINER_IMAGE//,/ })
+else
+  # Derive the images from what the component actually PUSHED, not just what it
   # built. The docker collector records every CI docker command in
-  # .containers.native.docker.cicd.cmds[]; we take the most recent one that
-  # shipped an image — a `docker push <ref>`, or a build with `--push`
-  # (`docker build --push` / `docker buildx build --push -t <ref>`).
-  # .containers.builds[] is "what was built" (test/dry-run builds that never
-  # shipped land there too, and a push in a separate job isn't reflected), so
-  # it's the wrong source for "what shipped". (Per Fry review on #221.)
-  COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
-  if [ -n "$COMPONENT_JSON" ]; then
-    IMAGE_REF=$(echo "$COMPONENT_JSON" | jq -r '
+  # .containers.native.docker.cicd.cmds[]; we take every one that shipped an
+  # image — a `docker push <ref>`, or a build with `--push` (`docker build
+  # --push` / `docker buildx build --push -t <ref>`) — in push order, the same
+  # ref pushed twice counting once. .containers.builds[] is "what was built"
+  # (test/dry-run builds that never shipped land there too, and a push in a
+  # separate job isn't reflected), so it's the wrong source for "what shipped".
+  # (Per Fry review on #221.)
+  #
+  # Pin the lookup to the commit being scanned. get-json does not default these
+  # from the environment: with neither flag it resolves the default branch's
+  # LATEST snapshot (`WHERE pr IS NULL`) — a different commit on a PR, and on main
+  # once main has moved on (say, a [skip ci] bot commit seconds after the push).
+  # That commit's docker record lacks this commit's pushed images, so the scan
+  # below skips. --pr narrows to the PR; --git-sha to the exact commit.
+  #
+  # The on-push (after-json) leg is pinned on every branch: its wave fires for one
+  # (component, sha). The cron `container-rescan` is pinned only on a PR — on the
+  # default branch its head_sha is the latest *ingested* main commit, which may
+  # not have been collected yet, so pinning would resolve nothing and silently
+  # stop the re-scan.
+  json_args=()
+  [ -n "${LUNAR_COMPONENT_PR:-}" ] && json_args=(--pr "$LUNAR_COMPONENT_PR")
+  if [ -n "${LUNAR_COMPONENT_PR:-}" ] || [ "$INTEGRATION" = "after-json" ]; then
+    [ -n "${LUNAR_COMPONENT_GIT_SHA:-}" ] && json_args+=(--git-sha "$LUNAR_COMPONENT_GIT_SHA")
+  fi
+
+  # The refs this component SHIPPED, in push order, the same ref twice counting
+  # once. Reads a Component JSON blob on stdin.
+  pushed_image_refs() {
+    jq -r '
       def ref_if_pushed:
         (split(" ") | map(select(. != ""))) as $t
         | (($t[1:] | map(select(startswith("-") | not)) | first) // "") as $sub
@@ -48,17 +81,160 @@ if [ -z "$IMAGE_REF" ]; then
       (.containers.native.docker.cicd.cmds // [])
       | map((.cmd // "") | ref_if_pushed)
       | map(select(. != "" and . != null))
-      | last // ""
-    ' 2>/dev/null || echo "")
+      | reduce .[] as $r ([]; if index($r) == null then . + [$r] else . end)
+      | .[]
+    '
+  }
+
+  # On Hubs before 4.9.0 the read races the record that dispatched this run, so
+  # it is RETRIED.
+  #
+  # The after-json wave fires off the LIVE hub.merged_collection_blobs row the
+  # instant the push record lands. Hub 4.9.0+ serves a --git-sha read from that
+  # row. Older Hubs resolve even a pinned read through public.components ->
+  # mat.component_json, a copy their mat workers drain asynchronously, so this
+  # collector can be dispatched by a record it cannot yet read.
+  #
+  # Measured on an internal Hub, 12 days, 452 container-scan waves on one
+  # component: 66 shas had a push record that landed BEFORE the run started and
+  # still scanned nothing. Those runs started a median 31s (max 112s) after the
+  # push record, while the runs that did resolve started a median 93s after it.
+  #
+  # Two failure shapes, kept apart on purpose — conflating them is the defect
+  # this fixes. Previously both ended at the same silent `exit 0`, so "nothing
+  # was pushed" and "I could not find out" were indistinguishable.
+  #
+  #   read returns nothing      This sha's row has not materialized. Retry for
+  #                             READ_BUDGET_SECS, then FAIL the run. The wave is
+  #                             fire-once per (component, sha) — Gate.Pending
+  #                             enqueues only when not already dispatched, and
+  #                             the job is unique ByArgs — so a swallowed read
+  #                             loses this commit's scan permanently and no
+  #                             re-run recovers it. Waiting beats losing it.
+  #                             900s follows collectors/codeql/monorepo-fanout.sh,
+  #                             which measured this same mat lag at 195/255/285
+  #                             and 292+s and found 300s to be the boundary.
+  #
+  #   read OK, no pushed ref    Either the push record has not drained yet (the
+  #                             race above) or this commit genuinely shipped
+  #                             nothing. A collector cannot tell those apart:
+  #                             the hook fires on
+  #                             .containers.native.docker.cicd.cmds, which the
+  #                             docker collector writes for ANY traced docker
+  #                             command, so "docker ran" is enough to dispatch a
+  #                             wave — 169 of those 452 waves never had a push
+  #                             record at all. So retry only long enough to
+  #                             cover the measured race (max 112s) with
+  #                             headroom, then exit 0 saying plainly that the
+  #                             read succeeded and no ref appeared. Failing here
+  #                             would redden 37% of waves for a legitimate state.
+  #
+  # The cron re-scan is not dispatched off a record, so it has no race to lose
+  # to, and it runs again on the next tick — it gets a short read retry, never
+  # waits for a ref to appear, and never fails the run.
+  #
+  # The _TEST_ overrides are a test seam, deliberately NOT declared in `inputs:`
+  # — they are not part of the plugin's config surface and cannot be set with
+  # `with:`. Without them the suite would sit here for the full budget.
+  if [ "$INTEGRATION" = "after-json" ]; then
+    READ_BUDGET_SECS="${LUNAR_CONTAINER_SCAN_TEST_READ_BUDGET:-900}"
+    RESOLVE_BUDGET_SECS="${LUNAR_CONTAINER_SCAN_TEST_RESOLVE_BUDGET:-180}"
+  else
+    READ_BUDGET_SECS="${LUNAR_CONTAINER_SCAN_TEST_READ_BUDGET:-30}"
+    RESOLVE_BUDGET_SECS=0
+  fi
+  # Linear backoff, BACKOFF_STEP per attempt, capped at 6 steps: 5s, 10s, 15s
+  # ... 30s, 30s. Same seam as the budgets above, so the suite exercises the
+  # real loop without sleeping for real.
+  BACKOFF_STEP="${LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP:-5}"
+
+  # Disposable container, so a fixed path needs no mktemp and no cleanup.
+  GETJSON_ERR=/tmp/get-json.err
+
+  # LUNAR_COMPONENT_ID and LUNAR_COMPONENT_PR are both injected by the Lunar
+  # runtime — neither is a misspelling of the other.
+  # shellcheck disable=SC2153
+  while :; do
+    ATTEMPT=$((ATTEMPT + 1))
+    if COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" "${json_args[@]}" 2>"$GETJSON_ERR") \
+       && [ -n "$COMPONENT_JSON" ]; then
+      RESOLVE_STATE=no_refs
+      BUDGET="$RESOLVE_BUDGET_SECS"
+      # jq's stderr is NOT silenced: a blob that fails to parse is a real
+      # problem, and hiding it was one of the layers that made this silent.
+      mapfile -t IMAGE_REFS < <(printf '%s' "$COMPONENT_JSON" | pushed_image_refs)
+      [ "${#IMAGE_REFS[@]}" -gt 0 ] && break
+    else
+      COMPONENT_JSON=""
+      RESOLVE_STATE=read_failed
+      BUDGET="$READ_BUDGET_SECS"
+      # Surface the CLI's own error instead of discarding it. Once, not once per
+      # attempt.
+      if [ "$ATTEMPT" -eq 1 ] && [ -s "$GETJSON_ERR" ]; then
+        # The error itself, not cobra's usage block — the CLI prints ~18 lines
+        # of flags after it on any failure, which would bury the run log.
+        sed -n '/^Usage:/q;p' "$GETJSON_ERR" | head -c 500 | sed 's/^/  get-json: /' >&2
+      fi
+    fi
+    BACKOFF=$((ATTEMPT * BACKOFF_STEP))
+    [ "$BACKOFF" -gt $((BACKOFF_STEP * 6)) ] && BACKOFF=$((BACKOFF_STEP * 6))
+    [ $((WAITED + BACKOFF)) -gt "$BUDGET" ] && break
+    sleep "$BACKOFF"
+    WAITED=$((WAITED + BACKOFF))
+  done
+  if [ "$WAITED" -gt 0 ]; then
+    echo "Waited ${WAITED}s across ${ATTEMPT} attempt(s) for the pushed-image record to become readable." >&2
   fi
 fi
 
-if [ -z "$IMAGE_REF" ] || [ "$IMAGE_REF" = "null" ]; then
-  echo "No pushed container image to scan (no container_image input and no 'docker push' / '--push' build in .containers.native.docker.cicd.cmds[]) — skipping." >&2
-  exit 0
+if [ "${#IMAGE_REFS[@]}" -eq 0 ]; then
+  case "$RESOLVE_STATE" in
+    read_failed)
+      # Distinguishable from a genuine no-push, and fatal on the fire-once leg.
+      echo "Could not read Component JSON for ${LUNAR_COMPONENT_ID:-?} after ${WAITED}s across ${ATTEMPT} attempt(s) — see the get-json error above. This commit's row has most likely not materialized yet (mat.component_json drains asynchronously, so the read lags the record that dispatched this run)." >&2
+      if [ "$INTEGRATION" = "after-json" ]; then
+        echo "Failing the run: the after-json wave is fire-once per (component, sha), so this commit's container scan is lost and no re-run recovers it. Push a new commit once the Hub catches up." >&2
+        exit 1
+      fi
+      echo "Skipping this re-scan; the next scheduled run will try again." >&2
+      exit 0
+      ;;
+    pinned)
+      echo "No container image to scan: the container_image input is set but resolved to no reference — skipping." >&2
+      exit 0
+      ;;
+    *)
+      echo "No pushed container image to scan: read the Component JSON for ${LUNAR_COMPONENT_ID:-?} successfully and found no 'docker push' / '--push' build in .containers.native.docker.cicd.cmds[], and no container_image input — skipping." >&2
+      exit 0
+      ;;
+  esac
 fi
 
-echo "Scanning image: $IMAGE_REF" >&2
+# --- 1b. Scan history (cron re-scan only, opt-in) ---
+# Snapshot the current .container_scan into a bounded .container_scan.history[]
+# before overwriting it. Cron only: latest-cron-per-collector replaces that
+# record wholesale so the array cannot self-concatenate, whereas an after-json
+# record would grow it on every push. A failed read skips the re-scan — writing
+# a record without history would replace the last one and wipe the trail.
+HIST_SIZE="${LUNAR_VAR_CONTAINER_SCAN_HISTORY_SIZE:-0}"
+case "$HIST_SIZE" in ''|*[!0-9]*) HIST_SIZE=0 ;; esac
+[ "$INTEGRATION" = "cron" ] || HIST_SIZE=0
+CUR_SCAN="{}"
+if [ "$HIST_SIZE" -gt 0 ]; then
+  # Reuse the blob already read to resolve the images; only a pinned
+  # container_image skips that read.
+  if [ -z "$COMPONENT_JSON" ] && [ -n "${LUNAR_COMPONENT_ID:-}" ]; then
+    COMPONENT_JSON=$(lunar component get-json "$LUNAR_COMPONENT_ID" 2>/dev/null || echo "")
+  fi
+  if [ -n "$COMPONENT_JSON" ] && printf '%s' "$COMPONENT_JSON" | jq -e . >/dev/null 2>&1; then
+    CUR_SCAN=$(printf '%s' "$COMPONENT_JSON" | jq -c '.container_scan // {}')
+  else
+    echo "Scan history: could not read the current Component JSON — skipping this re-scan so the existing .container_scan.history is preserved" >&2
+    exit 0
+  fi
+fi
+
+echo "Resolved ${#IMAGE_REFS[@]} image(s) to scan: ${IMAGE_REFS[*]}" >&2
 
 # --- 2. Registry auth for private images (optional) ---
 # Grype/Stereoscope reads registry credentials from these env vars. Public
@@ -71,78 +247,190 @@ if [ -n "$REG_USER" ] && [ -n "${LUNAR_SECRET_REGISTRY_PASSWORD:-}" ]; then
   export GRYPE_REGISTRY_AUTH_PASSWORD="$LUNAR_SECRET_REGISTRY_PASSWORD"
 fi
 
-# Scan against the DB baked into the image (same default as auto.sh).
-export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+# Vulnerability DB, per the `db_auto_update` input (same as auto.sh). Off: scan
+# against the DB baked into the image. On: download the current DB once, then
+# scan every image against it. A failed download fails the run instead of
+# falling back to the baked DB, since a stale scan reads as clean.
+if [ "${LUNAR_VAR_DB_AUTO_UPDATE:-false}" = "true" ]; then
+  export GRYPE_DB_CACHE_DIR=/var/tmp/lunar-grype-db
+  for attempt in 1 2 3; do
+    grype db update >&2 && break
+    if [ "$attempt" -eq 3 ]; then
+      echo "Could not download the Grype vulnerability DB (db_auto_update=true) — not scanning against the stale image-baked DB" >&2
+      exit 1
+    fi
+    sleep $((attempt * ${LUNAR_CONTAINER_SCAN_TEST_BACKOFF_STEP:-10}))
+  done
+else
+  export GRYPE_DB_CACHE_DIR="${GRYPE_DB_CACHE_DIR:-/opt/grype/db}"
+  export GRYPE_DB_VALIDATE_AGE=false
+fi
 export GRYPE_DB_AUTO_UPDATE=false
-export GRYPE_DB_VALIDATE_AGE=false
 export GOGC=40
 
-RESULTS_FILE="/tmp/grype-container-results.json"
-if ! grype "$IMAGE_REF" -o json > "$RESULTS_FILE" 2>/tmp/grype-container-stderr.log; then
-  echo "Grype image scan failed for $IMAGE_REF — skipping vulnerability collection." >&2
-  cat /tmp/grype-container-stderr.log >&2 || true
+# --- 3. Scan each image, normalizing as we go ---
+WORK_DIR=$(mktemp -d /tmp/grype-container.XXXXXX)
+trap 'rm -rf "$WORK_DIR"' EXIT
+IMAGES_FILE="$WORK_DIR/images.jsonl"   # one normalized object per scanned image, push order
+ERRORS_FILE="$WORK_DIR/errors.jsonl"   # one {image, error} per image that could not be scanned
+: > "$IMAGES_FILE"
+: > "$ERRORS_FILE"
+# The primary image — the most recently pushed one that scanned — keeps the
+# single-image fields (`image`, `os`, raw native output) meaning what they
+# always did.
+PRIMARY_REF=""
+PRIMARY_RESULTS=""
+n=0
+for IMAGE_REF in "${IMAGE_REFS[@]}"; do
+  n=$((n + 1))
+  echo "Scanning image: $IMAGE_REF" >&2
+  RESULTS_FILE="$WORK_DIR/results-$n.json"
+  STDERR_FILE="$WORK_DIR/stderr-$n.log"
+  if ! grype "$IMAGE_REF" -o json > "$RESULTS_FILE" 2>"$STDERR_FILE"; then
+    echo "Grype image scan failed for $IMAGE_REF — skipping this image." >&2
+    cat "$STDERR_FILE" >&2 || true
+    jq -nc --arg image "$IMAGE_REF" --rawfile err "$STDERR_FILE" \
+      '{image: $image, error: ($err | gsub("\\s+$"; "") | .[0:500])}' >> "$ERRORS_FILE"
+    continue
+  fi
+
+  # Normalize into the tool-agnostic .container_scan schema (mirrors auto.sh's
+  # .sca normalization; adds image + os). Negligible folds into low; Unknown
+  # still counts toward total.
+  jq -c --arg image "$IMAGE_REF" '
+    def matches: (.matches // []);
+    def sev: (.vulnerability.severity // "Unknown") | ascii_downcase;
+    # Registry digest of what was scanned — the recorded ref is usually a
+    # floating tag. repoDigests only: manifestDigest is the platform manifest,
+    # not the index digest a registry promotes. Unresolvable stays absent.
+    def repo_of: split("@")[0] | split("/") as $p | (($p[:-1] + [($p[-1] | split(":")[0])]) | join("/"));
+    def pick_digest($ref; $d):
+      (if ($d | length) == 1 then $d[0]
+       else ($d | map(select(startswith(($ref | repo_of) + "@"))) | first) end)
+      | if . == null then null else (split("@") | last) end
+      | if . != null and test("^[a-z0-9]+:[0-9a-f]{32,}$") then . else null end;
+    {
+      image: $image,
+      vulnerabilities: {
+        critical: [matches[] | select(sev == "critical")] | length,
+        high:     [matches[] | select(sev == "high")]     | length,
+        medium:   [matches[] | select(sev == "medium")]   | length,
+        low:      [matches[] | select(sev == "low" or sev == "negligible")] | length,
+        total:    (matches | length)
+      },
+      findings: [matches[] | {
+        severity:    (if sev == "negligible" then "low" else sev end),
+        package:     .artifact.name,
+        version:     .artifact.version,
+        ecosystem:   .artifact.type,
+        cve:         .vulnerability.id,
+        title:       (.vulnerability.description // null),
+        fix_version: ((.vulnerability.fix.versions // [])[0] // null),
+        fixable:     (.vulnerability.fix.state == "fixed"),
+        image:       $image
+      }],
+      summary: {
+        has_critical: ([matches[] | select(sev == "critical")] | length > 0),
+        has_high:     ([matches[] | select(sev == "high")]     | length > 0),
+        all_fixable:  ([matches[] | select(.vulnerability.fix.state != "fixed")] | length == 0)
+      }
+    }
+    + (if (.distro.name // "") != "" then
+         {os: ({family: .distro.name} + (if (.distro.version // "") != "" then {version: .distro.version} else {} end))}
+       else {} end)
+    + (pick_digest($image; (.source.target.repoDigests // [])) as $dg
+       | if $dg then {digest: $dg} else {} end)
+  ' "$RESULTS_FILE" >> "$IMAGES_FILE"
+  echo "Found $(jq '(.matches // []) | length' "$RESULTS_FILE") vulnerabilities in $IMAGE_REF" >&2
+  PRIMARY_REF="$IMAGE_REF"
+  PRIMARY_RESULTS="$RESULTS_FILE"
+done
+
+if [ -z "$PRIMARY_REF" ]; then
+  echo "Grype could not scan any of the ${#IMAGE_REFS[@]} image(s) — skipping vulnerability collection." >&2
   exit 0
 fi
 
-GRYPE_VERSION=$(jq -r '.descriptor.version // empty' "$RESULTS_FILE")
-OS_FAMILY=$(jq -r '.distro.name // empty' "$RESULTS_FILE")
-OS_VERSION=$(jq -r '.distro.version // empty' "$RESULTS_FILE")
+GRYPE_VERSION=$(jq -r '.descriptor.version // empty' "$PRIMARY_RESULTS")
 
-# Preserve the raw matches so policies can read fields we don't normalize.
-jq -c '.matches // []' "$RESULTS_FILE" | lunar collect -j ".container_scan.native.grype.matches" -
+# Preserve the primary image's raw matches so policies can read fields we don't
+# normalize. Per-image detail for every scanned image is in .findings[].image.
+jq -c '.matches // []' "$PRIMARY_RESULTS" | lunar collect -j ".container_scan.native.grype.matches" -
 
 # Source metadata (integration set above: after-json on-push, or cron re-scan).
-SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" --arg integration "$INTEGRATION" '{
+# collected_at dates the payload — without it a five-day-old count reads as
+# current. collected_sha is the commit the run was bound to, which on a cron
+# re-scan is the latest ingested default-branch commit, not necessarily the one
+# that built the image: provenance, not identity. The digest is the identity.
+COLLECTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+SOURCE_JSON=$(jq -n --arg version "$GRYPE_VERSION" --arg integration "$INTEGRATION" \
+  --arg collected_at "$COLLECTED_AT" --arg sha "${LUNAR_COMPONENT_GIT_SHA:-}" '{
   tool: "grype",
-  integration: $integration
-} + (if $version != "" then {version: $version} else {} end)')
+  integration: $integration,
+  collected_at: $collected_at
+} + (if $version != "" then {version: $version} else {} end)
+  + (if $sha != "" then {collected_sha: $sha} else {} end)')
 
-# os{} block, included only when Grype reported a distro.
-OS_JSON=$(jq -n --arg f "$OS_FAMILY" --arg v "$OS_VERSION" '
-  if $f != "" then {os: ({family: $f} + (if $v != "" then {version: $v} else {} end))} else {} end')
-
-VULN_COUNT=$(jq '.matches | length' "$RESULTS_FILE")
-if [ "$VULN_COUNT" = "0" ] || [ -z "$VULN_COUNT" ]; then
-  echo "No vulnerabilities found in $IMAGE_REF" >&2
-  jq -n --argjson source "$SOURCE_JSON" --argjson os "$OS_JSON" --arg image "$IMAGE_REF" '{
-    source: $source,
-    image: $image,
-    vulnerabilities: {critical: 0, high: 0, medium: 0, low: 0, total: 0},
-    summary: {has_critical: false, has_high: false, all_fixable: true}
-  } + $os' | lunar collect -j ".container_scan" -
-  exit 0
+# A compact entry: source, the ref and digest it described, counts, summary. No
+# findings[]/images[]/native — the hub concatenates those across the code+cron
+# records, so snapshotting them would double them (same reason .sca.history
+# omits them). At the cap the oldest entry stays and the second-oldest drops.
+#
+# Carried-forward entries are de-duplicated in place. A component running both
+# scanners' crons has two cron records, so each reads a merged history holding
+# the other's entries too; without the dedupe each record would re-absorb and
+# re-emit them every tick.
+HISTORY_JSON="{}"
+if [ "$HIST_SIZE" -gt 0 ]; then
+  HISTORY_JSON=$(printf '%s' "$CUR_SCAN" | jq -c --argjson size "$HIST_SIZE" '
+    (.history // []) as $hist
+    | ({source, image, digest, vulnerabilities, summary} | with_entries(select(.value != null))) as $snap
+    | (if $snap != {} then ($hist + [$snap]) else $hist end)
+    | (reduce .[] as $e ([]; if index([$e]) == null then . + [$e] else . end)) as $all
+    | ($all | length) as $len
+    | if $len == 0 then {}
+      else {history: (if $len > $size then ([$all[0]] + $all[($len - ($size - 1)):]) else $all end)}
+      end' 2>/dev/null || echo "{}")
+  [ -n "$HISTORY_JSON" ] || HISTORY_JSON="{}"
 fi
 
-# Normalize into the tool-agnostic .container_scan schema (mirrors auto.sh's
-# .sca normalization; adds image + os). Negligible folds into low; Unknown
-# still counts toward total.
-jq -c --argjson source "$SOURCE_JSON" --argjson os "$OS_JSON" --arg image "$IMAGE_REF" '
-  def sev: (.vulnerability.severity // "Unknown") | ascii_downcase;
-  {
-    source: $source,
-    image: $image,
-    vulnerabilities: {
-      critical: [.matches[] | select(sev == "critical")] | length,
-      high:     [.matches[] | select(sev == "high")]     | length,
-      medium:   [.matches[] | select(sev == "medium")]   | length,
-      low:      [.matches[] | select(sev == "low" or sev == "negligible")] | length,
-      total:    (.matches | length)
-    },
-    findings: [.matches[] | {
-      severity:    (if sev == "negligible" then "low" else sev end),
-      package:     .artifact.name,
-      version:     .artifact.version,
-      ecosystem:   .artifact.type,
-      cve:         .vulnerability.id,
-      title:       (.vulnerability.description // null),
-      fix_version: ((.vulnerability.fix.versions // [])[0] // null),
-      fixable:     (.vulnerability.fix.state == "fixed")
-    }],
-    summary: {
-      has_critical: ([.matches[] | select(sev == "critical")] | length > 0),
-      has_high:     ([.matches[] | select(sev == "high")]     | length > 0),
-      all_fixable:  ([.matches[] | select(.vulnerability.fix.state != "fixed")] | length == 0)
+# --- 4. Aggregate ---
+# `image` / `os` / raw native output describe the primary image, so a component
+# that pushes one image sees exactly the shape it always did. Counts, summary and
+# findings span every scanned image; images[] is the per-image breakdown and
+# errors[] the refs that could not be pulled or scanned.
+jq -c -s --argjson source "$SOURCE_JSON" --arg primary "$PRIMARY_REF" \
+   --slurpfile errors "$ERRORS_FILE" --argjson history "$HISTORY_JSON" '
+  . as $imgs
+  | ($imgs | map(select(.image == $primary)) | last) as $p
+  | ($imgs | map(.findings) | add) as $findings
+  | {
+      source: $source,
+      image: $primary,
+      images: ($imgs | map(
+        {image: .image, tool: "grype"}
+        + (if .digest then {digest: .digest} else {} end)
+        + (if .os then {os: .os} else {} end)
+        + {vulnerabilities: .vulnerabilities, summary: .summary})),
+      vulnerabilities: {
+        critical: ($imgs | map(.vulnerabilities.critical) | add),
+        high:     ($imgs | map(.vulnerabilities.high)     | add),
+        medium:   ($imgs | map(.vulnerabilities.medium)   | add),
+        low:      ($imgs | map(.vulnerabilities.low)      | add),
+        total:    ($imgs | map(.vulnerabilities.total)    | add)
+      },
+      summary: {
+        has_critical: ($imgs | any(.summary.has_critical)),
+        has_high:     ($imgs | any(.summary.has_high)),
+        all_fixable:  ($imgs | all(.summary.all_fixable))
+      }
     }
-  } + $os' "$RESULTS_FILE" | lunar collect -j ".container_scan" -
+  + (if ($findings | length) > 0 then {findings: $findings} else {} end)
+  + (if $p.digest then {digest: $p.digest} else {} end)
+  + (if $p.os then {os: $p.os} else {} end)
+  + (if ($errors | length) > 0 then {errors: $errors} else {} end)
+  + $history
+' "$IMAGES_FILE" | lunar collect -j ".container_scan" -
 
-echo "Found $VULN_COUNT vulnerabilities in $IMAGE_REF" >&2
+TOTAL=$(jq -s 'map(.vulnerabilities.total) | add' "$IMAGES_FILE")
+echo "Found $TOTAL vulnerabilities across $(wc -l < "$IMAGES_FILE" | tr -d ' ') scanned image(s); $(wc -l < "$ERRORS_FILE" | tr -d ' ') could not be scanned" >&2

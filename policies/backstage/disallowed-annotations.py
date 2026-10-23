@@ -1,5 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
+from catalog_presence import skip_if_no_catalog
+
 
 def main(node=None):
     c = Check(
@@ -17,9 +19,12 @@ def main(node=None):
                 "`disallowed_annotations` input to forbid annotation keys."
             )
 
+        skip_if_no_catalog(c)
+
         # Pure deny-check: read defensively so a missing catalog file simply
         # means "nothing disallowed is present" (pass), rather than a failure —
-        # the required-* / exists checks already cover a missing file.
+        # the required-* / exists checks already cover a missing file. Set
+        # `skip_when_no_catalog_info` to skip instead of green-passing.
         annotations = c.get_value_or_default(
             ".catalog.native.backstage.metadata.annotations", {}
         )

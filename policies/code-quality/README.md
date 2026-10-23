@@ -44,7 +44,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/code-quality@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, passing]  # Only run specific checks
+    include:
+      - executed
+      - passing
+      - min-coverage
+      - max-duplication
+      - max-severity
+      - max-total
     with:
       min_severity: "high"                  # Fail on critical and high issues
       max_total_threshold: "50"             # Fail if more than 50 total issues

@@ -10,6 +10,11 @@
 #
 # All scenarios run; any failure is logged and the script exits non-zero.
 #
+# Run this in the plugin image (`earthly ./catalogers/github-org+test`), not on
+# your host: the two glob scenarios below depend on sed dialect, and GNU sed
+# accepts expressions BusyBox sed — what ships — rejects. Green on a GNU host
+# proves nothing about those two.
+#
 # Opt-in real-API smoke: RUN_REAL_API_SMOKE=1 ./test-local.sh runs main.sh once
 # against a real org (TEST_ORG, default "earthly") using the real gh CLI, and
 # prints the captured catalog (no assertions — real topics vary). Requires a
@@ -20,6 +25,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEST_DIR=$(mktemp -d)
 COMPONENTS_OUT="$TEST_DIR/components.out"
+GH_ARGV_OUT="$TEST_DIR/gh-argv.out"
 DOMAINS_OUT="$TEST_DIR/domains.out"
 REPOS_FIXTURE="$TEST_DIR/repos.json"
 
@@ -32,9 +38,9 @@ echo "Test directory: $TEST_DIR"
 echo ""
 
 # --- Mock gh --------------------------------------------------------------
-# For `gh repo list <org> --visibility <v> ... --json ... [--no-archived]`,
-# emit the fixture at $MOCK_GH_REPOS_FILE for the "public" visibility (an empty
-# array for any other visibility). If no fixture is configured, delegate to the
+# For `gh repo list <org> ... --json ...`, emit the fixture at
+# $MOCK_GH_REPOS_FILE and record the argv at $MOCK_GH_ARGV_OUT so a scenario can
+# assert which flags were passed. If no fixture is configured, delegate to the
 # real gh — that's how the opt-in real-API smoke reuses this same PATH shim.
 cat > "$TEST_DIR/gh" << 'EOF'
 #!/bin/bash
@@ -43,16 +49,8 @@ if [ -z "${MOCK_GH_REPOS_FILE:-}" ]; then
     exec "${REAL_GH:?real gh not found on PATH}" "$@"
 fi
 if [ "${1:-}" = "repo" ] && [ "${2:-}" = "list" ]; then
-    visibility=""
-    while [ $# -gt 0 ]; do
-        [ "$1" = "--visibility" ] && visibility="${2:-}"
-        shift
-    done
-    if [ "$visibility" = "public" ]; then
-        cat "$MOCK_GH_REPOS_FILE"
-    else
-        echo "[]"
-    fi
+    printf '%s\n' "$@" > "$MOCK_GH_ARGV_OUT"
+    cat "$MOCK_GH_REPOS_FILE"
     exit 0
 fi
 echo "Mock gh: unhandled command: $*" >&2
@@ -82,12 +80,13 @@ chmod +x "$TEST_DIR/lunar"
 
 export PATH="$TEST_DIR:$PATH"
 export REAL_GH
+export MOCK_GH_ARGV_OUT="$GH_ARGV_OUT"
 export MOCK_LUNAR_COMPONENTS_OUT="$COMPONENTS_OUT"
 export MOCK_LUNAR_DOMAINS_OUT="$DOMAINS_OUT"
 
 # --- Repo fixture ---------------------------------------------------------
-# Two public repos with topics; the "payment-api" tags are what the scenarios
-# assert against (topic → tag with/without prefix).
+# Public, internal, archived, and empty fixtures exercise client-side filters;
+# the "payment-api" tags are what the topic-prefix scenarios assert against.
 cat > "$REPOS_FIXTURE" << 'EOF'
 [
   {
@@ -96,6 +95,7 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Payment processing API",
     "repositoryTopics": [{"name": "backend"}, {"name": "go"}],
     "isArchived": false,
+    "isEmpty": false,
     "visibility": "public"
   },
   {
@@ -104,7 +104,35 @@ cat > "$REPOS_FIXTURE" << 'EOF'
     "description": "Customer-facing web app",
     "repositoryTopics": [{"name": "react"}],
     "isArchived": false,
+    "isEmpty": false,
     "visibility": "public"
+  },
+  {
+    "name": "empty-placeholder",
+    "url": "https://github.com/acme/empty-placeholder",
+    "description": "Reserved repository name",
+    "repositoryTopics": [],
+    "isArchived": false,
+    "isEmpty": true,
+    "visibility": "public"
+  },
+  {
+    "name": "legacy-billing",
+    "url": "https://github.com/acme/legacy-billing",
+    "description": "Retired billing service",
+    "repositoryTopics": [],
+    "isArchived": true,
+    "isEmpty": false,
+    "visibility": "public"
+  },
+  {
+    "name": "internal-tooling",
+    "url": "https://github.com/acme/internal-tooling",
+    "description": "Enterprise-internal tooling",
+    "repositoryTopics": [],
+    "isArchived": false,
+    "isEmpty": false,
+    "visibility": "internal"
   }
 ]
 EOF
@@ -118,6 +146,7 @@ export LUNAR_VAR_INCLUDE_PUBLIC="true"
 export LUNAR_VAR_INCLUDE_PRIVATE="false"
 export LUNAR_VAR_INCLUDE_INTERNAL="false"
 export LUNAR_VAR_INCLUDE_ARCHIVED="false"
+export LUNAR_VAR_INCLUDE_EMPTY="false"
 export LUNAR_VAR_INCLUDE_REPOS=""
 export LUNAR_VAR_EXCLUDE_REPOS=""
 export LUNAR_VAR_DEFAULT_OWNER=""
@@ -208,6 +237,71 @@ export LUNAR_VAR_DISALLOWED_TOPICS="go"
 run_scenario "disallow_beats_allow" \
     '(has("github.com/acme/payment-api") | not) and (has("github.com/acme/frontend-app"))'
 unset LUNAR_VAR_ALLOWED_TOPICS LUNAR_VAR_DISALLOWED_TOPICS
+
+# ── Repository glob filters ───────────────────────────────────────────────
+# BusyBox sed treats escaped `\?` as a repetition operator. The old converter
+# therefore failed every non-empty include/exclude pattern and returned `^$`.
+export LUNAR_VAR_EXCLUDE_REPOS="payment-api"
+run_scenario "exclude_exact_repo" \
+    '(has("github.com/acme/payment-api") | not) and has("github.com/acme/frontend-app")'
+unset LUNAR_VAR_EXCLUDE_REPOS
+
+export LUNAR_VAR_INCLUDE_REPOS="payment-ap?"
+run_scenario "include_question_glob" \
+    'has("github.com/acme/payment-api") and (has("github.com/acme/frontend-app") | not)'
+unset LUNAR_VAR_INCLUDE_REPOS
+
+# ── Empty repositories ────────────────────────────────────────────────────
+run_scenario "empty_repos_excluded_by_default" \
+    '(has("github.com/acme/empty-placeholder") | not)'
+
+export LUNAR_VAR_INCLUDE_EMPTY="true"
+run_scenario "include_empty_opt_in" \
+    'has("github.com/acme/empty-placeholder")'
+export LUNAR_VAR_INCLUDE_EMPTY="false"
+
+# ── ENG-1411 regression: archived repos are filtered client-side ──────────
+# main.sh must not pass `gh repo list --no-archived` — that flag switches gh to
+# the search API and caps the listing at 1000 repos per visibility. The mock gh
+# returns the archived repo regardless of flags, so these two scenarios only
+# hold if the jq pass is doing the filtering.
+run_scenario "archived_excluded_by_default" \
+    '(has("github.com/acme/legacy-billing") | not) and (has("github.com/acme/payment-api"))'
+
+export LUNAR_VAR_INCLUDE_ARCHIVED="true"
+run_scenario "archived_included_when_requested" \
+    '(has("github.com/acme/legacy-billing")) and (.["github.com/acme/legacy-billing"].meta.archived == "true")'
+export LUNAR_VAR_INCLUDE_ARCHIVED="false"
+
+# ── ENG-1411 regression: internal repos are filtered client-side too ──────
+# `gh repo list --visibility internal` takes the same 1000-capped search path as
+# --no-archived, so visibility must be filtered in jq as well. The mock returns
+# every fixture repo regardless of flags, so these only hold if jq filters.
+run_scenario "internal_excluded_by_default" \
+    '(has("github.com/acme/internal-tooling") | not) and (has("github.com/acme/payment-api"))'
+
+export LUNAR_VAR_INCLUDE_INTERNAL="true"
+run_scenario "internal_included_when_requested" \
+    '(has("github.com/acme/internal-tooling")) and (.["github.com/acme/internal-tooling"].meta.visibility == "internal")'
+export LUNAR_VAR_INCLUDE_INTERNAL="false"
+
+# Public-only config must still drop private repos even though the fetch is
+# unfiltered.
+run_scenario "private_excluded_when_public_only" \
+    '(has("github.com/acme/payment-api")) and (has("github.com/acme/internal-tooling") | not)'
+
+# The flags themselves are the bug: every one of these switches gh to the
+# 1000-capped search API (cli/cli pkg/cmd/repo/list/http.go:32). Assert the real
+# invocation, not the source text.
+echo "── scenario: no_search_api_flags_passed ──"
+BAD=$(grep -E '^(--no-archived|--archived|--visibility|--topic|--language)$' "$GH_ARGV_OUT" || true)
+if [ -n "$BAD" ]; then
+    echo "  FAIL: main.sh passed search-API flag(s) to gh repo list: $(echo "$BAD" | tr '\n' ' ')"
+    FAILED=$((FAILED + 1))
+else
+    echo "  PASS"
+    PASSED=$((PASSED + 1))
+fi
 
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"

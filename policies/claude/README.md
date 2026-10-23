@@ -27,10 +27,14 @@ This policy enforces Claude-specific standards: CI safety flags, structured outp
 collectors:
   - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
+    include:
+      - cicd              # Claude CLI runs in CI
+      - instruction-file  # CLAUDE.md files
 
 policies:
   - uses: github://earthly/lunar-lib/policies/claude@main
     enforcement: report-pr
+    include: [cli-safe-flags, cli-structured-output, symlinked-aliases]
 ```
 
 ## Examples

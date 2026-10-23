@@ -36,6 +36,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ai@main
     on: ["domain:your-domain"]
+    include:
+      - instruction-files  # AGENTS.md files
+      - plans-dir          # AI plans directory
+      - ai-authorship      # AI authorship from commits
     # with:
     #   md_find_command: "find . -type f -name AGENTS.md"
     #   plans_dir_paths: ".agents/plans,.ai/plans"

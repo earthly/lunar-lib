@@ -67,7 +67,14 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/golang@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, golangci-lint]  # Only include specific subcollectors
+    include:
+      - cicd              # go commands in CI
+      - test-scope        # Test scope in CI
+      - test-coverage     # Coverage from go test
+      - project           # go.mod, go.sum and vendoring
+      - golangci-lint     # Runs golangci-lint
+      - golangci-lint-ci  # golangci-lint runs in CI
+      - dependencies      # Module dependencies
     # with:
     #   lint_timeout: "10m"
 ```

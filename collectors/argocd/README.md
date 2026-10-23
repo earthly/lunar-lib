@@ -29,6 +29,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/argocd@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [gitops, kubernetes]
+    include: [parse]
     # with:
     #   find_command: "find ./gitops -type f -name '*.yaml'"
 ```

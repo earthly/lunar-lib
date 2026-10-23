@@ -1,7 +1,7 @@
 """Shared helpers for the Istio policy checks."""
 
 
-def mesh_present(c):
+def mesh_present(c, resources_required=True):
     """Gate an Istio check on the `.mesh` category, driving the pending lifecycle.
 
     Accessing `.mesh` via ``get_node().exists()`` registers this check's
@@ -20,7 +20,16 @@ def mesh_present(c):
 
     Returns ``True`` when `.mesh` is present; otherwise calls ``c.skip(...)``
     (which raises ``SkippedError``) and never returns.
+
+    With ``resources_required`` (the default) it also skips a `.mesh` that holds
+    only MeshConfig, e.g. a repo whose one Istio file is a rendered istiod
+    ConfigMap: there are no mesh resources for the check to judge.
     """
     if not c.get_node(".mesh").exists():
         c.skip("No service-mesh (.mesh) data on this component — istio not in use")
+    if resources_required:
+        mesh = c.get_value(".mesh")
+        injection = mesh.get("injection") or {}
+        if not (mesh.get("resources") or injection.get("namespaces") or injection.get("workload_overrides")):
+            c.skip("Only MeshConfig on this component, no Istio resources to check")
     return True

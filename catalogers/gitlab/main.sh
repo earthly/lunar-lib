@@ -1,0 +1,535 @@
+#!/bin/bash
+set -euo pipefail
+
+# GitLab Cataloger — discovers the groups the service account maintains and
+# catalogs their projects, including subgroups, as Lunar components.
+
+# Inputs. Every one repeats its manifest default, because `lunar cataloger dev`
+# runs in a sanitized env that does not apply manifest defaults.
+GITLAB_HOST_RAW="${LUNAR_VAR_GITLAB_HOST:-gitlab.com}"
+GITLAB_HOST=$(echo "$GITLAB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#/.*$##')
+GITLAB_HOST="${GITLAB_HOST:-gitlab.com}"
+API_BASE="${LUNAR_VAR_API_BASE_URL:-}"
+API_BASE="${API_BASE:-https://${GITLAB_HOST}/api/v4}"
+API_BASE="${API_BASE%/}"
+
+INCLUDE_PUBLIC="${LUNAR_VAR_INCLUDE_PUBLIC:-true}"
+INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
+INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
+INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
+INCLUDE_FORKS="${LUNAR_VAR_INCLUDE_FORKS:-true}"
+INCLUDE_PERSONAL_NAMESPACES="${LUNAR_VAR_INCLUDE_PERSONAL_NAMESPACES:-false}"
+INCLUDE_GROUPS="${LUNAR_VAR_INCLUDE_GROUPS:-}"
+EXCLUDE_GROUPS="${LUNAR_VAR_EXCLUDE_GROUPS:-}"
+INCLUDE_PROJECTS="${LUNAR_VAR_INCLUDE_PROJECTS:-}"
+EXCLUDE_PROJECTS="${LUNAR_VAR_EXCLUDE_PROJECTS:-}"
+ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
+DISALLOWED_TOPICS="${LUNAR_VAR_DISALLOWED_TOPICS:-}"
+# `-` not `:-`: an explicit empty tag_prefix must survive so it can disable
+# prefixing, which is documented behavior.
+TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gl-}"
+DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+DOMAIN_FROM_GROUP_PATH="${LUNAR_VAR_DOMAIN_FROM_GROUP_PATH:-false}"
+
+# Maintainer. Fixed, not an input: this is the Hub's own scope signal, and a
+# lower level would onboard groups whose webhooks can never be registered.
+# Discovery only — a group named in include_groups is taken as given.
+MIN_ACCESS_LEVEL=40
+
+PER_PAGE=100
+MAX_RETRIES=5
+INITIAL_BACKOFF=5
+BATCH_SIZE=1000
+# Pace when the remaining API budget gets this low rather than driving into a 429.
+RATE_LIMIT_FLOOR=20
+# Room for a GitLab JSON error and the head of an HTML error page.
+ERROR_BODY_BYTES=2000
+
+GL_TOKEN="${LUNAR_SECRET_GL_TOKEN:-}"
+if [ -z "$GL_TOKEN" ]; then
+    # Deliberately exit 1, not the usual exit-0-on-missing-secret. A cataloger
+    # that exits 0 having written nothing reports an empty estate, and absence
+    # is what retires components — so a missing token would retire the whole
+    # catalog instead of leaving yesterday's in place.
+    echo "Error: LUNAR_SECRET_GL_TOKEN is not set. Configure the GL_TOKEN secret at cataloger scope: lunar secret set GL_TOKEN --scope cataloger" >&2
+    exit 1
+fi
+
+WORK=/tmp/gitlab-cataloger
+rm -rf "$WORK"; mkdir -p "$WORK"
+
+echo "Cataloging GitLab projects from $GITLAB_HOST"
+echo "API base: $API_BASE"
+echo "Include archived: $INCLUDE_ARCHIVED"
+echo "Include forks: $INCLUDE_FORKS"
+echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
+[ -n "$INCLUDE_GROUPS" ] && echo "Configured groups: $INCLUDE_GROUPS"
+[ -n "$EXCLUDE_GROUPS" ] && echo "Excluded groups: $EXCLUDE_GROUPS"
+[ -n "$INCLUDE_PROJECTS" ] && echo "Include patterns: $INCLUDE_PROJECTS"
+[ -n "$EXCLUDE_PROJECTS" ] && echo "Exclude patterns: $EXCLUDE_PROJECTS"
+[ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
+[ -n "$DISALLOWED_TOPICS" ] && echo "Disallowed topics: $DISALLOWED_TOPICS"
+[ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
+[ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
+[ "$DOMAIN_FROM_GROUP_PATH" = "true" ] && echo "Domain from group path: enabled"
+
+# --- HTTP -------------------------------------------------------------------
+
+# X-Request-Id is GitLab's correlation ID: the reference GitLab support needs
+# to find a request in their logs.
+request_id() {
+    tr -d '\r' < "$1" | sed -n 's/^[Xx]-[Rr]equest-[Ii]d:[[:space:]]*//p' | tail -1
+}
+
+# log_failure <body-file> <header-file> <curl-stderr-file>
+# What escalating a failed call takes: curl's own error, plus whatever response
+# arrived: request ID, headers and the start of the body.
+log_failure() {
+    local out="$1" hdr="$2" err="$3" id size
+    if [ -s "$err" ]; then
+        sed 's/^/  /' "$err" >&2
+    fi
+    if [ -s "$hdr" ]; then
+        id=$(request_id "$hdr")
+        echo "  Request ID: ${id:-none}" >&2
+        # Set-Cookie can carry a session credential.
+        tr -d '\r' < "$hdr" | sed -e '/^$/d' \
+            -e 's/^\([Ss][Ee][Tt]-[Cc][Oo][Oo][Kk][Ii][Ee]:\).*/\1 <redacted>/' \
+            -e 's/^/  < /' >&2
+    fi
+    if [ -s "$out" ]; then
+        echo "  Body:" >&2
+        head -c "$ERROR_BODY_BYTES" "$out" | tr -d '\r' | awk '{ print "    " $0 }' >&2
+        size=$(wc -c < "$out" | tr -d ' ')
+        if [ "$size" -gt "$ERROR_BODY_BYTES" ]; then
+            echo "    [truncated, $size bytes total]" >&2
+        fi
+    fi
+}
+
+# gl_api <path-with-query> <out-file>
+# Writes the response body to <out-file>. Retries 429 and 5xx honoring
+# Retry-After; aborts the run on any other non-2xx, because shrinking the
+# reported project set is what silently retires components.
+# A listing that asks for simple=false is retried with simple=true after an
+# HTTP 500. That entity is lighter but has no fork or archived details, so
+# GL_SIMPLE tells the caller which kind of page it got.
+SIMPLE_USABLE=true
+gl_api() {
+    local path="$1" out="$2"
+    local attempt=1 backoff=$INITIAL_BACKOFF code last_id hdr="$WORK/hdr" err="$WORK/curl.err"
+    GL_SIMPLE=false
+
+    while [ "$attempt" -le "$MAX_RETRIES" ]; do
+        # Cleared first: curl leaves -o untouched when no response arrives, and
+        # a stale file would be logged as this attempt's.
+        : > "$out"; : > "$hdr"
+        code=$(curl -sS -o "$out" -D "$hdr" -w '%{http_code}' \
+            -H "PRIVATE-TOKEN: ${GL_TOKEN}" \
+            -H 'Accept: application/json' \
+            "${API_BASE}${path}" 2>"$err") || code="000"
+
+        case "$code" in
+            2*)
+                # Before 18.2 the simple entity has no visibility, which the
+                # filter needs: back to full details for the rest of the run,
+                # without spending an attempt on the unusable page.
+                if [ "$GL_SIMPLE" = "true" ] && ! jq -e 'all(.[]; .visibility != null)' "$out" >/dev/null; then
+                    echo "  simple=true has no project visibility here (GitLab before 18.2), retrying with full details" >&2
+                    SIMPLE_USABLE=false
+                    path="${path/simple=true/simple=false}"
+                    GL_SIMPLE=false
+                    continue
+                fi
+                # Pace against the documented budget instead of discovering it via a 429.
+                local remaining reset now sleep_for
+                remaining=$(sed -n 's/^[Rr]ate[Ll]imit-[Rr]emaining:[[:space:]]*\([0-9]*\).*/\1/p' "$hdr" | tail -1)
+                if [ -n "$remaining" ] && [ "$remaining" -le "$RATE_LIMIT_FLOOR" ]; then
+                    reset=$(sed -n 's/^[Rr]ate[Ll]imit-[Rr]eset:[[:space:]]*\([0-9]*\).*/\1/p' "$hdr" | tail -1)
+                    now=$(date +%s)
+                    if [ -n "$reset" ] && [ "$reset" -gt "$now" ]; then
+                        sleep_for=$((reset - now + 1))
+                        [ "$sleep_for" -gt 60 ] && sleep_for=60
+                        echo "Rate limit budget at $remaining, sleeping ${sleep_for}s until reset" >&2
+                        sleep "$sleep_for"
+                    fi
+                fi
+                return 0
+                ;;
+            429|5*|000)
+                local retry_after
+                retry_after=$(sed -n 's/^[Rr]etry-[Aa]fter:[[:space:]]*\([0-9]*\).*/\1/p' "$hdr" | tail -1)
+                [ -n "$retry_after" ] && backoff="$retry_after"
+                echo "HTTP $code on $path (attempt $attempt/$MAX_RETRIES), retrying in ${backoff}s" >&2
+                log_failure "$out" "$hdr" "$err"
+                if [ "$code" = "500" ] && [ "$SIMPLE_USABLE" = "true" ] && [[ "$path" == *simple=false* ]]; then
+                    path="${path/simple=false/simple=true}"
+                    GL_SIMPLE=true
+                    echo "  Retrying this page with simple=true, without fork or archived details" >&2
+                fi
+                sleep "$backoff"
+                backoff=$((backoff * 2))
+                attempt=$((attempt + 1))
+                ;;
+            *)
+                echo "Error: HTTP $code on $path — aborting rather than reporting a partial estate." >&2
+                log_failure "$out" "$hdr" "$err"
+                exit 1
+                ;;
+        esac
+    done
+
+    last_id=$(request_id "$hdr")
+    echo "Error: $path still failing after $MAX_RETRIES attempts (last request ID: ${last_id:-none}) — aborting rather than reporting a partial estate." >&2
+    exit 1
+}
+
+urlenc_path() { printf '%s' "$1" | sed 's#/#%2F#g'; }
+
+# --- filters ----------------------------------------------------------------
+
+glob_to_regex() {
+    local escaped
+    escaped=$(echo "$1" | sed -E 's/([.+^${}()|\\])/\\\1/g')
+    escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/?/./g')
+    echo "^${escaped}$"
+}
+
+patterns_to_regex() {
+    local patterns="$1" pattern
+    [ -z "$patterns" ] && { echo ""; return; }
+    local parts=()
+    IFS=',' read -ra arr <<< "$patterns"
+    for pattern in "${arr[@]}"; do
+        pattern=$(echo "$pattern" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+        [ -n "$pattern" ] && parts+=("$(glob_to_regex "$pattern")")
+    done
+    local IFS='|'
+    echo "${parts[*]}"
+}
+
+# Group paths are matched literally, not as globs: they name groups, and
+# exclude_projects already covers pattern matching on project paths.
+normalize_group_list() {
+    local csv="$1" out="$2" raw g
+    : > "$out"
+    [ -z "$csv" ] && return 0
+    local entries=()
+    IFS=',' read -ra entries <<< "$csv"
+    local -A seen=()
+    for raw in "${entries[@]}"; do
+        g=$(printf '%s' "$raw" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s#^/+|/+$##g')
+        [ -z "$g" ] && continue
+        [ -n "${seen[$g]:-}" ] && continue
+        seen[$g]=1
+        printf '%s\n' "$g" >> "$out"
+    done
+}
+
+# True when the group is excluded outright or sits under an excluded group.
+group_excluded() {
+    local path="$1" ex
+    while IFS= read -r ex; do
+        [ -z "$ex" ] && continue
+        [ "$path" = "$ex" ] && return 0
+        case "$path" in "$ex"/*) return 0 ;; esac
+    done < "$WORK/exclude-groups.txt"
+    return 1
+}
+
+normalize_group_list "$EXCLUDE_GROUPS" "$WORK/exclude-groups.txt"
+EXCLUDE_GROUPS_JSON=$(jq -R -s 'split("\n") | map(select(length > 0))' "$WORK/exclude-groups.txt")
+
+INCLUDE_REGEX=$(patterns_to_regex "$INCLUDE_PROJECTS")
+EXCLUDE_REGEX=$(patterns_to_regex "$EXCLUDE_PROJECTS")
+
+VISIBILITIES=""
+[ "$INCLUDE_PUBLIC" = "true" ]   && VISIBILITIES="${VISIBILITIES}public "
+[ "$INCLUDE_INTERNAL" = "true" ] && VISIBILITIES="${VISIBILITIES}internal "
+[ "$INCLUDE_PRIVATE" = "true" ]  && VISIBILITIES="${VISIBILITIES}private "
+if [ -z "$VISIBILITIES" ]; then
+    echo "Error: at least one of include_public / include_internal / include_private must be true" >&2
+    exit 1
+fi
+echo "Visibilities: $VISIBILITIES"
+
+# --- group list -------------------------------------------------------------
+
+: > "$WORK/groups.txt"
+if [ -n "$INCLUDE_GROUPS" ]; then
+    # Named groups, so /groups is never called: a group-scoped token, or an
+    # account below maintainer, cannot list groups instance-wide. GitLab takes a
+    # URL-encoded path wherever it takes a group ID, so no lookup is needed.
+    normalize_group_list "$INCLUDE_GROUPS" "$WORK/groups.txt"
+
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        echo "Error: include_groups is set but names no groups." >&2
+        exit 1
+    fi
+    echo "Using $GROUP_COUNT configured group(s), skipping discovery: $(tr '\n' ' ' < "$WORK/groups.txt")"
+else
+    # /groups ignores id_after (verified against gitlab.com), so this endpoint is
+    # offset-paginated. Bounded by group count rather than project count, so paging
+    # by page=N is cheap here — but it is still walked to the end, never truncated.
+    echo "Discovering top-level groups (maintainer or above)..."
+    page=1
+    while :; do
+        gl_api "/groups?top_level_only=true&min_access_level=${MIN_ACCESS_LEVEL}&per_page=${PER_PAGE}&page=${page}&order_by=id&sort=asc" \
+            "$WORK/groups-page.json"
+        n=$(jq 'length' "$WORK/groups-page.json")
+        [ "$n" -eq 0 ] && break
+        jq -r '.[].full_path' "$WORK/groups-page.json" >> "$WORK/groups.txt"
+        [ "$n" -lt "$PER_PAGE" ] && break
+        page=$((page + 1))
+    done
+
+    GROUP_COUNT=$(wc -l < "$WORK/groups.txt" | tr -d ' ')
+    echo "Discovered $GROUP_COUNT top-level group(s): $(tr '\n' ' ' < "$WORK/groups.txt")"
+    if [ "$GROUP_COUNT" -eq 0 ]; then
+        # Nothing to report is not the same as "the estate is empty" — the token may
+        # have lost its memberships. Writing an empty catalog here would retire
+        # every component, so refuse instead.
+        echo "Error: no top-level groups on $GITLAB_HOST are visible to the token at maintainer or above. Refusing to write an empty catalog. Set include_groups to name the groups if the token cannot list groups." >&2
+        exit 1
+    fi
+fi
+
+# Drop excluded groups before enumerating them, so their listing call is never
+# made. A subgroup of a tree we still enumerate cannot be skipped here —
+# include_subgroups returns it regardless — so it is filtered in the transform.
+if [ -s "$WORK/exclude-groups.txt" ]; then
+    kept=0
+    : > "$WORK/groups-kept.txt"
+    while IFS= read -r group; do
+        [ -z "$group" ] && continue
+        if group_excluded "$group"; then
+            echo "  excluding group: $group"
+            continue
+        fi
+        printf '%s\n' "$group" >> "$WORK/groups-kept.txt"
+        kept=$((kept + 1))
+    done < "$WORK/groups.txt"
+    mv "$WORK/groups-kept.txt" "$WORK/groups.txt"
+    GROUP_COUNT=$kept
+    echo "$GROUP_COUNT group(s) left to enumerate after exclusions"
+fi
+
+# --- project enumeration ----------------------------------------------------
+
+# Keyset via id_before. NOTE: pagination=keyset is silently ignored on this
+# endpoint (it still returns offset Link headers), so id_before is what makes
+# the paging actually keyset — do not switch to following Link: rel="next".
+# Newest first because id DESC is the endpoint's default order; ascending has
+# timed out server-side (a 500 after 60s) even on small groups.
+# simple=false is the default, spelled out so gl_api can swap it for
+# simple=true when a page fails with HTTP 500.
+ARCHIVED_PARAM=""
+[ "$INCLUDE_ARCHIVED" != "true" ] && ARCHIVED_PARAM="&archived=false"
+SIMPLE_PAGES=0
+
+: > "$WORK/projects.ndjson"
+while IFS= read -r group; do
+    [ -z "$group" ] && continue
+    enc=$(urlenc_path "$group")
+    cursor=""
+    pages=0
+    before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    while :; do
+        # with_shared=false: GitLab includes projects shared INTO the group by
+        # default, which are owned elsewhere — they would be cataloged outside
+        # the account's groups and duplicated across any group sharing them.
+        gl_api "/groups/${enc}/projects?include_subgroups=true&with_shared=false&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+            "$WORK/proj-page.json"
+        n=$(jq 'length' "$WORK/proj-page.json")
+        [ "$n" -eq 0 ] && break
+        [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
+        jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+            "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
+        cursor=$(jq -r '.[-1].id' "$WORK/proj-page.json")
+        pages=$((pages + 1))
+    done
+    now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    echo "  $group: $((now - before)) project(s) over $pages page(s)"
+done < "$WORK/groups.txt"
+
+# Configured paths may nest (acme and acme/payments), and include_subgroups then
+# returns the same project under both. Discovery's groups are disjoint.
+if [ -n "$INCLUDE_GROUPS" ] && [ -s "$WORK/projects.ndjson" ]; then
+    jq -s -c 'unique_by(.id) | .[]' "$WORK/projects.ndjson" > "$WORK/projects-unique.ndjson"
+    mv "$WORK/projects-unique.ndjson" "$WORK/projects.ndjson"
+fi
+
+# Personal (user) namespaces are invisible to the group sweep by construction —
+# a personal namespace is not a group — so they need their own pass. Scoped with
+# membership=true on purpose: plain /projects on an instance-admin token returns
+# every project on the instance, including every user's scratch repos.
+if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
+    echo "Sweeping personal namespaces the account is a member of..."
+    cursor=""
+    pages=0
+    before=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    while :; do
+        gl_api "/projects?membership=true&simple=false&per_page=${PER_PAGE}&order_by=id&sort=desc${cursor:+&id_before=${cursor}}${ARCHIVED_PARAM}" \
+            "$WORK/personal-page.json"
+        n=$(jq 'length' "$WORK/personal-page.json")
+        [ "$n" -eq 0 ] && break
+        [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
+        # Keep only user namespaces: the group projects in this listing are the
+        # ones the group sweep already has, and re-adding them would duplicate.
+        jq -c '.[] | select(.namespace.kind == "user")
+               | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: .namespace.full_path, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
+            "$WORK/personal-page.json" >> "$WORK/projects.ndjson"
+        cursor=$(jq -r '.[-1].id' "$WORK/personal-page.json")
+        pages=$((pages + 1))
+    done
+    now=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+    echo "  personal namespaces: $((now - before)) project(s) over $pages page(s)"
+fi
+
+TOTAL_FETCHED=$(wc -l < "$WORK/projects.ndjson" | tr -d ' ')
+echo "Total projects fetched: $TOTAL_FETCHED"
+if [ "$SIMPLE_PAGES" -gt 0 ]; then
+    echo "Warning: $SIMPLE_PAGES page(s) listed with simple=true after an HTTP 500 — their projects are cataloged as non-forks, and as unarchived when include_archived is on." >&2
+fi
+
+# --- transform --------------------------------------------------------------
+
+jq -s \
+    --arg host "$GITLAB_HOST" \
+    --arg prefix "$TAG_PREFIX" \
+    --arg owner "$DEFAULT_OWNER" \
+    --arg domain "$DEFAULT_DOMAIN" \
+    --arg domain_from_path "$DOMAIN_FROM_GROUP_PATH" \
+    --arg include_regex "$INCLUDE_REGEX" \
+    --arg exclude_regex "$EXCLUDE_REGEX" \
+    --argjson exclude_groups "$EXCLUDE_GROUPS_JSON" \
+    --arg visibilities "$VISIBILITIES" \
+    --arg include_forks "$INCLUDE_FORKS" \
+    --arg allowed_topics "$ALLOWED_TOPICS" \
+    --arg disallowed_topics "$DISALLOWED_TOPICS" \
+    '
+    # GitLab topics are free text (any ASCII bar linebreaks). Whitespace and
+    # parens are exactly the token boundaries in the boolexpr lexer, so a tag
+    # containing either makes the whole on: expression a parse error, not just
+    # that term; matching is also case-sensitive. Other punctuation lexes fine.
+    def norm: ascii_downcase | gsub("[\\s()]+"; "-") | gsub("-+"; "-") | gsub("^-+|-+$"; "");
+    def csv_set($s): ($s | split(",") | map(norm) | map(select(length > 0)));
+
+    (csv_set($allowed_topics)) as $allow |
+    (csv_set($disallowed_topics)) as $deny |
+    ($visibilities | split(" ") | map(select(length > 0))) as $vis |
+
+    [ .[]
+      | select(.visibility as $v | $vis | index($v))
+      | select(($include_regex == "") or (.path_with_namespace | test($include_regex)))
+      | select(($exclude_regex == "") or (.path_with_namespace | test($exclude_regex) | not))
+      # Prefix on "<group>/" not "<group>": "acme/sandbox" must drop
+      # acme/sandbox/** without touching acme/sandbox-tools/**.
+      | select(.path_with_namespace as $p
+               | ($exclude_groups | any(. as $g | ($p | startswith($g + "/")))) | not)
+      | select($include_forks == "true" or (.is_fork | not))
+      # A GitLab delete is delayed: it renames the project to
+      # <path>-deletion_scheduled-<id> and keeps listing it, archived still
+      # false, until the retention window expires. Cataloging it would keep a
+      # component alive under a mangled name for weeks after the delete.
+      # Either field satisfies it: gitlab.com currently returns both
+      # marked_for_deletion_on and _at in agreement, and reading only one would
+      # silently stop filtering if that one is the half that goes away.
+      # The rename is matched too, because a simple=true page has neither
+      # field: -deletion_scheduled-<id> since GitLab 18.3, -deleted-<id> before.
+      | select((.pending_deletion
+                or (.id as $id | .path_with_namespace
+                    | endswith("-deletion_scheduled-\($id)") or endswith("-deleted-\($id)"))) | not)
+      | . + {norm_topics: [(.topics // [])[] | norm] }
+      # allow ∩ topics, expressed as set difference twice
+      | select(($allow | length) == 0 or (($allow - ($allow - .norm_topics)) | length) > 0)
+      | select(($deny  | length) == 0 or (($deny  - ($deny  - .norm_topics)) | length) == 0)
+    ]
+    # Domain from the group path: the namespace containing the project becomes
+    # a dotted domain, with default_domain as the root when both are set. A dot
+    # inside a GitLab path segment would invent a hierarchy level that is not
+    # there, so it is folded to a dash.
+    | [ .[] | . + {derived_domain: (
+          if $domain_from_path != "true" then $domain
+          else
+            ((.path_with_namespace | split("/") | .[:-1] | map(gsub("\\."; "-")))
+             | (if $domain != "" then [$domain] + . else . end)
+             | join("."))
+          end
+        )} ]
+    | [ .[] | {
+        key: "\($host)/\(.path_with_namespace)",
+        value: (
+          {
+            tags: (
+              ([.norm_topics[] | "\($prefix)\(.)"] | unique)
+              + ["gitlab-visibility-\(.visibility)"]
+              + (if .archived then ["gitlab-archived"] else [] end)
+              + (if .is_fork  then ["gitlab-fork"]     else [] end)
+              + (if .namespace_kind == "user" then ["gitlab-personal-namespace"] else [] end)
+            ),
+            meta: (
+              {
+                visibility: .visibility,
+                archived: (if .archived then "true" else "false" end),
+                project_id: (.id | tostring),
+                group: .group,
+                fork: (if .is_fork then "true" else "false" end),
+                namespace_kind: .namespace_kind,
+              }
+              # Absent rather than empty: a project with no commits has no
+              # default branch, and an undescribed project has no description.
+              + (if (.description // "") != "" then {description: .description} else {} end)
+              + (if (.default_branch // "") != "" then {default_branch: .default_branch} else {} end)
+              + (if (.topics // []) != [] then {topics: (.topics | join(","))} else {} end)
+              + (if .forked_from != null then {forked_from: .forked_from} else {} end)
+            )
+          }
+          + (if $owner != "" then {owner: $owner} else {} end)
+          + (if .derived_domain != "" then {domain: .derived_domain} else {} end)
+        )
+      } ]
+    ' "$WORK/projects.ndjson" > "$WORK/entries.json"
+
+TOTAL=$(jq 'length' "$WORK/entries.json")
+echo "Components after filtering: $TOTAL"
+
+if [ "$TOTAL" -eq 0 ]; then
+    # Every project filtered out is a configuration answer, not an outage, so
+    # this one is allowed to be an empty report — but say so loudly, because the
+    # consequence is that the previous catalog contribution is retired.
+    echo "WARNING: no projects matched the configured filters; this run reports an empty catalog and will retire any components a previous run contributed." >&2
+    exit 0
+fi
+
+# --- write ------------------------------------------------------------------
+
+# Register domains BEFORE the components that reference them: the hub resolves
+# a component's domain against the declared set and DROPS the component when it
+# is missing, and batches are saved as they are written. Derived domains make
+# this load-bearing rather than a formality — there is one per group path.
+jq -r '[.[].value.domain // empty] | unique | .[]' "$WORK/entries.json" > "$WORK/domains.txt"
+DOMAIN_COUNT=$(wc -l < "$WORK/domains.txt" | tr -d ' ')
+if [ "$DOMAIN_COUNT" -gt 0 ]; then
+    echo "Registering $DOMAIN_COUNT domain(s): $(tr '\n' ' ' < "$WORK/domains.txt")"
+    jq -R -s 'split("\n") | map(select(length > 0))
+              | map({(.): {description: "Created by the gitlab cataloger"}}) | add' \
+        "$WORK/domains.txt" \
+        | lunar catalog raw --json '.domains' -
+fi
+
+batch=0
+start=0
+while [ "$start" -lt "$TOTAL" ]; do
+    batch=$((batch + 1))
+    count=$BATCH_SIZE
+    [ $((start + count)) -gt "$TOTAL" ] && count=$((TOTAL - start))
+    echo "Writing batch $batch: components $((start + 1))-$((start + count)) of $TOTAL"
+    jq --argjson s "$start" --argjson c "$count" '.[$s:$s + $c] | from_entries' "$WORK/entries.json" \
+        | lunar catalog raw --json '.components' -
+    start=$((start + count))
+done
+
+echo "Cataloged $TOTAL component(s) from $GROUP_COUNT group(s) on $GITLAB_HOST"

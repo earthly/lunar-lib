@@ -55,6 +55,11 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/gitlab@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, kubernetes]
+    include:
+      - merge-request       # MR metadata
+      - repository          # Project settings
+      - branch-protection   # Protected branches and approval rules
+      - access-permissions  # Members and shared groups
     with:
       gitlab_host: gitlab.com   # Set to your self-managed host if applicable
     secrets:

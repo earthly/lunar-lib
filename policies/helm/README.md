@@ -23,18 +23,18 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.k8s.helm.charts[]` | array | `helm` collector |
-| `.k8s.helm.charts[].lint_passed` | boolean | `helm` collector |
-| `.k8s.helm.charts[].lint_errors` | array | `helm` collector |
-| `.k8s.helm.charts[].version` | string | `helm` collector |
-| `.k8s.helm.charts[].version_is_semver` | boolean | `helm` collector |
-| `.k8s.helm.charts[].has_values_schema` | boolean | `helm` collector |
-| `.k8s.helm.charts[].dependencies[]` | array | `helm` collector |
-| `.k8s.helm.charts[].dependencies[].name` | string | `helm` collector |
-| `.k8s.helm.charts[].dependencies[].version` | string | `helm` collector |
-| `.k8s.helm.charts[].dependencies[].is_pinned` | boolean | `helm` collector |
+| `.k8s.helm.charts[]` | array | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].lint_passed` | boolean | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].lint_errors` | array | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].version` | string | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].version_is_semver` | boolean | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].has_values_schema` | boolean | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].dependencies[]` | array | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].dependencies[].name` | string | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].dependencies[].version` | string | `helm` collector (`charts` sub-collector) |
+| `.k8s.helm.charts[].dependencies[].is_pinned` | boolean | `helm` collector (`charts` sub-collector) |
 
-**Note:** Ensure the `helm` collector is configured before enabling this policy.
+**Note:** These paths come from the [`helm` collector](../../collectors/helm). The `k8s` collector's `helm` sub-collector renders charts for the [`k8s` policy](../k8s) instead.
 
 ## Installation
 
@@ -44,12 +44,13 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/helm@v1.0.0
     on: [kubernetes, helm]
+    include: [charts]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/helm@v1.0.0
     on: [kubernetes, helm]
     enforcement: report-pr
-    # include: [lint-passed, version-semver]  # Only run specific checks
+    include: [lint-passed, version-semver, values-schema, dependencies-pinned]
 ```
 
 ## Examples

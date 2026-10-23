@@ -32,6 +32,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/shell@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
+    include: [shellcheck-clean]
     # with:
     #   min_severity: "error"  # Minimum severity to enforce: error, warning, info, style (default: error)
     #   max_shellcheck_warnings: "0"  # Maximum warnings allowed at or above min_severity (default: "0")

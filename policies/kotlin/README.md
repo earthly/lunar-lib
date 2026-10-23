@@ -47,7 +47,14 @@ policies:
   - uses: github://earthly/lunar-lib/policies/kotlin@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [build-tool-manifest-exists, kotlin-version-pinned]  # Only run specific checks
+    include:
+      - build-tool-manifest-exists
+      - kotlin-version-pinned
+      - min-kotlin-version
+      - build-tool-wrapper-exists
+      - dependencies-locked
+      - test-directory-exists
+      - linter-configured
 ```
 
 ## Examples

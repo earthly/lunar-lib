@@ -21,13 +21,17 @@ This collector writes to the following Component JSON paths:
 | `.sca.history[]` | array | *(opt-in)* Bounded list of prior scan snapshots (source, counts, summary) for point-in-time audit; oldest first. `[0]` is the oldest retained scan — the release-time (`integration="code"`) scan when history is enabled from the first scan. Absent unless `scan_history_size > 0` |
 | `.sca.rescan_count` | number | *(opt-in)* Monotonic tally of completed re-scans, used to enforce `max_rescans` independently of the (capped) `.sca.history[]` length. Present when scan history or `max_rescans` is enabled |
 | `.sca.native.trivy.cicd` | object | CI command detection data (command, version) |
-| `.container_scan.source` | object | Source metadata for the container image scan (tool, version, integration) |
-| `.container_scan.image` | string | The scanned image reference (e.g. `registry/app:tag`) |
-| `.container_scan.vulnerabilities` | object | Severity counts for the image scan (critical, high, medium, low, total) |
-| `.container_scan.findings[]` | array | Individual image findings (OS and application packages) |
-| `.container_scan.os` | object | Detected base-image OS family and version |
-| `.container_scan.summary` | object | Summary booleans (has_critical, has_high, all_fixable) |
-| `.container_scan.native.trivy` | object | Raw Trivy results for the image scan |
+| `.container_scan.source` | object | Source metadata for the container image scan: `tool`, `version`, `integration`, `collected_at` (when the scan ran) and `collected_sha` (the commit the run was bound to) |
+| `.container_scan.image` | string | The primary (most recently pushed) scanned image reference (e.g. `registry/app:tag`) |
+| `.container_scan.digest` | string | Registry digest of the primary image, resolved at scan time. Absent when the registry reports none |
+| `.container_scan.vulnerabilities` | object | Severity counts across every scanned image (critical, high, medium, low, total) |
+| `.container_scan.findings[]` | array | Individual image findings (OS and application packages), each with the `image` it was found in |
+| `.container_scan.images[]` | array | Per-image breakdown: `image`, `digest`, `tool`, `os`, `vulnerabilities`, `summary` |
+| `.container_scan.errors[]` | array | Pushed images that could not be pulled or scanned (`image`, `error`) |
+| `.container_scan.os` | object | Detected base-image OS family and version of the primary image |
+| `.container_scan.summary` | object | Summary booleans across every scanned image (has_critical, has_high, all_fixable) |
+| `.container_scan.history[]` | array | *(opt-in)* Bounded list of prior container scans (`source`, `image`, `digest`, counts, summary), oldest first. Absent unless `container_scan_history_size > 0` |
+| `.container_scan.native.trivy` | object | Raw Trivy results for the primary image |
 
 ## Collectors
 
@@ -38,8 +42,8 @@ This integration provides the following collectors (use `include` to select a su
 | `auto` | code | Auto-scans the repository filesystem for dependency vulnerabilities → `.sca` |
 | `cicd` | ci-after-command | Detects Trivy executions in CI; routes image scans (`trivy image <ref>`) to `.container_scan` and filesystem scans (`trivy fs`) to `.sca` |
 | `rescan` | cron | Re-runs the `auto` scan on a schedule (daily by default) and overwrites `.sca` so the SCA policy re-evaluates against newly-published CVEs; optionally snapshots prior scans into `.sca.history[]` (opt-in via `scan_history_size` — see [Scan history](#scan-history-point-in-time-audit)) |
-| `container-scan` | after-json | Automatically scans the image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as it's published; writes `.container_scan` |
-| `container-rescan` | cron | Re-scans the most recently **pushed** image on a schedule, catching CVEs disclosed since it was built |
+| `container-scan` | after-json | Automatically scans every image the docker collector records as **pushed** (`.containers.native.docker.cicd.cmds[]`) as soon as they're published; writes `.container_scan` |
+| `container-rescan` | cron | Re-scans every **pushed** image on a schedule, catching CVEs disclosed since they were built; optionally snapshots prior scans into `.container_scan.history[]` (opt-in via `container_scan_history_size`) |
 
 ## Installation
 
@@ -49,20 +53,26 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include:
+      - auto              # Scans the repo's dependencies
+      - cicd              # Trivy runs in CI
+      - rescan            # Daily rescan for new CVEs
+      - container-scan    # Scans each pushed image
+      - container-rescan  # Daily rescan of pushed images
 ```
 
 Zero configuration required. Works with any language Trivy supports.
 
-By default this also enables the `rescan` cron sub-collector, which re-runs the
-scan daily on each component's default branch and overwrites `.sca`. To keep the
-on-push (`auto`) and CI-detection (`cicd`) scans but turn the scheduled re-scan
-off, exclude it:
+The `rescan` cron sub-collector re-runs the scan daily on each component's
+default branch and overwrites `.sca`. To keep the on-push (`auto`) and
+CI-detection (`cicd`) scans but turn the scheduled re-scan off, leave it out of
+`include`:
 
 ```yaml
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
-    exclude: [rescan]
+    include: [auto, cicd, container-scan, container-rescan]
 ```
 
 ### Scan history (point-in-time audit)
@@ -77,6 +87,7 @@ like when we shipped this release"). Opt in by keeping a bounded history:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include: [auto, cicd, rescan, container-scan, container-rescan]
     with:
       scan_history_size: "30"   # keep up to 30 prior scans in .sca.history[]
       max_rescans: "0"          # 0 = keep re-scanning forever (default)
@@ -108,6 +119,7 @@ policy evaluation — `.sca` behaves identically whether history is on or off.
 |-------|---------|--------|
 | `scan_history_size` | `0` | Max entries kept in `.sca.history[]`. `0` disables history (today's overwrite-only behavior). At the cap the oldest entry (`[0]`) is kept and the second-oldest is dropped. |
 | `max_rescans` | `0` | Stop re-scanning a component after this many re-scans (`0` = unlimited). Counted independently via `.sca.rescan_count`, so it stands alone — no dependency on `scan_history_size`. |
+| `container_scan_history_size` | `0` | Max entries kept in `.container_scan.history[]` by the `container-rescan` cron. `0` disables it. Independent of `scan_history_size`, which covers `.sca`. |
 
 Both default to off, so existing installs are unchanged. Only the `rescan` cron
 maintains history — the on-push `auto` scan ignores these inputs.
@@ -115,8 +127,8 @@ maintains history — the on-push `auto` scan ignores these inputs.
 **Container image scanning.** Beyond source dependencies, this collector scans **built container images** into the normalized `.container_scan` path (consumed by the [`container-scan`](../../policies/container-scan) policy). Three sub-collectors feed it, none installing Trivy in your pipeline:
 
 - **`cicd`** *(detect)* — if your pipeline already runs `trivy image <ref>` itself, that scan is captured to `.container_scan` automatically. A `trivy fs` scan still routes to `.sca`. No install, no extra config.
-- **`container-scan`** *(on-push)* — automatically scans the image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag.
-- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans that image, catching CVEs **disclosed after it was built**.
+- **`container-scan`** *(on-push)* — automatically scans every image as soon as it's published. Hooks `after-json` on `.containers.native.docker.cicd.cmds`, so a scan fires the moment the docker collector records a push — no schedule lag. A pipeline that pushes several images (an app and its migrator, say) gets them all scanned into one `.container_scan`: `image` / `os` describe the most recently pushed one, `images[]` breaks the counts down per image and every `findings[]` entry names its `image`. On a pull request it scans the images *that* commit pushed, so PR-time scanning needs your pipeline to push on PR builds; otherwise there is nothing to scan until the merge. Because the scan is dispatched the instant the push is recorded, it can briefly run ahead of that record becoming readable; it retries for a few minutes rather than reporting "nothing was pushed", and fails the run if the record never arrives — the on-push scan fires once per commit, so a silent skip would leave that commit unscanned.
+- **`container-rescan`** *(scheduled re-scan)* — a daily cron that re-scans those images, catching CVEs **disclosed after they were built**.
 
 All three scan the shipped image *itself* in the Trivy collector image — no install in your CI. Enable the [`docker`](../docker) collector alongside this one so its `docker push` commands are recorded:
 
@@ -124,12 +136,33 @@ All three scan the shipped image *itself* in the Trivy collector image — no in
 collectors:
   - uses: github://earthly/lunar-lib/collectors/docker@main
     on: ["domain:your-domain"]
+    include: [cicd]
   - uses: github://earthly/lunar-lib/collectors/trivy@main
     on: ["domain:your-domain"]
+    include: [cicd, container-scan, container-rescan]
 ```
 
-> **`container-scan` needs a Hub with the `after-json` hook.** Without it, `exclude: [container-scan]` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
+> **`container-scan` needs a Hub with the `after-json` hook.** Without it, leave `container-scan` out of `include` and rely on the `container-rescan` cron (the other sub-collectors work on any Hub).
 
-**Private registries:** the `container-rescan` cron pulls the image, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets. Trivy's vulnerability database is a modest download at scan time.
+**Scan provenance.** A container scan records what it scanned and when: `source.collected_at`, `source.collected_sha` (the commit the run was bound to) and the registry `digest` of each image, resolved from the scanner's own output. The digest is the field that matters — the recorded reference is usually a floating tag like `registry/app:main`, so counts alone cannot tell you whether a scan covers the artifact you are about to promote. Compare `digest` against the digest you are promoting; if they differ, the numbers describe different bytes. A digest the registry does not report is left absent rather than guessed.
+
+`collected_sha` is provenance, not identity: on a cron re-scan it is the latest ingested default-branch commit, which need not be the commit that built the image.
+
+**Container scan history.** Set `container_scan_history_size` above `0` and each cron re-scan snapshots the current `.container_scan` into a bounded `.container_scan.history[]` before overwriting it, so the scan a release shipped with stays readable after later re-scans replace the live counts:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/trivy@main
+    on: ["domain:your-domain"]
+    include: [auto, cicd, rescan, container-scan, container-rescan]
+    with:
+      container_scan_history_size: "30"
+```
+
+Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only — `findings[]`, `images[]` and `native` are concatenated across collectors by the Hub, so snapshotting them would double them. At the cap the oldest entry is kept and the second-oldest dropped. Only the `container-rescan` cron maintains history; the on-push `container-scan` ignores the input. If the re-scan cannot read the current Component JSON it skips that tick rather than write a record without history. Running two scanners' crons on one component concatenates their histories, as it does `images[]` and `findings[]` — tell them apart by `source.tool`.
+
+**Private registries:** the `container-rescan` cron pulls the images, so a private registry needs the `REGISTRY_USERNAME` (or `REGISTRY_USER`) / `REGISTRY_PASSWORD` secrets. Trivy's vulnerability database is a modest download at scan time.
+
+**Resources:** `container-scan` and `container-rescan` declare `size: large`, because they pull and unpack the shipped image (and download the vulnerability database) inside the collector pod, and the default profile's 1Gi ephemeral-storage limit is too small for real-world images. The `cicd` sub-collector runs natively on your CI runner, so no pod size applies to it.
 
 > **Note:** If you already use the `snyk` collector, the `trivy` collector will overwrite `.sca` data since both write to the same paths. Use one SCA scanner per component, not both.

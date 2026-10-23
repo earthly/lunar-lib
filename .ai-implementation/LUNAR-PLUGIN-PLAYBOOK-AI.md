@@ -178,7 +178,7 @@ it's a sharp tool. The headline traps:
 |---------|---------------|-----|
 | Calling `lunar collect --component …` as-is in a collector | The runtime sets `LUNAR_COLLECT_STDOUT`, so `--component` is ignored and the write lands on the *current* component. | `env -u LUNAR_COLLECT_STDOUT -u LUNAR_LOG_PREFIX lunar collect --component …` |
 | Churning the cronos manifest while testing | `component_id = StableUUID(manifest_version, name)` — every manifest bump reassigns ids, splitting a component's code data and your external write across different ids (looks like the target's other data vanished). | Pin the manifest, let sources re-collect under it, *then* write. |
-| Assuming the write is idempotent | `CollectExternal` appends a new record each call and the hub re-runs collectors → arrays accumulate duplicates. | Skip the push if the target already carries your data — read it via `lunar component get-json` (NOT the lagging `components_latest` SQL view). |
+| Assuming the write is idempotent | `CollectExternal` appends a new record each call and the hub re-runs collectors → arrays accumulate duplicates. | Skip the push if the target already carries your data — read it via `lunar component get-json <id> --git-sha <sha>` at the sha you write (an unpinned read and the `components_latest` SQL view both lag the write). |
 | Writing at a fabricated SHA | The hub skips a SHA it hasn't VCS-ingested — the write silently no-ops. | Resolve the source's default-branch HEAD SHA and confirm it's ingested. |
 
 ### SVG icons

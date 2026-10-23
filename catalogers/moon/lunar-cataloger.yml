@@ -1,0 +1,71 @@
+version: 0
+
+name: moon
+description: Populates each monorepo component's paths from the moon project graph, so a change to a shared library re-evaluates the services that depend on it
+author: earthly
+default_image: earthly/lunar-lib:moon-main
+
+landing_page:
+  display_name: "moon Cataloger"
+  long_description: |
+    Reads the dependency graph a monorepo already declares in its
+    moon configuration and writes it into Lunar as component
+    `paths`. Each component gains a path entry for every directory it
+    transitively depends on, so a commit to a shared library
+    re-evaluates every service that consumes it.
+  categories: ["service-catalog", "vcs"]
+  icon: "assets/moon.svg"
+  status: "beta"
+  related:
+    - slug: "backstage-catalog-info-monorepo"
+      type: "cataloger"
+      reason: "Creates a component per catalog-info.yaml; this fills in their paths"
+    - slug: "github-org"
+      type: "cataloger"
+      reason: "Creates the per-repo components this cataloger augments"
+
+example_catalog_json: |
+  {
+    "components": {
+      "github.com/acme/monorepo/apps/web": {
+        "paths": [
+          "packages/auth/*",
+          "packages/telemetry/*"
+        ]
+      }
+    }
+  }
+
+catalogers:
+  - name: dependency-paths
+    description: |
+      Runs once per component of a repository that just received a commit, with
+      the repository checked out. Walks up for `.moon/`, runs `moon query
+      projects`, and matches the component's subdirectory against each project's
+      `source`. The matched project's transitive `dependsOn` closure becomes the
+      component's `paths` — one `<dir>/*` glob per dependency reached. Its own
+      directory is not written; the hub derives that implicitly from the
+      component name. Skips silently when the component is the repository root,
+      when there is no moon workspace, when the subdirectory is not a moon
+      project, or when the project has no dependencies.
+    mainBash: main.sh
+    hook:
+      type: component-repo
+      # moon reads moon.yml from a working tree, not the GitHub API.
+      clone-code: true
+    keywords: ["monorepo", "moon", "moonrepo", "dependency graph", "paths", "change detection", "shared library", "workspace"]
+
+inputs:
+  require_dependency_edges:
+    description: |
+      Fail the run when moon reports several projects but no dependency edges at
+      all. An unresolvable toolchain produces exactly that — moon exits 0 with
+      an empty stderr — so the default refuses to publish it. Set to `false` for
+      a workspace that genuinely declares no `dependsOn`.
+    default: "true"
+  exclude_scopes:
+    description: |
+      Comma-separated moon dependency scopes to ignore, e.g. `development` to
+      keep test-only dependencies out of a service's paths. Empty follows every
+      edge moon reports.
+    default: ""

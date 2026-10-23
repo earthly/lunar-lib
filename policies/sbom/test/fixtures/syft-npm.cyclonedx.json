@@ -1,0 +1,480 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "serialNumber": "urn:uuid:6e1c65d5-5bf5-4d4e-b769-01682d41e16e",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-26T16:28:08Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "anchore",
+          "name": "syft",
+          "version": "1.51.1"
+        }
+      ]
+    },
+    "component": {
+      "bom-ref": "af63bd4c8601b7f1",
+      "type": "file",
+      "name": "."
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "pkg:npm/%40bytecodealliance/preview2-shim@0.26.0?package-id=835d4cadbeff8849",
+      "type": "library",
+      "name": "@bytecodealliance/preview2-shim",
+      "version": "0.26.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "(Apache-2.0 WITH LLVM-exception)"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:\\@bytecodealliance\\/preview2-shim:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/%40bytecodealliance/preview2-shim@0.26.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:\\@bytecodealliance\\/preview2-shim:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:\\@bytecodealliance\\/preview2_shim:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:\\@bytecodealliance\\/preview2_shim:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:\\@bytecodealliance\\/preview2:\\@bytecodealliance\\/preview2-shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:\\@bytecodealliance\\/preview2:\\@bytecodealliance\\/preview2_shim:0.26.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/ag-grid-enterprise@36.2.0?package-id=e7a0a9f75067ffa5",
+      "type": "library",
+      "name": "ag-grid-enterprise",
+      "version": "36.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Commercial"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:ag-grid-enterprise:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/ag-grid-enterprise@36.2.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag-grid-enterprise:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag_grid_enterprise:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag_grid_enterprise:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag-grid:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag-grid:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag_grid:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag_grid:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag:ag-grid-enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:ag:ag_grid_enterprise:36.2.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/argparse@2.0.1?package-id=a0f39067a323fdb0",
+      "type": "library",
+      "name": "argparse",
+      "version": "2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Python-2.0"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:argparse:argparse:2.0.1:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/argparse@2.0.1",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/dompurify@3.4.16?package-id=d07ea9c1ee35fe66",
+      "type": "library",
+      "name": "dompurify",
+      "version": "3.4.16",
+      "licenses": [
+        {
+          "expression": "MPL-2.0 OR Apache-2.0"
+        }
+      ],
+      "cpe": "cpe:2.3:a:dompurify:dompurify:3.4.16:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/dompurify@3.4.16",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/inherits@2.0.4?package-id=911374ff7f37ba7f",
+      "type": "library",
+      "name": "inherits",
+      "version": "2.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:inherits:inherits:2.0.4:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/inherits@2.0.4",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/jszip@3.10.1?package-id=47a7b29ab705bbc2",
+      "type": "library",
+      "name": "jszip",
+      "version": "3.10.1",
+      "licenses": [
+        {
+          "expression": "MIT OR GPL-3.0-or-later"
+        }
+      ],
+      "cpe": "cpe:2.3:a:jszip_project:jszip:3.10.1:*:*:*:*:node.js:*:*",
+      "purl": "pkg:npm/jszip@3.10.1",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/node-forge@1.3.1?package-id=72cf3b0bbdbc2556",
+      "type": "library",
+      "name": "node-forge",
+      "version": "1.3.1",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause OR GPL-2.0"
+        }
+      ],
+      "cpe": "cpe:2.3:a:digitalbazaar:forge:1.3.1:*:*:*:*:node.js:*:*",
+      "purl": "pkg:npm/node-forge@1.3.1",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/pako@1.0.11?package-id=8811cee431746c6d",
+      "type": "library",
+      "name": "pako",
+      "version": "1.0.11",
+      "licenses": [
+        {
+          "expression": "MIT AND Zlib"
+        }
+      ],
+      "cpe": "cpe:2.3:a:pako:pako:1.0.11:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/pako@1.0.11",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/sha.js@2.4.11?package-id=6de29f769376875f",
+      "type": "library",
+      "name": "sha.js",
+      "version": "2.4.11",
+      "licenses": [
+        {
+          "expression": "MIT AND BSD-3-Clause"
+        }
+      ],
+      "cpe": "cpe:2.3:a:sha.js:sha.js:2.4.11:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/sha.js@2.4.11",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/tslib@2.8.1?package-id=732c6f5be784c8f2",
+      "type": "library",
+      "name": "tslib",
+      "version": "2.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:tslib:tslib:2.8.1:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/tslib@2.8.1",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "fd71c2238fc07657",
+      "type": "file",
+      "name": "/src/package-lock.json",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "869fb4dbabea11e174f609437cff1c7a4fad299e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5fe87ecc897c37a99c28d6825f2030f375ddfebda93821276facee039f8e02e5"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:npm/%40bytecodealliance/preview2-shim@0.26.0?package-id=835d4cadbeff8849",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/ag-grid-enterprise@36.2.0?package-id=e7a0a9f75067ffa5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/jszip@3.10.1?package-id=47a7b29ab705bbc2",
+      "dependsOn": [
+        "pkg:npm/pako@1.0.11?package-id=8811cee431746c6d"
+      ]
+    },
+    {
+      "ref": "pkg:npm/sha.js@2.4.11?package-id=6de29f769376875f",
+      "dependsOn": [
+        "pkg:npm/inherits@2.0.4?package-id=911374ff7f37ba7f"
+      ]
+    }
+  ]
+}

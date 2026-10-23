@@ -57,7 +57,7 @@ If a future cataloger lands and a clear normalization pattern emerges (e.g. "`.c
 
 ## Key Policy Paths
 
-- `.catalog.native.backstage` — namespace present ⇔ catalog-info.yaml was found (use `Check.exists(...)`)
+- `.catalog.native.backstage` — namespace present ⇔ a catalog-info.yaml for this component was found, in its own directory or as a monorepo's shared file with an entity pointing at it (use `Check.exists(...)`)
 - `.catalog.native.backstage.valid` — catalog-info.yaml passes lint checks
 - `.catalog.native.backstage.spec.owner` — Owner defined in Backstage
 - `.catalog.native.backstage.spec.lifecycle` — Lifecycle stage in Backstage

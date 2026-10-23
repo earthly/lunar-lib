@@ -30,7 +30,7 @@ sq_api_get() {
     local path="$1"
     local base
     base="$(sq_base_url)"
-    curl -fsS -u "${LUNAR_SECRET_SONARQUBE_TOKEN}:" "${base}${path}"
+    curl -fsS -u "${LUNAR_SECRET_SONARQUBE_TOKEN}:" "${base}${path}" # gitleaks:allow
 }
 
 # Convert SonarQube numeric rating ("1.0".."5.0") to letter (A..E).

@@ -33,4 +33,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/codex@main
     on: ["domain:your-domain"]
+    include:
+      - instruction-file  # CODEX.md files
+      - cicd              # Codex CLI runs in CI
 ```

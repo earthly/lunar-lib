@@ -1,6 +1,12 @@
 #!/bin/bash
+
+# LUNAR_COMPONENT_ID / LUNAR_COMPONENT_PR are injected by the Lunar runtime —
+# they are not local assignments or typos of each other.
+# shellcheck disable=SC2153
 set -e
 
+# helpers.sh sits alongside this script in the collector dir at runtime.
+# shellcheck disable=SC1091
 source "$(dirname "$0")/helpers.sh"
 
 # Only run in PR context.
@@ -14,6 +20,8 @@ if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "ticket-history requires GH_TOKEN secret to query GitHub." >&2
   exit 1
 fi
+
+resolve_ticket_path || exit 1
 
 # Fetch PR title and description from GitHub.
 fetch_pr_metadata || exit 1
@@ -56,12 +64,21 @@ SAFE_TICKET_KEY=$(echo "$TICKET_KEY" | sed "s/'/''/g")
 SAFE_COMPONENT_ID=$(echo "$LUNAR_COMPONENT_ID" | sed "s/'/''/g")
 SAFE_PR=$(echo "$LUNAR_COMPONENT_PR" | sed "s/'/''/g")
 
+# The id recorded at TICKET_PATH, e.g. component_json->'vcs'->'pr'->'ticket'->>'id'.
+# resolve_ticket_path admits only letters, digits and underscores per segment.
+ID_EXPR="component_json"
+IFS='.' read -ra SEGMENTS <<< "${TICKET_PATH#.}"
+for SEGMENT in "${SEGMENTS[@]}"; do
+  ID_EXPR+="->'${SEGMENT}'"
+done
+ID_EXPR+="->>'id'"
+
 # Query for other PRs using the same ticket.
 QUERY="
   SELECT COUNT(DISTINCT (component_id, pr))
   FROM components_latest
   WHERE pr IS NOT NULL
-    AND component_json->'vcs'->'pr'->'ticket'->>'id' = '${SAFE_TICKET_KEY}'
+    AND ${ID_EXPR} = '${SAFE_TICKET_KEY}'
     AND NOT (component_id = '${SAFE_COMPONENT_ID}' AND pr::text = '${SAFE_PR}')
 "
 
@@ -73,4 +90,4 @@ if ! [[ "$REUSE_COUNT" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-lunar collect -j ".vcs.pr.ticket.reuse_count" "$REUSE_COUNT"
+lunar collect -j "${TICKET_PATH}.reuse_count" "$REUSE_COUNT"

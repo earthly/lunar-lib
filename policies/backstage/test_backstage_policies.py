@@ -1,4 +1,4 @@
-"""Unit tests for the configurable backstage policies (required annotations + tag patterns)."""
+"""Unit tests for the backstage policy checks."""
 
 import os
 import unittest
@@ -22,12 +22,25 @@ def load_policy(filename):
     return module.main
 
 
+check_catalog_info_exists = load_policy("catalog-info-exists")
+check_catalog_info_valid = load_policy("catalog-info-valid")
+check_owner_set = load_policy("owner-set")
+check_lifecycle_set = load_policy("lifecycle-set")
+check_system_set = load_policy("system-set")
 check_required_annotations = load_policy("required-annotations")
 check_required_tag_patterns = load_policy("required-tag-patterns")
 check_disallowed_annotations = load_policy("disallowed-annotations")
 check_disallowed_tag_patterns = load_policy("disallowed-tag-patterns")
 check_domain_exists = load_policy("domain-exists")
 check_system_exists = load_policy("system-exists")
+check_system_domain_exists = load_policy("system-domain-exists")
+check_system_domain_set = load_policy("system-domain-set")
+check_system_domain_valid = load_policy("system-domain-valid")
+check_system_valid = load_policy("system-valid")
+check_required_link_types = load_policy("required-link-types")
+check_dependencies_documented = load_policy("dependencies-documented")
+check_allowed_types = load_policy("allowed-types")
+check_allowed_lifecycles = load_policy("allowed-lifecycles")
 
 from constraints import (
     parse_required_annotations,
@@ -56,6 +69,14 @@ def policy_vars(**kwargs):
 def is_skipped(check):
     """check.status never returns SKIPPED; a skip is recorded as a SKIPPED result."""
     return any(r.result == CheckStatus.SKIPPED for r in check._results)
+
+
+def skip_reason(check):
+    """The reason text of a skip, so tests can tell *which* gate skipped."""
+    return next(
+        (r.failure_message for r in check._results if r.result == CheckStatus.SKIPPED),
+        None,
+    )
 
 
 def backstage_data(annotations=None, tags=None):
@@ -250,6 +271,150 @@ class TestDisallowedTagPatterns(unittest.TestCase):
             )
 
 
+def catalog_node(metadata=None, spec=None):
+    """Finished node with a catalog file carrying the given metadata and spec."""
+    backstage = {"valid": True}
+    if metadata is not None:
+        backstage["metadata"] = metadata
+    if spec is not None:
+        backstage["spec"] = spec
+    return finished_node({"catalog": {"native": {"backstage": backstage}}})
+
+
+RUNBOOK = {"url": "https://wiki.example.com/runbook", "title": "Runbook", "type": "runbook"}
+DASHBOARD = {"url": "https://grafana.example.com/d/abc", "type": "dashboard"}
+
+
+class TestRequiredLinkTypes(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_required_link_types(catalog_node(metadata={"links": []}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("required_link_types", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(required_link_types="runbook"):
+            check = check_required_link_types(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_each_type_present_passes(self):
+        with policy_vars(required_link_types="runbook,dashboard"):
+            node = catalog_node(metadata={"links": [RUNBOOK, DASHBOARD]})
+            self.assertEqual(check_required_link_types(node).status, CheckStatus.PASS)
+
+    def test_missing_type_fails_and_names_it(self):
+        with policy_vars(required_link_types="runbook,dashboard"):
+            check = check_required_link_types(catalog_node(metadata={"links": [DASHBOARD]}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertEqual(len(check.failure_reasons), 1)
+            reason = check.failure_reasons[0]
+            self.assertIn("of type: runbook.", reason)
+            self.assertIn("Present link types: dashboard.", reason)
+
+    def test_title_does_not_stand_in_for_type(self):
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"url": "https://x", "title": "runbook"}]})
+            check = check_required_link_types(node)
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("Present link types: (none)", check.failure_reasons[0])
+
+    def test_url_is_not_checked(self):
+        # Match on type alone: the url isn't consulted.
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"type": "runbook"}]})
+            self.assertEqual(check_required_link_types(node).status, CheckStatus.PASS)
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(required_link_types="runbook"):
+            node = catalog_node(metadata={"links": [{"url": "https://x", "type": "Runbook"}]})
+            check = check_required_link_types(node)
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("Present link types: Runbook.", check.failure_reasons[0])
+
+    def test_no_links_block_fails(self):
+        with policy_vars(required_link_types="runbook"):
+            check = check_required_link_types(catalog_node(metadata={"name": "x"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_malformed_links_fail_without_crashing(self):
+        with policy_vars(required_link_types="runbook"):
+            for links in ("runbook", {"type": "runbook"}, ["runbook", None, {"type": 3}]):
+                with self.subTest(links=links):
+                    check = check_required_link_types(catalog_node(metadata={"links": links}))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_input_is_trimmed_and_deduplicated(self):
+        with policy_vars(required_link_types=" runbook , runbook,, dashboard "):
+            check = check_required_link_types(catalog_node(metadata={"links": []}))
+            self.assertIn("of type: runbook, dashboard.", check.failure_reasons[0])
+
+
+class TestDependenciesDocumented(unittest.TestCase):
+    def test_off_by_default_skips(self):
+        check = check_dependencies_documented(catalog_node(spec={"type": "service"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("require_dependencies", skip_reason(check))
+
+    def test_annotation_alone_does_not_enable(self):
+        with policy_vars(dependencies_annotation="example.com/dependencies"):
+            check = check_dependencies_documented(catalog_node(spec={"type": "service"}))
+            self.assertTrue(is_skipped(check))
+
+    def test_enable_flag_truthiness(self):
+        for raw, enforced in [("true", True), (" TRUE ", True), ("false", False), ("yes", False), ("", False)]:
+            with self.subTest(value=raw):
+                with policy_vars(require_dependencies=raw):
+                    check = check_dependencies_documented(catalog_node(spec={}))
+                    self.assertEqual(not is_skipped(check), enforced)
+
+    def test_no_catalog_file_fails_when_enabled(self):
+        with policy_vars(require_dependencies="true"):
+            check = check_dependencies_documented(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_depends_on_passes(self):
+        # Targets are not resolved, so any non-empty reference counts.
+        with policy_vars(require_dependencies="true"):
+            node = catalog_node(spec={"dependsOn": ["resource:not-in-any-catalog"]})
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.PASS)
+
+    def test_missing_or_empty_depends_on_fails(self):
+        with policy_vars(require_dependencies="true"):
+            for spec in ({"type": "service"}, {"dependsOn": []}, {"dependsOn": ["", "  "]}, {"dependsOn": "resource:db"}):
+                with self.subTest(spec=spec):
+                    check = check_dependencies_documented(catalog_node(spec=spec))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("declares no dependencies", check.failure_reasons[0])
+
+    def test_annotation_passes_when_configured(self):
+        with policy_vars(require_dependencies="true", dependencies_annotation="example.com/dependencies"):
+            node = catalog_node(
+                metadata={"annotations": {"example.com/dependencies": "resource:db, component:auth"}},
+                spec={"type": "service"},
+            )
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.PASS)
+
+    def test_annotation_ignored_when_not_configured(self):
+        with policy_vars(require_dependencies="true"):
+            node = catalog_node(
+                metadata={"annotations": {"example.com/dependencies": "resource:db"}},
+                spec={"type": "service"},
+            )
+            self.assertEqual(check_dependencies_documented(node).status, CheckStatus.FAIL)
+
+    def test_blank_annotation_fails_and_names_it(self):
+        with policy_vars(require_dependencies="true", dependencies_annotation="example.com/dependencies"):
+            for value in ("", " , ,", None):
+                with self.subTest(value=value):
+                    annotations = {} if value is None else {"example.com/dependencies": value}
+                    check = check_dependencies_documented(
+                        catalog_node(metadata={"annotations": annotations}, spec={})
+                    )
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("`example.com/dependencies` annotation", check.failure_reasons[0])
+
+
 def refs_node(refs=None):
     """Finished node with an optional .catalog.native.backstage.refs block.
 
@@ -262,6 +427,130 @@ def refs_node(refs=None):
         backstage["refs"] = refs
     data = {"catalog": {"native": {"backstage": backstage}}}
     return Node.from_component_json(data, {"workflows_finished": True})
+
+
+class TestAllowedTypes(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_allowed_types(catalog_node(spec={"type": "anything"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("allowed_types", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(Node.from_component_json({}))
+            self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_allowed_value_passes(self):
+        with policy_vars(allowed_types="service,website,library"):
+            for value in ("service", "library"):
+                with self.subTest(value=value):
+                    node = catalog_node(spec={"type": value})
+                    self.assertEqual(check_allowed_types(node).status, CheckStatus.PASS)
+
+    def test_value_not_in_list_fails_and_names_it(self):
+        with policy_vars(allowed_types="service,library"):
+            check = check_allowed_types(catalog_node(spec={"type": "website"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertEqual(len(check.failure_reasons), 1)
+            self.assertIn(
+                "spec.type 'website' is not one of the allowed types: service, library.",
+                check.failure_reasons[0],
+            )
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(allowed_types="service"):
+            check = check_allowed_types(catalog_node(spec={"type": "Service"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("'Service'", check.failure_reasons[0])
+
+    def test_missing_type_fails(self):
+        # Nothing else in the policy checks that spec.type is set.
+        with policy_vars(allowed_types="service"):
+            for spec in (None, {"owner": "team-a"}, {"type": ""}, {"type": "  "}, {"type": 3}):
+                with self.subTest(spec=spec):
+                    check = check_allowed_types(catalog_node(spec=spec))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertIn("spec.type is not set", check.failure_reasons[0])
+
+    def test_value_and_input_are_trimmed_and_deduplicated(self):
+        with policy_vars(allowed_types=" service , service,, library "):
+            self.assertEqual(
+                check_allowed_types(catalog_node(spec={"type": " library "})).status,
+                CheckStatus.PASS,
+            )
+            check = check_allowed_types(catalog_node(spec={"type": "website"}))
+            self.assertIn("allowed types: service, library.", check.failure_reasons[0])
+
+
+class TestAllowedLifecycles(unittest.TestCase):
+    def test_unconfigured_skips(self):
+        check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "anything"}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("allowed_lifecycles", skip_reason(check))
+
+    def test_no_catalog_file_fails_when_configured(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(finished_node({}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(Node.from_component_json({}))
+            self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_allowed_value_passes(self):
+        with policy_vars(allowed_lifecycles="production,experimental"):
+            node = catalog_node(spec={"lifecycle": "experimental"})
+            self.assertEqual(check_allowed_lifecycles(node).status, CheckStatus.PASS)
+
+    def test_value_not_in_list_fails_and_names_it(self):
+        with policy_vars(allowed_lifecycles="production,experimental"):
+            check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "prod"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn(
+                "spec.lifecycle 'prod' is not one of the allowed lifecycles: "
+                "production, experimental.",
+                check.failure_reasons[0],
+            )
+
+    def test_matching_is_case_sensitive(self):
+        with policy_vars(allowed_lifecycles="production"):
+            check = check_allowed_lifecycles(catalog_node(spec={"lifecycle": "Production"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_missing_lifecycle_skips_and_names_lifecycle_set(self):
+        with policy_vars(allowed_lifecycles="production"):
+            for spec in (None, {"type": "service"}, {"lifecycle": ""}, {"lifecycle": 3}):
+                with self.subTest(spec=spec):
+                    check = check_allowed_lifecycles(catalog_node(spec=spec))
+                    self.assertTrue(is_skipped(check))
+                    self.assertIn("lifecycle-set", skip_reason(check))
+
+    def test_exactly_one_failure_with_lifecycle_set(self):
+        # The pair splits the work: lifecycle-set owns presence, this check owns
+        # the value. A bad lifecycle fails exactly one of them; a good one, neither.
+        with policy_vars(allowed_lifecycles="production"):
+            for spec, failing in [
+                ({"lifecycle": "production"}, 0),
+                ({"lifecycle": "prod"}, 1),
+                ({"lifecycle": ""}, 1),
+                ({"lifecycle": 3}, 1),
+                ({"type": "service"}, 1),
+            ]:
+                with self.subTest(spec=spec):
+                    node = catalog_node(spec=spec)
+                    statuses = [
+                        check_lifecycle_set(node).status,
+                        check_allowed_lifecycles(node).status,
+                    ]
+                    self.assertEqual(statuses.count(CheckStatus.FAIL), failing)
 
 
 class TestDomainExists(unittest.TestCase):
@@ -343,6 +632,436 @@ class TestSystemExists(unittest.TestCase):
                 )
             )
         )
+
+
+class TestSystemDomainExists(unittest.TestCase):
+    """Transitive RI: component -> its system -> that system's domain."""
+
+    def test_unconfigured_skips(self):
+        # Collector parsed catalog-info but backstage_url is not set: no .refs.
+        self.assertTrue(is_skipped(check_system_domain_exists(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_exists(finished_node({}))))
+
+    def test_no_system_declared_passes(self):
+        # Configured, but this component declares no spec.system, so the
+        # collector never reached a system_domain.
+        self.assertEqual(
+            check_system_domain_exists(refs_node({"checked": True})).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_missing_passes_here(self):
+        # An unresolvable system is `system-exists`'s failure to report. This
+        # check must not pile a second failure onto the same root cause.
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_system_without_domain_passes(self):
+        # No domain means nothing to verify here; `system-domain-set` reports it.
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "standalone", "exists": True, "has_domain": False},
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_exists_passes(self):
+        self.assertEqual(
+            check_system_domain_exists(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True},
+                    "system_domain": {
+                        "name": "payments",
+                        "exists": True,
+                        "via_system": "payment-platform",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_missing_domain_fails_and_names_domain_and_system(self):
+        check = check_system_domain_exists(
+            refs_node({
+                "checked": True,
+                "system": {"name": "orphan-system", "exists": True},
+                "system_domain": {
+                    "name": "ghost-domain",
+                    "exists": False,
+                    "via_system": "orphan-system",
+                },
+            })
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        # Both halves matter: the domain that is missing, and the system that
+        # points at it — the latter is where the fix actually goes.
+        self.assertIn("ghost-domain", reason)
+        self.assertIn("orphan-system", reason)
+
+    def test_transient_error_skips(self):
+        self.assertTrue(
+            is_skipped(
+                check_system_domain_exists(
+                    refs_node({
+                        "checked": True,
+                        "system": {"name": "payment-platform", "exists": True},
+                        "system_domain": {
+                            "name": "payments",
+                            "error": "HTTP 502",
+                            "via_system": "payment-platform",
+                        },
+                    })
+                )
+            )
+        )
+
+    def test_domain_exists_ignores_system_domain(self):
+        # The two checks must stay independent: a dangling *transitive* domain
+        # is not `domain-exists`'s business (this component declares no
+        # spec.domain of its own).
+        self.assertEqual(
+            check_domain_exists(
+                refs_node({
+                    "checked": True,
+                    "system_domain": {
+                        "name": "ghost-domain",
+                        "exists": False,
+                        "via_system": "orphan-system",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+
+class TestSystemDomainSet(unittest.TestCase):
+    """The component's system must itself belong to a domain."""
+
+    def test_unconfigured_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_set(refs_node(None))))
+
+    def test_no_catalog_file_skips(self):
+        self.assertTrue(is_skipped(check_system_domain_set(finished_node({}))))
+
+    def test_no_system_declared_skips(self):
+        # No domain was checked, so not a pass; `system-set` owns "should
+        # spec.system be set", so not a second failure either.
+        check = check_system_domain_set(refs_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("system-set", skip_reason(check))
+
+    def test_system_missing_skips(self):
+        # `system-exists` reports an unresolvable system; skip, don't pass.
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "nope", "exists": False}})
+        )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'nope'", skip_reason(check))
+        self.assertIn("system-exists", skip_reason(check))
+
+    def test_system_lookup_error_skips(self):
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "payment-platform", "error": "HTTP 502"}})
+        )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 502", skip_reason(check))
+
+    def test_system_without_domain_fails_and_names_it(self):
+        check = check_system_domain_set(
+            refs_node({
+                "checked": True,
+                "system": {"name": "team-tools", "exists": True, "has_domain": False},
+            })
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("team-tools", check.failure_reasons[0])
+
+    def test_system_with_domain_passes(self):
+        self.assertEqual(
+            check_system_domain_set(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+                    "system_domain": {
+                        "name": "payments",
+                        "exists": True,
+                        "via_system": "payment-platform",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_dangling_domain_passes_here(self):
+        # The system does declare a domain; that it doesn't resolve is
+        # `system-domain-exists`'s failure to report.
+        self.assertEqual(
+            check_system_domain_set(
+                refs_node({
+                    "checked": True,
+                    "system": {"name": "orphan-system", "exists": True, "has_domain": True},
+                    "system_domain": {
+                        "name": "ghost-domain",
+                        "exists": False,
+                        "via_system": "orphan-system",
+                    },
+                })
+            ).status,
+            CheckStatus.PASS,
+        )
+
+    def test_older_collector_without_has_domain_skips(self):
+        # A resolved system with no has_domain is what every collector before
+        # this check writes. Reading that as "no domain" would fail every
+        # component whose collector is pinned to an older release.
+        check = check_system_domain_set(
+            refs_node({"checked": True, "system": {"name": "payment-platform", "exists": True}})
+        )
+        self.assertTrue(is_skipped(check))
+        self.assertIn("predates", skip_reason(check))
+
+
+def chain_node(refs=None, system="payment-platform"):
+    """Finished node for a Component declaring `system`, with optional .refs."""
+    backstage = {"valid": True, "kind": "Component"}
+    if system is not None:
+        backstage["spec"] = {"system": system}
+    if refs is not None:
+        backstage["refs"] = refs
+    return finished_node({"catalog": {"native": {"backstage": backstage}}})
+
+
+# The collector's .refs for each step of component -> System -> Domain.
+HEALTHY_CHAIN = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "payments", "exists": True, "via_system": "payment-platform"},
+}
+SYSTEM_MISSING = {"checked": True, "system": {"name": "payment-platform", "exists": False}}
+SYSTEM_ERROR = {"checked": True, "system": {"name": "payment-platform", "error": "HTTP 403"}}
+SYSTEM_NO_DOMAIN = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": False},
+}
+DOMAIN_MISSING = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "tbd", "exists": False, "via_system": "payment-platform"},
+}
+DOMAIN_ERROR = {
+    "checked": True,
+    "system": {"name": "payment-platform", "exists": True, "has_domain": True},
+    "system_domain": {"name": "payments", "error": "HTTP 502", "via_system": "payment-platform"},
+}
+
+
+class TestSystemDomainValid(unittest.TestCase):
+    """The whole component -> System -> Domain chain in one check."""
+
+    def test_whole_chain_passes(self):
+        check = check_system_domain_valid(chain_node(HEALTHY_CHAIN))
+        self.assertEqual(check.status, CheckStatus.PASS)
+        self.assertFalse(is_skipped(check))
+
+    def test_no_catalog_file_fails(self):
+        # Same as `system-set`: importing the policy says the component
+        # should be catalogued.
+        check = check_system_domain_valid(finished_node({}))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("No catalog-info.yaml found", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        check = check_system_domain_valid(Node.from_component_json({}))
+        self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_no_system_declared_skips(self):
+        # `system-set` reports a missing spec.system. This holds whether or not
+        # the collector has a backstage_url.
+        for system in (None, "", "   ", 123):
+            for refs in ({"checked": True}, None):
+                with self.subTest(system=system, refs=refs):
+                    check = check_system_domain_valid(chain_node(refs, system=system))
+                    self.assertTrue(is_skipped(check))
+                    self.assertIn("system-set", skip_reason(check))
+
+    def test_unconfigured_skips(self):
+        check = check_system_domain_valid(chain_node(None))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("backstage_url", skip_reason(check))
+
+    def test_no_recorded_system_lookup_skips(self):
+        check = check_system_domain_valid(chain_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payment-platform'", skip_reason(check))
+
+    def test_system_lookup_error_skips(self):
+        # A 403 or an STS failure isn't proof the System is missing.
+        check = check_system_domain_valid(chain_node(SYSTEM_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_system_missing_fails_and_names_it(self):
+        check = check_system_domain_valid(chain_node(SYSTEM_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 1)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not exist in the Backstage catalog", reason)
+
+    def test_system_without_domain_fails_and_names_it(self):
+        check = check_system_domain_valid(chain_node(SYSTEM_NO_DOMAIN))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not belong to any domain", reason)
+
+    def test_domain_lookup_error_skips(self):
+        check = check_system_domain_valid(chain_node(DOMAIN_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payments'", skip_reason(check))
+        self.assertIn("HTTP 502", skip_reason(check))
+
+    def test_missing_domain_fails_and_names_domain_and_system(self):
+        check = check_system_domain_valid(chain_node(DOMAIN_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        reason = check.failure_reasons[0]
+        self.assertIn("belongs to domain 'tbd', which does not exist", reason)
+        self.assertIn("'payment-platform' System entity", reason)
+
+    def test_older_collector_still_checks_a_recorded_domain(self):
+        # Collectors before has_domain still write system_domain for a System
+        # that has a domain.
+        for system_domain, expected in (
+            (DOMAIN_MISSING["system_domain"], CheckStatus.FAIL),
+            (HEALTHY_CHAIN["system_domain"], CheckStatus.PASS),
+        ):
+            with self.subTest(domain=system_domain["name"]):
+                check = check_system_domain_valid(chain_node({
+                    "checked": True,
+                    "system": {"name": "payment-platform", "exists": True},
+                    "system_domain": system_domain,
+                }))
+                self.assertEqual(check.status, expected)
+                self.assertFalse(is_skipped(check))
+
+    def test_older_collector_without_domain_entry_skips(self):
+        # Without has_domain, a System with no domain and a collector that
+        # never checked look the same.
+        check = check_system_domain_valid(chain_node({
+            "checked": True,
+            "system": {"name": "payment-platform", "exists": True},
+        }))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("predates", skip_reason(check))
+
+    def test_fails_exactly_where_a_separate_check_fails(self):
+        # One check for what system-exists, system-domain-set and
+        # system-domain-exists report separately.
+        separate = (check_system_exists, check_system_domain_set, check_system_domain_exists)
+        for label, refs, system in (
+            ("healthy", HEALTHY_CHAIN, "payment-platform"),
+            ("system missing", SYSTEM_MISSING, "payment-platform"),
+            ("system error", SYSTEM_ERROR, "payment-platform"),
+            ("system without domain", SYSTEM_NO_DOMAIN, "payment-platform"),
+            ("domain missing", DOMAIN_MISSING, "payment-platform"),
+            ("domain error", DOMAIN_ERROR, "payment-platform"),
+            ("unconfigured", None, "payment-platform"),
+            ("no spec.system", {"checked": True}, None),
+        ):
+            with self.subTest(case=label):
+                node = chain_node(refs, system=system)
+                self.assertEqual(
+                    check_system_domain_valid(node).status == CheckStatus.FAIL,
+                    any(fn(node).status == CheckStatus.FAIL for fn in separate),
+                )
+
+
+class TestSystemValid(unittest.TestCase):
+    """spec.system is set, then it resolves to a System, in one check."""
+
+    def test_set_and_resolved_passes(self):
+        check = check_system_valid(chain_node(HEALTHY_CHAIN))
+        self.assertEqual(check.status, CheckStatus.PASS)
+        self.assertFalse(is_skipped(check))
+
+    def test_no_catalog_file_fails(self):
+        check = check_system_valid(finished_node({}))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("No catalog-info.yaml found", check.failure_reasons[0])
+
+    def test_pends_while_collectors_are_running(self):
+        check = check_system_valid(Node.from_component_json({}))
+        self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_unset_system_fails_with_or_without_backstage_url(self):
+        # Step one needs no Backstage lookup, so it fails even unconfigured.
+        for system in (None, "", "   ", 123):
+            for refs in ({"checked": True}, None):
+                with self.subTest(system=system, refs=refs):
+                    check = check_system_valid(chain_node(refs, system=system))
+                    self.assertEqual(check.status, CheckStatus.FAIL)
+                    self.assertEqual(len(check.failure_reasons), 1)
+                    self.assertIn("spec.system is not set", check.failure_reasons[0])
+
+    def test_unconfigured_skips_a_set_system(self):
+        check = check_system_valid(chain_node(None))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("backstage_url", skip_reason(check))
+
+    def test_no_recorded_system_lookup_skips(self):
+        check = check_system_valid(chain_node({"checked": True}))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("'payment-platform'", skip_reason(check))
+
+    def test_lookup_error_skips(self):
+        # A 403 or an STS failure isn't proof the System is missing.
+        check = check_system_valid(chain_node(SYSTEM_ERROR))
+        self.assertTrue(is_skipped(check))
+        self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_unresolved_system_fails_and_names_it(self):
+        check = check_system_valid(chain_node(SYSTEM_MISSING))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 1)
+        reason = check.failure_reasons[0]
+        self.assertIn("System 'payment-platform'", reason)
+        self.assertIn("does not exist in the Backstage catalog", reason)
+
+    def test_domain_steps_are_not_its_business(self):
+        # A resolved System passes however its domain looks;
+        # system-domain-valid owns the domain chain.
+        for refs in (SYSTEM_NO_DOMAIN, DOMAIN_MISSING, DOMAIN_ERROR):
+            with self.subTest(refs=refs):
+                self.assertEqual(check_system_valid(chain_node(refs)).status, CheckStatus.PASS)
+
+    def test_fails_exactly_where_system_set_or_system_exists_fails(self):
+        separate = (check_system_set, check_system_exists)
+        for label, refs, system in (
+            ("healthy", HEALTHY_CHAIN, "payment-platform"),
+            ("system missing", SYSTEM_MISSING, "payment-platform"),
+            ("system error", SYSTEM_ERROR, "payment-platform"),
+            ("unconfigured", None, "payment-platform"),
+            ("no recorded lookup", {"checked": True}, "payment-platform"),
+            ("no spec.system", {"checked": True}, None),
+            ("no spec.system, unconfigured", None, None),
+        ):
+            with self.subTest(case=label):
+                node = chain_node(refs, system=system)
+                self.assertEqual(
+                    check_system_valid(node).status == CheckStatus.FAIL,
+                    any(fn(node).status == CheckStatus.FAIL for fn in separate),
+                )
 
 
 class TestConstraintParsing(unittest.TestCase):
@@ -582,6 +1301,205 @@ class TestRequiredAnnotationsTyped(unittest.TestCase):
             data = backstage_data(annotations={"k": "5"})
             with self.assertRaises(ConstraintConfigError):
                 check_required_annotations(Node.from_component_json(data))
+
+
+# Every check in the policy, paired with the inputs it needs to get past its own
+# opt-in gate and reach the catalog-presence gate. Without those inputs the
+# configurable checks skip on "nothing configured" and the assertions below would
+# pass vacuously.
+ALL_CHECKS = [
+    ("catalog-info-exists", check_catalog_info_exists, {}),
+    ("catalog-info-valid", check_catalog_info_valid, {}),
+    ("owner-set", check_owner_set, {}),
+    ("lifecycle-set", check_lifecycle_set, {}),
+    ("system-set", check_system_set, {}),
+    ("domain-exists", check_domain_exists, {}),
+    ("system-exists", check_system_exists, {}),
+    ("system-domain-exists", check_system_domain_exists, {}),
+    ("system-domain-set", check_system_domain_set, {}),
+    ("system-domain-valid", check_system_domain_valid, {}),
+    ("system-valid", check_system_valid, {}),
+    (
+        "required-annotations",
+        check_required_annotations,
+        {"required_annotations": "backstage.io/source-location"},
+    ),
+    (
+        "required-tag-patterns",
+        check_required_tag_patterns,
+        {"required_tag_patterns": "location/*"},
+    ),
+    (
+        "disallowed-annotations",
+        check_disallowed_annotations,
+        {"disallowed_annotations": "backstage.io/skip-checks"},
+    ),
+    (
+        "disallowed-tag-patterns",
+        check_disallowed_tag_patterns,
+        {"disallowed_tag_patterns": "deprecated/*"},
+    ),
+    (
+        "required-link-types",
+        check_required_link_types,
+        {"required_link_types": "runbook"},
+    ),
+    (
+        "dependencies-documented",
+        check_dependencies_documented,
+        {"require_dependencies": "true"},
+    ),
+    ("allowed-types", check_allowed_types, {"allowed_types": "service"}),
+    (
+        "allowed-lifecycles",
+        check_allowed_lifecycles,
+        {"allowed_lifecycles": "production"},
+    ),
+]
+
+# What each check resolves to on a missing catalog file with the mode OFF — the
+# behaviour this input must leave untouched.
+DEFAULT_NO_CATALOG = {
+    "catalog-info-exists": CheckStatus.FAIL,
+    "catalog-info-valid": CheckStatus.FAIL,
+    "owner-set": CheckStatus.FAIL,
+    "lifecycle-set": CheckStatus.FAIL,
+    "system-set": CheckStatus.FAIL,
+    "system-domain-valid": CheckStatus.FAIL,
+    "system-valid": CheckStatus.FAIL,
+    "required-annotations": CheckStatus.FAIL,
+    "required-tag-patterns": CheckStatus.FAIL,
+    "required-link-types": CheckStatus.FAIL,
+    "dependencies-documented": CheckStatus.FAIL,
+    "allowed-types": CheckStatus.FAIL,
+    "allowed-lifecycles": CheckStatus.FAIL,
+    # Pure deny-checks: nothing present means nothing forbidden.
+    "disallowed-annotations": CheckStatus.PASS,
+    "disallowed-tag-patterns": CheckStatus.PASS,
+    # Referential integrity already skips without .refs.checked.
+    "domain-exists": CheckStatus.SKIPPED,
+    "system-exists": CheckStatus.SKIPPED,
+    "system-domain-exists": CheckStatus.SKIPPED,
+    "system-domain-set": CheckStatus.SKIPPED,
+}
+
+
+class TestSkipWhenNoCatalogInfo(unittest.TestCase):
+    """The `skip_when_no_catalog_info` input, across all checks."""
+
+    def test_every_check_skips_when_set(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="true", **inputs):
+                    check = check_fn(finished_node({}))
+                    self.assertTrue(is_skipped(check))
+                    # Assert on the reason, not just the status: the
+                    # configurable checks have a skip gate of their own.
+                    self.assertIn("skip_when_no_catalog_info", skip_reason(check))
+
+    def test_default_leaves_every_check_unchanged(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(**inputs):
+                    check = check_fn(finished_node({}))
+                    expected = DEFAULT_NO_CATALOG[name]
+                    if expected == CheckStatus.SKIPPED:
+                        self.assertTrue(is_skipped(check))
+                        self.assertNotIn(
+                            "skip_when_no_catalog_info", skip_reason(check)
+                        )
+                    else:
+                        self.assertEqual(check.status, expected)
+
+    def test_explicit_false_leaves_every_check_unchanged(self):
+        for name, check_fn, inputs in ALL_CHECKS:
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="false", **inputs):
+                    check = check_fn(finished_node({}))
+                    expected = DEFAULT_NO_CATALOG[name]
+                    if expected == CheckStatus.SKIPPED:
+                        self.assertTrue(is_skipped(check))
+                    else:
+                        self.assertEqual(check.status, expected)
+
+    def test_set_does_not_skip_a_component_that_has_a_catalog_file(self):
+        # The mode is scoped to the file's absence. A component that *has* a
+        # catalog-info.yaml is still held to every check — otherwise this input
+        # would be a blanket off-switch for the policy.
+        with policy_vars(
+            skip_when_no_catalog_info="true",
+            required_annotations="backstage.io/source-location",
+            disallowed_annotations="backstage.io/skip-checks",
+            required_link_types="runbook",
+            require_dependencies="true",
+            allowed_types="website",
+        ):
+            present = finished_node(
+                {
+                    "catalog": {
+                        "native": {
+                            "backstage": {
+                                "valid": True,
+                                "metadata": {
+                                    "annotations": {
+                                        "backstage.io/skip-checks": "true"
+                                    }
+                                },
+                                "spec": {"type": "service"},
+                            }
+                        }
+                    }
+                }
+            )
+            self.assertEqual(
+                check_catalog_info_exists(present).status, CheckStatus.PASS
+            )
+            for check_fn in (check_owner_set, check_lifecycle_set, check_system_set):
+                self.assertEqual(check_fn(present).status, CheckStatus.FAIL)
+            # Configured checks still enforce: the required annotation is absent
+            # and a disallowed one is present.
+            self.assertEqual(
+                check_required_annotations(present).status, CheckStatus.FAIL
+            )
+            self.assertEqual(
+                check_disallowed_annotations(present).status, CheckStatus.FAIL
+            )
+            # No links and no dependsOn on this file.
+            self.assertEqual(
+                check_required_link_types(present).status, CheckStatus.FAIL
+            )
+            self.assertEqual(
+                check_dependencies_documented(present).status, CheckStatus.FAIL
+            )
+            # spec.type is "service", outside the allowed list.
+            self.assertEqual(check_allowed_types(present).status, CheckStatus.FAIL)
+
+    def test_set_still_pends_while_collectors_are_running(self):
+        # Absent data is only "no catalog file" once the collector has finished.
+        # Skipping earlier would resolve the check before the data could arrive.
+        for name, check_fn, inputs in ALL_CHECKS:
+            if DEFAULT_NO_CATALOG[name] == CheckStatus.PASS:
+                continue  # deny-checks read defensively and never pend
+            with self.subTest(check=name):
+                with policy_vars(skip_when_no_catalog_info="true", **inputs):
+                    check = check_fn(Node.from_component_json({}))
+                    self.assertEqual(check.status, CheckStatus.PENDING)
+
+    def test_input_truthiness(self):
+        for raw, skips in [
+            ("true", True),
+            ("TRUE", True),
+            ("  true  ", True),
+            ("True", True),
+            ("false", False),
+            ("", False),
+            ("yes", False),
+            ("1", False),
+        ]:
+            with self.subTest(value=raw):
+                with policy_vars(skip_when_no_catalog_info=raw):
+                    check = check_owner_set(finished_node({}))
+                    self.assertEqual(is_skipped(check), skips)
 
 
 if __name__ == "__main__":

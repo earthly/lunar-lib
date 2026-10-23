@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.CalculatorIT" tests="2" skipped="0" failures="1" errors="0" timestamp="2026-09-26T17:22:45" hostname="e0bfb433eabc" time="0.025">
+  <properties/>
+  <testcase name="integrationFails()" classname="com.example.CalculatorIT" time="0.024">
+    <failure message="org.opentest4j.AssertionFailedError: expected: &lt;0&gt; but was: &lt;3&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: &lt;0&gt; but was: &lt;3&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at app//com.example.CalculatorIT.integrationFails(CalculatorIT.java:12)
+	at java.base@17.0.13/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base@17.0.13/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base@17.0.13/java.util.ArrayList.forEach(ArrayList.java:1511)
+</failure>
+  </testcase>
+  <testcase name="integrationPasses()" classname="com.example.CalculatorIT" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

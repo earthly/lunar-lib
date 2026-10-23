@@ -52,6 +52,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/opsgenie@v1.0.0
     on: ["domain:your-domain"]
+    include: [oncall]
     # with:
     #   team_id: "4513b7ea-3b91-438f-b7e4-e3e54af9147c"  # Optional — falls back to catalog meta annotation
     #   opsgenie_base_url: "https://api.eu.opsgenie.com"  # For EU-region accounts

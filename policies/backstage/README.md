@@ -4,9 +4,9 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 ## Overview
 
-Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture. These checks apply to repositories that use Backstage as their service catalog and must be paired with the `backstage` collector.
+Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks fail when no `catalog-info.yaml` is present. The four configurable checks (`required-*` / `disallowed-*`) are opt-in and skipped until configured. The three referential-integrity checks (`domain-exists`, `system-exists`, `entity-ref-valid`) confirm declared references exist in Backstage — the last for entity refs tagged onto infrastructure; all three are opt-in, skipped (and passing) until the collector has a `backstage_url`, so enabling them unconfigured never turns a component red.
+The five core checks, `system-valid` and `system-domain-valid` fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check that reads the file skips instead, for a partly catalogued fleet. The opt-in checks (`required-*`, `disallowed-*`, `allowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`, `entity-ref-valid`) check references against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a catalogued component red.
 
 ## Policies
 
@@ -21,15 +21,23 @@ This plugin provides the following policies (use `include` to select a subset):
 | `system-set` | Validates that `spec.system` is defined |
 | `domain-exists` | Verifies the declared `spec.domain` exists in Backstage (needs collector `backstage_url`) |
 | `system-exists` | Verifies the declared `spec.system` exists in Backstage (needs collector `backstage_url`) |
+| `system-valid` | Verifies both System steps in one check: `spec.system` is set, and it resolves to a System in Backstage (the second step needs collector `backstage_url`) |
+| `system-domain-exists` | Verifies the domain that the component's *system* belongs to exists in Backstage — the transitive check for an ordinary `kind: Component` file (needs collector `backstage_url`) |
+| `system-domain-set` | Verifies that the component's *system* belongs to a domain at all (needs collector `backstage_url`) |
+| `system-domain-valid` | Verifies the whole chain in one check: `spec.system` resolves to a System, the System belongs to a domain, and that domain exists in Backstage (needs collector `backstage_url`) |
 | `required-annotations` | Validates that configured annotation keys are present, and optionally that their values match typed constraints (opt-in via the `required_annotations` input) |
 | `required-tag-patterns` | Validates that the component's tags match configured glob patterns (opt-in via the `required_tag_patterns` input) |
+| `required-link-types` | Validates that `metadata.links` has an entry of each configured link `type`, e.g. `runbook` (opt-in via the `required_link_types` input) |
 | `disallowed-annotations` | Fails if any forbidden annotation key is present (opt-in via the `disallowed_annotations` input) |
 | `disallowed-tag-patterns` | Fails if any tag matches a forbidden glob pattern (opt-in via the `disallowed_tag_patterns` input) |
+| `dependencies-documented` | Validates that `spec.dependsOn`, or a configured annotation, lists at least one dependency (opt-in via the `require_dependencies` input) |
+| `allowed-types` | Validates that `spec.type` is one of the configured values (opt-in via the `allowed_types` input) |
+| `allowed-lifecycles` | Validates that `spec.lifecycle` is one of the configured values (opt-in via the `allowed_lifecycles` input) |
 | `entity-ref-valid` | Verifies Backstage entity references tagged onto infrastructure resources are well-formed and exist in Backstage (needs collector `backstage_url` + IaC tag data) |
 
 ### `entity-ref-valid` — entity references on infrastructure resources
 
-Unlike the other checks, `entity-ref-valid` does not read `catalog-info.yaml`. It reads `.catalog.entity_refs`, written by the collector's `entity-refs` sub-collector from the resource tags an IaC collector recorded, and enforces that those references are well-formed (`[<kind>:][<namespace>/]<name>`) and resolve in the Backstage catalog. Optionally require a specific kind via the `entity_ref_kind` input (e.g. `component`).
+Unlike the other checks, `entity-ref-valid` does not read `catalog-info.yaml`, so `skip_when_no_catalog_info` doesn't affect it. It reads `.catalog.entity_refs`, written by the collector's `entity-refs` sub-collector from the resource tags an IaC collector recorded, and enforces that those references are well-formed (`[<kind>:][<namespace>/]<name>`) and resolve in the Backstage catalog. Optionally require a specific kind via the `entity_ref_kind` input (e.g. `component`).
 
 Concern split: whether a resource *carries* the tag at all is owned by the `terraform` policy's `aws-resources-tagged` check; whether the tag's *value* is a valid, existing Backstage entity is owned by this check. It skips (passes) when resolution didn't run — no `backstage_url`, or no IaC tag data — and skips an individual reference the collector couldn't resolve due to a transient Backstage error, so neither an unconfigured collector nor an outage turns it red. Unresolved Terraform expressions (`${var.x}`) are reported as skipped, since without `terraform plan` there is no concrete value to verify.
 
@@ -43,18 +51,22 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.valid` | boolean | `backstage` collector |
 | `.catalog.native.backstage.errors[]` | array | `backstage` collector |
 | `.catalog.native.backstage.spec.owner` | string | `backstage` collector |
-| `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector |
+| `.catalog.native.backstage.spec.type` | string | `backstage` collector (read by `allowed-types`) |
+| `.catalog.native.backstage.spec.lifecycle` | string | `backstage` collector (read by `lifecycle-set` / `allowed-lifecycles`) |
 | `.catalog.native.backstage.spec.system` | string | `backstage` collector |
 | `.catalog.native.backstage.metadata.annotations` | object | `backstage` collector (read by `required-annotations` / `disallowed-annotations`) |
 | `.catalog.native.backstage.metadata.tags` | array | `backstage` collector (read by `required-tag-patterns` / `disallowed-tag-patterns`) |
-| `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; both RI checks skip (pass) when absent |
+| `.catalog.native.backstage.metadata.links` | array | `backstage` collector (read by `required-link-types`) |
+| `.catalog.native.backstage.spec.dependsOn` | array | `backstage` collector (read by `dependencies-documented`, which also reads the `dependencies_annotation` annotation when set) |
+| `.catalog.native.backstage.refs.checked` | boolean | `backstage` collector — `true` when `backstage_url` is configured; the RI checks skip (pass) when absent |
 | `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }` on a transient lookup failure) for `spec.domain`; read by `domain-exists` |
-| `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`; read by `system-exists` |
+| `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`, plus `has_domain` once the system resolves; read by `system-exists`, `system-valid`, `system-domain-set` and `system-domain-valid` |
+| `.catalog.native.backstage.refs.system_domain` | object | `backstage` collector — `{ name, exists, via_system }` (or `{ name, error, via_system }`) for the domain the component's system belongs to; read by `system-domain-exists` and `system-domain-valid` |
 | `.catalog.entity_refs.checked` | boolean | `backstage` collector (`entity-refs`) — `true` when entity-ref resolution ran; `entity-ref-valid` skips (passes) when absent |
 | `.catalog.entity_refs.refs[]` | array | `backstage` collector (`entity-refs`) — `{name, exists, resources[]}` (or `{name, error, resources[]}`); read by `entity-ref-valid` |
 | `.catalog.entity_refs.unresolved[]` | array | `backstage` collector (`entity-refs`) — `{value, resources[]}` for tag values that were unresolved Terraform expressions |
 
-**Note:** Ensure the `backstage` collector is configured before enabling this policy. The `domain-exists` and `system-exists` checks additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they **skip (and pass)** rather than fail, since referential integrity cannot be verified. (A durable "pending" state isn't available — post-collection the SDK resolves a data-less check to fail/error, not pending — so these checks skip to pass when unverified, mirroring the opt-in `required-*` / `disallowed-*` checks.)
+**Note:** Ensure the `backstage` collector is configured before enabling this policy. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`) additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they **skip (and pass)** rather than fail, since referential integrity cannot be verified. `system-valid` needs it only for its second step: without it, an unset `spec.system` still fails and a set one skips. (A durable "pending" state isn't available — post-collection the SDK resolves a data-less check to fail/error, not pending — so these checks skip to pass when unverified, mirroring the opt-in `required-*` / `disallowed-*` checks.)
 
 ## Installation
 
@@ -65,16 +77,45 @@ policies:
   - uses: github://earthly/lunar-lib/policies/backstage@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [catalog-info-exists, owner-set]  # Only run specific checks
-    # Opt in to the configurable checks by setting their inputs:
+    include:
+      - catalog-info-exists
+      - catalog-info-valid
+      - owner-set
+      - lifecycle-set
+      - system-set
+      - domain-exists
+      - system-exists
+      - system-valid
+      - system-domain-exists
+      - system-domain-set
+      - system-domain-valid
+      - required-annotations
+      - required-tag-patterns
+      - required-link-types
+      - disallowed-annotations
+      - disallowed-tag-patterns
+      - dependencies-documented
+      - allowed-types
+      - allowed-lifecycles
     with:
+      # Leave the rest of the fleet alone when it has no catalog-info.yaml:
+      skip_when_no_catalog_info: "true"
+      # Opt in to the configurable checks by setting their inputs:
       required_annotations: "backstage.io/source-location"
       required_tag_patterns: "location/*,runs-on/*"
       disallowed_annotations: "backstage.io/skip-checks"
       disallowed_tag_patterns: "deprecated/*"
+      required_link_types: "runbook"
+      require_dependencies: "true"
+      allowed_types: "service,website,library"
+      allowed_lifecycles: "production,experimental,deprecated"
 ```
 
-All four inputs are comma-separated lists; leave them unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all.
+`skip_when_no_catalog_info` defaults to `"false"`: a component with no `catalog-info.yaml` fails, because importing the policy is itself the statement that the component should be catalogued. Set it to `"true"` to scope enforcement to the repositories that are already in Backstage — every check then skips on a component with no catalog file, and a component that *has* one is held to every check exactly as before.
+
+The list inputs are comma-separated; leave one unset (the default) and the corresponding check is skipped. `required_annotations` additionally accepts a YAML list for validating annotation *values* against typed constraints — see [Typed value constraints](#typed-value-constraints-on-required-annotations) below. Tag patterns are glob-style (`location/*` matches `location/us-east-1`), matched case-insensitively. `required-tag-patterns` needs each pattern matched by at least one tag; `disallowed-tag-patterns` fails if any tag matches any pattern. `required-annotations` needs each key present and non-empty; `disallowed-annotations` fails if any forbidden key is present at all. `required-link-types` needs a `metadata.links` entry whose `type` exactly equals each listed type; the link's title and URL aren't checked. `allowed-types` and `allowed-lifecycles` need `spec.type` / `spec.lifecycle` to exactly equal one of the listed values, case-sensitively. They read the file's first `Component`, else its first entity, whatever its `kind`: if that is an `API` (`spec.type: openapi`), list its type too or scope the component out with `on:`. A missing `spec.type` fails `allowed-types`. A missing `spec.lifecycle` skips `allowed-lifecycles`, because `lifecycle-set` already fails it.
+
+`dependencies-documented` is off until `require_dependencies` is `"true"`, so a whole-policy import doesn't fail every component that lists no dependencies. Once on, it passes on any non-empty `spec.dependsOn` (targets are not looked up in Backstage) or, when `dependencies_annotation` names an annotation, on a non-empty comma-separated value there. A component with nothing to depend on fails too, so leave such components out with `on:`.
 
 ## Examples
 
@@ -131,7 +172,9 @@ All four inputs are comma-separated lists; leave them unset (the default) and th
 {}
 ```
 
-The `.catalog.native.backstage` namespace is simply absent. The five core checks fail. The `required-*` checks fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All four are skipped if unconfigured.
+The `.catalog.native.backstage` namespace is simply absent. The five core checks, `system-valid` and `system-domain-valid` fail. The `required-*` and `allowed-*` checks and `dependencies-documented` fail too if configured; the `disallowed-*` checks **pass** (nothing forbidden can be present without a file). All of them are skipped if unconfigured.
+
+With `skip_when_no_catalog_info: "true"` every check **skips** on this component instead — including the `disallowed-*` pair, which would otherwise report a green pass on a repository that has no catalog file at all.
 
 **Failure messages:**
 - `"No catalog-info.yaml found"`
@@ -142,7 +185,7 @@ The `.catalog.native.backstage` namespace is simply absent. The five core checks
 
 ### Configurable checks: required and disallowed annotations / tag patterns
 
-With `required_annotations: "backstage.io/source-location"`, `required_tag_patterns: "location/*,runs-on/*"`, `disallowed_annotations: "backstage.io/skip-checks"`, and `disallowed_tag_patterns: "deprecated/*"` configured, this component **passes** all four configurable checks:
+With `required_annotations: "backstage.io/source-location"`, `required_tag_patterns: "location/*,runs-on/*"`, `disallowed_annotations: "backstage.io/skip-checks"`, and `disallowed_tag_patterns: "deprecated/*"` configured, this component **passes** all four of those checks:
 
 ```json
 {
@@ -161,11 +204,37 @@ With `required_annotations: "backstage.io/source-location"`, `required_tag_patte
 
 Remove the `backstage.io/source-location` annotation and `required-annotations` fails: `"catalog-info.yaml is missing required annotation(s): backstage.io/source-location"`. Drop every `runs-on/*` tag and `required-tag-patterns` fails: `"catalog-info.yaml has no tag matching required pattern(s): runs-on/*"`. Conversely, add a `backstage.io/skip-checks` annotation and `disallowed-annotations` fails; add a `deprecated/legacy` tag and `disallowed-tag-patterns` fails: `"catalog-info.yaml has tag(s) matching disallowed pattern(s): deprecated/* (deprecated/legacy)"`.
 
-### Referential integrity: domain-exists and system-exists
+### Configurable checks: typed links and declared dependencies
+
+With `required_link_types: "runbook,dashboard"` and `require_dependencies: "true"` configured, this component **passes** `required-link-types` and `dependencies-documented`:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "metadata": {
+          "links": [
+            { "url": "https://wiki.example.com/payment-api/runbook", "title": "Runbook", "type": "runbook" },
+            { "url": "https://grafana.example.com/d/abc123", "title": "Service dashboard", "type": "dashboard" }
+          ]
+        },
+        "spec": {
+          "dependsOn": ["resource:payments-db", "component:auth-service"]
+        }
+      }
+    }
+  }
+}
+```
+
+Drop the `runbook` link and `required-link-types` fails: `"catalog-info.yaml has no metadata.links entry of type: runbook. Present link types: dashboard."` A link titled "Runbook" with no `type` doesn't count. Empty `spec.dependsOn` and `dependencies-documented` fails: `"catalog-info.yaml declares no dependencies."` With `dependencies_annotation: "example.com/dependencies"` set, an annotation such as `example.com/dependencies: "resource:payments-db,component:auth-service"` passes it instead.
+
+### Referential integrity: domain-exists, system-exists, system-domain-exists and system-domain-set
 
 These checks read the `.refs` block the `backstage` collector writes when it is configured with a `backstage_url`. The `.refs.checked` marker (always written when the collector is configured) is what lets the checks tell "configured" from "not configured."
 
-> **Which check fires depends on the entity kind.** In Backstage, `spec.system` lives on `Component` entities and `spec.domain` lives on `System` entities. So `system-exists` is the everyday check (the common one-`Component`-per-repo case), while `domain-exists` only does work when the repo's `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). Each check passes silently when its reference isn't declared.
+> **Which check fires depends on the entity kind.** In Backstage, `spec.system` lives on `Component` entities and `spec.domain` lives on `System` entities. A Component has **no domain of its own** — it reaches one only *through* its system (a `spec.domain` written directly on a Component is inert; Backstage generates no domain relation from it). So for the common one-`Component`-per-repo case the everyday checks are `system-exists` and `system-domain-exists`, while `domain-exists` only does work when the repo's `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). `domain-exists`, `system-exists` and `system-domain-exists` pass silently when their reference isn't declared; `system-domain-set` and `system-domain-valid` skip, and `system-valid` fails, like `system-set`.
 
 **Component → system.** The declared system is a typo that doesn't resolve in Backstage:
 
@@ -186,7 +255,7 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 }
 ```
 
-`system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. `domain-exists` **passes** — no `spec.domain` is declared on this Component, so there's nothing to cross-reference.
+`system-exists` **fails**: `"System 'typo-platform' referenced in catalog-info.yaml does not exist in the Backstage catalog"`. `domain-exists` **passes** — no `spec.domain` is declared on this Component, so there's nothing to cross-reference. `system-domain-set` **skips**: there's no System to read a domain off.
 
 **System → domain.** A `kind: System` catalog file whose declared domain does resolve:
 
@@ -209,13 +278,89 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 
 `domain-exists` **passes** (`payments` exists in Backstage).
 
-**Not configured / transient outage — both skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and both checks **skip (pass)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:
+**Component → system → domain (transitive).** The everyday case: the component's system resolves fine, but the domain *that system* belongs to does not exist. `system-exists` passes and the component declares no `spec.domain` of its own, so without the transitive entry nothing would catch this:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "kind": "Component",
+        "spec": { "system": "orphan-system" },
+        "refs": {
+          "checked": true,
+          "system": { "name": "orphan-system", "exists": true },
+          "system_domain": {
+            "name": "ghost-domain",
+            "exists": false,
+            "via_system": "orphan-system"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`system-domain-exists` **fails**: `"System 'orphan-system' (referenced by spec.system) belongs to domain 'ghost-domain', which does not exist in the Backstage catalog."` The message names the System deliberately — this component's `catalog-info.yaml` has nothing to correct, because `spec.domain` lives on the System entity, whose catalog file is typically owned by another team.
+
+`system-domain-exists` **passes** whenever there is nothing to cross-check: no `spec.system` declared, the system itself didn't resolve (that is `system-exists`'s failure to report, not a second one), or the system belongs to no domain at all.
+
+**Component → system with no domain.** The system resolves, but it isn't assigned to any domain, so there is no domain for `system-domain-exists` to verify:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "kind": "Component",
+        "spec": { "system": "team-tools" },
+        "refs": {
+          "checked": true,
+          "system": { "name": "team-tools", "exists": true, "has_domain": false }
+        }
+      }
+    }
+  }
+}
+```
+
+`system-domain-set` **fails**: `"System 'team-tools' (referenced by spec.system) does not belong to any domain."` Like `system-domain-exists`, it names the System, because `spec.domain` is set on that entity. It **skips**, rather than passing, when there is no System to check: no `spec.system` is declared (`system-set` fails that) or the system doesn't resolve (`system-exists` fails that). It also skips when `has_domain` is absent from a resolved system, which is what a collector older than this check writes.
+
+
+**Not configured / transient outage — they skip (pass).** When the collector has no `backstage_url`, `.refs` is absent entirely (no `.refs.checked`) and every referential-integrity check **skips (passes)** — referential integrity couldn't run, so they don't fail. If the collector *is* configured but a lookup hits a transient Backstage error, that ref is recorded as `{ "name": "...", "error": "..." }` and the corresponding check **skips (passes)** too, rather than false-failing on an outage:
 
 ```json
 { "catalog": { "native": { "backstage": {
   "refs": { "checked": true, "system": { "name": "payment-platform", "error": "502 Bad Gateway" } }
 } } } }
 ```
+
+### The whole chain in one check: system-domain-valid
+
+`system-domain-valid` follows `spec.system` to its System and on to that System's domain, reading the same `.refs` entries as the checks above, and fails at the first broken step. It fails wherever `system-exists`, `system-domain-set` or `system-domain-exists` would, so include it instead of those three when owners should see one result; alongside them, a broken step fails twice.
+
+| Component → System → Domain | `system-domain-valid` |
+|---|---|
+| All three resolve | passes |
+| System not in Backstage | fails: `"System 'typo-platform' (referenced by spec.system) does not exist in the Backstage catalog."` |
+| System has no domain | fails: `"System 'team-tools' (referenced by spec.system) does not belong to any domain."` |
+| System's domain not in Backstage | fails: `"System 'orphan-system' (referenced by spec.system) belongs to domain 'ghost-domain', which does not exist in the Backstage catalog."` |
+| No `catalog-info.yaml` | fails, like `system-set` (skips with `skip_when_no_catalog_info`) |
+| No `spec.system` | skips; `system-set` reports it |
+| No `backstage_url`, or a lookup errored | skips |
+
+### Set and resolved in one check: system-valid
+
+`system-valid` checks `spec.system` in two steps and fails at the first broken one. It fails wherever `system-set` or `system-exists` would, so include it instead of that pair when owners should see one result; alongside them, a broken step fails twice.
+
+| `spec.system` | `system-valid` |
+|---|---|
+| Set, and the System is in Backstage | passes |
+| Not set | fails: `"spec.system is not set in catalog-info.yaml."` |
+| Set, but the System is not in Backstage | fails: `"System 'typo-platform' (referenced by spec.system) does not exist in the Backstage catalog."` |
+| No `catalog-info.yaml` | fails, like `system-set` (skips with `skip_when_no_catalog_info`) |
+| Set, but no `backstage_url` or a lookup errored | skips |
 
 ### Referential integrity on infrastructure tags: entity-ref-valid
 
@@ -225,8 +370,10 @@ Enable the collector's `entity-refs` sub-collector alongside an IaC collector, t
 collectors:
   - uses: github://earthly/lunar-lib/collectors/terraform@main
     on: [infra]
+    include: [terraform]
   - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
     on: [infra]
+    include: [entity-refs]
     with:
       backstage_url: "https://backstage.example.com"
 
@@ -311,9 +458,13 @@ The comma-separated form (`required_annotations: "key1,key2"`) still works and r
 
 When this policy fails, resolve it by updating your `catalog-info.yaml`:
 
-1. **Missing file** - Create a `catalog-info.yaml` in the repository root following the [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format)
+1. **Missing file** - Create a `catalog-info.yaml` in the repository root following the [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format). If the component is not meant to be in the catalog, set `skip_when_no_catalog_info: "true"` on the policy import instead of excluding the checks one by one
 2. **Lint errors** - Review `.catalog.native.backstage.errors[]` in the component payload and fix the reported issues
 3. **Missing owner** - Add `spec.owner` with a valid team or user reference (e.g., `team-payments`)
 4. **Missing lifecycle** - Add `spec.lifecycle` with a stage: `production`, `experimental`, or `deprecated`
-5. **Missing system** - Add `spec.system` referencing the parent system that groups related components
-6. **Referential-integrity failure** (`domain-exists` / `system-exists`) - The `spec.domain` or `spec.system` value points at an entity that does not exist in the Backstage catalog. Fix the reference to match an existing entity's `metadata.name`, or register the missing Domain/System in Backstage
+5. **Missing system** (`system-set` / `system-valid`) - Add `spec.system` referencing the parent system that groups related components
+6. **Referential-integrity failure** (`domain-exists` / `system-exists` / `system-valid` / `system-domain-valid`) - The `spec.domain` or `spec.system` value points at an entity that does not exist in the Backstage catalog. Fix the reference to match an existing entity's `metadata.name`, or register the missing Domain/System in Backstage
+7. **System has no domain** (`system-domain-set` / `system-domain-valid`) - Set `spec.domain` on the named System entity, in that System's own catalog file
+8. **Missing link type** (`required-link-types`) - Add a `metadata.links` entry with the missing `type` and its `url`
+9. **No dependencies** (`dependencies-documented`) - List the entities the component depends on under `spec.dependsOn` (e.g. `resource:payments-db`), or in the annotation named by `dependencies_annotation`
+10. **Type or lifecycle not allowed** (`allowed-types` / `allowed-lifecycles`) - Set `spec.type` or `spec.lifecycle` to one of the values the failure lists, matching case

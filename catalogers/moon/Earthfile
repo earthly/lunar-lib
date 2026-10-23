@@ -1,0 +1,31 @@
+VERSION 0.8
+
+# Offline test: test-local.sh builds moon fixture workspaces in a temp dir and
+# drives main.sh with `lunar` stubbed on PATH. On +base-image, not alpine — the
+# script's path arithmetic runs on BusyBox in the shipped image, and a dialect
+# difference that passes on a GNU dev host would die there.
+test:
+    FROM +image
+    WORKDIR /workspace
+    COPY main.sh test-local.sh .
+    RUN ./test-local.sh
+
+image:
+    FROM --pass-args ../../+base-image
+
+    # moon: a single static musl binary. It reads moon.yml and needs no network
+    # and no language toolchain for the explicit `dependsOn` edges this
+    # cataloger consumes, which is what makes it usable on air-gapped installs.
+    # BusyBox tar handles -J here; no xz package needed.
+    ARG TARGETARCH
+    # renovate: datasource=github-releases depName=moonrepo/moon extractVersion=^v(?<version>.*)$
+    ARG MOON_VERSION=2.5.5
+    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
+        curl -sSL "https://github.com/moonrepo/moon/releases/download/v${MOON_VERSION}/moon_cli-${ARCH}-unknown-linux-musl.tar.xz" \
+          | tar -xJ -C /tmp && \
+        install -m0755 "/tmp/moon_cli-${ARCH}-unknown-linux-musl/moon" /usr/local/bin/moon && \
+        rm -rf "/tmp/moon_cli-${ARCH}-unknown-linux-musl" && \
+        echo "${MOON_VERSION}" > /usr/local/bin/moon.version
+
+    ARG VERSION=main
+    SAVE IMAGE --push earthly/lunar-lib:moon-$VERSION

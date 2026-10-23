@@ -25,10 +25,12 @@ This policy enforces Codex-specific CI standards. It validates that Codex CLI in
 collectors:
   - uses: github://earthly/lunar-lib/collectors/codex@main
     on: ["domain:your-domain"]
+    include: [cicd]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/codex@main
     enforcement: report-pr
+    include: [cli-safe-flags, cli-structured-output]
 ```
 
 ## Examples

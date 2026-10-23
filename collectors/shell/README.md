@@ -47,7 +47,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/shell@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, shellcheck, shellcheck-cicd]  # Only include specific subcollectors
+    include:
+      - project          # Shell scripts and their shells
+      - shellcheck       # Runs ShellCheck
+      - shellcheck-cicd  # ShellCheck runs in CI
     # with:
     #   find_command: "find . -type f -name '*.sh' -not -path '*/node_modules/*'"  # Override file discovery
 ```

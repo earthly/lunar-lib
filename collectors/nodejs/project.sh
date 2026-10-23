@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 # Check if this is a Node.js project
@@ -9,7 +10,7 @@ if ! is_nodejs_project; then
     exit 0
 fi
 
-package_json_exists=true
+package_json_exists=false
 package_lock_exists=false
 yarn_lock_exists=false
 pnpm_lock_exists=false
@@ -18,6 +19,11 @@ eslint_configured=false
 prettier_configured=false
 engines_node=""
 monorepo_type=""
+
+# is_nodejs_project also passes when every package.json is in a subdirectory
+if [[ -f "package.json" ]]; then
+    package_json_exists=true
+fi
 
 # Check lockfiles
 if [[ -f "package-lock.json" ]]; then
@@ -55,8 +61,8 @@ fi
 # Extract engines.node from package.json
 engines_node=$(jq -r '.engines.node // ""' package.json 2>/dev/null || echo "")
 
-# Detect monorepo
-if jq -e '.workspaces' package.json > /dev/null 2>&1; then
+# Detect monorepo (pnpm declares workspaces in pnpm-workspace.yaml, not package.json)
+if jq -e '.workspaces' package.json > /dev/null 2>&1 || [[ -f "pnpm-workspace.yaml" ]]; then
     monorepo_type="workspaces"
 elif [[ -f "turbo.json" ]]; then
     monorepo_type="turborepo"

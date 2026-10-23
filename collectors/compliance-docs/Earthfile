@@ -1,0 +1,11 @@
+VERSION 0.8
+
+# Runs the collector scripts on +base-image, their production runtime, so the
+# tests use the same bash, BusyBox find/awk, jq and yq. Wired into the root
+# +test target. (No image: target — the collector runs on the base image.)
+test:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY pentest.sh helpers.sh .
+    COPY --dir test .
+    RUN cd test && python3 -m unittest test_pentest -v

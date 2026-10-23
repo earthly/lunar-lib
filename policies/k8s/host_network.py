@@ -1,26 +1,24 @@
 from lunar_policy import Check
 
+from helpers import Findings, entries_or_skip
+
 
 def main(node=None):
     """Fails when workload PodSpecs set hostNetwork: true."""
     c = Check("host-network", "Workload PodSpecs should not set hostNetwork: true", node=node)
     with c:
-        workloads = c.get_node(".k8s.workloads")
-        if not workloads.exists():
-            c.skip("No Kubernetes workloads found in this repository")
+        workloads = entries_or_skip(c, ".k8s.workloads", "No Kubernetes workloads found in this repository")
 
+        findings = Findings(c)
         for workload in workloads:
-            kind = workload.get_value_or_default(".kind", "")
-            name = workload.get_value_or_default(".name", "<unknown>")
-            namespace = workload.get_value_or_default(".namespace", "default")
-            path = workload.get_value_or_default(".path", "<unknown>")
-
-            host_network = workload.get_value_or_default(".host_network", False)
-
-            c.assert_true(
-                host_network is not True,
-                f"{path}: {kind} {namespace}/{name} should not set spec.hostNetwork: true (workload shares the host network namespace)"
+            kind = workload.get("kind", "")
+            name = workload.get("name", "<unknown>")
+            namespace = workload.get("namespace", "default")
+            findings.check(
+                workload.get("host_network", False) is not True, workload,
+                f"{kind} {namespace}/{name} should not set spec.hostNetwork: true (workload shares the host network namespace)"
             )
+        findings.report()
 
     return c
 

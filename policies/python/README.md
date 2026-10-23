@@ -39,7 +39,11 @@ policies:
   - uses: github://earthly/lunar-lib/policies/python@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [lockfile-exists, linter-configured]  # Only run specific checks
+    include:
+      - lockfile-exists
+      - linter-configured
+      - min-python-version
+      - min-python-version-cicd
     with:
       min_python_version: "3.9"       # Minimum Python version (default: "3.9")
       min_python_version_cicd: "3.9"  # Minimum CI/CD Python version (default: "3.9")

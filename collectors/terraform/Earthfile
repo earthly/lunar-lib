@@ -1,15 +1,38 @@
 VERSION 0.8
 
+test:
+    FROM python:3.12-alpine
+    # main.sh is bash and shells out to jq, awk and parallel. The tests stub
+    # `lunar` and `hcl2json` on PATH and drive the real script as a subprocess,
+    # on alpine so the busybox awk the image actually ships is what runs.
+    RUN apk add --no-cache bash jq parallel
+    WORKDIR /workspace
+    COPY main.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v
+
 image:
     FROM --pass-args ../../+base-image
 
     # Install hcl2json for Terraform HCL parsing
     ARG TARGETARCH
-    ARG HCL2JSON_VERSION=0.6.8
-    RUN curl -fsSL -o /usr/local/bin/hcl2json \
-        "https://github.com/tmccombs/hcl2json/releases/download/v${HCL2JSON_VERSION}/hcl2json_linux_${TARGETARCH}" && \
-        chmod +x /usr/local/bin/hcl2json && \
-        echo "${HCL2JSON_VERSION}" > /usr/local/bin/hcl2json.version
+    # renovate: datasource=github-releases depName=tmccombs/hcl2json extractVersion=^v(?<version>.*)$
+    ARG HCL2JSON_VERSION=0.6.9
+    COPY (+hcl2json-bin/hcl2json --HCL2JSON_VERSION=$HCL2JSON_VERSION) /usr/local/bin/hcl2json
+    RUN echo "${HCL2JSON_VERSION}" > /usr/local/bin/hcl2json.version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:terraform-$VERSION
+
+# Built from source so the binary carries a current Go stdlib and x/text; upstream's
+# release pins x/text 0.25.0 (a fixable High). Cloned because `go install` can't
+# override a dependency.
+hcl2json-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required HCL2JSON_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${HCL2JSON_VERSION}" https://github.com/tmccombs/hcl2json /src
+    WORKDIR /src
+    RUN go get golang.org/x/text@latest && \
+        CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${HCL2JSON_VERSION}" -o /out/hcl2json .
+    SAVE ARTIFACT /out/hcl2json

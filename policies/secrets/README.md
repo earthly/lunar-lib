@@ -34,7 +34,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/secrets@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, no-hardcoded-secrets]  # Only run specific checks
+    include: [executed, no-hardcoded-secrets, max-issues]
     with:
       max_issues_threshold: "10"  # Default — fails only when issue count exceeds this
 ```

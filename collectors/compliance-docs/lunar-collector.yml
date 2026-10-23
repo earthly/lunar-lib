@@ -1,0 +1,61 @@
+version: 0
+
+name: compliance-docs
+description: Collect compliance evidence records kept in the repository
+author: earthly
+default_image: earthly/lunar-lib:base-main
+
+landing_page:
+  display_name: "Compliance Documentation Collector"
+  long_description: |
+    Collect compliance evidence records kept in the repository, such as dated penetration-test records that point to the confidential report, so policies can check the evidence is current.
+  categories: ["documentation", "security"]
+  icon: "assets/compliance-docs.svg"
+  status: "beta"
+  related:
+    - slug: "compliance-docs"
+      type: "policy"
+      reason: "Checks that a recent pen-test report is on record"
+    - slug: "dr-docs"
+      type: "collector"
+      reason: "Collects disaster recovery plans and exercise records"
+
+collectors:
+  - name: pentest
+    description: |
+      Collects penetration-test records from a directory (default: `docs/pentests/`).
+      Each record is a Markdown file named for the report date (e.g. `2026-03-14.md`
+      or `2026-03-14-external.md`), with optional YAML frontmatter for the provider,
+      scope and a link to the report. Writes an empty list when there are no records.
+    mainBash: pentest.sh
+    hook:
+      type: code
+    keywords: ["penetration test", "pen test", "security testing", "compliance", "audit evidence"]
+
+inputs:
+  pentest_dir_paths:
+    description: Comma-separated list of candidate directories for pen-test records (first match wins)
+    default: "docs/pentests"
+
+example_component_json: |
+  {
+    "compliance": {
+      "penetration_testing": {
+        "reports": [
+          {
+            "date": "2026-03-14",
+            "path": "docs/pentests/2026-03-14.md",
+            "provider": "Example Security Ltd",
+            "scope": "Public API, customer web app",
+            "report_url": "https://grc.example.com/reports/pentest-2026-03-14"
+          },
+          {
+            "date": "2025-03-02",
+            "path": "docs/pentests/2025-03-02-external.md",
+            "provider": "Example Security Ltd",
+            "scope": "External network"
+          }
+        ]
+      }
+    }
+  }

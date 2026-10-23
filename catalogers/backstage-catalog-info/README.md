@@ -79,15 +79,18 @@ The two sub-catalogers produce identical catalog entries from the same `catalog-
 | **Catches drift independent of commits** | Yes — re-reads every component each cron | No — only fires when a repo is committed to |
 | **Covers components whose repo is quiet** | Yes | No, until the next commit |
 
-They aren't mutually exclusive. Running **both** is a reasonable default: `augment-on-commit` keeps active repos current within seconds of a change, while the nightly `augment` backfills components that haven't seen a commit and re-asserts state. Selecting a subset is done with `include` / `exclude` (see [Installation](#installation)). When both run, they write the same keys with the same data, so there's no conflict — the later writer simply re-asserts the value.
+They aren't mutually exclusive. Running **both** is a reasonable default: `augment-on-commit` keeps active repos current within seconds of a change, while the nightly `augment` backfills components that haven't seen a commit and re-asserts state. Pick which to run with `include` (see [Installation](#installation)). When both run, they write the same keys with the same data, so there's no conflict — the later writer simply re-asserts the value.
 
 ## Installation
 
-Add to your `lunar-config.yml`. With no `include` / `exclude`, both sub-catalogers run:
+Add to your `lunar-config.yml`. To run both sub-catalogers:
 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include:
+      - augment            # Daily, via the GitHub Contents API
+      - augment-on-commit  # On each commit, no token needed
 ```
 
 Pick a single variant with `include` (see [Choosing a variant](#choosing-a-variant)):
@@ -123,10 +126,12 @@ Both variants augment existing components only — neither `component-cron` nor 
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
     with:
       org_name: "acme"
 
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment, augment-on-commit]
 ```
 
 ### Pick This or the Live Backstage Cataloger — Not Both
@@ -189,6 +194,7 @@ Some orgs model component domains via a custom annotation rather than the canoni
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment, augment-on-commit]
     with:
       domain_annotation: "yourorg.example.com/domain"
 ```
@@ -202,6 +208,7 @@ Not every `catalog-info.yaml` sets a domain. When a matched Component resolves t
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment, augment-on-commit]
     with:
       default_domain: "engineering"
 ```
@@ -251,6 +258,7 @@ Several lunar-lib collectors resolve their per-component target from the Lunar c
 ```yaml
 catalogers:
   - uses: github://earthly/lunar-lib/catalogers/backstage-catalog-info@v1.0.0
+    include: [augment, augment-on-commit]
     # default: meta_annotations: "pagerduty.com/service-id=pagerduty/service-id"
 ```
 

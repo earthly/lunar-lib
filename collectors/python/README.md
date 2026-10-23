@@ -46,5 +46,12 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/python@v1.0.0
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - cicd           # python commands in CI
+      - pip-cicd       # pip commands in CI
+      - poetry-cicd    # Poetry commands in CI
+      - uv-cicd        # uv commands in CI
+      - test-coverage  # Coverage from coverage.xml
+      - project        # pyproject.toml, requirements and lockfiles
+      - dependencies   # Dependencies
 ```

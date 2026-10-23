@@ -38,6 +38,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/grafana@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - dashboard        # Dashboard and alert rules from the API
+      - repo-dashboards  # Dashboard JSON in the repo
     with:
       grafana_base_url: "https://grafana.example.com"
       # find_command: "find ./dashboards -type f -name '*.json'"  # Optional, narrows repo scan

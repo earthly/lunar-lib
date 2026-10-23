@@ -1,13 +1,22 @@
 VERSION 0.8
 
+test:
+    FROM python:3.12-alpine
+    # container-rescan.sh is bash and shells out to jq. The tests stub `lunar`
+    # and `grype` on PATH and drive the real script as a subprocess.
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY container-rescan.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v
+
 image:
     FROM --pass-args ../../+base-image
 
     # Install Grype
-    ARG GRYPE_VERSION=0.114.0
-    ARG TARGETARCH
-    RUN curl -sSfL "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_${TARGETARCH}.tar.gz" | tar xz -C /usr/local/bin grype && \
-        chmod +x /usr/local/bin/grype
+    # renovate: datasource=github-releases depName=anchore/grype extractVersion=^v(?<version>.*)$
+    ARG GRYPE_VERSION=0.120.1
+    COPY (+grype-bin/grype --GRYPE_VERSION=$GRYPE_VERSION) /usr/local/bin/grype
 
     RUN grype version
 
@@ -23,3 +32,17 @@ image:
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:grype-$VERSION
+
+# Built from source: the 0.120.1 release ships go1.26.8 and x/net 0.59.0, both
+# with fixable criticals.
+grype-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required GRYPE_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${GRYPE_VERSION}" https://github.com/anchore/grype /src
+    WORKDIR /src
+    RUN go get golang.org/x/net@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
+            -ldflags "-s -w -X main.version=${GRYPE_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${GRYPE_VERSION}" \
+            -o /out/grype ./cmd/grype
+    SAVE ARTIFACT /out/grype

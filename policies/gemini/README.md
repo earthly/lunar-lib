@@ -25,10 +25,12 @@ This policy enforces Gemini-specific CI standards. It validates that Gemini CLI 
 collectors:
   - uses: github://earthly/lunar-lib/collectors/gemini@main
     on: ["domain:your-domain"]
+    include: [cicd]
 
 policies:
   - uses: github://earthly/lunar-lib/policies/gemini@main
     enforcement: report-pr
+    include: [cli-safe-flags, cli-structured-output]
 ```
 
 ## Examples

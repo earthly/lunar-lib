@@ -9,7 +9,7 @@ import unittest
 
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(HERE, ".."))
-from lint_backstage import lint, lint_documents
+from lint_backstage import entity_dirs, lint, lint_documents, repo_dir
 
 SCRIPT = os.path.join(HERE, "..", "lint_backstage.py")
 
@@ -623,18 +623,276 @@ class TestEmptyDocumentsFiltered(unittest.TestCase):
         self.assertNotIn("entities", result)
 
 
+REPO = "github.com/acme/monorepo"
+
+
+def _pointing(kind, name, source_location=None, links=(), **spec):
+    entity = _entity(kind, name, **spec)
+    if source_location is not None:
+        entity["metadata"]["annotations"] = {"backstage.io/source-location": source_location}
+    if links:
+        entity["metadata"]["links"] = [{"url": url, "title": "Repo"} for url in links]
+    return entity
+
+
+class TestRepoDir(unittest.TestCase):
+    def test_tree_url_with_location_ref_prefix(self):
+        self.assertEqual(
+            repo_dir("url:https://github.com/acme/monorepo/tree/main/services/api/", REPO),
+            "services/api",
+        )
+
+    def test_blob_url_and_plain_url(self):
+        self.assertEqual(
+            repo_dir("https://github.com/acme/monorepo/blob/main/services/api", REPO),
+            "services/api",
+        )
+
+    def test_repo_root_forms(self):
+        for url in (
+            "url:https://github.com/acme/monorepo",
+            "https://github.com/acme/monorepo/",
+            "https://github.com/acme/monorepo/tree/main",
+            "https://github.com/acme/monorepo/tree/main/",
+        ):
+            self.assertEqual(repo_dir(url, REPO), "", url)
+
+    def test_other_repo_or_host_is_none(self):
+        for url in (
+            "https://github.com/acme/other/tree/main/services/api",
+            "https://github.com/other-org/monorepo/tree/main/services/api",
+            "https://gitlab.com/acme/monorepo/tree/main/services/api",
+            "https://github.com/acme/monorepo-fork/tree/main/services/api",
+        ):
+            self.assertIsNone(repo_dir(url, REPO), url)
+
+    def test_repo_match_ignores_case_but_path_keeps_it(self):
+        self.assertEqual(
+            repo_dir("https://www.GitHub.com/ACME/Monorepo/tree/main/Services/API", REPO),
+            "Services/API",
+        )
+
+    def test_gitlab_nested_group(self):
+        self.assertEqual(
+            repo_dir(
+                "https://gitlab.com/acme/platform/monorepo/-/tree/main/services/api",
+                "gitlab.com/acme/platform/monorepo",
+            ),
+            "services/api",
+        )
+
+    def test_bitbucket_src(self):
+        self.assertEqual(
+            repo_dir("https://bitbucket.org/acme/monorepo/src/main/services/api/", "bitbucket.org/acme/monorepo"),
+            "services/api",
+        )
+
+    def test_query_fragment_and_encoding(self):
+        self.assertEqual(
+            repo_dir("https://github.com/acme/monorepo/tree/main/my%20svc/?x=1#readme", REPO),
+            "my svc",
+        )
+
+    def test_not_a_directory_view(self):
+        for url in (
+            "https://github.com/acme/monorepo/issues",
+            "https://github.com/acme/monorepo/pull/12",
+            "https://github.com/acme/monorepo/tree",
+            "https://github.com/acme/monorepo/tree/main/../secrets",
+        ):
+            self.assertIsNone(repo_dir(url, REPO), url)
+
+    def test_junk_is_none(self):
+        for value in (None, 42, "", "services/api", "dir:./services/api", "file:/tmp/x", "url:"):
+            self.assertIsNone(repo_dir(value, REPO), value)
+
+    def test_no_repo_is_none(self):
+        self.assertIsNone(repo_dir("https://github.com/acme/monorepo/tree/main/x", ""))
+
+
+class TestEntityDirs(unittest.TestCase):
+    def test_source_location_subdir_wins_over_links(self):
+        entity = _pointing(
+            "Component",
+            "c",
+            source_location="url:https://github.com/acme/monorepo/tree/main/services/api",
+            links=["https://github.com/acme/monorepo/tree/main/services/web"],
+        )
+        self.assertEqual(entity_dirs(entity, REPO), {"services/api"})
+
+    def test_root_source_location_falls_back_to_links(self):
+        # What Backstage derives for every entity in a root catalog file.
+        entity = _pointing(
+            "Component",
+            "c",
+            source_location="url:https://github.com/acme/monorepo/tree/main/",
+            links=["https://github.com/acme/monorepo/tree/main/services/web"],
+        )
+        self.assertEqual(entity_dirs(entity, REPO), {"services/web"})
+
+    def test_links_only(self):
+        entity = _pointing(
+            "Component",
+            "c",
+            links=[
+                "https://github.com/acme/monorepo/tree/main/services/web",
+                "https://github.com/acme/monorepo",
+                "https://runbooks.example.com/web",
+            ],
+        )
+        self.assertEqual(entity_dirs(entity, REPO), {"services/web"})
+
+    def test_nothing_to_go_on(self):
+        self.assertEqual(entity_dirs(_component("c"), REPO), set())
+        self.assertEqual(entity_dirs({"kind": "Component"}, REPO), set())
+        self.assertEqual(entity_dirs("not-a-mapping", REPO), set())
+
+    def test_match_selects_the_references_consulted(self):
+        entity = _pointing(
+            "Component",
+            "c",
+            source_location="url:https://github.com/acme/monorepo/tree/main/services/docs",
+            links=["https://github.com/acme/monorepo/tree/main/services/web"],
+        )
+        self.assertEqual(entity_dirs(entity, REPO, {"source-location"}), {"services/docs"})
+        # Source-location off: it no longer decides, so the link counts.
+        self.assertEqual(entity_dirs(entity, REPO, {"links"}), {"services/web"})
+        self.assertEqual(entity_dirs(entity, REPO, frozenset()), set())
+
+    def test_links_ignored_unless_matched(self):
+        entity = _pointing(
+            "Component", "c", links=["https://github.com/acme/monorepo/tree/main/services/web"]
+        )
+        self.assertEqual(entity_dirs(entity, REPO, {"source-location"}), set())
+
+    def test_malformed_links_ignored(self):
+        entity = _component("c")
+        entity["metadata"]["links"] = ["https://github.com/acme/monorepo/tree/main/x", {"title": "no url"}]
+        self.assertEqual(entity_dirs(entity, REPO), set())
+
+
+class TestComponentDirSelection(unittest.TestCase):
+    """A subdirectory component reading a shared file from an ancestor dir."""
+
+    def setUp(self):
+        bad = _pointing(
+            "Component",
+            "worker",
+            source_location="url:https://github.com/acme/monorepo/tree/main/services/worker/",
+            owner="team-worker",
+        )
+        bad["metadata"]["tags"] = ["bad/tag"]
+        self.docs = [
+            None,  # a leading `---` after a comment block
+            _component("root", owner="team-platform"),
+            _pointing(
+                "API",
+                "api-grpc",
+                source_location="url:https://github.com/acme/monorepo/tree/main/services/api/",
+                owner="team-api",
+            ),
+            _pointing(
+                "Component",
+                "api",
+                source_location="url:https://github.com/acme/monorepo/tree/main/services/api/",
+                owner="team-api",
+            ),
+            bad,
+            _pointing(
+                "Component",
+                "web",
+                links=["https://github.com/acme/monorepo/tree/main/services/web"],
+                owner="team-web",
+            ),
+        ]
+
+    def select(self, component_dir):
+        return lint_documents(self.docs, "../../catalog-info.yaml", component_dir, REPO)
+
+    def test_keeps_only_entities_pointing_at_the_dir(self):
+        result = self.select("services/api")
+        self.assertEqual([e["metadata"]["name"] for e in result["entities"]], ["api-grpc", "api"])
+        self.assertEqual(result["path"], "../../catalog-info.yaml")
+
+    def test_primary_is_the_first_selected_component(self):
+        result = self.select("services/api")
+        self.assertEqual(result["metadata"]["name"], "api")
+        self.assertEqual(result["spec"]["owner"], "team-api")
+
+    def test_links_select_too(self):
+        result = self.select("services/web")
+        self.assertEqual([e["metadata"]["name"] for e in result["entities"]], ["web"])
+
+    def test_other_entities_errors_do_not_count(self):
+        self.assertTrue(self.select("services/api")["valid"])
+
+    def test_selected_entity_error_keeps_its_file_position(self):
+        result = self.select("services/worker")
+        self.assertFalse(result["valid"])
+        tag_errors = [e for e in result["errors"] if "bad/tag" in e["message"]]
+        self.assertTrue(tag_errors)
+        # The file's 4th entity (the leading null doc isn't one), entities[0].
+        self.assertTrue(tag_errors[0]["message"].startswith("document 4 (Component 'worker'): "))
+        self.assertEqual(tag_errors[0]["entity"], 0)
+
+    def test_no_match_is_none(self):
+        self.assertIsNone(self.select("services/unlisted"))
+        self.assertIsNone(lint_documents([None], "../catalog-info.yaml", "services/api", REPO))
+
+    def test_match_restricts_selection(self):
+        docs, path = self.docs, "../../catalog-info.yaml"
+        self.assertIsNone(lint_documents(docs, path, "services/web", REPO, {"source-location"}))
+        self.assertIsNone(lint_documents(docs, path, "services/api", REPO, {"links"}))
+        self.assertEqual(
+            [e["metadata"]["name"] for e in lint_documents(docs, path, "services/web", REPO, {"links"})["entities"]],
+            ["web"],
+        )
+
+    def test_without_component_dir_nothing_is_filtered(self):
+        result = lint_documents(self.docs, "catalog-info.yaml")
+        self.assertEqual(len(result["entities"]), 5)
+        self.assertEqual(result["metadata"]["name"], "root")
+
+
 class TestMainStdinContract(unittest.TestCase):
     """main() over stdin — the exact contract main.sh drives (`yq ea '[.]'`)."""
 
-    def _run(self, payload):
+    def _run(self, payload, *extra):
         proc = subprocess.run(
-            [sys.executable, SCRIPT, "--path", "catalog-info.yaml"],
+            [sys.executable, SCRIPT, "--path", "catalog-info.yaml", *extra],
             input=json.dumps(payload),
             capture_output=True,
             text=True,
             check=True,
         )
         return json.loads(proc.stdout)
+
+    def test_component_dir_selects_and_prints_null_on_no_match(self):
+        docs = [
+            _component("root", owner="t"),
+            _pointing(
+                "Component",
+                "api",
+                source_location="url:https://github.com/acme/monorepo/tree/main/services/api",
+                owner="t",
+            ),
+        ]
+        out = self._run(docs, "--component-dir", "services/api", "--repo", REPO)
+        self.assertEqual([e["metadata"]["name"] for e in out["entities"]], ["api"])
+        self.assertIsNone(self._run(docs, "--component-dir", "services/web", "--repo", REPO))
+        self.assertIsNone(
+            self._run(docs, "--component-dir", "services/api", "--repo", REPO, "--match", "links")
+        )
+
+    def test_unknown_match_value_is_rejected(self):
+        proc = subprocess.run(
+            [sys.executable, SCRIPT, "--path", "p", "--match", "source-location,name"],
+            input="[]",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("unknown value", proc.stderr)
 
     def test_json_array_of_entities(self):
         out = self._run(

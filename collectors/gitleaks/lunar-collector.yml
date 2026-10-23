@@ -27,7 +27,8 @@ collectors:
     description: |
       Auto-runs Gitleaks against the repository source code. Parses the
       JSON report and writes normalized findings to .secrets with source
-      metadata.
+      metadata. Runs Gitleaks with --redact so the detected credential is
+      never written to Component JSON.
     mainBash: scan.sh
     hook:
       type: code
@@ -39,7 +40,8 @@ collectors:
       to .native.gitleaks.cicd.cmds and collects the JSON report file if
       --report-path / -r can be parsed from the command. Collected reports
       are written to .secrets.cicd (normalized) and
-      .native.gitleaks.cicd.report (raw).
+      .native.gitleaks.cicd.report (raw, with the Secret and Match fields
+      stripped so the detected credential is never stored).
     mainBash: cicd.sh
     hook:
       type: ci-after-command
@@ -80,7 +82,9 @@ example_component_json: |
                 "File": "config/settings.py",
                 "StartLine": 42,
                 "Commit": "abc1234",
-                "Description": "Generic API Key"
+                "Description": "Generic API Key",
+                "Secret": "REDACTED",
+                "Match": "api_key = 'REDACTED'"
               }
             ]
           },

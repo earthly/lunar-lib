@@ -84,7 +84,7 @@ while IFS= read -r sha; do
     '{
       sha: $sha,
       has_annotation: $has_annotation,
-      model: ($model | select(. != "")),
+      model: (if $model != "" then $model else null end),
       tokens: (if $tokens != "" then ($tokens | tonumber? // null) else null end)
     }')
 

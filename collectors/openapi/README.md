@@ -46,6 +46,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/openapi@main
     on: ["domain:your-domain"]
+    include: [openapi]
     # with:
     #   find_command: "find . -name 'openapi.yaml' -not -path '*/node_modules/*'"
 ```

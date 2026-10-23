@@ -3,11 +3,17 @@
 from lunar_policy import Check
 
 
-def main():
-    with Check("build-tagged", "Container builds should use explicit image tags") as c:
+def main(node=None):
+    c = Check(
+        "build-tagged",
+        "Container builds should use explicit image tags",
+        node=node,
+    )
+    with c:
         builds = c.get_node(".containers.builds")
         if not builds.exists():
-            return
+            c.skip("No container builds observed in CI for this component")
+            return c
 
         for build in builds:
             cmd = build.get_value_or_default(".cmd", "<unknown>")
@@ -17,6 +23,7 @@ def main():
                 has_tag,
                 f"Build command missing -t/--tag flag: {cmd}"
             )
+    return c
 
 
 if __name__ == "__main__":

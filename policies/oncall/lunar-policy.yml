@@ -9,10 +9,10 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "On-Call Guardrails"
   long_description: |
-    Enforce on-call operational readiness standards. Verify that services have
-    an active on-call schedule, a multi-level escalation policy, and a minimum
-    number of rotation participants. Works with any oncall-category collector
-    (PagerDuty, OpsGenie, etc.).
+    Enforce on-call operational readiness standards. Verify that services are
+    mapped to an on-call service and have an active schedule, a multi-level
+    escalation policy, and enough rotation participants. Works with any
+    oncall-category collector (PagerDuty, OpsGenie, Datadog On-Call, etc.).
   category: "operational-readiness"
   icon: "assets/oncall.svg"
   status: "beta"
@@ -23,10 +23,22 @@ landing_page:
     - slug: "opsgenie"
       type: "collector"
       reason: "Provides on-call and escalation data (OpsGenie implementation)"
+    - slug: "datadog"
+      type: "collector"
+      reason: "Provides on-call and escalation data (Datadog On-Call implementation)"
   related: []
-  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "opsgenie", "operational readiness"]
+  keywords: ["oncall", "on-call", "incident", "escalation", "pagerduty", "opsgenie", "datadog", "operational readiness"]
 
 policies:
+  - name: service-mapped
+    description: |
+      Verifies the component is mapped to an on-call service. Fails when a
+      collector looked for one and found none (.oncall.service_lookup), naming
+      the places it looked; skips when no collector looked, or a lookup
+      couldn't finish.
+    mainPython: ./service_mapped.py
+    keywords: ["oncall", "service mapping", "pagerduty", "backstage", "service-id"]
+
   - name: schedule-configured
     description: |
       Verifies that the service has an active on-call schedule by checking
@@ -41,7 +53,7 @@ policies:
       checking .oncall.escalation.exists is true. Fails if no escalation
       data is present.
     mainPython: ./escalation_defined.py
-    keywords: ["escalation", "incident", "pagerduty", "opsgenie", "response"]
+    keywords: ["escalation", "incident", "pagerduty", "opsgenie", "datadog", "response"]
 
   - name: min-participants
     description: |
@@ -67,7 +79,8 @@ example_component_json: |
       "service": {
         "id": "PXXXXXX",
         "name": "Payment API",
-        "status": "active"
+        "status": "active",
+        "discovered_via": "system:default/payment-platform"
       },
       "schedule": {
         "exists": true,

@@ -1,7 +1,40 @@
 #!/bin/bash
 set -e
 
-# ── Early exit if no GHA workflows ──────────────────────────────────────────
+# Same lookup as collectors/repo-boilerplate/codeowners.sh: git, else the
+# nearest .git entry (a file in the hub's per-snippet worktrees).
+find_repo_root() {
+    local root dir
+    root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$root" ] && [ -d "$root" ]; then
+        printf '%s\n' "$root"
+        return 0
+    fi
+    dir="$(pwd -P)"
+    while [ "$dir" != "/" ]; do
+        if [ -e "$dir/.git" ]; then
+            printf '%s\n' "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+# ── Locate the workflows ────────────────────────────────────────────────────
+# GitHub only runs workflows from the repository root. A monorepo subdirectory
+# component runs from <repo>/<subdir> with the whole repo checked out, so read
+# the root's; a .github/workflows inside the subdirectory never runs.
+COMPONENT_DIR="$(pwd -P)"
+REPO_ROOT="$(find_repo_root || true)"
+if [ -n "$REPO_ROOT" ] && [ "$REPO_ROOT" != "$COMPONENT_DIR" ]; then
+    if [ -d ".github/workflows" ]; then
+        echo "Ignoring ${COMPONENT_DIR#"$REPO_ROOT"/}/.github/workflows/: GitHub only runs the repository root's." >&2
+    fi
+    echo "Reading the repository root's .github/workflows/ ($REPO_ROOT)." >&2
+    cd "$REPO_ROOT"
+fi
+
 if [ ! -d ".github/workflows" ]; then
     echo "No .github/workflows/ directory found" >&2
     exit 0
@@ -56,7 +89,7 @@ classify_action() {
         party="3rd"
     fi
 
-    jq -n \
+    jq -n -c \
         --arg name "$name" \
         --arg ref "$ref" \
         --arg pinning "$pinning" \
@@ -66,8 +99,17 @@ classify_action() {
 }
 
 # ── Parse workflows ─────────────────────────────────────────────────────────
-WORKFLOWS="[]"
-ALL_DEPS="[]"
+# Accumulate into files rather than shell variables. jq's --argjson passes a
+# value as a single argv element, and the kernel caps that at 128 KiB
+# (MAX_ARG_STRLEN) regardless of ulimit -s — a large monorepo's projection
+# exceeds it and jq fails to exec with "Argument list too long". Files are read
+# by path, so they have no such limit, and appending is O(1) instead of piping
+# the whole accumulated array back through jq once per item.
+WORKFLOWS_FILE="/tmp/gha-workflows.json"
+ALL_DEPS_FILE="/tmp/gha-deps.json"
+WF_ACTIONS_FILE="/tmp/gha-workflow-actions.json"
+: > "$WORKFLOWS_FILE"
+: > "$ALL_DEPS_FILE"
 
 while IFS= read -r file; do
     [ -z "$file" ] && continue
@@ -117,105 +159,97 @@ while IFS= read -r file; do
     ' 2>/dev/null || echo '[]')
 
     # Classify each action
-    ACTIONS="[]"
+    : > "$WF_ACTIONS_FILE"
     for uses in $(echo "$uses_refs" | jq -r '.[]' 2>/dev/null); do
         action_json=$(classify_action "$uses")
         if [ -n "$action_json" ]; then
-            ACTIONS=$(echo "$ACTIONS" | jq --argjson a "$action_json" '. + [$a]')
-            ALL_DEPS=$(echo "$ALL_DEPS" | jq --argjson a "$action_json" '. + [$a]')
+            printf '%s\n' "$action_json" >> "$WF_ACTIONS_FILE"
+            printf '%s\n' "$action_json" >> "$ALL_DEPS_FILE"
         fi
     done
 
-    # Build workflow object
-    WORKFLOW=$(jq -n \
+    # Build workflow object. $jobs_detail is the one value here that grows with
+    # the workflow's size, so it goes on stdin; the classified actions are a
+    # stream of objects in their own file, which --slurpfile reads as an array.
+    printf '%s' "$jobs_detail" | jq -c \
         --arg file "$file" \
         --arg name "$wf_name" \
         --argjson triggers "$triggers" \
-        --argjson jobs "$jobs_detail" \
         --argjson permissions "$permissions" \
-        --argjson actions "$ACTIONS" \
+        --slurpfile actions "$WF_ACTIONS_FILE" \
         '{
             file: $file,
             name: $name,
             triggers: $triggers,
-            jobs: $jobs,
+            jobs: .,
             permissions: $permissions,
             actions: $actions
-        }')
-
-    WORKFLOWS=$(echo "$WORKFLOWS" | jq --argjson w "$WORKFLOW" '. + [$w]')
+        }' >> "$WORKFLOWS_FILE"
 done <<< "$WORKFLOW_FILES"
 
 # ── Run actionlint ──────────────────────────────────────────────────────────
-LINT_ERRORS="[]"
-ERROR_COUNT=0
-WARNING_COUNT=0
-
+# .ci.lint is only written when actionlint actually ran, so a zero error_count
+# always means clean to ci.lint-clean.
+LINT_ERRORS=""
 if command -v actionlint &>/dev/null; then
     ACTIONLINT_VERSION=$(actionlint --version 2>/dev/null | head -1 || echo "unknown")
 
-    # actionlint -format outputs one JSON per error, exits 1 if errors found
-    LINT_RAW=$(actionlint -format '{{json .}}' 2>&1 || true)
+    # Lint exactly the files parsed above, which also skips actionlint's own
+    # project detection. stdout is one JSON array of findings; exit 1 means
+    # findings, 2 and up means actionlint itself failed.
+    mapfile -t WORKFLOW_ARGS <<< "$WORKFLOW_FILES"
+    LINT_STATUS=0
+    LINT_RAW=$(actionlint -format '{{json .}}' "${WORKFLOW_ARGS[@]}" 2>/tmp/gha-actionlint.err) || LINT_STATUS=$?
 
-    if [ -n "$LINT_RAW" ]; then
-        LINT_ERRORS=$(echo "$LINT_RAW" | jq -s '[.[] | {
+    if [ "$LINT_STATUS" -le 1 ]; then
+        LINT_ERRORS=$(printf '%s' "$LINT_RAW" | jq -e '[.[] | {
             file: .filepath,
             line: .line,
             column: .column,
             message: .message,
             rule: .kind
-        }]' 2>/dev/null || echo '[]')
-        ERROR_COUNT=$(echo "$LINT_ERRORS" | jq 'length')
+        }]' 2>/dev/null) || LINT_ERRORS=""
+    fi
+    if [ -z "$LINT_ERRORS" ]; then
+        echo "actionlint failed (exit $LINT_STATUS), not recording lint results: $(head -c 500 /tmp/gha-actionlint.err)" >&2
     fi
 else
-    ACTIONLINT_VERSION="not-installed"
     echo "actionlint not found, skipping lint" >&2
 fi
 
-# ── Build pinning summary ──────────────────────────────────────────────────
-TOTAL=$(echo "$ALL_DEPS" | jq 'length')
-SHA_PINNED=$(echo "$ALL_DEPS" | jq '[.[] | select(.pinning == "sha")] | length')
-TAG_PINNED=$(echo "$ALL_DEPS" | jq '[.[] | select(.pinning == "tag")] | length')
-BRANCH_REF=$(echo "$ALL_DEPS" | jq '[.[] | select(.pinning == "branch")] | length')
-UNPINNED=$(echo "$ALL_DEPS" | jq '[.[] | select(.pinning == "unpinned")] | length')
-PINNED=$((SHA_PINNED + TAG_PINNED))
-NOT_PINNED=$((BRANCH_REF + UNPINNED))
-THIRD_PARTY_UNPINNED=$(echo "$ALL_DEPS" | jq -c '[.[] | select(.party == "3rd" and (.pinning == "branch" or .pinning == "unpinned")) | .uses]')
-
 # ── Write normalized .ci.lint ───────────────────────────────────────────────
-jq -n \
-    --argjson errors "$LINT_ERRORS" \
-    --argjson error_count "$ERROR_COUNT" \
-    --argjson warning_count "$WARNING_COUNT" \
-    --arg tool "actionlint" \
-    --arg version "$ACTIONLINT_VERSION" \
-    '{
-        source: {tool: $tool, version: $version, integration: "code"},
-        errors: $errors,
-        error_count: $error_count,
-        warning_count: $warning_count
-    }' | lunar collect -j ".ci.lint" -
+# $LINT_ERRORS grows with the number of actionlint findings, so it goes on
+# stdin; only the scalars stay on argv.
+if [ -n "$LINT_ERRORS" ]; then
+    printf '%s' "$LINT_ERRORS" | jq \
+        --arg tool "actionlint" \
+        --arg version "$ACTIONLINT_VERSION" \
+        '{
+            source: {tool: $tool, version: $version, integration: "code"},
+            errors: .,
+            error_count: length,
+            warning_count: 0
+        }' | lunar collect -j ".ci.lint" -
+fi
 
 # ── Write normalized .ci.dependencies ───────────────────────────────────────
-jq -n \
-    --argjson total "$TOTAL" \
-    --argjson pinned "$PINNED" \
-    --argjson unpinned "$NOT_PINNED" \
-    --argjson items "$ALL_DEPS" \
-    --argjson third_party_unpinned "$THIRD_PARTY_UNPINNED" \
-    '{
+# -s slurps the dependency stream into an array; the counts are derived from it
+# here so nothing repo-sized has to cross argv.
+jq -s '. as $items | {
         source: {tool: "github-actions", version: "0.1.0", integration: "code"},
-        total: $total,
-        pinned: $pinned,
-        unpinned: $unpinned,
+        total: ($items | length),
+        pinned: ($items | map(select(.pinning == "sha" or .pinning == "tag")) | length),
+        unpinned: ($items | map(select(.pinning == "branch" or .pinning == "unpinned")) | length),
         items: $items,
-        third_party_unpinned: $third_party_unpinned
-    }' | lunar collect -j ".ci.dependencies" -
+        third_party_unpinned: [
+            $items[]
+            | select(.party == "3rd" and (.pinning == "branch" or .pinning == "unpinned"))
+            | .uses
+        ]
+    }' "$ALL_DEPS_FILE" | lunar collect -j ".ci.dependencies" -
 
 # ── Write native .ci.native.github_actions ──────────────────────────────────
-jq -n \
-    --argjson workflows "$WORKFLOWS" \
-    '{
+jq -s '{
         source: {tool: "github-actions", version: "0.1.0", integration: "code"},
-        workflows: $workflows
-    }' | lunar collect -j ".ci.native.github_actions" -
+        workflows: .
+    }' "$WORKFLOWS_FILE" | lunar collect -j ".ci.native.github_actions" -

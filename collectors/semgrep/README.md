@@ -37,6 +37,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/semgrep@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, python]
+    include:
+      - github-app      # Semgrep App scans on PRs
+      - running-in-prs  # Proves Semgrep runs on PRs
+      - cli             # Semgrep CLI runs in CI
 ```
 
 The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access.

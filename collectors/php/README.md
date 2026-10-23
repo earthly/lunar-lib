@@ -40,5 +40,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/php@v1.0.0
     on: [php]  # Or use domain: ["domain:your-domain"]
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - cicd           # php commands in CI
+      - composer-cicd  # Composer commands in CI
+      - project        # composer.json, lockfile and tool config
+      - dependencies   # Composer dependencies
+      - test-coverage  # PHPUnit coverage
 ```

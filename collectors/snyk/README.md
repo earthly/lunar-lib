@@ -68,6 +68,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/snyk@v1.0.0
     on: ["domain:your-domain"]  # Or use tags like [backend, go]
+    include:
+      - github-app      # Snyk App scans on PRs
+      - running-in-prs  # Proves Snyk runs on PRs
+      - cli             # Snyk CLI runs in CI
 ```
 
 Required secrets:

@@ -32,9 +32,12 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_high` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_medium` | boolean | Container scanner collector (preferred) |
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
-| `.container_scan.findings[]` | array | Container scanner collector — used to list the offending packages/CVEs in the `max-severity` failure message (`cve`, `severity`, `package`, `fix_version`) |
+| `.containers.native.docker.cicd.cmds[]` | array | `docker` collector, plus any CI step that records a pushed image — the pushed refs decide whether `max-severity` / `max-total` apply |
+| `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
+
+**Applicability.** `max-severity` and `max-total` skip a component with no `.containers`, and also skip a commit whose `.containers` record carries no pushed image ref — a CI tracer records `docker info` / `docker ps` there, so the object alone does not mean an image shipped. With a pushed ref and no `.container_scan` they fail: something shipped that nothing scanned. The pushed-ref resolution matches the one the Trivy and Grype container sub-collectors use to choose images, so these checks are applicable exactly when a scanner had a target. `executed` does not consult it — include it to require a scan whatever the CI record shows.
 
 ## Installation
 
@@ -45,11 +48,47 @@ policies:
   - uses: github://earthly/lunar-lib/policies/container-scan@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [executed, max-severity]  # Only run specific checks
+    include: [executed, max-severity, max-total]
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
+      # ignore_unfixable: "true"  # Optional: only fail on findings that have a fix
 ```
+
+### Only failing on fixable findings
+
+By default `max-severity` fails on every finding at or above `min_severity`,
+whether or not a fix exists. That is the right default, but base images routinely
+carry criticals that the upstream distro has not fixed — so a release gate on
+`critical` can end up permanently closed on findings no change to your own image
+can clear. Set `ignore_unfixable: "true"` to narrow the failure to findings that
+carry an upgrade target, which is what makes a `block-pr-and-release` gate
+practical:
+
+```yaml
+    enforcement: block-pr-and-release
+    with:
+      min_severity: "critical"
+      ignore_unfixable: "true"
+```
+
+Unfixable findings are **still collected and still visible** in the Component
+JSON and the dashboard — the option changes what the check *gates on*, never what
+is recorded. It can only turn a failure into a pass: it is applied after the
+threshold has already been crossed, so it never creates a failure the default
+would not have raised.
+
+Two behaviours worth knowing:
+
+- A finding counts as fixable when the scanner reported a fix version. Trivy and
+  Grype can both scan the same image; where they disagree, the one that found a
+  fix wins — a fix that exists is actionable.
+- If the scanner reported only summary counts and no `.container_scan.findings[]`,
+  fixability cannot be evaluated per finding, so the check **fails as it would
+  with the option off** and says so in the failure message.
+  `.container_scan.summary.all_fixable` is not a substitute: it is a single
+  boolean across *all* severities, so it cannot answer whether the in-scope
+  findings are fixable.
 
 ## Examples
 
@@ -82,12 +121,16 @@ policies:
 ```
 
 **Failure messages:**
-- `executed`: "No container scan data found. Ensure a scanner (Trivy, Grype, etc.) is configured."
-- `max-severity`: names the offending packages/CVEs (most severe first, capped at 10 with a `+N more` tail), the same format the `sca` policy uses. When the scanner emits per-finding detail it renders as a nested list:
+- `executed`: "No container scan results at this commit, though it pushed 2 image(s) — either no scanner
+  is configured for this component, or a configured one recorded nothing here.", followed by one
+  `not scanned: <image>` assertion per pushed image. `max-severity` and `max-total` say the same when
+  an image shipped and nothing scanned it; with no pushed image they skip instead.
+- `max-severity`: fails with a headline assertion plus one assertion per offending package/CVE (most severe first), the same format the `sca` policy uses — no policy-side cap; the hub truncates the display. When the scanner emits per-finding detail it renders as a nested list under the check:
   ```
-  Critical container vulnerabilities detected:
-      * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
-      * high: libcurl — CVE-2026-5678 (no fix available)
+  ❌ max-severity
+    * Critical container vulnerabilities detected
+    * critical: openssl — CVE-2026-1234 (fix: 3.0.14)
+    * high: libcurl — CVE-2026-5678 (no fix available)
   ```
   A summary-only scanner (no `.container_scan.findings[]`) falls back to the headline alone (e.g. `Critical container vulnerabilities detected`).
 - `max-total`: "Total container vulnerability findings (40) exceeds threshold (10)"
@@ -97,5 +140,7 @@ policies:
 When this policy fails, you can resolve it by:
 
 1. **`executed` failure:** Configure a container scanner (Trivy, Grype, Snyk Container) in your CI pipeline.
+   If one is already configured, check its run for this commit — a scanner that ran but recorded nothing
+   leaves the same empty `.container_scan`.
 2. **`max-severity` failure:** Review and remediate flagged vulnerabilities by updating base images or using vulnerability suppression for accepted risks.
 3. **`max-total` failure:** Reduce total vulnerability count by updating base images and dependencies.

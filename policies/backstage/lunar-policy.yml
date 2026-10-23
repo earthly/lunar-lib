@@ -9,10 +9,10 @@ landing_page:
   display_name: "Backstage Guardrails"
   long_description: |
     Validates Backstage catalog-info.yaml entries for completeness and
-    compliance. Checks that the catalog file exists and is valid, owner
-    is set, lifecycle stage is defined, system grouping is assigned, and
-    that entity references tagged onto infrastructure resources resolve
-    in the catalog.
+    compliance: the catalog file exists and is valid, owner, lifecycle and
+    system are set, and entity references tagged onto infrastructure
+    resolve in the catalog. Optionally skips components with no catalog
+    file instead of failing them.
   category: "repository-and-ownership"
   icon: "assets/backstage.svg"
   status: "beta"
@@ -95,6 +95,68 @@ policies:
     mainPython: ./system-exists.py
     keywords: ["backstage", "system", "referential integrity", "catalog", "cross-reference"]
 
+  - name: system-valid
+    description: |
+      Checks spec.system in two steps and fails at the first broken one: it
+      is not set, or it does not resolve to a System in the Backstage catalog.
+      One check for what `system-set` and `system-exists` report separately.
+      Fails if the catalog file is missing, like `system-set`. Skips when
+      spec.system is set but can't be looked up: the collector has no
+      `backstage_url`, or the lookup errored.
+    mainPython: ./system-valid.py
+    keywords: ["backstage", "system", "referential integrity", "catalog", "grouping"]
+
+  - name: system-domain-exists
+    description: |
+      Verifies that the domain the component's system belongs to actually
+      exists in the Backstage catalog (transitive referential integrity).
+      Reads the collector's lookup result at
+      `.catalog.native.backstage.refs.system_domain`.
+      In the Backstage model a Component has no domain of its own — domain
+      membership is carried by its System (`System.spec.domain`) — so this is
+      the check that answers "is my domain real?" for an ordinary
+      `kind: Component` catalog file, where `domain-exists` has nothing to
+      inspect. Fails when the system's domain is absent from Backstage,
+      naming the offending System (the entity to fix is the System's own
+      catalog file, typically owned by another team, not this component's).
+      Passes when there is nothing to cross-check — no `spec.system` declared,
+      the system itself did not resolve (that is `system-exists`'s failure to
+      report), or the system belongs to no domain (that is
+      `system-domain-set`'s). Skips (passes) when
+      referential integrity was not performed — the `backstage` collector is
+      not configured with `backstage_url` (no `.refs.checked`) — or the lookup
+      errored transiently (`.refs.system_domain.error`), so an unconfigured
+      collector or a Backstage outage never turns this red.
+    mainPython: ./system-domain-exists.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "cross-reference", "transitive"]
+
+  - name: system-domain-set
+    description: |
+      Verifies that the system the component belongs to is itself assigned to
+      a domain (`System.spec.domain`), read from the collector's
+      `.catalog.native.backstage.refs.system.has_domain`. Fails when the
+      system resolves in Backstage but declares no domain, naming the System
+      to fix. Skips when there is no System to check: no `spec.system` is
+      declared, or the system does not resolve (`system-set` and
+      `system-exists` report those). Also skips when the collector has no
+      `backstage_url`, the system lookup errored, or the collector predates
+      `has_domain`.
+    mainPython: ./system-domain-set.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
+
+  - name: system-domain-valid
+    description: |
+      Follows spec.system to its System in the Backstage catalog and on to
+      that System's domain, and fails at the first broken step: the System
+      does not exist, it belongs to no domain, or its domain does not exist.
+      Each failure names the System. One check for what `system-exists`,
+      `system-domain-set` and `system-domain-exists` report separately.
+      Fails if the catalog file is missing, like `system-set`. Skips when no
+      `spec.system` is declared (`system-set` reports that), when the
+      collector has no `backstage_url`, or when a lookup errored.
+    mainPython: ./system-domain-valid.py
+    keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
+
   - name: entity-ref-valid
     description: |
       Verifies that the Backstage entity references tagged onto infrastructure
@@ -141,6 +203,16 @@ policies:
     mainPython: ./required-tag-patterns.py
     keywords: ["backstage", "tags", "tag patterns", "glob", "required", "metadata"]
 
+  - name: required-link-types
+    description: |
+      Verifies that catalog-info.yaml has a `metadata.links` entry of each
+      configured link type (e.g. `runbook`, `dashboard`), matched exactly on
+      the link's `type`. Configure via the `required_link_types` input.
+      Skipped when no link types are required (the default). Fails if the
+      catalog file is missing or any required type has no link.
+    mainPython: ./required-link-types.py
+    keywords: ["backstage", "links", "link type", "runbook", "dashboard", "required", "metadata"]
+
   - name: disallowed-annotations
     description: |
       Verifies that catalog-info.yaml declares none of a configurable set
@@ -160,7 +232,66 @@ policies:
     mainPython: ./disallowed-tag-patterns.py
     keywords: ["backstage", "tags", "tag patterns", "glob", "disallowed", "forbidden"]
 
+  - name: dependencies-documented
+    description: |
+      Verifies that catalog-info.yaml declares the component's dependencies:
+      a non-empty `spec.dependsOn`, or a non-empty comma-separated value in
+      the annotation named by the `dependencies_annotation` input. Targets
+      are not looked up in the catalog. Skipped unless `require_dependencies`
+      is `"true"`. Fails if the catalog file is missing or declares no
+      dependencies.
+    mainPython: ./dependencies-documented.py
+    keywords: ["backstage", "dependencies", "dependsOn", "dependency mapping", "metadata"]
+
+  - name: allowed-types
+    description: |
+      Verifies that catalog-info.yaml `spec.type` is one of the values in the
+      `allowed_types` input (e.g. `service,website,library`), matched exactly
+      and case-sensitively. Skipped when no types are configured (the
+      default). Fails if the catalog file is missing, or `spec.type` is
+      missing or not in the list.
+    mainPython: ./allowed-types.py
+    keywords: ["backstage", "type", "spec.type", "allowed values", "taxonomy"]
+
+  - name: allowed-lifecycles
+    description: |
+      Verifies that catalog-info.yaml `spec.lifecycle` is one of the values in
+      the `allowed_lifecycles` input (e.g. `production,experimental`), matched
+      exactly and case-sensitively. Skipped when no lifecycles are configured
+      (the default), and when `spec.lifecycle` is missing, which
+      `lifecycle-set` reports. Fails if the catalog file is missing or the
+      value is not in the list.
+    mainPython: ./allowed-lifecycles.py
+    keywords: ["backstage", "lifecycle", "spec.lifecycle", "allowed values", "taxonomy"]
+
 inputs:
+  skip_when_no_catalog_info:
+    description: |
+      Skip every check in this policy on a component with no catalog-info.yaml,
+      instead of failing it. Set to `"true"` when only some repositories in
+      scope are registered in Backstage, so importing the policy broadly does
+      not turn the rest red.
+
+      One switch for the whole family, and the only place their missing-file
+      behaviour is described. With the default (`"false"`) a missing catalog
+      file fails `catalog-info-exists`, `catalog-info-valid`, `owner-set`,
+      `lifecycle-set`, `system-set` and `system-domain-valid`; fails
+      `required-annotations`, `required-tag-patterns`, `required-link-types`,
+      `dependencies-documented`, `allowed-types` and `allowed-lifecycles`
+      when those are configured; passes the two
+      `disallowed-*` deny-checks, since nothing forbidden can be present
+      without a file; and skips the other referential-integrity checks, which
+      have nothing to cross-check. With `"true"` every check skips instead —
+      the `disallowed-*` pair included, so a component that is not in the
+      catalog reports no green passes it did not earn.
+
+      Only the file's absence is affected: a component that has a
+      catalog-info.yaml is held to every check either way.
+
+      `entity-ref-valid` never skips on a missing catalog file: it reads
+      infrastructure tags, not catalog-info.yaml, and an infrastructure repo
+      usually has no catalog file of its own.
+    default: "false"
   entity_ref_kind:
     description: |
       When set, `entity-ref-valid` requires each infrastructure entity-reference
@@ -205,6 +336,14 @@ inputs:
       case-insensitive. Empty (the default) disables the
       `required-tag-patterns` check.
     default: ""
+  required_link_types:
+    description: |
+      Comma-separated list of link types; catalog-info.yaml
+      `metadata.links` must include an entry whose `type` is each of them.
+      Example: `runbook,dashboard`. Matching is exact and case-sensitive,
+      and only the `type` is compared, not the link's title or URL. Empty
+      (the default) disables the `required-link-types` check.
+    default: ""
   disallowed_annotations:
     description: |
       Comma-separated list of annotation keys that must NOT be present in
@@ -218,4 +357,33 @@ inputs:
       `metadata.tags` must NOT include any tag matching these patterns.
       Example: `deprecated/*,internal-only`. Matching is case-insensitive.
       Empty (the default) disables the `disallowed-tag-patterns` check.
+    default: ""
+  require_dependencies:
+    description: |
+      Set to `"true"` to enforce `dependencies-documented`. Off by default,
+      so importing the whole policy doesn't fail every component that
+      declares no dependencies.
+    default: "false"
+  dependencies_annotation:
+    description: |
+      Annotation key that also counts as declared dependencies when its
+      value is a non-empty comma-separated list, for catalogs that record
+      dependencies there instead of in `spec.dependsOn`. Example:
+      `example.com/dependencies`. Empty (the default) checks
+      `spec.dependsOn` only.
+    default: ""
+  allowed_types:
+    description: |
+      Comma-separated list of allowed `spec.type` values. Example:
+      `service,website,library`. Matching is exact and case-sensitive, and
+      applies to the primary entity whatever its kind, so an `API` entity's
+      type (e.g. `openapi`) needs listing too. Empty (the default) disables
+      the `allowed-types` check.
+    default: ""
+  allowed_lifecycles:
+    description: |
+      Comma-separated list of allowed `spec.lifecycle` values. Example:
+      `production,experimental,deprecated`. Matching is exact and
+      case-sensitive. Empty (the default) disables the `allowed-lifecycles`
+      check.
     default: ""

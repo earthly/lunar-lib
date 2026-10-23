@@ -1,0 +1,11 @@
+VERSION 0.8
+
+# Test-only target. This collector runs on earthly/lunar-lib:base-main, so it
+# has no image target and is intentionally absent from the root +all target.
+test:
+    FROM python:3.12-alpine
+    RUN apk add --no-cache bash
+    WORKDIR /work
+    COPY parse_registries.py main.sh .
+    COPY test/test_parse_registries.py test/
+    RUN cd test && python -m unittest test_parse_registries -v

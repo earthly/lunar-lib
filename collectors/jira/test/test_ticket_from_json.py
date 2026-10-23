@@ -3,14 +3,16 @@
 
 ticket_from_json.sh reads the PR's title/description from the *PR-scoped*
 Component JSON via `lunar component get-json`, then resolves the ticket with the
-shared helpers. The regression these tests lock in: the script must pass
+shared helpers. The regressions these tests lock in: the script must pass
 `--pr "$LUNAR_COMPONENT_PR"` to get-json — without it, get-json returns the
-main-branch JSON (which has no `.vcs.pr`) and the ticket is never resolved.
+main-branch JSON (which has no `.vcs.pr`) and the ticket is never resolved —
+and `--git-sha "$LUNAR_COMPONENT_GIT_SHA"`, without which it reads the PR's
+latest materialized row, which can be an earlier commit's.
 
-The `lunar` stub returns PR-scoped JSON only when `--pr` is present (mirroring
-the Hub) and logs its `collect` calls to $CAPTURE; the real script runs as a
-subprocess. No Jira is configured, so resolution takes the best candidate
-unchecked — enough to prove the PR title was read.
+The `lunar` stub returns a commit's own JSON for `--git-sha`, PR-scoped JSON for
+`--pr` (mirroring the Hub) and logs its `collect` calls to $CAPTURE; the real
+script runs as a subprocess. No Jira is configured, so resolution takes the best
+candidate unchecked — enough to prove which PR title was read.
 """
 
 import os
@@ -44,10 +46,12 @@ class Base(unittest.TestCase):
         os.chmod(path, 0o755)
 
     def _write_stubs(self):
-        # lunar stub: `component get-json` returns the PR-scoped fixture only
-        # when --pr is passed, else the main-branch fixture (no .vcs.pr) —
-        # exactly the distinction the real Hub makes. Everything else (collect)
-        # is logged to $CAPTURE: args, then any piped stdin.
+        # lunar stub: `component get-json` returns sha-<sha>.json when
+        # --git-sha names a commit that has one, else the PR-scoped fixture
+        # when --pr is passed (the PR's latest row), else the main-branch
+        # fixture (no .vcs.pr) — the distinctions the real Hub makes.
+        # Everything else (collect) is logged to $CAPTURE: args, then any
+        # piped stdin.
         self._stub(
             "lunar",
             textwrap.dedent(
@@ -55,6 +59,36 @@ class Base(unittest.TestCase):
                 #!/bin/sh
                 printf 'ARGS: %s\\n' "$*" >> "$CAPTURE"
                 if [ "$1" = "component" ] && [ "$2" = "get-json" ]; then
+                  # Test seams, both off by default. Each names a countdown file
+                  # holding the number of remaining calls that should misbehave;
+                  # -1 means forever. This models the Hub's mat lag: the read
+                  # either fails outright or succeeds while still missing the
+                  # .vcs.pr.title that dispatched the wave.
+                  if [ -n "$GETJSON_FAIL" ] && [ -f "$GETJSON_FAIL" ]; then
+                    n=$(cat "$GETJSON_FAIL")
+                    if [ "$n" -ne 0 ]; then
+                      [ "$n" -gt 0 ] && echo $((n - 1)) > "$GETJSON_FAIL"
+                      echo "rpc error: code = NotFound desc = failed to load component" >&2
+                      echo "Usage:" >&2
+                      echo "  lunar component get-json [flags]" >&2
+                      exit 1
+                    fi
+                  fi
+                  if [ -n "$GETJSON_STALE" ] && [ -f "$GETJSON_STALE" ]; then
+                    n=$(cat "$GETJSON_STALE")
+                    if [ "$n" -ne 0 ]; then
+                      [ "$n" -gt 0 ] && echo $((n - 1)) > "$GETJSON_STALE"
+                      cat "$MOCK_DIR/main.json"
+                      exit 0
+                    fi
+                  fi
+                  prev=""
+                  for a in "$@"; do
+                    if [ "$prev" = "--git-sha" ] && [ -f "$MOCK_DIR/sha-$a.json" ]; then
+                      cat "$MOCK_DIR/sha-$a.json"; exit 0
+                    fi
+                    prev="$a"
+                  done
                   for a in "$@"; do
                     if [ "$a" = "--pr" ]; then cat "$MOCK_DIR/pr.json"; exit 0; fi
                   done
@@ -97,6 +131,7 @@ class Base(unittest.TestCase):
     MAIN_JSON = '{"vcs":{}}'
 
     BASE_ENV = {"LUNAR_COMPONENT_ID": "github.com/acme/backend"}
+    SHA = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
 
 
 class TicketFromJsonTest(Base):
@@ -112,6 +147,21 @@ class TicketFromJsonTest(Base):
         self.assertIn(".vcs.pr.ticket.id", log)  # ticket was resolved + collected
         self.assertIn("ABC-123", log)
 
+    def test_reads_the_commit_the_wave_fired_for(self):
+        # The PR's latest row still holds the previous commit's title; this
+        # commit's title names a different ticket. Fails if the script reads
+        # with --pr alone.
+        self.fixture("pr.json", self.PR_JSON)
+        self.fixture("main.json", self.MAIN_JSON)
+        self.fixture("sha-%s.json" % self.SHA,
+                     '{"vcs":{"pr":{"title":"[ABC-456] Add healthz","description":""}}}')
+        result, log = self.run_script(dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8",
+                                           LUNAR_COMPONENT_GIT_SHA=self.SHA))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("ABC-456", log)
+        self.assertNotIn("ABC-123", log)
+        self.assertIn("--pr 8 --git-sha " + self.SHA, log)
+
     def test_skips_cleanly_without_pr_context(self):
         # No LUNAR_COMPONENT_PR (not a PR run): no --pr, get-json returns the
         # main-branch JSON with no .vcs.pr, and the collector skips without
@@ -120,6 +170,102 @@ class TicketFromJsonTest(Base):
         self.fixture("main.json", self.MAIN_JSON)
         result, log = self.run_script(dict(self.BASE_ENV))
         self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertNotIn(".vcs.pr.ticket.id", log)
+
+
+class ReadRaceTest(Base):
+    """ENG-1831. The after-json wave is dispatched off the LIVE merged blob the
+    instant .vcs.pr.title lands, but `lunar component get-json` reads it back
+    through a copy the Hub drains asynchronously — so this collector can be
+    dispatched by a record it cannot yet read.
+
+    The hook's path IS this collector's input (`after-json` on .vcs.pr.title),
+    and the Hub fires only collectors whose path is present in that live blob.
+    So in PR context a missing title cannot mean the PR has no title; it means
+    the read is stale. Pre-fix `2>/dev/null || echo ""` plus the shared skip
+    turned that into `exit 0`, and because the wave is fire-once per
+    (component, sha), the PR's ticket was lost for good.
+    """
+
+    FAST = {
+        "LUNAR_JIRA_TEST_READ_BUDGET": "4",
+        "LUNAR_JIRA_TEST_BACKOFF_STEP": "1",
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.fixture("pr.json", self.PR_JSON)
+        self.fixture("main.json", self.MAIN_JSON)
+
+    def countdown(self, name, n):
+        path = os.path.join(self.tmp, name)
+        with open(path, "w") as f:
+            f.write(str(n))
+        return path
+
+    def getjson_calls(self, log):
+        return [ln for ln in log.splitlines() if "component get-json" in ln]
+
+    def test_stale_read_is_retried_until_the_title_appears(self):
+        # THE REGRESSION: the first two reads land before .vcs.pr.title has
+        # drained, the third carries it. Pre-fix the first read won and the
+        # ticket was never recorded.
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", 2))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 3, msg=log)
+        self.assertIn(".vcs.pr.ticket.id", log)
+        self.assertIn("ABC-123", log)
+
+    def test_happy_path_reads_once_and_never_sleeps(self):
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST)
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertNotIn("Waited", result.stderr)
+
+    def test_persistent_stale_read_fails_the_run_in_pr_context(self):
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 1, msg=result.stderr)
+        self.assertIn("fire-once", result.stderr)
+        self.assertNotIn(".vcs.pr.ticket.id", log)
+
+    def test_failed_read_surfaces_the_error_without_the_usage_block(self):
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST,
+                   GETJSON_FAIL=self.countdown("fail", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 1, msg=result.stderr)
+        self.assertIn("get-json: rpc error", result.stderr)
+        self.assertNotIn("Usage:", result.stderr)
+        self.assertNotIn(".vcs.pr.ticket.id", log)
+
+    def test_no_pr_context_still_skips_without_waiting(self):
+        # A branch push has no .vcs.pr.title for the hook to match, so the wave
+        # never fires there — that path is only reached by a manual/dev run,
+        # where an absent title is genuine. Unchanged: one read, skip, exit 0.
+        env = dict(self.BASE_ENV, **self.FAST,
+                   GETJSON_STALE=self.countdown("stale", -1))
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(len(self.getjson_calls(log)), 1, msg=log)
+        self.assertNotIn("Waited", result.stderr)
+        self.assertNotIn(".vcs.pr.ticket.id", log)
+
+    def test_unparseable_blob_retries_instead_of_aborting_on_jq(self):
+        # `set -e` with no pipefail: an assignment from a failing jq aborts the
+        # script on jq's bare exit status. So a malformed blob has to be routed
+        # into the retry (and its error surfaced), not allowed to kill the run
+        # with no explanation.
+        self.fixture("pr.json", "not json at all")
+        env = dict(self.BASE_ENV, LUNAR_COMPONENT_PR="8", **self.FAST)
+        result, log = self.run_script(env)
+        self.assertEqual(result.returncode, 1, msg=result.stderr)
+        self.assertIn("jq: ", result.stderr)          # error surfaced, not hidden
+        self.assertIn("fire-once", result.stderr)     # reached the loud arm
+        self.assertGreater(len(self.getjson_calls(log)), 1, msg=log)  # retried
         self.assertNotIn(".vcs.pr.ticket.id", log)
 
 

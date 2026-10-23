@@ -45,6 +45,7 @@ INCLUDE_PUBLIC="${LUNAR_VAR_INCLUDE_PUBLIC:-true}"
 INCLUDE_PRIVATE="${LUNAR_VAR_INCLUDE_PRIVATE:-true}"
 INCLUDE_INTERNAL="${LUNAR_VAR_INCLUDE_INTERNAL:-true}"
 INCLUDE_ARCHIVED="${LUNAR_VAR_INCLUDE_ARCHIVED:-false}"
+INCLUDE_EMPTY="${LUNAR_VAR_INCLUDE_EMPTY:-false}"
 INCLUDE_REPOS="${LUNAR_VAR_INCLUDE_REPOS:-}"
 EXCLUDE_REPOS="${LUNAR_VAR_EXCLUDE_REPOS:-}"
 ALLOWED_TOPICS="${LUNAR_VAR_ALLOWED_TOPICS:-}"
@@ -62,15 +63,12 @@ DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 MAX_RETRIES=5
 INITIAL_BACKOFF=5  # seconds
 
-# How many repos to fetch per visibility level, from the max_repos_per_visibility
-# input (default 10000). `gh repo list` requires a --limit (it defaults to 30)
-# and paginates up to this number via GitHub's GraphQL repositories connection —
-# cursor-based, so there is NO 1000-result Search-API cap; it keeps paging until
-# the org is exhausted or this ceiling is reached. The default covers most orgs;
-# raise the input for an org with more repos than this in a single visibility. If
-# a fetch comes back at exactly this ceiling we warn instead of silently
-# cataloging a partial org.
-FETCH_LIMIT="${LUNAR_VAR_MAX_REPOS_PER_VISIBILITY:-10000}"
+# How many repos to fetch for the whole org, from the max_repos input (default
+# 10000). `gh repo list` requires a --limit (it defaults to 30) and paginates up
+# to this number through GitHub's GraphQL repositories connection. The default
+# covers most orgs; raise it for a larger one. A fetch that comes back at exactly
+# this ceiling warns instead of silently cataloging a partial org.
+FETCH_LIMIT="${LUNAR_VAR_MAX_REPOS:-10000}"
 
 # Build list of visibilities to fetch
 VISIBILITIES=()
@@ -89,10 +87,15 @@ if [ ${#VISIBILITIES[@]} -eq 0 ]; then
     exit 1
 fi
 
+# The same list as a JSON array: visibility is applied in the jq filter, not by
+# a gh flag (see fetch_repos).
+VISIBILITIES_JSON=$(printf '%s\n' "${VISIBILITIES[@]}" | jq -R . | jq -sc .)
+
 echo "Cataloging repos from GitHub org: $ORG_NAME"
 echo "GitHub host: $GITHUB_HOST"
 echo "Visibilities: ${VISIBILITIES[*]}"
 echo "Include archived: $INCLUDE_ARCHIVED"
+echo "Include empty: $INCLUDE_EMPTY"
 [ -n "$INCLUDE_REPOS" ] && echo "Include patterns: $INCLUDE_REPOS"
 [ -n "$EXCLUDE_REPOS" ] && echo "Exclude patterns: $EXCLUDE_REPOS"
 [ -n "$ALLOWED_TOPICS" ] && echo "Allowed topics: $ALLOWED_TOPICS"
@@ -108,7 +111,9 @@ glob_to_regex() {
     local escaped
     escaped=$(echo "$glob" | sed -E 's/([.+^${}()|\\])/\\\1/g')
     # Convert glob wildcards to regex
-    escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/\?/./g')
+    # `?` is literal in POSIX basic regex. Escaping it turns it into a
+    # repetition operator in BusyBox sed and makes every non-empty filter fail.
+    escaped=$(echo "$escaped" | sed 's/\*/.\*/g; s/?/./g')
     echo "^${escaped}$"
 }
 
@@ -136,20 +141,22 @@ patterns_to_regex() {
     echo "${regex_parts[*]}"
 }
 
-# Fetch repos with retry and exponential backoff
-fetch_repos_with_retry() {
-    local visibility="$1"
+# Fetch the org's repos with retry and exponential backoff.
+#
+# Pass no filter flags. `gh repo list` only uses the cursor-paginated
+# RepositoryList query when --language, --topic, --archived/--no-archived and
+# --visibility internal are all absent (cli/cli pkg/cmd/repo/list/http.go:32);
+# any one of them switches it to RepositoryListSearch, GitHub's search API,
+# which hard-caps at 1000 results per query. An unfiltered fetch is the only way
+# to see a whole org, so visibility and archived are applied in the jq pass.
+fetch_repos() {
     local attempt=1
     local backoff=$INITIAL_BACKOFF
     
     while [ $attempt -le $MAX_RETRIES ]; do
         # Build gh command
-        local GH_ARGS=(repo list "$ORG_NAME" --visibility "$visibility" --limit "$FETCH_LIMIT")
-        GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,visibility")
-        
-        if [ "$INCLUDE_ARCHIVED" = "false" ]; then
-            GH_ARGS+=(--no-archived)
-        fi
+        local GH_ARGS=(repo list "$ORG_NAME" --limit "$FETCH_LIMIT")
+        GH_ARGS+=(--json "name,url,description,repositoryTopics,isArchived,isEmpty,visibility")
         
         # Try to fetch
         local output
@@ -180,11 +187,11 @@ fetch_repos_with_retry() {
         fi
         
         # Non-retryable error
-        echo "Error fetching $visibility repos: $output" >&2
+        echo "Error fetching repos: $output" >&2
         return 1
     done
     
-    echo "Failed to fetch $visibility repos after $MAX_RETRIES attempts" >&2
+    echo "Failed to fetch repos after $MAX_RETRIES attempts" >&2
     return 1
 }
 
@@ -202,35 +209,24 @@ trap 'rm -f "$TEMP_FILE" "${TEMP_FILE}.chunk" "${TEMP_FILE}.new"' EXIT
 # Initialize with empty array
 echo "[]" > "$TEMP_FILE"
 
-# Collect repos from all visibility levels
-for visibility in "${VISIBILITIES[@]}"; do
-    echo "Fetching $visibility repos..."
-    
-    if ! REPOS=$(fetch_repos_with_retry "$visibility"); then
-        echo "Failed to fetch $visibility repos, aborting"
-        exit 1
-    fi
-    
-    REPO_COUNT=$(echo "$REPOS" | jq 'length')
-    echo "Found $REPO_COUNT $visibility repos"
+echo "Fetching repos..."
 
-    # gh stops paginating at --limit, so a fetch that returns exactly FETCH_LIMIT
-    # almost certainly means the org has more repos than the configured ceiling.
-    # Warn loudly (pointing at the input to raise) instead of silently cataloging
-    # a partial org.
-    if [ "$REPO_COUNT" -ge "$FETCH_LIMIT" ]; then
-        echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT $visibility repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos_per_visibility' input to catalog them all." >&2
-    fi
+if ! REPOS=$(fetch_repos); then
+    echo "Failed to fetch repos, aborting"
+    exit 1
+fi
 
-    # Merge into temp file (single jq call, not accumulating in memory)
-    echo "$REPOS" > "${TEMP_FILE}.chunk"
-    jq -s 'add' "$TEMP_FILE" "${TEMP_FILE}.chunk" > "${TEMP_FILE}.new"
-    mv "${TEMP_FILE}.new" "$TEMP_FILE"
-    rm -f "${TEMP_FILE}.chunk"
-done
-
+echo "$REPOS" > "$TEMP_FILE"
 TOTAL_COUNT=$(jq 'length' "$TEMP_FILE")
 echo "Total repos fetched: $TOTAL_COUNT"
+
+# gh stops paginating at --limit, so a fetch that returns exactly FETCH_LIMIT
+# almost certainly means the org has more repos than the configured ceiling.
+# Warn loudly (pointing at the input to raise) instead of silently cataloging a
+# partial org.
+if [ "$TOTAL_COUNT" -ge "$FETCH_LIMIT" ]; then
+    echo "WARNING: reached the fetch ceiling of $FETCH_LIMIT repos — results may be TRUNCATED and some repositories not cataloged. Raise the 'max_repos' input to catalog them all." >&2
+fi
 
 # Batch size for lunar catalog calls
 BATCH_SIZE=1000
@@ -241,18 +237,31 @@ CATALOG_ENTRIES=$(jq \
     --arg prefix "$TAG_PREFIX" \
     --arg owner "$DEFAULT_OWNER" \
     --arg domain "$DEFAULT_DOMAIN" \
+    --arg include_empty "$INCLUDE_EMPTY" \
     --arg include_regex "$INCLUDE_REGEX" \
     --arg exclude_regex "$EXCLUDE_REGEX" \
     --arg allowed_topics "$ALLOWED_TOPICS" \
     --arg disallowed_topics "$DISALLOWED_TOPICS" \
+    --arg include_archived "$INCLUDE_ARCHIVED" \
+    --argjson visibilities "$VISIBILITIES_JSON" \
     '
     # Parse a comma-separated input into a trimmed, non-empty set of topics.
     def csv_set($s): ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)));
     (csv_set($allowed_topics)) as $allow |
     (csv_set($disallowed_topics)) as $deny |
 
-    # Filter repos based on include/exclude patterns and topic allow/blocklists
+    # Filter repos based on content, include/exclude patterns, and topic
+    # allow/blocklists. Empty repositories have no commit to collect or evaluate,
+    # so omit them unless the operator explicitly opts in.
     [.[] |
+        # Visibility and archived are filtered here, not by gh flags — see
+        # fetch_repos.
+        select(.visibility | ascii_downcase | IN($visibilities[])) |
+        select($include_archived == "true" or (.isArchived | not)) |
+        select(
+            ($include_empty == "true") or
+            (.isEmpty | not)
+        ) |
         # Apply include filter (if specified, must match)
         select(
             ($include_regex == "") or

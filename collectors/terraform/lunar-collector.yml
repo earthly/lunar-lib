@@ -1,7 +1,7 @@
 version: 0
 
 name: terraform
-description: Parses Terraform HCL files and collects IaC configuration data
+description: Parses Terraform and OpenTofu configuration files and collects IaC configuration data
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:terraform-main
@@ -10,10 +10,10 @@ default_image_ci_collectors: native
 landing_page:
   display_name: "Terraform Collector"
   long_description: |
-    Parse Terraform HCL files to extract configuration data. Writes file validity,
-    normalized resources with their tags and provider default_tags, and full parsed
-    HCL JSON for downstream policy analysis of providers, modules, backends,
-    resource tagging, and infrastructure security posture.
+    Parse Terraform and OpenTofu configuration files to extract configuration data.
+    Writes file validity, normalized resources with their tags and provider
+    default_tags, and full parsed HCL JSON for policy analysis of providers,
+    modules, backends, resource tagging, and infrastructure security posture.
   categories: ["security", "orchestration"]
   icon: "assets/terraform.svg"
   status: "beta"
@@ -31,12 +31,13 @@ landing_page:
 collectors:
   - name: terraform
     description: |
-      Parses all Terraform (.tf) files in the repository using hcl2json and collects:
-      File validity and parse errors (.iac.files[]);
-      normalized modules with resources, resource tags, and analysis (.iac.modules[]);
-      provider-level default_tags per module (.iac.modules[].default_tags);
-      full parsed HCL JSON for terraform-specific policy (.iac.native.terraform.files[]);
-      and source tool metadata (.iac.source).
+      Parses every Terraform/OpenTofu HCL file in the repository (.tf, .tofu)
+      and collects:
+      - File validity and parse errors (.iac.files[])
+      - Normalized modules with resources, resource tags, and analysis (.iac.modules[])
+      - Provider-level default_tags per module (.iac.modules[].default_tags)
+      - Full parsed HCL JSON for terraform-specific policy (.iac.native.terraform.files[])
+      - Source tool metadata (.iac.source)
       Resource tags: each entry in .iac.modules[].resources[] carries the literal
       `tags = {}` map it declares. hcl2json is a purely syntactic transform — it
       never runs `terraform plan` — so tag values that are interpolations

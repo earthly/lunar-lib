@@ -1,24 +1,22 @@
 from lunar_policy import Check
 
+from helpers import Findings, entries_or_skip
+
 
 def main(node=None):
-    """Validates that all K8s manifests are syntactically correct."""
+    """Validates that all K8s manifests are syntactically correct, and that Helm charts render."""
     c = Check("valid", "All K8s manifests should be valid", node=node)
     with c:
-        manifests = c.get_node(".k8s.manifests")
-        if not manifests.exists():
-            c.skip("No Kubernetes manifests found in this repository")
+        manifests = entries_or_skip(c, ".k8s.manifests", "No Kubernetes manifests found in this repository")
 
+        findings = Findings(c)
         for manifest in manifests:
-            path = manifest.get_value_or_default(".path", "<unknown>")
-            valid = manifest.get_value_or_default(".valid", False)
-            error = manifest.get_value_or_default(".error", "Unknown validation error")
-
-            c.assert_true(valid, f"{path}: {error}")
+            error = manifest.get("error") or "Unknown validation error"
+            findings.check(manifest.get("valid") is True, manifest, error)
+        findings.report()
 
     return c
 
 
 if __name__ == "__main__":
     main()
-

@@ -114,6 +114,31 @@ policies:
     mainPython: aws_ebs_snapshot_encryption.py
     keywords: ["ebs snapshot", "encryption at rest", "kms", "data protection", "aws", "soc2"]
 
+  - name: aws-iam-role-permissions-boundary
+    description: |
+      Requires every IAM role to set a permissions boundary, capping the
+      maximum privilege the role can ever be granted regardless of the
+      policies later attached to it.
+    mainPython: aws_iam_role_permissions_boundary.py
+    keywords: ["iam role", "permissions boundary", "least privilege", "privilege escalation", "soc2"]
+
+  - name: aws-imdsv2-required
+    description: |
+      Requires EC2 instances and launch templates to demand IMDSv2
+      (http_tokens = required, which defaults to optional) and objects to an
+      explicit hop limit above 1, so a container or a request-forging process
+      cannot read the instance role's credentials.
+    mainPython: aws_imdsv2_required.py
+    keywords: ["imdsv2", "instance metadata", "ssrf", "credential theft", "ec2", "soc2"]
+
+  - name: opentofu-state-encryption
+    description: |
+      Requires an OpenTofu encryption block with a key provider and
+      state.enforced = true. State holds every resource attribute in
+      plaintext, including generated secrets.
+    mainPython: opentofu_state_encryption.py
+    keywords: ["opentofu", "state encryption", "secrets", "terraform state", "soc2"]
+
   - name: aws-ebs-volume-encryption
     description: |
       Requires EBS volumes (standalone and instance block devices) to be
@@ -281,6 +306,35 @@ policies:
     mainPython: aws_cloudtrail_kms_encryption.py
     keywords: ["cloudtrail", "kms", "encryption at rest", "audit log", "sse-kms", "soc2"]
 
+  - name: aws-tls-policy-approved
+    description: |
+      Requires every TLS-terminating resource to negotiate using a policy on the
+      approved list: ALB/NLB listener `ssl_policy`, CloudFront
+      `minimum_protocol_version`, and API Gateway custom-domain `security_policy`.
+      Complements aws-elb-https-only, which asserts the listener is encrypted but
+      not which protocol versions and ciphers it will accept. Configure the set
+      via `approved_tls_policies`; skipped when none are configured, because the
+      approved suite is the organisation's cryptographic standard and there is no
+      safe default to assume on its behalf. A resource that terminates TLS but
+      names no policy fails, since the negotiated suite is then whatever the
+      provider defaults to.
+    mainPython: aws_tls_policy_approved.py
+    keywords: ["tls", "ssl policy", "cipher suite", "minimum protocol version", "encryption in transit", "cloudfront", "api gateway"]
+
+  - name: aws-stateful-backup-configured
+    description: |
+      Requires stateful resources to declare a backup: a non-zero
+      `backup_retention_period` on RDS instances and clusters, an enabled
+      `point_in_time_recovery` block on DynamoDB tables, and an enabled
+      `backup_policy` on EFS file systems. Read replicas are skipped — they
+      inherit the source's backups and cannot set their own. Retention must be
+      written down rather than inherited from the provider default, because a
+      window nobody declared is a window nobody can evidence. A retention value
+      that is an unresolved expression fails rather than passing, since an
+      unknown window is not a known-good one.
+    mainPython: aws_stateful_backup_configured.py
+    keywords: ["backup", "point in time recovery", "pitr", "rds retention", "efs backup", "disaster recovery", "resilience"]
+
   # --- Resource tagging (reads the normalized .iac.modules[] view) ---
   - name: aws-resources-tagged
     description: |
@@ -325,6 +379,13 @@ inputs:
   min_password_length:
     description: Minimum IAM account password length required by aws-iam-password-min-length
     default: "14"
+  approved_tls_policies:
+    description: |
+      Comma-separated list of approved TLS policy names, checked by
+      aws-tls-policy-approved against ALB/NLB `ssl_policy`, CloudFront
+      `minimum_protocol_version` and API Gateway `security_policy`. Empty (the
+      default) skips the check.
+    default: ""
   required_tags:
     description: |
       Comma-separated list of tag keys that every taggable AWS resource must

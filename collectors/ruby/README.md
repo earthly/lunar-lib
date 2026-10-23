@@ -48,7 +48,14 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ruby@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
-    # include: [project, dependencies]  # Only include specific subcollectors
+    include:
+      - project             # Ruby version and build systems
+      - dependencies        # Gemfile dependencies
+      - cicd                # ruby commands in CI
+      - bundler-cicd        # bundle commands in CI
+      - rake-cicd           # rake commands in CI
+      - bundler-audit       # Runs bundler-audit
+      - bundler-audit-cicd  # bundler-audit results from CI
 ```
 
 The CI-hook collectors (`cicd`, `bundler-cicd`, `rake-cicd`, `bundler-audit-cicd`) require a GitHub Actions workflow that runs on a Lunar-enabled runner. Example steps:

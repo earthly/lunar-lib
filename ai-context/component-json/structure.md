@@ -31,6 +31,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.vcs.branch_protection` | Protection settings (`enabled`, `required_approvals`, `require_codeowner_review`) |
 | `.vcs.pr` | PR-specific data (only in PR context) — see [PR-Specific Data](conventions.md#pr-specific-data) |
 | `.vcs.pr.ticket` | Extracted ticket reference (`id`, `source`, `url`) |
+| `.vcs.release_range` | Commits since the previous release tag, with the merged PR behind each (default branch, opt-in) |
 | **[`.containers`](cat-containers.md)** | **Container images, Dockerfiles, registries** |
 | `.containers.definitions[]` | Dockerfile definitions (`path`, `valid`, `base_images`, `final_stage`, `labels`) |
 | `.containers.definitions[].base_images[]` | Base image info (`reference`, `image`, `tag`) |
@@ -38,11 +39,13 @@ This table lists important sub-objects within each category. For full details, s
 | `.containers.lint_results[]` | Per-Dockerfile lint results (`path`, `issues[]` with `rule`, `severity`, `message`, `line`) |
 | `.containers.builds[]` | Built images (`image`, `tag`, `signed`, `has_git_sha_label`) |
 | **[`.k8s`](cat-k8s.md)** | **Kubernetes manifests and configuration** |
-| `.k8s.manifests[]` | Manifest files (`path`, `valid`, `resources`) |
-| `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `containers`) |
-| `.k8s.workloads[].containers[]` | Container specs (`has_resources`, `has_liveness_probe`, `runs_as_non_root`) |
-| `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `target_workload`, `min_available`) |
-| `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`) |
+| `.k8s.manifests[]` | Manifest files and Helm chart renders (`path`, `render`, `valid`, `resources`) |
+| `.k8s.workloads[]` | Workload resources (`kind`, `name`, `replicas`, `pod_labels`, `pod_annotations`, `topology_spread_constraints`, `render`, `containers`, `init_containers`) |
+| `.k8s.workloads[].containers[]` | Container specs (`has_resources`, `liveness_probe`, `readiness_probe`, `has_prestop`, `runs_as_non_root`) |
+| `.k8s.pdbs[]` | PodDisruptionBudgets (`name`, `selector`, `min_available`, `render`) |
+| `.k8s.hpas[]` | HorizontalPodAutoscalers (`min_replicas`, `max_replicas`, `render`) |
+| `.k8s.scaled_objects[]` | KEDA ScaledObjects (`target_workload`, `min_replicas`, `max_replicas`, `render`) |
+| `.k8s.network_policies[]` | NetworkPolicies (`pod_selector`, `policy_types`, `egress`, `render`) |
 | `.k8s.summary` | Aggregated checks (`all_have_resources`, `all_have_probes`, `all_have_pdb`) |
 | **[`.iac`](cat-iac.md)** | **Infrastructure as Code (Terraform, Pulumi, etc.)** |
 | `.iac.source` | Tool metadata (`tool`, `version`) |
@@ -59,8 +62,14 @@ This table lists important sub-objects within each category. For full details, s
 | **[`.testing`](cat-testing.md)** | **Test execution results and code coverage** |
 | `.testing.results` | Test results (`total`, `passed`, `failed`, `skipped`) |
 | `.testing.failures[]` | Failure details (`name`, `file`, `line`, `message`) |
+| `.testing.runs[]` | Per-build results (`pipeline`, `run_id`, `attempt`, `job`, `step`, totals, `all_passing`) |
 | `.testing.coverage` | Coverage data (`percentage`, `lines`, `files[]`) |
 | `.testing.coverage.lines` | Line coverage (`covered`, `total`) |
+| **[`.dependencies`](cat-dependencies.md)** | **Where dependencies are resolved from (package registries)** |
+| `.dependencies.registries[]` | Registry declarations (`ecosystem`, `host`, `url`, `path`, `kind`, `is_default`, `is_public`) |
+| `.dependencies.registries_used` | Deduplicated registry hostnames across ecosystems |
+| `.dependencies.ecosystems` | Package ecosystems detected (`npm`, `maven`, ...) |
+| `.dependencies.summary` | Aggregated checks (`has_public`) |
 | **[`.sca`](cat-sca.md)** | **Software Composition Analysis (dependency vulnerabilities)** |
 | `.sca.source` | Tool source (`tool`, `version`, `integration`) |
 | `.sca.vulnerabilities` | Vuln counts (`critical`, `high`, `medium`, `low`, `total`) |
@@ -84,6 +93,8 @@ This table lists important sub-objects within each category. For full details, s
 | `.observability.slo` | SLO info (`defined`, `count`, `has_error_budget`) |
 | `.observability.summary` | Aggregated checks (`golden_signals_complete`, `has_dashboard`) |
 | **[`.oncall`](cat-oncall.md)** | **On-call, incident management, runbooks** |
+| `.oncall.service` | Mapped on-call service (`id`, `name`, `status`, `discovered_via`) |
+| `.oncall.service_lookup` | Present when a collector looked for a service mapping and found none (`searched`, and `errors` for lookups that didn't complete) |
 | `.oncall.schedule` | Schedule info (`exists`, `participants`, `rotation`) |
 | `.oncall.escalation` | Escalation info (`exists`, `levels`) |
 | `.oncall.runbook` | Runbook info (`exists`, `path`, `url`) |
@@ -96,6 +107,7 @@ This table lists important sub-objects within each category. For full details, s
 | `.compliance.regimes` | List of applicable regimes (e.g., `["soc2", "pci-dss"]`) |
 | `.compliance.data_classification` | Data classification (`level`, `contains_pii`, `contains_pci`) |
 | `.compliance.controls` | Control status (`access_reviews`, `audit_logging`, `encryption_at_rest`) |
+| `.compliance.penetration_testing.reports[]` | Pen-test report records (`date`, `path`, `provider`, `scope`, `report_url`) |
 | **[`.api`](cat-api.md)** | **API specifications and documentation** |
 | `.api.spec_files[]` | Spec file metadata — protocol-agnostic (`path`, `format`, `protocol`, `valid`, `version`, `operation_count`, `schema_count`, `has_docs`) |
 | `.api.native.openapi` | Map of file path → raw OpenAPI/Swagger spec as JSON (all versions, same spec lineage) |
@@ -158,6 +170,7 @@ Each category has its own detailed documentation:
 - [`.iac`](cat-iac.md) — Infrastructure as Code (Terraform, Pulumi, etc.)
 - [`.ci`](cat-ci.md) — CI/CD pipeline execution and configuration
 - [`.testing`](cat-testing.md) — Test execution results and code coverage
+- [`.dependencies`](cat-dependencies.md) — Where dependencies are resolved from (package registries)
 - [`.sca`](cat-sca.md) — Software Composition Analysis (dependency vulnerabilities)
 - [`.sast`](cat-sast.md) — Static Application Security Testing
 - [`.secrets`](cat-secrets.md) — Secret/credential scanning

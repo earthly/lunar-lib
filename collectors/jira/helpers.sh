@@ -3,6 +3,24 @@
 
 DEFAULT_TICKET_PATTERN="[A-Za-z][A-Za-z0-9]+-[0-9]+"
 DEFAULT_TICKET_KEYWORDS="fixes|fixed|fix|closes|closed|close|resolves|resolved|resolve|ticket|issue"
+DEFAULT_TICKET_PATH=".vcs.pr.ticket"
+
+# resolve_ticket_path: Sets TICKET_PATH to where this import records its ticket.
+# A second import records a second reference, such as an architecture-review
+# submission, at a path of its own instead of overwriting .vcs.pr.ticket.
+#
+# Segments are limited to what a policy can address with dot syntax, which also
+# keeps the path safe to splice into ticket-history's SQL. Returns 1 on a path
+# outside .vcs.pr or with any other character.
+resolve_ticket_path() {
+  local re='^\.vcs\.pr(\.[A-Za-z_][A-Za-z0-9_]*)+$'
+  TICKET_PATH="${LUNAR_VAR_TICKET_PATH:-$DEFAULT_TICKET_PATH}"
+  [[ $TICKET_PATH == .* ]] || TICKET_PATH=".${TICKET_PATH}"
+  if [[ ! $TICKET_PATH =~ $re ]]; then
+    echo "ticket_path must be a path under .vcs.pr made of letters, digits and underscores, such as .vcs.pr.architecture_review; got '${LUNAR_VAR_TICKET_PATH}'." >&2
+    return 1
+  fi
+}
 
 # escape_string: Escapes special regex characters in a string for bash regex.
 escape_string() {
@@ -12,7 +30,7 @@ escape_string() {
   for (( i=0; i<${#str}; i++ )); do
     char="${str:i:1}"
     case "$char" in
-      \\|\.|\^|\$|\*|\+|\?|\(|\)|\[|\]|\{|\}|\||- ) escaped+="\\$char" ;;
+      \\|\.|^|\$|\*|\+|\?|\(|\)|\[|\]|\{|\}|\||- ) escaped+="\\$char" ;;
       *) escaped+="$char" ;;
     esac
   done
@@ -201,6 +219,7 @@ jira_validate_ticket() {
 #     0 - the PR references a candidate; see TICKET_VALID for its standing
 #     1 - the PR references no candidate at all
 #     2 - Jira rejected the credentials
+# shellcheck disable=SC2034  # TICKET_* are read by the scripts sourcing this file
 resolve_ticket() {
   TICKET_KEY=""
   TICKET_VALID=""

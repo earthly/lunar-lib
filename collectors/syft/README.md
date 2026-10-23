@@ -35,4 +35,7 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/syft@main
     on: ["domain:engineering"]
+    include:
+      - generate  # Generates an SBOM
+      - ci        # Syft runs in CI
 ```

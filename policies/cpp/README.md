@@ -40,7 +40,12 @@ policies:
   - uses: github://earthly/lunar-lib/policies/cpp@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [build-system-exists, min-cpp-standard]  # Only run specific checks
+    include:
+      - build-system-exists
+      - min-cpp-standard
+      - cppcheck-clean
+      - min-compiler-version-cicd
+      - min-cmake-version-cicd
     with:
       min_cpp_standard: "17"           # Minimum C++ standard (default: "17")
       max_cppcheck_warnings: "0"       # Maximum cppcheck warnings (default: "0")

@@ -102,6 +102,31 @@ policies:
     mainPython: ./require-signed-commits.py
     keywords: ["signed commits", "gpg signing", "commit verification"]
 
+  - name: disallow-bypass-actors
+    description: |
+      Fails when anyone can bypass protection on the default branch: a ruleset
+      bypass actor, or (classic protection) admins not enforced or a bypass
+      allowance. Accepted actors go in allowed_bypass_actors.
+    mainPython: ./disallow-bypass-actors.py
+    keywords: ["bypass actors", "rulesets", "enforce admins", "branch protection"]
+
+  - name: pr-commits-signed
+    description: |
+      Requires every commit in a pull request to carry a signature GitHub
+      verified. Skips when commit data isn't collected.
+    mainPython: ./pr-commits-signed.py
+    runs_on: [prs]
+    keywords: ["signed commits", "commit verification", "pull request"]
+
+  - name: release-commits-merged-via-pr
+    description: |
+      Every commit since the previous release tag must have reached the default
+      branch through merged pull requests. Gate releases with
+      `enforcement: block-release`.
+    mainPython: ./release-commits-merged-via-pr.py
+    runs_on: [default-branch]
+    keywords: ["release", "merged pull request", "ok-release", "change management"]
+
   - name: require-private
     description: |
       Ensures repository visibility is set to private, not public.
@@ -132,4 +157,19 @@ inputs:
     default: "main"
   allowed_merge_strategies:
     description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
+    default: ""
+  allowed_bypass_actors:
+    description: |
+      Bypass actors the disallow-bypass-actors check accepts, one per line or
+      comma-separated. An entry is an actor type (`OrganizationAdmin`,
+      `DeployKey`) or `<type>:<id>`: a ruleset bypass actor's `actor_id`
+      (`Integration:98765`, `RepositoryRole:5`), or a classic bypass
+      allowance's login or slug (`User:jdoe`, `Team:release-managers`,
+      `Integration:release-bot`). `#` comments out the rest of a line:
+
+      ```yaml
+      with:
+        allowed_bypass_actors: |
+          Integration:98765  # release app, tags after CI passes
+      ```
     default: ""

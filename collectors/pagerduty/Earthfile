@@ -1,0 +1,17 @@
+VERSION 0.8
+
+# Offline test for the collector's service-ID resolution: meta, input, the
+# checked-out file, and the from-backstage-collector sub-collector, for which the real
+# backstage collector runs against a mock Backstage and its output is served as
+# the Component JSON. test-local.sh stubs curl, lunar and sleep on PATH, so no
+# network, Backstage or Lunar Hub is needed. Runs on +base-image, the
+# collector's real runtime, for its bash, jq, yq and python3. No image: target —
+# the plugin uses base-main.
+test:
+    FROM --pass-args ../../+base-image
+    WORKDIR /workspace
+    COPY ../backstage+src/main.sh ../backstage+src/lint_backstage.py backstage/
+    COPY helpers.sh oncall.sh from-backstage-collector.sh test-local.sh .
+    COPY --dir test .
+    ENV BACKSTAGE_DIR=/workspace/backstage
+    RUN ./test-local.sh

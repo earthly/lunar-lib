@@ -4,7 +4,8 @@ image:
     FROM --pass-args ../../+base-image
 
     # Install Go (download from official source to get latest version)
-    ARG GO_VERSION=1.23.4
+    # renovate: datasource=golang-version depName=golang
+    ARG GO_VERSION=1.27.2
     ARG TARGETARCH
     RUN wget -q "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
         tar -C /usr/local -xzf "go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" && \
@@ -12,12 +13,29 @@ image:
     ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
 
     # Install golangci-lint v2
-    ARG GOLANGCI_LINT_VERSION=v2.8.0
-    RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-        sh -s -- -b /usr/local/bin ${GOLANGCI_LINT_VERSION}
+    # renovate: datasource=github-releases depName=golangci/golangci-lint
+    ARG GOLANGCI_LINT_VERSION=v2.13.2
+    # Download + verify against the release's checksums.txt ourselves. Upstream's
+    # install.sh greps that file for the tarball name, which since v2.13 also
+    # matches the tarball's sbom entry, so its checksum check always fails.
+    COPY (+golangci-lint-bin/golangci-lint --GOLANGCI_LINT_VERSION=$GOLANGCI_LINT_VERSION) /usr/local/bin/golangci-lint
 
     # Verify installations
     RUN go version && golangci-lint --version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:golang-$VERSION
+
+# Built from source: the release binaries ship the Go they were built with
+# (v2.13.2 and v2.15.0 both carry go1.27.0, with fixable criticals).
+golangci-lint-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required GOLANGCI_LINT_VERSION
+    RUN git clone --quiet --depth 1 --branch "${GOLANGCI_LINT_VERSION}" https://github.com/golangci/golangci-lint /src
+    WORKDIR /src
+    RUN go get golang.org/x/text@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X main.version=${GOLANGCI_LINT_VERSION#v} -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(git log -1 --format=%cI)" \
+            -o /out/golangci-lint ./cmd/golangci-lint
+    SAVE ARTIFACT /out/golangci-lint

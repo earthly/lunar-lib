@@ -5,7 +5,569 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+Sections are generated at release time by `scripts/gen-changelog-section.sh` from
+the commits in the tag range — don't hand-edit. A merged change appears here when
+the next version ships.
+
+## [1.21.1] — 2026-10-21
+
+### Security
+
+- nodejs, license-origins: bump Node to 22.23.4 for the eMudhra CA security fix (#394)
+
+## [1.21.0] — 2026-10-21
+
+### Added
+
+- ticket: add skip_authors to skip PRs from bots like dependabot (#389)
+
+### Changed
+
+- Bump lunar-scripts base images to 1.1.11 (#388)
+
+### Security
+
+- Refresh pip certifi bundles in the shared image base (#390)
+
+## [1.20.0] — 2026-10-19
+
+### Added
+
+- backstage: add a system-valid check that fails when spec.system is unset or doesn't resolve to a System (#386)
+- backstage: add a system-domain-valid check that fails at the first broken step from spec.system to its Domain (#384)
+- backstage: add allowed-types and allowed-lifecycles checks (#381)
+- backstage-catalog-info-monorepo: add discover-on-commit to catalog a monorepo on every push (#377)
+- java, testing: add a JUnit XML test-results sub-collector, and make testing.passing check every CI build (#348)
+
+### Changed
+
+- docs: reflect 300+ built-in guardrails in AI context (#378)
+- release: refuse to cut a release behind the newest lunar-scripts, and have Renovate bump it as soon as it ships (#375)
+
+### Fixed
+
+- grype: image scans honor db_auto_update instead of always using the image-baked DB (#383)
+- github-actions: fix lint errors never being recorded, and read only the root's workflows in monorepos (#380)
+- github-actions: fix monorepo subdirectory components missing the repository root's workflows (#379)
+
+### Security
+
+- images: move to lunar-scripts 1.1.10 and use its yq in github-actions to clear the last Go stdlib CVEs (#385)
+- images: rebuild vendored Go tools on Go 1.27.2 to clear stdlib CVEs, move to lunar-scripts 1.1.9, and run grype image scans at size xlarge (#382)
+
+## [1.19.1] — 2026-10-09
+
+### Added
+
+- compliance-docs: add a pen-test report freshness check and a collector for pen-test records (#349)
+- ticket, jira: add a ticket-field check and a ticket_path input for recording a second ticket reference (#350)
+
+### Changed
+
+- READMEs: install snippets list their sub-collectors and checks with include: (#371)
+- Let gitleaks scan this repo clean: allow its test fixtures and one false positive (#365)
+
+### Fixed
+
+- jira ticket-from-json, argocd-deployment-tracking: read Component JSON at the exact commit instead of the latest snapshot (#372)
+
+### Security
+
+- Clear fixable CVEs in plugin images, and gate releases on Lunar's ok-release (#373)
+
+## [1.19.0] — 2026-10-06
+
+### Added
+
+- k8s: render Helm charts, and add nine k8s checks (#368)
+
+### Fixed
+
+- k8s: fix rendering Helm charts whose directory name isn't a valid release name (#369)
+
+## [1.18.1] — 2026-10-05
+
+### Added
+
+- pagerduty: find the service ID in the backstage collector's live lookup, including one set on the System or Domain; oncall: add service-mapped (#359)
+- datadog: add an oncall sub-collector reading Datadog On-Call for policies/oncall (#347)
+- github collector + vcs policy: add PR reviews and commit signatures, ruleset bypass actors, and a release-range merged-PR check (#346)
+
+### Changed
+
+- claude, codex, gemini: quote JSON string values in the cicd collectors (#364)
+- gitlab cataloger: retry a project listing page with simple=true after an HTTP 500 (#362)
+
+### Fixed
+
+- backstage: fix system-domain-set passing when there's no System to check (#363)
+
+## [1.18.0] — 2026-10-01
+
+### Added
+
+- backstage: add required-link-types and dependencies-documented checks (#357)
+- k8s, istio: add a metadata-endpoint egress check and an approved TLS versions and ciphers check (#345)
+- backstage: add a system-domain-set check for a component whose system belongs to no domain (#356)
+- sbom: add an allowed-licenses allow-list check (#344)
+- ci-archive: add a daily cron that backs up the default branch's CI logs to S3 (#351)
+- ci-archive: add a collector that archives each finished CI run attempt and its logs to S3 (#334)
+
+### Changed
+
+- CI: authenticate earthly/actions-setup so a rate-limited runner IP no longer fails the build (#360)
+- gitlab cataloger: page project listings newest-first; a project created mid-run is now cataloged on the next run (#353)
+
+### Fixed
+
+- grype, trivy: fix the on-push container scan skipping when a newer main commit lands first (#354)
+- nodejs, elixir: fix detection of repos with no root package.json or mix.exs (#355)
+
+## [1.17.1] — 2026-09-25
+
+### Added
+
+- backstage collector: add opt-in lookup of a monorepo's shared catalog-info.yaml for subdirectory components (#337)
+- backstage: add aws_assume_role_arns for cross-account SigV4 auth (#336)
+- backstage: opt-in skip when no catalog-info.yaml is found (#335)
+
+### Changed
+
+- gitlab cataloger: add the request ID, response headers and body to GitLab API error logs (#340)
+
+### Fixed
+
+- k8s: fix pdb check to match PodDisruptionBudgets by label selector, not name (#339)
+- backstage: fix SigV4 signing of by-query lookups on curl older than 8.14 (#338)
+
+## [1.17.0] — 2026-09-23
+
+### Added
+
+- moon cataloger: populate monorepo component paths from the moon dependency graph (#330)
+- terraform: permissions boundary, IMDSv2, OpenTofu state encryption (#326)
+- terraform: approved TLS policy and stateful-resource backup coverage (#329)
+- terraform collector: find .tofu files, honour OpenTofu precedence (#327)
+- github-actions: exempt named jobs from checkout-no-persist-credentials (#331)
+- grype/trivy container scans: record collected_at, the commit, and the resolved image digest (#320)
+
+### Changed
+
+- ai: cap every instruction file on lines and bytes, not just the root one (#332)
+
+## [1.16.0] — 2026-09-21
+
+### Changed
+
+- Skip empty repositories and fix repository filters (#321)
+- changelog: generate the section at release time, drop [Unreleased] (#319)
+- gitlab cataloger: skip group discovery when include_groups is set (#323)
+- container-scan: gate max-severity on a pushed image, not on .containers (#315)
+- CI: record the images +all pushes so they get CVE-scanned (#316)
+
+### Fixed
+
+- container-scan: name the unscanned images instead of blaming the config (#325)
+- after-json collectors: retry the get-json resolve instead of silently skipping (#322)
+- github-org: stop passing --no-archived so gh doesn't fall back to the 1000-capped search API (#318)
+
+## [1.15.1] — 2026-09-15
+
+### Fixed
+
+- `gitlab` cataloger: projects GitLab has scheduled for deletion are no longer
+  cataloged. A GitLab delete is delayed — the project is renamed to
+  `<path>-deletion_scheduled-<id>` and keeps appearing in the project listing,
+  with `archived` still false — so a deleted project lingered as a component
+  for the whole retention window instead of dropping out on the next run
+  (#313).
+
+## [1.15.0] — 2026-09-15
+
+### Added
+
+- `gitlab` cataloger: discovers every top-level GitLab group the service
+  account maintains and catalogs each group's projects, including subgroups, as
+  components. No group list to maintain — inviting the account to a group
+  onboards it. Project topics become Lunar tags (normalized, since GitLab
+  topics are free text and a tag containing whitespace or parens cannot be
+  referenced from a policy's `on:` expression), with visibility, archived state
+  and the numeric project ID in `meta`. Archived projects are excluded by
+  default and forks can be excluded with `include_forks`; personal-namespace
+  projects can be swept in with `include_personal_namespaces`. All three
+  states become tags (`gitlab-archived`, `gitlab-fork`,
+  `gitlab-personal-namespace`). `domain_from_group_path`
+  optionally derives each component's domain from the group path that
+  contains it, so the catalog mirrors the GitLab hierarchy (#306).
+
+## [1.14.5] — 2026-09-14
+
+### Changed
+
+- `grype` and `trivy` collectors: `container-scan` and `container-rescan` scan
+  every image the component pushed, not just the last one. `.container_scan`
+  gains `images[]` (per-image counts), `findings[].image` and `errors[]`;
+  `container_image` accepts a comma-separated list. The `container-scan`
+  `max-severity` check names the image(s) on each failing line (#305).
+
+### Fixed
+
+- `github-actions` collector: repo-sized values now reach `jq` on stdin or via
+  files instead of `--argjson`, which the kernel caps at 128 KiB per argument.
+  On a large monorepo the collector died with `Argument list too long` and wrote
+  no workflow or dependency data at all, which left the `dependencies-pinned`
+  and `no-mutable-refs` checks reporting "skipped" rather than flagging unpinned
+  actions (#310).
+- `ai` collector: `ai-authorship` no longer dies with `invalid JSON text passed
+  to --argjson` on commits that carry no AI trailer — a jq `select` in an
+  object-value position produced an empty entry (#309).
+- All plugin images built on `base-image`: `git` is now installed, with
+  `safe.directory '*'` set system-wide. Collectors that shell out to git
+  (`ai` authorship, `claude` code review) were writing empty data because the
+  binary was absent and their call sites swallow the failure (#307).
+
+### Security
+
+- Bundled tool binaries across the plugin images are updated to current
+  releases (Go toolchain, `helm`, `istioctl`, `gh`, `kubeconform`, `syft`,
+  `trivy`, `gitleaks`, `actionlint`, `yq`, `hcl2json`, `dockerfile-json`, npm),
+  clearing the fixable critical CVEs their old builds carried. `actionlint`,
+  `hcl2json` and `dockerfile-json` are built from source — their latest release
+  binaries still ship a stale Go stdlib (#304).
+
+## [1.14.4] — 2026-09-03
+
+### Changed
+
+- `grype` and `trivy` collectors: `container-scan` and `container-rescan` now
+  declare `size: large`, since pulling an image can exceed the default 1Gi
+  ephemeral-storage limit. `size:` on the `uses:` line does not reach a
+  plugin's sub-collectors yet, so it lives in the manifest (#301).
+
+## [1.14.3] — 2026-09-03
+
+### Security
+
+- All plugin images: OS packages are now upgraded at build time (`apk upgrade`
+  on the shared alpine base image, `apt-get upgrade` on the five debian-based
+  images), clearing the fixable critical OpenSSL CVEs (CVE-2026-63073,
+  CVE-2026-75803) every published image carried, and the lunar-scripts base is
+  pinned to 1.1.6 (lunar CLI 2.10.0, which raises the gRPC message cap to
+  16 MiB). `nodejs` and `license-origins` move to Node 22.23.2 and npm 12.0.2
+  for the fixable criticals in Node and in npm's vendored `tar` (#300).
+
+## [1.14.2] — 2026-09-01
+
+### Added
+
+- `backstage` collector + policy: transitive domain referential integrity. A
+  Backstage `Component` reaches a domain only through its `System`, so on the
+  usual one-`Component`-per-repo catalog file `domain-exists` had nothing to
+  read and passed vacuously — a component whose system pointed at a missing
+  domain was indistinguishable from a healthy one. The collector now follows
+  `spec.system` one hop further to that System's own `spec.domain` and records
+  `.refs.system_domain = {name, exists, via_system}`; the new
+  `system-domain-exists` check consumes it and names the offending System, since
+  that's whose catalog file needs fixing. `domain-exists` is unchanged (#299).
+
+## [1.14.1] — 2026-08-31
+
+### Added
+
+- `backstage` collector: `ref_lookup` input selects which catalog endpoint
+  resolves each declared `spec.domain` / `spec.system` reference — `by-name`
+  (default, unchanged behavior) or `by-query`. Some deployments authorize only
+  the catalog search endpoint: a gateway in front of Backstage can expose
+  `/catalog/entities/by-query` while rejecting `/catalog/entities/by-name/...`
+  outright, and then every reference lookup fails however correct the auth is,
+  recording an `error` per reference that reads like an outage rather than a
+  misconfiguration. `by-query` is the same endpoint the `backstage` *cataloger*
+  already uses, so an instance the cataloger can read supports it. Both modes
+  write an identical `.refs` shape, so no policy changes are needed, and
+  `ref_lookup` composes with `auth_mode` and `api_path_prefix`. Because
+  `by-query` reports "no match" as an empty result set, a `200` whose body is
+  not parseable JSON records `{name, error}` rather than collapsing into
+  `exists: false` — a gateway login page must not read as a missing domain
+  (#297).
+
+## [1.14.0] — 2026-08-28
+
+### Added
+
+- `ticket-coverage` collector and policy (experimental): record and score what
+  share of a component's recent pull requests referenced an issue-tracker
+  ticket. Per-PR ticket checks only ever produce PR-scoped results, and every
+  Lunar rollup filters on `pr IS NULL`, so a component with a spotless record of
+  ticket-linked pull requests scored zero on a change-management initiative —
+  indistinguishable on screen from everything-failing. Writing the metric on the
+  default branch is what makes ticket adoption scoreable at all. The collector
+  reads only Lunar's own data through the SQL API — no issue-tracker or Git
+  platform call and no token — so it behaves the same on any Git platform, which
+  is the substantive difference from the existing `jira` `ticket-history`
+  sub-collector (#288).
+
+- `codeql` collector (`monorepo-fanout`): new sub-collector that redistributes a
+  monorepo's repo-wide CodeQL findings to its subdirectory components. A
+  repo-scoped scan resolves to the repository, so its findings land on the
+  repo-root component and every subcomponent evaluates as "No SAST scanning data
+  found" despite having been scanned. This runs on the root once its collection
+  settles and writes each subcomponent's own slice of the path-tagged findings
+  onto that subcomponent at the same commit; a finding no component claims stays
+  on the root. Attribution reuses Lunar's own change-detection rule (a
+  component's explicit `paths:` plus the implicit patterns its name implies), so
+  a monorepo whose components are scoped correctly for change detection needs no
+  new configuration. The `after-json` hook is on `.sast.issues` rather than
+  `.sast`, because the CLI sub-collector writes `.sast.native.codeql.cicd` for
+  every `codeql` exec — so `.sast` is present on any repo where `codeql` merely
+  ran, including runs that produce no SARIF. Target it at the repository root
+  component and enable it alongside `cicd`, which writes the findings it fans
+  out (#293).
+
+- `backstage` collector: AWS SigV4 authentication for the referential-integrity
+  lookups, for Backstage APIs fronted by AWS IAM auth (e.g. Amazon API Gateway)
+  that reject Bearer tokens. Set `auth_mode: sigv4` plus `aws_region` (and
+  `aws_service`, default `execute-api`); credentials resolve at runtime from the
+  standard AWS chain — IRSA, EKS Pod Identity / ECS, EC2 instance profile, then
+  the optional static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets — so
+  they self-refresh with nothing to rotate. Brings the collector to parity with
+  the `backstage` cataloger (#232); both run in the same snippet pods, so a
+  single service-account role annotation covers both. An auth or
+  credential-resolution failure never discards the parse and lint results — it
+  is recorded as a per-reference `{name, error}` (#294).
+
+- `backstage` collector: `api_path_prefix` input (default `/api`) — set it to an
+  empty string when the Backstage catalog API is mounted at the root, e.g. behind
+  an API gateway that strips the `/api` hop and returns 403/404 for
+  `/api/catalog/entities`. Matches the same input on the `backstage` cataloger.
+  This pairs with `auth_mode: sigv4` above: an IAM-fronted Backstage is usually
+  behind Amazon API Gateway, which is exactly the shape that strips the hop, so
+  the instances needing SigV4 are often the ones needing an empty prefix (#294).
+
+- `sca` and `container-scan` policies (`max-severity`): new `ignore_unfixable`
+  input (default `false`) narrows the failure to findings that carry an upgrade
+  target, so an unfixable base-image or upstream advisory cannot hold a release
+  gate closed indefinitely. It is applied after the threshold has already been
+  crossed, so it can only turn a FAIL into a PASS and never manufactures a
+  failure the default would not have raised. Unfixable findings are still
+  collected and still visible in the Component JSON — the option changes the
+  verdict, never what is recorded — and a summary-only scan fails as if the
+  option were off and says why. Also collapses findings double-written when two
+  scanners write the same path, keyed on CVE id, so a CVE is enumerated once
+  rather than once per scanner (#289).
+
+- Manifest snippet allow-list: the `meta` and `failureText` snippet fields are
+  now accepted. Both landed in the hub on 2026-08-25, after the allow-list was
+  transcribed, so a manifest setting either was rejected as an unknown key. The
+  unknown-key error no longer asserts that the hub silently ignores the key —
+  a false statement for a field the hub decodes fine, and one that would talk an
+  author into deleting working configuration — and the allow-list records the
+  upstream commit it was derived from so the next drift is auditable (#292).
+
+### Changed
+
+- `backstage` cataloger: components whose git repository does not exist are now
+  skipped instead of catalogued, via the new `verify_repos` input (default
+  `true`). A Backstage id annotation is a claim about a repo, not a fact, and
+  Lunar does not validate repo existence when the catalog is saved — so a
+  renamed, deleted or typo'd slug created a component with nothing behind it,
+  which no collector or policy could ever run against. Skipped components are
+  named in the run log. In practice this stays off until the new optional
+  `GH_TOKEN` secret is set: without it the cataloger logs one line and writes
+  every component as before, so upgrading changes nothing until you opt in.
+  The host is read from each component id, so a catalog spanning github.com and
+  any number of GitHub Enterprise Server hosts needs no extra configuration, and
+  each host is verified independently — a host that can't be checked (bad
+  credentials, unreachable, or a forge that isn't GitHub) leaves its own
+  components untouched without affecting the rest. Lookups are batched ~100
+  repos per GraphQL request rather than one request per component. A component
+  is dropped only on an explicit `NOT_FOUND` from GitHub, never on a null
+  `data` field alone — GitHub also nulls a field for `FORBIDDEN` (a classic PAT
+  not SSO-authorized for a SAML org, where the repo exists and the token simply
+  cannot see it) and for a partial `SERVICE_UNAVAILABLE` (#295).
+
+- `backstage` cataloger: an explicit empty `component_id_prefix` is no longer
+  clobbered back to `github.com/`. It used `:-` rather than `-`, so setting it
+  to `""` silently kept the default and double-prefixed ids whose annotation
+  value already carried a host — which made a multi-host catalog impossible to
+  express. Same bug previously fixed for `tag_prefix` (#295).
+
+- `sca` and `container-scan` policies (`max-severity`): a failing check now
+  emits the severity headline plus one assertion per offending finding, most
+  severe first, instead of a truncated list ending in "+N more (see component
+  JSON for full list)". That pointer used internal jargon, so it meant nothing
+  to the developer reading the PR comment; the hub already truncates the display,
+  so the policy needs no cap of its own. A summary-only collector with no
+  per-finding detail still emits the headline alone. Also wires `policies/sca`
+  and `policies/container-scan` into the root `+test` target — both had test
+  suites CI was never running (#252).
+
+### Fixed
+
+- `claude`, `coderabbit` and `codeql` collectors: `runs_on` was nested under
+  `hook:` in five sub-collectors, where it does nothing. `runs_on` is a
+  snippet-level field; the hook mapping has no such key, and because plugin
+  manifests are not decoded with unknown-key rejection it was dropped silently
+  and then replaced by the `[prs, default-branch]` default. All five were
+  running in both contexts while the manifest said otherwise. `claude`
+  (`code-reviewer`, `run-code-review`) and `coderabbit` (`code-reviewer`) now
+  declare `runs_on: [prs]` at snippet level and **stop running on
+  default-branch commits** — they read pull request review data, and on a
+  default-branch commit there is no pull request. The two `codeql`
+  sub-collectors drop the key instead: GitHub Code Scanning covers the default
+  branch and `github-app.sh` queries check-runs for any commit, so both should
+  run in both contexts and the key was only ever a copy of the semgrep
+  pattern, whose PR-only reasoning does not apply. codeql behaviour is
+  therefore unchanged. A new `scripts/validate_manifest_schema.py` runs in
+  `+lint` and now fails the build on any key a plugin manifest puts outside
+  the snippet or hook schema, naming the file, sub-snippet, key and line
+  (#291).
+
+### Security
+
+- `gitleaks` collector: the raw scanner report is no longer stored with detected
+  secrets in plaintext. Both sub-collectors shipped the report to
+  `.secrets.native.gitleaks.{auto,cicd}.report`, and gitleaks puts the detected
+  credential in that report's `Secret` and `Match` fields — so a secret scan
+  produced a stored copy of the very secrets it found. The normalized
+  `.secrets.issues` / `.secrets.cicd` projections were always safe. `scan.sh`
+  now passes `--redact` and then verifies the report really is redacted rather
+  than trusting the flag, dropping it if not; `cicd.sh` strips `.Secret` and
+  `.Match` with `jq`, and collects the raw report only when it parses as a
+  gitleaks JSON array that was successfully stripped. Both paths degrade to
+  losing raw detail, never to leaking (#290).
+
+## [1.13.0] — 2026-08-18
+
+### Added
+
+- `package-registries` collector and `registry-provenance` guardrails in the
+  `dependencies` policy: verify that repositories resolve dependencies through
+  an approved package registry rather than straight from a public index. The
+  collector reads package-manager configuration already committed to the repo
+  and normalizes the resolved registry per ecosystem into a new `.dependencies`
+  category, covering npm, pip, Maven, Gradle, RubyGems and NuGet — token-free,
+  Python stdlib only, and registry locations only (`_authToken` lines are
+  skipped and URL userinfo is stripped, so credentials are never emitted). An
+  ecosystem in use that declares no registry still resolves from its public
+  default, so that default is recorded with `is_default: true` rather than
+  omitted — otherwise the guardrail would pass the most common violation (#286).
+
+### Changed
+
+- **BREAKING** — `pagerduty` collector: `oncall` is now the code-hook
+  sub-collector that runs on pull requests and the default branch, and the daily
+  cron variant moves to `oncall-cron`. This matches the `trivy`/`grype` split
+  philosophy, where the event-driven collector takes the base name. Both share
+  the same script and write the same normalized `.oncall.*` output. An import
+  pinning `include: [oncall]` for the daily cron must change to
+  `include: [oncall-cron]` (#283).
+
+- `golang` collector (`golangci-lint`): declares `size: large`, raising the
+  memory limit from 512Mi to 2Gi. `golangci-lint` runs `go mod download` and
+  then type-checks every package, so its peak memory scales with the module and
+  overran the default profile on larger Go repos; the container was OOMKilled,
+  the run recorded as internal-error, and that commit's lint data simply lost.
+  Mirrors the sibling `grype` and `trivy` collectors. The `golangci-lint-ci`
+  sub-collector stays on the default profile — it runs native on the CI runner
+  and only parses the user's existing JSON output (#282).
+
+### Fixed
+
+- `docker` collector (`hadolint`) and the `container` policies: a component that
+  has never built a container no longer materializes a `.containers` object. The
+  "no Dockerfiles found" path wrote an empty `.containers.lint_results`, and
+  object presence in the Component JSON is the detection signal. Downstream, the
+  container policies gated on `.containers.*` with a bare `return`, producing a
+  check with zero assertions — which the SDK resolves to PASS, indistinguishable
+  from a check that genuinely succeeded. All 8 now `skip()` with a reason. The
+  empty-vs-absent distinction is preserved: Dockerfiles present and hadolint
+  clean still writes `[]` and genuinely passes (#287).
+
+- `trivy` and `grype` collectors (`container-scan`): image scans no longer skip
+  on every pull request. The image to scan is resolved from the docker
+  collector's pushed-image record via `lunar component get-json`, but the lookup
+  was unqualified — the Hub resolves that to the default-branch snapshot
+  (`WHERE pr IS NULL`), so a PR run read main's Component JSON, never saw the
+  image the PR had just pushed, and skipped with "No pushed container image to
+  scan" (which in turn made the `container-scan` policy report no scan data). In
+  PR context the lookup is now pinned to the commit being scanned (`--pr`, plus
+  `--git-sha` to select the exact commit rather than the PR's latest). The
+  default-branch lookup is deliberately unchanged: the `container-rescan` cron
+  is given the latest *ingested* main commit, which may not have been collected
+  yet, so pinning there would resolve nothing and silently stop the re-scan
+  (#284).
+
+## [1.12.2] — 2026-08-11
+
+### Changed
+
+- `github-org` cataloger: new `max_repos_per_visibility` input (default 10000)
+  raises the per-visibility fetch ceiling, and a fetch that returns exactly the
+  ceiling now warns loudly instead of silently cataloguing a partial org. There
+  was never a 1000-repo limit — `gh repo list` paginates over the GraphQL API
+  and the write loop chunks every entry to the hub — but the `--limit` ceiling
+  was applied with no signal. The catalog is also emitted in byte-bounded,
+  sorted batches (#279).
+
+- `pagerduty` collector: transient PagerDuty API errors (429, 5xx, timeout,
+  connection refused) are retried with backoff and `Retry-After` handling
+  instead of failing the call, fixing flaky `oncall` policy results. The caller
+  contract is unchanged (#281).
+
+- `vcs` policy: failure text and documentation are now vendor-agnostic. The
+  policy hardcoded "github" in user-facing text even though the `gitlab`
+  collector populates the same `.vcs.*` schema, so failure messages and docs
+  were misleading for GitLab-hosted repos. All 14 "data not found" messages now
+  say "Ensure a VCS collector…", and `gitlab` joins `github` in
+  `landing_page.requires` (#278).
+
+### Fixed
+
+- `backstage` collector: a multi-document `catalog-info.yaml` (several entities
+  separated by `---`, e.g. a Component plus the APIs it provides) is now parsed
+  correctly. `yq -o=json '.'` emits concatenated JSON objects on a multi-doc
+  file — not valid JSON — so the lint threw and the collector wrote only
+  `{valid: false, errors: [...]}` with no metadata or spec, and every downstream
+  policy false-failed on a perfectly legal file. Every document is now linted,
+  with each error tagged by document index and kind (#280).
+
+## [1.12.1] — 2026-08-10
+
+### Fixed
+
+- `jira` collector (`ticket-from-json`): the after-json collector fired but
+  never resolved the ticket on a real pull request. It read the Component JSON
+  without `--pr`, and `get-json` defaults `--pr` to 0 with no environment
+  fallback, so it returned the main-branch JSON — no `.vcs.pr.title` — and the
+  collector skipped, leaving `.vcs.pr.ticket` unwritten and `ticket-present`
+  failing. It now passes `--pr "$LUNAR_COMPONENT_PR"` (#277).
+
+- Cataloger READMEs: corrected an invalid `uses:` scheme in the installation
+  examples, and taught the README validator to check the cataloger `uses_path`
+  scheme so it cannot recur (#276).
+
+## [1.12.0] — 2026-08-07
+
+### Added
+
+- `gitlab` collector (`merge-request`, `repository`, `branch-protection`,
+  `access-permissions`), producing the shared `.vcs.*` schema, plus a `.vcs.pr`
+  producer/consumer split: `github` `pull-request` and `gitlab` `merge-request`
+  populate `.vcs.pr.*`, and the `jira` `ticket-from-json` after-json consumer
+  reads `.vcs.pr` — no `GH_TOKEN`, provider-agnostic. `branch-protection`
+  normalizes approval rules, external status checks and push rules so the shared
+  `vcs` policy evaluates GitLab data (13 of 14 checks pass;
+  `require-branches-up-to-date` is GitHub-only). Validated against a live GitLab
+  instance (#274).
+
+- `backstage` cataloger: `include_*` / `exclude_*` inputs for `spec.type`,
+  `spec.lifecycle`, and resolved domain and system, so a large catalog can be
+  onboarded incrementally (one domain at a time) and trimmed of noise. Mirrors
+  the `github-org` cataloger's allowlist/denylist pattern: comma-separated,
+  empty disables, exclude wins over include. Filters run client-side because
+  Backstage's `?filter=` has no negation, and they are kind-aware — Domain and
+  System entities carry no type or lifecycle, so they always pass and the
+  hierarchy survives when components are filtered down (#272).
 
 ### Changed
 
@@ -27,6 +589,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sub-collectors resolve through the same validated path, so the reuse count
   keys off the ticket that was actually collected. Only one ticket is
   collected — `.vcs.pr.ticket.id` is single-valued (#271).
+
 - `jira` collector: Jira lookups now tell their failure modes apart. A
   transient failure — connection refused, timeout, `429`, `5xx` — is retried
   `jira_retries` times (default 3); if Jira is still unreachable the run keeps
@@ -37,6 +600,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bad token is a misconfiguration an operator has to fix rather than a property
   of the PR. The `ticket-valid` policy reads `tracker_error` and names the
   actual cause instead of guessing between them (#271).
+
+- `backstage` collector: `metadata.tags` in `catalog-info.yaml` are validated
+  against Backstage's own tag rules. The schema accepts any non-empty string,
+  but the Backstage server rejects the whole entity at ingest unless each tag
+  matches `isValidTag` (lowercase `[a-z0-9+#]` segments, dash-separated, 63
+  chars or fewer) — so a tag like `hosting/internal` passed Lunar and only
+  failed at registration with a confusing `'tags.0' is not valid`. Slashes,
+  spaces, dots, uppercase, bad or edge dashes, over-length, non-string items and
+  a non-list `tags` field now surface as errors naming the offending tag (#275).
+
+### Fixed
+
+- `nodejs` policy (`engines-pinned`): a project that correctly pins
+  `engines.node` no longer false-fails. `lunar_policy`'s `assert_true` is a
+  strict identity check (`v is True`), and the check passed it the truthy
+  `engines.node` string (e.g. `">=18"`) instead of a bool, so the assertion
+  could never pass on a real version constraint — it only ever "passed" by
+  taking the missing-data path. The value is now coerced to a bool (#273).
+
+## [1.11.0] — 2026-07-30
+
+### Changed
+
 - `container` policy (`stable-tags`): a base image tag is now considered stable
   when it *contains* a full `major.minor.patch` semantic version anywhere in the
   tag, so registry- or vendor-specific prefixes and suffixes are accepted (e.g.
@@ -44,6 +630,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag had to be *exactly* a semver (optionally `v`-prefixed / `-`-suffixed),
   which flagged these pinned, immutable tags as unstable. Partial versions like
   `20` or `16.1` still fail (#270).
+
 - `jira` collector: errors now fail the run with a non-zero exit code instead
   of silently exiting 0 — a missing `GH_TOKEN` secret, a failed GitHub
   PR-metadata fetch (both sub-collectors), a missing `psql` client, and a
@@ -56,17 +643,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `nodejs` policy (`engines-pinned`): a project that correctly pins
-  `engines.node` no longer false-fails. `lunar_policy`'s `assert_true` is a
-  strict identity check (`v is True`), and the check passed it the truthy
-  `engines.node` string (e.g. `">=18"`) instead of a bool, so the assertion
-  could never pass on a real version constraint — it only ever "passed" by
-  taking the missing-data path. The value is now coerced to a bool (#273).
 - `jira` collector: the PR-metadata fetch built an invalid GitHub API URL for
   monorepo sub-path components (`github.com/<owner>/<repo>/<path>`), so
   `ticket` and `ticket-history` collected nothing for them. The component ID is
   now parsed as `<host>/<owner>/<repository>[/<subpath>...]`, and the API base
   URL is derived from the host, so GHES components work too (#269).
+
 - `secrets` policy (`no-hardcoded-secrets`): report each finding individually
   with its file, line, and rule instead of a single aggregate count, so PR
   comments and dashboards show exactly where each secret is (#268).
@@ -501,7 +1083,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
-[Unreleased]: https://github.com/earthly/lunar-lib/compare/v1.7.0...HEAD
+[1.21.1]: https://github.com/earthly/lunar-lib/compare/v1.21.0...v1.21.1
+[1.21.0]: https://github.com/earthly/lunar-lib/compare/v1.20.0...v1.21.0
+[1.20.0]: https://github.com/earthly/lunar-lib/compare/v1.19.1...v1.20.0
+[1.19.1]: https://github.com/earthly/lunar-lib/compare/v1.19.0...v1.19.1
+[1.19.0]: https://github.com/earthly/lunar-lib/compare/v1.18.1...v1.19.0
+[1.18.1]: https://github.com/earthly/lunar-lib/compare/v1.18.0...v1.18.1
+[1.18.0]: https://github.com/earthly/lunar-lib/compare/v1.17.1...v1.18.0
+[1.17.1]: https://github.com/earthly/lunar-lib/compare/v1.17.0...v1.17.1
+[1.17.0]: https://github.com/earthly/lunar-lib/compare/v1.16.0...v1.17.0
+[1.16.0]: https://github.com/earthly/lunar-lib/compare/v1.15.1...v1.16.0
+[1.15.1]: https://github.com/earthly/lunar-lib/compare/v1.15.0...v1.15.1
+[1.15.0]: https://github.com/earthly/lunar-lib/compare/v1.14.5...v1.15.0
+[1.14.5]: https://github.com/earthly/lunar-lib/compare/v1.14.4...v1.14.5
+[1.14.4]: https://github.com/earthly/lunar-lib/compare/v1.14.3...v1.14.4
+[1.14.3]: https://github.com/earthly/lunar-lib/compare/v1.14.2...v1.14.3
+[1.14.2]: https://github.com/earthly/lunar-lib/compare/v1.14.1...v1.14.2
+[1.14.1]: https://github.com/earthly/lunar-lib/compare/v1.14.0...v1.14.1
+[1.14.0]: https://github.com/earthly/lunar-lib/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/earthly/lunar-lib/compare/v1.12.2...v1.13.0
+[1.12.2]: https://github.com/earthly/lunar-lib/compare/v1.12.1...v1.12.2
+[1.12.1]: https://github.com/earthly/lunar-lib/compare/v1.12.0...v1.12.1
+[1.12.0]: https://github.com/earthly/lunar-lib/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/earthly/lunar-lib/compare/v1.10.1...v1.11.0
+[1.10.1]: https://github.com/earthly/lunar-lib/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/earthly/lunar-lib/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/earthly/lunar-lib/compare/v1.8.1...v1.9.0
+[1.8.1]: https://github.com/earthly/lunar-lib/compare/v1.8.0...v1.8.1
+[1.8.0]: https://github.com/earthly/lunar-lib/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/earthly/lunar-lib/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/earthly/lunar-lib/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/earthly/lunar-lib/compare/v1.4.0...v1.5.0

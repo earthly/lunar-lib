@@ -84,7 +84,7 @@ inputs:
     description: Comma-separated list of allowed registries
     default: "docker.io"
   required_labels:
-    description: Comma-separated list of required labels checked across Dockerfile and build commands (empty = no requirement)
+    description: Comma-separated list of required labels checked across Dockerfile and build commands. Leave empty to skip this check.
     default: ""
   hadolint_severity:
     description: Minimum hadolint severity to enforce (error, warning, info, style)

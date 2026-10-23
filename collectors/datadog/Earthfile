@@ -1,0 +1,12 @@
+VERSION 0.8
+
+# Offline tests for the oncall sub-collector. They stub curl and lunar on PATH
+# and drive the real oncall.sh against Datadog API fixtures. Wired into the
+# root +test target. (No image: target — datadog runs on the shared base image.)
+test:
+    FROM python:3.12-alpine
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY oncall.sh .
+    COPY --dir test .
+    RUN cd test && python -m unittest test_oncall -v

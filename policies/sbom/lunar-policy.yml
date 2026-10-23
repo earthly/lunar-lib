@@ -11,8 +11,8 @@ landing_page:
   long_description: |
     Enforce Software Bill of Materials standards across your organization.
     Verify SBOMs are generated, contain license data, use approved formats,
-    do not include disallowed licenses, and flag dependencies with blocked
-    geographic origins or disallowed package patterns.
+    keep licenses within an allow-list or out of a denylist, and flag
+    dependencies with blocked geographic origins or disallowed package patterns.
   category: "security-and-compliance"
   icon: "assets/sbom.svg"
   status: "stable"
@@ -44,6 +44,13 @@ policies:
       Matches component licenses against configurable regex patterns.
     mainPython: ./disallowed-licenses.py
     keywords: ["sbom", "licenses", "compliance", "gpl", "copyleft"]
+
+  - name: allowed-licenses
+    description: |
+      Fails when an SBOM component carries a license that allowed_licenses
+      does not admit. Skips until allowed_licenses is configured.
+    mainPython: ./allowed-licenses.py
+    keywords: ["sbom", "licenses", "license allow-list", "approved licenses", "compliance"]
 
   - name: min-components
     description: |
@@ -78,6 +85,9 @@ policies:
 inputs:
   disallowed_licenses:
     description: Regex patterns of disallowed licenses. Accepts a comma-separated string (e.g. "GPL.*,AGPL.*") or a JSON array (e.g. '["GPL.*", "AGPL.*"]').
+  allowed_licenses:
+    description: Licenses components may use, as SPDX IDs or regex patterns that must match the whole ID, case-insensitively (e.g. '["MIT", "Apache-2.0", "BSD-.*-Clause"]'). Accepts a comma-separated string or a JSON array. Empty skips the allowed-licenses check.
+    default: ""
   min_license_coverage:
     description: Minimum percentage of components that must have license info (0-100)
     default: "50"

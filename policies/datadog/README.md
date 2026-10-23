@@ -35,7 +35,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/datadog@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [monitor-has-pager-target]   # Run a subset
+    include: [monitor-has-pager-target, slo-burn-rate-alert]
     with:
       pager_handle_prefixes: "pagerduty,opsgenie"   # Override default list
 ```

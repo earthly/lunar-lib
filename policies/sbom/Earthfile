@@ -1,0 +1,12 @@
+VERSION 0.8
+
+# Unit tests for the SBOM policy checks. Wired into the root +test target.
+# (No image: target — the sbom policy runs on the shared base image.)
+test:
+    FROM python:3.12-alpine
+    WORKDIR /workspace
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    COPY *.py .
+    COPY --dir test .
+    RUN cd test && python -m unittest discover -v

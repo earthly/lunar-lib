@@ -24,6 +24,7 @@ Add to the **GitOps repo's** `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/argocd-deployment-tracking@v1.0.0
     on: ["domain:your-gitops-repo"]
+    include: [tracking]
     # with:
     #   correlate_by: "annotation,image,repoURL"
 ```

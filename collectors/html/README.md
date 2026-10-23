@@ -43,5 +43,8 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/html@v1.0.0
     on: ["domain:your-domain"]
-    # include: [project, htmlhint]  # Only include specific subcollectors
+    include:
+      - project    # HTML and CSS file counts
+      - htmlhint   # Runs HTMLHint
+      - stylelint  # Runs Stylelint
 ```

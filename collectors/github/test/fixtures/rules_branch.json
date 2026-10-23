@@ -1,0 +1,36 @@
+[
+  {
+    "type": "deletion",
+    "ruleset_source_type": "Repository",
+    "ruleset_source": "monalisa/my-repo",
+    "ruleset_id": 42
+  },
+  {
+    "type": "non_fast_forward",
+    "ruleset_source_type": "Repository",
+    "ruleset_source": "monalisa/my-repo",
+    "ruleset_id": 42
+  },
+  {
+    "type": "pull_request",
+    "ruleset_source_type": "Repository",
+    "ruleset_source": "monalisa/my-repo",
+    "ruleset_id": 42,
+    "parameters": {
+      "required_approving_review_count": 1,
+      "dismiss_stale_reviews_on_push": true,
+      "require_code_owner_review": false,
+      "require_last_push_approval": false,
+      "required_review_thread_resolution": false,
+      "allowed_merge_methods": [
+        "squash"
+      ]
+    }
+  },
+  {
+    "type": "required_signatures",
+    "ruleset_source_type": "Organization",
+    "ruleset_source": "my-org",
+    "ruleset_id": 73
+  }
+]

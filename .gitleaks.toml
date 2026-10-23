@@ -1,0 +1,11 @@
+# generic-api-key false positives in test data that can't carry an inline gitleaks:allow.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+paths = [
+  '''catalogers/backstage-catalog-info/test-local\.sh''',
+  '''collectors/github/test/fixtures/pull_request\.json''',
+]

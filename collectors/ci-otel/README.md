@@ -39,6 +39,13 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/ci-otel@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - job-start   # Job span start
+      - job-end     # Job span end
+      - step-start  # Step span start
+      - step-end    # Step span end
+      - cmd-start   # Command span start
+      - cmd-end     # Command span end
     with:
       otel_endpoint: "http://tempo:4318"  # Your OTLP HTTP endpoint
       # debug: "true"  # Enable to collect trace data in Component JSON

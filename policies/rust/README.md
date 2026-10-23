@@ -44,7 +44,13 @@ policies:
   - uses: github://earthly/lunar-lib/policies/rust@main
     on: ["domain:your-domain"]  # replace with your own domain or tags
     enforcement: report-pr
-    # include: [cargo-toml-exists, cargo-lock-exists]  # Only run specific checks
+    include:
+      - cargo-toml-exists
+      - cargo-lock-exists
+      - min-rust-edition
+      - min-rust-version-cicd
+      - clippy-clean
+      - max-unsafe-blocks
     with:
       lock_mode: "auto"             # "auto", "required", "forbidden", "none" (default: "auto")
       min_rust_edition: "2021"      # Minimum Rust edition (default: "2021")

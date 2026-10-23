@@ -64,6 +64,7 @@ collectors:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/claude@main
     on: ["domain:your-domain"]
+    include: [cicd, instruction-file]
 ```
 
 ### Run Prompt (AI-Powered Analysis)

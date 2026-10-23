@@ -40,7 +40,11 @@ policies:
   - uses: github://earthly/lunar-lib/policies/sonarqube@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [quality-gate-passing]  # Only run specific checks
+    include:
+      - quality-gate-passing
+      - min-reliability-rating
+      - min-security-rating
+      - min-maintainability-rating
     with:
       min_reliability_rating: "A"       # Fail if reliability is B or worse
       min_security_rating: "A"          # Fail if security is B or worse

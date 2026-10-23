@@ -36,6 +36,9 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/checkov@main
     on: ["domain:your-domain"]  # Or use tags
+    include:
+      - scan  # Runs Checkov on the repo
+      - cicd  # Checkov runs in CI
 ```
 
 No configuration or secrets required. The `scan` sub-collector auto-runs Checkov using the `checkov-main` container image. The `cicd` sub-collector detects existing Checkov invocations in CI pipelines.

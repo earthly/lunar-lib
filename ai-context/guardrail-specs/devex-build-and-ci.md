@@ -262,14 +262,17 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
 ### Dependency Sources
 
 * `deps-approved-registries` **Dependencies are fetched from approved registries**: All dependencies must come from approved package registries (internal artifactory, npmjs, PyPI, etc.).
-  * Collector(s): Analyze package manager configuration for registry URLs; check lock files for registry sources
+  * **Implemented** by the `package-registries` collector and the `dependencies` policy's `approved-registries` check. Same guardrail as `sec-deps-approved-registries` in `security-and-compliance.md` — one implementation covers both.
+  * Collector(s): Analyze package manager configuration for registry URLs
   * Component JSON:
-    * `.dependencies.registries` - Array of registries used
-    * `.dependencies.unapproved_registries` - Array of unapproved registries found
-    * `.dependencies.uses_approved_registries` - Boolean for approved registries only
+    * `.dependencies.registries[]` - Registry declarations (`ecosystem`, `host`, `url`, `path`, `kind`, `is_default`, `is_public`). **Object array** — the earlier flat list of registry strings is retired; use `registries_used` for that.
+    * `.dependencies.registries_used` - Deduplicated registry hostnames
+    * `.dependencies.summary.has_public` - Boolean indicating any registry is a public index
   * Policy: Assert that all dependencies come from approved registries
-  * Configuration: Approved registry URLs per ecosystem
+  * Configuration: `allowed_registries` — comma-separated approved hosts, held in policy config
   * Strategy: Strategy 12 (Dependency Manifest Analysis)
+  * Note: the allow-list is policy config and is deliberately not collected, so one collection serves consumers with different allow-lists. See `ai-context/component-json/cat-dependencies.md`.
+  * Note: lock-file registry provenance (which registry each installed package actually resolved from) is **not** covered — the implementation reads configuration only. npm/yarn/RubyGems lock files record it, Maven/Gradle/NuGet do not.
 
 * `deps-internal-registry` **Private dependencies reference internal registry**: Internal/private packages must be resolved from internal registries, not public mirrors.
   * Collector(s): Check package manager configuration for internal package routing

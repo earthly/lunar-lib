@@ -19,6 +19,12 @@ This collector writes to the following Component JSON paths:
 | `.containers.native.docker.cicd` | object | Docker CI command tracking (commands + version) |
 | `.containers.native.hadolint` | object | Raw hadolint JSON output with source metadata |
 
+When a repository contains no Dockerfiles, this collector writes nothing at all
+— no `.containers` object is created. Absence is the signal that the component
+has no containers, and the container policies skip on it. When Dockerfiles *do*
+exist, `.containers.lint_results` is always written, empty array included, so
+policies can tell "hadolint ran clean" apart from "hadolint never ran".
+
 ## Collectors
 
 This integration provides the following collectors (use `include` to select a subset):
@@ -37,6 +43,10 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/docker@v1.0.0
     on: ["domain:your-domain"]
+    include:
+      - dockerfile  # Parses Dockerfiles
+      - cicd        # docker commands in CI
+      - hadolint    # Lints Dockerfiles with hadolint
     # with:
     #   find_command: "find ./docker -name Dockerfile"  # Custom Dockerfile search
 ```

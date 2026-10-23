@@ -28,9 +28,9 @@ collectors:
       check-runs API for the coderabbitai app. Waits for scan completion and
       writes a normalized entry to ai.code_reviewers[].
     mainBash: code-reviewer.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["coderabbit", "code review", "ai review", "pull request"]
 
   - name: config

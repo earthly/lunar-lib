@@ -32,9 +32,9 @@ collectors:
       GitHub check-runs API. Waits for scan completion and writes a normalized
       entry to ai.code_reviewers[].
     mainBash: code-reviewer.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["claude", "code review", "ai review", "pull request"]
 
   - name: run-code-review
@@ -43,9 +43,9 @@ collectors:
       review findings, severity levels, and affected files. Writes results to
       ai.native.claude.code_review for Claude-specific policy evaluation.
     mainBash: run-code-review.sh
+    runs_on: [prs]
     hook:
       type: code
-      runs_on: [prs]
     keywords: ["claude", "code review", "ai review", "pull request", "claude cli"]
 
   - name: cicd

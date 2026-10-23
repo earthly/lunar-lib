@@ -161,9 +161,10 @@ Required sections, in order:
 4. **Skip-safe behaviour** — bullet list of every case where the
    probe is a no-op. This is the reader's reassurance that adding the
    probe is low-risk.
-5. **Installation** — the `uses:` one-liner for `.lunar/probes.yml`,
+5. **Installation** — the `uses:` entry for `.lunar/probes.yml`,
    pointing at `github://earthly/lunar-lib/probes/<name>@main` (and
-   the tag-pinned form once a `v*` release is cut).
+   the tag-pinned form once a `v*` release is cut), with `include:`
+   listing its probes. `+lint` fails an install snippet without it.
 6. **Requirements** — local tools required (commitlint, shellcheck,
    …), and how to install them.
 7. **Configuration** — `inputs:` table if present, plus a note on

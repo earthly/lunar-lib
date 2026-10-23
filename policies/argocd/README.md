@@ -36,12 +36,14 @@ Add to your `lunar-config.yml`:
 collectors:
   - uses: github://earthly/lunar-lib/collectors/argocd@v1.0.0
     on: [gitops]
+    include: [parse]
 
 policies:
   # ArgoCD-specific checks
   - uses: github://earthly/lunar-lib/policies/argocd@v1.0.0
     on: [gitops]
     enforcement: report-pr
+    include: [valid, non-default-project]
     # with:
     #   allowed_projects: "platform,payments"
 
@@ -49,6 +51,11 @@ policies:
   - uses: github://earthly/lunar-lib/policies/gitops@v1.0.0
     on: [gitops]
     enforcement: report-pr
+    include:
+      - sync-policy
+      - source-repo-allowlist
+      - destination-allowlist
+      - gitops-managed
 ```
 
 ## Examples

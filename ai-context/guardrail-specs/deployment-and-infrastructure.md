@@ -65,7 +65,8 @@ This document specifies possible policies for the **Deployment and Infrastructur
   * Collector(s): Parse Kubernetes manifests for PDBs and correlate with workloads by label selectors
   * Component JSON:
     * `.k8s.pdbs[]` - Array of PodDisruptionBudget configurations
-    * `.k8s.pdbs[].target_workload` - Workload the PDB applies to
+    * `.k8s.pdbs[].selector` - The PDB's label selector (`matchLabels` / `matchExpressions`)
+    * `.k8s.workloads[].pod_labels` - Pod template labels the selector is matched against
     * `.k8s.pdbs[].min_available` - Minimum available pods
     * `.k8s.pdbs[].max_unavailable` - Maximum unavailable pods
     * `.k8s.summary.all_have_pdb` - Boolean indicating all workloads have PDBs

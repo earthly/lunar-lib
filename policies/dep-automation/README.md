@@ -41,7 +41,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/dep-automation@v1.0.0
     on: ["domain:your-domain"]
     enforcement: report-pr
-    # include: [dep-update-tool-configured]  # Only run specific checks
+    include: [dep-update-tool-configured, all-ecosystems-covered]
 ```
 
 ## Examples

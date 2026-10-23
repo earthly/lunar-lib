@@ -48,5 +48,8 @@ inputs:
   min_severity:
     description: "Minimum severity to fail on (critical, high, medium, low)"
     default: "high"
+  ignore_unfixable:
+    description: "Only fail max-severity on findings that have a fix available. Unfixable findings are still reported in the component JSON."
+    default: "false"
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"

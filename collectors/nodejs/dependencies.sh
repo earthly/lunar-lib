@@ -1,10 +1,8 @@
 #!/bin/bash
 set -e
 
-source "$(dirname "$0")/helpers.sh"
-
-# Check if this is a Node.js project
-if ! is_nodejs_project; then
+# Dependencies come from the root package.json only
+if [[ ! -f "package.json" ]]; then
     echo "No package.json found, exiting"
     exit 0
 fi
