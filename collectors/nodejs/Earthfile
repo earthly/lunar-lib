@@ -40,9 +40,6 @@ image:
             tar xzf "/tmp/$p"-*.tgz -C "$NPM_DIR/node_modules/$p" --strip-components=1; \
         done && rm -f /tmp/*.tgz
 
-    # Nothing in this image runs pip, so drop it and the libraries it bundles.
-    RUN python3 -m pip uninstall -y -q pip
-
     # Verify installation
     RUN node --version && npm --version
 

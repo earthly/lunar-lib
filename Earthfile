@@ -171,9 +171,7 @@ all:
     BUILD --pass-args ./catalogers/moon+image
     BUILD --pass-args ./policies/dependencies+image
 
-# base-image before pip comes out. Only for images that run pip: syft at
-# runtime, checkov and policy-dependencies at build time (they drop it after).
-base-image-with-pip:
+base-image:
     ARG SCRIPTS_VERSION=1.1.11-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
@@ -200,12 +198,6 @@ base-image-with-pip:
     # safe.directory: the snippet checkout is owned by a different uid than the
     # process running the script, which git otherwise refuses to read.
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
-
-base-image:
-    FROM --pass-args +base-image-with-pip
-    # Nothing on base runs pip, and scanners flag the urllib3, msgpack and
-    # setuptools it bundles, which no pip release has fixed yet.
-    RUN python3 -m pip uninstall -y -q pip
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 

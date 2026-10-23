@@ -1,7 +1,7 @@
 VERSION 0.8
 
 image:
-    FROM --pass-args ../../+base-image-with-pip
+    FROM --pass-args ../../+base-image
 
     # Install Checkov via pip
     # Build deps needed for some native extensions (pycep-parser, etc.).
@@ -16,8 +16,7 @@ image:
     RUN apk add --no-cache --virtual .build-deps gcc musl-dev python3-dev libffi-dev cargo && \
         pip install --no-cache-dir --break-system-packages "checkov==${CHECKOV_VERSION}" && \
         apk del .build-deps && \
-        rm -rf "$HOME/.cargo" && \
-        python3 -m pip uninstall -y -q pip
+        rm -rf "$HOME/.cargo"
 
     # Verify installation
     RUN checkov --version

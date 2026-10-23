@@ -22,8 +22,5 @@ image:
         apt-get remove -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && \
         echo "${AST_GREP_VERSION}" > /usr/local/bin/ast-grep.version
 
-    # Nothing in this image runs pip, so drop it and the libraries it bundles.
-    RUN python3 -m pip uninstall -y -q pip
-
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:ast-grep-$VERSION
