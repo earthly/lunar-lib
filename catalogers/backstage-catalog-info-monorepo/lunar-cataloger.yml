@@ -188,8 +188,9 @@ inputs:
 
   branch:
     description: |
-      Git ref to read the tree and files from. Empty means each
-      repo's default branch.
+      Git ref to read the tree and files from in the scanned repos.
+      Empty means each repo's default branch. `hierarchy_repos` always
+      read their default branch.
     default: ""
 
   exclude_paths:

@@ -109,7 +109,7 @@ Where the hierarchy is read from:
 
 - **Every catalog-info file in the scan set**, including files that don't become components: files matched by `exclude_paths`, and files without exactly one `Component` (a file of only `System` / `Domain` entities, say).
 - **`hierarchy_paths`**: path globs for System / Domain YAML with other names, such as `catalog/domains/*.yaml`. Matched like `exclude_paths`, against the full repo-relative path in the scanned repos and `hierarchy_repos` (`*` also matches `/`). Files matched only by `hierarchy_paths` never become components.
-- **`hierarchy_repos`**: repos read only for System / Domain entities, never for components. Use it for a central catalog repo:
+- **`hierarchy_repos`**: repos read only for System / Domain entities, never for components, always from their default branch. Use it for a central catalog repo:
 
 ```yaml
 catalogers:

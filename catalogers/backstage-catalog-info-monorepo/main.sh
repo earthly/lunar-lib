@@ -329,8 +329,10 @@ scan_repo() {
         echo "=== Scanning $slug for Domain/System entities (hierarchy_repos) ==="
     fi
 
-    # Resolve the ref: explicit branch, or the repo's default branch.
-    ref="$BRANCH"
+    # Resolve the ref: the `branch` input for scanned repos, else the repo's
+    # default branch. hierarchy_repos always read their default branch.
+    ref=""
+    [ "$create" = "true" ] && ref="$BRANCH"
     if [ -z "$ref" ]; then
         code=$(gh_get "application/vnd.github+json" "$API_BASE/repos/$slug")
         if [ "$code" != "200" ]; then

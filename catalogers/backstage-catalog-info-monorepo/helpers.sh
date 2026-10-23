@@ -113,8 +113,10 @@ resolve_hierarchy() {
 hierarchy_domain_rows() {
     local OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
     local DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
+    # The map can exceed the 128 KiB single-argument limit, so it goes in
+    # through a pipe rather than --argjson.
     jq \
-        --argjson paths "$2" \
+        --slurpfile pathsf <(printf '%s' "$2") \
         --arg owner_format "$OWNER_FORMAT" \
         --arg default_owner "$DEFAULT_OWNER" \
         '
@@ -127,7 +129,8 @@ hierarchy_domain_rows() {
         def format_owner(o):
             if $owner_format == "bare-name" then bare(o) else o end;
 
-        [ .[]
+        $pathsf[0] as $paths
+        | [ .[]
           | (.metadata.name | tostring) as $name
           | (if .kind == "System" then ($paths.systems[$name] // $name)
              else ($paths.domains[$name] // $name) end) as $key
@@ -254,7 +257,7 @@ create_component() {
         --arg default_owner "$DEFAULT_OWNER" \
         --arg domain_annotation "$DOMAIN_ANNOTATION" \
         --arg default_domain "$DEFAULT_DOMAIN" \
-        --argjson paths "$HIERARCHY_MAP" \
+        --slurpfile pathsf <(printf '%s' "$HIERARCHY_MAP") \
         '
         def bare(s):
             if (s | type) != "string" or s == "" then s
@@ -265,7 +268,8 @@ create_component() {
         def format_owner(o):
             if $owner_format == "bare-name" then bare(o) else o end;
 
-        . as $e
+        $pathsf[0] as $paths
+        | . as $e
         | (.spec.owner // "" | tostring) as $raw_owner
         | (if $raw_owner == "" then $default_owner else format_owner($raw_owner) end) as $owner
         | (if ($domain_annotation | length) > 0

@@ -497,6 +497,23 @@ assert "central repo supplies the chain (full refs normalized); it creates no co
      and ([keys[] | select(startswith(\"github.com/acme/catalog\"))] | length == 0)" \
     "(.[\"$FULL\"].description == \"Build and release tooling\") and has(\"engineering.developer-platform\")"
 
+echo "── hierarchy_repos_ignore_branch ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_BRANCH="develop" LUNAR_VAR_HIERARCHY_REPOS="acme/catalog" LUNAR_VAR_HIERARCHY_PATHS="domains/*.yaml,systems/*.yaml"
+place hier_component.yaml "services/build-api/catalog-info.yaml"
+place_in acme/catalog hier_domain_engineering.yaml "domains/engineering.yaml"
+place_in acme/catalog hier_domain_platform.yaml    "domains/developer-platform.yaml"
+place_in acme/catalog hier_system.yaml             "systems/build-tools.yaml"
+run_main
+assert "branch applies to scanned repos only; the chain still resolves" \
+    ".[\"$SD\"].domain == \"$FULL\"" ''
+assert_log_file() {
+    if grep -qE "$2" "$TEST_DIR/curl.log"; then echo "  [$1] OK"; PASSED=$((PASSED+1))
+    else echo "  [$1] FAIL — curl.log has no match for: $2"; indent < "$TEST_DIR/curl.log"; FAILED=$((FAILED+1)); fi
+}
+assert_log_file "scanned repo is read at the branch input" '/repos/acme/monorepo/git/trees/develop\?'
+assert_log_file "hierarchy repo is read at its default branch" '/repos/acme/catalog/git/trees/main\?'
+
 echo "── hierarchy_repos_without_paths (control) ──"
 fresh_repo; reset_out; reset_env
 export LUNAR_VAR_HIERARCHY_REPOS="acme/catalog"
@@ -617,11 +634,40 @@ assert "hierarchy_repos are read from the same GHES host" \
 assert_curl "hierarchy repo calls use the GHES API too" \
     "https://ghes.example.com/api/v3/" "Authorization: Bearer ent-token"
 
+echo "── large_hierarchy ──"
+# 48 Domains + 3000 Systems: the resolved map is past the 128 KiB limit on a
+# single argv string, so it must reach jq some other way.
+fresh_repo; reset_out; reset_env
+mkdir -p "$REPO_DIR/services/big"
+{
+    printf 'kind: Component\nmetadata: {name: big-svc}\nspec: {owner: team-big, system: sys-0001}\n'
+    printf -- '---\nkind: Domain\nmetadata: {name: domain-root}\nspec: {}\n'
+    for d in $(seq -w 1 48); do
+        printf -- '---\nkind: Domain\nmetadata: {name: domain-%s}\nspec: {subdomainOf: domain-root}\n' "$d"
+    done
+    for n in $(seq -w 1 3000); do
+        printf -- '---\nkind: System\nmetadata: {name: sys-%s, description: payments ledger system %s}\nspec: {domain: domain-%02d}\n' "$n" "$n" $(( (10#$n % 48) + 1 ))
+    done
+} > "$REPO_DIR/services/big/catalog-info.yaml"
+run_main
+assert "a 3000-System hierarchy resolves" \
+    '.["github.com/acme/monorepo/services/big"].domain == "domain-root.domain-02.sys-0001"' \
+    'length == 3049'
+
 # ── A run that can read nothing fails instead of writing an empty catalog ─
 echo "── all_repos_unreadable_fails ──"
 fresh_repo; reset_out; reset_env
 export LUNAR_VAR_REPOS="acme/gone" MOCK_FAIL_REPOS="acme/gone"
 assert_main_fails "no readable repo in the scan set → non-zero exit"
+assert "…and nothing is written" "" ""
+
+echo "── unreadable_scan_set_with_hierarchy_repo ──"
+fresh_repo; reset_out; reset_env
+export LUNAR_VAR_REPOS="acme/gone" MOCK_FAIL_REPOS="acme/gone" \
+       LUNAR_VAR_HIERARCHY_REPOS="acme/catalog" LUNAR_VAR_HIERARCHY_PATHS="domains/*.yaml,systems/*.yaml"
+place_in acme/catalog hier_domain_engineering.yaml "domains/engineering.yaml"
+place_in acme/catalog hier_system.yaml             "systems/build-tools.yaml"
+assert_main_fails "a readable hierarchy repo doesn't count as reading the scan set"
 assert "…and nothing is written" "" ""
 
 echo "── partial_repo_failure_still_runs ──"
