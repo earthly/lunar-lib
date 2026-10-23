@@ -1,7 +1,8 @@
 VERSION 0.8
 
 image:
-    FROM --pass-args ../../+base-image
+    # Keeps pip: generate.sh pip-installs Python projects' deps for license detection.
+    FROM --pass-args ../../+base-image-with-pip
 
     # Install Syft
     # renovate: datasource=github-releases depName=anchore/syft extractVersion=^v(?<version>.*)$

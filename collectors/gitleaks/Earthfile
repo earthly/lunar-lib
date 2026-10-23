@@ -14,8 +14,9 @@ image:
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:gitleaks-$VERSION
 
-# Built from source with current golang.org/x modules: upstream's latest release
-# (8.30.1) still ships go1.24.11 and x/crypto 0.35.0, both with fixable criticals.
+# Built from source with current golang.org/x modules and klauspost/compress:
+# upstream's latest release (8.30.1) still ships go1.24.11, x/crypto 0.35.0 and
+# compress 1.17.11, all with fixable CVEs.
 # gore2regex matches upstream's release build (its regex engine).
 gitleaks-bin:
     FROM golang:1.27-alpine
@@ -23,7 +24,8 @@ gitleaks-bin:
     ARG --required GITLEAKS_VERSION
     RUN git clone --depth 1 --branch "v${GITLEAKS_VERSION}" https://github.com/gitleaks/gitleaks /src
     WORKDIR /src
-    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest golang.org/x/text@latest golang.org/x/sys@latest && \
+    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest golang.org/x/text@latest golang.org/x/sys@latest \
+            github.com/klauspost/compress@latest && \
         go mod tidy && \
         CGO_ENABLED=0 go build -trimpath -tags gore2regex \
             -ldflags "-s -w -X github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \

@@ -171,7 +171,9 @@ all:
     BUILD --pass-args ./catalogers/moon+image
     BUILD --pass-args ./policies/dependencies+image
 
-base-image:
+# base-image before pip comes out. Only for images that run pip: syft at
+# runtime, checkov and policy-dependencies at build time (they drop it after).
+base-image-with-pip:
     ARG SCRIPTS_VERSION=1.1.11-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
@@ -189,7 +191,8 @@ base-image:
     # pip vendors certifi: upgrading certifi alone leaves GHSA-6q48-6c7w-9gw2
     # in pip's bundle. Keep the active venv pip current and remove the unused
     # Alpine system pip, which carries a second vulnerable copy.
-    RUN --no-cache python3 -m pip install --no-cache-dir --upgrade 'pip>=26.2.2' && apk del py3-pip
+    RUN --no-cache python3 -m pip install --no-cache-dir --upgrade 'pip>=26.2.2' && \
+        if apk info -e py3-pip >/dev/null; then apk del py3-pip; fi
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     # git: a dozen collectors shell out to it (diff, log, ls-files) and their
@@ -197,6 +200,12 @@ base-image:
     # safe.directory: the snippet checkout is owned by a different uid than the
     # process running the script, which git otherwise refuses to read.
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
+
+base-image:
+    FROM --pass-args +base-image-with-pip
+    # Nothing on base runs pip, and scanners flag the urllib3, msgpack and
+    # setuptools it bundles, which no pip release has fixed yet.
+    RUN python3 -m pip uninstall -y -q pip
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 

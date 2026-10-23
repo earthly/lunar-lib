@@ -26,6 +26,9 @@ image:
         && rm -rf /var/lib/apt/lists/* \
         && git config --system --add safe.directory '*'
 
+    # Nothing in this image runs pip, so drop it and the libraries it bundles.
+    RUN python3 -m pip uninstall -y -q pip
+
     # Verify installations
     RUN elixir --version && mix --version
 

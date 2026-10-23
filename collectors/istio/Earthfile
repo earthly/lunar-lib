@@ -29,7 +29,12 @@ istioctl-bin:
     ARG --required ISTIO_VERSION
     RUN git clone --quiet --depth 1 --branch "${ISTIO_VERSION}" https://github.com/istio/istio /src
     WORKDIR /src
+    # Commit the bumps and tag the commit vX.Y.Z so Go stamps that as the module
+    # version. Otherwise the binary claims a v0.0.0-...+dirty pseudo-version, which
+    # scanners match against every istio CVE since 2019.
     RUN go get golang.org/x/crypto@latest google.golang.org/grpc@v1.83.2 && \
+        git -c user.name=build -c user.email=build@localhost commit -q -am "bump deps" && \
+        git tag "v${ISTIO_VERSION}" && \
         CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w -X istio.io/istio/pkg/version.buildVersion=${ISTIO_VERSION} -X istio.io/istio/pkg/version.buildStatus=Clean -X istio.io/istio/pkg/version.buildTag=${ISTIO_VERSION}" \
             -o /out/istioctl ./istioctl/cmd/istioctl
