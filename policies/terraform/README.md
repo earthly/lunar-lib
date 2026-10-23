@@ -4,7 +4,7 @@ Enforces Terraform-specific configuration best practices.
 
 ## Overview
 
-This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It also bundles a set of AWS resource security checks relevant to SOC 2 — such as encryption at rest, logging, public-access blocking, and network ingress limits — each individually includable. All checks read from `.iac.native.terraform.files[]` and analyze the parsed HCL. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
+This policy enforces Terraform-specific standards that don't transfer to other IaC frameworks: provider version pinning, module version pinning, and remote backend usage. It also bundles a set of AWS resource security checks relevant to SOC 2 — such as encryption at rest, logging, public-access blocking, and network ingress limits — each individually includable, plus a resource-tagging governance check. Most checks read from `.iac.native.terraform.files[]` and analyze the parsed HCL; the tagging check reads the normalized `.iac.modules[]` view. For generic IaC checks (validity, WAF, datastores), see the `iac` policy.
 
 ## Policies
 
@@ -56,13 +56,32 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-cloudtrail-log-file-validation` | CloudTrail validates log-file integrity | Trail without `enable_log_file_validation = true` |
 | `aws-cloudtrail-kms-encryption` | CloudTrail logs encrypted with KMS | Trail without `kms_key_id` |
 
+The check below governs **resource tagging**. It reads the normalized `.iac.modules[]` view (not raw HCL) and is opt-in via an input:
+
+| Policy | Description | Failure Meaning |
+|--------|-------------|-----------------|
+| `aws-resources-tagged` | Every taggable AWS resource carries the required tag key(s) | A taggable resource is missing a `required_tags` key (on neither its own `tags` nor the module's `default_tags`) |
+
+It checks only that the key is present. To check that an entity-reference value resolves, use the `backstage` policy's `entity-ref-valid`.
+
+Only `aws_*` resource types that accept a `tags` argument are checked. The policy ships that list, generated from the AWS provider schema, so sub-resources such as `aws_s3_bucket_versioning` or `aws_iam_role_policy_attachment`, and non-AWS types such as `random_id`, are never flagged. Use `exempt_resource_types` to ignore more types.
+
+### How `aws-resources-tagged` handles unresolvable data
+
+The collector doesn't evaluate HCL, so:
+
+- A resource whose `tags` attribute is an expression (`tags = merge(...)`, flagged `tags_expression`) is skipped — its keys can't be listed, so it can't be judged missing.
+- A tag key present but with an interpolated value (`${var.x}`, listed in `tags_unresolved`) counts as **present**: this check tests presence, and the key is genuinely there.
+- Provider-level `default_tags` (`.iac.modules[].default_tags`) count toward the requirement, including those a local module inherits from its caller, so a repo that tags everything via `default_tags` is not flagged.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.iac.native.terraform.files[]` | array | `terraform` collector |
+| `.iac.native.terraform.files[]` | array | `terraform` collector (all checks except `aws-resources-tagged`) |
+| `.iac.modules[]` | array | `terraform` collector (`aws-resources-tagged`) |
 
 **Note:** Ensure the `terraform` collector is configured before enabling this policy.
 
@@ -123,6 +142,29 @@ policies:
     #   required_backend_types: "s3,gcs,remote"  # Restrict allowed backend types
     #   min_provider_versions: '{"aws": "5.0", "random": "3.0"}'  # Enforce minimum versions
 ```
+
+### Require a tag on every resource
+
+Block a PR (or score a component) when any AWS resource is missing a required tag:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/terraform@main
+    on: [infra]
+    include: [terraform]
+
+policies:
+  - uses: github://earthly/lunar-lib/policies/terraform@main
+    on: [infra]
+    enforcement: report-pr          # or score
+    include: [aws-resources-tagged]
+    with:
+      required_tags: "backstage.com/entity_ref,cost-center"
+```
+
+To also check that the entity-reference tag resolves, add the `backstage`
+collector (with `backstage_url`) and the [`backstage` policy](../backstage/README.md)'s
+`entity-ref-valid`.
 
 ## Examples
 
@@ -205,6 +247,33 @@ A component with unpinned providers, unversioned modules, and no backend:
 - `Modules without pinned versions: vpc, rds. Add version constraints or use ?ref= to pin module sources.`
 - `No backend configured. Terraform state is stored locally, which is fragile and cannot be shared across teams.`
 
+### Tagging example (`aws-resources-tagged`)
+
+With `required_tags: backstage.com/entity_ref`, given the normalized module view:
+
+```json
+{
+  "iac": {
+    "modules": [
+      {
+        "path": "deploy/terraform",
+        "resources": [
+          {"type": "aws_db_instance", "name": "main", "category": "datastore",
+           "tags": {"backstage.com/entity_ref": "component:default/payment-api"}},
+          {"type": "aws_s3_bucket", "name": "logs", "category": "datastore"},
+          {"type": "aws_lb", "name": "api", "category": "network", "tags_expression": true}
+        ],
+        "default_tags": {}
+      }
+    ]
+  }
+}
+```
+
+- `aws_db_instance.main` — **passes** (required tag key present).
+- `aws_s3_bucket.logs` — **fails** (no `backstage.com/entity_ref`, and none via `default_tags`).
+- `aws_lb.api` — **skipped** (`tags_expression`: keys can't be extracted from `merge(...)`).
+
 ## Remediation
 
 When this policy fails, resolve it by:
@@ -234,6 +303,25 @@ When this policy fails, resolve it by:
        bucket = "my-terraform-state"
        key    = "state.tfstate"
        region = "us-east-1"
+     }
+   }
+   ```
+4. **For `aws-resources-tagged` failures:** Add the required tag key to the resource, or set it once for the whole module via provider `default_tags`:
+   ```hcl
+   # Per-resource
+   resource "aws_s3_bucket" "logs" {
+     bucket = "acme-logs"
+     tags = {
+       "backstage.com/entity_ref" = "component:default/payment-api"
+     }
+   }
+
+   # Or module-wide via the provider
+   provider "aws" {
+     default_tags {
+       tags = {
+         "backstage.com/entity_ref" = "component:default/payment-api"
+       }
      }
    }
    ```

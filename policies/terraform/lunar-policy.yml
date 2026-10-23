@@ -335,6 +335,16 @@ policies:
     mainPython: aws_stateful_backup_configured.py
     keywords: ["backup", "point in time recovery", "pitr", "rds retention", "efs backup", "disaster recovery", "resilience"]
 
+  # --- Resource tagging (reads the normalized .iac.modules[] view) ---
+  - name: aws-resources-tagged
+    description: |
+      Requires every taggable `aws_*` resource to carry the `required_tags`
+      keys, on its own `tags` or its module's `default_tags`. Skips resources
+      whose `tags` is an unevaluated expression (`merge(...)`). Skipped when
+      `required_tags` is empty (the default).
+    mainPython: aws_resources_tagged.py
+    keywords: ["aws", "tags", "resource tagging", "default_tags", "required tags", "governance", "cost allocation"]
+
 inputs:
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
@@ -366,4 +376,14 @@ inputs:
       aws-tls-policy-approved against ALB/NLB `ssl_policy`, CloudFront
       `minimum_protocol_version` and API Gateway `security_policy`. Empty (the
       default) skips the check.
+    default: ""
+  required_tags:
+    description: |
+      Comma-separated tag keys aws-resources-tagged requires (e.g.
+      `backstage.com/entity_ref,cost-center`). Empty (the default) skips it.
+    default: ""
+  exempt_resource_types:
+    description: |
+      Comma-separated taggable resource types aws-resources-tagged should
+      also ignore.
     default: ""

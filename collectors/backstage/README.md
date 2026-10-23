@@ -6,7 +6,7 @@ Parses and lints Backstage `catalog-info.yaml` files.
 
 This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. The raw Backstage descriptor (apiVersion, kind, metadata, spec) is written to the `.catalog.native.backstage` Component JSON path as-is — annotations keep their original `backstage.io/` or vendor prefixes. Files that declare [multiple entities](#multiple-entities) separated by `---` are fully supported. The search paths are configurable via the `paths` input.
 
-Optionally, when a `backstage_url` is configured, it also cross-checks the domain and system referenced in `catalog-info.yaml` against the live Backstage catalog and records whether those entities exist under `.catalog.native.backstage.refs`.
+Optionally, when a `backstage_url` is configured, it cross-checks the referenced domain and system against the live catalog under `.catalog.native.backstage.refs`, and resolves entity-reference tags on infrastructure into `.catalog.entity_refs`.
 
 ## Collected Data
 
@@ -49,6 +49,27 @@ By default the lookup is a direct `by-name` fetch, whose HTTP status is the answ
 >
 > That is why there are two domain paths. `.refs.domain` records the domain an entity declares **directly**, so `domain-exists` only does work when the `catalog-info.yaml` is itself a `kind: System` (or a `Component` carrying a custom `spec.domain`). `.refs.system_domain` records the domain reached **via the system**, which is the only meaningful domain question for the common one-`Component`-per-repo file. Each entry is written only when its reference is actually declared.
 
+### Entity references on infrastructure resources (`.catalog.entity_refs`)
+
+The `entity-refs` sub-collector resolves the entity references tagged onto infrastructure resources, reading the `entity_ref_tag_key` tag that the [`terraform` collector](../terraform/README.md) records.
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.catalog.entity_refs` | object | Resolution results; written only when `backstage_url` is set **and** IaC tag data is present |
+| `.catalog.entity_refs.checked` | boolean | `true` whenever resolution ran — the signal the policy uses to tell *configured* from *not configured* |
+| `.catalog.entity_refs.source` | object | Tool metadata (`tool: backstage`, `integration: api`) |
+| `.catalog.entity_refs.refs[]` | array | One entry per distinct concrete reference: `{name, kind, exists, resources[]}` on a definitive lookup, or `{name, kind, error, resources[]}` on a transient failure. `kind` is the kind looked up. |
+| `.catalog.entity_refs.unresolved[]` | array | Tag values that were unresolved Terraform expressions: `{value, resources[]}` — nothing concrete to look up |
+
+How it works:
+
+- Runs on the `after-json` hook (`path: .iac.modules`) once an IaC collector has written its modules, and reads the merged Component JSON, so no repo checkout is needed.
+- Resolves each distinct tag value across resource `tags` and module `default_tags` once, with the same [`ref_lookup`](#lookup-endpoint-ref_lookup), [`api_path_prefix`](#api-path-prefix) and [`auth_mode`](#aws-sigv4-authentication-iam-role-signed) as `.refs`. The lookup uses the kind the value declares (`component:payment-api`), or `entity_ref_default_kind` (default `component`) when it declares none; a bare ref uses the `default` namespace.
+- A lookup that fails (timeout, `5xx`, auth) records `error` instead of `exists`, so the policy skips rather than fails.
+- `resources[]` names the `<type>.<name>` resources carrying each reference.
+- Unresolved Terraform expressions (`${var.entity_ref}`) go to `unresolved[]` and are never looked up.
+- With no `backstage_url`, or no IaC tag data, nothing is written.
+
 ### Multiple entities
 
 A single `catalog-info.yaml` may declare several Backstage entities separated by `---` — most commonly a `Component` plus the `API`s it provides, or a `System` and its `Component`s. The collector parses **every** document in the file:
@@ -83,6 +104,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
 | `catalog-info` | code | Parses and lints `catalog-info.yaml`; writes parsed metadata and lint results |
+| `entity-refs` | after-json | Resolves Backstage entity-reference tags on infrastructure resources into `.catalog.entity_refs`; requires `backstage_url` |
 
 ## Installation
 
@@ -235,3 +257,25 @@ Parsing and linting are the collector's primary job and are **never** discarded 
 The `backstage` policy treats `{name, error}` as "couldn't determine" rather than "doesn't exist", so a misconfiguration shows up as an unresolved check rather than a false `domain-exists` failure. The underlying error is also logged to the collector's stderr.
 
 > A static custom auth header cannot substitute for SigV4 — signatures are per-request and time-bound (they cover an `X-Amz-Date` within a ~15-minute window plus a payload hash), so there is nothing static to configure.
+
+### Entity-reference tags on infrastructure (optional)
+
+`backstage_url` also enables `entity-refs`. Pair it with an IaC collector that records resource tags:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/terraform@main
+    on: [infra]
+    include: [terraform]
+
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    on: [infra]
+    include: [entity-refs]
+    with:
+      backstage_url: "https://backstage.example.com"
+      entity_ref_tag_key: "backstage.com/entity_ref"   # the default
+```
+
+Results land in `.catalog.entity_refs`; enforce them with the `backstage` policy's `entity-ref-valid` check. Add `catalog-info` to `include:` to run both sub-collectors from one import.
+
+> **`entity-refs` needs a Hub with the `after-json` hook.** The `catalog-info` sub-collector works on any Hub.

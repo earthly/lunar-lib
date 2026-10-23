@@ -6,7 +6,7 @@ Enforce Backstage service catalog standards for catalog-info.yaml completeness.
 
 Validates that Backstage catalog entries include required metadata for service ownership, lifecycle management, and system architecture; pair it with the `backstage` collector.
 
-The five core checks, `system-valid` and `system-domain-valid` fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check skips instead, for a partly catalogued fleet. The opt-in checks (`required-*`, `disallowed-*`, `allowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`) check the domain and system a component points at against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a catalogued component red.
+The five core checks, `system-valid` and `system-domain-valid` fail when no `catalog-info.yaml` is present — set `skip_when_no_catalog_info` and every check that reads the file skips instead, for a partly catalogued fleet. The opt-in checks (`required-*`, `disallowed-*`, `allowed-*`, `dependencies-documented`) skip until configured. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`, `entity-ref-valid`) check references against the live Backstage catalog; they too skip until the collector has a `backstage_url`, so enabling them unconfigured never turns a catalogued component red.
 
 ## Policies
 
@@ -33,6 +33,11 @@ This plugin provides the following policies (use `include` to select a subset):
 | `dependencies-documented` | Validates that `spec.dependsOn`, or a configured annotation, lists at least one dependency (opt-in via the `require_dependencies` input) |
 | `allowed-types` | Validates that `spec.type` is one of the configured values (opt-in via the `allowed_types` input) |
 | `allowed-lifecycles` | Validates that `spec.lifecycle` is one of the configured values (opt-in via the `allowed_lifecycles` input) |
+| `entity-ref-valid` | Verifies Backstage entity references tagged onto infrastructure resources are well-formed and exist in Backstage (needs collector `backstage_url` + IaC tag data) |
+
+### `entity-ref-valid` — entity references on infrastructure resources
+
+`entity-ref-valid` reads `.catalog.entity_refs`, not `catalog-info.yaml`, so `skip_when_no_catalog_info` doesn't affect it. It fails when a reference is malformed (`[<kind>:][<namespace>/]<name>`), doesn't exist in Backstage, or isn't the `entity_ref_kind` you set. It skips when resolution didn't run (no `backstage_url` or no IaC tag data), and skips a reference whose lookup errored or whose value is an unresolved Terraform expression. Whether a resource carries the tag at all is checked by the `terraform` policy's `aws-resources-tagged`.
 
 ## Required Data
 
@@ -55,6 +60,9 @@ This policy reads from the following Component JSON paths. The presence of `.cat
 | `.catalog.native.backstage.refs.domain` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }` on a transient lookup failure) for `spec.domain`; read by `domain-exists` |
 | `.catalog.native.backstage.refs.system` | object | `backstage` collector — `{ name, exists }` (or `{ name, error }`) for `spec.system`, plus `has_domain` once the system resolves; read by `system-exists`, `system-valid`, `system-domain-set` and `system-domain-valid` |
 | `.catalog.native.backstage.refs.system_domain` | object | `backstage` collector — `{ name, exists, via_system }` (or `{ name, error, via_system }`) for the domain the component's system belongs to; read by `system-domain-exists` and `system-domain-valid` |
+| `.catalog.entity_refs.checked` | boolean | `backstage` collector (`entity-refs`) — `true` when entity-ref resolution ran; `entity-ref-valid` skips (passes) when absent |
+| `.catalog.entity_refs.refs[]` | array | `backstage` collector (`entity-refs`) — `{name, kind, exists, resources[]}` (or `{name, kind, error, resources[]}`); read by `entity-ref-valid` |
+| `.catalog.entity_refs.unresolved[]` | array | `backstage` collector (`entity-refs`) — `{value, resources[]}` for tag values that were unresolved Terraform expressions |
 
 **Note:** Ensure the `backstage` collector is configured before enabling this policy. The referential-integrity checks (`domain-exists`, `system-exists`, `system-domain-*`) additionally require the collector to be configured with a `backstage_url` (and, for authenticated instances, a `BACKSTAGE_TOKEN` secret); without it they **skip (and pass)** rather than fail, since referential integrity cannot be verified. `system-valid` needs it only for its second step: without it, an unset `spec.system` still fails and a set one skips. (A durable "pending" state isn't available — post-collection the SDK resolves a data-less check to fail/error, not pending — so these checks skip to pass when unverified, mirroring the opt-in `required-*` / `disallowed-*` checks.)
 
@@ -351,6 +359,59 @@ These checks read the `.refs` block the `backstage` collector writes when it is 
 | Set, but the System is not in Backstage | fails: `"System 'typo-platform' (referenced by spec.system) does not exist in the Backstage catalog."` |
 | No `catalog-info.yaml` | fails, like `system-set` (skips with `skip_when_no_catalog_info`) |
 | Set, but no `backstage_url` or a lookup errored | skips |
+
+### Referential integrity on infrastructure tags: entity-ref-valid
+
+Enable the collector's `entity-refs` sub-collector alongside an IaC collector, then turn on this check:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/terraform@main
+    on: [infra]
+    include: [terraform]
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    on: [infra]
+    include: [entity-refs]
+    with:
+      backstage_url: "https://backstage.example.com"
+
+policies:
+  - uses: github://earthly/lunar-lib/policies/backstage@v1.0.0
+    on: [infra]
+    enforcement: report-pr          # or score
+    include: [entity-ref-valid]
+    with:
+      entity_ref_kind: "component"  # optional: require a component ref
+```
+
+Given collected data:
+
+```json
+{
+  "catalog": {
+    "entity_refs": {
+      "checked": true,
+      "refs": [
+        {"name": "component:default/payment-api", "kind": "component", "exists": true,
+         "resources": ["aws_db_instance.main", "aws_s3_bucket.logs"]},
+        {"name": "legacy-svc", "kind": "component", "exists": false,
+         "resources": ["aws_instance.web"]}
+      ],
+      "unresolved": [
+        {"value": "${var.entity_ref}", "resources": ["aws_sqs_queue.jobs"]}
+      ]
+    }
+  }
+}
+```
+
+`entity-ref-valid` **fails**, naming the offender:
+
+- `component:default/payment-api` — passes (well-formed, resolves, correct kind).
+- `legacy-svc` — **fails**: no such `component` (the collector's default kind for a bare ref) in the Backstage catalog (tagged on `aws_instance.web`).
+- `${var.entity_ref}` — **skipped**: an unresolved Terraform expression has no concrete value to verify.
+
+**Not configured / transient outage — skips (pass).** With no `backstage_url` (or no IaC tag data) `.catalog.entity_refs` is absent, so the check skips. A single ref recorded as `{"name": "...", "error": "503"}` is skipped individually rather than failed.
 
 ### Typed value constraints on required annotations
 

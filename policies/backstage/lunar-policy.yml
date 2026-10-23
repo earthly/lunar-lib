@@ -9,16 +9,17 @@ landing_page:
   display_name: "Backstage Guardrails"
   long_description: |
     Validates Backstage catalog-info.yaml entries for completeness and
-    compliance. Checks that the catalog file exists and is valid, owner
-    is set, lifecycle stage is defined, and system grouping is assigned.
-    Optionally skips components with no catalog file instead of failing them.
+    compliance: the catalog file exists and is valid, owner, lifecycle and
+    system are set, and entity references tagged onto infrastructure
+    resolve in the catalog. Optionally skips components with no catalog
+    file instead of failing them.
   category: "repository-and-ownership"
   icon: "assets/backstage.svg"
   status: "beta"
   requires:
     - slug: "backstage"
       type: "collector"
-      reason: "Provides parsed Backstage catalog metadata at .catalog.native.backstage"
+      reason: "Provides .catalog.native.backstage metadata and resolved .catalog.entity_refs"
 
 policies:
   - name: catalog-info-exists
@@ -156,6 +157,15 @@ policies:
     mainPython: ./system-domain-valid.py
     keywords: ["backstage", "domain", "system", "referential integrity", "catalog", "transitive", "domain assignment"]
 
+  - name: entity-ref-valid
+    description: |
+      Fails when an entity reference tagged onto an infrastructure resource is
+      malformed or doesn't exist in Backstage, naming the resources that carry
+      it. Skips until `.catalog.entity_refs` is collected, and skips references
+      that hit a lookup error or are unresolved Terraform expressions.
+    mainPython: ./entity-ref-valid.py
+    keywords: ["backstage", "entity_ref", "referential integrity", "terraform", "iac", "tags", "catalog"]
+
   - name: required-annotations
     description: |
       Verifies that catalog-info.yaml declares a configurable set of
@@ -264,7 +274,14 @@ inputs:
 
       Only the file's absence is affected: a component that has a
       catalog-info.yaml is held to every check either way.
+      `entity-ref-valid` doesn't read the file, so this doesn't affect it.
     default: "false"
+  entity_ref_kind:
+    description: |
+      When set, `entity-ref-valid` fails references whose `kind`, as the
+      collector looked it up, isn't this one (e.g. `component`). Empty (the
+      default) accepts any kind.
+    default: ""
   required_annotations:
     description: |
       Annotation keys that must be present (and non-empty) in

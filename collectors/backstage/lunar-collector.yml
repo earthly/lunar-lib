@@ -8,11 +8,11 @@ default_image: earthly/lunar-lib:base-main
 landing_page:
   display_name: "Backstage Collector"
   long_description: |
-    Parses and lints Backstage catalog-info.yaml files. Writes the raw
-    Backstage descriptor (apiVersion, kind, metadata, spec) to
-    .catalog.native.backstage, preserving annotations as-is. Optionally
-    verifies the referenced domain and system exist in a live catalog,
-    via Bearer token or AWS SigV4.
+    Parses and lints Backstage catalog-info.yaml, writing the raw
+    descriptor to .catalog.native.backstage. Optionally verifies the
+    referenced domain and system exist in a live catalog (Bearer token or
+    AWS SigV4) and resolves entity-reference tags on infrastructure into
+    .catalog.entity_refs.
   categories: ["service-catalog"]
   icon: "assets/backstage.svg"
   status: "beta"
@@ -20,6 +20,9 @@ landing_page:
     - slug: "backstage"
       type: "policy"
       reason: "Enforces Backstage catalog standards based on collected metadata"
+    - slug: "terraform"
+      type: "collector"
+      reason: "Records the infrastructure resource tags that entity-refs resolves"
 
 collectors:
   - name: catalog-info
@@ -87,6 +90,18 @@ collectors:
       type: code
     keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam", "monorepo", "source-location"]
 
+  - name: entity-refs
+    description: |
+      Resolves the entity references in infrastructure resource tags (the
+      `entity_ref_tag_key` tag under `.iac.modules`) against the Backstage
+      catalog and writes the results to `.catalog.entity_refs`. Runs once an
+      IaC collector has written `.iac.modules`; requires `backstage_url`.
+    mainBash: entity_refs.sh
+    hook:
+      type: after-json
+      path: .iac.modules
+    keywords: ["backstage", "entity_ref", "referential integrity", "service catalog", "after-json", "terraform", "tags", "iac"]
+
 inputs:
   paths:
     description: |
@@ -120,9 +135,9 @@ inputs:
       Base URL of the Backstage instance (e.g. https://backstage.example.com).
       When set, the collector cross-checks each declared spec.domain and
       spec.system against the Backstage catalog API and records the result
-      under `.catalog.native.backstage.refs`. Empty (the default) disables
-      referential-integrity lookups — the collector only parses and lints the
-      local file, exactly as before.
+      under `.catalog.native.backstage.refs`; it also enables `entity-refs`.
+      Empty (the default) disables referential-integrity lookups — the
+      collector only parses and lints the local file, exactly as before.
     default: ""
   api_path_prefix:
     description: |
@@ -204,6 +219,16 @@ inputs:
                      same endpoint the Backstage *cataloger* uses, so an
                      instance the cataloger can already read supports it.
     default: "by-name"
+  entity_ref_tag_key:
+    description: |
+      Resource tag key whose value `entity-refs` resolves as a Backstage
+      entity reference (`[<kind>:][<namespace>/]<name>`).
+    default: "backstage.com/entity_ref"
+  entity_ref_default_kind:
+    description: |
+      Kind `entity-refs` looks up for a reference that doesn't declare one
+      (`payment-api` rather than `component:payment-api`).
+    default: "component"
 
 secrets:
   BACKSTAGE_TOKEN:
@@ -311,6 +336,27 @@ example_component_json: |
             "system_domain": { "name": "payments", "exists": true, "ref": "domain:default/payments", "via_system": "payment-platform" }
           }
         }
+      },
+      "entity_refs": {
+        "checked": true,
+        "source": { "tool": "backstage", "integration": "api" },
+        "refs": [
+          {
+            "name": "component:default/payment-api",
+            "kind": "component",
+            "exists": true,
+            "resources": ["aws_db_instance.main", "aws_s3_bucket.logs"]
+          },
+          {
+            "name": "legacy-svc",
+            "kind": "component",
+            "exists": false,
+            "resources": ["aws_instance.web"]
+          }
+        ],
+        "unresolved": [
+          { "value": "${var.entity_ref}", "resources": ["aws_sqs_queue.jobs"] }
+        ]
       }
     }
   }
