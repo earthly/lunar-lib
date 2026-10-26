@@ -35,10 +35,16 @@ PATHS="${LUNAR_VAR_PATHS:-catalog-info.yaml,catalog-info.yml}"
 BRANCH="${LUNAR_VAR_BRANCH:-}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
 
-# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
-if command -v lunar-github-token >/dev/null 2>&1; then
-    LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
-    export LUNAR_SECRET_GH_TOKEN
+# Prefer a token from the Hub's GitHub App (`lunar github-app add`) over the
+# GH_TOKEN secret; github_app_only turns the fallback off.
+if APP_TOKEN=$(lunar github-app get-token "${LUNAR_VAR_GITHUB_APP-lunar-lib}" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+    echo "GitHub auth: GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}" >&2
+    export LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
+elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
+    echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}, and github_app_only is set" >&2
+    exit 1
+else
+    echo "GitHub auth: GH_TOKEN secret" >&2
 fi
 
 if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then

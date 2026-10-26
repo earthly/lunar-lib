@@ -13,6 +13,20 @@ GITHUB_HOST=$(echo "$GITHUB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##;
 GITHUB_HOST="${GITHUB_HOST:-github.com}"
 export GH_HOST="$GITHUB_HOST"
 
+# Prefer a token from the Hub's GitHub App for this org and host over the
+# secrets below; github_app_only turns the fallback off.
+if APP_TOKEN=$(lunar github-app get-token "${LUNAR_VAR_GITHUB_APP-lunar-lib}" --owner "${LUNAR_VAR_ORG_NAME:-}" \
+        --host "$GITHUB_HOST" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+    echo "GitHub auth: GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}" >&2
+    LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
+    LUNAR_SECRET_GH_ENTERPRISE_TOKEN="$APP_TOKEN"
+elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
+    echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}, and github_app_only is set" >&2
+    exit 1
+else
+    echo "GitHub auth: token secret" >&2
+fi
+
 # Authenticate the gh CLI. github.com and a GitHub Enterprise Server are separate
 # hosts with separate credentials, so read separate secrets and route each to the
 # variable gh selects by host:
@@ -21,12 +35,7 @@ export GH_HOST="$GITHUB_HOST"
 #                          falling back to LUNAR_SECRET_GH_TOKEN so single-token
 #                          setups that only ever set GH_TOKEN keep working.
 # A matching token already exported in the environment is honored as a last resort.
-# Prefer a token minted from the Hub's GitHub App for this org and host; the
-# secrets above are the fallback.
 if [ "$GITHUB_HOST" = "github.com" ]; then
-    if command -v lunar-github-token >/dev/null 2>&1; then
-        LUNAR_SECRET_GH_TOKEN=$(lunar-github-token --owner "${LUNAR_VAR_ORG_NAME:-}" --host github.com) || exit 1
-    fi
     GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
     if [ -z "$GH_AUTH_TOKEN" ]; then
         echo "Error: LUNAR_SECRET_GH_TOKEN (or GH_TOKEN) must be set for github.com" >&2
@@ -34,10 +43,6 @@ if [ "$GITHUB_HOST" = "github.com" ]; then
     fi
     export GH_TOKEN="$GH_AUTH_TOKEN"
 else
-    if command -v lunar-github-token >/dev/null 2>&1; then
-        LUNAR_SECRET_GH_ENTERPRISE_TOKEN=$(lunar-github-token --owner "${LUNAR_VAR_ORG_NAME:-}" --host "$GITHUB_HOST" \
-            --fallback-env LUNAR_SECRET_GH_ENTERPRISE_TOKEN) || exit 1
-    fi
     GH_AUTH_TOKEN="${LUNAR_SECRET_GH_ENTERPRISE_TOKEN:-${LUNAR_SECRET_GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-${GH_TOKEN:-}}}}"
     if [ -z "$GH_AUTH_TOKEN" ]; then
         echo "Error: LUNAR_SECRET_GH_ENTERPRISE_TOKEN (or LUNAR_SECRET_GH_TOKEN) must be set for GitHub Enterprise host $GITHUB_HOST" >&2

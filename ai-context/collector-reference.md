@@ -331,16 +331,21 @@ curl -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" ...
 
 ### GitHub API Tokens
 
-Prefer a token the Hub mints from a GitHub App over the `GH_TOKEN` secret. `lunar-github-token`, in the lunar-lib base image, prints one from the App named by the `github_app` input (default `lunar-lib`), falls back to `LUNAR_SECRET_GH_TOKEN`, and logs which it used. Copy the `github_app` and `github_app_only` inputs from `collectors/github/lunar-collector.yml`, then call it before checking the token:
+Prefer a token the Hub mints from a GitHub App (`lunar github-app add`) over the `GH_TOKEN` secret. Copy the `github_app` and `github_app_only` inputs from `collectors/github/lunar-collector.yml`, then mint before checking the secret:
 
 ```bash
-if command -v lunar-github-token >/dev/null 2>&1; then
-  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
-  export LUNAR_SECRET_GH_TOKEN
+if APP_TOKEN=$(lunar github-app get-token "${LUNAR_VAR_GITHUB_APP-lunar-lib}" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+  echo "GitHub auth: GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}" >&2
+  export LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
+elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
+  echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}, and github_app_only is set" >&2
+  exit 1
+else
+  echo "GitHub auth: GH_TOKEN secret" >&2
 fi
 ```
 
-A cataloger has no component, so pass `--owner <org>` (and `--host` on GitHub Enterprise Server). An App token only covers one org.
+The token is for the component's org and host. A cataloger has no component, so pass `--owner <org>` (and `--host` on GitHub Enterprise Server). An App token only covers one org.
 
 ### CI Hook-Specific
 
