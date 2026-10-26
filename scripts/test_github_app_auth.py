@@ -105,12 +105,13 @@ class GithubAppAuthTest(unittest.TestCase):
                 os.remove(log)
         e = {"PATH": self.bin + ":/usr/local/bin:/usr/bin:/bin", "STUB_MODE": mode,
              "CURL_LOG": self.curl_log, "LUNAR_ARGS": self.lunar_args, "GH_LOG": self.gh_log,
-             "LUNAR_SECRET_GH_TOKEN": PAT,
+             "LUNAR_SECRET_GH_TOKEN": PAT, "LUNAR_VAR_GITHUB_APP": "lunar-lib",
              "LUNAR_COMPONENT_ID": "github.com/acme/widget",
              "LUNAR_COMPONENT_GIT_SHA": "0123456789abcdef0123456789abcdef01234567",
              "LUNAR_COMPONENT_PR": "7"}
         e.update(env)
-        p = subprocess.run(["bash", os.path.join(ROOT, script)], env=e,
+        e = {k: v for k, v in e.items() if v is not None}
+        p = subprocess.run(["bash", os.path.join(ROOT, script)], env=e, stdin=subprocess.DEVNULL,
                            capture_output=True, text=True, timeout=120)
         reqs = []
         if os.path.exists(self.curl_log):
@@ -133,15 +134,26 @@ class GithubAppAuthTest(unittest.TestCase):
                     _, reqs, err = self.run_script(script, mode)
                     self.assertTrue(reqs, f"no GitHub request made: {err[-500:]}")
                     self.assertEqual({r["token"] for r in reqs}, {PAT})
-                    self.assertIn("GitHub auth: GH_TOKEN secret", err)
+                    self.assertIn("GitHub auth: GH_TOKEN secret, because GitHub App lunar-lib minted no token", err)
 
-    def test_app_only_fails_before_any_request(self):
+    def test_unset_github_app_never_calls_the_hub(self):
         for script in SCRIPTS:
             with self.subTest(script=script):
-                code, reqs, err = self.run_script(script, "notfound", LUNAR_VAR_GITHUB_APP_ONLY="true")
-                self.assertEqual(code, 1, err[-500:])
-                self.assertEqual(reqs, [])
-                self.assertIn("github_app_only is set", err)
+                _, reqs, err = self.run_script(script, "ok", LUNAR_VAR_GITHUB_APP=None)
+                self.assertTrue(reqs, f"no GitHub request made: {err[-500:]}")
+                self.assertEqual({r["token"] for r in reqs}, {PAT})
+                self.assertFalse(os.path.exists(self.lunar_args), "lunar github-app was called")
+                self.assertNotIn("GitHub auth:", err)
+
+    def test_app_only_fails_before_any_request(self):
+        for app in ("lunar-lib", None):
+            for script in SCRIPTS:
+                with self.subTest(script=script, github_app=app):
+                    code, reqs, err = self.run_script(script, "notfound", LUNAR_VAR_GITHUB_APP=app,
+                                                      LUNAR_VAR_GITHUB_APP_ONLY="true")
+                    self.assertEqual(code, 1, err[-500:])
+                    self.assertEqual(reqs, [])
+                    self.assertIn("github_app_only is set", err)
 
     def test_custom_app_name(self):
         self.run_script(SCRIPTS[0], "ok", LUNAR_VAR_GITHUB_APP="acme-reader")
@@ -161,11 +173,14 @@ class GithubAppAuthTest(unittest.TestCase):
                     gh_token, gh_enterprise_token = f.readline().strip().split("|")
                 self.assertEqual(gh_token if var == "GH_TOKEN" else gh_enterprise_token, APP_TOKEN)
 
-    def test_github_org_falls_back_to_the_secret(self):
-        self.run_script("catalogers/github-org/main.sh", "notfound", LUNAR_VAR_ORG_NAME="acme")
-        with open(self.gh_log) as f:
-            self.assertEqual(f.readline().strip().split("|")[0], PAT)
-
+    def test_github_org_uses_the_secret_without_an_app(self):
+        for mode, app in (("notfound", "lunar-lib"), ("ok", None)):
+            with self.subTest(mode=mode, github_app=app):
+                self.run_script("catalogers/github-org/main.sh", mode, LUNAR_VAR_ORG_NAME="acme",
+                                LUNAR_VAR_GITHUB_APP=app)
+                with open(self.gh_log) as f:
+                    self.assertEqual(f.readline().strip().split("|")[0], PAT)
+                self.assertEqual(os.path.exists(self.lunar_args), app is not None)
 
 if __name__ == "__main__":
     unittest.main()

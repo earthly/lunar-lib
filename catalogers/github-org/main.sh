@@ -13,18 +13,18 @@ GITHUB_HOST=$(echo "$GITHUB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##;
 GITHUB_HOST="${GITHUB_HOST:-github.com}"
 export GH_HOST="$GITHUB_HOST"
 
-# Prefer a token from the Hub's GitHub App for this org and host over the
-# secrets below; github_app_only turns the fallback off.
-if APP_TOKEN=$(lunar github-app get-token "${LUNAR_VAR_GITHUB_APP-lunar-lib}" --owner "${LUNAR_VAR_ORG_NAME:-}" \
-        --host "$GITHUB_HOST" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
-    echo "GitHub auth: GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}" >&2
+# With github_app set, mint a token from that Hub GitHub App for this org and
+# host instead of using the secrets below; github_app_only turns the fallback off.
+if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ] && APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" \
+        --owner "${LUNAR_VAR_ORG_NAME:-}" --host "$GITHUB_HOST" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+    echo "GitHub auth: GitHub App $LUNAR_VAR_GITHUB_APP" >&2
     LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
     LUNAR_SECRET_GH_ENTERPRISE_TOKEN="$APP_TOKEN"
 elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
-    echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}, and github_app_only is set" >&2
+    echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP:-(github_app is not set)}, and github_app_only is set" >&2
     exit 1
-else
-    echo "GitHub auth: token secret" >&2
+elif [ -n "${LUNAR_VAR_GITHUB_APP:-}" ]; then
+    echo "GitHub auth: token secret, because GitHub App $LUNAR_VAR_GITHUB_APP minted no token" >&2
 fi
 
 # Authenticate the gh CLI. github.com and a GitHub Enterprise Server are separate

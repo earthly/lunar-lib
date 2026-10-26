@@ -13,16 +13,16 @@ fi
 
 resolve_ticket_path || exit 1
 
-# Prefer a token from the Hub's GitHub App (`lunar github-app add`) over the
-# GH_TOKEN secret; github_app_only turns the fallback off.
-if APP_TOKEN=$(lunar github-app get-token "${LUNAR_VAR_GITHUB_APP-lunar-lib}" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
-  echo "GitHub auth: GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}" >&2
+# With github_app set, mint a token from that Hub GitHub App (`lunar github-app add`)
+# instead of using the GH_TOKEN secret; github_app_only turns the fallback off.
+if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ] && APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+  echo "GitHub auth: GitHub App $LUNAR_VAR_GITHUB_APP" >&2
   export LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
 elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
-  echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP-lunar-lib}, and github_app_only is set" >&2
+  echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP:-(github_app is not set)}, and github_app_only is set" >&2
   exit 1
-else
-  echo "GitHub auth: GH_TOKEN secret" >&2
+elif [ -n "${LUNAR_VAR_GITHUB_APP:-}" ]; then
+  echo "GitHub auth: GH_TOKEN secret, because GitHub App $LUNAR_VAR_GITHUB_APP minted no token" >&2
 fi
 
 # Require GH_TOKEN to fetch PR metadata.
