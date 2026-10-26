@@ -329,6 +329,19 @@ Secrets are passed as `LUNAR_SECRET_<NAME>`:
 curl -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" ...
 ```
 
+### GitHub API Tokens
+
+Prefer a token the Hub mints from a GitHub App over the `GH_TOKEN` secret. `lunar-github-token`, in the lunar-lib base image, prints one from the App named by the `github_app` input (default `lunar-lib`), falls back to `LUNAR_SECRET_GH_TOKEN`, and logs which it used. Copy the `github_app` and `github_app_only` inputs from `collectors/github/lunar-collector.yml`, then call it before checking the token:
+
+```bash
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+```
+
+A cataloger has no component, so pass `--owner <org>` (and `--host` on GitHub Enterprise Server). An App token only covers one org.
+
 ### CI Hook-Specific
 
 For `ci-before-job`, `ci-after-job`, `ci-before-step`, `ci-after-step`, `ci-before-command`, and `ci-after-command` hooks:
