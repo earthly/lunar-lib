@@ -94,16 +94,17 @@ Two behaviours worth knowing:
 ### Exempting accepted findings
 
 A scanner marks a finding fixable when the library has a fixed release, even if
-you can't take it. A copy of urllib3 bundled inside pip is one example: urllib3
-has the fix, but no pip release ships it yet. List those in `exempt_findings`,
-one `<id> <package>@<version>` per line, optionally limited to some images:
+you can't take it yet. The usual case is a library bundled inside a third-party
+tool: the library has the fix, but the tool hasn't shipped it. List those in
+`exempt_findings`, one `<id> <package>@<version>` per line, optionally limited
+to some images:
 
 ```yaml
     with:
       min_severity: "high"
       ignore_unfixable: "true"
       exempt_findings: |
-        # bundled inside pip; no pip release ships urllib3 2.8.0 yet
+        # bundled inside a vendor tool that hasn't shipped urllib3 2.8.0
         CVE-2026-97687 urllib3@2.7.0 registry.example.com/tools:*
 ```
 

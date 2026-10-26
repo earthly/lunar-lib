@@ -60,7 +60,7 @@ inputs:
       ```yaml
       with:
         exempt_findings: |
-          # bundled inside pip; no pip release ships urllib3 2.8.0 yet
+          # bundled inside a vendor tool that hasn't shipped urllib3 2.8.0
           CVE-2026-97687 urllib3@2.7.0 registry.example.com/tools:*
       ```
 
