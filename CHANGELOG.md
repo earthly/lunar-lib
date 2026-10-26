@@ -9,6 +9,13 @@ Sections are generated at release time by `scripts/gen-changelog-section.sh` fro
 the commits in the tag range — don't hand-edit. A merged change appears here when
 the next version ships.
 
+## [1.22.0] — 2026-10-23
+
+### Changed
+
+- backstage-catalog-info-monorepo: resolve Domain/System hierarchy across all scanned files and support GitHub Enterprise Server (#391)
+- ci-archive: retry a dropped log archive download from a fresh link (#392)
+
 ## [1.21.1] — 2026-10-21
 
 ### Security
@@ -1083,6 +1090,7 @@ the next version ships.
 Initial tagged release. Earlier history captured in
 [git log](https://github.com/earthly/lunar-lib/commits/v0.1.0).
 
+[1.22.0]: https://github.com/earthly/lunar-lib/compare/v1.21.1...v1.22.0
 [1.21.1]: https://github.com/earthly/lunar-lib/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/earthly/lunar-lib/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/earthly/lunar-lib/compare/v1.19.1...v1.20.0
