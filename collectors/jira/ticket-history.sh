@@ -15,6 +15,12 @@ if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
   exit 0
 fi
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+
 # Require GH_TOKEN to fetch PR metadata.
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "ticket-history requires GH_TOKEN secret to query GitHub." >&2

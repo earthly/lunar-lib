@@ -4,6 +4,12 @@ set -e
 # Detect Claude Code Review check-runs on pull requests.
 # Queries GitHub check-runs API and writes to ai.code_reviewers[].
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
   echo "LUNAR_SECRET_GH_TOKEN is required for Claude code-reviewer detection." >&2
   exit 1

@@ -18,6 +18,12 @@ INCLUDE_EVENTS="${LUNAR_VAR_INCLUDE_EVENTS:-}"
 LOOKBACK_INPUT="${LUNAR_VAR_DAILY_BACKUP_LOOKBACK_HOURS:-48}"
 BRANCH="${LUNAR_VAR_DAILY_BACKUP_BRANCH:-}"
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   log "GH_TOKEN secret is not set; skipping."
   exit 0

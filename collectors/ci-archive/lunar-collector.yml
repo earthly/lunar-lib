@@ -54,6 +54,12 @@ inputs:
   daily_backup_branch:
     description: Branch whose runs backup-logs-s3-daily backs up. Empty means the repository's default branch.
     default: ""
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add`. The GH_TOKEN secret is the fallback when it can't mint one; empty uses only the secret.
+    default: "lunar-lib"
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN secret, to check the App works before the secret is removed.
+    default: "false"
 
 secrets:
   GH_TOKEN:

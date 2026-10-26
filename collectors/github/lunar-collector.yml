@@ -97,6 +97,12 @@ inputs:
   release_range_max_commits:
     description: Most commits the release-range sub-collector records, up to the 1000 GitHub lists for a comparison; a longer range is recorded with `truncated` set.
     default: "250"
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add`. The GH_TOKEN secret is the fallback when it can't mint one; empty uses only the secret.
+    default: "lunar-lib"
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN secret, to check the App works before the secret is removed.
+    default: "false"
 
 secrets:
   GH_TOKEN:

@@ -21,7 +21,12 @@ export GH_HOST="$GITHUB_HOST"
 #                          falling back to LUNAR_SECRET_GH_TOKEN so single-token
 #                          setups that only ever set GH_TOKEN keep working.
 # A matching token already exported in the environment is honored as a last resort.
+# Prefer a token minted from the Hub's GitHub App for this org and host; the
+# secrets above are the fallback.
 if [ "$GITHUB_HOST" = "github.com" ]; then
+    if command -v lunar-github-token >/dev/null 2>&1; then
+        LUNAR_SECRET_GH_TOKEN=$(lunar-github-token --owner "${LUNAR_VAR_ORG_NAME:-}" --host github.com) || exit 1
+    fi
     GH_AUTH_TOKEN="${LUNAR_SECRET_GH_TOKEN:-${GH_TOKEN:-}}"
     if [ -z "$GH_AUTH_TOKEN" ]; then
         echo "Error: LUNAR_SECRET_GH_TOKEN (or GH_TOKEN) must be set for github.com" >&2
@@ -29,6 +34,10 @@ if [ "$GITHUB_HOST" = "github.com" ]; then
     fi
     export GH_TOKEN="$GH_AUTH_TOKEN"
 else
+    if command -v lunar-github-token >/dev/null 2>&1; then
+        LUNAR_SECRET_GH_ENTERPRISE_TOKEN=$(lunar-github-token --owner "${LUNAR_VAR_ORG_NAME:-}" --host "$GITHUB_HOST" \
+            --fallback-env LUNAR_SECRET_GH_ENTERPRISE_TOKEN) || exit 1
+    fi
     GH_AUTH_TOKEN="${LUNAR_SECRET_GH_ENTERPRISE_TOKEN:-${LUNAR_SECRET_GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-${GH_TOKEN:-}}}}"
     if [ -z "$GH_AUTH_TOKEN" ]; then
         echo "Error: LUNAR_SECRET_GH_ENTERPRISE_TOKEN (or LUNAR_SECRET_GH_TOKEN) must be set for GitHub Enterprise host $GITHUB_HOST" >&2

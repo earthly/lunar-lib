@@ -21,6 +21,12 @@ RUN_ID="${LUNAR_CI_PIPELINE_RUN_ID:-}"
 ATTEMPT="${LUNAR_CI_PIPELINE_RUN_ATTEMPT:-}"
 WORKFLOW="${LUNAR_CI_PIPELINE_NAME:-}"
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   log "GH_TOKEN secret is not set; skipping."
   exit 0

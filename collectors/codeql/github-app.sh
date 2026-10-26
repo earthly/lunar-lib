@@ -3,6 +3,12 @@ set -e
 
 source "$(dirname "$0")/helpers.sh"
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+    LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+    export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -z "$LUNAR_SECRET_GH_TOKEN" ]; then
     echo "LUNAR_SECRET_GH_TOKEN is required for the CodeQL GitHub App collector." >&2
     exit 1

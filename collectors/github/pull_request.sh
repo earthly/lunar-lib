@@ -14,6 +14,12 @@ if [ -z "${LUNAR_COMPONENT_PR:-}" ]; then
   exit 0
 fi
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+  LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+  export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -z "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
   echo "Error: LUNAR_SECRET_GH_TOKEN is not set. Configure the GH_TOKEN secret for this collector." >&2
   exit 1

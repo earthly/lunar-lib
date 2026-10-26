@@ -67,6 +67,7 @@ plugin-source:
     SAVE ARTIFACT policies
 
 test:
+    BUILD ./base-image+test
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD --pass-args ./collectors/backstage+test-offline
@@ -198,6 +199,9 @@ base-image:
     # safe.directory: the snippet checkout is owned by a different uid than the
     # process running the script, which git otherwise refuses to read.
     RUN apk add --no-cache git && git config --system --add safe.directory '*'
+    # Picks between a Hub-minted GitHub App token and the GH_TOKEN secret for
+    # the plugins that call the GitHub API.
+    COPY base-image/lunar-github-token /usr/local/bin/lunar-github-token
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 

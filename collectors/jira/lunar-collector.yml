@@ -111,6 +111,12 @@ inputs:
       refused, timeout, 429, 5xx. A rejected credential or an unknown ticket is
       not retried.
     default: "3"
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add`. The GH_TOKEN secret is the fallback when it can't mint one; empty uses only the secret.
+    default: "lunar-lib"
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN secret, to check the App works before the secret is removed.
+    default: "false"
 
 secrets:
   JIRA_TOKEN:

@@ -35,6 +35,12 @@ PATHS="${LUNAR_VAR_PATHS:-catalog-info.yaml,catalog-info.yml}"
 BRANCH="${LUNAR_VAR_BRANCH:-}"
 COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX:-github.com/}"
 
+# Prefer a GitHub App token from the Hub; the GH_TOKEN secret is the fallback.
+if command -v lunar-github-token >/dev/null 2>&1; then
+    LUNAR_SECRET_GH_TOKEN=$(lunar-github-token) || exit 1
+    export LUNAR_SECRET_GH_TOKEN
+fi
+
 if [ -n "${LUNAR_SECRET_GH_TOKEN:-}" ]; then
     export GH_TOKEN="$LUNAR_SECRET_GH_TOKEN"
 elif [ -z "${GH_TOKEN:-}" ]; then
