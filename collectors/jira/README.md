@@ -102,6 +102,11 @@ Both sub-collectors build a list of candidate keys from the PR, best first, and 
 Step 2 outranks step 3 because a description usually names more than one ticket, and the first one to appear is often not the PR's own. Given this body, the list leads with `ENG-1234` rather than `OPS-500`:
 
 ```markdown
+
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Pull requests (used by `ticket` and `ticket-history`); a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.
+
 ## Related
 - Depends on OPS-500
 - Reverts OPS-412

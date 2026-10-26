@@ -95,3 +95,7 @@ collectors:
     # with:
     #   release_tag_pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'  # enables release-range
 ```
+
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Metadata for `repository`, Administration for `branch-protection` and `access-permissions`, Pull requests for `pull-request`, and Contents and Pull requests for `release-range`; a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.

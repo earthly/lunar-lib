@@ -37,6 +37,12 @@ SCRIPTS = [
 LUNAR_STUB = """#!/bin/bash
 if [ "$1 $2" = "github-app get-token" ]; then
   printf '%s\\n' "$@" > "$LUNAR_ARGS"
+  for p in ${DENIED_PERMS:-}; do
+    case " $* " in *" $p=read "*)
+      echo "Error: GitHub refused the request (HTTP 422): The permissions requested are not granted to this installation." >&2
+      exit 1 ;;
+    esac
+  done
   case "$STUB_MODE" in
     ok) echo "ghs_app_token_from_hub" ;;
     empty) ;;
@@ -47,25 +53,37 @@ fi
 cat >/dev/null 2>&1 || true
 """
 
+# The App token gets GitHub's 403 on endpoints its requested permissions don't
+# cover (metadata comes with every token), like a real scoped installation token.
 CURL_STUB = """#!/usr/bin/env python3
 import json, os, sys
 args = sys.argv[1:]
 url = next((a for a in reversed(args) if a.startswith("http")), "")
 auth = [args[i + 1] for i, a in enumerate(args[:-1])
         if a == "-H" and args[i + 1].lower().startswith("authorization:")]
+token = auth[0].split()[-1] if auth else None
+needs = ("checks" if "/check-runs" in url else "statuses" if url.endswith("/status")
+         else "pull_requests" if "/pulls" in url else "administration" if "/teams" in url or "/protection" in url
+         else "actions" if "/actions/" in url else "contents" if "/contents/" in url else "metadata")
+granted = {"metadata"}
+if os.path.exists(os.environ["LUNAR_ARGS"]):
+    a = open(os.environ["LUNAR_ARGS"]).read().split("\\n")
+    granted |= {a[i + 1].split("=")[0] for i, x in enumerate(a[:-1]) if x == "--permission"}
+denied = token == "ghs_app_token_from_hub" and needs not in granted
 with open(os.environ["CURL_LOG"], "a") as f:
-    f.write(json.dumps({"url": url, "token": auth[0].split()[-1] if auth else None}) + "\\n")
-if "/check-runs" in url:
-    body = '{"total_count":0,"check_runs":[]}'
+    f.write(json.dumps({"url": url, "token": token, "needs": needs, "denied": denied}) + "\\n")
+if denied:
+    body, code = '{"message":"Resource not accessible by integration"}', "403"
+elif "/check-runs" in url:
+    body, code = '{"total_count":0,"check_runs":[]}', "200"
 elif url.endswith("/status"):
-    body = '{"state":"success","statuses":[]}'
+    body, code = '{"state":"success","statuses":[]}', "200"
 elif "/teams" in url or "/collaborators" in url or url.endswith("/commits") or "/reviews" in url:
-    body = "[]"
-elif "/contents/" in url:
-    body = '{"message":"Not Found"}'
+    body, code = "[]", "200"
+elif "/contents/" in url or "/protection" in url:
+    body, code = '{"message":"Not Found"}', "404"
 else:
-    body = '{"default_branch":"main","name":"widget","full_name":"acme/widget","title":"ABC-1 widget"}'
-code = "404" if "/protection" in url or "/contents/" in url else "200"
+    body, code = '{"default_branch":"main","name":"widget","full_name":"acme/widget","title":"ABC-1 widget"}', "200"
 if "-o" in args:
     open(args[args.index("-o") + 1], "w").write(body)
     body = ""
@@ -74,8 +92,10 @@ if "-w" in args:
 sys.stdout.write(body)
 """
 
-# Records the tokens gh would authenticate with, then lists no repos.
+# Answers github-org's install-scope check, and records the tokens `gh repo
+# list` would authenticate with, then lists no repos.
 GH_STUB = """#!/bin/bash
+if [ "$1" = "api" ]; then echo "${STUB_SELECTION:-all}"; exit 0; fi
 echo "${GH_TOKEN:-}|${GH_ENTERPRISE_TOKEN:-}" >> "$GH_LOG"
 echo "[]"
 """
@@ -125,7 +145,26 @@ class GithubAppAuthTest(unittest.TestCase):
                 _, reqs, err = self.run_script(script, "ok")
                 self.assertTrue(reqs, f"no GitHub request made: {err[-500:]}")
                 self.assertEqual({r["token"] for r in reqs}, {APP_TOKEN})
+                self.assertEqual([r["url"] for r in reqs if r["denied"]], [],
+                                 "the token's --permission list doesn't cover these endpoints")
                 self.assertIn("GitHub auth: GitHub App lunar-lib", err)
+
+    def test_app_without_a_needed_permission_falls_back(self):
+        # An App granted only metadata: GitHub refuses any wider token request.
+        denied = "administration checks statuses pull_requests contents actions"
+        for script in SCRIPTS:
+            with self.subTest(script=script):
+                _, reqs, err = self.run_script(script, "ok", DENIED_PERMS=denied)
+                with open(self.lunar_args) as f:
+                    asked = {a.split("=")[0] for a in f.read().split("\n") if a.endswith("=read")}
+                want = APP_TOKEN if asked <= {"metadata"} else PAT
+                self.assertTrue(reqs, f"no GitHub request made: {err[-500:]}")
+                self.assertEqual({r["token"] for r in reqs}, {want})
+                if want == PAT:
+                    self.assertIn("not granted to this installation", err)
+                    code, reqs, _ = self.run_script(script, "ok", DENIED_PERMS=denied,
+                                                    LUNAR_VAR_GITHUB_APP_ONLY="true")
+                    self.assertEqual((code, reqs), (1, []))
 
     def test_secret_when_the_app_cannot_mint(self):
         for mode in ("notfound", "empty"):
@@ -172,6 +211,17 @@ class GithubAppAuthTest(unittest.TestCase):
                 with open(self.gh_log) as f:
                     gh_token, gh_enterprise_token = f.readline().strip().split("|")
                 self.assertEqual(gh_token if var == "GH_TOKEN" else gh_enterprise_token, APP_TOKEN)
+
+    def test_github_org_selected_install_falls_back(self):
+        script = "catalogers/github-org/main.sh"
+        _, _, err = self.run_script(script, "ok", LUNAR_VAR_ORG_NAME="acme", STUB_SELECTION="selected")
+        with open(self.gh_log) as f:
+            self.assertEqual(f.readline().strip().split("|")[0], PAT)
+        self.assertIn("isn't installed on all of acme's repositories", err)
+        code, _, _ = self.run_script(script, "ok", LUNAR_VAR_ORG_NAME="acme", STUB_SELECTION="selected",
+                                     LUNAR_VAR_GITHUB_APP_ONLY="true")
+        self.assertEqual(code, 1)
+        self.assertFalse(os.path.exists(self.gh_log), "gh repo list ran under github_app_only")
 
     def test_github_org_uses_the_secret_without_an_app(self):
         for mode, app in (("notfound", "lunar-lib"), ("ok", None)):

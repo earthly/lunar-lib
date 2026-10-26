@@ -158,3 +158,7 @@ or `"pending"` on timeout.
 | `auto_extra_args` | *(empty)* | Extra command-line args appended to every `auto` `sonar-scanner` invocation (e.g. `-Dsonar.exclusions=**/*.min.js`). |
 | `github_app_poll_timeout_seconds` | `180` | Total seconds `github-app` waits for the SonarCloud GitHub check run on the PR head SHA. |
 | `github_app_poll_interval_seconds` | `10` | Seconds between polls while waiting for the SonarCloud check run. |
+
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Commit statuses (used by `github-app`); a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.

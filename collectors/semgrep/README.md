@@ -46,3 +46,7 @@ collectors:
 The `github-app` collector requires a `GH_TOKEN` secret for GitHub API access.
 
 The `running-in-prs` collector queries the Lunar Hub database to verify PR scanning. It uses `lunar sql connection-string` to obtain database credentials. If unavailable, the collector skips silently.
+
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Checks (used by `github-app`); a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.

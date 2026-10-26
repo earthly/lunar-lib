@@ -40,3 +40,6 @@ collectors:
       GH_TOKEN: "${{ secrets.GH_TOKEN }}"
 ```
 
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Checks (used by `code-reviewer`); a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.

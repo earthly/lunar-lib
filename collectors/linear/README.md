@@ -47,3 +47,7 @@ Required secrets:
 - `GH_TOKEN` — GitHub token for reading PR metadata
 
 Linear has no native "issue type" field. The `type_labels` input lets you specify label names (e.g. `bug,feature,chore`) that should be treated as types. If a matching label is found on the issue, it is written to `.vcs.pr.ticket.type`. The Linear GraphQL API returns the full issue URL, so no base URL input is needed (unlike the Jira collector). Linear uses `TEAM-NUMBER` identifiers (e.g. `ENG-123`), which match the same default regex as Jira.
+
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Pull requests (used by `ticket` and `ticket-history`); a token request for a permission the App lacks fails, and the collector falls back to the secret. It must be installed on every repository this collector runs on, since a repository outside the installation answers 404 like one that doesn't exist.

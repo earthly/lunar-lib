@@ -4,8 +4,10 @@ set -e
 source "$(dirname "$0")/helpers.sh"
 
 # With github_app set, mint a token from that Hub GitHub App (`lunar github-app add`)
-# instead of using the GH_TOKEN secret; github_app_only turns the fallback off.
-if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ] && APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" 2>/dev/null) && [ -n "$APP_TOKEN" ]; then
+# instead of using the GH_TOKEN secret. The token asks for only the permissions this
+# script uses, so an App without them falls back; github_app_only turns that off.
+if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ] && APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" --permission statuses=read) \
+    && [ -n "$APP_TOKEN" ]; then
     echo "GitHub auth: GitHub App $LUNAR_VAR_GITHUB_APP" >&2
     export LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
 elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
