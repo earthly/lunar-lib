@@ -4,7 +4,10 @@
 # draft the GitHub release notes. One source, two renderings.
 #
 #   scripts/gen-changelog-section.sh v1.16.0            # preview on stdout
-#   scripts/gen-changelog-section.sh v1.16.0 --write    # splice into CHANGELOG.md
+#   scripts/gen-changelog-section.sh v1.16.0 --write    # previous tag's CHANGELOG.md + this section
+#
+# The full file only lives on release tags; main's CHANGELOG.md is a pointer, so
+# --write rebuilds the working copy from the previous tag before splicing.
 #
 # Why generated rather than hand-appended: the old flow had every PR append
 # under `## [Unreleased]` and a roll PR rename that heading at release time. A
@@ -14,9 +17,8 @@
 # entries landed under an already-shipped heading that way. With no
 # `[Unreleased]` there is no append point to race on.
 #
-# Bucketing is inferred from the commit subject, so treat the output as a draft:
-# reconcile it against the release notes you write by hand and move any misfiled
-# line before committing.
+# Bucketing is inferred from the commit subject and can misfile a line. The
+# hand-written GitHub release notes are where each change gets its right bucket.
 set -euo pipefail
 
 REPO_URL="https://github.com/earthly/lunar-lib"
@@ -31,7 +33,7 @@ while [ $# -gt 0 ]; do
     --write)  write=1; shift ;;
     --since)  since="${2:?--since needs a tag}"; shift 2 ;;
     --date)   date="${2:?--date needs YYYY-MM-DD}"; shift 2 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     -*)       echo "unknown flag: $1" >&2; exit 2 ;;
     *)        version="$1"; shift ;;
   esac
@@ -97,6 +99,19 @@ for pair in "Added:$added" "Changed:$changed" "Fixed:$fixed" "Security:$security
   section+=$'\n'"### ${heading}"$'\n\n'"${body}"
 done
 
+changelog="$(git rev-parse --show-toplevel)/CHANGELOG.md"
+
+# Before the no-commits exit, so a release without a section still tags the
+# previous history rather than main's pointer.
+if [ "$write" -eq 1 ]; then
+  if ! git show "refs/tags/${since}:CHANGELOG.md" > "${changelog}.tmp"; then
+    rm -f "${changelog}.tmp"
+    echo "no CHANGELOG.md on ${since}" >&2
+    exit 1
+  fi
+  mv "${changelog}.tmp" "$changelog"
+fi
+
 if [ "$section" = "## [${bare}] — ${date}"$'\n' ]; then
   echo "no user-visible commits in ${range}" >&2
   exit 1
@@ -109,7 +124,6 @@ if [ "$write" -eq 0 ]; then
   exit 0
 fi
 
-changelog="$(git rev-parse --show-toplevel)/CHANGELOG.md"
 grep -q "^## \[${bare}\]" "$changelog" && { echo "CHANGELOG.md already has a [${bare}] section" >&2; exit 1; }
 
 # Splice: the section goes above the newest existing version heading, the link
