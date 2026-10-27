@@ -64,6 +64,7 @@ Container images and Dockerfiles. Tool-agnostic (works with Docker, Podman, Buil
 - `.containers.definitions[].valid` — Dockerfile valid
 - `.containers.definitions[].final_stage.user` — User instruction value
 - `.containers.definitions[].base_images[].tag` — Tag value (check for `null` or `"latest"`)
+- `.containers.definitions[].base_images[].reference` — Full `FROM` image. Read digests (`@sha256:...`) from here: `tag` is split on `:` and never holds one
 - `.containers.lint_results[]` — Per-Dockerfile lint results (rule, severity, message, line)
 - `.containers.builds[].signed` — Image signed
 - `.containers.registries_used` — Registries for allowlist checking

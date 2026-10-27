@@ -328,6 +328,7 @@ This document specifies possible policies for the **DevEx, Build and CI** catego
   * Policy: Assert that base images are pinned by digest (may be advisory or required for production)
   * Configuration: Tags requiring digest pinning (e.g., ["production", "tier1"])
   * Strategy: Strategy 8 (File Parsing and Schema Extraction)
+  * **Implemented** by the `container` policy's `digest-pinned` check, which reads the digest from `.containers.definitions[].base_images[].reference`. Scope it to production or tier-1 components with the import's `on:`.
 
 * `container-minimal-final-stage` **Final stage uses minimal base image**: Multi-stage builds should use minimal images (distroless, scratch, alpine) for the final stage.
   * Collector(s): Parse Dockerfile for multi-stage builds and analyze final stage base image
