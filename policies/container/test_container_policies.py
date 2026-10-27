@@ -16,6 +16,7 @@ from lunar_policy import Node, CheckStatus
 
 from allowed_registries import main as check_allowed_registries
 from build_tagged import main as check_build_tagged
+from digest_pinned import main as check_digest_pinned
 from dockerfile_lint_clean import main as check_dockerfile_lint_clean
 from healthcheck import main as check_healthcheck
 from no_latest import main as check_no_latest
@@ -27,6 +28,7 @@ from user import main as check_user
 ALL_CHECKS = [
     check_allowed_registries,
     check_build_tagged,
+    check_digest_pinned,
     check_dockerfile_lint_clean,
     check_healthcheck,
     check_no_latest,
@@ -66,6 +68,13 @@ def finished_node(data):
     skips are a post-collection judgement, so these tests use a finished node.
     """
     return Node.from_component_json(data, {"workflows_finished": True})
+
+
+DIGEST = "sha256:" + "a" * 64
+
+# Shaped like the docker collector's output, which splits FROM values on ":".
+ALPINE_BY_DIGEST = {"reference": f"alpine@{DIGEST}", "image": "alpine@sha256", "tag": "a" * 64}
+NODE_TAG_AND_DIGEST = {"reference": f"node:20@{DIGEST}", "image": "node", "tag": "20@sha256"}
 
 
 def definition(path="Dockerfile", **overrides):
@@ -192,6 +201,45 @@ class TestDefinitionChecks(unittest.TestCase):
             check = check_allowed_registries(finished_node(data))
         self.assertEqual(check.status, CheckStatus.FAIL)
         self.assertIn("gcr.io", check.failure_reasons[0])
+
+
+class TestDigestPinning(unittest.TestCase):
+    def test_digest_pinned_passes_on_digest_refs(self):
+        data = {"containers": {"definitions": [definition(
+            base_images=[ALPINE_BY_DIGEST, NODE_TAG_AND_DIGEST]
+        )]}}
+        self.assertEqual(check_digest_pinned(finished_node(data)).status, CheckStatus.PASS)
+
+    def test_digest_pinned_fails_without_digest(self):
+        for img in [
+            {"reference": "alpine:3.19.1", "image": "alpine", "tag": "3.19.1"},
+            {"reference": "node:20", "image": "node", "tag": "20"},
+            {"reference": "alpine", "image": "alpine", "tag": None},
+            # "@" without a digest
+            {"reference": "apache/hadoop-runner:@docker.hadoop-runner.version@",
+             "image": "apache/hadoop-runner", "tag": "@docker.hadoop-runner.version@"},
+        ]:
+            with self.subTest(reference=img["reference"]):
+                data = {"containers": {"definitions": [definition(base_images=[img])]}}
+                check = check_digest_pinned(finished_node(data))
+                self.assertEqual(check.status, CheckStatus.FAIL)
+                self.assertIn(img["reference"], check.failure_reasons[0])
+
+    def test_digest_pinned_fails_only_the_unpinned_image(self):
+        data = {"containers": {"definitions": [definition(base_images=[
+            ALPINE_BY_DIGEST,
+            {"reference": "golang:1.21.5-alpine", "image": "golang", "tag": "1.21.5-alpine"},
+        ])]}}
+        check = check_digest_pinned(finished_node(data))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 1)
+        self.assertIn("golang:1.21.5-alpine", check.failure_reasons[0])
+
+    def test_stable_tags_passes_on_digest_refs(self):
+        data = {"containers": {"definitions": [definition(
+            base_images=[ALPINE_BY_DIGEST, NODE_TAG_AND_DIGEST]
+        )]}}
+        self.assertEqual(check_stable_tags(finished_node(data)).status, CheckStatus.PASS)
 
 
 class TestBuildTagged(unittest.TestCase):

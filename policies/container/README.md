@@ -14,6 +14,7 @@ This plugin provides the following policies (use `include` to select a subset):
 |--------|-------------|-----------------|
 | `no-latest` | No `:latest` tags (explicit or implicit) | Image uses `:latest` tag (explicit or implicit) |
 | `stable-tags` | Tags must be a digest or contain a full semver (e.g., `1.2.3`, `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`) | Image uses unstable tag (partial version, branch name, etc.) |
+| `digest-pinned` | Base images must be pinned by digest (e.g., `node:20@sha256:...`). Stricter than `stable-tags` | Image has no digest, whatever its tag |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
 | `required-labels` | Required labels must be present (Dockerfile or build command) | Missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
@@ -34,8 +35,8 @@ This policy reads from the following Component JSON paths:
 Each check **skips** when the data it reads is absent, rather than reporting a
 pass it didn't earn. On a repository with no Dockerfiles, the `docker` collector
 writes no `.containers` data at all, so every definition-based check
-(`no-latest`, `stable-tags`, `allowed-registries`, `healthcheck`, `user`,
-`dockerfile-lint-clean`) skips; `build-tagged` skips independently when no
+(`no-latest`, `stable-tags`, `digest-pinned`, `allowed-registries`,
+`healthcheck`, `user`, `dockerfile-lint-clean`) skips; `build-tagged` skips independently when no
 container build ran in CI. `required-labels` also skips when its
 `required_labels` variable is unset, since there is nothing to require.
 
@@ -55,6 +56,7 @@ policies:
     include:
       - no-latest
       - stable-tags
+      - digest-pinned
       - allowed-registries
       - required-labels
       - healthcheck
@@ -95,7 +97,7 @@ policies:
 
 ### Failing Examples
 
-#### Using :latest tag (fails `no-latest`, `stable-tags`)
+#### Using :latest tag (fails `no-latest`, `stable-tags`, `digest-pinned`)
 ```json
 {
   "containers": {
@@ -112,7 +114,7 @@ policies:
 }
 ```
 
-#### Using unstable tag (fails `stable-tags`)
+#### Using unstable tag (fails `stable-tags`, `digest-pinned`)
 ```json
 {
   "containers": {
@@ -161,6 +163,18 @@ Avoid:
 - Implicit latest: `FROM alpine`
 - Explicit latest: `FROM alpine:latest`
 - Partial versions: `FROM node:20` or `FROM node:16.1` (no patch component)
+
+### digest-pinned
+
+Add the digest to every `FROM`. You can keep the tag for readability, but the
+digest is what gets pulled:
+
+```dockerfile
+FROM node:20.11.1-alpine@sha256:<digest>
+```
+
+`docker buildx imagetools inspect node:20.11.1-alpine` prints the digest.
+Renovate or Dependabot can keep pinned digests up to date.
 
 ### allowed-registries
 

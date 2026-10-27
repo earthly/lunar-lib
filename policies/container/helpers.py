@@ -47,3 +47,21 @@ def parse_image_reference(reference: str) -> tuple[str | None, str, str | None]:
     
     # No registry, all parts are namespace/repo
     return None, image_part, tag
+
+
+def image_digest(reference: str) -> str | None:
+    """
+    Return the digest an image reference is pinned to, or None.
+
+    Read it from the full reference: the docker collector splits on ":", so its
+    tag for "alpine@sha256:<hex>" is just "<hex>".
+
+    Examples:
+    - alpine@sha256:abc123 -> sha256:abc123
+    - node:20@sha256:abc123 -> sha256:abc123
+    - node:20.11.1 -> None
+    """
+    _, _, tag = parse_image_reference(reference)
+    if tag and tag.startswith(("sha256:", "sha512:")):
+        return tag
+    return None

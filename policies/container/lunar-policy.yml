@@ -35,6 +35,13 @@ policies:
     mainPython: stable_tags.py
     keywords: ["semver", "image digest", "version pinning", "tag policy"]
 
+  - name: digest-pinned
+    description: |
+      Requires base images to be pinned by digest (e.g. "node:20@sha256:...").
+      Any tag, full semver included, can be re-pushed with different content; a digest can't.
+    mainPython: digest_pinned.py
+    keywords: ["image digest", "digest pinning", "sha256", "immutable images", "supply chain security"]
+
   - name: allowed-registries
     description: |
       Restricts base images to approved container registries only.
