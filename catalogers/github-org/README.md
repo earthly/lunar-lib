@@ -186,6 +186,10 @@ Topics are matched exactly (case-sensitive) against the repository's GitHub
 topics, and both lists compose with the visibility and name-pattern
 (`include_repos` / `exclude_repos`) filters — a repo must pass all of them.
 
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN` (or `GH_ENTERPRISE_TOKEN`), add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Metadata; a token request for a permission the App lacks fails, and the cataloger falls back to the secret. It must be installed on all of the org's repositories: on a "selected repositories" install the cataloger can't list the whole org, so it ignores the App and uses the token secret, or fails with `github_app_only`.
+
 ## Source System
 
 This cataloger uses the GitHub CLI (`gh`) to query the GitHub API. It requires:

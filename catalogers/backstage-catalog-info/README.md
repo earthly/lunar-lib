@@ -287,6 +287,10 @@ Backstage `spec.owner` is typically an entity reference like `group:default/team
 
 If you'd rather store bare names, set `owner_format: bare-name` to strip the `<kind>:<namespace>/` prefix. `default_owner` is also written verbatim, regardless of `owner_format`.
 
+### GitHub App
+
+To use a token from a GitHub App instead of `GH_TOKEN`, add the App with `lunar github-app add` and set `github_app` to its name. Grant it read access to Contents; a token request for a permission the App lacks fails, and the cataloger falls back to the secret. It must be installed on every repository this cataloger runs on, since a repository outside the installation answers 404 like one that doesn't exist.
+
 ## Source System
 
 [GitHub](https://github.com) — the cataloger calls the [Contents API](https://docs.github.com/en/rest/repos/contents) once per component invocation to fetch `catalog-info.yaml` from each repo. Requirements:

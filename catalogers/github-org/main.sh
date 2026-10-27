@@ -13,6 +13,31 @@ GITHUB_HOST=$(echo "$GITHUB_HOST_RAW" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##;
 GITHUB_HOST="${GITHUB_HOST:-github.com}"
 export GH_HOST="$GITHUB_HOST"
 
+# With github_app set, mint a token from that Hub GitHub App for this org and
+# host instead of using the secrets below; github_app_only turns the fallback off.
+APP_TOKEN=""
+if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ]; then
+    APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" --owner "${LUNAR_VAR_ORG_NAME:-}" \
+        --host "$GITHUB_HOST" --permission metadata=read) || APP_TOKEN=""
+    # An App lists only the repos it's installed on, so a "selected repositories"
+    # install would quietly shrink the catalog to that subset.
+    if [ -n "$APP_TOKEN" ] && [ "$(GH_TOKEN="$APP_TOKEN" GH_ENTERPRISE_TOKEN="$APP_TOKEN" \
+            gh api 'installation/repositories?per_page=1' --jq .repository_selection)" != "all" ]; then
+        echo "GitHub App $LUNAR_VAR_GITHUB_APP isn't installed on all of ${LUNAR_VAR_ORG_NAME:-the org}'s repositories" >&2
+        APP_TOKEN=""
+    fi
+fi
+if [ -n "$APP_TOKEN" ]; then
+    echo "GitHub auth: GitHub App $LUNAR_VAR_GITHUB_APP" >&2
+    LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
+    LUNAR_SECRET_GH_ENTERPRISE_TOKEN="$APP_TOKEN"
+elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
+    echo "GitHub auth: no usable token from GitHub App ${LUNAR_VAR_GITHUB_APP:-(github_app is not set)}, and github_app_only is set" >&2
+    exit 1
+elif [ -n "${LUNAR_VAR_GITHUB_APP:-}" ]; then
+    echo "GitHub auth: token secret, because GitHub App $LUNAR_VAR_GITHUB_APP gave no usable token" >&2
+fi
+
 # Authenticate the gh CLI. github.com and a GitHub Enterprise Server are separate
 # hosts with separate credentials, so read separate secrets and route each to the
 # variable gh selects by host:

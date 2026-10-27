@@ -98,6 +98,11 @@ inputs:
       guardrail evaluates. Turn it on if you want the per-finding detail visible
       on each service in the UI.
     default: "false"
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add` (e.g. `lunar-lib`). Unset, the plugin uses the GH_TOKEN secret without calling the Hub; set, the secret is the fallback when the App can't mint a token.
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN secret, to check the `github_app` App works before the secret is removed.
+    default: "false"
 
 example_component_json: |
   {

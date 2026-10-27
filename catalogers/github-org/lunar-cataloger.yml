@@ -156,3 +156,8 @@ inputs:
       one. If a fetch returns exactly this many repositories, the cataloger warns
       that results may be truncated.
     default: "10000"
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add` (e.g. `lunar-lib`). Unset, the plugin uses the GH_TOKEN (or, on GitHub Enterprise Server, GH_ENTERPRISE_TOKEN) secret without calling the Hub; set, the secret is the fallback when the App can't mint a token. The App must be installed on all of the org's repositories.
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN (or, on GitHub Enterprise Server, GH_ENTERPRISE_TOKEN) secret, to check the `github_app` App works before the secret is removed.
+    default: "false"

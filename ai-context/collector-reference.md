@@ -329,6 +329,25 @@ Secrets are passed as `LUNAR_SECRET_<NAME>`:
 curl -H "Authorization: token $LUNAR_SECRET_GH_TOKEN" ...
 ```
 
+### GitHub API Tokens
+
+Let users swap the `GH_TOKEN` secret for a token the Hub mints from a GitHub App (`lunar github-app add`). Copy the `github_app` and `github_app_only` inputs from `collectors/github/lunar-collector.yml`, then mint before checking the secret, asking for only the permissions the script uses:
+
+```bash
+if [ -n "${LUNAR_VAR_GITHUB_APP:-}" ] && APP_TOKEN=$(lunar github-app get-token "$LUNAR_VAR_GITHUB_APP" --permission checks=read) \
+    && [ -n "$APP_TOKEN" ]; then
+  echo "GitHub auth: GitHub App $LUNAR_VAR_GITHUB_APP" >&2
+  export LUNAR_SECRET_GH_TOKEN="$APP_TOKEN"
+elif [ "${LUNAR_VAR_GITHUB_APP_ONLY:-false}" = "true" ]; then
+  echo "GitHub auth: no token from GitHub App ${LUNAR_VAR_GITHUB_APP:-(github_app is not set)}, and github_app_only is set" >&2
+  exit 1
+elif [ -n "${LUNAR_VAR_GITHUB_APP:-}" ]; then
+  echo "GitHub auth: GH_TOKEN secret, because GitHub App $LUNAR_VAR_GITHUB_APP minted no token" >&2
+fi
+```
+
+With `github_app` unset, the plugin never calls the Hub. GitHub refuses a token request for a permission the App wasn't granted, so a short App falls back instead of answering 403 mid-run. Metadata comes with every token. The token is for the component's org and host. A cataloger has no component, so pass `--owner <org>` (and `--host` on GitHub Enterprise Server). An App token only covers one org and the repos the App is installed on, so list both in the plugin's README.
+
 ### CI Hook-Specific
 
 For `ci-before-job`, `ci-after-job`, `ci-before-step`, `ci-after-step`, `ci-before-command`, and `ci-after-command` hooks:

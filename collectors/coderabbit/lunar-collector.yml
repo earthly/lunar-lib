@@ -42,6 +42,13 @@ collectors:
       type: code
     keywords: ["coderabbit", "config", "yaml", "configuration"]
 
+inputs:
+  github_app:
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add` (e.g. `lunar-lib`). Unset, the plugin uses the GH_TOKEN secret without calling the Hub; set, the secret is the fallback when the App can't mint a token.
+  github_app_only:
+    description: Fail instead of falling back to the GH_TOKEN secret, to check the `github_app` App works before the secret is removed.
+    default: "false"
+
 secrets:
   GH_TOKEN:
     description: GitHub token for API access (required for code-reviewer collector)

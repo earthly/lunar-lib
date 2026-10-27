@@ -59,6 +59,16 @@ guardrails-assets:
     
     SAVE ARTIFACT icons
 
+# The GitHub plugins mint a token from the Hub's GitHub App and fall back to the
+# GH_TOKEN secret; this runs their scripts against stub lunar and curl.
+github-app-auth-test:
+    FROM python:3.12-alpine
+    RUN apk add --no-cache bash jq
+    WORKDIR /workspace
+    COPY --dir collectors catalogers .
+    COPY scripts/test_github_app_auth.py .
+    RUN python -m unittest -v test_github_app_auth
+
 # Export collector and policy source code
 plugin-source:
     WORKDIR /build
@@ -67,6 +77,7 @@ plugin-source:
     SAVE ARTIFACT policies
 
 test:
+    BUILD +github-app-auth-test
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD --pass-args ./collectors/backstage+test-offline
