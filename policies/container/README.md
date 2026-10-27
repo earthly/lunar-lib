@@ -36,9 +36,9 @@ Each check **skips** when the data it reads is absent, rather than reporting a
 pass it didn't earn. On a repository with no Dockerfiles, the `docker` collector
 writes no `.containers` data at all, so every definition-based check
 (`no-latest`, `stable-tags`, `digest-pinned`, `allowed-registries`,
-`healthcheck`, `user`, `dockerfile-lint-clean`) skips; `build-tagged` skips independently when no
-container build ran in CI. `required-labels` also skips when its
-`required_labels` variable is unset, since there is nothing to require.
+`healthcheck`, `user`, `dockerfile-lint-clean`) skips; `build-tagged` skips
+independently when no container build ran in CI. `required-labels` also skips
+when its `required_labels` variable is unset, since there is nothing to require.
 
 Note that an *empty* `.containers.lint_results` is not the same as an absent
 one: it means hadolint ran and found no issues, so `dockerfile-lint-clean`
