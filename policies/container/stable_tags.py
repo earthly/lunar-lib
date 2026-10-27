@@ -2,6 +2,7 @@
 
 import re
 from lunar_policy import Check
+from helpers import image_digest
 
 
 def main(node=None):
@@ -42,13 +43,13 @@ def main(node=None):
                 if image == "scratch":
                     continue
 
+                # Digests are stable
+                if image_digest(reference):
+                    continue
+
                 # No tag means implicit :latest (unstable)
                 if tag is None:
                     c.fail(f"'{path}' uses implicit :latest tag for '{reference}' (unstable)")
-                    continue
-
-                # Digests are stable
-                if tag.startswith("sha256:") or tag.startswith("sha512:"):
                     continue
 
                 # Tags containing a full semantic version are stable
