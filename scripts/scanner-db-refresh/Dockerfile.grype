@@ -1,0 +1,5 @@
+# The release image's own grype rewrites its baked DB, the same step its
+# Earthfile ends with. Nothing else changes.
+ARG BASE
+FROM ${BASE}
+RUN rm -rf /opt/grype/db && grype db update && grype db status && chmod -R a+rX /opt/grype

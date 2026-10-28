@@ -165,4 +165,8 @@ Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only â
 
 **Resources:** `container-scan` and `container-rescan` declare `size: large`, because they pull and unpack the shipped image (and download the vulnerability database) inside the collector pod, and the default profile's 1Gi ephemeral-storage limit is too small for real-world images. The `cicd` sub-collector runs natively on your CI runner, so no pod size applies to it.
 
+### Fresh database images
+
+Every night the latest release's image is rebuilt with that day's vulnerability and Java databases baked in, and pushed as `earthly/lunar-lib:trivy-vX.Y.Z-<YYYYMMDDHHMM>`. It is the release image plus one database layer, so the scripts and the trivy binary stay the release's. Scans skip the download while the baked database is fresh and fetch a new one once it is past its update time. Pin and update it the same way as the grype image: see [Fresh database images](../grype/README.md#fresh-database-images).
+
 > **Note:** If you already use the `snyk` collector, the `trivy` collector will overwrite `.sca` data since both write to the same paths. Use one SCA scanner per component, not both.
