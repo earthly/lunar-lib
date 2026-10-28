@@ -166,3 +166,25 @@ Entries hold `source`, `image`, `digest`, `vulnerabilities` and `summary` only â
 > **Note:** The `grype` collector writes to the same `.sca` paths as the `snyk` and `trivy` collectors. Use one SCA scanner per component, not several, or they will overwrite each other's `.sca` data.
 
 > **Re-scan freshness:** By default (`db_auto_update: false`), each cron re-scan uses the DB baked into the collector image, so freshness is tied to the image rebuild cadence â€” bumping the pinned `grype` collector version (a newer image ships a newer DB) is what picks up new CVE data. Set `db_auto_update: true` (on a Hub that honors collector size) to have every scan, on-push and re-scan, fetch the latest vulnerability database first, so CVEs published since the image was built surface on the next scan. An image scan whose download fails exits non-zero rather than scan against the stale baked DB.
+
+### Fresh database images
+
+Every night the latest release's image is rebuilt with that day's database and pushed as `earthly/lunar-lib:grype-vX.Y.Z-<YYYYMMDDHHMM>`. It is the release image plus one database layer, so the scripts and the grype binary stay the release's, and `grype-vX.Y.Z` itself never changes. Pin it with `image_replace` (Hub 3.6.0 or later), keeping `db_auto_update` off:
+
+```yaml
+image_replace:
+  - from_pattern: '^earthly/lunar-lib:grype-v1\.22\.0$'
+    to: 'earthly/lunar-lib:grype-v1.22.0-202610280730@sha256:<digest>'
+```
+
+To keep the pin current, a Renovate regex manager can move it to the newest timestamp of the same release:
+
+```json
+{
+  "customType": "regex",
+  "managerFilePatterns": ["/(^|/)lunar-config\\.ya?ml$/"],
+  "matchStrings": ["to:\\s*['\"]?(?<depName>earthly/lunar-lib):(?<currentValue>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+(?:-\\d{12})?)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+  "datasourceTemplate": "docker",
+  "versioningTemplate": "regex:^(?<compatibility>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+)(?:-(?<major>\\d{12}))?$"
+}
+```

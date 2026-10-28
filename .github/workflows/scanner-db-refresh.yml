@@ -1,0 +1,68 @@
+name: Scanner DB refresh
+
+# Nightly: rebuild the latest release's grype and trivy images with the day's
+# vulnerability DB and push them as immutable <scanner>-<release>-<timestamp>
+# tags. The release tag itself never moves. See scripts/scanner-db-refresh/.
+on:
+  schedule:
+    - cron: '30 7 * * *' # after Anchore publishes the day's grype DB (~06:40Z)
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Release to refresh, e.g. v1.22.0 (default: latest)'
+        required: false
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/scanner-db-refresh.yml
+      - scripts/scanner-db-refresh/**
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: scanner-db-refresh-${{ github.ref }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scanner: [grype, trivy]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RELEASE: ${{ inputs.release }}
+        run: |-
+          release="${INPUT_RELEASE:-$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)}"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+      - name: Login
+        # Pull requests only build and validate; they never push.
+        if: github.event_name != 'pull_request'
+        run: |-
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      - name: Refresh
+        env:
+          SCANNER: ${{ matrix.scanner }}
+          RELEASE: ${{ steps.release.outputs.release }}
+          PUSH: ${{ github.event_name != 'pull_request' && '--push' || '' }}
+        run: |-
+          scripts/scanner-db-refresh/refresh.sh "$SCANNER" "$RELEASE" $PUSH
+      - name: Report failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: 'Scanner DB refresh failed: ${{ matrix.scanner }}-${{ steps.release.outputs.release }}'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |-
+          issue=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$TITLE" --body "No new image was pushed, so pins stay on the last good one. Run: $RUN_URL"
+          fi

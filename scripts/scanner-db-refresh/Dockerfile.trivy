@@ -1,0 +1,9 @@
+# The release image bakes no DB, and its scripts run trivy without
+# --cache-dir, so trivy reads $HOME/.cache/trivy. Baking both DBs there lets
+# the release's own scripts skip the per-scan download while a DB is fresh;
+# past its NextUpdate, trivy downloads one as before.
+ARG BASE
+FROM ${BASE}
+RUN trivy image --download-db-only --no-progress && \
+    trivy image --download-java-db-only --no-progress && \
+    chmod -R a+rX "$HOME/.cache/trivy"
