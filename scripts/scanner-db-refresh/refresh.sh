@@ -96,8 +96,9 @@ log "DB built $BUILT"
 
 # 4. Offline, with no DB flags (as the release scripts run it), the scanner
 #    still finds Log4Shell, so trivy would fail here if it tried to download a
-#    DB. grype's dir: scan reads the pom.xml; trivy reads the jar as a rootfs,
-#    which also loads the Java DB.
+#    DB. grype's dir: scan reads the pom.xml. trivy scans an image holding the
+#    jar, which also loads the Java DB, as uid 1000 the way a non-root hub runs
+#    it, so its scan cache has to be writable.
 FIXTURE=$(mktemp -d)
 python3 - "$FIXTURE" <<'PY'
 import sys, zipfile
@@ -112,11 +113,14 @@ POM
 if [ "$SCANNER" = grype ]; then
   FOUND=$(docker run --rm --network none -e GRYPE_DB_AUTO_UPDATE=false -e GRYPE_DB_VALIDATE_AGE=false \
     -v "$FIXTURE:/fixture:ro" --entrypoint grype "$CANDIDATE" dir:/fixture -o json |
-    jq -r '[.matches[] | .vulnerability.id, .relatedVulnerabilities[]?.id] | index("CVE-2021-44228") != null')
+    jq -r '[.matches[] | .vulnerability.id, .relatedVulnerabilities[]?.id] | index("CVE-2021-44228") != null' || true)
 else
-  FOUND=$(docker run --rm --network none -v "$FIXTURE:/fixture:ro" --entrypoint trivy "$CANDIDATE" \
-    rootfs --scanners vuln --format json /fixture |
-    jq -r '[.Results[]?.Vulnerabilities[]?.VulnerabilityID] | index("CVE-2021-44228") != null')
+  printf 'FROM scratch\nCOPY log4j-core-2.14.1.jar /\n' | docker build -q -t "$CANDIDATE-fixture" -f - "$FIXTURE" >/dev/null
+  docker save -o "$FIXTURE/fixture.tar" "$CANDIDATE-fixture"
+  chmod a+r "$FIXTURE/fixture.tar"
+  FOUND=$(docker run --rm --network none -u 1000 -v "$FIXTURE/fixture.tar:/fixture.tar:ro" --entrypoint trivy "$CANDIDATE" \
+    image --input /fixture.tar --scanners vuln --format json |
+    jq -r '[.Results[]?.Vulnerabilities[]?.VulnerabilityID] | index("CVE-2021-44228") != null' || true)
 fi
 [ "$FOUND" = true ] || fail "the offline fixture scan did not find CVE-2021-44228"
 log "offline fixture scan found CVE-2021-44228"
