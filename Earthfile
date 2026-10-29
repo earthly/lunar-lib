@@ -197,11 +197,8 @@ base-image:
     # after a pin bump picked up. Release cuts and new branches never had a cache
     # to hit, so they were always fresh; this makes main behave the same.
     RUN --no-cache apk upgrade --no-cache
-    # pip vendors certifi: upgrading certifi alone leaves GHSA-6q48-6c7w-9gw2
-    # in pip's bundle. Keep the active venv pip current and remove the unused
-    # Alpine system pip, which carries a second vulnerable copy.
-    RUN --no-cache python3 -m pip install --no-cache-dir --upgrade 'pip>=26.2.2' && \
-        if apk info -e py3-pip >/dev/null; then apk del py3-pip; fi
+    # Don't upgrade pip here: lunar-scripts re-vendors it with fixed urllib3 and
+    # msgpack and without setuptools; stock pip from PyPI still bundles the old ones.
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     # git: a dozen collectors shell out to it (diff, log, ls-files) and their
