@@ -34,14 +34,14 @@ image:
     SAVE IMAGE --push earthly/lunar-lib:grype-$VERSION
 
 # Built from source: the 0.120.1 release ships go1.26.8 and x/net 0.59.0, both
-# with fixable criticals.
+# with fixable criticals, and go-jose 4.1.5, a fixable High.
 grype-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
     ARG --required GRYPE_VERSION
     RUN git clone --quiet --depth 1 --branch "v${GRYPE_VERSION}" https://github.com/anchore/grype /src
     WORKDIR /src
-    RUN go get golang.org/x/net@latest && go mod tidy && \
+    RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest && go mod tidy && \
         CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
             -ldflags "-s -w -X main.version=${GRYPE_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${GRYPE_VERSION}" \
             -o /out/grype ./cmd/grype

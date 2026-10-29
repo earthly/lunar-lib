@@ -183,7 +183,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.11-alpine
+    ARG SCRIPTS_VERSION=1.1.12-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -197,11 +197,8 @@ base-image:
     # after a pin bump picked up. Release cuts and new branches never had a cache
     # to hit, so they were always fresh; this makes main behave the same.
     RUN --no-cache apk upgrade --no-cache
-    # pip vendors certifi: upgrading certifi alone leaves GHSA-6q48-6c7w-9gw2
-    # in pip's bundle. Keep the active venv pip current and remove the unused
-    # Alpine system pip, which carries a second vulnerable copy.
-    RUN --no-cache python3 -m pip install --no-cache-dir --upgrade 'pip>=26.2.2' && \
-        if apk info -e py3-pip >/dev/null; then apk del py3-pip; fi
+    # Don't upgrade pip here: lunar-scripts re-vendors it with fixed urllib3 and
+    # msgpack and without setuptools; stock pip from PyPI still bundles the old ones.
     # Add postgresql-client for collectors that need to query the Hub database
     RUN apk add --no-cache postgresql-client
     # git: a dozen collectors shell out to it (diff, log, ls-files) and their
@@ -213,14 +210,15 @@ base-image:
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 
 # syft for the syft and license-origins images, built from source: the 1.54.1
-# release ships go1.26.8 and x/net 0.59.0, both with fixable criticals.
+# release ships go1.26.8 and x/net 0.59.0, both with fixable criticals, and
+# go-jose 4.1.5, a fixable High.
 syft-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
     ARG --required SYFT_VERSION
     RUN git clone --quiet --depth 1 --branch "v${SYFT_VERSION}" https://github.com/anchore/syft /src
     WORKDIR /src
-    RUN go get golang.org/x/net@latest && go mod tidy && \
+    RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest && go mod tidy && \
         CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
             -ldflags "-s -w -X main.version=${SYFT_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${SYFT_VERSION}" \
             -o /out/syft ./cmd/syft

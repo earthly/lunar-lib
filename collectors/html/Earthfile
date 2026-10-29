@@ -14,7 +14,7 @@ image:
     # npm bundles brace-expansion and undici versions with fixable Highs, and no npm
     # release ships the fixes yet (npm/cli#10088). Swap in the fixed versions.
     RUN NPM_DIR="$(npm root -g)/npm" && cd /tmp && \
-        npm pack --silent brace-expansion@5.0.12 undici@6.29.0 && \
+        npm pack --silent brace-expansion@5.0.12 undici@6.29.1 && \
         for p in brace-expansion undici; do \
             rm -rf "$NPM_DIR/node_modules/$p" && mkdir -p "$NPM_DIR/node_modules/$p" && \
             tar xzf "/tmp/$p"-*.tgz -C "$NPM_DIR/node_modules/$p" --strip-components=1; \
