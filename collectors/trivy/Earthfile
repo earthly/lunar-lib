@@ -16,12 +16,22 @@ image:
     # Install Trivy
     # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.*)$
     ARG TRIVY_VERSION=0.76.1
-    ARG TARGETARCH
-    RUN ARCH=$(echo "${TARGETARCH}" | sed 's/amd64/64bit/; s/arm64/ARM64/') && \
-        curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz" | tar xz -C /usr/local/bin trivy && \
-        chmod +x /usr/local/bin/trivy
+    COPY (+trivy-bin/trivy --TRIVY_VERSION=$TRIVY_VERSION) /usr/local/bin/trivy
 
     RUN trivy version
 
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:trivy-$VERSION
+
+# Built from source: the 0.76.1 release ships go-jose 4.1.5, a fixable High.
+trivy-bin:
+    FROM golang:1.27-alpine
+    RUN apk add --no-cache git
+    ARG --required TRIVY_VERSION
+    RUN git clone --quiet --depth 1 --branch "v${TRIVY_VERSION}" https://github.com/aquasecurity/trivy /src
+    WORKDIR /src
+    RUN go get github.com/go-jose/go-jose/v4@latest && go mod tidy && \
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver=${TRIVY_VERSION}" \
+            -o /out/trivy ./cmd/trivy
+    SAVE ARTIFACT /out/trivy

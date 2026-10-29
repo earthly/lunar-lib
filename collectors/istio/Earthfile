@@ -21,8 +21,9 @@ image:
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:istio-$VERSION
 
-# Built from source with current x/crypto and grpc: the 1.31.1 release binary
-# still carries fixable Highs in both. Drop the grpc pin once istio moves past it.
+# Built from source with current x/crypto, grpc and go-jose: the 1.31.1 release
+# binary still carries fixable Highs in all three. Drop the grpc pin once istio
+# moves past it.
 istioctl-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
@@ -32,7 +33,7 @@ istioctl-bin:
     # Commit the bumps and tag the commit vX.Y.Z so Go stamps that as the module
     # version. Otherwise the binary claims a v0.0.0-...+dirty pseudo-version, which
     # scanners match against every istio CVE since 2019.
-    RUN go get golang.org/x/crypto@latest google.golang.org/grpc@v1.83.2 && \
+    RUN go get golang.org/x/crypto@latest google.golang.org/grpc@v1.83.2 github.com/go-jose/go-jose/v4@latest && \
         git -c user.name=build -c user.email=build@localhost commit -q -am "bump deps" && \
         git tag "v${ISTIO_VERSION}" && \
         CGO_ENABLED=0 go build -trimpath \
