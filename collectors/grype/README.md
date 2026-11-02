@@ -177,14 +177,23 @@ image_replace:
     to: 'earthly/lunar-lib:grype-v1.22.0-202610280730@sha256:<digest>'
 ```
 
-To keep the pin current, a Renovate regex manager can move it to the newest timestamp of the same release:
+To keep the pin current, Renovate can move it to the newest timestamp of the same release. The timestamp is the major version, so each nightly is a major jump of thousands, and Renovate silently skips jumps over `maxMajorIncrement` (500 by default). The package rule turns that limit off for these images:
 
 ```json
 {
-  "customType": "regex",
-  "managerFilePatterns": ["/(^|/)lunar-config\\.ya?ml$/"],
-  "matchStrings": ["to:\\s*['\"]?(?<depName>earthly/lunar-lib):(?<currentValue>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+(?:-\\d{12})?)@(?<currentDigest>sha256:[a-f0-9]{64})"],
-  "datasourceTemplate": "docker",
-  "versioningTemplate": "regex:^(?<compatibility>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+)(?:-(?<major>\\d{12}))?$"
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)lunar-config\\.ya?ml$/"],
+      "matchStrings": ["to:\\s*['\"]?(?<depName>earthly/lunar-lib):(?<currentValue>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+(?:-\\d{12})?)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "regex:^(?<compatibility>(?:grype|trivy)-v\\d+\\.\\d+\\.\\d+)(?:-(?<major>\\d{12}))?$"
+    }
+  ],
+  "packageRules": [
+    { "matchPackageNames": ["earthly/lunar-lib"], "maxMajorIncrement": 0 }
+  ]
 }
 ```
+
+Only the latest release gets new images, so the pin stops moving once a newer release ships. Move the rule to the new release when you upgrade the collector.
