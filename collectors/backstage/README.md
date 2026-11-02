@@ -4,13 +4,13 @@ Parses and lints Backstage `catalog-info.yaml` files.
 
 ## Overview
 
-This collector scans the repository for a Backstage catalog definition file (`catalog-info.yaml` or `catalog-info.yml`), parses it, and lints it for schema/syntax issues. The raw Backstage descriptor (apiVersion, kind, metadata, spec) is written to the `.catalog.native.backstage` Component JSON path as-is — annotations keep their original `backstage.io/` or vendor prefixes. Files that declare [multiple entities](#multiple-entities) separated by `---` are fully supported. The search paths are configurable via the `paths` input.
+This collector finds a Backstage catalog file (`catalog-info.yaml` or `catalog-info.yml`, configurable via `paths`), parses it, and lints it for schema/syntax issues. The raw descriptor (apiVersion, kind, metadata, spec) is written to `.catalog.native.backstage` as-is, annotations included, and files that declare [multiple entities](#multiple-entities) separated by `---` are fully supported.
 
-Optionally, when a `backstage_url` is configured, it also cross-checks the domain and system referenced in `catalog-info.yaml` against the live Backstage catalog and records whether those entities exist under `.catalog.native.backstage.refs`.
+With a `backstage_url` configured, it also checks the domain and system the file references against the live Backstage catalog, recording the results under `.catalog.native.backstage.refs`. With [`catalog_api_fallback`](#repos-without-a-catalog-file), a component that has no catalog file gets its entity from the live catalog instead.
 
 ## Collected Data
 
-When a catalog-info file is found, this collector writes to the following Component JSON paths. When no file is found, the `.catalog.native.backstage` namespace is **not written** — absence of the namespace is the signal.
+When a catalog-info file is found, this collector writes to the following Component JSON paths. When no file is found, the `.catalog.native.backstage` namespace is **not written** — absence of the namespace is the signal. The one exception is [`catalog_api_fallback`](#repos-without-a-catalog-file), which writes an entity fetched from the catalog API without the file-only `path`, `valid`, `errors` and `entities[]`; `path` is present exactly when the data came from a file.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -119,6 +119,65 @@ lunar secret set BACKSTAGE_TOKEN <your-token>
 ```
 
 The collector reads `LUNAR_SECRET_BACKSTAGE_TOKEN` automatically — no extra `with:` is needed. Pair this with the `backstage` policy's `domain-exists` / `system-exists` checks to enforce the results. With `backstage_url` unset (the default), the collector makes no network calls and behaves exactly as the parse-and-lint default above.
+
+### Repos without a catalog file
+
+Some components are in Backstage but keep no catalog file in their own repository: their entity is defined in a central catalog repository, or registered straight through Backstage. Set `catalog_api_fallback: "true"` (it needs `backstage_url`), and when no catalog file describes the component, the collector fetches the component's entity from the catalog API instead:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/backstage@v1.0.0
+    include: [catalog-info]
+    with:
+      backstage_url: "https://backstage.example.com"
+      catalog_api_fallback: "true"
+```
+
+The entity is named by the component's `backstage/entity-ref` meta, written `[kind:][namespace/]name` (kind defaults to `component`, namespace to `default`). The [Backstage cataloger](../../catalogers/backstage/README.md#entity-ref-meta) writes it with `include_entity_ref_meta: "true"`. A cataloger of your own can write the same key, and a component declared in `lunar-config.yml` can set it under `meta`:
+
+```yaml
+components:
+  github.com/acme/payment-api:
+    meta:
+      backstage/entity-ref: "component:default/payment-api"
+```
+
+The lookup uses the same `auth_mode`, `ref_lookup` and `api_path_prefix` as the reference lookups, so a `by-query` or SigV4 setup carries over unchanged. The fetched entity's `apiVersion`, `kind`, `metadata` and `spec` are written like a file's primary entity. `.refs.entity` records the entity itself, and the System and Domain hops run as usual, so the [pagerduty collector](../pagerduty/README.md)'s `from-backstage-collector` maps the service without changes. The entity's `relations` and `status` are dropped, and the file-only `path`, `valid`, `errors` and `entities[]` are not written:
+
+```json
+{
+  "catalog": {
+    "native": {
+      "backstage": {
+        "apiVersion": "backstage.io/v1alpha1",
+        "kind": "Component",
+        "metadata": {
+          "name": "payment-api",
+          "namespace": "default",
+          "annotations": {
+            "backstage.io/managed-by-location": "url:https://github.com/acme/backstage-catalog/blob/main/payments/payment-api.yaml",
+            "backstage.io/view-url": "https://github.com/acme/backstage-catalog/blob/main/payments/payment-api.yaml",
+            "pagerduty.com/service-id": "PXXXXXX"
+          }
+        },
+        "spec": { "type": "service", "owner": "team-payments", "lifecycle": "production", "system": "payment-platform" },
+        "refs": {
+          "checked": true,
+          "entity": { "kind": "Component", "name": "payment-api", "exists": true, "ref": "component:default/payment-api", "annotations": { "backstage.io/managed-by-location": "url:https://github.com/acme/backstage-catalog/blob/main/payments/payment-api.yaml", "backstage.io/view-url": "https://github.com/acme/backstage-catalog/blob/main/payments/payment-api.yaml", "pagerduty.com/service-id": "PXXXXXX" } },
+          "system": { "name": "payment-platform", "exists": true, "ref": "system:default/payment-platform", "has_domain": true },
+          "system_domain": { "name": "payments", "exists": true, "ref": "domain:default/payments", "via_system": "payment-platform" }
+        }
+      }
+    }
+  }
+}
+```
+
+- **Nothing is written unless the entity is found.** A component without the meta, a ref the catalog doesn't have, a failed lookup or an auth problem writes nothing, the same as with the input off, so a Backstage outage can't fail a component that would otherwise skip. The reason goes to stderr.
+- **A file always wins.** The fallback runs only when no catalog file in the component's directory, or with `search_parent_dirs` up the tree, describes it.
+- **The entity is judged as Backstage stores it.** Backstage adds annotations of its own, such as `backstage.io/managed-by-location`, `backstage.io/view-url` and often `backstage.io/source-location`, and the annotation checks see them.
+- **A fix in Backstage shows up on the component's next push.** The collector runs on the code hook.
+- **Upgrade the `backstage` policy with it.** The policy from the same release tells a fetched entity from a file: `catalog-info-exists` and `catalog-info-valid` still look for the file, and failures name the file the entity is defined in. Earlier versions read a fetched entity as a file.
 
 ### Lookup Endpoint (`ref_lookup`)
 

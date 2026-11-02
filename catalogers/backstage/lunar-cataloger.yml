@@ -59,7 +59,8 @@ catalogers:
       keyed by a configurable annotation (defaults to
       `github.com/project-slug`) so they line up with components
       discovered by the `github-org` cataloger or by repo-based
-      collectors.
+      collectors. With `include_entity_ref_meta`, each component also
+      records its entity ref in its `backstage/entity-ref` meta.
     mainBash: main.sh
     hook:
       type: cron
@@ -130,6 +131,14 @@ inputs:
       `bs-type-service`) and `spec.lifecycle` (e.g.
       `bs-lifecycle-production`) in addition to `metadata.tags`.
     default: "true"
+
+  include_entity_ref_meta:
+    description: |
+      When `true`, writes each synced component's Backstage entity ref
+      (e.g. `component:default/payment-api`) to its `backstage/entity-ref`
+      meta. The `backstage` collector's `catalog_api_fallback` uses it to
+      fetch the entity for a component with no catalog-info.yaml.
+    default: "false"
 
   owner_format:
     description: |

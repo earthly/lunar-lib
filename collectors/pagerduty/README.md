@@ -98,6 +98,7 @@ collectors:
 - `oncall` writes `.oncall.service_lookup` for a component it can't map, and `from-backstage-collector` then writes `.oncall.service` if the live catalog maps it. The check reads `.oncall.service` first, so it passes. `oncall-cron` checks the same places, then the backstage collector's lookup in the default branch's Component JSON.
 - The System and Domain are the ones the catalog file declares (`spec.system`, and that System's `spec.domain`), which the backstage collector also checks for referential integrity. A Component missing from the catalog still inherits from the System its file declares.
 - A monorepo component whose entity is in a shared parent `catalog-info.yaml` (the backstage collector's `search_parent_dirs`) is always `from-backstage-collector`'s to collect: `oncall` reads only the component's own directory.
+- A component with no catalog file at all is covered too when the backstage collector's [`catalog_api_fallback`](../backstage/README.md#repos-without-a-catalog-file) fetches its entity: the lookup lands in the same place, so `from-backstage-collector` maps it with no extra setting.
 
 ### Inputs
 

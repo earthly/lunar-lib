@@ -264,6 +264,12 @@ inputs:
 
       Only the file's absence is affected: a component that has a
       catalog-info.yaml is held to every check either way.
+
+      With the collector's `catalog_api_fallback`, a component with no file
+      can still carry its entity, fetched from the catalog API. The file
+      checks, `catalog-info-exists` and `catalog-info-valid`, treat it as
+      no file. Every other check evaluates the fetched entity in either
+      mode, and its failures name the file the entity is defined in.
     default: "false"
   required_annotations:
     description: |
