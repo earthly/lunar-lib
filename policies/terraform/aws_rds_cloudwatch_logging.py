@@ -1,7 +1,7 @@
 """Require RDS instances/clusters to export logs to CloudWatch."""
 
 from lunar_policy import Check
-from helpers import iter_resources, iter_module_calls
+from helpers import RDS_MODULE_SOURCES, iter_resources, iter_module_calls
 
 
 def _exports_missing(cfg):
@@ -18,7 +18,7 @@ def main(node=None):
 
         dbs = list(iter_resources(native, "aws_db_instance", "aws_rds_cluster"))
         # terraform-aws-modules/rds and /rds-aurora use the same arg name.
-        rds_modules = list(iter_module_calls(native, "terraform-aws-modules/rds"))
+        rds_modules = list(iter_module_calls(native, *RDS_MODULE_SOURCES))
         if not dbs and not rds_modules:
             c.skip("No RDS instances or clusters found")
 

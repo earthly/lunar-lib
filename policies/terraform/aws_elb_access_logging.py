@@ -11,9 +11,17 @@ def main(node=None):
         if not native.exists():
             c.skip("No Terraform data found")
 
-        lbs = list(iter_resources(native, "aws_lb", "aws_alb", "aws_elb"))
+        # Application (the aws_lb default) and Classic Load Balancers only, the
+        # scope of Security Hub ELB.5. NLBs write access logs only for TLS
+        # listeners; Gateway Load Balancers write none.
+        lbs = [
+            (rtype, name, cfg)
+            for rtype, name, cfg in iter_resources(native, "aws_lb", "aws_alb", "aws_elb")
+            if rtype == "aws_elb"
+            or str(cfg.get("load_balancer_type", "application")).lower() not in ("network", "gateway")
+        ]
         if not lbs:
-            c.skip("No load balancers found")
+            c.skip("No Application or Classic Load Balancers found")
 
         for rtype, name, cfg in lbs:
             logs = block(cfg, "access_logs")

@@ -49,6 +49,7 @@ import aws_cloudtrail_kms_encryption
 import aws_iam_role_permissions_boundary
 import aws_imdsv2_required
 import opentofu_state_encryption
+from helpers import module_source_matches
 
 
 def node(resource):
@@ -299,12 +300,12 @@ class TestRdsLogging(unittest.TestCase):
         self.assertEqual(status(aws_rds_cloudwatch_logging, EMPTY), CheckStatus.SKIPPED)
 
     def test_pass_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds",
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws",
                                  "enabled_cloudwatch_logs_exports": ["postgresql"]}]})
         self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.PASS)
 
     def test_fail_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds"}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws"}]})
         self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.FAIL)
 
 
@@ -410,11 +411,11 @@ class TestRdsEncryption(unittest.TestCase):
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.PASS)
 
     def test_pass_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds", "storage_encrypted": True}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws", "storage_encrypted": True}]})
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.PASS)
 
     def test_fail_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds"}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws"}]})
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.FAIL)
 
     def test_skip(self):
@@ -947,6 +948,153 @@ class StatefulBackupConfiguredTest(unittest.TestCase):
 
     def test_skips_with_no_terraform_data(self):
         self.assertEqual(status(aws_stateful_backup_configured, EMPTY), CheckStatus.SKIPPED)
+
+
+class TestEksModuleV21Arguments(unittest.TestCase):
+    """terraform-aws-modules/eks v21 dropped the cluster_ prefix from these arguments."""
+
+    def test_logging_pass_v21_name(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws", "version": "21.24.2",
+                                  "enabled_log_types": ["api", "audit", "authenticator", "controllerManager", "scheduler"]}]})
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.PASS)
+
+    def test_logging_fail_v21_name_partial(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "enabled_log_types": ["api"]}]})
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.FAIL)
+        # The configured list is read, not the module default (which has audit).
+        self.assertIn("audit, authenticator", failure_message(aws_eks_control_plane_logging, n))
+
+    def test_private_endpoint_fail_v21_false(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "endpoint_private_access": False}]})
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.FAIL)
+        self.assertIn("sets endpoint_private_access = false",
+                      failure_message(aws_eks_private_endpoint, n))
+
+    def test_private_endpoint_pass_v21_true_with_public(self):
+        # A public endpoint is not this check's concern.
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "endpoint_private_access": True, "endpoint_public_access": True}]})
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.PASS)
+
+    def test_private_endpoint_fail_v20_false_message(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "cluster_endpoint_private_access": "false"}]})
+        self.assertIn("sets cluster_endpoint_private_access = false",
+                      failure_message(aws_eks_private_endpoint, n))
+
+
+class TestModuleSourceMatching(unittest.TestCase):
+    """Module calls match the registry path by whole segment; submodules only on request."""
+
+    def test_matches(self):
+        for src in ("terraform-aws-modules/eks/aws",
+                    "registry.terraform.io/terraform-aws-modules/eks/aws",
+                    "terraform-aws-modules/eks/aws?ref=v21.0.0",
+                    "Terraform-AWS-Modules/EKS/aws"):
+            self.assertTrue(module_source_matches(src, "terraform-aws-modules/eks/aws"), src)
+
+    def test_no_match(self):
+        for src in ("terraform-aws-modules/eks-pod-identity/aws",
+                    "terraform-aws-modules/eks/aws//modules/karpenter",
+                    "terraform-aws-modules/eks/aws//modules/eks-managed-node-group?ref=v21.0.0",
+                    "terraform-aws-modules/eks",
+                    "./modules/eks"):
+            self.assertFalse(module_source_matches(src, "terraform-aws-modules/eks/aws"), src)
+
+    def test_submodule_on_request(self):
+        want = "terraform-aws-modules/rds/aws//modules/db_instance"
+        self.assertTrue(module_source_matches("terraform-aws-modules/rds/aws//modules/db_instance", want))
+        self.assertFalse(module_source_matches("terraform-aws-modules/rds/aws", want))
+        self.assertFalse(module_source_matches("terraform-aws-modules/rds/aws//modules/db_subnet_group", want))
+
+    def test_git_subdir_not_confused_with_scheme(self):
+        self.assertFalse(module_source_matches(
+            "git::https://example.com/terraform-aws-modules/vpc/aws//modules/vpc-endpoints?ref=v6",
+            "terraform-aws-modules/vpc/aws"))
+
+    def test_eks_ignores_sibling_and_submodules(self):
+        # One real cluster plus the karpenter submodule and eks-pod-identity:
+        # only the cluster is evaluated.
+        n = node_module({
+            "eks": [{"source": "terraform-aws-modules/eks/aws", "enabled_log_types": ["api", "audit", "authenticator", "controllerManager", "scheduler"]}],
+            "karpenter": [{"source": "terraform-aws-modules/eks/aws//modules/karpenter"}],
+            "pod_identity": [{"source": "terraform-aws-modules/eks-pod-identity/aws"}],
+        })
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.PASS)
+
+    def test_eks_skip_when_only_non_cluster_modules(self):
+        n = node_module({
+            "karpenter": [{"source": "terraform-aws-modules/eks/aws//modules/karpenter"}],
+            "pod_identity": [{"source": "terraform-aws-modules/eks-pod-identity/aws"}],
+        })
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.SKIPPED)
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.SKIPPED)
+
+    def test_vpc_skip_vpc_endpoints_submodule(self):
+        n = node_module({"endpoints": [{"source": "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"}]})
+        self.assertEqual(status(aws_vpc_flow_logs, n), CheckStatus.SKIPPED)
+
+    def test_rds_skip_parameter_group_submodule(self):
+        n = node_module({"pg": [{"source": "terraform-aws-modules/rds/aws//modules/db_parameter_group"}]})
+        self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.SKIPPED)
+
+    def test_rds_db_instance_submodule_and_aurora_still_evaluated(self):
+        for src in ("terraform-aws-modules/rds/aws//modules/db_instance",
+                    "terraform-aws-modules/rds-aurora/aws"):
+            n = node_module({"db": [{"source": src}]})
+            self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.FAIL, src)
+
+
+class TestElbNetworkLoadBalancers(unittest.TestCase):
+    """Only plaintext HTTP is flagged; NLB/GWLB access logs are out of scope."""
+
+    def test_https_only_skip_tcp_only(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "udp": [{"protocol": "UDP"}],
+                                      "both": [{"protocol": "TCP_UDP"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.SKIPPED)
+
+    def test_https_only_pass_tcp_alongside_https(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "web": [{"protocol": "HTTPS"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.PASS)
+
+    def test_https_only_pass_nlb_tls(self):
+        n = node({"aws_lb_listener": {"tls": [{"protocol": "TLS"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.PASS)
+
+    def test_https_only_fail_names_only_http(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "web": [{"protocol": "HTTP"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+        msg = failure_message(aws_elb_https_only, n)
+        self.assertIn("aws_lb_listener.web", msg)
+        self.assertNotIn("aws_lb_listener.tcp", msg)
+
+    def test_https_only_fail_default_protocol_is_http(self):
+        n = node({"aws_lb_listener": {"web": [{"port": 80}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+
+    def test_https_only_fail_classic_tcp(self):
+        # Classic listeners stay strict: Security Hub ELB.3 flags TCP too.
+        n = node({"aws_elb": {"c": [{"listener": [{"lb_protocol": "TCP"}]}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+
+    def test_access_logging_skip_nlb_and_gwlb(self):
+        n = node({"aws_lb": {"nlb": [{"load_balancer_type": "network"}],
+                             "gwlb": [{"load_balancer_type": "gateway"}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.SKIPPED)
+
+    def test_access_logging_nlb_ignored_alb_checked(self):
+        n = node({"aws_lb": {"nlb": [{"load_balancer_type": "network"}],
+                             "alb": [{"load_balancer_type": "application"}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.FAIL)
+        msg = failure_message(aws_elb_access_logging, n)
+        self.assertIn("aws_lb.alb", msg)
+        self.assertNotIn("aws_lb.nlb", msg)
+
+    def test_access_logging_classic_still_checked(self):
+        n = node({"aws_elb": {"c": [{}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.FAIL)
 
 
 if __name__ == "__main__":

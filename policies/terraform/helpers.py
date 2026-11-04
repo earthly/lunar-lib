@@ -154,13 +154,47 @@ def has_resource(native_files_node, *rtypes):
     return False
 
 
-def iter_module_calls(native_files_node, *source_substrings):
-    """Yield ``(name, config)`` for ``module`` blocks whose ``source`` matches.
+def _split_module_source(source):
+    """Split a module ``source`` into ``(path, subdir)``, lowercased.
 
-    With no substrings, yields every module call. Used so checks can evaluate
-    module-provisioned infrastructure (e.g. ``terraform-aws-modules/eks``) by
-    reading the module's input arguments, rather than skipping because the
-    underlying ``aws_*`` resource lives inside the module and isn't in the HCL.
+    Drops any ``?query`` (e.g. ``?ref=v1.2.0``) and splits off a ``//subdir``
+    (``terraform-aws-modules/eks/aws//modules/karpenter``). The ``//`` of a
+    ``scheme://`` prefix is not taken for a subdir separator.
+    """
+    src = str(source).split("?", 1)[0].strip().lower()
+    scheme = src.find("://")
+    sep = src.find("//", scheme + 3 if scheme >= 0 else 0)
+    if sep < 0:
+        return src.strip("/"), ""
+    return src[:sep].strip("/"), src[sep + 2:].strip("/")
+
+
+def module_source_matches(source, wanted):
+    """True if a module ``source`` calls the registry module ``wanted``.
+
+    ``wanted`` is ``<namespace>/<name>/<provider>``, optionally with a
+    ``//<subdir>``. Matches whole path segments, so
+    ``terraform-aws-modules/eks/aws`` does not match
+    ``terraform-aws-modules/eks-pod-identity/aws``; a registry host prefix
+    (``registry.terraform.io/...``) is allowed. A submodule call
+    (``.../eks/aws//modules/karpenter``) matches only when ``wanted`` names
+    that same subdir.
+    """
+    src_path, src_sub = _split_module_source(source)
+    want_path, want_sub = _split_module_source(wanted)
+    want_segs = want_path.split("/")
+    return src_sub == want_sub and src_path.split("/")[-len(want_segs):] == want_segs
+
+
+def iter_module_calls(native_files_node, *sources):
+    """Yield ``(name, config)`` for ``module`` blocks calling one of ``sources``.
+
+    Each source is a registry module path matched by
+    ``module_source_matches``. With no sources, yields every module call. Used
+    so checks can evaluate module-provisioned infrastructure (e.g.
+    ``terraform-aws-modules/eks/aws``) by reading the module's input arguments,
+    rather than skipping because the underlying ``aws_*`` resource lives inside
+    the module and isn't in the HCL.
     """
     if not native_files_node.exists():
         return
@@ -176,9 +210,33 @@ def iter_module_calls(native_files_node, *source_substrings):
             continue
         for mname, configs in modules.items():
             for cfg in as_blocks(configs):
-                src = str(cfg.get("source", ""))
-                if not source_substrings or any(s in src for s in source_substrings):
+                src = cfg.get("source", "")
+                if not sources or any(module_source_matches(src, s) for s in sources):
                     yield mname, cfg
+
+
+# Registry modules that provision an RDS instance or cluster and take the
+# instance arguments (storage_encrypted, publicly_accessible,
+# enabled_cloudwatch_logs_exports) directly. Not the rds submodules for
+# parameter/option/subnet groups, which create no database.
+RDS_MODULE_SOURCES = (
+    "terraform-aws-modules/rds/aws",
+    "terraform-aws-modules/rds/aws//modules/db_instance",
+    "terraform-aws-modules/rds-aurora/aws",
+)
+
+
+def first_set(cfg, keys, default=None):
+    """Return ``(key, value)`` for the first of ``keys`` set (non-null) in ``cfg``.
+
+    For module arguments renamed across major versions, e.g.
+    terraform-aws-modules/eks v21 dropping the ``cluster_`` prefix. Returns
+    ``(None, default)`` when none is set.
+    """
+    for k in keys:
+        if cfg.get(k) is not None:
+            return k, cfg[k]
+    return None, default
 
 
 def block(cfg, key):

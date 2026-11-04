@@ -1,7 +1,7 @@
 """Require RDS instances/clusters to encrypt storage at rest."""
 
 from lunar_policy import Check
-from helpers import iter_resources, iter_module_calls, truthy
+from helpers import RDS_MODULE_SOURCES, iter_resources, iter_module_calls, truthy
 
 
 def main(node=None):
@@ -12,7 +12,7 @@ def main(node=None):
             c.skip("No Terraform data found")
 
         dbs = list(iter_resources(native, "aws_db_instance", "aws_rds_cluster"))
-        rds_modules = list(iter_module_calls(native, "terraform-aws-modules/rds"))
+        rds_modules = list(iter_module_calls(native, *RDS_MODULE_SOURCES))
         if not dbs and not rds_modules:
             c.skip("No RDS instances or clusters found")
 

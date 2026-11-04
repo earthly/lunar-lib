@@ -27,10 +27,10 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
 | `aws-security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
 | `aws-eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
-| `aws-elb-access-logging` | Load balancers log access requests | `aws_lb` / `aws_elb` without access logging enabled |
+| `aws-elb-access-logging` | Load balancers log access requests | Application or Classic Load Balancer without access logging enabled (network and gateway load balancers are not evaluated) |
 | `aws-ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
 | `aws-ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
-| `aws-elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect |
+| `aws-elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect, or a Classic Load Balancer listener that isn't HTTPS/SSL (TCP/UDP pass-through listeners are not evaluated) |
 | `aws-guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
 | `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
 | `aws-s3-block-public-access` | S3 buckets block public access | Bucket without a full `aws_s3_bucket_public_access_block` |

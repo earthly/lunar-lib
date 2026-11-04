@@ -100,9 +100,9 @@ policies:
 
   - name: aws-elb-access-logging
     description: |
-      Requires Elastic Load Balancers to have access logging enabled so request
-      traffic is recorded to S3 for audit, troubleshooting, and security
-      investigations.
+      Requires Application and Classic Load Balancers to have access logging
+      enabled so request traffic is recorded to S3 for audit, troubleshooting,
+      and security investigations.
     mainPython: aws_elb_access_logging.py
     keywords: ["elb", "load balancer", "access logging", "s3 logs", "audit", "soc2"]
 
@@ -149,8 +149,8 @@ policies:
   - name: aws-elb-https-only
     description: |
       Requires load balancers to enforce encrypted transport. HTTP listeners must
-      redirect to HTTPS, and listeners must use HTTPS/TLS so traffic in transit is
-      never sent in cleartext.
+      redirect to HTTPS, and Classic Load Balancer listeners must use HTTPS/SSL.
+      TCP/UDP pass-through listeners are not evaluated.
     mainPython: aws_elb_https_only.py
     keywords: ["elb", "https", "tls", "encryption in transit", "load balancer listener", "soc2"]
 
