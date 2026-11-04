@@ -48,13 +48,33 @@ def fetched_from_catalog(c):
     return isinstance(data, dict) and data.get("path") is None
 
 
+def require_catalog_file():
+    """Whether the file checks need a literal catalog-info.yaml (the default),
+    or also accept an entity fetched from the catalog API."""
+    return variable_or_default("require_catalog_file", "true").strip().lower() != "false"
+
+
+def fetched_counts_as_no_file(c):
+    """A fetched entity that the file checks must treat as a missing file."""
+    return fetched_from_catalog(c) and require_catalog_file()
+
+
 def skip_if_no_catalog_file(c):
     """`skip_if_no_catalog` for the checks about the file itself, where an
-    entity fetched from the catalog API counts as no file."""
+    entity fetched from the catalog API counts as no file unless
+    `require_catalog_file` is off."""
     if skip_when_no_catalog_info() and (
-        not c.exists(".catalog.native.backstage") or fetched_from_catalog(c)
+        not c.exists(".catalog.native.backstage") or fetched_counts_as_no_file(c)
     ):
         c.skip(SKIP_REASON)
+
+
+FETCHED_NO_FILE = (
+    "No catalog-info.yaml found in the repository; this component's entity was "
+    "fetched from the Backstage catalog instead. Add a catalog-info.yaml, or set "
+    'the policy\'s `require_catalog_file` input to "false" to accept an entity '
+    "that is in Backstage."
+)
 
 
 def _entity_location(c):

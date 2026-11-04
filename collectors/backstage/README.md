@@ -177,7 +177,7 @@ The lookup uses the same `auth_mode`, `ref_lookup` and `api_path_prefix` as the 
 - **A file always wins.** The fallback runs only when no catalog file in the component's directory, or with `search_parent_dirs` up the tree, describes it.
 - **The entity is judged as Backstage stores it.** Backstage adds annotations of its own, such as `backstage.io/managed-by-location`, `backstage.io/view-url` and often `backstage.io/source-location`, and the annotation checks see them.
 - **A fix in Backstage shows up on the component's next push.** The collector runs on the code hook.
-- **Upgrade the `backstage` policy with it.** The policy from the same release tells a fetched entity from a file: `catalog-info-exists` and `catalog-info-valid` still look for the file, and failures name the file the entity is defined in. Earlier versions read a fetched entity as a file.
+- **Upgrade the `backstage` policy with it.** The policy from the same release tells a fetched entity from a file: `catalog-info-exists` and `catalog-info-valid` still look for the file unless its `require_catalog_file` is `"false"`, and failures name the file the entity is defined in. Earlier versions read a fetched entity as a file.
 
 ### Lookup Endpoint (`ref_lookup`)
 

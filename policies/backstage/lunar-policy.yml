@@ -268,9 +268,18 @@ inputs:
       With the collector's `catalog_api_fallback`, a component with no file
       can still carry its entity, fetched from the catalog API. The file
       checks, `catalog-info-exists` and `catalog-info-valid`, treat it as
-      no file. Every other check evaluates the fetched entity in either
-      mode, and its failures name the file the entity is defined in.
+      no file unless `require_catalog_file` is `"false"`. Every other check
+      evaluates the fetched entity in either mode, and its failures name the
+      file the entity is defined in.
     default: "false"
+  require_catalog_file:
+    description: |
+      Whether `catalog-info-exists` and `catalog-info-valid` need a literal
+      catalog-info.yaml. Set to `"false"` to also accept an entity the
+      collector fetched from the catalog API (`catalog_api_fallback`): it is
+      in Backstage, and Backstage validated it on ingestion. Has no effect
+      without the fallback.
+    default: "true"
   required_annotations:
     description: |
       Annotation keys that must be present (and non-empty) in

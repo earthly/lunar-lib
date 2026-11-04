@@ -1540,6 +1540,35 @@ class TestFetchedFromCatalog(unittest.TestCase):
             check = check_fn(fetched(spec={"owner": "team-a"}))
             self.assertEqual(check.status, CheckStatus.FAIL)
             self.assertIn("No catalog-info.yaml found", failures(check)[0])
+            # The way out that doesn't need a file in this repo.
+            self.assertIn('`require_catalog_file` input to "false"', failures(check)[0])
+
+    def test_require_catalog_file_off_accepts_the_entity_in_either_mode(self):
+        for mode in ("true", "false"):
+            with self.subTest(skip_when_no_catalog_info=mode), policy_vars(
+                skip_when_no_catalog_info=mode, require_catalog_file="false"
+            ):
+                for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                    check = check_fn(fetched(spec={"owner": "team-a"}))
+                    self.assertFalse(is_skipped(check))
+                    self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_require_catalog_file_off_leaves_a_missing_component_alone(self):
+        with policy_vars(require_catalog_file="false"):
+            for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                self.assertEqual(check_fn(finished_node({})).status, CheckStatus.FAIL)
+        with policy_vars(require_catalog_file="false", skip_when_no_catalog_info="true"):
+            for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                self.assertTrue(is_skipped(check_fn(finished_node({}))))
+
+    def test_require_catalog_file_off_still_lints_a_file(self):
+        data = {"catalog": {"native": {"backstage": {
+            "path": "catalog-info.yaml", "valid": False,
+            "errors": [{"line": 3, "message": "bad tag", "severity": "error"}],
+            "metadata": {"name": "x"}, "spec": {}}}}}
+        with policy_vars(require_catalog_file="false"):
+            check = check_catalog_info_valid(finished_node(data))
+        self.assertEqual(failures(check), ["catalog-info.yaml (line 3): bad tag"])
 
     def test_content_checks_evaluate_the_entity_in_either_mode(self):
         for mode in ("true", "false"):
