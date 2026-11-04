@@ -138,16 +138,15 @@ which `max-severity` already gates.
 Approved exemptions can also arrive at run time, in
 `.compliance.vulnerability_exemptions.records[]`, written by the
 [`vulnerability-exemptions`](https://github.com/earthly/lunar-lib/tree/main/collectors/vulnerability-exemptions)
-collector from records kept in one compliance repository. `max-severity` and
-`unfixable-reviewed` honor them alongside `exempt_findings`, so a new or revoked exemption needs no config
-change. A record applies to a finding when all of these hold:
+collector from a register kept in one compliance repository. `max-severity` and
+`unfixable-reviewed` honor them alongside `exempt_findings`, so a new or expired
+exemption needs no config change. A record applies to a finding when all of these hold:
 
-- the finding's ID is in `vulnerabilities` (case-insensitive);
-- the package matches `packages`, by name or `name@version`, when `packages` is set;
-- the image matches `images`, when `images` is set (container findings only);
-- `approved_by`, `approved_on` and `review_by` are set, and today is not past `review_by`;
-- for `kind: no-fix`, the finding has no fix. Once a fix ships, the record stops
-  applying and `max-severity` takes over.
+- the finding's `cve` matches the record's `cve` (case-insensitive);
+- the record's `component` is the component being checked;
+- today is not past `until`;
+- the finding has no fix. Once a fix ships, the record stops applying and
+  `max-severity` takes over; `exempt_findings` covers a fix you can't take yet.
 
 ## Examples
 

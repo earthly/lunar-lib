@@ -85,8 +85,8 @@ inputs:
       this input.
 
       Approved records in `.compliance.vulnerability_exemptions.records[]`
-      (written by the `vulnerability-exemptions` collector) are honored the same
-      way, read at run time, alongside this input.
+      (written by the `vulnerability-exemptions` collector) also exempt findings
+      that have no fix, read at run time, alongside this input.
     default: ""
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"
