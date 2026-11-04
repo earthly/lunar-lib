@@ -10,6 +10,9 @@ closed indefinitely. The default (`"false"`) fails on every finding at or above
 the threshold, fixable or not. Unfixable findings are always still recorded in
 the component JSON — the option changes the *verdict*, never what is collected.
 
+Findings with no fix that an exemption record covers drop out of the verdict
+too (see exemption_records.py).
+
 Additionally, if an `alert_url` input is configured, a best-effort
 webhook is POSTed describing the findings (payload schema in webhook.py).
 Delivery is fire-and-forget with a short timeout: a slow or unreachable
@@ -23,6 +26,7 @@ import sys
 from lunar_policy import Check, variable_or_default
 
 import webhook
+from exemption_records import find_record, load_records
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 
@@ -64,16 +68,19 @@ def _dedupe_findings(findings):
     return out
 
 
-def _collect_findings(sca_node, in_scope):
-    """Return findings at/above threshold from .sca.findings[], normalized.
+def _collect_findings(sca_node, in_scope, records=()):
+    """Return `(findings, exempted)` at/above threshold from .sca.findings[],
+    normalized.
 
-    Returns [] when the collector did not emit per-finding detail (e.g. a
+    Both are empty when the collector did not emit per-finding detail (e.g. a
     summary-only SCA collector) — the alert still carries the failure message.
+    Each exempted finding carries the exemption record it matched.
     """
     findings_node = sca_node.get_node(".findings")
     if not findings_node.exists():
-        return []
+        return [], []
     out = []
+    exempted = []
     for finding in findings_node:
         severity = (finding.get_value_or_default(".severity", "") or "").lower()
         if severity not in in_scope:
@@ -85,16 +92,31 @@ def _collect_findings(sca_node, in_scope):
             # available proxy. It is exactly how trivy and snyk compute it, and
             # grype only carries a fix version for findings it marks fixed.
             fixable = bool(fix_version)
-        out.append(
-            {
-                "id": finding.get_value_or_default(".cve", None),
-                "severity": severity,
-                "package": finding.get_value_or_default(".package", None),
-                "fix_version": fix_version,
-                "fixable": bool(fixable),
-            }
-        )
-    return _dedupe_findings(out)
+        entry = {
+            "id": finding.get_value_or_default(".cve", None),
+            "severity": severity,
+            "package": finding.get_value_or_default(".package", None),
+            "fix_version": fix_version,
+            "fixable": bool(fixable),
+        }
+        record = find_record(records, entry["id"], entry["fixable"])
+        if record:
+            exempted.append(dict(entry, exemption=record))
+        else:
+            out.append(entry)
+    return _dedupe_findings(out), _dedupe_findings(exempted)
+
+
+def _format_records(records, limit=5):
+    """Render the exemption records that matched, each once, for a check message."""
+    unique = []
+    for record in records:
+        if record not in unique:
+            unique.append(record)
+    shown = "; ".join(str(r) for r in unique[:limit])
+    if len(unique) > limit:
+        shown += f" (and {len(unique) - limit} more)"
+    return shown
 
 
 def _most_severe(findings):
@@ -189,14 +211,14 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            findings = _collect_findings(sca_node, set(in_scope))
+            findings, exempted = _collect_findings(sca_node, set(in_scope), load_records(c))
             if ignore_unfixable:
                 # Narrow the failure to findings that carry an upgrade target, so
                 # an unfixable upstream CVE cannot hold a release gate closed
                 # forever. Deliberately applied *after* the summary/count path
                 # has already decided this is a failure: the option can only
                 # suppress a failure, never create one.
-                if not findings:
+                if not findings and not exempted:
                     # Summary-only scan: fixability is not knowable per finding.
                     # `.sca.summary.all_fixable` cannot answer this — it is a
                     # single boolean across *all* severities, not the in-scope
@@ -223,6 +245,20 @@ def main(node=None):
                         f"{severity.capitalize()} vulnerability findings with an available fix "
                         f"detected (findings with no available fix ignored)"
                     )
+            elif exempted:
+                # Records only cover findings with no fix, which ignore_unfixable
+                # already drops, so they matter only when it is off.
+                shown = _format_records([f["exemption"] for f in exempted])
+                if not findings:
+                    c.skip(
+                        f"{len(exempted)} finding(s) at or above '{min_severity}', all with no fix "
+                        f"and exempted by exemption records — {shown}"
+                    )
+                # The summary's headline may name a severity only exempt findings had.
+                fail_message = (
+                    f"{_most_severe(findings).capitalize()} vulnerability findings detected "
+                    f"— {len(exempted)} exempted by exemption records: {shown}"
+                )
 
             _fire_alert(min_severity, fail_message, findings)
             # Multiple failing assertions on a single check (the product's

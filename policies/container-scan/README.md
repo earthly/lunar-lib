@@ -35,6 +35,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
 | `.containers.native.docker.cicd.cmds[]` | array | `docker` collector, plus any CI step that records a pushed image — the pushed refs decide whether `max-severity` / `max-total` apply |
 | `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` and `exempt_findings` (`cve`, `severity`, `package`, `version`, `fix_version`, `fixable`, `image`) |
+| `.compliance.vulnerability_exemptions.records[]` | array | Optional: `vulnerability-exemptions` collector — exemption records for findings with no fix (`cve`, `component`, `until`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 

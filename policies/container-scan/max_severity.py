@@ -16,11 +16,13 @@ component JSON — the option changes the *verdict*, never what is collected.
 
 `exempt_findings` lists vulnerabilities that were reviewed and accepted, by id
 and exact package version, optionally limited to some images (see
-exemptions.py). Exempt findings drop out of the verdict the same way.
+exemptions.py). Exempt findings drop out of the verdict the same way, and so do
+findings with no fix covered by an exemption record (see exemption_records.py).
 """
 
 import sys
 
+from exemption_records import ExemptionRecord, find_record, load_records
 from exemptions import find_exemption, format_exemptions, parse_exempt_findings
 from helpers import no_scan_data_reasons, pushed_image_refs
 from lunar_policy import Check, variable_or_default
@@ -94,7 +96,7 @@ def _dedupe_findings(findings):
     return out
 
 
-def _collect_findings(scan_node, in_scope, exemptions=()):
+def _collect_findings(scan_node, in_scope, exemptions=(), records=()):
     """Return `(findings, exempted)` at/above threshold from
     `.container_scan.findings[]`.
 
@@ -102,7 +104,8 @@ def _collect_findings(scan_node, in_scope, exemptions=()):
     summary-only scan) — the failure message then stays the headline alone,
     same as the `sca` policy. Exemptions are matched per image, before the
     dedupe merges images, so a vulnerability exempted in one image still fails
-    in another. Each exempted finding carries the `exemption` it matched.
+    in another. Each exempted finding carries the `exemption` it matched: an
+    `exempt_findings` entry, or an exemption record when it has no fix.
     """
     findings_node = scan_node.get_node(".findings")
     if not findings_node.exists():
@@ -136,7 +139,7 @@ def _collect_findings(scan_node, in_scope, exemptions=()):
             entry["package"],
             entry["version"],
             entry["images"][0] if entry["images"] else None,
-        )
+        ) or find_record(records, entry["id"], entry["fixable"])
         if exemption:
             exempted.append(dict(entry, exemption=exemption))
         else:
@@ -144,9 +147,18 @@ def _collect_findings(scan_node, in_scope, exemptions=()):
     return _dedupe_findings(out), _dedupe_findings(exempted)
 
 
+def _exempted_by(exempted):
+    """Name where the matched exemptions came from."""
+    sources = {
+        "exemption records" if isinstance(f["exemption"], ExemptionRecord) else "exempt_findings"
+        for f in exempted
+    }
+    return " and ".join(sorted(sources))
+
+
 def _exempted_suffix(exempted):
     return (
-        f" — {len(exempted)} exempted by exempt_findings: "
+        f" — {len(exempted)} exempted by {_exempted_by(exempted)}: "
         f"{format_exemptions([f['exemption'] for f in exempted])}"
     )
 
@@ -224,7 +236,8 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            findings, exempted = _collect_findings(scan_node, set(in_scope), exemptions)
+            records = load_records(c)
+            findings, exempted = _collect_findings(scan_node, set(in_scope), exemptions, records)
             if ignore_unfixable:
                 # Narrow the failure to findings that carry an upgrade target, so
                 # an unfixable base-image CVE cannot hold a release gate closed
@@ -251,7 +264,7 @@ def main(node=None):
                         if exempted:
                             c.skip(
                                 f"{len(exempted)} finding(s) at or above '{min_severity}' with "
-                                f"an available fix, all exempted by exempt_findings — "
+                                f"an available fix, all exempted by {_exempted_by(exempted)} — "
                                 f"{format_exemptions([f['exemption'] for f in exempted])}"
                             )
                         # Every in-scope finding is unfixable — nothing actionable
@@ -272,7 +285,7 @@ def main(node=None):
                 if not findings:
                     c.skip(
                         f"{len(exempted)} finding(s) at or above '{min_severity}', all exempted "
-                        f"by exempt_findings — {format_exemptions([f['exemption'] for f in exempted])}"
+                        f"by {_exempted_by(exempted)} — {format_exemptions([f['exemption'] for f in exempted])}"
                     )
                 # The summary's headline may name a severity only exempt findings had.
                 fail_message = (

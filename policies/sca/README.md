@@ -34,6 +34,7 @@ This policy reads from the following Component JSON paths:
 | `.sca.summary.has_medium` | boolean | SCA collector (preferred) |
 | `.sca.summary.has_low` | boolean | SCA collector (preferred) |
 | `.sca.findings[]` | array | SCA collector — names the offending packages/CVEs in the `max-severity` failure, drives `ignore_unfixable`, and populates the optional webhook alert (`cve`, `severity`, `package`, `fix_version`, `fixable`) |
+| `.compliance.vulnerability_exemptions.records[]` | array | Optional: `vulnerability-exemptions` collector — exemption records for findings with no fix (`cve`, `component`, `until`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 

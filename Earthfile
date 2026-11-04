@@ -87,6 +87,7 @@ test:
     BUILD ./collectors/gitlab+test
     BUILD ./collectors/jira+test
     BUILD --pass-args ./collectors/compliance-docs+test
+    BUILD --pass-args ./collectors/vulnerability-exemptions+test
     BUILD ./collectors/package-registries+test
     BUILD ./collectors/trivy+test
     BUILD ./collectors/grype+test
