@@ -22,14 +22,14 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `aws-alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association` |
+| `aws-alb-waf-enabled` | Public ALBs have a WAF web ACL associated | Internet-facing `aws_lb` with no `aws_wafv2_web_acl_association`, or an internet-facing AWS Load Balancer Controller Ingress group with no `alb.ingress.kubernetes.io/wafv2-acl-arn` annotation |
 | `aws-cloudtrail-multi-region` | CloudTrail is multi-region and ships to CloudWatch | No multi-region `aws_cloudtrail`, or no CloudWatch Logs group |
 | `aws-security-group-no-public-postgres` | No public ingress to PostgreSQL | A security group allows `0.0.0.0/0` to port 5432 |
 | `aws-security-group-no-public-ssh` | No public ingress to SSH | A security group allows `0.0.0.0/0` to port 22 |
 | `aws-eks-control-plane-logging` | EKS control-plane logging enabled | `aws_eks_cluster` missing required `enabled_cluster_log_types` |
-| `aws-elb-access-logging` | Load balancers log access requests | Application or Classic Load Balancer without access logging enabled (network and gateway load balancers are not evaluated) |
+| `aws-elb-access-logging` | Load balancers log access requests | Application or Classic Load Balancer without access logging enabled, including an AWS Load Balancer Controller Ingress group without `access_logs.s3.enabled=true` in `alb.ingress.kubernetes.io/load-balancer-attributes` (network and gateway load balancers are not evaluated) |
 | `aws-ebs-snapshot-encryption` | EBS snapshots encrypted at rest | `aws_ebs_snapshot` without `encrypted = true` |
-| `aws-ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true` |
+| `aws-ebs-volume-encryption` | EBS volumes encrypted at rest | `aws_ebs_volume` or block device without `encrypted = true`. An `aws_instance` with no `root_block_device`, or a `terraform-aws-modules/eks` node group with no encrypted `block_device_mappings`, fails unless `aws_ebs_encryption_by_default` is declared |
 | `aws-elb-https-only` | Load balancers enforce HTTPS/TLS | Plaintext HTTP listener without an HTTPS redirect, or a Classic Load Balancer listener that isn't HTTPS/SSL (TCP/UDP pass-through listeners are not evaluated) |
 | `aws-guardduty-enabled` | GuardDuty detector enabled | No `aws_guardduty_detector` with `enable = true` |
 | `aws-rds-cloudwatch-logging` | RDS exports logs to CloudWatch | RDS instance/cluster without `enabled_cloudwatch_logs_exports` |
@@ -55,6 +55,8 @@ The checks below are AWS resource security guardrails relevant to SOC 2 (tagged 
 | `aws-lambda-not-public` | Lambda functions are not publicly invokable | `principal = "*"` permission without source scope, or function URL with `authorization_type = NONE` |
 | `aws-cloudtrail-log-file-validation` | CloudTrail validates log-file integrity | Trail without `enable_log_file_validation = true` |
 | `aws-cloudtrail-kms-encryption` | CloudTrail logs encrypted with KMS | Trail without `kms_key_id` |
+
+The load balancer checks also read Kubernetes Ingresses the AWS Load Balancer Controller manages (`kubernetes_ingress_v1` / `kubernetes_ingress`). Ingresses that share an `alb.ingress.kubernetes.io/group.name` are one ALB, and the scheme defaults to `internal`. Annotations written as `merge(local.<name>, {...})` are resolved against the module's `locals`; a value the policy can't resolve statically never fails a check.
 
 ## Required Data
 
