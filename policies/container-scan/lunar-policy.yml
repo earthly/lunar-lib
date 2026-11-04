@@ -21,7 +21,10 @@ landing_page:
     - slug: "snyk"
       type: "collector"
       reason: "Provides container scan results via Snyk Container"
-  related: []
+  related:
+    - slug: "vulnerability-exemptions"
+      type: "collector"
+      reason: "Provides approved exemptions, read at run time"
 
 policies:
   - name: executed
@@ -43,6 +46,12 @@ policies:
       Ensures total container vulnerabilities are under a configurable threshold.
     mainPython: max_total.py
     keywords: ["container", "threshold", "vulnerabilities", "docker"]
+
+  - name: unfixable-reviewed
+    description: |
+      Fails on each finding at or above min_severity that has no fix available and no approved exemption.
+    mainPython: unfixable_reviewed.py
+    keywords: ["container", "unfixable", "no fix", "exemption", "risk acceptance", "vulnerabilities", "docker"]
 
 inputs:
   min_severity:
@@ -74,6 +83,10 @@ inputs:
       every finding that would have failed was exempt. An entry that cannot be
       parsed fails the check without exempting anything. `max-total` ignores
       this input.
+
+      Approved records in `.compliance.vulnerability_exemptions.records[]`
+      (written by the `vulnerability-exemptions` collector) are honored the same
+      way, read at run time, alongside this input.
     default: ""
   max_total_threshold:
     description: "Maximum total findings allowed (must be configured)"

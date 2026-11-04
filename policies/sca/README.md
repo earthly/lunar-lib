@@ -15,6 +15,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `executed` | Verifies SCA scanning ran | No scanner has written to `.sca` |
 | `max-severity` | No findings at or above severity threshold (optionally fires a [webhook](#webhook-alerts) on failure) | Findings found at configured severity or higher |
 | `max-total` | Total vulnerabilities under threshold | Total count exceeds configured limit |
+| `unfixable-reviewed` | Every finding with no fix at or above the threshold has an approved exemption | A finding with no fix has no approved exemption |
 
 ## Required Data
 
@@ -45,7 +46,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/sca@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    include: [executed, max-severity, max-total]
+    include: [executed, max-severity, max-total, unfixable-reviewed]
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
@@ -158,6 +159,41 @@ evaluation with a configurable timeout (`alert_timeout_sec`, default 2s).
 the runner must permit network egress to the endpoint (an egress allowlist would
 need the endpoint allowlisted). If egress is blocked, the check still fails on
 the findings as normal and the delivery failure is logged to stderr.
+
+### Reviewing findings with no fix
+
+`ignore_unfixable` keeps a gate practical, but it also hides findings no one has
+looked at. `unfixable-reviewed` closes that gap: it fails once per dependency finding
+at or above `min_severity` that has no fix available and no approved exemption.
+Run it as a non-blocking report next to the gate:
+
+```yaml
+  - uses: github://earthly/lunar-lib/policies/sca@main
+    name: sca-unfixable
+    include: [unfixable-reviewed]
+    enforcement: report-pr
+    with:
+      min_severity: "high"
+```
+
+It skips when no scan data is present, and it never counts fixable findings,
+which `max-severity` already gates.
+
+### Exemption records
+
+Approved exemptions can also arrive at run time, in
+`.compliance.vulnerability_exemptions.records[]`, written by the
+[`vulnerability-exemptions`](https://github.com/earthly/lunar-lib/tree/main/collectors/vulnerability-exemptions)
+collector from records kept in one compliance repository. `max-severity` and
+`unfixable-reviewed` honor them, so a new or revoked exemption needs no config
+change. A record applies to a finding when all of these hold:
+
+- the finding's ID is in `vulnerabilities` (case-insensitive);
+- the package matches `packages`, by name or `name@version`, when `packages` is set;
+- the image matches `images`, when `images` is set (container findings only);
+- `approved_by`, `approved_on` and `review_by` are set, and today is not past `review_by`;
+- for `kind: no-fix`, the finding has no fix. Once a fix ships, the record stops
+  applying and `max-severity` takes over.
 
 ## Examples
 

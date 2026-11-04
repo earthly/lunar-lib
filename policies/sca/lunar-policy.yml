@@ -29,7 +29,10 @@ landing_page:
     - slug: "grype"
       type: "collector"
       reason: "Provides SCA scan results via Grype vulnerability scanning"
-  related: []
+  related:
+    - slug: "vulnerability-exemptions"
+      type: "collector"
+      reason: "Provides approved exemptions, read at run time"
 
 policies:
   - name: executed
@@ -43,6 +46,7 @@ policies:
     description: |
       Ensures no findings at or above the configured severity threshold.
       Configure min_severity to set the threshold (critical, high, medium, low).
+      Findings covered by an approved exemption record don't count.
     mainPython: max_severity.py
     keywords: ["sca", "critical", "high", "vulnerabilities", "security", "dependencies", "webhook", "alert"]
 
@@ -51,6 +55,12 @@ policies:
       Ensures total vulnerabilities are under a configurable threshold.
     mainPython: max_total.py
     keywords: ["sca", "threshold", "vulnerabilities", "dependencies"]
+
+  - name: unfixable-reviewed
+    description: |
+      Fails on each finding at or above min_severity that has no fix available and no approved exemption.
+    mainPython: unfixable_reviewed.py
+    keywords: ["sca", "unfixable", "no fix", "exemption", "risk acceptance", "vulnerabilities", "dependencies"]
 
 inputs:
   min_severity:
