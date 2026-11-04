@@ -18,6 +18,7 @@
 #   component_id_prefix       (default github.com/)
 #   tag_prefix                (default bs-)
 #   include_derived_tags      (default true)
+#   include_entity_ref_meta   (default false) Write each component's entity ref to its backstage/entity-ref meta
 #   owner_format              (default as-is) as-is | bare-name
 #   default_owner             (default empty)
 #   domain_default_description (default empty)
@@ -82,6 +83,7 @@ COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX-github.com/}"
 # local invocation), not for a config-supplied empty string.
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
+INCLUDE_ENTITY_REF_META="${LUNAR_VAR_INCLUDE_ENTITY_REF_META:-false}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DOMAIN_DEFAULT_DESCRIPTION="${LUNAR_VAR_DOMAIN_DEFAULT_DESCRIPTION:-}"
@@ -518,6 +520,7 @@ COMPONENTS=$(jq \
     --arg id_prefix "$COMPONENT_ID_PREFIX" \
     --arg tag_prefix "$TAG_PREFIX" \
     --arg include_derived "$INCLUDE_DERIVED_TAGS" \
+    --arg entity_ref_meta "$INCLUDE_ENTITY_REF_META" \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
     --arg inc_types "$INCLUDE_TYPES" --arg exc_types "$EXCLUDE_TYPES" \
@@ -608,7 +611,12 @@ COMPONENTS=$(jq \
      | {key: $id, value:
          ({tags: ($prefixed + $derived)}
           + (if $owner != "" then {owner: $owner} else {} end)
-          + (if $domain != "" then {domain: $domain} else {} end))}
+          + (if $domain != "" then {domain: $domain} else {} end)
+          # catalog_api_fallback in the backstage collector looks the entity up by this.
+          + (if $entity_ref_meta == "true"
+             then {meta: {"backstage/entity-ref":
+                     "\(.kind | ascii_downcase):\(.metadata.namespace // "default")/\(.metadata.name)"}}
+             else {} end))}
     ]
     | from_entries' "$ALL_ENTITIES")
 

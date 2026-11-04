@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 from constraints import parse_required_annotations, validate_value
 
 
@@ -18,7 +18,7 @@ def main(node=None):
         entries = parse_required_annotations(raw)
         if not entries:
             # Opt-in check: with nothing configured there is nothing to enforce.
-            c.skip(
+            skip(c,
                 "No required_annotations configured. Set the "
                 "`required_annotations` input to enforce annotation keys."
             )
@@ -27,7 +27,7 @@ def main(node=None):
 
         keys = [entry["key"] for entry in entries]
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found, so required annotations cannot be "
                 f"verified. Required: {', '.join(keys)}. Add a "
                 "catalog-info.yaml with these annotations under metadata.annotations."
@@ -44,7 +44,7 @@ def main(node=None):
             key = entry["key"]
             raw_value = annotations.get(key)
             if raw_value is None or not str(raw_value).strip():
-                c.fail(
+                fail(c,
                     f'catalog-info.yaml is missing required annotation "{key}". '
                     "Add it under metadata.annotations."
                 )
@@ -54,7 +54,7 @@ def main(node=None):
             if constraints:
                 message = validate_value(key, raw_value, constraints)
                 if message:
-                    c.fail("catalog-info.yaml " + message)
+                    fail(c, "catalog-info.yaml " + message)
     return c
 
 

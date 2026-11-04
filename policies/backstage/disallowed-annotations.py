@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -14,7 +14,7 @@ def main(node=None):
         disallowed = [a.strip() for a in disallowed_str.split(",") if a.strip()]
         if not disallowed:
             # Opt-in check: with nothing configured there is nothing to enforce.
-            c.skip(
+            skip(c,
                 "No disallowed_annotations configured. Set the "
                 "`disallowed_annotations` input to forbid annotation keys."
             )
@@ -33,7 +33,7 @@ def main(node=None):
 
         present = [key for key in disallowed if key in annotations]
         if present:
-            c.fail(
+            fail(c,
                 "catalog-info.yaml declares disallowed annotation(s): "
                 f"{', '.join(present)}. Remove them from metadata.annotations."
             )

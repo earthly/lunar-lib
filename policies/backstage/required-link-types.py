@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -16,7 +16,7 @@ def main(node=None):
         )
         if not required:
             # Opt-in check: with nothing configured there is nothing to enforce.
-            c.skip(
+            skip(c,
                 "No required_link_types configured. Set the "
                 "`required_link_types` input to require typed metadata.links entries."
             )
@@ -24,7 +24,7 @@ def main(node=None):
         skip_if_no_catalog(c)
 
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found, so required link types cannot be "
                 f"verified. Required: {', '.join(required)}. Add a "
                 "catalog-info.yaml with a link of each type under metadata.links."
@@ -48,7 +48,7 @@ def main(node=None):
 
         missing = [t for t in required if t not in present]
         if missing:
-            c.fail(
+            fail(c,
                 "catalog-info.yaml has no metadata.links entry of type: "
                 f"{', '.join(missing)}. Present link types: "
                 f"{', '.join(present) if present else '(none)'}. Add a link "

@@ -1,6 +1,6 @@
 from lunar_policy import Check
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -20,7 +20,7 @@ def main(node=None):
         # (A durable "pending" isn't available — post-collection the SDK
         # resolves a data-less check to fail/error, not pending.)
         if not c.exists(".catalog.native.backstage.refs.checked"):
-            c.skip(
+            skip(c,
                 "Backstage referential integrity is not configured. Set the "
                 "`backstage` collector's `backstage_url` input to verify the "
                 "domain of this component's system against the live catalog."
@@ -47,7 +47,7 @@ def main(node=None):
             # integrity could not be determined, so skip rather than false-fail
             # on a Backstage outage.
             err = ref.get("error", "unknown error")
-            c.skip(
+            skip(c,
                 f"Could not verify domain '{name}' of system '{via}' against "
                 f"Backstage ({err}); skipping rather than failing on a "
                 "transient error."
@@ -59,7 +59,7 @@ def main(node=None):
             # catalog-info.yaml has nothing to correct — spec.domain lives on
             # the System entity, whose catalog file is typically owned by
             # another team. Without the system name there is nowhere to go.
-            c.fail(
+            fail(c,
                 f"System '{via}' (referenced by spec.system) belongs to domain "
                 f"'{name}', which does not exist in the Backstage catalog. "
                 f"This component's catalog-info.yaml is not at fault — fix "

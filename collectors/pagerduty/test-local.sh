@@ -588,6 +588,30 @@ run_case oncall.sh "$CRON"
 assert_eq "cron: a lookup the backstage collector couldn't complete is an error" \
   "$(svc_lookup | jq -c '.errors | length') $(queried)" "1 none"
 
+echo "from-backstage-collector on the backstage collector's catalog_api_fallback (no catalog file):"
+
+for mode in by-name by-query; do
+  FB=("LUNAR_VAR_REF_LOOKUP=$mode" "LUNAR_VAR_CATALOG_API_FALLBACK=true")
+
+  new_case "$mode-fallback-component"
+  backstage_json "${FB[@]}" 'LUNAR_COMPONENT_META={"backstage/entity-ref":"component:default/payment-api"}'
+  assert_eq "[$mode] the backstage collector wrote the fetched entity, with no path" \
+    "$(jq -c '.catalog.native.backstage | [has("path"), .metadata.name, .refs.entity.ref]' "$CASE/component.json")" \
+    '[false,"payment-api","component:default/payment-api"]'
+  run_case from-backstage-collector.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=true
+  assert_eq "[$mode] the fetched Component's own annotation maps it" "$(queried) $(via)" "PCOMP01 component:default/payment-api"
+
+  new_case "$mode-fallback-system"
+  backstage_json "${FB[@]}" 'LUNAR_COMPONENT_META={"backstage/entity-ref":"checkout"}'
+  run_case from-backstage-collector.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=true
+  assert_eq "[$mode] inherited from the fetched entity's System" "$(queried) $(via)" "PSYS001 system:default/payment-platform"
+
+  new_case "$mode-fallback-domain"
+  backstage_json "${FB[@]}" 'LUNAR_COMPONENT_META={"backstage/entity-ref":"ledger-api"}'
+  run_case from-backstage-collector.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=true
+  assert_eq "[$mode] inherited from the System's Domain" "$(queried) $(via)" "PDOM001 domain:default/finance"
+done
+
 echo
 if [ "$FAILS" -eq 0 ]; then
   echo "All pagerduty collector tests passed."

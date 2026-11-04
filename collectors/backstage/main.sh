@@ -89,42 +89,69 @@ elif [ "$SEARCH_PARENT_DIRS" = "true" ]; then
   fi
 fi
 
-if [ -z "$CATALOG_FILE" ]; then
-  # No catalog-info.yaml found — write nothing. Absence of `.catalog.native.backstage`
-  # IS the signal. Policies use Check.exists(".catalog.native.backstage") to detect.
-  exit 0
-fi
-
-YQ_ERR=$(mktemp)
-trap 'rm -f "$YQ_ERR"' EXIT
-
-# `catalog-info.yaml` may declare multiple entities separated by `---`. Use
-# `yq ea` (eval-all) with `[.]` to collect every document into a single JSON
-# array: a plain `yq -o=json '.'` emits the docs as concatenated objects, which
-# is not valid JSON and makes the linter choke ("Invalid parser output"),
-# false-failing every downstream policy. A single-document file yields a
-# one-element array, so the linter's aggregate shape is uniform. Truly malformed
-# YAML still exits non-zero and drops to the parse-error branch below.
-PARSE_OK=false
-if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
-  RESULT=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED" "${LINT_ARGS[@]}")
-  PARSE_OK=true
-  if [ "$RESULT" = "null" ]; then
-    # A shared file that doesn't describe this directory: same as no file.
-    echo "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR ($MATCH); nothing collected." >&2
+# No catalog file describes this component. Without catalog_api_fallback, write
+# nothing: absence of `.catalog.native.backstage` IS the signal. With it, carry
+# on and fetch the entity named by the component's `backstage/entity-ref` meta,
+# exiting 0 (nothing written, same as no file) when that can't run. $1 is why no
+# file applies, logged in both cases.
+FALLBACK_REF=""
+start_fallback() {
+  if [ "${LUNAR_VAR_CATALOG_API_FALLBACK:-false}" != "true" ]; then
+    if [ -n "${1:-}" ]; then echo "$1; nothing collected." >&2; fi
     exit 0
   fi
-else
-  ERR_MSG=$(tr '\n' ' ' < "$YQ_ERR" | sed 's/[[:space:]]*$//' | head -c 500)
-  [ -z "$ERR_MSG" ] && ERR_MSG="YAML parse error"
-  RESULT=$(jq -n \
-    --arg path "$PATH_NORMALIZED" \
-    --arg msg "$ERR_MSG" \
-    '{
-      valid: false,
-      errors: [{line: 0, message: $msg, severity: "error"}],
-      path: $path
-    }')
+  if [ -n "${1:-}" ]; then echo "$1." >&2; fi
+  if [ -z "${LUNAR_VAR_BACKSTAGE_URL:-}" ]; then
+    echo "catalog_api_fallback needs backstage_url; nothing collected." >&2
+    exit 0
+  fi
+  FALLBACK_REF=$(printf '%s' "${LUNAR_COMPONENT_META:-}" \
+    | jq -r '."backstage/entity-ref" | strings | gsub("^\\s+|\\s+$"; "")' 2>/dev/null) || FALLBACK_REF=""
+  if [ -z "$FALLBACK_REF" ]; then
+    echo "No catalog file, and no backstage/entity-ref meta to look the entity up by; nothing collected." >&2
+    exit 0
+  fi
+  echo "No catalog file describes this component; fetching $FALLBACK_REF from the Backstage catalog." >&2
+}
+
+if [ -z "$CATALOG_FILE" ]; then
+  start_fallback ""
+fi
+
+PARSE_OK=false
+RESULT=""
+if [ -z "$FALLBACK_REF" ]; then
+  YQ_ERR=$(mktemp)
+  trap 'rm -f "$YQ_ERR"' EXIT
+
+  # `catalog-info.yaml` may declare multiple entities separated by `---`. Use
+  # `yq ea` (eval-all) with `[.]` to collect every document into a single JSON
+  # array: a plain `yq -o=json '.'` emits the docs as concatenated objects, which
+  # is not valid JSON and makes the linter choke ("Invalid parser output"),
+  # false-failing every downstream policy. A single-document file yields a
+  # one-element array, so the linter's aggregate shape is uniform. Truly malformed
+  # YAML still exits non-zero and drops to the parse-error branch below.
+  if PARSED_JSON=$(yq ea -o=json '[.]' "$CATALOG_FILE" 2>"$YQ_ERR"); then
+    LINTED=$(echo "$PARSED_JSON" | python3 "$SCRIPT_DIR/lint_backstage.py" --path "$PATH_NORMALIZED" "${LINT_ARGS[@]}")
+    if [ "$LINTED" = "null" ]; then
+      # A shared file that doesn't describe this directory: same as no file.
+      start_fallback "No entity in $PATH_NORMALIZED points at $COMPONENT_DIR ($MATCH)"
+    else
+      RESULT="$LINTED"
+      PARSE_OK=true
+    fi
+  else
+    ERR_MSG=$(tr '\n' ' ' < "$YQ_ERR" | sed 's/[[:space:]]*$//' | head -c 500)
+    [ -z "$ERR_MSG" ] && ERR_MSG="YAML parse error"
+    RESULT=$(jq -n \
+      --arg path "$PATH_NORMALIZED" \
+      --arg msg "$ERR_MSG" \
+      '{
+        valid: false,
+        errors: [{line: 0, message: $msg, severity: "error"}],
+        path: $path
+      }')
+  fi
 fi
 
 # --- Referential integrity (optional) ---
@@ -325,9 +352,12 @@ assume_role_chain() {
 }
 
 BACKSTAGE_URL="${LUNAR_VAR_BACKSTAGE_URL:-}"
-if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
+if { [ "$PARSE_OK" = true ] || [ -n "$FALLBACK_REF" ]; } && [ -n "$BACKSTAGE_URL" ]; then
   BASE_URL="${BACKSTAGE_URL%/}"
-  DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
+  DEFAULT_NS=default
+  if [ "$PARSE_OK" = true ]; then
+    DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
+  fi
 
   # Path prefix before /catalog/entities — `/api` for a standard Backstage
   # layout, "" for an instance whose catalog API is mounted at the root (e.g.
@@ -556,14 +586,40 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   ENTITY_BODY_FILE=$(mktemp)
   trap 'rm -f "$YQ_ERR" "$ENTITY_BODY_FILE"' EXIT
 
-  # The primary entity itself, as the live catalog has it. Backstage processors
-  # can add annotations the file doesn't carry, such as an ID inherited from
-  # the entity's System, so readers of annotations want this copy.
-  ENTITY_KIND=$(echo "$RESULT" | jq -r '.kind | strings')
-  ENTITY_NAME=$(echo "$RESULT" | jq -r '.metadata.name | strings')
-  if [ -n "$ENTITY_KIND" ] && [ -n "$ENTITY_NAME" ]; then
-    ENTITY_ENTRY=$(resolve_ref "${ENTITY_KIND,,}" "$ENTITY_NAME")
+  if [ -n "$FALLBACK_REF" ]; then
+    # catalog_api_fallback: the fetched entity becomes the result, and its
+    # lookup is the `.refs.entity` entry. Only a definitive hit on a readable
+    # entity writes anything; a miss, an error or a setup problem writes
+    # nothing, exactly as with no catalog file.
+    FALLBACK_KIND=component
+    case "$FALLBACK_REF" in
+      *:*) FALLBACK_KIND="${FALLBACK_REF%%:*}" ;;
+    esac
+    ENTITY_ENTRY=$(resolve_ref "${FALLBACK_KIND,,}" "$FALLBACK_REF")
+    if [ "$(echo "$ENTITY_ENTRY" | jq -r '.exists // empty')" != "true" ] \
+       || ! RESULT=$(jq -ce 'if type == "object" and (.kind | type) == "string"
+                               and (.metadata.name | type) == "string"
+                             then {apiVersion, kind, metadata, spec} | with_entries(select(.value != null))
+                             else error("not an entity") end' "$ENTITY_BODY_FILE" 2>/dev/null); then
+      REASON=$(echo "$ENTITY_ENTRY" | jq -r 'if .error then .error elif .exists == false then "not in the catalog" else "unreadable response" end')
+      echo "Couldn't fetch $FALLBACK_REF from the Backstage catalog ($REASON); nothing collected." >&2
+      exit 0
+    fi
+    ENTITY_KIND=$(echo "$RESULT" | jq -r '.kind')
+    ENTITY_NAME=$(echo "$RESULT" | jq -r '.metadata.name')
+    DEFAULT_NS=$(echo "$RESULT" | jq -r '.metadata.namespace // "default"')
+    ENTITY_ENTRY=$(echo "$ENTITY_ENTRY" | jq --arg name "$ENTITY_NAME" '.name = $name')
     REFS=$(echo "$REFS" | jq --arg kind "$ENTITY_KIND" --argjson e "$ENTITY_ENTRY" '. + {entity: ({kind: $kind} + $e)}')
+  else
+    # The primary entity itself, as the live catalog has it. Backstage processors
+    # can add annotations the file doesn't carry, such as an ID inherited from
+    # the entity's System, so readers of annotations want this copy.
+    ENTITY_KIND=$(echo "$RESULT" | jq -r '.kind | strings')
+    ENTITY_NAME=$(echo "$RESULT" | jq -r '.metadata.name | strings')
+    if [ -n "$ENTITY_KIND" ] && [ -n "$ENTITY_NAME" ]; then
+      ENTITY_ENTRY=$(resolve_ref "${ENTITY_KIND,,}" "$ENTITY_NAME")
+      REFS=$(echo "$REFS" | jq --arg kind "$ENTITY_KIND" --argjson e "$ENTITY_ENTRY" '. + {entity: ({kind: $kind} + $e)}')
+    fi
   fi
 
   DOMAIN_REF=$(echo "$RESULT" | jq -r '.spec.domain // empty')
@@ -633,4 +689,5 @@ if [ "$PARSE_OK" = true ] && [ -n "$BACKSTAGE_URL" ]; then
   RESULT=$(echo "$RESULT" | jq --argjson refs "$REFS" '. + {refs: $refs}')
 fi
 
+[ -n "$RESULT" ] || exit 0
 echo "$RESULT" | lunar collect -j ".catalog.native.backstage" -
