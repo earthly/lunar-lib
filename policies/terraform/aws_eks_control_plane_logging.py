@@ -1,11 +1,11 @@
 """Require EKS clusters to enable control-plane logging to CloudWatch."""
 
 from lunar_policy import Check, variable_or_default
-from helpers import iter_resources, iter_module_calls
+from helpers import iter_resources, iter_module_calls, first_set
 
 
 # terraform-aws-modules/eks enables these by default when the caller omits
-# cluster_enabled_log_types.
+# enabled_log_types (v21) / cluster_enabled_log_types (v20).
 _EKS_MODULE_DEFAULT = ["audit", "api", "authenticator"]
 
 
@@ -17,7 +17,7 @@ def main(node=None):
             c.skip("No Terraform data found")
 
         clusters = list(iter_resources(native, "aws_eks_cluster"))
-        eks_modules = list(iter_module_calls(native, "terraform-aws-modules/eks"))
+        eks_modules = list(iter_module_calls(native, "terraform-aws-modules/eks/aws"))
         if not clusters and not eks_modules:
             c.skip("No EKS clusters found")
 
@@ -43,9 +43,9 @@ def main(node=None):
             missing_from(cfg.get("enabled_cluster_log_types"), "aws_eks_cluster.{}".format(name))
 
         for mname, cfg in eks_modules:
-            enabled = cfg.get("cluster_enabled_log_types")
-            if enabled is None:
-                enabled = _EKS_MODULE_DEFAULT  # module default when arg omitted
+            _, enabled = first_set(
+                cfg, ("enabled_log_types", "cluster_enabled_log_types"), _EKS_MODULE_DEFAULT
+            )
             missing_from(enabled, "module.{} (terraform-aws-modules/eks)".format(mname))
     return c
 

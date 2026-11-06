@@ -49,6 +49,7 @@ import aws_cloudtrail_kms_encryption
 import aws_iam_role_permissions_boundary
 import aws_imdsv2_required
 import opentofu_state_encryption
+from helpers import module_source_matches
 
 
 def node(resource):
@@ -299,12 +300,12 @@ class TestRdsLogging(unittest.TestCase):
         self.assertEqual(status(aws_rds_cloudwatch_logging, EMPTY), CheckStatus.SKIPPED)
 
     def test_pass_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds",
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws",
                                  "enabled_cloudwatch_logs_exports": ["postgresql"]}]})
         self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.PASS)
 
     def test_fail_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds"}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws"}]})
         self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.FAIL)
 
 
@@ -410,11 +411,11 @@ class TestRdsEncryption(unittest.TestCase):
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.PASS)
 
     def test_pass_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds", "storage_encrypted": True}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws", "storage_encrypted": True}]})
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.PASS)
 
     def test_fail_module(self):
-        n = node_module({"db": [{"source": "terraform-aws-modules/rds"}]})
+        n = node_module({"db": [{"source": "terraform-aws-modules/rds/aws"}]})
         self.assertEqual(status(aws_rds_encryption_at_rest, n), CheckStatus.FAIL)
 
     def test_skip(self):
@@ -947,6 +948,398 @@ class StatefulBackupConfiguredTest(unittest.TestCase):
 
     def test_skips_with_no_terraform_data(self):
         self.assertEqual(status(aws_stateful_backup_configured, EMPTY), CheckStatus.SKIPPED)
+
+
+class TestEksModuleV21Arguments(unittest.TestCase):
+    """terraform-aws-modules/eks v21 dropped the cluster_ prefix from these arguments."""
+
+    def test_logging_pass_v21_name(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws", "version": "21.24.2",
+                                  "enabled_log_types": ["api", "audit", "authenticator", "controllerManager", "scheduler"]}]})
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.PASS)
+
+    def test_logging_fail_v21_name_partial(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "enabled_log_types": ["api"]}]})
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.FAIL)
+        # The configured list is read, not the module default (which has audit).
+        self.assertIn("audit, authenticator", failure_message(aws_eks_control_plane_logging, n))
+
+    def test_private_endpoint_fail_v21_false(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "endpoint_private_access": False}]})
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.FAIL)
+        self.assertIn("sets endpoint_private_access = false",
+                      failure_message(aws_eks_private_endpoint, n))
+
+    def test_private_endpoint_pass_v21_true_with_public(self):
+        # A public endpoint is not this check's concern.
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "endpoint_private_access": True, "endpoint_public_access": True}]})
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.PASS)
+
+    def test_private_endpoint_fail_v20_false_message(self):
+        n = node_module({"eks": [{"source": "terraform-aws-modules/eks/aws",
+                                  "cluster_endpoint_private_access": "false"}]})
+        self.assertIn("sets cluster_endpoint_private_access = false",
+                      failure_message(aws_eks_private_endpoint, n))
+
+
+class TestModuleSourceMatching(unittest.TestCase):
+    """Module calls match the registry path by whole segment; submodules only on request."""
+
+    def test_matches(self):
+        for src in ("terraform-aws-modules/eks/aws",
+                    "registry.terraform.io/terraform-aws-modules/eks/aws",
+                    "terraform-aws-modules/eks/aws?ref=v21.0.0",
+                    "Terraform-AWS-Modules/EKS/aws"):
+            self.assertTrue(module_source_matches(src, "terraform-aws-modules/eks/aws"), src)
+
+    def test_no_match(self):
+        for src in ("terraform-aws-modules/eks-pod-identity/aws",
+                    "terraform-aws-modules/eks/aws//modules/karpenter",
+                    "terraform-aws-modules/eks/aws//modules/eks-managed-node-group?ref=v21.0.0",
+                    "terraform-aws-modules/eks",
+                    "./modules/eks"):
+            self.assertFalse(module_source_matches(src, "terraform-aws-modules/eks/aws"), src)
+
+    def test_submodule_on_request(self):
+        want = "terraform-aws-modules/rds/aws//modules/db_instance"
+        self.assertTrue(module_source_matches("terraform-aws-modules/rds/aws//modules/db_instance", want))
+        self.assertFalse(module_source_matches("terraform-aws-modules/rds/aws", want))
+        self.assertFalse(module_source_matches("terraform-aws-modules/rds/aws//modules/db_subnet_group", want))
+
+    def test_git_subdir_not_confused_with_scheme(self):
+        self.assertFalse(module_source_matches(
+            "git::https://example.com/terraform-aws-modules/vpc/aws//modules/vpc-endpoints?ref=v6",
+            "terraform-aws-modules/vpc/aws"))
+
+    def test_eks_ignores_sibling_and_submodules(self):
+        # One real cluster plus the karpenter submodule and eks-pod-identity:
+        # only the cluster is evaluated.
+        n = node_module({
+            "eks": [{"source": "terraform-aws-modules/eks/aws", "enabled_log_types": ["api", "audit", "authenticator", "controllerManager", "scheduler"]}],
+            "karpenter": [{"source": "terraform-aws-modules/eks/aws//modules/karpenter"}],
+            "pod_identity": [{"source": "terraform-aws-modules/eks-pod-identity/aws"}],
+        })
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.PASS)
+
+    def test_eks_skip_when_only_non_cluster_modules(self):
+        n = node_module({
+            "karpenter": [{"source": "terraform-aws-modules/eks/aws//modules/karpenter"}],
+            "pod_identity": [{"source": "terraform-aws-modules/eks-pod-identity/aws"}],
+        })
+        self.assertEqual(status(aws_eks_control_plane_logging, n), CheckStatus.SKIPPED)
+        self.assertEqual(status(aws_eks_private_endpoint, n), CheckStatus.SKIPPED)
+
+    def test_vpc_skip_vpc_endpoints_submodule(self):
+        n = node_module({"endpoints": [{"source": "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"}]})
+        self.assertEqual(status(aws_vpc_flow_logs, n), CheckStatus.SKIPPED)
+
+    def test_rds_skip_parameter_group_submodule(self):
+        n = node_module({"pg": [{"source": "terraform-aws-modules/rds/aws//modules/db_parameter_group"}]})
+        self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.SKIPPED)
+
+    def test_rds_db_instance_submodule_and_aurora_still_evaluated(self):
+        for src in ("terraform-aws-modules/rds/aws//modules/db_instance",
+                    "terraform-aws-modules/rds-aurora/aws"):
+            n = node_module({"db": [{"source": src}]})
+            self.assertEqual(status(aws_rds_cloudwatch_logging, n), CheckStatus.FAIL, src)
+
+
+class TestElbNetworkLoadBalancers(unittest.TestCase):
+    """Only plaintext HTTP is flagged; NLB/GWLB access logs are out of scope."""
+
+    def test_https_only_skip_tcp_only(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "udp": [{"protocol": "UDP"}],
+                                      "both": [{"protocol": "TCP_UDP"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.SKIPPED)
+
+    def test_https_only_pass_tcp_alongside_https(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "web": [{"protocol": "HTTPS"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.PASS)
+
+    def test_https_only_pass_nlb_tls(self):
+        n = node({"aws_lb_listener": {"tls": [{"protocol": "TLS"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.PASS)
+
+    def test_https_only_fail_names_only_http(self):
+        n = node({"aws_lb_listener": {"tcp": [{"protocol": "TCP"}], "web": [{"protocol": "HTTP"}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+        msg = failure_message(aws_elb_https_only, n)
+        self.assertIn("aws_lb_listener.web", msg)
+        self.assertNotIn("aws_lb_listener.tcp", msg)
+
+    def test_https_only_fail_default_protocol_is_http(self):
+        n = node({"aws_lb_listener": {"web": [{"port": 80}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+
+    def test_https_only_fail_classic_tcp(self):
+        # Classic listeners stay strict: Security Hub ELB.3 flags TCP too.
+        n = node({"aws_elb": {"c": [{"listener": [{"lb_protocol": "TCP"}]}]}})
+        self.assertEqual(status(aws_elb_https_only, n), CheckStatus.FAIL)
+
+    def test_access_logging_skip_nlb_and_gwlb(self):
+        n = node({"aws_lb": {"nlb": [{"load_balancer_type": "network"}],
+                             "gwlb": [{"load_balancer_type": "gateway"}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.SKIPPED)
+
+    def test_access_logging_nlb_ignored_alb_checked(self):
+        n = node({"aws_lb": {"nlb": [{"load_balancer_type": "network"}],
+                             "alb": [{"load_balancer_type": "application"}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.FAIL)
+        msg = failure_message(aws_elb_access_logging, n)
+        self.assertIn("aws_lb.alb", msg)
+        self.assertNotIn("aws_lb.nlb", msg)
+
+    def test_access_logging_classic_still_checked(self):
+        n = node({"aws_elb": {"c": [{}]}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.FAIL)
+
+
+
+def node_files(*files):
+    """Build a node from (path, hcl) pairs."""
+    return Node.from_component_json(
+        {"iac": {"native": {"terraform": {"files": [
+            {"path": path, "hcl": hcl} for path, hcl in files
+        ]}}}}
+    )
+
+
+LBC = "alb.ingress.kubernetes.io/"
+
+
+def ingress(annotations=None, ingress_class="alb"):
+    """A kubernetes_ingress_v1 body as hcl2json renders it."""
+    cfg = {"metadata": [{"name": "x"}], "spec": [{"rule": [{}]}]}
+    if annotations is not None:
+        cfg["metadata"][0]["annotations"] = annotations
+    if ingress_class is not None:
+        cfg["spec"][0]["ingress_class_name"] = ingress_class
+    return [cfg]
+
+
+PUBLIC = {LBC + "group.name": "web", LBC + "scheme": "internet-facing",
+          LBC + "load-balancer-attributes": "idle_timeout.timeout_seconds=600"}
+INTERNAL = {LBC + "group.name": "web-internal", LBC + "scheme": "internal",
+            LBC + "load-balancer-attributes": "idle_timeout.timeout_seconds=600"}
+
+# The annotations expression hcl2json emits for merge(local.<name>, {...}),
+# comments and an unquoted value included.
+MERGED = ('${merge(local.%s, {\n      "' + LBC + 'group.order" = "10"\n'
+          '      # a comment with "quotes" and = signs\n'
+          '      "' + LBC + 'inbound-cidrs" = var.vpc_cidr_block # trailing comment\n'
+          '      "' + LBC + 'backend-protocol-version" = "GRPC"\n    })}')
+
+
+class TestLoadBalancerControllerAlbs(unittest.TestCase):
+    """ALBs the AWS Load Balancer Controller builds from Terraform-declared Ingresses."""
+
+    def test_waf_fail_names_group_and_members(self):
+        n = node({"kubernetes_ingress_v1": {"api": ingress(PUBLIC), "ui": ingress(PUBLIC)}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.FAIL)
+        self.assertIn('ALB group "web" (kubernetes_ingress_v1.api, kubernetes_ingress_v1.ui)',
+                      failure_message(aws_alb_waf_enabled, n))
+
+    def test_waf_pass_when_one_group_member_sets_acl(self):
+        waf = dict(PUBLIC, **{LBC + "wafv2-acl-arn": "${aws_wafv2_web_acl.main.arn}"})
+        n = node({"kubernetes_ingress_v1": {"api": ingress(PUBLIC), "ui": ingress(waf)}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.PASS)
+
+    def test_waf_pass_legacy_acl_id(self):
+        waf = dict(PUBLIC, **{LBC + "waf-acl-id": "abc-123"})
+        n = node({"kubernetes_ingress": {"api": ingress(waf)}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.PASS)
+
+    def test_waf_empty_acl_is_no_waf(self):
+        waf = dict(PUBLIC, **{LBC + "wafv2-acl-arn": ""})
+        n = node({"kubernetes_ingress_v1": {"api": ingress(waf)}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.FAIL)
+
+    def test_waf_skip_internal_and_default_scheme(self):
+        no_scheme = {LBC + "group.name": "g"}
+        n = node({"kubernetes_ingress_v1": {"a": ingress(INTERNAL), "b": ingress(no_scheme)}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.SKIPPED)
+
+    def test_waf_fail_names_only_internet_facing_group(self):
+        n = node({"kubernetes_ingress_v1": {"pub": ingress(PUBLIC), "priv": ingress(INTERNAL)}})
+        msg = failure_message(aws_alb_waf_enabled, n)
+        self.assertIn('ALB group "web" (kubernetes_ingress_v1.pub)', msg)
+        self.assertNotIn("web-internal", msg)
+
+    def test_ungrouped_ingress_is_its_own_alb(self):
+        n = node({"kubernetes_ingress_v1": {"solo": ingress({LBC + "scheme": "internet-facing"})}})
+        self.assertIn("ALB for kubernetes_ingress_v1.solo", failure_message(aws_alb_waf_enabled, n))
+
+    def test_class_annotation_or_alb_annotation_counts_as_controller(self):
+        n = node({"kubernetes_ingress_v1": {
+            "a": ingress({"kubernetes.io/ingress.class": "alb"}, ingress_class=None),
+            "b": ingress({LBC + "scheme": "internet-facing"}, ingress_class=None)}})
+        self.assertIn("ALB for kubernetes_ingress_v1.a", failure_message(aws_elb_access_logging, n))
+        self.assertIn("ALB for kubernetes_ingress_v1.b", failure_message(aws_alb_waf_enabled, n))
+
+    def test_other_ingress_controllers_ignored(self):
+        n = node({"kubernetes_ingress_v1": {"a": ingress({"nginx.ingress.kubernetes.io/ssl-redirect": "true"},
+                                                          ingress_class="nginx")}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.SKIPPED)
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.SKIPPED)
+
+    def test_merge_with_local_resolved(self):
+        n = node_files(("app/locals.tf", {"locals": [{"common": PUBLIC}]}),
+                       ("app/ingress.tf", {"resource": {"kubernetes_ingress_v1": {
+                           "api": ingress(MERGED % "common")}}}))
+        self.assertIn('ALB group "web" (kubernetes_ingress_v1.api)', failure_message(aws_alb_waf_enabled, n))
+        self.assertIn('ALB group "web" (kubernetes_ingress_v1.api)', failure_message(aws_elb_access_logging, n))
+
+    def test_merge_inline_pair_overrides_local(self):
+        # The key right after an unquoted value with a trailing comment.
+        logs = MERGED.replace('# trailing comment\n', '# trailing comment\n "' + LBC +
+                              'load-balancer-attributes" = "access_logs.s3.enabled=true,access_logs.s3.bucket=logs"\n')
+        n = node_files(("locals.tf", {"locals": [{"common": INTERNAL}]}),
+                       ("ingress.tf", {"resource": {"kubernetes_ingress_v1": {"api": ingress(logs % "common")}}}))
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.PASS)
+
+    def test_local_from_another_directory_not_used(self):
+        n = node_files(("other/locals.tf", {"locals": [{"common": PUBLIC}]}),
+                       ("app/ingress.tf", {"resource": {"kubernetes_ingress_v1": {
+                           "api": ingress(MERGED % "common")}}}))
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.SKIPPED)
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.PASS)
+
+    def test_access_logs_attribute_present(self):
+        on = dict(INTERNAL, **{LBC + "load-balancer-attributes":
+                               "idle_timeout.timeout_seconds=600, Access_Logs.S3.Enabled=TRUE,access_logs.s3.bucket=logs"})
+        n = node({"kubernetes_ingress_v1": {"a": ingress(INTERNAL), "b": ingress(on)}})
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.PASS)
+
+    def test_access_logs_attribute_absent_or_disabled(self):
+        off = dict(PUBLIC, **{LBC + "load-balancer-attributes": "access_logs.s3.enabled=false"})
+        n = node({"kubernetes_ingress_v1": {"a": ingress(off), "b": ingress(INTERNAL)}})
+        msg = failure_message(aws_elb_access_logging, n)
+        self.assertIn('ALB group "web" (kubernetes_ingress_v1.a)', msg)
+        self.assertIn('ALB group "web-internal" (kubernetes_ingress_v1.b)', msg)
+
+    def test_unknown_expressions_never_fail(self):
+        unknown_attrs = dict(INTERNAL, **{LBC + "load-balancer-attributes": "${var.lb_attributes}"})
+        unknown_group = dict(PUBLIC, **{LBC + "group.name": "${var.group}"})
+        n = node_files(("locals.tf", {"locals": [{"common": PUBLIC}]}),
+                       ("ingress.tf", {"resource": {"kubernetes_ingress_v1": {
+                           "whole": ingress("${var.annotations}"),
+                           "merged": ingress("${merge(local.common, var.extra)}"),
+                           "missing_local": ingress("${merge(local.nope, {})}"),
+                           "malformed": ingress("${merge(var.x})}"),
+                           "attrs": ingress(unknown_attrs),
+                       }, "kubernetes_ingress": {"group": ingress(unknown_group)}}}))
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.PASS)
+        self.assertEqual(status(aws_elb_access_logging, n), CheckStatus.PASS)
+
+    def test_waf_association_on_looked_up_alb_not_failed(self):
+        n = node({"kubernetes_ingress_v1": {"api": ingress(PUBLIC)},
+                  "aws_wafv2_web_acl_association": {"a": [{"resource_arn": "${data.aws_lb.ingress.arn}"}]}})
+        self.assertEqual(status(aws_alb_waf_enabled, n), CheckStatus.PASS)
+
+
+class TestEbsImplicitRootVolumes(unittest.TestCase):
+    """Root volumes left to the AMI default: instances and EKS-module node groups."""
+
+    EKS = "terraform-aws-modules/eks/aws"
+    ENCRYPTED = {"xvda": {"device_name": "/dev/xvda", "ebs": {"volume_size": 50, "encrypted": True}}}
+
+    def eks(self, **args):
+        return dict({"source": self.EKS, "version": "21.24.2"}, **args)
+
+    def test_instance_without_root_block_device_fails(self):
+        n = node({"aws_instance": {"bastion": [{"instance_type": "t4g.nano"}]}})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.FAIL)
+        self.assertIn("aws_instance.bastion root volume", failure_message(aws_ebs_volume_encryption, n))
+
+    def test_instance_without_root_block_device_passes_with_account_default(self):
+        n = node({"aws_instance": {"bastion": [{"instance_type": "t4g.nano"}]},
+                  "aws_ebs_encryption_by_default": {"this": [{}]}})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+
+    def test_account_default_disabled_does_not_count(self):
+        n = node({"aws_instance": {"bastion": [{}]},
+                  "aws_ebs_encryption_by_default": {"this": [{"enabled": False}]}})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.FAIL)
+
+    def test_account_default_keeps_explicit_offenders_and_names_covered(self):
+        n = node({"aws_instance": {"bastion": [{}]}, "aws_ebs_volume": {"data": [{}]},
+                  "aws_ebs_encryption_by_default": {"this": [{"enabled": True}]}})
+        msg = failure_message(aws_ebs_volume_encryption, n)
+        self.assertIn("aws_ebs_volume.data", msg)
+        self.assertIn("aws_instance.bastion root volume (no root_block_device) covered by "
+                      "aws_ebs_encryption_by_default", msg)
+
+    def test_instance_from_launch_template_not_flagged(self):
+        n = node({"aws_instance": {"web": [{"launch_template": [{"id": "${aws_launch_template.web.id}"}]}]}})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+
+    def test_node_groups_without_mappings_fail(self):
+        n = node_module({"eks": [self.eks(eks_managed_node_groups={
+            "system": {"instance_types": ["m6i.large"], "disk_size": 50},
+            "services": {"instance_types": ["m6i.large"], "block_device_mappings": self.ENCRYPTED},
+        })]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.FAIL)
+        msg = failure_message(aws_ebs_volume_encryption, n)
+        self.assertIn("module.eks.eks_managed_node_groups.system", msg)
+        self.assertNotIn("services", msg)
+
+    def test_node_groups_with_encrypted_mappings_pass(self):
+        n = node_module({"eks": [self.eks(
+            eks_managed_node_groups={"system": {"block_device_mappings": self.ENCRYPTED}},
+            self_managed_node_groups={"batch": {"block_device_mappings": self.ENCRYPTED}})]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+
+    def test_mapping_without_encrypted_fails(self):
+        plain = {"xvda": {"device_name": "/dev/xvda", "ebs": {"volume_size": 50}}}
+        n = node_module({"eks": [self.eks(self_managed_node_groups={"batch": {"block_device_mappings": plain}})]})
+        self.assertIn("module.eks.self_managed_node_groups.batch", failure_message(aws_ebs_volume_encryption, n))
+
+    def test_node_groups_pass_with_account_default(self):
+        n = node_files(("eks.tf", {"module": {"eks": [self.eks(eks_managed_node_groups={"system": {}})]}}),
+                       ("ebs.tf", {"resource": {"aws_ebs_encryption_by_default": {"this": [{"enabled": True}]}}}))
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+
+    def test_v20_defaults_block(self):
+        defaults = {"block_device_mappings": self.ENCRYPTED}
+        n = node_module({"eks": [self.eks(eks_managed_node_group_defaults=defaults,
+                                          eks_managed_node_groups={"system": {}})]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+        plain = {"xvda": {"ebs": {"encrypted": False}}}
+        n = node_module({"eks": [self.eks(eks_managed_node_group_defaults=defaults,
+                                          eks_managed_node_groups={"gpu": {"block_device_mappings": plain}})]})
+        self.assertIn("module.eks.eks_managed_node_groups.gpu", failure_message(aws_ebs_volume_encryption, n))
+
+    def test_standalone_node_group_submodule(self):
+        src = self.EKS + "//modules/eks-managed-node-group"
+        n = node_module({"ng": [{"source": src, "block_device_mappings": self.ENCRYPTED}]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.PASS)
+        n = node_module({"ng": [{"source": src}]})
+        self.assertIn("module.ng", failure_message(aws_ebs_volume_encryption, n))
+
+    def test_launch_template_choice(self):
+        # EKS's default launch template ignores block_device_mappings; an existing
+        # launch template (launch_template_id) decides for itself.
+        n = node_module({"eks": [self.eks(eks_managed_node_groups={
+            "default_lt": {"use_custom_launch_template": False, "block_device_mappings": self.ENCRYPTED},
+            "own_lt": {"create_launch_template": False, "launch_template_id": "${aws_launch_template.x.id}"},
+        })]})
+        msg = failure_message(aws_ebs_volume_encryption, n)
+        self.assertIn("module.eks.eks_managed_node_groups.default_lt", msg)
+        self.assertNotIn("own_lt", msg)
+
+    def test_unevaluable_node_groups_not_flagged(self):
+        n = node_module({"eks": [self.eks(eks_managed_node_groups="${var.node_groups}")]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.SKIPPED)
+        n = node_module({"eks": [self.eks(eks_managed_node_groups={
+            "a": "${var.group_a}",
+            "b": {"block_device_mappings": "${local.mappings}"},
+            "c": {"block_device_mappings": {"xvda": {"ebs": {"encrypted": "${var.encrypt}"}}}},
+            "d": {"use_custom_launch_template": "${var.custom}"},
+        })]})
+        self.assertEqual(status(aws_ebs_volume_encryption, n), CheckStatus.SKIPPED)
 
 
 if __name__ == "__main__":
