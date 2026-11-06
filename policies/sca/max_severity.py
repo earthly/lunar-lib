@@ -211,7 +211,10 @@ def main(node=None):
                     break
 
         if fail_message is not None:
-            findings, exempted = _collect_findings(sca_node, set(in_scope), load_records(c))
+            # Records only cover findings with no fix, which ignore_unfixable already
+            # drops; skipping the lookup keeps the check from waiting on them.
+            records = [] if ignore_unfixable else load_records(c)
+            findings, exempted = _collect_findings(sca_node, set(in_scope), records)
             if ignore_unfixable:
                 # Narrow the failure to findings that carry an upgrade target, so
                 # an unfixable upstream CVE cannot hold a release gate closed

@@ -45,13 +45,13 @@ def record(cve, component=COMPONENT, until="2099-01-01"):
     return {"cve": cve, "component": component, "reason": "No fix upstream.", "until": until}
 
 
-def node(container_scan=None, records=None):
+def node(container_scan=None, records=None, finished=True):
     data = {"containers": {"native": {"docker": {"cicd": {"cmds": []}}}}}
     if container_scan is not None:
         data["container_scan"] = container_scan
     if records is not None:
         data["compliance"] = {"vulnerability_exemptions": {"records": records}}
-    return Node.from_component_json(data, bundle_info={"workflows_finished": True})
+    return Node.from_component_json(data, bundle_info={"workflows_finished": finished})
 
 
 def run(module, n, **env):
@@ -136,6 +136,17 @@ class MaxSeverityRecordsTest(unittest.TestCase):
                 LUNAR_VAR_min_severity="high",
                 LUNAR_VAR_exempt_findings="CVE-2026-11111 libssl3@3.5.7-r0")
         self.assertIn("2 exempted by exempt_findings and exemption records", failure_message(c))
+
+
+    def test_ignore_unfixable_fails_without_waiting_for_records(self):
+        # Records can't change this verdict, so a fixable finding fails mid-CI.
+        c = run(max_severity, node(scan(OPENSSL), finished=False),
+                LUNAR_VAR_min_severity="critical", LUNAR_VAR_ignore_unfixable="true")
+        self.assertEqual(c.status, CheckStatus.FAIL)
+
+    def test_waits_for_records_while_workflows_run(self):
+        c = run(max_severity, node(scan(OPENSSL), finished=False), LUNAR_VAR_min_severity="critical")
+        self.assertEqual(c.status, CheckStatus.PENDING)
 
 
 class UnfixableReviewedTest(unittest.TestCase):

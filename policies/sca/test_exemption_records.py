@@ -40,13 +40,13 @@ def record(cve, until="2099-01-01"):
     return {"cve": cve, "component": COMPONENT, "reason": "No fix upstream.", "until": until}
 
 
-def node(sca_data=None, records=None):
+def node(sca_data=None, records=None, finished=True):
     data = {"lang": {"go": {"version": "1.22"}}}
     if sca_data is not None:
         data["sca"] = sca_data
     if records is not None:
         data["compliance"] = {"vulnerability_exemptions": {"records": records}}
-    return Node.from_component_json(data, bundle_info={"workflows_finished": True})
+    return Node.from_component_json(data, bundle_info={"workflows_finished": finished})
 
 
 def run(module, n, **env):
@@ -80,6 +80,15 @@ class MaxSeverityRecordsTest(unittest.TestCase):
     def test_records_change_nothing_with_ignore_unfixable(self):
         c = run(max_severity, node(sca(NO_FIX), [record("CVE-2026-9001")]), LUNAR_VAR_ignore_unfixable="true")
         self.assertEqual(resolved_status(c), CheckStatus.PASS)
+
+
+    def test_ignore_unfixable_fails_without_waiting_for_records(self):
+        c = run(max_severity, node(sca(FIXABLE), finished=False), LUNAR_VAR_ignore_unfixable="true")
+        self.assertEqual(c.status, CheckStatus.FAIL)
+
+    def test_waits_for_records_while_workflows_run(self):
+        c = run(max_severity, node(sca(FIXABLE), finished=False))
+        self.assertEqual(c.status, CheckStatus.PENDING)
 
 
 class UnfixableReviewedTest(unittest.TestCase):
