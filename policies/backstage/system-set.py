@@ -1,6 +1,6 @@
 from lunar_policy import Check
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -13,7 +13,7 @@ def main(node=None):
         skip_if_no_catalog(c)
 
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found. Add the file with a spec.system "
                 "reference so this component is grouped under a parent system."
             )
@@ -21,7 +21,7 @@ def main(node=None):
 
         system = c.get_value_or_default(".catalog.native.backstage.spec.system", "")
         if not isinstance(system, str) or not system.strip():
-            c.fail(
+            fail(c,
                 "spec.system is not set in catalog-info.yaml. Add a system "
                 "reference (e.g. `payment-platform`) so this component is "
                 "grouped under a parent system for dependency mapping."

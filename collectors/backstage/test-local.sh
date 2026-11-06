@@ -82,6 +82,17 @@ url="${@: -1}"
 # can tell which entity's annotations landed where.
 mock_entity() {
   local kind="$1" ns="$2" ename="$3" dom="" ann=""
+  # withsys* -> a full Component as the catalog API returns it, for the
+  # catalog_api_fallback tests: annotations, a spec.system to hop through,
+  # and the relations/status that the collector must drop.
+  if [ "$kind" = "component" ]; then
+    case "$ename" in
+      withsys*)
+        printf '{"apiVersion":"backstage.io/v1alpha1","kind":"Component","metadata":{"name":"%s","namespace":"%s","annotations":{"backstage.io/view-url":"https://git.example.com/catalog/%s.yaml","pagerduty.com/service-id":"PFB0001"}},"spec":{"type":"service","owner":"team-fb","lifecycle":"production","system":"annotated-sys"},"relations":[{"type":"ownedBy","targetRef":"group:default/team-fb"}],"status":{"items":[]}}' \
+          "$ename" "$ns" "$ename"
+        return ;;
+    esac
+  fi
   if [ "$kind" = "system" ]; then
     case "$ename" in
       *-nodomain) dom="" ;;
@@ -950,6 +961,118 @@ if command -v git >/dev/null 2>&1; then
 else
   echo "  skip: git not installed, rev-parse path not exercised"
 fi
+
+echo "catalog_api_fallback tests:"
+
+# run_fallback <meta-json> [KEY=VALUE ...] — main.sh in a directory with no
+# catalog file, catalog_api_fallback on and backstage_url set unless overridden.
+# Emits the collected object, or nothing when the collector wrote nothing.
+run_fallback() {
+  local meta="$1"
+  shift
+  local wd="$TEST_DIR/fb"
+  rm -rf "$wd"; mkdir -p "$wd"
+  : > "$CURL_LOG"
+  ( cd "$wd" \
+    && env PATH="$MOCK:$PATH" \
+       LUNAR_VAR_PATHS="catalog-info.yaml,catalog-info.yml" \
+       LUNAR_VAR_BACKSTAGE_URL="http://fake:7007" \
+       LUNAR_VAR_CATALOG_API_FALLBACK=true \
+       LUNAR_SECRET_BACKSTAGE_TOKEN=test-token \
+       LUNAR_COMPONENT_META="$meta" \
+       "$@" \
+       bash "$SCRIPT_DIR/main.sh" 2>"$TEST_DIR/fb.err" )
+}
+lookups() { grep -c '/catalog/entities/' "$CURL_LOG" || true; }
+REF='{"backstage/entity-ref":"component:default/withsys-app"}'
+
+assert_eq "off by default: a ref in meta is ignored, nothing written" \
+  "$(run_fallback "$REF" LUNAR_VAR_CATALOG_API_FALLBACK=)" ''
+assert_eq "off by default: no Backstage request" "$(lookups)" '0'
+assert_eq "no backstage/entity-ref meta: nothing written" \
+  "$(run_fallback '{"pagerduty/service-id":"P1"}')" ''
+assert_eq "no meta at all: nothing written" "$(run_fallback '')" ''
+assert_eq "no meta: no Backstage request" "$(lookups)" '0'
+assert_eq "a non-string ref is no ref" "$(run_fallback '{"backstage/entity-ref":{"name":"x"}}')" ''
+assert_eq "meta that isn't JSON is no ref" "$(run_fallback 'not json')" ''
+assert_eq "no backstage_url: nothing written" \
+  "$(run_fallback "$REF" LUNAR_VAR_BACKSTAGE_URL=)" ''
+assert_eq "no backstage_url: no request, and says why" \
+  "$(lookups) $(grep -c 'needs backstage_url' "$TEST_DIR/fb.err")" '0 1'
+
+OUT=$(run_fallback "$REF")
+assert_eq "a hit writes the entity, hoisted like a file's primary entity" \
+  "$(echo "$OUT" | jq -c '[.apiVersion, .kind, .metadata.name, .spec.owner, .spec.system]')" \
+  '["backstage.io/v1alpha1","Component","withsys-app","team-fb","annotated-sys"]'
+assert_eq "no file-only fields, and relations/status dropped" \
+  "$(echo "$OUT" | jq -c '[has("path"), has("valid"), has("errors"), has("entities"), has("relations"), has("status")]')" \
+  '[false,false,false,false,false,false]'
+assert_eq "refs.entity is the fetched entity, with ref and annotations" \
+  "$(echo "$OUT" | jq -c '.refs.entity | [.kind, .name, .exists, .ref, .annotations["pagerduty.com/service-id"]]')" \
+  '["Component","withsys-app",true,"component:default/withsys-app","PFB0001"]'
+assert_eq "the System and Domain hops run off the fetched spec" \
+  "$(echo "$OUT" | jq -c '[.refs.checked, .refs.system.exists, .refs.system_domain.name, .refs.system_domain.via_system]')" \
+  '[true,true,"annotated-domain","annotated-sys"]'
+assert_eq "one lookup for the entity, then the System and its Domain" "$(lookups)" '3'
+assert_eq "the entity lookup is by-name for its kind, namespace and name" \
+  "$(grep -c '/by-name/component/default/withsys-app' "$CURL_LOG")" '1'
+
+assert_eq "a bare name defaults to component in the default namespace" \
+  "$(run_fallback '{"backstage/entity-ref":"withsys-app"}' | jq -c '.refs.entity.ref')" '"component:default/withsys-app"'
+run_fallback '{"backstage/entity-ref":" Component:ns2/withsys-app "}' > /dev/null
+assert_eq "an explicit kind and namespace are used, kind lowercased, spaces trimmed" \
+  "$(grep -c '/by-name/component/ns2/withsys-app' "$CURL_LOG")" '1'
+
+BYQ=$(run_fallback "$REF" LUNAR_VAR_REF_LOOKUP=by-query)
+assert_eq "by-query writes the same shape as by-name" \
+  "$(echo "$BYQ" | jq -cS 'del(.refs)')" "$(echo "$OUT" | jq -cS 'del(.refs)')"
+assert_eq "by-query records the same refs" \
+  "$(echo "$BYQ" | jq -cS '.refs')" "$(echo "$OUT" | jq -cS '.refs')"
+assert_eq "by-query filters on the ref's kind, namespace and name" \
+  "$(grep -c 'filter=kind%3Dcomponent%2Cmetadata.namespace%3Ddefault%2Cmetadata.name%3Dwithsys-app' "$CURL_LOG")" '1'
+
+SIGV4_FB=(LUNAR_VAR_AUTH_MODE=sigv4 LUNAR_VAR_AWS_REGION=us-east-1 LUNAR_VAR_REF_LOOKUP=by-query
+  MOCK_STS=1 AWS_ROLE_ARN=arn:aws:iam::123456789012:role/r AWS_WEB_IDENTITY_TOKEN_FILE="$TEST_DIR/wit")
+assert_eq "by-query + SigV4 fetches the entity" \
+  "$(run_fallback "$REF" "${SIGV4_FB[@]}" | jq -c '.metadata.name')" '"withsys-app"'
+assert_eq "every fallback lookup is SigV4-signed" \
+  "$(grep '/catalog/entities/' "$CURL_LOG" | grep -c -- '--aws-sigv4 aws:amz:us-east-1:execute-api')" '3'
+assert_eq "an assumed role signs the fallback lookup too" \
+  "$(run_fallback "$REF" "${SIGV4_FB[@]}" LUNAR_VAR_AWS_ASSUME_ROLE_ARNS=arn:aws:iam::210987654321:role/ok-reader | jq -c '.metadata.name')" '"withsys-app"'
+
+for case in "by-name typo-app" "by-query typo-app" "by-name five" "by-name boom" "by-name login" \
+            "by-name gatewayerr" "by-name nullbody" "by-query five" "by-query login" "by-query noitems"; do
+  mode="${case% *}"; name="${case#* }"
+  assert_eq "$mode $name: nothing written" \
+    "$(run_fallback "{\"backstage/entity-ref\":\"$name\"}" LUNAR_VAR_REF_LOOKUP="$mode")" ''
+done
+run_fallback '{"backstage/entity-ref":"typo-app"}' > /dev/null
+assert_eq "a miss says the entity isn't in the catalog" \
+  "$(grep -c "Couldn't fetch typo-app from the Backstage catalog (not in the catalog)" "$TEST_DIR/fb.err")" '1'
+run_fallback '{"backstage/entity-ref":"five"}' > /dev/null
+assert_eq "a 5xx names the error" "$(grep -c '(HTTP 502); nothing collected' "$TEST_DIR/fb.err")" '1'
+assert_eq "sigv4 without a region: nothing written, and says why" \
+  "$(run_fallback "$REF" LUNAR_VAR_AUTH_MODE=sigv4 AWS_REGION= AWS_DEFAULT_REGION=) $(grep -c 'aws_region required for sigv4); nothing collected' "$TEST_DIR/fb.err")" ' 1'
+assert_eq "an invalid auth_mode: nothing written" \
+  "$(run_fallback "$REF" LUNAR_VAR_AUTH_MODE=oauth2)" ''
+assert_eq "by-query escapes a ref that tries to add a filter" \
+  "$(run_fallback '{"backstage/entity-ref":"x&filter=kind=system"}' LUNAR_VAR_REF_LOOKUP=by-query > /dev/null; grep -c 'metadata.name%3Dx%26filter%3Dkind%3Dsystem' "$CURL_LOG")" '1'
+
+FILE_OUT=$(cd "$TEST_DIR" && mkdir -p fbfile && cd fbfile && printf 'apiVersion: backstage.io/v1alpha1\nkind: Component\nmetadata:\n  name: from-file\nspec:\n  owner: team-file\n' > catalog-info.yaml \
+  && env PATH="$MOCK:$PATH" LUNAR_VAR_PATHS="catalog-info.yaml" LUNAR_VAR_BACKSTAGE_URL="http://fake:7007" \
+     LUNAR_VAR_CATALOG_API_FALLBACK=true LUNAR_COMPONENT_META="$REF" bash "$SCRIPT_DIR/main.sh" 2>/dev/null)
+assert_eq "a local file wins over the fallback" \
+  "$(echo "$FILE_OUT" | jq -c '[.path, .metadata.name, .refs.entity.name]')" '["catalog-info.yaml","from-file","from-file"]'
+
+make_mono
+assert_eq "a parent file with no entity for this directory falls back" \
+  "$(mono_main services/unlisted "${LOOKUP_ON[@]}" LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 \
+     LUNAR_VAR_CATALOG_API_FALLBACK=true LUNAR_COMPONENT_META="$REF" 2>/dev/null | jq -c '[has("path"), .metadata.name]')" \
+  '[false,"withsys-app"]'
+assert_eq "a parent file that describes this directory wins" \
+  "$(mono_main services/payments "${LOOKUP_ON[@]}" LUNAR_VAR_BACKSTAGE_URL=http://fake:7007 \
+     LUNAR_VAR_CATALOG_API_FALLBACK=true LUNAR_COMPONENT_META="$REF" 2>/dev/null | jq -c '.path')" \
+  '"../../catalog-info.yaml"'
 
 if [ "$FAILS" -eq 0 ]; then
   echo "All referential-integrity and auth-mode tests passed."

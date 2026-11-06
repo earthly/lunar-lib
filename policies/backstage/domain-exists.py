@@ -1,6 +1,6 @@
 from lunar_policy import Check
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -19,7 +19,7 @@ def main(node=None):
         # (A durable "pending" isn't available — post-collection the SDK
         # resolves a data-less check to fail/error, not pending.)
         if not c.exists(".catalog.native.backstage.refs.checked"):
-            c.skip(
+            skip(c,
                 "Backstage referential integrity is not configured. Set the "
                 "`backstage` collector's `backstage_url` input to verify "
                 "spec.domain against the live catalog."
@@ -38,7 +38,7 @@ def main(node=None):
             # on a Backstage outage.
             name = ref.get("name", "?")
             err = ref.get("error", "unknown error")
-            c.skip(
+            skip(c,
                 f"Could not verify domain '{name}' against Backstage ({err}); "
                 "skipping rather than failing on a transient error."
             )
@@ -46,7 +46,7 @@ def main(node=None):
 
         if not ref.get("exists"):
             name = ref.get("name", "?")
-            c.fail(
+            fail(c,
                 f"Domain '{name}' referenced in catalog-info.yaml does not exist "
                 "in the Backstage catalog. Fix spec.domain to match an existing "
                 "Domain's metadata.name, or register the Domain in Backstage."

@@ -15,6 +15,7 @@ This cataloger writes to the following Catalog JSON paths:
 | `.components[*].owner` | string | `spec.owner` of the Backstage Component (or `default_owner` fallback) |
 | `.components[*].domain` | string | `spec.domain` of the Backstage Component |
 | `.components[*].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
+| `.components[*].meta["backstage/entity-ref"]` | string | The component's entity ref (e.g. `component:default/payment-api`), with [`include_entity_ref_meta`](#entity-ref-meta) |
 | `.domains[*].description` | string | `metadata.description` of the Backstage Domain |
 | `.domains[*].owner` | string | `spec.owner` of the Backstage Domain |
 
@@ -213,6 +214,25 @@ with:
   component_id_annotation: "gitlab.com/project-slug"
   component_id_prefix: "gitlab.com/"
 ```
+
+### Entity Ref Meta
+
+Set `include_entity_ref_meta: "true"` and each synced component records the Backstage entity it came from in its `backstage/entity-ref` meta, as `<kind>:<namespace>/<name>`:
+
+```json
+{
+  "components": {
+    "github.com/acme/payment-api": {
+      "owner": "group:default/team-payments",
+      "domain": "platform.payments",
+      "tags": ["bs-payments", "bs-type-service", "bs-lifecycle-production"],
+      "meta": { "backstage/entity-ref": "component:default/payment-api" }
+    }
+  }
+}
+```
+
+The [`backstage` collector](../../collectors/backstage/README.md#repos-without-a-catalog-file) reads it with `catalog_api_fallback` to fetch the entity of a component that keeps no catalog-info.yaml in its repository. When several entities map to the same component, the ref names the entity whose owner, domain and tags were kept.
 
 ### Verifying Repos Exist (`verify_repos`)
 

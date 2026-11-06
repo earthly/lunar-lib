@@ -40,6 +40,12 @@ collectors:
       repository root, keeping only the entities that point at its directory
       through `backstage.io/source-location` (`match_source_location`) or a
       `metadata.links` URL (`match_links`).
+      Opt-in (`catalog_api_fallback`): a component that no catalog file
+      describes is looked up in the Backstage catalog instead, by the entity
+      ref in its `backstage/entity-ref` meta. The fetched entity is written to
+      `.catalog.native.backstage` like a file's primary entity, with `.refs`
+      as below but without the file-only `path`, `valid`, `errors` and
+      `entities[]`. No ref, a miss or a failed lookup writes nothing.
       When `backstage_url` is configured, it additionally performs a
       referential-integrity check: for each grouping reference declared in the
       file (`spec.domain`, `spec.system`) it queries the Backstage catalog API
@@ -85,7 +91,7 @@ collectors:
     mainBash: main.sh
     hook:
       type: code
-    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam", "monorepo", "source-location"]
+    keywords: ["backstage", "catalog-info", "service catalog", "ownership", "lifecycle", "system", "lint", "referential integrity", "domain", "referential-integrity", "sigv4", "aws", "iam", "monorepo", "source-location", "catalog api", "fallback", "entity-ref", "meta"]
 
 inputs:
   paths:
@@ -204,6 +210,16 @@ inputs:
                      same endpoint the Backstage *cataloger* uses, so an
                      instance the cataloger can already read supports it.
     default: "by-name"
+  catalog_api_fallback:
+    description: |
+      When no catalog file describes the component, fetch its entity from
+      the Backstage catalog instead. The entity is named by the component's
+      `backstage/entity-ref` meta (`[kind:][namespace/]name`), which a
+      cataloger writes or `lunar-config.yml` declares. Needs `backstage_url`
+      and uses the same `auth_mode`, `ref_lookup` and `api_path_prefix` as
+      the reference lookups. No ref, a miss or a failed lookup writes
+      nothing. Use with the `backstage` policy from the same release.
+    default: "false"
 
 secrets:
   BACKSTAGE_TOKEN:

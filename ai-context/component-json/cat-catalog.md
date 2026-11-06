@@ -6,6 +6,8 @@ Each catalog tool writes its raw descriptor under `.catalog.native.<tool>`, foll
 
 **Presence as the signal.** If a catalog tool finds no descriptor file, it writes nothing to component JSON — the absence of `.catalog.native.<tool>` means "this tool did not find data for this component." No redundant `exists: false` sentinel. Policies use `Check.exists(".catalog.native.<tool>")` to detect file-level presence.
 
+**Opt-in exception: entities fetched from the catalog API.** With the `backstage` collector's `catalog_api_fallback`, a component with no catalog file can still get `.catalog.native.backstage`, holding its entity as the Backstage catalog API returns it (`apiVersion`, `kind`, `metadata`, `spec`, plus `refs`). That data has no `path`, `valid`, `errors` or `entities[]`, so `.catalog.native.backstage.path` is the file-presence signal: policies that are about the file itself (`catalog-info-exists`, `catalog-info-valid`) check `.path` unless configured to accept an entity in Backstage (`require_catalog_file: "false"`), and the rest evaluate the entity either way.
+
 ```json
 {
   "catalog": {
@@ -57,7 +59,8 @@ If a future cataloger lands and a clear normalization pattern emerges (e.g. "`.c
 
 ## Key Policy Paths
 
-- `.catalog.native.backstage` — namespace present ⇔ a catalog-info.yaml for this component was found, in its own directory or as a monorepo's shared file with an entity pointing at it (use `Check.exists(...)`)
+- `.catalog.native.backstage` — namespace present ⇔ a catalog-info.yaml for this component was found, in its own directory or as a monorepo's shared file with an entity pointing at it, or `catalog_api_fallback` fetched its entity from the catalog API (use `Check.exists(...)`)
+- `.catalog.native.backstage.path` — present ⇔ the data came from a catalog file
 - `.catalog.native.backstage.valid` — catalog-info.yaml passes lint checks
 - `.catalog.native.backstage.spec.owner` — Owner defined in Backstage
 - `.catalog.native.backstage.spec.lifecycle` — Lifecycle stage in Backstage

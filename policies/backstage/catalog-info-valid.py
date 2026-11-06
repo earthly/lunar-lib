@@ -1,6 +1,11 @@
 from lunar_policy import Check
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import (
+    FETCHED_NO_FILE,
+    fetched_counts_as_no_file,
+    fetched_from_catalog,
+    skip_if_no_catalog_file,
+)
 
 
 def main(node=None):
@@ -10,13 +15,22 @@ def main(node=None):
         node=node,
     )
     with c:
-        skip_if_no_catalog(c)
+        skip_if_no_catalog_file(c)
 
         if not c.exists(".catalog.native.backstage"):
             c.fail(
                 "No catalog-info.yaml found. Add a catalog-info.yaml file to "
                 "the repository root so Backstage can register this component."
             )
+            return c
+
+        if fetched_counts_as_no_file(c):
+            c.fail(FETCHED_NO_FILE)
+            return c
+
+        # An accepted fetched entity has no file to lint, and Backstage already
+        # validated it on ingestion.
+        if fetched_from_catalog(c):
             return c
 
         if c.get_value(".catalog.native.backstage.valid"):

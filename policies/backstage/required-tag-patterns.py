@@ -2,7 +2,7 @@ import fnmatch
 
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -16,7 +16,7 @@ def main(node=None):
         patterns = [p.strip() for p in patterns_str.split(",") if p.strip()]
         if not patterns:
             # Opt-in check: with nothing configured there is nothing to enforce.
-            c.skip(
+            skip(c,
                 "No required_tag_patterns configured. Set the "
                 "`required_tag_patterns` input to enforce tag patterns."
             )
@@ -24,7 +24,7 @@ def main(node=None):
         skip_if_no_catalog(c)
 
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found, so required tag patterns cannot be "
                 f"verified. Required patterns: {', '.join(patterns)}. Add a "
                 "catalog-info.yaml with matching tags under metadata.tags."
@@ -43,7 +43,7 @@ def main(node=None):
             if not any(fnmatch.fnmatchcase(t, p.lower()) for t in tags)
         ]
         if unmatched:
-            c.fail(
+            fail(c,
                 "catalog-info.yaml has no tag matching required pattern(s): "
                 f"{', '.join(unmatched)}. Present tags: "
                 f"{', '.join(tags) if tags else '(none)'}. Add matching tags "

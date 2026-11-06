@@ -692,6 +692,28 @@ check_eq "  ... with no literal filter grammar" "0" \
     "$(grep -c 'filter=kind=' "$CURL_URLS" || true)"
 
 echo ""
+echo "=== include_entity_ref_meta ==="
+# meta_run <include_entity_ref_meta> -> the captured .components, merged.
+meta_run() {
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    if ! LUNAR_VAR_INCLUDE_ENTITY_REF_META="$1" "$SCRIPT_DIR/main.sh" > "$TEST_DIR/meta.out" 2>&1; then
+        echo '"__MAINSH_FAILED__"'; return
+    fi
+    jq -cs 'add // {}' "$COMPONENTS_OUT"
+}
+OFF=$(meta_run "")
+check_eq "off by default: no component gets meta" "0" "$(echo "$OFF" | jq '[.[] | select(has("meta"))] | length')"
+ON=$(meta_run true)
+check_eq "on: every component gets backstage/entity-ref" "$(echo "$ON" | jq 'length')" \
+    "$(echo "$ON" | jq '[.[] | select(.meta["backstage/entity-ref"] | type == "string")] | length')"
+check_eq "on: a Component's ref is component:<namespace>/<name>" '"component:default/payment-api"' \
+    "$(echo "$ON" | jq '.["github.com/acme/payment-api"].meta["backstage/entity-ref"]')"
+check_eq "on: an API keeps its own kind" '"api:default/payment-api-grpc"' \
+    "$(echo "$ON" | jq '.["github.com/acme/payment-api-proto"].meta["backstage/entity-ref"]')"
+check_eq "on: owner, domain and tags are unchanged" "$(echo "$OFF" | jq -cS .)" \
+    "$(echo "$ON" | jq -cS 'map_values(del(.meta))')"
+
+echo ""
 if [ "$FAILED" -eq 0 ]; then
     echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), sigv4 + aws_assume_role_arns, and percent-encoded query values verified"
 else

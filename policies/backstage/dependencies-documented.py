@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 EXAMPLE = "(e.g. `resource:payments-db`, `component:auth-service`)"
 
@@ -15,7 +15,7 @@ def main(node=None):
         if variable_or_default("require_dependencies", "false").strip().lower() != "true":
             # Opt-in, so a whole-bundle import doesn't start failing every
             # component that declares no dependencies.
-            c.skip(
+            skip(c,
                 'Not enforced. Set the `require_dependencies` input to "true" '
                 "to require declared dependencies."
             )
@@ -28,7 +28,7 @@ def main(node=None):
             where += f", or as a comma-separated list in the `{annotation}` annotation"
 
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found, so dependencies cannot be verified. "
                 f"Add a catalog-info.yaml that lists them {where}."
             )
@@ -51,7 +51,7 @@ def main(node=None):
             if isinstance(value, str) and any(p.strip() for p in value.split(",")):
                 return c
 
-        c.fail(
+        fail(c,
             "catalog-info.yaml declares no dependencies. List the entities this "
             f"component depends on {where}."
         )

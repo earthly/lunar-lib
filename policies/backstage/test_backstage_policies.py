@@ -1439,6 +1439,7 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
                     "catalog": {
                         "native": {
                             "backstage": {
+                                "path": "catalog-info.yaml",
                                 "valid": True,
                                 "metadata": {
                                     "annotations": {
@@ -1451,9 +1452,9 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
                     }
                 }
             )
-            self.assertEqual(
-                check_catalog_info_exists(present).status, CheckStatus.PASS
-            )
+            exists = check_catalog_info_exists(present)
+            self.assertFalse(is_skipped(exists))
+            self.assertEqual(exists.status, CheckStatus.PASS)
             for check_fn in (check_owner_set, check_lifecycle_set, check_system_set):
                 self.assertEqual(check_fn(present).status, CheckStatus.FAIL)
             # Configured checks still enforce: the required annotation is absent
@@ -1500,6 +1501,138 @@ class TestSkipWhenNoCatalogInfo(unittest.TestCase):
                 with policy_vars(skip_when_no_catalog_info=raw):
                     check = check_owner_set(finished_node({}))
                     self.assertEqual(is_skipped(check), skips)
+
+
+def fetched(spec=None, annotations=None, refs=None):
+    """An entity the collector fetched from the catalog API: no `path`."""
+    entity = {
+        "apiVersion": "backstage.io/v1alpha1",
+        "kind": "Component",
+        "metadata": {"name": "payment-api", "namespace": "default"},
+        "spec": spec if spec is not None else {},
+    }
+    if annotations is not None:
+        entity["metadata"]["annotations"] = annotations
+    if refs is not None:
+        entity["refs"] = refs
+    return finished_node({"catalog": {"native": {"backstage": entity}}})
+
+
+def failures(check):
+    return [r.failure_message for r in check._results if r.result == CheckStatus.FAIL]
+
+
+VIEW_URL = "https://git.example.com/catalog/payment-api.yaml"
+LOCATED = {"backstage.io/view-url": VIEW_URL}
+
+
+class TestFetchedFromCatalog(unittest.TestCase):
+    """Data from the collector's catalog_api_fallback (no `path`)."""
+
+    def test_file_checks_skip_in_skip_mode(self):
+        with policy_vars(skip_when_no_catalog_info="true"):
+            for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                check = check_fn(fetched(spec={"owner": "team-a"}))
+                self.assertIn("skip_when_no_catalog_info", skip_reason(check) or "")
+
+    def test_file_checks_fail_by_default(self):
+        for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+            check = check_fn(fetched(spec={"owner": "team-a"}))
+            self.assertEqual(check.status, CheckStatus.FAIL)
+            self.assertIn("No catalog-info.yaml found", failures(check)[0])
+            # The way out that doesn't need a file in this repo.
+            self.assertIn('`require_catalog_file` input to "false"', failures(check)[0])
+
+    def test_require_catalog_file_off_accepts_the_entity_in_either_mode(self):
+        for mode in ("true", "false"):
+            with self.subTest(skip_when_no_catalog_info=mode), policy_vars(
+                skip_when_no_catalog_info=mode, require_catalog_file="false"
+            ):
+                for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                    check = check_fn(fetched(spec={"owner": "team-a"}))
+                    self.assertFalse(is_skipped(check))
+                    self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_require_catalog_file_off_leaves_a_missing_component_alone(self):
+        with policy_vars(require_catalog_file="false"):
+            for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                self.assertEqual(check_fn(finished_node({})).status, CheckStatus.FAIL)
+        with policy_vars(require_catalog_file="false", skip_when_no_catalog_info="true"):
+            for check_fn in (check_catalog_info_exists, check_catalog_info_valid):
+                self.assertTrue(is_skipped(check_fn(finished_node({}))))
+
+    def test_require_catalog_file_off_still_lints_a_file(self):
+        data = {"catalog": {"native": {"backstage": {
+            "path": "catalog-info.yaml", "valid": False,
+            "errors": [{"line": 3, "message": "bad tag", "severity": "error"}],
+            "metadata": {"name": "x"}, "spec": {}}}}}
+        with policy_vars(require_catalog_file="false"):
+            check = check_catalog_info_valid(finished_node(data))
+        self.assertEqual(failures(check), ["catalog-info.yaml (line 3): bad tag"])
+
+    def test_content_checks_evaluate_the_entity_in_either_mode(self):
+        for mode in ("true", "false"):
+            with self.subTest(skip_when_no_catalog_info=mode), policy_vars(
+                skip_when_no_catalog_info=mode
+            ):
+                good = fetched(spec={"owner": "team-a", "lifecycle": "production"})
+                for check_fn in (check_owner_set, check_lifecycle_set):
+                    check = check_fn(good)
+                    self.assertFalse(is_skipped(check))
+                    self.assertEqual(check.status, CheckStatus.PASS)
+                self.assertEqual(check_system_set(good).status, CheckStatus.FAIL)
+
+    def test_failure_names_the_file_the_entity_is_defined_in(self):
+        check = check_owner_set(fetched(annotations=LOCATED))
+        self.assertEqual(
+            failures(check),
+            [
+                f"spec.owner is not set in the Backstage entity (defined in {VIEW_URL}). "
+                "Add an owner reference (e.g. `team-payments`, `group:infra`, `user:alice`)."
+            ],
+        )
+
+    def test_managed_by_location_is_used_without_its_type_prefix(self):
+        check = check_owner_set(
+            fetched(annotations={"backstage.io/managed-by-location": "url:" + VIEW_URL})
+        )
+        self.assertIn(f"(defined in {VIEW_URL})", failures(check)[0])
+
+    def test_no_location_annotation_still_says_backstage_entity(self):
+        message = failures(check_owner_set(fetched()))[0]
+        self.assertTrue(message.startswith("spec.owner is not set in the Backstage entity. "))
+
+    def test_a_sentence_that_opened_with_the_file_is_capitalized(self):
+        with policy_vars(disallowed_annotations="backstage.io/skip-checks"):
+            check = check_disallowed_annotations(
+                fetched(annotations={**LOCATED, "backstage.io/skip-checks": "true"})
+            )
+        self.assertTrue(
+            failures(check)[0].startswith(
+                f"The Backstage entity (defined in {VIEW_URL}) declares disallowed annotation(s): "
+            )
+        )
+
+    def test_not_at_fault_names_the_entity(self):
+        refs = {
+            "checked": True,
+            "system": {"name": "pay", "exists": True, "has_domain": True},
+            "system_domain": {"name": "gone", "exists": False, "via_system": "pay"},
+        }
+        check = check_system_domain_exists(
+            fetched(spec={"system": "pay"}, annotations=LOCATED, refs=refs)
+        )
+        self.assertIn(
+            f"This component's Backstage entity (defined in {VIEW_URL}) is not at fault",
+            failures(check)[0],
+        )
+
+    def test_file_messages_are_unchanged(self):
+        data = {"catalog": {"native": {"backstage": {
+            "path": "catalog-info.yaml", "valid": True,
+            "metadata": {"name": "x", "annotations": LOCATED}, "spec": {}}}}}
+        message = failures(check_owner_set(finished_node(data)))[0]
+        self.assertTrue(message.startswith("spec.owner is not set in catalog-info.yaml. "))
 
 
 if __name__ == "__main__":

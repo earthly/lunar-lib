@@ -2,7 +2,7 @@ import fnmatch
 
 from lunar_policy import Check, variable_or_default
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -16,7 +16,7 @@ def main(node=None):
         patterns = [p.strip() for p in patterns_str.split(",") if p.strip()]
         if not patterns:
             # Opt-in check: with nothing configured there is nothing to enforce.
-            c.skip(
+            skip(c,
                 "No disallowed_tag_patterns configured. Set the "
                 "`disallowed_tag_patterns` input to forbid tag patterns."
             )
@@ -39,7 +39,7 @@ def main(node=None):
             if matching:
                 violations.append(f"{p} ({', '.join(matching)})")
         if violations:
-            c.fail(
+            fail(c,
                 "catalog-info.yaml has tag(s) matching disallowed pattern(s): "
                 f"{'; '.join(violations)}. Remove them from metadata.tags."
             )

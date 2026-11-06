@@ -1,6 +1,6 @@
 from lunar_policy import Check
 
-from catalog_presence import skip_if_no_catalog
+from catalog_presence import fail, skip, skip_if_no_catalog
 
 
 def main(node=None):
@@ -13,7 +13,7 @@ def main(node=None):
         skip_if_no_catalog(c)
 
         if not c.exists(".catalog.native.backstage"):
-            c.fail(
+            fail(c,
                 "No catalog-info.yaml found. Add the file with a spec.owner so "
                 "this component has a designated owner."
             )
@@ -21,7 +21,7 @@ def main(node=None):
 
         owner = c.get_value_or_default(".catalog.native.backstage.spec.owner", "")
         if not isinstance(owner, str) or not owner.strip():
-            c.fail(
+            fail(c,
                 "spec.owner is not set in catalog-info.yaml. Add an owner "
                 "reference (e.g. `team-payments`, `group:infra`, `user:alice`)."
             )
