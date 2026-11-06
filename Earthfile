@@ -210,15 +210,17 @@ base-image:
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 
 # syft for the syft and license-origins images, built from source: the 1.54.1
-# release ships go1.26.8 and x/net 0.59.0, both with fixable criticals, and
-# go-jose 4.1.5, a fixable High.
+# release ships go1.26.8, x/net 0.59.0 and brotli 1.2.0, all with fixable
+# criticals, and go-jose 4.1.5 and klauspost/compress 1.20.1, fixable Highs.
 syft-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
     ARG --required SYFT_VERSION
     RUN git clone --quiet --depth 1 --branch "v${SYFT_VERSION}" https://github.com/anchore/syft /src
     WORKDIR /src
-    RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest && go mod tidy && \
+    RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest \
+            github.com/klauspost/compress@latest github.com/andybalholm/brotli@latest && \
+        go mod tidy && \
         CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
             -ldflags "-s -w -X main.version=${SYFT_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${SYFT_VERSION}" \
             -o /out/syft ./cmd/syft

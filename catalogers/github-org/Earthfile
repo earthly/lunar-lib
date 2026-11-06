@@ -23,14 +23,14 @@ image:
     SAVE IMAGE --push earthly/lunar-lib:github-org-$VERSION
 
 # Built from source: the 2.102.0 release ships go1.27.1 and x/net 0.58.0, both
-# with fixable criticals.
+# with fixable criticals, and klauspost/compress 1.20.1, a fixable High.
 gh-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
     ARG --required GH_VERSION
     RUN git clone --quiet --depth 1 --branch "v${GH_VERSION}" https://github.com/cli/cli /src
     WORKDIR /src
-    RUN go get golang.org/x/net@latest && go mod tidy && \
+    RUN go get golang.org/x/net@latest github.com/klauspost/compress@latest && go mod tidy && \
         CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w -X github.com/cli/cli/v2/internal/build.Version=${GH_VERSION} -X github.com/cli/cli/v2/internal/build.Date=$(git log -1 --format=%cs)" \
             -o /out/gh ./cmd/gh

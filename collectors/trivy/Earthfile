@@ -23,14 +23,15 @@ image:
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:trivy-$VERSION
 
-# Built from source: the 0.76.1 release ships go-jose 4.1.5, a fixable High.
+# Built from source: the 0.76.1 release ships go-jose 4.1.5 and
+# klauspost/compress 1.20.1, both fixable Highs.
 trivy-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
     ARG --required TRIVY_VERSION
     RUN git clone --quiet --depth 1 --branch "v${TRIVY_VERSION}" https://github.com/aquasecurity/trivy /src
     WORKDIR /src
-    RUN go get github.com/go-jose/go-jose/v4@latest && go mod tidy && \
+    RUN go get github.com/go-jose/go-jose/v4@latest github.com/klauspost/compress@latest && go mod tidy && \
         CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver=${TRIVY_VERSION}" \
             -o /out/trivy ./cmd/trivy
