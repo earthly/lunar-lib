@@ -16,3 +16,4 @@ test:
     COPY *.py .
     RUN python -m unittest test_max_severity -v
     RUN python -m unittest test_helpers -v
+    RUN python -m unittest test_exemption_records -v

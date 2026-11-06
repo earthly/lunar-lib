@@ -13,7 +13,7 @@ def main(node=None):
 
         vpcs = list(iter_resources(native, "aws_vpc"))
         # terraform-aws-modules/vpc provisions the VPC + (optionally) flow logs.
-        vpc_modules = list(iter_module_calls(native, "terraform-aws-modules/vpc"))
+        vpc_modules = list(iter_module_calls(native, "terraform-aws-modules/vpc/aws"))
         if not vpcs and not vpc_modules:
             c.skip("No VPCs found")
 

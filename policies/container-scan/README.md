@@ -15,6 +15,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `executed` | Verifies container scanning ran | No scanner has written to `.container_scan` |
 | `max-severity` | No findings at or above severity threshold | Findings found at configured severity or higher |
 | `max-total` | Total vulnerabilities under threshold | Total count exceeds configured limit |
+| `unfixable-reviewed` | Every finding with no fix at or above the threshold has an approved exemption | A finding with no fix has no approved exemption |
 
 ## Required Data
 
@@ -34,6 +35,7 @@ This policy reads from the following Component JSON paths:
 | `.container_scan.summary.has_low` | boolean | Container scanner collector (preferred) |
 | `.containers.native.docker.cicd.cmds[]` | array | `docker` collector, plus any CI step that records a pushed image — the pushed refs decide whether `max-severity` / `max-total` apply |
 | `.container_scan.findings[]` | array | Container scanner collector — names the offending packages/CVEs in the `max-severity` failure message and drives `ignore_unfixable` and `exempt_findings` (`cve`, `severity`, `package`, `version`, `fix_version`, `fixable`, `image`) |
+| `.compliance.vulnerability_exemptions.records[]` | array | Optional: `vulnerability-exemptions` collector — exemption records for findings with no fix (`cve`, `component`, `until`) |
 
 **Note:** If collectors don't yet write vulnerability counts, the `max-severity` and `max-total` checks will fail. Use `include: [executed]` to only verify the scanner ran until collectors are enhanced.
 
@@ -48,7 +50,7 @@ policies:
   - uses: github://earthly/lunar-lib/policies/container-scan@main
     on: ["domain:your-domain"]
     enforcement: report-pr
-    include: [executed, max-severity, max-total]
+    include: [executed, max-severity, max-total, unfixable-reviewed]
     with:
       min_severity: "high"        # Fail on critical and high findings
       max_total_threshold: "10"   # Fail if more than 10 total findings
@@ -112,6 +114,40 @@ The version must match exactly, so the entry stops applying once the package is
 upgraded. An exemption never turns a finding into a pass: other findings still
 fail, and the check resolves to `skip`, naming what it exempted, only when
 nothing else would have failed.
+
+### Reviewing findings with no fix
+
+`ignore_unfixable` keeps a gate practical, but it also hides findings no one has
+looked at. `unfixable-reviewed` closes that gap: it fails once per image finding
+at or above `min_severity` that has no fix available and no approved exemption.
+Run it as a non-blocking report next to the gate:
+
+```yaml
+  - uses: github://earthly/lunar-lib/policies/container-scan@main
+    name: image-cve-unfixable
+    include: [unfixable-reviewed]
+    enforcement: report-pr
+    with:
+      min_severity: "high"
+```
+
+It skips when no scan data is present, and it never counts fixable findings,
+which `max-severity` already gates.
+
+### Exemption records
+
+Approved exemptions can also arrive at run time, in
+`.compliance.vulnerability_exemptions.records[]`, written by the
+[`vulnerability-exemptions`](https://github.com/earthly/lunar-lib/tree/main/collectors/vulnerability-exemptions)
+collector from a register kept in one compliance repository. `max-severity` and
+`unfixable-reviewed` honor them alongside `exempt_findings`, so a new or expired
+exemption needs no config change. A record applies to a finding when all of these hold:
+
+- the finding's `cve` matches the record's `cve` (case-insensitive);
+- the record's `component` is the component being checked;
+- today is not past `until`;
+- the finding has no fix. Once a fix ships, the record stops applying and
+  `max-severity` takes over; `exempt_findings` covers a fix you can't take yet.
 
 ## Examples
 
