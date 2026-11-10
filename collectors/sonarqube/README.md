@@ -129,10 +129,19 @@ SonarQube's Compute Engine queues analyses asynchronously — when a scan
 finishes uploading (via user-run `sonar-scanner` or our own `auto`
 invocation), the results aren't immediately visible on the Web API.
 Typical latency is 10–60 seconds; large projects can take several minutes.
-Both `api` and `auto` handle this race by polling
-`api/project_analyses/search` until the most recent analysis's `revision`
-matches the current `head_sha`, or until `api_poll_timeout_seconds`
-elapses. If the timeout hits, they write
+Both `api` and `auto` handle this race by polling until the analysis of the
+current `head_sha` is published, or until `api_poll_timeout_seconds`
+elapses:
+
+- On default-branch commits, until the newest analysis in
+  `api/project_analyses/search` has that `revision`.
+- On PR commits, until the PR's entry in `api/project_pull_requests/list`
+  is for that commit. SonarCloud reports the analyzed commit there.
+  SonarQube Server doesn't, so there the PR's latest analysis must be no
+  older than the commit; a scan of the previous push that started after
+  this commit was made still counts.
+
+If the timeout hits, they write
 `.code_quality.source.analysis_status = "pending"` with no metrics —
 policies that care about "is SonarQube wired up at all?" can still read
 the `config` sub-collector's output, and policies that want to gate on

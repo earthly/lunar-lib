@@ -23,14 +23,15 @@ collectors:
     description: |
       Queries the SonarQube/SonarCloud Web API for code-quality metrics, scoped
       per-commit. On default-branch commits the query uses `branch=<default>`;
-      on PR commits it uses `pullRequest=$LUNAR_COMPONENT_PR` — the only
-      difference between the two paths is the query param, so they share one
-      sub-collector. Because SonarQube's Compute Engine queues analyses
-      asynchronously — typically publishing 10–60s after `sonar-scanner` exits,
-      longer for large projects — this sub-collector polls
-      `api/project_analyses/search` for up to `api_poll_timeout_seconds`
-      (default 180s) waiting for an analysis whose `revision` matches the
-      current `head_sha`. If the matching analysis never appears, writes
+      on PR commits it uses `pullRequest=$LUNAR_COMPONENT_PR`. Because
+      SonarQube's Compute Engine queues analyses asynchronously — typically
+      publishing 10–60s after `sonar-scanner` exits, longer for large
+      projects — this sub-collector polls for up to `api_poll_timeout_seconds`
+      (default 180s) for the analysis of the current `head_sha`: the newest
+      `api/project_analyses/search` revision on default-branch commits, the
+      PR's `api/project_pull_requests/list` entry on PR commits (SonarQube
+      Server reports no commit for a PR analysis, so there it waits for one no
+      older than the commit). If the matching analysis never appears, writes
       `.code_quality.source.analysis_status = "pending"` and no metrics, so
       policies can distinguish "SonarQube hasn't finished yet" from "SonarQube
       isn't configured". Discovers the project key from the
