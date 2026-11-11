@@ -33,7 +33,7 @@ istioctl-bin:
     # Commit the bumps and tag the commit vX.Y.Z so Go stamps that as the module
     # version. Otherwise the binary claims a v0.0.0-...+dirty pseudo-version, which
     # scanners match against every istio CVE since 2019.
-    RUN go get golang.org/x/crypto@latest google.golang.org/grpc@v1.83.2 github.com/go-jose/go-jose/v4@latest \
+    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest google.golang.org/grpc@v1.83.2 github.com/go-jose/go-jose/v4@latest \
             github.com/klauspost/compress@latest && \
         git -c user.name=build -c user.email=build@localhost commit -q -am "bump deps" && \
         git tag "v${ISTIO_VERSION}" && \
