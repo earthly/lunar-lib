@@ -24,7 +24,7 @@ helm-bin:
     ARG --required HELM_VERSION
     RUN git clone --quiet --depth 1 --branch "v${HELM_VERSION}" https://github.com/helm/helm /src
     WORKDIR /src
-    RUN go get golang.org/x/crypto@latest && \
+    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest && \
         K=$(go list -f '{{.Version}}' -m k8s.io/client-go | sed 's/^v//') && \
         KMAJ=$(( ${K%%.*} + 1 )) && KMIN=$(echo "$K" | cut -d. -f2) && \
         CGO_ENABLED=0 go build -trimpath -ldflags "-w -s \
