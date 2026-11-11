@@ -20,14 +20,121 @@ exemptions.py). Exempt findings drop out of the verdict the same way, and so do
 findings with no fix covered by an exemption record (see exemption_records.py).
 """
 
+import re
 import sys
+from datetime import datetime
 
 from exemption_records import ExemptionRecord, find_record, load_records
 from exemptions import find_exemption, format_exemptions, parse_exempt_findings
 from helpers import no_scan_data_reasons, pushed_image_refs
-from lunar_policy import Check, variable_or_default
+from lunar_policy import Check, Node, NoDataError, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
+
+
+def _snapshot_key(scan):
+    source = scan.get("source") or {}
+    tool = source.get("tool")
+    counts = scan.get("vulnerabilities") or {}
+    if (
+        not tool or scan.get("errors")
+        or not all(severity in counts for severity in SEVERITY_ORDER)
+    ):
+        return None
+    images = scan.get("images") or []
+    refs = {image["image"] for image in images if image.get("image")}
+    if not refs and scan.get("image"):
+        refs = {scan["image"]}
+    return (tool, frozenset(refs)) if refs else None
+
+
+def _inventory_scope(scan):
+    source = scan.get("source") or {}
+    images = scan.get("images") or []
+    counts = scan.get("vulnerabilities") or {}
+    summary = scan.get("summary") or {}
+    if (
+        source.get("integration") not in ("after-json", "cron")
+        or not images or scan.get("errors")
+        or not all(image.get("image") for image in images)
+        or not all(severity in counts for severity in SEVERITY_ORDER)
+        or not all(f"has_{severity}" in summary for severity in ("critical", "high"))
+    ):
+        return None
+    sha = source.get("collected_sha") or ""
+    scope = set()
+    for image in images:
+        ref = image["image"]
+        tag = ref.rsplit("/", 1)[-1].rpartition(":")[2]
+        # Only commit-derived tags identify an inventory across releases.
+        # Static tags (e.g. staging/production) are independent scan targets.
+        if "@" not in ref and re.fullmatch(r"[0-9a-f]{7,40}", tag) and sha.startswith(tag):
+            scope.add((ref.rsplit(":", 1)[0], "commit"))
+        else:
+            scope.add((ref, "ref"))
+    return frozenset(scope)
+
+
+def _collected_at(scan):
+    value = (scan.get("source") or {}).get("collected_at")
+    if not isinstance(value, str):
+        return None
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return timestamp if timestamp.utcoffset() is not None else None
+
+
+def _scan_snapshots(c):
+    """Keep coherent scan payloads; merged arrays retain superseded cron CVEs."""
+    try:
+        snapshots = c.get_all_values(".container_scan")
+    except (ValueError, NoDataError):
+        return [c.get_value(".container_scan")]
+    snapshots = [
+        scan for scan in snapshots
+        if isinstance(scan, dict) and any(
+            key in scan for key in ("vulnerabilities", "summary", "findings")
+        )
+    ]
+    if not snapshots:
+        return [c.get_value(".container_scan")]
+
+    # Older collectors may write counts and findings in separate deltas. Their
+    # records do not contain complete snapshots, so retain the merged behavior.
+    if any(not any(k in scan for k in ("vulnerabilities", "summary")) for scan in snapshots):
+        return [c.get_value(".container_scan")]
+
+    dated = [(scan, _snapshot_key(scan), _collected_at(scan)) for scan in snapshots]
+    if not any(key is not None and timestamp is not None for _, key, timestamp in dated):
+        return [c.get_value(".container_scan")]
+
+    latest = {}
+    inventories = {}
+    pushed = set(pushed_image_refs(c.get_node(".containers")))
+    for scan, key, timestamp in dated:
+        if key is None or timestamp is None:
+            continue
+        latest[key] = max(timestamp, latest.get(key, timestamp))
+        scope = _inventory_scope(scan)
+        # Replacing SHA tags requires a complete scan of this commit's pushed
+        # refs. Separate configured image inventories must remain independent.
+        if scope and pushed and pushed == key[1]:
+            inventory_key = key[0], scope
+            inventories[inventory_key] = max(timestamp, inventories.get(inventory_key, timestamp))
+
+    selected = []
+    for scan, key, timestamp in dated:
+        if key is not None and timestamp is not None:
+            newest = latest[key]
+            scope = _inventory_scope(scan)
+            if scope:
+                newest = max(newest, inventories.get((key[0], scope), timestamp))
+            if timestamp < newest:
+                continue
+        selected.append(scan)
+    return selected
 
 
 def _severities_in_scope(min_severity):
@@ -181,6 +288,115 @@ def _rank(finding):
     )
 
 
+def _evaluate_scan(c, scan_node, in_scope, min_severity, ignore_unfixable, exemptions):
+    """Evaluate a snapshot without borrowing another scan's counts or findings."""
+    # Determine the failing severity: summary booleans first (preferred),
+    # then counts. Build the same human-readable headline we fail with.
+    fail_message = None
+    for severity in in_scope:
+        summary = scan_node.get_node(f".summary.has_{severity}")
+        if summary.exists() and summary.get_value():
+            fail_message = f"{severity.capitalize()} container vulnerabilities detected"
+            break
+    if fail_message is None:
+        for severity in in_scope:
+            count_node = scan_node.get_node(f".vulnerabilities.{severity}")
+            if count_node.exists() and count_node.get_value() > 0:
+                fail_message = (
+                    f"{severity.capitalize()} container vulnerabilities detected "
+                    f"({count_node.get_value()} found)"
+                )
+                break
+
+    if fail_message is not None:
+        # Records only cover findings with no fix, which ignore_unfixable already
+        # drops; skipping the lookup keeps the check from waiting on them.
+        records = [] if ignore_unfixable else load_records(c)
+        findings, exempted = _collect_findings(scan_node, set(in_scope), exemptions, records)
+        if ignore_unfixable:
+            # Narrow the failure to findings that carry an upgrade target, so
+            # an unfixable base-image CVE cannot hold a release gate closed
+            # forever. Deliberately applied *after* the summary/count path has
+            # already decided this is a failure: the option can only suppress
+            # a failure, never create one.
+            if not findings and not exempted:
+                # Summary-only scan: fixability is not knowable per finding.
+                # `.container_scan.summary.all_fixable` cannot answer this —
+                # it is a single boolean across *all* severities, not the
+                # in-scope ones. Fail as if the option were off, and say why
+                # rather than passing on data we do not have.
+                fail_message += (
+                    " (ignore_unfixable is set, but the scanner reported no per-finding "
+                    "detail, so fixability could not be verified)"
+                )
+            else:
+                in_scope_count = len(findings) + len(exempted)
+                # An unfixable finding would not have failed, so exempting it
+                # changed nothing worth reporting.
+                exempted = [f for f in exempted if f["fixable"]]
+                fixable = [f for f in findings if f["fixable"]]
+                if not fixable:
+                    if exempted:
+                        return None, [], (
+                            f"{len(exempted)} finding(s) at or above '{min_severity}' with "
+                            f"an available fix, all exempted by {_exempted_by(exempted)} — "
+                            f"{format_exemptions([f['exemption'] for f in exempted])}"
+                        )
+                    # Every in-scope finding is unfixable — nothing actionable
+                    # to gate on. They remain in the component JSON.
+                    print(
+                        f"[ignore_unfixable] passing: all {in_scope_count} finding(s) at or "
+                        f"above '{min_severity}' have no fix available",
+                        file=sys.stderr,
+                    )
+                    return None, [], None
+                findings = fixable
+                severity = _most_severe(findings)
+                fail_message = (
+                    f"{severity.capitalize()} container vulnerabilities with an available fix "
+                    f"detected (findings with no available fix ignored)"
+                )
+        elif exempted:
+            if not findings:
+                return None, [], (
+                    f"{len(exempted)} finding(s) at or above '{min_severity}', all exempted "
+                    f"by {_exempted_by(exempted)} — {format_exemptions([f['exemption'] for f in exempted])}"
+                )
+            # The summary's headline may name a severity only exempt findings had.
+            fail_message = (
+                f"{_most_severe(findings).capitalize()} container vulnerabilities detected"
+            )
+        if exempted:
+            fail_message += _exempted_suffix(exempted)
+
+        # Multiple failing assertions on a single check — same treatment as
+        # the `sca` policy: the headline first (the threshold that tripped
+        # plus any `ignore_unfixable` narrowing), then one assertion per
+        # offending package/CVE, most severe first. The hub renders each as
+        # its own line and truncates the *display* (hub/poster
+        # maxAssertionListSize); no policy-side cap or "+N more" tail. A
+        # summary-only scan emits the headline alone.
+        return fail_message, findings, None
+
+    # Scan data exists but reports no findings/summary — that's a collector
+    # bug; raise ValueError deliberately so it surfaces as a crash.
+    has_any_data = False
+    for severity in in_scope:
+        if scan_node.get_node(f".summary.has_{severity}").exists():
+            has_any_data = True
+            break
+        if scan_node.get_node(f".vulnerabilities.{severity}").exists():
+            has_any_data = True
+            break
+
+    if not has_any_data:
+        raise ValueError(
+            "Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary."
+        )
+
+    return None, [], None
+
+
 def main(node=None):
     c = Check("max-severity", "No findings at or above severity threshold", node=node)
     with c:
@@ -217,112 +433,26 @@ def main(node=None):
             variable_or_default("ignore_unfixable", "false").strip().lower() == "true"
         )
 
-        # Determine the failing severity: summary booleans first (preferred),
-        # then counts. Build the same human-readable headline we fail with.
-        fail_message = None
-        for severity in in_scope:
-            summary = scan_node.get_node(f".summary.has_{severity}")
-            if summary.exists() and summary.get_value():
-                fail_message = f"{severity.capitalize()} container vulnerabilities detected"
-                break
-        if fail_message is None:
-            for severity in in_scope:
-                count_node = scan_node.get_node(f".vulnerabilities.{severity}")
-                if count_node.exists() and count_node.get_value() > 0:
-                    fail_message = (
-                        f"{severity.capitalize()} container vulnerabilities detected "
-                        f"({count_node.get_value()} found)"
-                    )
-                    break
-
-        if fail_message is not None:
-            # Records only cover findings with no fix, which ignore_unfixable already
-            # drops; skipping the lookup keeps the check from waiting on them.
-            records = [] if ignore_unfixable else load_records(c)
-            findings, exempted = _collect_findings(scan_node, set(in_scope), exemptions, records)
-            if ignore_unfixable:
-                # Narrow the failure to findings that carry an upgrade target, so
-                # an unfixable base-image CVE cannot hold a release gate closed
-                # forever. Deliberately applied *after* the summary/count path has
-                # already decided this is a failure: the option can only suppress
-                # a failure, never create one.
-                if not findings and not exempted:
-                    # Summary-only scan: fixability is not knowable per finding.
-                    # `.container_scan.summary.all_fixable` cannot answer this —
-                    # it is a single boolean across *all* severities, not the
-                    # in-scope ones. Fail as if the option were off, and say why
-                    # rather than passing on data we do not have.
-                    fail_message += (
-                        " (ignore_unfixable is set, but the scanner reported no per-finding "
-                        "detail, so fixability could not be verified)"
-                    )
-                else:
-                    in_scope_count = len(findings) + len(exempted)
-                    # An unfixable finding would not have failed, so exempting it
-                    # changed nothing worth reporting.
-                    exempted = [f for f in exempted if f["fixable"]]
-                    fixable = [f for f in findings if f["fixable"]]
-                    if not fixable:
-                        if exempted:
-                            c.skip(
-                                f"{len(exempted)} finding(s) at or above '{min_severity}' with "
-                                f"an available fix, all exempted by {_exempted_by(exempted)} — "
-                                f"{format_exemptions([f['exemption'] for f in exempted])}"
-                            )
-                        # Every in-scope finding is unfixable — nothing actionable
-                        # to gate on. They remain in the component JSON.
-                        print(
-                            f"[ignore_unfixable] passing: all {in_scope_count} finding(s) at or "
-                            f"above '{min_severity}' have no fix available",
-                            file=sys.stderr,
-                        )
-                        return c
-                    findings = fixable
-                    severity = _most_severe(findings)
-                    fail_message = (
-                        f"{severity.capitalize()} container vulnerabilities with an available fix "
-                        f"detected (findings with no available fix ignored)"
-                    )
-            elif exempted:
-                if not findings:
-                    c.skip(
-                        f"{len(exempted)} finding(s) at or above '{min_severity}', all exempted "
-                        f"by {_exempted_by(exempted)} — {format_exemptions([f['exemption'] for f in exempted])}"
-                    )
-                # The summary's headline may name a severity only exempt findings had.
-                fail_message = (
-                    f"{_most_severe(findings).capitalize()} container vulnerabilities detected"
-                )
-            if exempted:
-                fail_message += _exempted_suffix(exempted)
-
-            # Multiple failing assertions on a single check — same treatment as
-            # the `sca` policy: the headline first (the threshold that tripped
-            # plus any `ignore_unfixable` narrowing), then one assertion per
-            # offending package/CVE, most severe first. The hub renders each as
-            # its own line and truncates the *display* (hub/poster
-            # maxAssertionListSize); no policy-side cap or "+N more" tail. A
-            # summary-only scan emits the headline alone.
-            c.fail(fail_message)
-            for finding in sorted(findings, key=_rank):
-                c.fail(finding_text(finding))
-            return c
-
-        # Scan data exists but reports no findings/summary — that's a collector
-        # bug; raise ValueError deliberately so it surfaces as a crash.
-        has_any_data = False
-        for severity in in_scope:
-            if scan_node.get_node(f".summary.has_{severity}").exists():
-                has_any_data = True
-                break
-            if scan_node.get_node(f".vulnerabilities.{severity}").exists():
-                has_any_data = True
-                break
-
-        if not has_any_data:
-            raise ValueError(
-                "Vulnerability counts not available. Ensure collector reports .container_scan.vulnerabilities or .container_scan.summary."
+        messages, findings, skipped = [], [], []
+        for scan in _scan_snapshots(c):
+            message, current_findings, skip_message = _evaluate_scan(
+                c, Node.from_component_json(scan, bundle_info={"workflows_finished": True}),
+                in_scope, min_severity,
+                ignore_unfixable, exemptions,
             )
+            if message:
+                messages.append(message)
+                findings.extend(current_findings)
+            if skip_message:
+                skipped.append(skip_message)
+
+        if messages:
+            for message in dict.fromkeys(messages):
+                c.fail(message)
+            for finding in sorted(_dedupe_findings(findings), key=_rank):
+                c.fail(finding_text(finding))
+        elif skipped:
+            c.skip("; ".join(dict.fromkeys(skipped)))
 
     return c
 

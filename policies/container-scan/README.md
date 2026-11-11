@@ -41,6 +41,17 @@ This policy reads from the following Component JSON paths:
 
 **Applicability.** `max-severity` and `max-total` skip a component with no `.containers`, and also skip a commit whose `.containers` record carries no pushed image ref — a CI tracer records `docker info` / `docker ps` there, so the object alone does not mean an image shipped. With a pushed ref and no `.container_scan` they fail: something shipped that nothing scanned. The pushed-ref resolution matches the one the Trivy and Grype container sub-collectors use to choose images, so these checks are applicable exactly when a scanner had a target. `executed` does not consult it — include it to require a scan whatever the CI record shows.
 
+**Scan freshness.** `max-severity` evaluates individual scan records so an older
+scheduled scan cannot keep a repaired image failing through merged findings.
+For each scanner, a newer complete scan replaces an older scan of the same image refs.
+A complete after-json or cron scan of all currently pushed refs also replaces
+the previous commit's equivalent inventory when its image tags match
+`source.collected_sha`. Static tags and separate inventories stay independent.
+Selection uses `source.tool` and `source.collected_at`; records without reliable
+freshness metadata are retained. Each selected scan's counts and findings are
+evaluated together. Legacy collectors that write separate fields retain the
+merged-data behavior.
+
 ## Installation
 
 Add to your `lunar-config.yml`:
