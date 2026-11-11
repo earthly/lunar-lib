@@ -41,16 +41,7 @@ This policy reads from the following Component JSON paths:
 
 **Applicability.** `max-severity` and `max-total` skip a component with no `.containers`, and also skip a commit whose `.containers` record carries no pushed image ref — a CI tracer records `docker info` / `docker ps` there, so the object alone does not mean an image shipped. With a pushed ref and no `.container_scan` they fail: something shipped that nothing scanned. The pushed-ref resolution matches the one the Trivy and Grype container sub-collectors use to choose images, so these checks are applicable exactly when a scanner had a target. `executed` does not consult it — include it to require a scan whatever the CI record shows.
 
-**Scan freshness.** `max-severity` evaluates individual scan records so an older
-scheduled scan cannot keep a repaired image failing through merged findings.
-For each scanner, a newer complete scan replaces an older scan of the same image refs.
-A complete after-json or cron scan of all currently pushed refs also replaces
-the previous commit's equivalent inventory when its image tags match
-`source.collected_sha`. Static tags and separate inventories stay independent.
-Selection uses `source.tool` and `source.collected_at`; records without reliable
-freshness metadata are retained. Each selected scan's counts and findings are
-evaluated together. Legacy collectors that write separate fields retain the
-merged-data behavior.
+**Which scans count.** `max-severity` and `unfixable-reviewed` judge each scan record collected at the commit on its own, not the merged `.container_scan`. The merged object concatenates `findings[]` across records, and on the default branch it also carries the latest scheduled rescan forward from an older commit, so a fixed CVE could keep failing on a rescan of the previous commit's images. Of several complete scans by one scanner of the same images (say the on-push scan and a later rescan), only the newest by `source.collected_at` counts; scanners are judged independently. A commit with no scan record of its own uses the merged data as before, and so do collectors that predate `source.collected_at` or write counts and findings separately.
 
 ## Installation
 

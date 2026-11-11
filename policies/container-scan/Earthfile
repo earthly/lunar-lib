@@ -5,7 +5,8 @@ VERSION 0.8
 # finding dedup, the `ignore_unfixable` and `exempt_findings` narrowing
 # (including the regression guard that the default still fails on unfixable
 # findings), and the pushed-image applicability gate both max-severity and
-# max-total share.
+# max-total share, and judging the scan records at a commit rather than the
+# merged blob.
 # Wired into the root +test target.
 # (No image: target — the container-scan policy runs on the shared base image.)
 test:
@@ -17,3 +18,4 @@ test:
     RUN python -m unittest test_max_severity -v
     RUN python -m unittest test_helpers -v
     RUN python -m unittest test_exemption_records -v
+    RUN python -m unittest test_scan_records -v

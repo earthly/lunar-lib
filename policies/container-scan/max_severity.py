@@ -20,121 +20,14 @@ exemptions.py). Exempt findings drop out of the verdict the same way, and so do
 findings with no fix covered by an exemption record (see exemption_records.py).
 """
 
-import re
 import sys
-from datetime import datetime
 
 from exemption_records import ExemptionRecord, find_record, load_records
 from exemptions import find_exemption, format_exemptions, parse_exempt_findings
-from helpers import no_scan_data_reasons, pushed_image_refs
-from lunar_policy import Check, Node, NoDataError, variable_or_default
+from helpers import no_scan_data_reasons, pushed_image_refs, scan_snapshots
+from lunar_policy import Check, Node, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
-
-
-def _snapshot_key(scan):
-    source = scan.get("source") or {}
-    tool = source.get("tool")
-    counts = scan.get("vulnerabilities") or {}
-    if (
-        not tool or scan.get("errors")
-        or not all(severity in counts for severity in SEVERITY_ORDER)
-    ):
-        return None
-    images = scan.get("images") or []
-    refs = {image["image"] for image in images if image.get("image")}
-    if not refs and scan.get("image"):
-        refs = {scan["image"]}
-    return (tool, frozenset(refs)) if refs else None
-
-
-def _inventory_scope(scan):
-    source = scan.get("source") or {}
-    images = scan.get("images") or []
-    counts = scan.get("vulnerabilities") or {}
-    summary = scan.get("summary") or {}
-    if (
-        source.get("integration") not in ("after-json", "cron")
-        or not images or scan.get("errors")
-        or not all(image.get("image") for image in images)
-        or not all(severity in counts for severity in SEVERITY_ORDER)
-        or not all(f"has_{severity}" in summary for severity in ("critical", "high"))
-    ):
-        return None
-    sha = source.get("collected_sha") or ""
-    scope = set()
-    for image in images:
-        ref = image["image"]
-        tag = ref.rsplit("/", 1)[-1].rpartition(":")[2]
-        # Only commit-derived tags identify an inventory across releases.
-        # Static tags (e.g. staging/production) are independent scan targets.
-        if "@" not in ref and re.fullmatch(r"[0-9a-f]{7,40}", tag) and sha.startswith(tag):
-            scope.add((ref.rsplit(":", 1)[0], "commit"))
-        else:
-            scope.add((ref, "ref"))
-    return frozenset(scope)
-
-
-def _collected_at(scan):
-    value = (scan.get("source") or {}).get("collected_at")
-    if not isinstance(value, str):
-        return None
-    try:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return timestamp if timestamp.utcoffset() is not None else None
-
-
-def _scan_snapshots(c):
-    """Keep coherent scan payloads; merged arrays retain superseded cron CVEs."""
-    try:
-        snapshots = c.get_all_values(".container_scan")
-    except (ValueError, NoDataError):
-        return [c.get_value(".container_scan")]
-    snapshots = [
-        scan for scan in snapshots
-        if isinstance(scan, dict) and any(
-            key in scan for key in ("vulnerabilities", "summary", "findings")
-        )
-    ]
-    if not snapshots:
-        return [c.get_value(".container_scan")]
-
-    # Older collectors may write counts and findings in separate deltas. Their
-    # records do not contain complete snapshots, so retain the merged behavior.
-    if any(not any(k in scan for k in ("vulnerabilities", "summary")) for scan in snapshots):
-        return [c.get_value(".container_scan")]
-
-    dated = [(scan, _snapshot_key(scan), _collected_at(scan)) for scan in snapshots]
-    if not any(key is not None and timestamp is not None for _, key, timestamp in dated):
-        return [c.get_value(".container_scan")]
-
-    latest = {}
-    inventories = {}
-    pushed = set(pushed_image_refs(c.get_node(".containers")))
-    for scan, key, timestamp in dated:
-        if key is None or timestamp is None:
-            continue
-        latest[key] = max(timestamp, latest.get(key, timestamp))
-        scope = _inventory_scope(scan)
-        # Replacing SHA tags requires a complete scan of this commit's pushed
-        # refs. Separate configured image inventories must remain independent.
-        if scope and pushed and pushed == key[1]:
-            inventory_key = key[0], scope
-            inventories[inventory_key] = max(timestamp, inventories.get(inventory_key, timestamp))
-
-    selected = []
-    for scan, key, timestamp in dated:
-        if key is not None and timestamp is not None:
-            newest = latest[key]
-            scope = _inventory_scope(scan)
-            if scope:
-                newest = max(newest, inventories.get((key[0], scope), timestamp))
-            if timestamp < newest:
-                continue
-        selected.append(scan)
-    return selected
 
 
 def _severities_in_scope(min_severity):
@@ -434,7 +327,7 @@ def main(node=None):
         )
 
         messages, findings, skipped = [], [], []
-        for scan in _scan_snapshots(c):
+        for scan in scan_snapshots(c):
             message, current_findings, skip_message = _evaluate_scan(
                 c, Node.from_component_json(scan, bundle_info={"workflows_finished": True}),
                 in_scope, min_severity,

@@ -10,8 +10,16 @@ import sys
 
 from exemption_records import load_records
 from exemptions import parse_exempt_findings
-from lunar_policy import Check, variable_or_default
-from max_severity import SEVERITY_ORDER, _collect_findings, _rank, _severities_in_scope, finding_text
+from helpers import scan_snapshots
+from lunar_policy import Check, Node, variable_or_default
+from max_severity import (
+    SEVERITY_ORDER,
+    _collect_findings,
+    _dedupe_findings,
+    _rank,
+    _severities_in_scope,
+    finding_text,
+)
 
 
 def main(node=None):
@@ -30,15 +38,24 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
-        scan_node = c.get_node(".container_scan")
-        if not scan_node.exists():
+        if not c.get_node(".container_scan").exists():
             c.skip("No container scan data at this commit")
-        if not scan_node.get_node(".findings").exists():
+        # Scan records, not the merged arrays: see helpers.scan_snapshots.
+        scans = [
+            Node.from_component_json(scan, bundle_info={"workflows_finished": True})
+            for scan in scan_snapshots(c)
+        ]
+        if not any(scan.get_node(".findings").exists() for scan in scans):
             c.skip("The scanner reported no per-finding detail, so findings with no fix can't be identified")
 
-        findings, exempted = _collect_findings(
-            scan_node, set(_severities_in_scope(min_severity)), exemptions, load_records(c)
-        )
+        in_scope = set(_severities_in_scope(min_severity))
+        records = load_records(c)
+        findings, exempted = [], []
+        for scan in scans:
+            scan_findings, scan_exempted = _collect_findings(scan, in_scope, exemptions, records)
+            findings += scan_findings
+            exempted += scan_exempted
+        findings, exempted = _dedupe_findings(findings), _dedupe_findings(exempted)
         unreviewed = [f for f in findings if not f["fixable"]]
         reviewed = [f for f in exempted if not f["fixable"]]
         if reviewed:
