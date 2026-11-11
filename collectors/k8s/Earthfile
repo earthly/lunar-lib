@@ -38,7 +38,7 @@ helm-bin:
     ARG --required HELM_VERSION
     RUN git clone --quiet --depth 1 --branch "v${HELM_VERSION}" https://github.com/helm/helm /src
     WORKDIR /src
-    RUN go get golang.org/x/crypto@latest && \
+    RUN go get golang.org/x/crypto@latest golang.org/x/net@latest && \
         CGO_ENABLED=0 go build -trimpath -ldflags "-w -s \
             -X helm.sh/helm/v4/internal/version.version=v${HELM_VERSION} \
             -X helm.sh/helm/v4/internal/version.metadata= \
