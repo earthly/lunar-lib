@@ -20,11 +20,14 @@ image:
     # upgrade re-runs every build instead of coming out of the layer cache.
     # git + safe.directory, as in the root base-image: project detection falls
     # back to `git ls-files` when the repo has no root mix.exs.
+    # protocol.*.allow=user refuses submodule fetches, which CVE-2026-111760 needs
+    # and Debian's git 2.47.3 is unpatched for. Drop it once Debian ships the fix.
     RUN --no-cache apt-get update \
         && apt-get upgrade -y \
         && apt-get install -y --no-install-recommends erlang elixir git \
         && rm -rf /var/lib/apt/lists/* \
-        && git config --system --add safe.directory '*'
+        && git config --system --add safe.directory '*' \
+        && for p in https http ssh git; do git config --system "protocol.$p.allow" user; done
 
     # Verify installations
     RUN elixir --version && mix --version

@@ -206,7 +206,8 @@ base-image:
     # call sites swallow the failure, so without it they silently write nothing.
     # safe.directory: the snippet checkout is owned by a different uid than the
     # process running the script, which git otherwise refuses to read.
-    RUN apk add --no-cache git && git config --system --add safe.directory '*'
+    # >=2.54.1-r0 fixes CVE-2026-111760; apk fails the build rather than ship older.
+    RUN apk add --no-cache 'git>=2.54.1-r0' && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 
