@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Offline test for the pagerduty collector's service-ID resolution. Stubs
+# Offline test for the pagerduty collector's service-ID resolution and its
+# layer-based (v2) and shift-based (v3) schedule reads. Stubs
 # `curl`, `lunar` and `sleep` on PATH and runs the scripts from a per-case
 # checkout dir, so no network, no Backstage and no Lunar Hub are needed.
 #
@@ -14,7 +15,8 @@
 #     except these names: boom -> connection error, five -> HTTP 502,
 #     login -> a 200 HTML login page, notentity -> a 200 JSON body that isn't
 #     an entity.
-#   * PagerDuty /services, /escalation_policies, /schedules. PGONE00 -> 404.
+#   * PagerDuty /services, /escalation_policies, /schedules and /v3/schedules.
+#     PGONE00 -> 404.
 # The mock `lunar component get-json` serves $CASE/component.json; the first
 # MOCK_GETJSON_FAIL calls fail and the next MOCK_GETJSON_STALE calls return a
 # blob without the backstage lookup, for the retry cases.
@@ -60,7 +62,18 @@ case "$url" in
     [ "$sid" = "PGONE00" ] && pd 404 '{"error":{"message":"Not Found","code":2100}}'
     pd 200 "{\"service\":{\"id\":\"$sid\",\"name\":\"Service $sid\",\"status\":\"active\",\"escalation_policy\":{\"id\":\"PEP0001\"}}}" ;;
   */escalation_policies/PEP0001)
-    pd 200 '{"escalation_policy":{"name":"Primary","escalation_rules":[{"targets":[{"type":"schedule_reference","id":"PSCH001"}]},{"targets":[{"type":"user_reference","id":"PUSER01"}]}]}}' ;;
+    # A case's MOCK_EP_RULES replaces the escalation rules.
+    rules='[{"targets":[{"type":"schedule_reference","id":"PSCH001"}]},{"targets":[{"type":"user_reference","id":"PUSER01"}]}]'
+    pd 200 "{\"escalation_policy\":{\"name\":\"Primary\",\"escalation_rules\":${MOCK_EP_RULES:-$rules}}}" ;;
+  # Shift-based schedules are served under /v3, and each API answers 400 for
+  # the other kind. PSHFT02 has no rotations; PSHFT03 -> 403; PBOTH00 -> 400
+  # from both. These come first: */schedules/ also matches /v3/schedules/.
+  */v3/schedules/PSHFT01) pd 200 "$(cat "$FIXTURES/pagerduty-schedule-v3.json")" ;;
+  */v3/schedules/PSHFT02) pd 200 '{"schedule":{"id":"PSHFT02","type":"schedule_v3","rotations":[]}}' ;;
+  */v3/schedules/PSHFT03) pd 403 '{"error":{"message":"Access Denied","code":2010}}' ;;
+  */v3/schedules/*) pd 400 '{"error":{"message":"Invalid Input Provided","code":2001}}' ;;
+  */schedules/PSHFT0*) pd 400 '{"error":{"message":"This is a shift-based schedule. Use the v3 Schedules API to access it.","code":2001}}' ;;
+  */schedules/PBOTH00) pd 400 '{"error":{"message":"Invalid Input Provided","code":2001}}' ;;
   */schedules/PSCH001)
     pd 200 '{"schedule":{"schedule_layers":[{"rotation_turn_length_seconds":604800,"users":[{"user":{"id":"PUSER01"}},{"user":{"id":"PUSER02"}}]}]}}' ;;
 esac
@@ -206,6 +219,7 @@ run_case() {
   : > "$CURL_LOG"
   CASE_EXIT=0
   ( cd "${CASE_CWD:-$CASE}" && env -i PATH="$MOCK:$PATH" MOCK_DIR="$CASE" CURL_LOG="$CURL_LOG" ENTITIES="$ENTITIES" \
+      FIXTURES="$SCRIPT_DIR/test/fixtures" \
       TMPDIR="$CASE" LUNAR_COMPONENT_ID=github.com/acme/svc LUNAR_COMPONENT_GIT_SHA=abc123 \
       LUNAR_SECRET_PAGERDUTY_API_KEY=pd-test-key LUNAR_VAR_PAGERDUTY_BASE_URL=https://pd.test \
       "$@" bash "$SCRIPT_DIR/$script" ) > "$CASE/stdout" 2> "$CASE/stderr" || CASE_EXIT=$?
@@ -334,6 +348,74 @@ catalog payment-api "" "pagerduty.com/service-id: PABC123" > "$CASE/catalog-info
 run_case oncall.sh LUNAR_VAR_BACKSTAGE_DISCOVERY=live
 assert_eq "backstage_discovery other than true/false: warned, and the file isn't read" \
   "$(logged "backstage_discovery is 'live', but it takes") $(queried) $(svc_lookup | jq -c '.searched | length')" "1 none 2"
+
+echo "oncall: layer-based (v2) and shift-based (v3) schedules:"
+
+V2=schedule_reference
+V3=schedule_v3_reference
+# sched_case <name> <type>:<id>|user ... — runs oncall.sh with one escalation
+# rule per argument, each targeting that schedule (or "user", a user).
+sched_case() {
+  local name="$1" a rules
+  shift
+  rules=$(for a in "$@"; do
+    if [ "$a" = user ]; then
+      echo '{"targets":[{"type":"user_reference","id":"PUSER01"}]}'
+    else
+      jq -nc --arg t "${a%%:*}" --arg id "${a#*:}" '{targets: [{type: $t, id: $id}]}'
+    fi
+  done | jq -sc .)
+  new_case "$name"
+  run_case oncall.sh LUNAR_VAR_SERVICE_ID=PSVC001 "MOCK_EP_RULES=$rules"
+}
+v2req() { count "pd.test/schedules/$1"; }
+v3req() { count "pd.test/v3/schedules/$1"; }
+
+sched_case v2-only "$V2:PSCH001" user
+assert_eq "v2: a layer-based schedule reads as before" \
+  "$(got schedule)" '{"exists":true,"participants":2,"rotation":"weekly"}'
+assert_eq "v2: one request to /schedules, none to /v3" "$(v2req PSCH001) $(count /v3/)" "1 0"
+
+sched_case v3-only "$V3:PSHFT01" user
+assert_eq "v3: users on live rotation events, without empty slots or ended events" \
+  "$(got schedule)" '{"exists":true,"participants":3,"rotation":"unknown"}'
+assert_eq "v3: read from /v3/schedules only" "$(v3req PSHFT01) $(v2req PSHFT01)" "1 0"
+assert_eq "v3: the summary agrees" \
+  "$(got summary)" '{"has_oncall":true,"has_escalation":true,"min_participants":3}'
+assert_eq "v3: the raw schedule is stashed" "$(got native_pagerduty_schedule | jq -r .schedule.type)" "schedule_v3"
+
+sched_case mixed-v2-first "$V3:PSHFT01" "$V2:PSCH001" user
+assert_eq "mixed: the lowest schedule ID still wins, read from its own API" \
+  "$(got schedule) $(v2req PSCH001) $(count /v3/)" '{"exists":true,"participants":2,"rotation":"weekly"} 1 0'
+
+sched_case mixed-v3-first "$V2:PZZZ002" "$V3:PSHFT01"
+assert_eq "mixed: a v3 target that sorts first is read from /v3" \
+  "$(got schedule | jq -c .participants) $(v3req PSHFT01) $(v2req PZZZ002)" "3 1 0"
+
+sched_case stale-v2-ref "$V2:PSHFT01"
+assert_eq "schedule_reference to a shift-based schedule: 400, then /v3" \
+  "$(got schedule | jq -c .participants) $(v2req PSHFT01) $(v3req PSHFT01)" "3 1 1"
+
+sched_case stale-v3-ref "$V3:PSCH001"
+assert_eq "schedule_v3_reference to a layer-based schedule: 400, then /schedules" \
+  "$(got schedule) $(v3req PSCH001) $(v2req PSCH001)" '{"exists":true,"participants":2,"rotation":"weekly"} 1 1'
+
+sched_case v3-empty "$V3:PSHFT02"
+assert_eq "v3 with no rotations: exists, 0 participants" \
+  "$(got schedule)" '{"exists":true,"participants":0,"rotation":"unknown"}'
+
+sched_case v3-403 "$V3:PSHFT03"
+assert_eq "v3 403: no schedule, and no second try on /schedules" \
+  "$(got schedule | jq -c .exists) $(v3req PSHFT03) $(v2req PSHFT03)" "false 1 0"
+assert_eq "v3 403: the status is logged" "$(logged '/v3/schedules/PSHFT03 returned HTTP 403')" "1"
+
+sched_case both-400 "$V3:PBOTH00"
+assert_eq "400 from both APIs: no schedule, one request each" \
+  "$(got schedule | jq -c .exists) $(v3req PBOTH00) $(v2req PBOTH00)" "false 1 1"
+
+sched_case no-schedule-target user
+assert_eq "no schedule target: no schedule request" \
+  "$(got schedule) $(count /schedules/)" '{"exists":false,"participants":0,"rotation":"unknown"} 0'
 
 echo "from-backstage-collector sub-collector: the backstage collector's live lookup:"
 

@@ -276,7 +276,7 @@ finish_unresolved() {
 }
 
 # pd_get <path> — GET a PagerDuty API path. Echoes the response body on stdout
-# and returns 0 on success; returns 1 on any failure.
+# and returns 0 on success; returns 2 on an HTTP 400 and 1 on any other failure.
 #
 # curl retries the transient failures itself — connection refused, timeouts,
 # 429 and 5xx — with backoff between attempts, and honors a Retry-After header
@@ -328,9 +328,28 @@ pd_get() {
       ;;
     *)
       echo "PagerDuty request to ${path} returned HTTP ${http_code}." >&2
+      # 400 is PagerDuty's answer when a schedule is asked for on the wrong API.
+      [ "$http_code" = 400 ] && return 2
       return 1
       ;;
   esac
+}
+
+# pd_get_schedule <id> <target-type> — a schedule from the API its escalation
+# target names: /v3/schedules for a shift-based schedule_v3_reference,
+# /schedules otherwise. On a 400 the schedule is the other kind, so ask the
+# other API once.
+pd_get_schedule() {
+  local v2="/schedules/$1" v3="/v3/schedules/$1" rc
+  if [ "$2" = schedule_v3_reference ]; then
+    pd_get "$v3" && return 0
+    rc=$?
+    [ "$rc" -eq 2 ] && pd_get "$v2"
+  else
+    pd_get "$v2" && return 0
+    rc=$?
+    [ "$rc" -eq 2 ] && pd_get "$v3"
+  fi
 }
 
 # Query PagerDuty for $SERVICE_ID and write .oncall.
@@ -382,8 +401,8 @@ collect_pagerduty() {
   echo "$SERVICE_JSON" | lunar collect -j ".oncall.native.pagerduty.service" -
 
   # Escalation policy.
-  local HAS_ESCALATION=false ESCALATION_LEVELS=0 ESCALATION_NAME="" EP_JSON sid
-  local -a SCHEDULE_IDS=()
+  local HAS_ESCALATION=false ESCALATION_LEVELS=0 ESCALATION_NAME="" EP_JSON sid stype
+  local -a SCHEDULE_IDS=() SCHEDULE_TYPES=()
 
   if [ -n "$ESCALATION_POLICY_ID" ]; then
     if EP_JSON="$(pd_get "/escalation_policies/${ESCALATION_POLICY_ID}")"; then
@@ -391,9 +410,11 @@ collect_pagerduty() {
       ESCALATION_LEVELS="$(echo "$EP_JSON" | jq '.escalation_policy.escalation_rules | length')"
       ESCALATION_NAME="$(echo "$EP_JSON" | jq -r '.escalation_policy.name // empty')"
       echo "$EP_JSON" | lunar collect -j ".oncall.native.pagerduty.escalation_policy" -
-      while IFS= read -r sid; do
-        [ -n "$sid" ] && SCHEDULE_IDS+=("$sid")
-      done < <(echo "$EP_JSON" | jq -r '[.escalation_policy.escalation_rules[].targets[] | select(.type == "schedule_reference") | .id] | unique | .[]')
+      # Layer-based (schedule_reference) and shift-based (schedule_v3_reference)
+      # targets, sorted by ID as before.
+      while IFS=$'\t' read -r sid stype; do
+        [ -n "$sid" ] && SCHEDULE_IDS+=("$sid") && SCHEDULE_TYPES+=("$stype")
+      done < <(echo "$EP_JSON" | jq -r '[.escalation_policy.escalation_rules[].targets[] | select(.type == "schedule_reference" or .type == "schedule_v3_reference")] | unique_by(.id) | .[] | "\(.id)\t\(.type)"')
     fi
   fi
 
@@ -408,9 +429,17 @@ collect_pagerduty() {
   local HAS_SCHEDULE=false PARTICIPANTS=0 ROTATION="unknown" SCHED_JSON ROTATION_SECS
 
   if [ ${#SCHEDULE_IDS[@]} -gt 0 ]; then
-    if SCHED_JSON="$(pd_get "/schedules/${SCHEDULE_IDS[0]}")"; then
+    if SCHED_JSON="$(pd_get_schedule "${SCHEDULE_IDS[0]}" "${SCHEDULE_TYPES[0]}")"; then
       HAS_SCHEDULE=true
-      PARTICIPANTS="$(echo "$SCHED_JSON" | jq '[.schedule.schedule_layers[].users[].user.id] | unique | length')"
+      # A shift-based schedule (type schedule_v3) lists members on its rotations'
+      # events, not on layers; events that have ended don't count. It has no
+      # layers, so its rotation below stays "unknown".
+      PARTICIPANTS="$(echo "$SCHED_JSON" | jq '(now | todate) as $now | .schedule
+        | if .type == "schedule_v3"
+          then [.rotations[]?.events[]? | select(.effective_until == null or .effective_until > $now)
+                | .assignment_strategy.members[]? | select(.type == "user_member") | .user_id | strings]
+          else [.schedule_layers[].users[].user.id] end
+        | unique | length')"
       ROTATION_SECS="$(echo "$SCHED_JSON" | jq '.schedule.schedule_layers[0].rotation_turn_length_seconds // 0')"
       if [ "$ROTATION_SECS" -le 0 ]; then
         ROTATION="unknown"

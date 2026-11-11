@@ -1,0 +1,78 @@
+{
+  "schedule": {
+    "id": "PSHFT01",
+    "type": "schedule_v3",
+    "name": "Primary On-Call",
+    "time_zone": "UTC",
+    "self": "https://api.pagerduty.com/v3/schedules/PSHFT01",
+    "escalation_policies": [{ "id": "PEP0001", "type": "escalation_policy_reference" }],
+    "rotations": [
+      {
+        "id": "ROT1",
+        "type": "schedule_rotation",
+        "events": [
+          {
+            "id": "EVT1",
+            "type": "schedule_event",
+            "name": "Weekly",
+            "start_time": { "date_time": "2026-01-05T09:00:00Z", "time_zone": "UTC" },
+            "end_time": { "date_time": "2026-01-12T09:00:00Z", "time_zone": "UTC" },
+            "effective_since": "2026-01-05T09:00:00Z",
+            "effective_until": null,
+            "recurrence": ["RRULE:FREQ=WEEKLY"],
+            "assignment_strategy": {
+              "type": "rotating_member_assignment_strategy",
+              "shifts_per_member": 1,
+              "members": [
+                { "type": "user_member", "user_id": "PUSER01" },
+                { "type": "user_member", "user_id": "PUSER02" },
+                { "type": "empty_member" }
+              ]
+            }
+          },
+          {
+            "id": "EVT0",
+            "type": "schedule_event",
+            "name": "Weekly, before PUSER09 left",
+            "start_time": { "date_time": "2025-01-06T09:00:00Z", "time_zone": "UTC" },
+            "end_time": { "date_time": "2025-01-13T09:00:00Z", "time_zone": "UTC" },
+            "effective_since": "2025-01-06T09:00:00Z",
+            "effective_until": "2026-01-05T09:00:00Z",
+            "recurrence": ["RRULE:FREQ=WEEKLY"],
+            "assignment_strategy": {
+              "type": "rotating_member_assignment_strategy",
+              "shifts_per_member": 1,
+              "members": [
+                { "type": "user_member", "user_id": "PUSER01" },
+                { "type": "user_member", "user_id": "PUSER09" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "ROT2",
+        "type": "schedule_rotation",
+        "events": [
+          {
+            "id": "EVT2",
+            "type": "schedule_event",
+            "name": "Business hours, both on",
+            "start_time": { "date_time": "2026-01-05T09:00:00-08:00", "time_zone": "America/Los_Angeles" },
+            "end_time": { "date_time": "2026-01-05T17:00:00-08:00", "time_zone": "America/Los_Angeles" },
+            "effective_since": "2026-01-05T17:00:00Z",
+            "effective_until": "2099-01-01T00:00:00Z",
+            "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"],
+            "assignment_strategy": {
+              "type": "every_member_assignment_strategy",
+              "members": [
+                { "type": "user_member", "user_id": "PUSER02" },
+                { "type": "user_member", "user_id": "PUSER03" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
