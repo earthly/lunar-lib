@@ -31,7 +31,7 @@ trivy-bin:
     ARG --required TRIVY_VERSION
     RUN git clone --quiet --depth 1 --branch "v${TRIVY_VERSION}" https://github.com/aquasecurity/trivy /src
     WORKDIR /src
-    RUN go get github.com/go-jose/go-jose/v4@latest github.com/klauspost/compress@latest && go mod tidy && \
+    RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest github.com/klauspost/compress@latest && go mod tidy && \
         CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver=${TRIVY_VERSION}" \
             -o /out/trivy ./cmd/trivy

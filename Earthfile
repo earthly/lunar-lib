@@ -184,7 +184,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.15-alpine
+    ARG SCRIPTS_VERSION=1.1.16-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -206,7 +206,8 @@ base-image:
     # call sites swallow the failure, so without it they silently write nothing.
     # safe.directory: the snippet checkout is owned by a different uid than the
     # process running the script, which git otherwise refuses to read.
-    RUN apk add --no-cache git && git config --system --add safe.directory '*'
+    # >=2.54.1-r0 fixes CVE-2026-111760; apk fails the build rather than ship older.
+    RUN apk add --no-cache 'git>=2.54.1-r0' && git config --system --add safe.directory '*'
     ARG VERSION=main
     SAVE IMAGE --push earthly/lunar-lib:base-$VERSION
 
