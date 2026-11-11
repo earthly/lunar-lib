@@ -8,3 +8,6 @@ pkg-install.lock
 pkg-install.log
 .venv/
 venv/
+
+# Claude Code local settings: saved "don't ask again" approvals can hold secrets
+**/.claude/settings.local.json
