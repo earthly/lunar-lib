@@ -3,12 +3,13 @@ set -e
 
 # Queries SonarQube/SonarCloud Web API for code-quality metrics on the current
 # commit. Scopes with branch=<default> on default-branch commits and
-# pullRequest=<n> on PR commits. Polls api/project_analyses/search until the
-# analysis for LUNAR_COMPONENT_GIT_SHA appears or api_poll_timeout_seconds
-# elapses, then fetches measures + quality-gate status + issue severity facet
-# and writes both tool-agnostic (.code_quality.*) and native
+# pullRequest=<n> on PR commits. Polls until the analysis for
+# LUNAR_COMPONENT_GIT_SHA appears or api_poll_timeout_seconds elapses (see
+# sq_poll_analysis), then fetches measures + quality-gate status + issue
+# severity facet and writes both tool-agnostic (.code_quality.*) and native
 # (.code_quality.native.sonarqube.*) fields.
 
+# shellcheck source=collectors/sonarqube/helpers.sh disable=SC1091
 source "$(dirname "$0")/helpers.sh"
 
 if [ -z "${LUNAR_SECRET_SONARQUBE_TOKEN:-}" ]; then

@@ -82,6 +82,7 @@ test:
     BUILD ./collectors/backstage+test
     BUILD --pass-args ./collectors/backstage+test-offline
     BUILD --pass-args ./collectors/ci-archive+test
+    BUILD --pass-args ./collectors/sonarqube+test
     BUILD ./collectors/github+test
     BUILD --pass-args ./collectors/github-actions+test
     BUILD ./collectors/gitlab+test

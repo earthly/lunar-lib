@@ -62,11 +62,16 @@ sq_scope_query() {
     fi
 }
 
-# Poll api/project_analyses/search until the newest analysis's revision matches
-# LUNAR_COMPONENT_GIT_SHA, or until api_poll_timeout_seconds elapses.
-# Returns 0 on match, 1 on timeout or error. Silent on success; logs on timeout.
+# Poll until SonarQube has published the analysis of LUNAR_COMPONENT_GIT_SHA, or
+# until api_poll_timeout_seconds elapses: api/project_analyses/search on branch
+# commits, sq_poll_pr_analysis on PR commits. Returns 0 on match, 1 on timeout or
+# error. Silent on success; logs on timeout.
 sq_poll_analysis() {
     local project_key="$1"
+    if [ -n "${LUNAR_COMPONENT_PR:-}" ]; then
+        sq_poll_pr_analysis "$project_key"
+        return
+    fi
     local timeout="${LUNAR_VAR_API_POLL_TIMEOUT_SECONDS:-180}"
     local interval="${LUNAR_VAR_API_POLL_INTERVAL_SECONDS:-10}"
     local scope
@@ -92,6 +97,56 @@ sq_poll_analysis() {
     done
 
     echo "sonarqube: analysis for ${expected} did not appear within ${timeout}s — writing analysis_status=pending" >&2
+    return 1
+}
+
+# api/project_analyses/search has no pullRequest param (Server or Cloud) and
+# answers for the main branch, so PR commits wait on the PR's own entry in
+# api/project_pull_requests/list. SonarCloud reports the analyzed commit there;
+# SonarQube Server reports none, so the analysis must not predate the commit.
+sq_poll_pr_analysis() {
+    local project_key="$1"
+    local timeout="${LUNAR_VAR_API_POLL_TIMEOUT_SECONDS:-180}"
+    local interval="${LUNAR_VAR_API_POLL_INTERVAL_SECONDS:-10}"
+    local pr="$LUNAR_COMPONENT_PR"
+    local expected="${LUNAR_COMPONENT_GIT_SHA:-}"
+    local path="/api/project_pull_requests/list?project=${project_key}"
+    local elapsed=0 not_before resp state="no response"
+
+    if [ -z "$expected" ]; then
+        # No SHA to match against — single-shot check that the PR was analyzed.
+        sq_api_get "$path" 2>/dev/null | jq -e --arg pr "$pr" 'any(.pullRequests[]?; .key == $pr)' >/dev/null 2>&1
+        return
+    fi
+
+    # The head commit's committer time; without a checkout, when this run started.
+    not_before="$(git log -1 --format=%ct "$expected" 2>/dev/null || true)"
+    case "$not_before" in ''|*[!0-9]*) not_before="$(date +%s)" ;; esac
+
+    while [ "$elapsed" -lt "$timeout" ]; do
+        if resp="$(sq_api_get "$path" 2>/dev/null)"; then
+            state="$(printf '%s' "$resp" | jq -r --arg pr "$pr" --arg sha "$expected" --argjson not_before "$not_before" '
+              def epoch: (.[0:19] + "Z" | fromdateiso8601) as $t
+                | (.[19:] | sub("^\\.[0-9]+"; "") | gsub(":"; "")) as $z
+                | if ($z | test("^[+-][0-9]{4}$"))
+                  then $t - (($z[1:3] | tonumber) * 3600 + ($z[3:5] | tonumber) * 60) * (if $z[0:1] == "-" then -1 else 1 end)
+                  else $t end;
+              (first(.pullRequests[]? | select(.key == $pr)) // null) as $e
+              | if $e == null or ($e.analysisDate // "") == "" then "pull request not analyzed yet"
+                elif ($e.commit.sha // "") != "" then
+                  if $e.commit.sha == $sha then "match" else "latest analysis is of \($e.commit.sha)" end
+                elif ($e.analysisDate | epoch) >= $not_before then "match"
+                else "latest analysis (\($e.analysisDate)) predates \($not_before | todate)" end
+            ' 2>/dev/null)" || state="unreadable response"
+        else
+            state="API request failed"
+        fi
+        [ "$state" = "match" ] && return 0
+        sleep "$interval"
+        elapsed=$((elapsed + interval))
+    done
+
+    echo "sonarqube: pull request ${pr} analysis for ${expected} did not appear within ${timeout}s (${state}) — writing analysis_status=pending" >&2
     return 1
 }
 
