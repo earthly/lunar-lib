@@ -2,7 +2,7 @@ VERSION 0.8
 
 image:
     # Use Debian variant for glibc compatibility with Node.js binaries
-    ARG SCRIPTS_VERSION=1.1.15-debian
+    ARG SCRIPTS_VERSION=1.1.16-debian
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
 
     # apt-get upgrade: pull in the OS security fixes Debian has published for the
@@ -11,10 +11,13 @@ image:
     # upgrade re-runs every build instead of coming out of the layer cache.
     # git + safe.directory, as in the root base-image: project detection falls
     # back to `git ls-files` when the repo has no root package.json.
+    # protocol.*.allow=user refuses submodule fetches, which CVE-2026-111760 needs
+    # and Debian's git 2.47.3 is unpatched for. Drop it once Debian ships the fix.
     RUN --no-cache apt-get update && apt-get upgrade -y && \
         apt-get install -y --no-install-recommends git && \
         rm -rf /var/lib/apt/lists/* && \
-        git config --system --add safe.directory '*'
+        git config --system --add safe.directory '*' && \
+        for p in https http ssh git; do git config --system "protocol.$p.allow" user; done
 
     # Install Node.js (download from official source for latest LTS)
     # renovate: datasource=node-version depName=node
