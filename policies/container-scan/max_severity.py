@@ -24,7 +24,7 @@ import sys
 
 from exemption_records import ExemptionRecord, find_record, load_records
 from exemptions import find_exemption, format_exemptions, parse_exempt_findings
-from helpers import no_scan_data_reasons, pushed_image_refs
+from helpers import no_scan_data_reasons, pushed_image_refs, scan_for_commit
 from lunar_policy import Check, variable_or_default
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
@@ -199,7 +199,11 @@ def main(node=None):
                 f"Policy misconfiguration: 'min_severity' must be one of {SEVERITY_ORDER}, got '{min_severity}'"
             )
 
-        scan_node = c.get_node(".container_scan")
+        scan_node, scan_problems = scan_for_commit(c)
+        if scan_problems:
+            for problem in scan_problems:
+                c.fail(problem)
+            return c
         if not scan_node.exists():
             # The CI tracer materializes `.containers` on almost any build — a
             # bare `docker info` is enough — so its presence does not mean an

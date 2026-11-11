@@ -8,6 +8,14 @@ This policy validates that container scanning is configured and enforces vulnera
 
 ## Policies
 
+With a commit context, `max-severity` evaluates the images that commit pushed.
+An on-push scan at that commit must identify each image's registry digest.
+The check reads individual scan records so findings from earlier images cannot
+leak in through merged arrays, including when a moving tag keeps the same name.
+New scheduled findings for the same digest still count. Missing scans, missing
+digests, or conflicting digests block the check rather than imply a clean image.
+Offline Component JSON without a commit context retains the merged-data behavior.
+
 This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
