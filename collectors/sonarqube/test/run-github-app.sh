@@ -79,8 +79,9 @@ FAILED=0
 CASE=""
 
 # run_case <name> <scenario> [VAR=value ...]: loads the scenario into the
-# stand-in and runs github-app.sh in a clean env, as the PR code hook would.
-# Leaves the merged Component JSON in $CJ, requests in $REQ.
+# stand-in and runs github-app.sh in a clean env, as the PR code hook would,
+# killing a run that hangs (exit 124). Leaves the merged Component JSON in $CJ,
+# requests in $REQ.
 run_case() {
   CASE="$1"; printf '%s' "$2" > "$TMP/$CASE.scenario.json"; shift 2
   curl -fsS "http://127.0.0.1:$PORT/__load?file=$TMP/$CASE.scenario.json" > /dev/null
@@ -94,7 +95,7 @@ run_case() {
     LUNAR_SECRET_GH_TOKEN=gh-token \
     LUNAR_VAR_GITHUB_APP_POLL_TIMEOUT_SECONDS=30 \
     LUNAR_VAR_GITHUB_APP_POLL_INTERVAL_SECONDS=10 \
-    "$@" bash "$SCRIPT" > "$OUT" 2> "$ERR")
+    "$@" timeout 60 bash "$SCRIPT" > "$OUT" 2> "$ERR")
   CODE=$?
   cp "$TMP/requests.log" "$REQ"
   touch "$TMP/get-token.log" "$TMP/sleep.log"
