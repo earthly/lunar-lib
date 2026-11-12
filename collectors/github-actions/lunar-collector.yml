@@ -16,7 +16,7 @@ landing_page:
   category: "ci-cd"
   icon: "assets/github-actions.svg"
   status: "beta"
-  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "supply-chain"]
+  keywords: ["github-actions", "actionlint", "ci", "workflow", "pinning", "lockfile", "supply-chain"]
 
 collectors:
   - name: workflows
@@ -24,12 +24,14 @@ collectors:
       Parses all GitHub Actions workflow files in .github/workflows/,
       runs actionlint for lint errors, and classifies action version
       pinning (SHA, tag, branch, unpinned) for supply-chain hygiene.
+      Records the workflow lockfile, .github/workflows/actions.lock, when
+      the repository has one.
       In a monorepo, a subdirectory component reads the repository root's
       .github/workflows/, the only ones GitHub runs.
     mainBash: workflows.sh
     hook:
       type: code
-    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lint", "monorepo"]
+    keywords: ["github-actions", "actionlint", "workflows", "pinning", "lockfile", "lint", "monorepo"]
 
 example_component_json: |
   {
@@ -89,7 +91,22 @@ example_component_json: |
                 { "uses": "docker/login-action@main", "pinning": "branch", "party": "3rd" }
               ]
             }
-          ]
+          ],
+          "lockfile": {
+            "path": ".github/workflows/actions.lock",
+            "version": "v0.0.3",
+            "workflows": {
+              ".github/workflows/ci.yml": ["docker/build-push-action@v5.1.0"]
+            },
+            "dependencies": {
+              "docker/build-push-action@v5.1.0": {
+                "ref": "v5.1.0",
+                "commit": "sha1-4a13e500e55cf31b7a5d59a38ab2040ab0f42f56",
+                "owner_id": 5429470,
+                "repo_id": 241092383
+              }
+            }
+          }
         }
       }
     }
