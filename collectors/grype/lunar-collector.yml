@@ -102,9 +102,20 @@ collectors:
     mainBash: container-rescan.sh
     # Image unpack plus a db_auto_update DB peaks at ~6.5GB, over large's 4Gi.
     size: xlarge
-    hook:
-      type: after-json
-      path: .containers.native.docker.cicd.cmds
+    # Match a recorded push, not incidental docker info/ps commands. Keep both
+    # positions of the standalone --push flag (middle or end of a build command).
+    hooks:
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"* push *").cmd'
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"* --push *").cmd'
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"* --push").cmd'
+      # --push=true, or a buildx --output with push=true / type=registry.
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"*push=true*").cmd'
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"*type=registry*").cmd'
     keywords: ["grype", "container scan", "image scan", "after-json", "on-push", "cve", "vulnerability"]
 
   - name: container-rescan

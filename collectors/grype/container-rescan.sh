@@ -40,8 +40,9 @@ else
   # Derive the images from what the component actually PUSHED, not just what it
   # built. The docker collector records every CI docker command in
   # .containers.native.docker.cicd.cmds[]; we take every one that shipped an
-  # image — a `docker push <ref>`, or a build with `--push` (`docker build
-  # --push` / `docker buildx build --push -t <ref>`) — in push order, the same
+  # image — a `docker push <ref>` / `docker image push <ref>`, or a build with
+  # `--push` / `--push=true` or a registry `--output` (`type=registry`, or
+  # `push=true` with the ref from `-t` or `name=`) — in push order, the same
   # ref pushed twice counting once. .containers.builds[] is "what was built"
   # (test/dry-run builds that never shipped land there too, and a push in a
   # separate job isn't reflected), so it's the wrong source for "what shipped".
@@ -69,14 +70,27 @@ else
   # once. Reads a Component JSON blob on stdin.
   pushed_image_refs() {
     jq -r '
+      def tag_ref($t):
+        [ range(0; ($t | length)) as $i | select($t[$i] == "-t" or $t[$i] == "--tag") | $t[$i+1] ] | first // "";
+      # buildx --output/-o values, each split into its comma-separated keys.
+      def outputs($t):
+        [ range(0; ($t | length)) as $i
+          | if ($t[$i] == "-o" or $t[$i] == "--output") then $t[$i+1]
+            elif ($t[$i] | startswith("--output=")) then ($t[$i] | ltrimstr("--output="))
+            else empty end
+          | select(. != null) | split(",") ];
       def ref_if_pushed:
         (split(" ") | map(select(. != ""))) as $t
-        | (($t[1:] | map(select(startswith("-") | not)) | first) // "") as $sub
-        | if $sub == "push"
+        | ($t[1:] | map(select(startswith("-") | not))) as $w
+        | if $w[0] == "push" or ($w[0] == "image" and $w[1] == "push")
           then ((($t | index("push")) // -1) as $pi
                 | if $pi < 0 then "" else ($t[($pi+1):] | map(select(startswith("-") | not)) | first // "") end)
-          elif ($t | any(. == "--push"))
-          then ([ range(0; ($t | length)) as $i | select($t[$i] == "-t" or $t[$i] == "--tag") | $t[$i+1] ] | first // "")
+          elif ($t | any(. == "--push" or . == "--push=true"))
+          then tag_ref($t)
+          elif (outputs($t) | any(index("type=registry") != null or index("push=true") != null))
+          then (tag_ref($t) as $r
+                | if $r != "" then $r
+                  else (outputs($t) | map(.[] | select(startswith("name=")) | ltrimstr("name=")) | first // "") end)
           else "" end;
       (.containers.native.docker.cicd.cmds // [])
       | map((.cmd // "") | ref_if_pushed)
