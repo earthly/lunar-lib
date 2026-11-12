@@ -112,26 +112,12 @@ collectors:
 
   - name: github-app
     description: |
-      Reads the check run SonarQube (Server or Cloud) posts on a pull
-      request's head commit, on github.com or GitHub Enterprise Server, so
-      pull requests get SonarQube's quality gate without a project key or a
-      SonarQube token. Matches the check to the pull request through its
-      dashboard link, which leaves out branch analyses of the same commit,
-      other pull requests, and CI jobs or code-scanning checks with "Sonar" in
-      their name. Given a project key (the `sonarqube/project-key` meta or the
-      `project_key` input), reads only that project's check; otherwise reads
-      every project that reported, and the gate passes only if all of them
-      pass. Writes the gate to `.code_quality.passing` and
-      `.code_quality.native.sonarqube.quality_gate`, with the failed
-      conditions SonarQube lists; the pull request's new-code numbers
-      SonarQube prints (new, fixed and accepted issues, security hotspots,
-      coverage and duplication on new code) to `.code_quality.pr`; and the
-      check run to `.code_quality.native.sonarqube.github_app`. A number
-      SonarQube doesn't print, such as coverage it has no data for, is left
-      out rather than written as 0. Polls up to
-      `github_app_poll_timeout_seconds`, because SonarQube posts the check
-      only after its analysis, then writes `github_app.status = "pending"`.
-      Fails the run on a GitHub error other than a rate limit or a 5xx.
+      Reads the check run SonarQube (Server or Cloud) posts on each pull
+      request, on github.com or GitHub Enterprise Server, so it needs no
+      project key or SonarQube token. Writes the quality gate with its failed
+      conditions, and the pull request's new-code numbers to
+      `.code_quality.pr`. Writes `github_app.status = "pending"` if the check
+      hasn't completed within `github_app_poll_timeout_seconds`.
     mainBash: github-app.sh
     runs_on: [prs]
     hook:
