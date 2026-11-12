@@ -1,0 +1,5 @@
+{
+  "conclusion": "cancelled",
+  "title": "SonarQube Cloud analysis failed",
+  "summary": "❌ The last analysis has failed.\n\n[See analysis details on SonarQube Cloud](https://sonarcloud.io/dashboard?id=acme_widgets&pullRequest=42)"
+}

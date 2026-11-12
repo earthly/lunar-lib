@@ -1,11 +1,13 @@
 VERSION 0.8
 
-# Offline end-to-end test of the api sub-collector: the real scripts, curl, jq,
-# git and lunar CLI from the collector's runtime image, against a SonarQube Web
-# API stand-in (test/sonarqube.py). No network or SonarQube server needed.
+# Offline end-to-end tests of the api and github-app sub-collectors: the real
+# scripts, curl, jq, git and lunar CLI from the collector's runtime image,
+# against a SonarQube Web API stand-in (test/sonarqube.py) and a GitHub REST API
+# stand-in (test/github_api.py). No network, SonarQube or GitHub needed.
 test:
     FROM --pass-args ../../+base-image
     WORKDIR /workspace
-    COPY api.sh helpers.sh .
+    COPY api.sh github-app.sh github-app.jq helpers.sh .
     COPY --dir test .
     RUN ./test/run.sh
+    RUN ./test/run-github-app.sh

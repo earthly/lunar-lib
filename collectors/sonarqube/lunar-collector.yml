@@ -1,7 +1,7 @@
 version: 0
 
 name: sonarqube
-description: Collect SonarQube/SonarCloud data via Web API read, auto-run scanner, in-repo config, CI scanner runs, and GitHub App checks
+description: Collect SonarQube/SonarCloud data via Web API read, auto-run scanner, in-repo config, CI scanner runs, and SonarQube's pull request check on GitHub
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -11,9 +11,9 @@ landing_page:
   display_name: "SonarQube Collector"
   long_description: |
     Detects SonarQube/SonarCloud via Web API reads, auto-run of
-    `sonar-scanner`, in-repo config, CI scanner runs, and the GitHub App PR
-    check. Normalizes results into `.code_quality` for tool-agnostic policy
-    evaluation.
+    `sonar-scanner`, in-repo config, CI scanner runs, and SonarQube's pull
+    request check on GitHub. Normalizes results into `.code_quality` for
+    tool-agnostic policy evaluation.
   categories: ["code-analysis"]
   icon: "assets/sonarqube.svg"
   status: "experimental"
@@ -112,20 +112,26 @@ collectors:
 
   - name: github-app
     description: |
-      Detects the SonarCloud (or SonarQube-for-GitHub) PR analysis check on
-      pull requests by querying the GitHub commit status API. Writes check
-      `state`, `context`, and `target_url` to
-      `.code_quality.native.sonarqube.github_app`, plus a `status` field set
-      to `"complete"` on success or `"pending"` on timeout (mirrors the
-      sibling `source.analysis_status` and `auto.status` pattern). Mirrors
-      the `snyk/github-app` pattern. Only runs on PRs. Requires `GH_TOKEN`
-      to read commit statuses. Because SonarCloud publishes its status
-      check only after analysis completes, this sub-collector polls
-      `/repos/<owner>/<repo>/commits/<sha>/status` for up to
-      `github_app_poll_timeout_seconds` (default 180s) for a SonarCloud
-      status on the PR head SHA. If it never appears, writes
-      `.code_quality.native.sonarqube.github_app.status = "pending"` and
-      exits cleanly.
+      Reads the check run SonarQube (Server or Cloud) posts on a pull
+      request's head commit, on github.com or GitHub Enterprise Server, so
+      pull requests get SonarQube's quality gate without a project key or a
+      SonarQube token. Matches the check to the pull request through its
+      dashboard link, which leaves out branch analyses of the same commit,
+      other pull requests, and CI jobs or code-scanning checks with "Sonar" in
+      their name. Given a project key (the `sonarqube/project-key` meta or the
+      `project_key` input), reads only that project's check; otherwise reads
+      every project that reported, and the gate passes only if all of them
+      pass. Writes the gate to `.code_quality.passing` and
+      `.code_quality.native.sonarqube.quality_gate`, with the failed
+      conditions SonarQube lists; the pull request's new-code numbers
+      SonarQube prints (new, fixed and accepted issues, security hotspots,
+      coverage and duplication on new code) to `.code_quality.pr`; and the
+      check run to `.code_quality.native.sonarqube.github_app`. A number
+      SonarQube doesn't print, such as coverage it has no data for, is left
+      out rather than written as 0. Polls up to
+      `github_app_poll_timeout_seconds`, because SonarQube posts the check
+      only after its analysis, then writes `github_app.status = "pending"`.
+      Fails the run on a GitHub error other than a rate limit or a 5xx.
     mainBash: github-app.sh
     runs_on: [prs]
     hook:
@@ -177,18 +183,20 @@ inputs:
     default: ""
   github_app_poll_timeout_seconds:
     description: >
-      Total seconds the `github-app` sub-collector will wait for the
-      SonarCloud GitHub check run to appear on the PR head SHA.
+      Total seconds the `github-app` sub-collector waits for SonarQube's check
+      run on the PR head commit. SonarQube posts it once it has analyzed the
+      commit, so raise this when your scanner runs late in CI. A waiting run
+      holds one of the Hub's collection workers.
     default: "180"
   github_app_poll_interval_seconds:
     description: >
-      Seconds between polls while the `github-app` sub-collector waits for the
-      SonarCloud check run.
+      Seconds between polls while the `github-app` sub-collector waits for
+      SonarQube's check run.
     default: "10"
   github_app:
-    description: GitHub App to mint API tokens from, by its name in `lunar github-app add` (e.g. `lunar-lib`). Unset, the plugin uses the GH_TOKEN secret without calling the Hub; set, the secret is the fallback when the App can't mint a token.
+    description: GitHub App to mint API tokens from, by its name in `lunar github-app add` (e.g. `lunar-lib`). Unset, the plugin uses the GH_TOKEN (or, on GitHub Enterprise Server, GH_ENTERPRISE_TOKEN) secret without calling the Hub; set, the secret is the fallback when the App can't mint a token.
   github_app_only:
-    description: Fail instead of falling back to the GH_TOKEN secret, to check the `github_app` App works before the secret is removed.
+    description: Fail instead of falling back to the GH_TOKEN (or, on GitHub Enterprise Server, GH_ENTERPRISE_TOKEN) secret, to check the `github_app` App works before the secret is removed.
     default: "false"
 
 secrets:
@@ -201,8 +209,14 @@ secrets:
       empty password, per the SonarQube Web API convention.
   GH_TOKEN:
     description: >
-      GitHub token for the GitHub Checks API. Used by the `github-app`
-      sub-collector to read SonarCloud / SonarQube check runs on PRs.
+      GitHub token that can read the repository's check runs (Checks read on
+      a fine-grained token, `repo` on a classic one). Used by the `github-app`
+      sub-collector, and on GitHub Enterprise Server when
+      `GH_ENTERPRISE_TOKEN` isn't set.
+  GH_ENTERPRISE_TOKEN:
+    description: >
+      Token for components on GitHub Enterprise Server, with the same access
+      as `GH_TOKEN`.
 
 example_component_json: |
   {
@@ -215,6 +229,14 @@ example_component_json: |
         "analysis_status": "complete"
       },
       "passing": true,
+      "pr": {
+        "new_issues": 2,
+        "fixed_issues": 1,
+        "accepted_issues": 0,
+        "security_hotspots": 0,
+        "coverage_percentage": 85.7,
+        "duplication_percentage": 0.0
+      },
       "coverage_percentage": 78.3,
       "duplication_percentage": 3.1,
       "issues": {
@@ -258,9 +280,17 @@ example_component_json: |
           },
           "github_app": {
             "status": "complete",
-            "state": "success",
-            "context": "SonarCloud Code Analysis",
-            "target_url": "https://sonarcloud.io/dashboard?id=my-org_my-service&pullRequest=42"
+            "check_runs": [
+              {
+                "name": "SonarCloud Code Analysis",
+                "project_key": "my-org_my-service",
+                "conclusion": "success",
+                "title": "Quality Gate passed",
+                "url": "https://sonarcloud.io/dashboard?id=my-org_my-service&pullRequest=42",
+                "completed_at": "2026-11-10T10:04:00Z",
+                "quality_gate": "passed"
+              }
+            ]
           }
         }
       }
