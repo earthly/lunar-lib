@@ -12,7 +12,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
-| `quality-gate-passing` | Quality gate is `OK` with zero failed conditions | Gate `status` is `WARN`/`ERROR` or conditions failed |
+| `quality-gate-passing` | Quality gate is `OK` with zero failed conditions | Gate `status` is `WARN`/`ERROR` or conditions failed (each failed condition is listed when the collector's `github-app` recorded them), or SonarQube's pull request check reported no gate, as when its analysis failed |
 | `min-reliability-rating` | Reliability rating meets minimum | Rating worse than configured letter |
 | `min-security-rating` | Security rating meets minimum | Rating worse than configured letter |
 | `min-maintainability-rating` | Maintainability rating meets minimum | Rating worse than configured letter |
@@ -23,8 +23,10 @@ This policy reads from the following Component JSON paths:
 
 | Path | Type | Provided By |
 |------|------|-------------|
-| `.code_quality.native.sonarqube.quality_gate.status` | string | `sonarqube` collector (`api` or `auto` sub-collector) |
-| `.code_quality.native.sonarqube.quality_gate.conditions_failed` | number | `sonarqube` collector (`api` or `auto` sub-collector) |
+| `.code_quality.native.sonarqube.quality_gate.status` | string | `sonarqube` collector (`api`, `auto` or `github-app` sub-collector) |
+| `.code_quality.native.sonarqube.quality_gate.conditions_failed` | number | `sonarqube` collector (`api`, `auto` or `github-app` sub-collector) |
+| `.code_quality.native.sonarqube.quality_gate.failed_conditions` | array | `sonarqube` collector (`github-app` sub-collector) |
+| `.code_quality.native.sonarqube.github_app.check_runs` | array | `sonarqube` collector (`github-app` sub-collector) |
 | `.code_quality.native.sonarqube.ratings.reliability` | string | `sonarqube` collector (`api` or `auto` sub-collector) |
 | `.code_quality.native.sonarqube.ratings.security` | string | `sonarqube` collector (`api` or `auto` sub-collector) |
 | `.code_quality.native.sonarqube.ratings.maintainability` | string | `sonarqube` collector (`api` or `auto` sub-collector) |
@@ -79,7 +81,14 @@ policies:
   "code_quality": {
     "native": {
       "sonarqube": {
-        "quality_gate": { "status": "ERROR", "conditions_failed": 3 },
+        "quality_gate": {
+          "status": "ERROR",
+          "conditions_failed": 2,
+          "failed_conditions": [
+            { "text": "57.1% Coverage on New Code (required ≥ 80%)", "metric": "Coverage on New Code", "value": "57.1%", "required": "≥ 80%", "project_key": "my-org_my-service" },
+            { "text": "2 New issues", "metric": "New issues", "value": "2", "project_key": "my-org_my-service" }
+          ]
+        },
         "ratings": {
           "reliability": "C",
           "security": "B",
@@ -92,7 +101,7 @@ policies:
 ```
 
 **Failure messages:**
-- `quality-gate-passing`: "SonarQube quality gate failed (status=ERROR, 3 conditions failed)"
+- `quality-gate-passing`: "SonarQube quality gate is ERROR with 2 failed condition(s)", then one message per condition: "57.1% Coverage on New Code (required ≥ 80%)" and "2 New issues"
 - `min-reliability-rating`: "Reliability rating C is below minimum A"
 - `min-security-rating`: "Security rating B is below minimum A"
 - `min-maintainability-rating`: "Maintainability rating D is below minimum B"

@@ -1,0 +1,5 @@
+{
+  "conclusion": "failure",
+  "title": "Quality Gate failed",
+  "summary": "Failed conditions  \n[![](https://raw.githubusercontent.com/SonarSource/sonarqube-static-resources/master/v104/common/failed.svg '')](https://sonar.example.com/sonarqube/dependency-risks?id=com.acme%3Awidgets&pullRequest=42&riskStatuses=OPEN%2CCONFIRM) [Vulnerability dependency risks too severe](https://sonar.example.com/sonarqube/dependency-risks?id=com.acme%3Awidgets&pullRequest=42&riskStatuses=OPEN%2CCONFIRM) (required < 'medium' severity)  \n  \n[See analysis details on SonarQube](https://sonar.example.com/sonarqube/dashboard?id=com.acme%3Awidgets&pullRequest=42)\n\n##   \n"
+}

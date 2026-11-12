@@ -1,0 +1,5 @@
+{
+  "conclusion": "failure",
+  "title": "Quality Gate failed",
+  "summary": "### ![Failed](https://sonar.example.com/static/communityBranchPlugin/checks/QualityGateBadge/failed-16px.png) Quality Gate failed\n- 45.00% Coverage on New Code (is less than 80.00%)\n- 4.50% Duplicated Lines (%) on New Code (is greater than 3.00%)\n- C Reliability Rating on New Code (is worse than A)\n- 3 New Issues (is greater than 0)\n\n**Project ID:** acme_widgets\n\n[View in SonarQube](https://sonar.example.com/dashboard?id=acme_widgets&pullRequest=42)\n"
+}

@@ -1,0 +1,5 @@
+{
+  "conclusion": "failure",
+  "title": "Quality Gate failed",
+  "summary": "Failed conditions  \n[![](https://raw.githubusercontent.com/SonarSource/sonarqube-static-resources/master/v104/common/failed.svg '')](https://sonar.example.com/sonarqube/project/issues?id=com.acme%3Awidgets&pullRequest=42&resolved=false) [2 New issues](https://sonar.example.com/sonarqube/project/issues?id=com.acme%3Awidgets&pullRequest=42&resolved=false)  \n  \n[See analysis details on SonarQube](https://sonar.example.com/sonarqube/dashboard?id=com.acme%3Awidgets&pullRequest=42)\n\n##   \n![](https://raw.githubusercontent.com/SonarSource/sonarqube-static-resources/master/v104/common/bulb.svg '') Catch issues before they fail your Quality Gate with our IDE extension [![SonarQube for IDE](https://raw.githubusercontent.com/SonarSource/sonarqube-static-resources/master/v104/common/sonarqube-ide.svg 'SonarQube for IDE')](https://www.sonarsource.com/products/sonarlint/features/connected-mode/?referrer=pull-request) [SonarQube for IDE](https://www.sonarsource.com/products/sonarlint/features/connected-mode/?referrer=pull-request)\n\n"
+}

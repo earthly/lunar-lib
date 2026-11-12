@@ -28,9 +28,9 @@ landing_page:
 policies:
   - name: quality-gate-passing
     description: |
-      Verifies the SonarQube quality gate is green — `status` is `OK` and no
-      failed conditions. Reads `.code_quality.native.sonarqube.quality_gate`.
-      Skips if SonarQube data is not present for the component.
+      Verifies the SonarQube quality gate is `OK`, listing each failed
+      condition SonarQube reports. Skips when the component has no SonarQube
+      data.
     mainPython: quality_gate_passing.py
     keywords: ["sonarqube", "quality-gate", "conditions", "pass-fail"]
 
