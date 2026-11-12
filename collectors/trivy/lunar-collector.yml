@@ -102,7 +102,7 @@ collectors:
     size: large
     # Match a recorded push, not incidental docker info/ps commands. Keep both
     # positions of the standalone --push flag (middle or end of a build command).
-    hook:
+    hooks:
       - type: after-json
         path: '.containers.native.docker.cicd.cmds.#(cmd%"* push *").cmd'
       - type: after-json
