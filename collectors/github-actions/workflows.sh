@@ -60,8 +60,9 @@ classify_action() {
     local uses="$1"
     local name ref pinning party
 
-    # Docker or local actions — skip
-    if [[ "$uses" == docker://* ]] || [[ "$uses" == ./* ]] || [[ "$uses" == ../* ]]; then
+    # Docker or local actions — skip. A same-repository $/ action always runs at
+    # the workflow's own commit.
+    if [[ "$uses" == docker://* ]] || [[ "$uses" == ./* ]] || [[ "$uses" == ../* ]] || [[ "$uses" == '$/'* ]]; then
         return
     fi
 
@@ -187,6 +188,24 @@ while IFS= read -r file; do
         }' >> "$WORKFLOWS_FILE"
 done <<< "$WORKFLOW_FILES"
 
+# ── Read the workflow lockfile ──────────────────────────────────────────────
+# `gh actions-lock` records the commit every action a workflow uses resolves
+# to, and the runner enforces it, so an action it locks by tag is as fixed as
+# a SHA pin. Recorded as written; an unreadable lockfile is left out.
+LOCKFILE=".github/workflows/actions.lock"
+LOCK_JSON_FILE="/tmp/gha-lockfile.json"
+: > "$LOCK_JSON_FILE"
+if [ -f "$LOCKFILE" ]; then
+    yq -p yaml -o json '.' "$LOCKFILE" 2>/tmp/gha-lockfile.err \
+        | jq -c --arg path "$LOCKFILE" 'select(type == "object")
+            | {path: $path, version, workflows, dependencies}
+            | with_entries(select(.value != null))' > "$LOCK_JSON_FILE" 2>>/tmp/gha-lockfile.err \
+        || : > "$LOCK_JSON_FILE"
+    if [ ! -s "$LOCK_JSON_FILE" ]; then
+        echo "Could not read $LOCKFILE, not recording it: $(head -c 500 /tmp/gha-lockfile.err)" >&2
+    fi
+fi
+
 # ── Run actionlint ──────────────────────────────────────────────────────────
 # .ci.lint is only written when actionlint actually ran, so a zero error_count
 # always means clean to ci.lint-clean.
@@ -249,7 +268,8 @@ jq -s '. as $items | {
     }' "$ALL_DEPS_FILE" | lunar collect -j ".ci.dependencies" -
 
 # ── Write native .ci.native.github_actions ──────────────────────────────────
-jq -s '{
+jq -s --slurpfile lock "$LOCK_JSON_FILE" '{
         source: {tool: "github-actions", version: "0.1.0", integration: "code"},
         workflows: .
-    }' "$WORKFLOWS_FILE" | lunar collect -j ".ci.native.github_actions" -
+    } + (if ($lock | length) > 0 then {lockfile: $lock[0]} else {} end)' \
+    "$WORKFLOWS_FILE" | lunar collect -j ".ci.native.github_actions" -
