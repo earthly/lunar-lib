@@ -155,6 +155,28 @@ class TestLockfile(unittest.TestCase):
         self.assertEqual(len(reasons), 1)
         self.assertIn("new.yml", reasons[0])
 
+    def test_owner_and_repo_match_case_insensitively(self):
+        # gh actions-lock lowercases owner/repo; workflows keep the publisher's case.
+        check = run(
+            [workflow([action("Swatinem/rust-cache@v2.9.3", "tag")])],
+            lock({".github/workflows/ci.yml": ["swatinem/rust-cache@v2.9.3"]}),
+        )
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_sub_path_action_is_locked_by_its_repository(self):
+        check = run(
+            [workflow([action("github/codeql-action/upload-sarif@v4.39.1", "tag")])],
+            lock({".github/workflows/ci.yml": ["github/codeql-action@v4.39.1"]}),
+        )
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_tag_case_still_matters(self):
+        check = run(
+            [workflow([action("actions/checkout@V4", "branch")])],
+            lock({".github/workflows/ci.yml": ["actions/checkout@v4"]}),
+        )
+        self.assertEqual(check.status, CheckStatus.FAIL)
+
     def test_lockfile_without_workflows_locks_nothing(self):
         check = run(
             [workflow([action("actions/checkout@v4", "tag")])],

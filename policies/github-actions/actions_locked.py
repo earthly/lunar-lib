@@ -6,11 +6,26 @@ workflow's entry in .github/workflows/actions.lock (written by
 `gh actions-lock`, enforced by the runner) lists it.
 """
 
+import re
+
 from lunar_policy import Check
+
+FULL_SHA = re.compile(r"[0-9a-fA-F]{40}")
 
 
 def is_reusable_workflow(name):
     return "/.github/workflows/" in name
+
+
+def lock_key(uses):
+    """How gh actions-lock keys a reference: owner/repo lowercased, any sub-path
+    dropped (it locks the repository), and the ref as written unless it's a
+    full SHA. Tags and branches are case-sensitive, like git."""
+    target, _, ref = uses.partition("@")
+    nwo = "/".join(target.split("/")[:2]).lower()
+    if FULL_SHA.fullmatch(ref):
+        ref = ref.lower()
+    return f"{nwo}@{ref}"
 
 
 def main(node=None):
@@ -42,7 +57,7 @@ def main(node=None):
                 continue
             wf_file = wf.get("file", "<unknown>")
             locked = locked_by_file.get(wf_file)
-            locked = {u for u in locked if isinstance(u, str)} if isinstance(locked, list) else set()
+            locked = {lock_key(u) for u in locked if isinstance(u, str)} if isinstance(locked, list) else set()
 
             for action in wf.get("actions") or []:
                 if not isinstance(action, dict):
@@ -62,7 +77,7 @@ def main(node=None):
                         f"Pin it to a full-length commit SHA; actions.lock doesn't cover "
                         f"reusable workflows."
                     )
-                elif uses not in locked:
+                elif lock_key(uses) not in locked:
                     c.fail(
                         f"'{wf_file}' uses '{uses}', which isn't pinned to a commit. "
                         f"Pin it to a full-length commit SHA, or lock it with gh actions-lock."
