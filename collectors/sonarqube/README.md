@@ -162,7 +162,8 @@ timeout to cover it.
 `github-app` reads the check SonarQube Server and SonarQube Cloud post on a
 pull request's head commit: "SonarQube Code Analysis" or "SonarCloud Code
 Analysis", prefixed with the project name in a monorepo. It works on
-github.com and GitHub Enterprise Server alike, needs no project key, and
+github.com and GitHub Enterprise Server alike (GitLab components are
+skipped), needs no project key, and
 never calls SonarQube, so it needs no SonarQube token and no route from Lunar
 to your SonarQube.
 

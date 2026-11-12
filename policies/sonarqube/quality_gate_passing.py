@@ -34,8 +34,7 @@ def main(node=None):
             c.fail(
                 f"SonarQube quality gate is {status} with {failed} failed condition(s)"
             )
-            conditions_node = gate_node.get_node(".failed_conditions")
-            conditions = conditions_node.get_value() if conditions_node.exists() else []
+            conditions = gate_node.get_value_or_default(".failed_conditions", [])
             projects = {cond.get("project_key") for cond in conditions}
             for cond in conditions:
                 prefix = f"{cond.get('project_key')}: " if len(projects) > 1 else ""

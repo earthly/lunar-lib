@@ -36,6 +36,10 @@ REST="${LUNAR_COMPONENT_ID#*/}"
 OWNER="${REST%%/*}"
 REST="${REST#*/}"
 REPO="${OWNER}/${REST%%/*}"
+# A hub can serve GitLab too: never send a GitHub token there.
+case "$HOST" in
+    *gitlab*) echo "sonarqube/github-app: GitHub only; $HOST is not supported — skipping." >&2; exit 0 ;;
+esac
 API_BASE="https://api.github.com"
 if [ "$HOST" != "github.com" ]; then
     API_BASE="https://${HOST}/api/v3"

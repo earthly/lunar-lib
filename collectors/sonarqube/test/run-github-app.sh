@@ -205,6 +205,11 @@ expect "keeps a condition without a value" cj '.code_quality.native.sonarqube.qu
     text: "Vulnerability dependency risks too severe (required < '"'"'medium'"'"' severity)",
     metric: "Vulnerability dependency risks too severe", required: "< '"'"'medium'"'"' severity", project_key: "com.acme:widgets"}]'
 
+run_case github-com-with-both-secrets "$(polls "$(one "$(check server-passed)")")" LUNAR_SECRET_GH_ENTERPRISE_TOKEN=ghes-token
+expect_complete true OK
+expect "sends github.com GH_TOKEN, never GH_ENTERPRISE_TOKEN" count '^github\.com /.* gh-token$' 1
+expect "sends no GHES token" count 'ghes-token' 0
+
 run_case ghes-gh-token-fallback "$(polls "$(one "$(check server-passed)")")" \
   LUNAR_COMPONENT_ID=ghes.example.com/acme/widgets
 expect_complete true OK
@@ -410,6 +415,12 @@ for c in "not-a-pr LUNAR_COMPONENT_PR=" "no-sha LUNAR_COMPONENT_GIT_SHA=" "no-to
          "bad-component-id LUNAR_COMPONENT_ID=widgets"; do
   run_case "${c%% *}" "$(polls '[]')" "${c#* }"
   expect_skip
+done
+for c in "gitlab-com LUNAR_COMPONENT_ID=gitlab.com/acme/widgets" "gitlab-self-hosted LUNAR_COMPONENT_ID=gitlab.example.com/acme/widgets"; do
+  run_case "${c%% *}" "$(polls '[]')" "${c#* }" LUNAR_SECRET_GH_ENTERPRISE_TOKEN=ghes-token
+  expect_skip
+  h="${c##*=}"
+  expect "logs why" logged "GitHub only; ${h%%/*} is not supported"
 done
 run_case ghes-no-token "$(polls '[]')" LUNAR_COMPONENT_ID=ghes.example.com/acme/widgets LUNAR_SECRET_GH_TOKEN=
 expect_skip

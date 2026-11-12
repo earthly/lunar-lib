@@ -70,6 +70,12 @@ class QualityGatePassingTest(unittest.TestCase):
         c = run(node({"quality_gate": {"status": "ERROR", "conditions_failed": 1}}))
         self.assertEqual(c.failure_reasons, ["SonarQube quality gate is ERROR with 1 failed condition(s)"])
 
+    def test_failed_gate_fails_before_ci_finishes(self):
+        # api and auto write no failed_conditions; that mustn't hold the verdict.
+        c = run(node({"quality_gate": {"status": "ERROR", "conditions_failed": 2}}, finished=False))
+        self.assertEqual(c.status, CheckStatus.FAIL)
+        self.assertEqual(c.failure_reasons, ["SonarQube quality gate is ERROR with 2 failed condition(s)"])
+
     def test_unknown_condition_count(self):
         c = run(node({"quality_gate": {"status": "ERROR"}}))
         self.assertEqual(c.failure_reasons, ["SonarQube quality gate is ERROR with ? failed condition(s)"])
