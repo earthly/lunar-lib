@@ -23,7 +23,7 @@ This collector writes to the following Component JSON paths:
 | `.oncall.source` | object | Tool and integration metadata |
 | `.oncall.service` | object | PagerDuty service ID, name, status, and `discovered_via`: where the ID came from (see [Service ID discovery](#service-id-discovery)) |
 | `.oncall.service_lookup` | object | Written when a sub-collector found no service ID: `searched` lists the places it looked, and `errors` any Backstage lookup that didn't complete. The `oncall` policy's `service-mapped` check fails on it, or skips when it has `errors`, unless another sub-collector wrote `.oncall.service` |
-| `.oncall.schedule` | object | On-call schedule: exists flag, participant count, rotation type |
+| `.oncall.schedule` | object | On-call schedule: exists flag, participant count, rotation type. A shift-based (v3) schedule counts the users on its rotation events that haven't ended, and its rotation is `unknown` |
 | `.oncall.escalation` | object | Escalation policy: exists flag, level count, policy name |
 | `.oncall.summary` | object | Summary flags for quick policy evaluation |
 | `.oncall.native.pagerduty` | object | Raw PagerDuty API responses |
