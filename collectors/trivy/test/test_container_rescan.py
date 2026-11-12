@@ -416,6 +416,29 @@ class MultiImageTest(Base):
         self.assertEqual([i["image"] for i in scan["images"]], ["ghcr.io/acme/api:v1", "ghcr.io/acme/worker:v1"])
 
 
+class PushFormsTest(Base):
+    """Every docker form that ships an image is scanned; forms that don't push are not."""
+
+    CMDS = [
+        "docker image push reg/a:1",
+        "docker buildx build --push=true -t reg/b:1 .",
+        "docker buildx build --output type=registry -t reg/c:1 .",
+        "docker buildx build -o type=image,name=reg/d:1,push=true .",
+        "docker buildx build --push=false -t reg/no:1 .",
+        "docker buildx build --output type=image,push=false -t reg/no:2 .",
+        "docker buildx build --output type=docker -t reg/no:3 .",
+        "docker image ls",
+    ]
+
+    def test_scans_each_pushing_form_and_skips_the_rest(self):
+        self.fixture("main.json", json.dumps(
+            {"containers": {"native": {"docker": {"cicd": {"cmds": [{"cmd": c} for c in self.CMDS]}}}}}))
+        result, log = self.run_script(dict(self.CRON_ENV))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        scanned = [ln.split()[-1] for ln in log.splitlines() if ln.startswith("TRIVY:")]
+        self.assertEqual(scanned, ["reg/a:1", "reg/b:1", "reg/c:1", "reg/d:1"])
+
+
 class ProvenanceTest(Base):
     """`.container_scan` must say WHEN it was collected and WHAT bytes it scanned.
 

@@ -111,6 +111,11 @@ collectors:
         path: '.containers.native.docker.cicd.cmds.#(cmd%"* --push *").cmd'
       - type: after-json
         path: '.containers.native.docker.cicd.cmds.#(cmd%"* --push").cmd'
+      # --push=true, or a buildx --output with push=true / type=registry.
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"*push=true*").cmd'
+      - type: after-json
+        path: '.containers.native.docker.cicd.cmds.#(cmd%"*type=registry*").cmd'
     keywords: ["grype", "container scan", "image scan", "after-json", "on-push", "cve", "vulnerability"]
 
   - name: container-rescan
