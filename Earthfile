@@ -78,6 +78,7 @@ plugin-source:
 
 test:
     BUILD +github-app-auth-test
+    BUILD ./collectors/python+test
     BUILD ./collectors/repo-boilerplate+test
     BUILD ./collectors/backstage+test
     BUILD --pass-args ./collectors/backstage+test-offline
