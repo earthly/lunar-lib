@@ -32,7 +32,8 @@ policies:
   - name: min-java-version
     description: |
       Ensures the Java version configured in the build file (pom.xml or
-      build.gradle) meets the minimum. Compares full versions, not just the major.
+      build.gradle) meets the minimum. Compares full versions, not just the major;
+      the update a feature-release target can't show comes from Java recorded in CI.
     mainPython: ./min_java_version.py
     keywords: ["java version", "compatibility", "security", "LTS"]
 

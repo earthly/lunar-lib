@@ -88,18 +88,68 @@ def compare_java_versions(a, b):
 
 
 def omits_required_update(actual, minimum):
-    """True when actual matches the minimum as far as it goes but stops short.
+    """True when a build-file version names no update ("21", "21.0") but the minimum needs one.
 
-    "21" against a minimum of 21.0.13.1 names the feature release only, so it
+    Build files declare only the feature release, so "21" against 21.0.13.1
     can't show which 21 update is in use.
     """
     k = len(actual.numbers)
     return (
         actual.pre is None
+        and k < 3
         and k < len(minimum.numbers)
         and actual.numbers == minimum.numbers[:k]
         and any(minimum.numbers[k:])
     )
+
+
+def ci_version_problem(raw, minimum):
+    """Return why one version recorded in CI misses the minimum, or None if it meets it.
+
+    A JDK reports its full version, so a recorded "21" is 21.0.0, not an unknown update.
+    """
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return "No Java version recorded"
+    try:
+        actual = parse_java_version(raw)
+    except ValueError as e:
+        shown = f'"{raw}"' if isinstance(raw, str) else json.dumps(raw, default=str)
+        return f"Java version {shown} {e}"
+    if compare_java_versions(actual, minimum) < 0:
+        return f"Java {actual.text} is below minimum {minimum.text}"
+    return None
+
+
+def report_ci_versions(c, cmds, minimum, summary):
+    """Fail c with summary plus one finding per distinct problem among the recorded commands.
+
+    Grouping by problem reports a JDK that ran many commands once.
+    """
+    problems = {}
+    for entry in cmds:
+        entry = entry if isinstance(entry, dict) else {}
+        problem = ci_version_problem(entry.get("version"), minimum)
+        if problem:
+            problems.setdefault(problem, []).append(entry.get("cmd") or "unknown command")
+
+    c.assert_true(not problems, summary)
+    for problem, commands in problems.items():
+        count = f"{len(commands)} commands, e.g." if len(commands) > 1 else "command"
+        c.fail(f"{problem} ({count} '{commands[0]}')")
+
+
+def _check_update_from_ci(c, target, minimum):
+    """Take the update a feature-release build target can't show from the JDKs CI ran."""
+    cmds_node = c.get_node(".lang.java.cicd.cmds")
+    cmds = cmds_node.get_value() if cmds_node.exists() else None
+    unknown = f"Java {target.text} in the build config doesn't show which update is in use"
+    if not cmds:
+        c.fail(
+            f"{unknown}, and CI recorded no Java version that does. Run CI on JDK "
+            f"{minimum.text} or newer with the Lunar CI/CD Tracer installed."
+        )
+        return
+    report_ci_versions(c, cmds, minimum, f"{unknown}, and CI ran Java that does not meet minimum {minimum.text}")
 
 
 def _parse_or_error(value, label):
@@ -136,15 +186,17 @@ def check_min_java_version(min_version=None, node=None):
         elif actual_error:
             c.fail(actual_error)
         elif omits_required_update(actual, minimum):
-            c.fail(
-                f"Java version {actual.text} does not specify an update release, "
-                f"so it cannot be shown to meet minimum {minimum.text}"
-            )
+            _check_update_from_ci(c, actual, minimum)
         else:
+            # A build target takes a feature release, never an update like 21.0.13.1.
+            advice = (
+                f" Update your build config to target Java {minimum.numbers[0]} or newer."
+                if actual.numbers[0] < minimum.numbers[0]
+                else ""
+            )
             c.assert_true(
                 compare_java_versions(actual, minimum) >= 0,
-                f"Java version {actual.text} is below minimum {minimum.text}. "
-                f"Update your build config to target Java {minimum.text} or newer.",
+                f"Java version {actual.text} is below minimum {minimum.text}.{advice}",
             )
     return c
 

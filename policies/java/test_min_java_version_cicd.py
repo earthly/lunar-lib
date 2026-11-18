@@ -106,12 +106,13 @@ class MinJavaVersionCicdTest(unittest.TestCase):
         c = run_check([cmd("javac A.java", "1.8.0_512")], "11")
         self.assertIn("Java 1.8.0_512 is below minimum 11 (command 'javac A.java')", failures(c))
 
-    def test_feature_release_only_cannot_meet_an_update_minimum(self):
+    def test_recorded_versions_are_complete(self):
+        # A JDK reports its full version: "27" is the 27 GA release and 21.0.13 has no
+        # patch, so both are below the minimum rather than missing an update.
         c = run_check([cmd("java -version", "27")], "27.0.1.1")
-        self.assertIn(
-            "Java 27 does not specify an update release, so it cannot be shown to meet minimum 27.0.1.1 (command 'java -version')",
-            failures(c),
-        )
+        self.assertIn("Java 27 is below minimum 27.0.1.1 (command 'java -version')", failures(c))
+        c = run_check([cmd("java -jar app.jar", "21.0.13")], "21.0.13.1")
+        self.assertIn("Java 21.0.13 is below minimum 21.0.13.1 (command 'java -jar app.jar')", failures(c))
 
     def test_unparseable_minimum_fails(self):
         c = run_check([cmd("java -version", "21.0.13.1")], "latest")
@@ -132,6 +133,18 @@ class MinJavaVersionCicdTest(unittest.TestCase):
         self.assertEqual(outcome(build), CheckStatus.PASS)
         self.assertEqual(outcome(ci), CheckStatus.FAIL)
         self.assertIn("Java 21.0.5 is below minimum 21.0.13.1 (command 'java -jar app.jar')", failures(ci))
+
+    def test_same_update_minimum_on_both_inputs(self):
+        # A build target of 21 can't show its update, so min-java-version takes it from CI too.
+        os.environ["LUNAR_VAR_min_java_version"] = "21.0.13.1"
+        os.environ["LUNAR_VAR_min_java_version_cicd"] = "21.0.13.1"
+        for ci_version, expected in [("21.0.13.1", CheckStatus.PASS), ("21.0.13", CheckStatus.FAIL)]:
+            with self.subTest(ci_version=ci_version):
+                java = {"project_exists": True, "version": "21", "cicd": {"cmds": [cmd("java -jar app.jar", ci_version)]}}
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build = check_min_java_version(node=node_for(java))
+                    ci = check_min_java_version_cicd(node=node_for(java))
+                self.assertEqual((outcome(build), outcome(ci)), (expected, expected))
 
     def test_skips_when_no_java_ran_in_ci(self):
         self.assertEqual(outcome(run_check(None, "17", java={"project_exists": True, "version": "21"})), CheckStatus.SKIPPED)
