@@ -144,10 +144,8 @@ def _check_update_from_ci(c, target, minimum):
     cmds = cmds_node.get_value() if cmds_node.exists() else None
     unknown = f"Java {target.text} in the build config doesn't show which update is in use"
     if not cmds:
-        c.fail(
-            f"{unknown}, and CI recorded no Java version that does. Run CI on JDK "
-            f"{minimum.text} or newer with the Lunar CI/CD Tracer installed."
-        )
+        # Nothing ran in CI to compare, e.g. the CI/CD Tracer isn't installed.
+        c.skip(f"{unknown}, and CI recorded no java or javac commands to compare with minimum {minimum.text}")
         return
     report_ci_versions(c, cmds, minimum, f"{unknown}, and CI ran Java that does not meet minimum {minimum.text}")
 

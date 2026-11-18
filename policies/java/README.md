@@ -13,7 +13,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `build-tool-wrapper-exists` | Validates mvnw/gradlew exists | Missing build wrapper for reproducibility |
-| `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum, not comparable to it, or CI doesn't show the update a minimum needs |
+| `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum or not comparable to it, or CI ran Java below a minimum's update |
 | `min-java-version-cicd` | Ensures every Java version recorded in CI meets a minimum | CI ran a JDK below the minimum, or one whose version wasn't recorded |
 | `min-maven-version` | Ensures minimum Maven version in CI/CD | CI Maven version too old |
 | `min-gradle-version` | Ensures minimum Gradle version in CI/CD | CI Gradle version too old |
@@ -30,7 +30,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `27-ea`, `27-ea+12` | Just before `27` | A pre-release sorts before its release and after every earlier version |
 | `1.8.0_202`, `1.8.0_202-b08`, `8u202` | `8.0.202` | Java 8 and earlier; `1.8` is `8` |
 
-Build files declare only the feature release, so a build target of `21` can't show which Java 21 update is in use. Against a minimum such as `21.0.13.1`, `min-java-version` takes the update from the Java versions the `java` collector recorded in CI. It passes when every recorded version meets the minimum, and it fails when one doesn't or when CI recorded none. A target below the minimum's feature release (`17`) fails without CI, and one above it (`25`) passes. In CI a recorded version is complete, so `21` there is the 21 GA release and `21.0.13` is below `21.0.13.1`. Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
+Build files declare only the feature release, so a build target of `21` can't show which Java 21 update is in use. Against a minimum such as `21.0.13.1`, `min-java-version` takes the update from the Java versions the `java` collector recorded in CI. It passes when every recorded version meets the minimum and fails when one doesn't, including a command whose version wasn't recorded. If CI recorded no java or javac commands at all, for example because the Lunar CI/CD Tracer isn't installed, it skips. A target below the minimum's feature release (`17`) fails without CI, and one above it (`25`) passes. In CI a recorded version is complete, so `21` there is the 21 GA release and `21.0.13` is below `21.0.13.1`. Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
 
 ## Required Data
 

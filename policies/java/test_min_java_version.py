@@ -179,16 +179,18 @@ class MinJavaVersionCheckTest(unittest.TestCase):
         ]:
             self.assertOutcome(version, "17", expected)
 
-    def test_feature_release_target_without_ci_evidence_fails(self):
+    def test_feature_release_target_skips_when_no_java_ran_in_ci(self):
+        # E.g. no CI/CD Tracer installed: nothing to compare, so skip like min-java-version-cicd.
         for version in ["21", "21.0"]:
             self.assertOutcome(
                 version,
                 "21.0.13.1",
-                CheckStatus.FAIL,
+                CheckStatus.SKIPPED,
                 f"Java {version} in the build config doesn't show which update is in use, and CI "
-                "recorded no Java version that does. Run CI on JDK 21.0.13.1 or newer with the "
-                "Lunar CI/CD Tracer installed.",
+                "recorded no java or javac commands to compare with minimum 21.0.13.1",
             )
+        c = run_check(None, "21.0.13.1", java=java_with_ci("21", []))
+        self.assertEqual(outcome(c), CheckStatus.SKIPPED)
         self.assertOutcome("21", "21.0.0", CheckStatus.PASS)  # nothing beyond the feature release is required
 
     def test_feature_release_target_takes_the_update_from_ci(self):
