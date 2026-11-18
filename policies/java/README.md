@@ -13,10 +13,23 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `build-tool-wrapper-exists` | Validates mvnw/gradlew exists | Missing build wrapper for reproducibility |
-| `min-java-version` | Ensures minimum Java version in build config | Java target version too old |
+| `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum, or not comparable to it |
 | `min-maven-version` | Ensures minimum Maven version in CI/CD | CI Maven version too old |
 | `min-gradle-version` | Ensures minimum Gradle version in CI/CD | CI Gradle version too old |
 | `tests-all-modules` | Ensures tests run all modules | Tests may miss modules |
+
+### Version comparison
+
+`min-java-version` compares full versions, so the minimum can be a feature release (`17`) or a specific update (`21.0.13.1`). `21.0.5` fails a `21.0.13.1` minimum and passes a `21` one.
+
+| Version | Compared as | Notes |
+|---------|-------------|-------|
+| `21`, `21.0.5`, `21.0.13.1`, `17.0.21.0.3` | Element by element | Missing trailing elements count as zero, so `21` equals `21.0.0` |
+| `21.0.5+11`, `21.0.5+11-LTS` | `21.0.5` | Build numbers and vendor suffixes are ignored |
+| `27-ea`, `27-ea+12` | Just before `27` | A pre-release sorts before its release and after every earlier version |
+| `1.8.0_202`, `1.8.0_202-b08`, `8u202` | `8.0.202` | Java 8 and earlier; `1.8` is `8` |
+
+A version less precise than the minimum fails when the missing part decides the result: `21` fails a `21.0.13.1` minimum because it could be any Java 21 update, while `25` passes it. Build files usually declare only the feature release, so pair this check with a feature-release minimum. Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
 
 ## Required Data
 
@@ -93,7 +106,7 @@ policies:
 
 **Failure messages:**
 - `"Missing build tool wrapper(s): mvnw (Maven wrapper)"`
-- `"Java version 11 (major: 11) is below minimum 17"`
+- `"Java version 11 is below minimum 17. Update your build config to target Java 17 or newer."`
 
 ## Remediation
 
@@ -104,6 +117,7 @@ policies:
 ### min-java-version
 - **Maven:** Update `<java.version>` or `<maven.compiler.source>` in pom.xml
 - **Gradle:** Update `sourceCompatibility` in build.gradle
+- **Unrecognized version:** Use a plain version such as `17`, `21.0.5` or `1.8` (see [Version comparison](#version-comparison))
 
 ### min-maven-version / min-gradle-version
 - Update your CI/CD pipeline or build tool wrapper to use a newer version

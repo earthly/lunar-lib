@@ -31,8 +31,8 @@ policies:
 
   - name: min-java-version
     description: |
-      Ensures the Java version configured in the build file meets the minimum
-      requirement. Checks pom.xml or build.gradle for the target Java version.
+      Ensures the Java version configured in the build file (pom.xml or
+      build.gradle) meets the minimum. Compares full versions, not just the major.
     mainPython: ./min_java_version.py
     keywords: ["java version", "compatibility", "security", "LTS"]
 
@@ -59,7 +59,7 @@ policies:
 
 inputs:
   min_java_version:
-    description: Minimum required Java version (e.g., "17", "21")
+    description: Minimum Java version, either a feature release ("17") or a specific update ("21.0.13.1")
     default: "17"
   min_maven_version:
     description: Minimum required Maven version (e.g., "3.9.0")

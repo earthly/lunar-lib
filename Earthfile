@@ -121,6 +121,7 @@ test:
     BUILD ./policies/repo-boilerplate+test
     BUILD ./policies/dependencies+test
     BUILD ./policies/container+test
+    BUILD ./policies/java+test
     BUILD ./policies/terraform+test
     BUILD ./policies/sbom+test
     BUILD ./policies/testing+test
