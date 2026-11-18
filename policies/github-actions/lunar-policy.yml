@@ -1,7 +1,7 @@
 version: 0
 
 name: github-actions
-description: Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene
+description: Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, credential hygiene, and actions locked to a commit
 author: support@earthly.dev
 
 default_image: earthly/lunar-lib:base-main
@@ -11,7 +11,8 @@ landing_page:
   long_description: |
     Enforces security best practices for GitHub Actions workflows. Detects
     template injection, dangerous pull_request_target checkouts, missing
-    permissions, credential persistence, and secrets inheritance.
+    permissions, credential persistence, secrets inheritance, and actions
+    that a tag or branch can move.
   category: "security-and-compliance"
   icon: "assets/github-actions.svg"
   status: "beta"
@@ -19,7 +20,7 @@ landing_page:
     - slug: "github-actions"
       type: "collector"
       reason: "Parsed workflow data at .ci.native.github_actions.workflows"
-  keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "ci"]
+  keywords: ["github-actions", "security", "injection", "permissions", "supply-chain", "pinning", "lockfile", "ci"]
 
 policies:
   - name: no-script-injection
@@ -71,6 +72,14 @@ policies:
       least-privilege. Workflows should explicitly pass only needed secrets.
     mainPython: no_secrets_inherit.py
     keywords: ["secrets", "inherit", "reusable", "least-privilege", "security"]
+
+  - name: actions-locked
+    description: |
+      Flags third-party actions that aren't pinned to a full-length commit SHA
+      or locked in .github/workflows/actions.lock. A tag or branch can be
+      moved to different code.
+    mainPython: actions_locked.py
+    keywords: ["pinning", "sha", "lockfile", "actions.lock", "immutable", "supply-chain", "security"]
 
 inputs:
   exempt_jobs:

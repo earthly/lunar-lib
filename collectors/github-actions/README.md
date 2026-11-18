@@ -23,7 +23,7 @@ This collector writes to both **normalized** (vendor-agnostic) and **native** (G
 
 | Path | Type | Description |
 |------|------|-------------|
-| `.ci.native.github_actions` | object | Raw GHA workflow data (full parsed workflows with triggers, jobs, permissions, action refs) |
+| `.ci.native.github_actions` | object | Raw GHA workflow data (full parsed workflows with triggers, jobs, permissions, action refs), plus the workflow lockfile (`.lockfile`) when the repository has `.github/workflows/actions.lock` |
 
 ## Collectors
 

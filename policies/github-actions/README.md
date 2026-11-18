@@ -1,10 +1,10 @@
 # GitHub Actions Security Guardrails
 
-Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, and credential hygiene.
+Enforces GitHub Actions security best practices — injection prevention, least-privilege permissions, credential hygiene, and actions locked to a commit.
 
 ## Overview
 
-Checks GitHub Actions workflows for six categories of security misconfiguration that have led to real-world supply chain compromises. All checks analyze the parsed workflow data collected by the `github-actions` collector — no separate security collector needed. Skips gracefully when no GitHub Actions workflow data is available (i.e., component has no `.github/workflows/` directory). Complements the general `ci` policy (which covers vendor-agnostic lint and dependency pinning) with GHA-specific security checks. Different from the `sast` policy (which covers application code analysis, not CI configuration).
+Checks GitHub Actions workflows for seven categories of security misconfiguration that have led to real-world supply chain compromises. All checks analyze the parsed workflow data collected by the `github-actions` collector — no separate security collector needed. Skips gracefully when no GitHub Actions workflow data is available (i.e., component has no `.github/workflows/` directory). Complements the general `ci` policy (which covers vendor-agnostic lint and dependency pinning) with GHA-specific security checks. Different from the `sast` policy (which covers application code analysis, not CI configuration).
 
 ## Policies
 
@@ -18,6 +18,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `no-write-all-permissions` | Flags `permissions: write-all` at workflow or job level |
 | `checkout-no-persist-credentials` | Flags `actions/checkout` without `persist-credentials: false`. Jobs whose risk has been accepted can be exempted with the `exempt_jobs` input |
 | `no-secrets-inherit` | Flags `secrets: inherit` in reusable workflow calls |
+| `actions-locked` | Flags third-party actions not pinned to a full-length commit SHA or locked in `.github/workflows/actions.lock` |
 
 ## Required Data
 
@@ -26,6 +27,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.ci.native.github_actions.workflows[]` | array | `github-actions` collector (workflows sub-collector) |
+| `.ci.native.github_actions.lockfile` | object | `github-actions` collector, when the repository has `.github/workflows/actions.lock` |
 
 The policy walks the parsed workflow data (triggers, permissions, jobs, steps, run blocks, with parameters) and applies security rules directly. No pre-processed security data needed — the collector just gathers the raw workflow structure.
 
@@ -50,6 +52,7 @@ policies:
       - no-write-all-permissions
       - checkout-no-persist-credentials
       - no-secrets-inherit
+      - actions-locked
 ```
 
 To accept the risk on a named job rather than fix it, list it under `exempt_jobs`.
@@ -89,7 +92,7 @@ Workflow has explicit permissions, safe env-var indirection for user input, and 
                 "steps": [
                   {
                     "name": "Checkout",
-                    "uses": "actions/checkout@abc123",
+                    "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
                     "with": { "persist-credentials": false }
                   },
                   {
@@ -99,7 +102,10 @@ Workflow has explicit permissions, safe env-var indirection for user input, and 
                   }
                 ]
               }
-            }
+            },
+            "actions": [
+              { "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "pinning": "sha", "party": "3rd" }
+            ]
           }
         ]
       }
@@ -174,6 +180,38 @@ A `pull_request_target` workflow checks out PR head code:
 ```
 
 **Failure message:** `"1 dangerous checkout(s) found — .github/workflows/pr-target.yml: pull_request_target workflow checks out PR head ref in job 'build'"`
+
+### Failing Example — Unlocked Action
+
+A workflow uses an action by tag, and `actions.lock` doesn't list it for that workflow:
+
+```json
+{
+  "ci": {
+    "native": {
+      "github_actions": {
+        "workflows": [
+          {
+            "file": ".github/workflows/release.yml",
+            "actions": [
+              { "uses": "actions/checkout@v7.0.1", "pinning": "tag", "party": "3rd" },
+              { "uses": "docker/login-action@v4", "pinning": "tag", "party": "3rd" }
+            ]
+          }
+        ],
+        "lockfile": {
+          "path": ".github/workflows/actions.lock",
+          "workflows": {
+            ".github/workflows/release.yml": ["actions/checkout@v7.0.1"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Failure message:** `"'.github/workflows/release.yml' uses 'docker/login-action@v4', which isn't pinned to a commit. Pin it to a full-length commit SHA, or lock it with gh actions-lock."`
 
 ## Remediation
 
@@ -263,3 +301,20 @@ uses: ./.github/workflows/deploy.yml
 secrets:
   DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
 ```
+
+### Unlocked Actions (`actions-locked`)
+
+Lock the workflows with GitHub's [workflow lockfile](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles). It also locks the actions each action uses in turn, which a SHA pin doesn't:
+
+```bash
+gh extension install github/gh-actions-lock
+gh actions-lock    # writes .github/workflows/actions.lock; rerun after changing any uses:
+```
+
+Or pin each action to a full-length commit SHA, with the version in a comment for Renovate or Dependabot. This is the only option on GitHub Enterprise Server, and for reusable workflows from another repository, which the lockfile doesn't cover:
+
+```yaml
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+```
+
+Actions from the component's own GitHub organization, local `./` and `$/` actions, and `docker://` images aren't checked.
