@@ -36,6 +36,13 @@ policies:
     mainPython: ./min_java_version.py
     keywords: ["java version", "compatibility", "security", "LTS"]
 
+  - name: min-java-version-cicd
+    description: |
+      Ensures every Java version recorded for java/javac commands in CI meets the
+      minimum. Compares full versions and doesn't need a build file.
+    mainPython: ./min_java_version_cicd.py
+    keywords: ["java version", "ci/cd", "jdk", "security", "patch level"]
+
   - name: min-maven-version
     description: |
       Ensures the Maven version used in CI/CD commands meets the minimum
@@ -60,6 +67,9 @@ policies:
 inputs:
   min_java_version:
     description: Minimum Java version, either a feature release ("17") or a specific update ("21.0.13.1")
+    default: "17"
+  min_java_version_cicd:
+    description: Minimum Java version for java/javac commands in CI, either a feature release ("17") or a specific update ("21.0.13.1")
     default: "17"
   min_maven_version:
     description: Minimum required Maven version (e.g., "3.9.0")

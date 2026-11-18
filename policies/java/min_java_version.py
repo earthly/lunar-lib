@@ -87,7 +87,7 @@ def compare_java_versions(a, b):
     return _compare_pre(a.pre, b.pre)
 
 
-def _omits_required_update(actual, minimum):
+def omits_required_update(actual, minimum):
     """True when actual matches the minimum as far as it goes but stops short.
 
     "21" against a minimum of 21.0.13.1 names the feature release only, so it
@@ -135,7 +135,7 @@ def check_min_java_version(min_version=None, node=None):
             c.fail(min_error)
         elif actual_error:
             c.fail(actual_error)
-        elif _omits_required_update(actual, minimum):
+        elif omits_required_update(actual, minimum):
             c.fail(
                 f"Java version {actual.text} does not specify an update release, "
                 f"so it cannot be shown to meet minimum {minimum.text}"
