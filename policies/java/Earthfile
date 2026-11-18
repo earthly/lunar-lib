@@ -1,0 +1,12 @@
+VERSION 0.8
+
+# Unit tests for min-java-version's full-version comparison. Wired into the
+# root +test target. (No image: target; the java policy runs on the shared
+# base image.)
+test:
+    FROM python:3.12-alpine
+    WORKDIR /workspace
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    COPY *.py .
+    RUN python -m unittest test_min_java_version -v
