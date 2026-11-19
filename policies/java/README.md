@@ -13,14 +13,15 @@ This plugin provides the following policies (use `include` to select a subset):
 | Policy | Description | Failure Meaning |
 |--------|-------------|-----------------|
 | `build-tool-wrapper-exists` | Validates mvnw/gradlew exists | Missing build wrapper for reproducibility |
-| `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum, or not comparable to it |
+| `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum or not comparable to it, or CI ran Java below a minimum's update |
+| `min-java-version-cicd` | Ensures every Java version recorded in CI meets a minimum | CI ran a JDK below the minimum, or one whose version wasn't recorded |
 | `min-maven-version` | Ensures minimum Maven version in CI/CD | CI Maven version too old |
 | `min-gradle-version` | Ensures minimum Gradle version in CI/CD | CI Gradle version too old |
 | `tests-all-modules` | Ensures tests run all modules | Tests may miss modules |
 
 ### Version comparison
 
-`min-java-version` compares full versions, so the minimum can be a feature release (`17`) or a specific update (`21.0.13.1`). `21.0.5` fails a `21.0.13.1` minimum and passes a `21` one.
+`min-java-version` and `min-java-version-cicd` compare full versions, so a minimum can be a feature release (`17`) or a specific update (`21.0.13.1`). `21.0.5` fails a `21.0.13.1` minimum and passes a `21` one.
 
 | Version | Compared as | Notes |
 |---------|-------------|-------|
@@ -29,7 +30,15 @@ This plugin provides the following policies (use `include` to select a subset):
 | `27-ea`, `27-ea+12` | Just before `27` | A pre-release sorts before its release and after every earlier version |
 | `1.8.0_202`, `1.8.0_202-b08`, `8u202` | `8.0.202` | Java 8 and earlier; `1.8` is `8` |
 
-A version less precise than the minimum fails when the missing part decides the result: `21` fails a `21.0.13.1` minimum because it could be any Java 21 update, while `25` passes it. Build files usually declare only the feature release, so pair this check with a feature-release minimum. Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
+Against a minimum with an update, such as `21.0.13.1`:
+
+- **A `21` build target** can't show which Java 21 update is in use, so `min-java-version` takes the update from the Java versions the `java` collector recorded in CI. It passes when every recorded version meets the minimum and fails when one doesn't, including a command whose version wasn't recorded. If CI recorded no java or javac commands, for example because the Lunar CI/CD Tracer isn't installed, it skips. A `17` target fails without CI, and a `25` target passes.
+- **A version recorded in CI** is complete, so `21` there is the 21 GA release and `21.0.13` is below `21.0.13.1`.
+- **One minimum is one floor across feature releases.** `21.0.13.1` passes any 25 or 27 build, whatever its update, and fails a patched 17.0.21.1. To require a fixed update on several releases, use one policy entry per release, each scoped with `on:` to the components that run it.
+- **Only build files and CI are checked.** `min-java-version-cicd` sees the JDKs CI ran, not the JDK in a deployed image or on a host.
+- **Gradle toolchains aren't read.** The `java` collector takes the build target from `<java.version>`, `<maven.compiler.source>`, `<maven.compiler.release>`, `sourceCompatibility` or `JavaVersion.VERSION_*`, so a project that declares only `JavaLanguageVersion.of(21)` skips `min-java-version`. `min-java-version-cicd` still checks its CI JDKs.
+
+Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
 
 ## Required Data
 
@@ -59,11 +68,13 @@ policies:
     include:
       - build-tool-wrapper-exists
       - min-java-version
+      - min-java-version-cicd
       - min-maven-version
       - min-gradle-version
       - tests-all-modules
     with:
       min_java_version: "17"
+      min_java_version_cicd: "17"
       min_maven_version: "3.9.0"
       min_gradle_version: "8.0.0"
 ```
@@ -77,6 +88,9 @@ policies:
   "lang": {
     "java": {
       "version": "21",
+      "cicd": {
+        "cmds": [{ "cmd": "java -jar app.jar", "version": "21.0.5" }]
+      },
       "build_systems": ["maven"],
       "mvnw_exists": true,
       "maven": {
@@ -97,6 +111,9 @@ policies:
   "lang": {
     "java": {
       "version": "11",
+      "cicd": {
+        "cmds": [{ "cmd": "java -jar app.jar", "version": "11.0.25" }]
+      },
       "build_systems": ["maven"],
       "mvnw_exists": false
     }
@@ -107,6 +124,8 @@ policies:
 **Failure messages:**
 - `"Missing build tool wrapper(s): mvnw (Maven wrapper)"`
 - `"Java version 11 is below minimum 17. Update your build config to target Java 17 or newer."`
+- `"CI ran Java that does not meet minimum 17"`
+- `"Java 11.0.25 is below minimum 17 (command 'java -jar app.jar')"`
 
 ## Remediation
 
@@ -117,7 +136,12 @@ policies:
 ### min-java-version
 - **Maven:** Update `<java.version>` or `<maven.compiler.source>` in pom.xml
 - **Gradle:** Update `sourceCompatibility` in build.gradle
+- **Minimum with an update, such as `21.0.13.1`:** keep the build file on the feature release and run CI on a JDK at or above the minimum, with the Lunar CI/CD Tracer installed so the `java` collector records it
 - **Unrecognized version:** Use a plain version such as `17`, `21.0.5` or `1.8` (see [Version comparison](#version-comparison))
+
+### min-java-version-cicd
+- Upgrade the JDK your CI runs, e.g. `java-version` in `actions/setup-java` or the build image's base, to the minimum or newer
+- **No Java version recorded:** the command's `java -version` or `javac -version` printed no version line, often because the JVM failed to start
 
 ### min-maven-version / min-gradle-version
 - Update your CI/CD pipeline or build tool wrapper to use a newer version

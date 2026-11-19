@@ -39,6 +39,15 @@ def messages(check):
     return " | ".join(r.failure_message or "" for r in check._results)
 
 
+def failures(check):
+    return [r.failure_message for r in check._results if r.result == CheckStatus.FAIL]
+
+
+def java_with_ci(version, ci_versions):
+    cmds = [{"cmd": f"java -jar app-{i}.jar", "version": v} for i, v in enumerate(ci_versions)]
+    return {"project_exists": True, "build_systems": ["maven"], "version": version, "cicd": {"cmds": cmds}}
+
+
 class ParseJavaVersionTest(unittest.TestCase):
     def assertParses(self, text, numbers, pre=None):
         v = parse_java_version(text)
@@ -170,15 +179,59 @@ class MinJavaVersionCheckTest(unittest.TestCase):
         ]:
             self.assertOutcome(version, "17", expected)
 
-    def test_feature_release_only_cannot_meet_an_update_minimum(self):
+    def test_feature_release_target_skips_when_no_java_ran_in_ci(self):
+        # E.g. no CI/CD Tracer installed: nothing to compare, so skip like min-java-version-cicd.
         for version in ["21", "21.0"]:
             self.assertOutcome(
-                version, "21.0.13.1", CheckStatus.FAIL, "does not specify an update release"
+                version,
+                "21.0.13.1",
+                CheckStatus.SKIPPED,
+                f"Java {version} in the build config doesn't show which update is in use, and CI "
+                "recorded no java or javac commands to compare with minimum 21.0.13.1",
             )
+        c = run_check(None, "21.0.13.1", java=java_with_ci("21", []))
+        self.assertEqual(outcome(c), CheckStatus.SKIPPED)
         self.assertOutcome("21", "21.0.0", CheckStatus.PASS)  # nothing beyond the feature release is required
 
+    def test_feature_release_target_takes_the_update_from_ci(self):
+        c = run_check(None, "21.0.13.1", java=java_with_ci("21", ["21.0.13.1", "21.0.14"]))
+        self.assertEqual(outcome(c), CheckStatus.PASS, messages(c))
+
+        c = run_check(None, "21.0.13.1", java=java_with_ci("21", ["21.0.13.1", "21.0.13", "21.0.13"]))
+        self.assertEqual(outcome(c), CheckStatus.FAIL)
+        self.assertEqual(
+            failures(c),
+            [
+                "Java 21 in the build config doesn't show which update is in use, "
+                "and CI ran Java that does not meet minimum 21.0.13.1",
+                "Java 21.0.13 is below minimum 21.0.13.1 (2 commands, e.g. 'java -jar app-1.jar')",
+            ],
+        )
+
+    def test_ci_command_without_a_version_is_not_evidence(self):
+        c = run_check(None, "21.0.13.1", java=java_with_ci("21", [""]))
+        self.assertEqual(outcome(c), CheckStatus.FAIL)
+        self.assertIn("No Java version recorded (command 'java -jar app-0.jar')", failures(c))
+
+    def test_pending_while_ci_evidence_may_still_arrive(self):
+        java = {"project_exists": True, "build_systems": ["maven"], "version": "21"}
+        c = run_check(None, "21.0.13.1", finished=False, java=java)
+        self.assertEqual(outcome(c), CheckStatus.PENDING)
+
     def test_older_feature_release_fails_whatever_its_update(self):
-        self.assertOutcome("17", "21.0.13.1", CheckStatus.FAIL, "below minimum 21.0.13.1")
+        c = run_check("17", "21.0.13.1")
+        self.assertEqual(outcome(c), CheckStatus.FAIL)
+        self.assertEqual(
+            failures(c),
+            ["Java version 17 is below minimum 21.0.13.1. Update your build config to target Java 21 or newer."],
+        )
+
+    def test_explicit_update_in_the_build_config_gets_no_target_advice(self):
+        c = run_check("21.0.5", "21.0.13.1")
+        self.assertEqual(failures(c), ["Java version 21.0.5 is below minimum 21.0.13.1."])
+        # 21.0.13 names its update, so it is compared, not referred to CI.
+        c = run_check("21.0.13", "21.0.13.1")
+        self.assertEqual(failures(c), ["Java version 21.0.13 is below minimum 21.0.13.1."])
 
     def test_legacy_versions(self):
         self.assertOutcome("1.8.0_202", "8u191", CheckStatus.PASS)
