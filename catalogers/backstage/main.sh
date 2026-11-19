@@ -19,6 +19,7 @@
 #   tag_prefix                (default bs-)
 #   include_derived_tags      (default true)
 #   include_entity_ref_meta   (default false) Write each component's entity ref to its backstage/entity-ref meta
+#   include_host_org_tags     (default false) Tag each component host:<host> and org:<org> from its id
 #   owner_format              (default as-is) as-is | bare-name
 #   default_owner             (default empty)
 #   domain_default_description (default empty)
@@ -84,6 +85,7 @@ COMPONENT_ID_PREFIX="${LUNAR_VAR_COMPONENT_ID_PREFIX-github.com/}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-bs-}"
 INCLUDE_DERIVED_TAGS="${LUNAR_VAR_INCLUDE_DERIVED_TAGS:-true}"
 INCLUDE_ENTITY_REF_META="${LUNAR_VAR_INCLUDE_ENTITY_REF_META:-false}"
+INCLUDE_HOST_ORG_TAGS="${LUNAR_VAR_INCLUDE_HOST_ORG_TAGS:-false}"
 OWNER_FORMAT="${LUNAR_VAR_OWNER_FORMAT:-as-is}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DOMAIN_DEFAULT_DESCRIPTION="${LUNAR_VAR_DOMAIN_DEFAULT_DESCRIPTION:-}"
@@ -348,7 +350,7 @@ fi
 echo "Kinds: $ENTITY_KINDS"
 echo "Namespace: $NAMESPACE"
 echo "Component id: $COMPONENT_ID_PREFIX + <annotation '$COMPONENT_ID_ANNOTATION'>"
-echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS)"
+echo "Tag prefix: $TAG_PREFIX (derived: $INCLUDE_DERIVED_TAGS, host/org: $INCLUDE_HOST_ORG_TAGS)"
 echo "Owner format: $OWNER_FORMAT"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$USER_FILTER" ] && echo "Extra filter: $USER_FILTER"
@@ -521,6 +523,7 @@ COMPONENTS=$(jq \
     --arg tag_prefix "$TAG_PREFIX" \
     --arg include_derived "$INCLUDE_DERIVED_TAGS" \
     --arg entity_ref_meta "$INCLUDE_ENTITY_REF_META" \
+    --arg host_org "$INCLUDE_HOST_ORG_TAGS" \
     --arg owner_format "$OWNER_FORMAT" \
     --arg default_owner "$DEFAULT_OWNER" \
     --arg inc_types "$INCLUDE_TYPES" --arg exc_types "$EXCLUDE_TYPES" \
@@ -536,6 +539,14 @@ COMPONENTS=$(jq \
 
     def format_owner(o):
         if $owner_format == "bare-name" then bare(o) else o end;
+
+    # host:<host> and org:<org>, lowercased, from a <host>/<org>/<repo>[/<path>] id:
+    # the split the Hub uses for a GitHub component. Any other id gets neither.
+    def host_org_tags($id):
+        ($id | split("/")) as $p
+        | if ($p | length) >= 3 and ($p[0:3] | all(length > 0))
+          then ["host:" + ($p[0] | ascii_downcase), "org:" + ($p[1] | ascii_downcase)]
+          else [] end;
 
     def domain_ref(e):
         (e.spec.domain // "") as $d
@@ -609,7 +620,8 @@ COMPONENTS=$(jq \
      | select(keep_domain($domain;       $inc_domains;    $exc_domains))
      | select(keep_system(.spec.system;  $inc_systems;    $exc_systems))
      | {key: $id, value:
-         ({tags: ($prefixed + $derived)}
+         ({tags: ($prefixed + $derived
+                  + (if $host_org == "true" then host_org_tags($id) else [] end))}
           + (if $owner != "" then {owner: $owner} else {} end)
           + (if $domain != "" then {domain: $domain} else {} end)
           # catalog_api_fallback in the backstage collector looks the entity up by this.

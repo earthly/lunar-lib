@@ -14,7 +14,7 @@ This cataloger writes to the following Catalog JSON paths:
 |------|------|-------------|
 | `.components[*].owner` | string | Default owner (if `default_owner` is configured) |
 | `.components[*].domain` | string | Default domain (if `default_domain` is configured) |
-| `.components[*].tags[]` | array | GitHub topics with prefix (e.g., `gh-backend`) |
+| `.components[*].tags[]` | array | GitHub topics with prefix (e.g., `gh-backend`), plus `host:<host>` and `org:<org>` if `include_host_org_tags` is on |
 | `.components[*].meta.description` | string | Repository description |
 | `.components[*].meta.visibility` | string | Repository visibility (public, private, internal) |
 | `.components[*].meta.archived` | string | Whether the repository is archived ("true"/"false") |
@@ -144,6 +144,30 @@ any trailing path are stripped automatically. Authentication for a GHE host uses
 `GH_ENTERPRISE_TOKEN`), falling back to `LUNAR_SECRET_GH_TOKEN` if that secret is
 not set — so a github.com and a GHE server can use distinct credentials. Component
 IDs reflect the host, so a repo on GHE is keyed as `github.acme.com/<org>/<repo>`.
+
+### Host and Org Tags
+
+Set `include_host_org_tags: "true"` to tag each repository with its host and organization, so other imports can target them:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/github-org@v1.0.0
+    include: [repos]
+    with:
+      org_name: "acme-corp"
+      github_host: "github.acme.com"
+      include_host_org_tags: "true"   # host:github.acme.com, org:acme-corp
+
+policies:
+  - uses: github://earthly/lunar-lib/policies/repo-boilerplate@v1.0.0
+    include: [codeowners-exists]
+    on: "host:github.acme.com AND org:acme-corp"
+    enforcement: block-pr
+```
+
+- Both values are lowercased, and `tag_prefix` doesn't apply, so the `backstage` cataloger's `include_host_org_tags` produces the same tags.
+- Use the full hostname. In `on:`, `.` separates tag levels, so `host:github` also matches `host:github.acme.com`.
+- You don't need these tags to use a different GitHub App per host or organization: one `github_app` name can hold an App for each.
 
 ### Include Only Specific Repos
 

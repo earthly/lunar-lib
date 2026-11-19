@@ -148,6 +148,14 @@ inputs:
       lunar-config.yml still wins on merge.
     default: ""
 
+  include_host_org_tags:
+    description: |
+      When `true`, tags each repository with its Git host and organization,
+      lowercased: e.g. `host:github.com` and `org:acme`. Target them with
+      `on: "host:github.com AND org:acme"`. `tag_prefix` doesn't apply to
+      them, so they match the same tags from the `backstage` cataloger.
+    default: "false"
+
   max_repos:
     description: |
       Maximum repositories to fetch for the organization. Repository listing

@@ -83,6 +83,7 @@ DISALLOWED_TOPICS="${LUNAR_VAR_DISALLOWED_TOPICS:-}"
 TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gh-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
+INCLUDE_HOST_ORG_TAGS="${LUNAR_VAR_INCLUDE_HOST_ORG_TAGS:-false}"
 
 # Rate limit / retry settings
 MAX_RETRIES=5
@@ -127,6 +128,7 @@ echo "Include empty: $INCLUDE_EMPTY"
 [ -n "$DISALLOWED_TOPICS" ] && echo "Disallowed topics: $DISALLOWED_TOPICS"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
+echo "Host and org tags: $INCLUDE_HOST_ORG_TAGS"
 
 # Convert glob pattern to regex
 # Escapes regex special chars, converts * to .* and ? to .
@@ -268,10 +270,18 @@ CATALOG_ENTRIES=$(jq \
     --arg allowed_topics "$ALLOWED_TOPICS" \
     --arg disallowed_topics "$DISALLOWED_TOPICS" \
     --arg include_archived "$INCLUDE_ARCHIVED" \
+    --arg host_org "$INCLUDE_HOST_ORG_TAGS" \
     --argjson visibilities "$VISIBILITIES_JSON" \
     '
     # Parse a comma-separated input into a trimmed, non-empty set of topics.
     def csv_set($s): ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)));
+    # host:<host> and org:<org>, lowercased, from a <host>/<org>/<repo> id: the
+    # split the Hub uses for a GitHub component. Any other id gets neither.
+    def host_org_tags($id):
+        ($id | split("/")) as $p
+        | if ($p | length) >= 3 and ($p[0:3] | all(length > 0))
+          then ["host:" + ($p[0] | ascii_downcase), "org:" + ($p[1] | ascii_downcase)]
+          else [] end;
     (csv_set($allowed_topics)) as $allow |
     (csv_set($disallowed_topics)) as $deny |
 
@@ -313,11 +323,12 @@ CATALOG_ENTRIES=$(jq \
     ] |
 
     # Transform to catalog format as array of entries (for batching)
-    [.[] | {
-        key: (.url | gsub("https://"; "")),
+    [.[] | (.url | gsub("https://"; "")) as $id | {
+        key: $id,
         value: (
             {
-                tags: ([(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"] + ["github-visibility-\(.visibility | ascii_downcase)"]),
+                tags: ([(.repositoryTopics // [])[] | .name | "\($prefix)\(.)"] + ["github-visibility-\(.visibility | ascii_downcase)"]
+                    + (if $host_org == "true" then host_org_tags($id) else [] end)),
                 meta: {
                     description: .description,
                     visibility: .visibility,

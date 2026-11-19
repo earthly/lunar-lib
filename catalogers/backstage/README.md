@@ -14,7 +14,7 @@ This cataloger writes to the following Catalog JSON paths:
 |------|------|-------------|
 | `.components[*].owner` | string | `spec.owner` of the Backstage Component (or `default_owner` fallback) |
 | `.components[*].domain` | string | `spec.domain` of the Backstage Component |
-| `.components[*].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix` |
+| `.components[*].tags[]` | array | `metadata.tags` plus derived `type-*` / `lifecycle-*` tags, all with `tag_prefix`; plus `host:<host>` and `org:<org>` with [`include_host_org_tags`](#host-and-org-tags) |
 | `.components[*].meta["backstage/entity-ref"]` | string | The component's entity ref (e.g. `component:default/payment-api`), with [`include_entity_ref_meta`](#entity-ref-meta) |
 | `.domains[*].description` | string | `metadata.description` of the Backstage Domain |
 | `.domains[*].owner` | string | `spec.owner` of the Backstage Domain |
@@ -233,6 +233,14 @@ Set `include_entity_ref_meta: "true"` and each synced component records the Back
 ```
 
 The [`backstage` collector](../../collectors/backstage/README.md#repos-without-a-catalog-file) reads it with `catalog_api_fallback` to fetch the entity of a component that keeps no catalog-info.yaml in its repository. When several entities map to the same component, the ref names the entity whose owner, domain and tags were kept.
+
+### Host and Org Tags
+
+Set `include_host_org_tags: "true"` to tag each component with the Git host and organization in its id. A component keyed `github.acme.com/acme-corp/payment-api` gets `host:github.acme.com` and `org:acme-corp`, so other imports can target `on: "host:github.acme.com AND org:acme-corp"`.
+
+- The split is the Hub's for a GitHub component: the first two segments of a `<host>/<org>/<repo>[/<path>]` id. An id with fewer than three segments gets neither tag.
+- Both values are lowercased, and `tag_prefix` doesn't apply, so the tags match the `github-org` cataloger's.
+- Use the full hostname. In `on:`, `.` separates tag levels, so `host:github` also matches `host:github.acme.com`.
 
 ### Verifying Repos Exist (`verify_repos`)
 
