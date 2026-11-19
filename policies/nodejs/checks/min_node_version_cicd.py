@@ -1,11 +1,8 @@
-"""Check that Node.js version used in CI/CD meets minimum requirement."""
+"""Check that the Node.js version used in CI/CD meets the minimum for its major release."""
 from lunar_policy import Check, variable_or_default
 
-
-def parse_major(v):
-    """Extract major version number from a version string."""
-    s = str(v).strip().lstrip("vV")
-    return int(s.split(".")[0])
+from min_node_version import NODE
+from version_minimum import parse_minimum, report_ci_versions
 
 
 def check_min_node_version_cicd(min_version=None, node=None):
@@ -23,33 +20,12 @@ def check_min_node_version_cicd(min_version=None, node=None):
         if not cmds_node.exists():
             c.skip("No CI/CD Node.js commands recorded")
 
-        cmds = cmds_node.get_value()
-
         try:
-            min_major = parse_major(min_version)
-        except (ValueError, TypeError):
-            c.fail(f"Invalid minimum version format: {min_version}")
+            minimum = parse_minimum(min_version, NODE)
+        except ValueError as e:
+            c.fail(f"min_node_version_cicd {e}")
             return c
-
-        violations = []
-        for cmd_info in cmds:
-            cmd_name = cmd_info.get("cmd", "unknown")
-            version = cmd_info.get("version")
-            if not version:
-                violations.append(f"'{cmd_name}' has no Node.js version recorded")
-                continue
-            try:
-                actual_major = parse_major(version)
-                if actual_major < min_major:
-                    violations.append(f"'{cmd_name}' used Node.js {version}")
-            except (ValueError, TypeError):
-                violations.append(f"'{cmd_name}' has unparseable version '{version}'")
-
-        if violations:
-            c.fail(
-                f"CI/CD Node.js version issues (minimum: {min_version}):\n"
-                + "\n".join(f"  - {v}" for v in violations)
-            )
+        report_ci_versions(c, cmds_node.get_value(), minimum)
     return c
 
 

@@ -88,8 +88,5 @@ policies:
 
 inputs:
   min_kotlin_version:
-    description: |
-      Minimum required Kotlin compiler version (e.g., "1.8", "1.9", "2.0").
-      Compared with semantic-version semantics — "1.8" matches 1.8.x and above,
-      but rejects 1.7.x.
+    description: Minimum Kotlin compiler version ("1.8", "2.1.21") or one per release line ("2.1.21, 2.2.20")
     default: "1.8"

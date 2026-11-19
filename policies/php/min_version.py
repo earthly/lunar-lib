@@ -1,6 +1,34 @@
+"""Check that the composer.json PHP constraint meets the minimum for its release line."""
 import re
 
 from lunar_policy import Check, variable_or_default
+
+from version_minimum import Runtime, compare_versions, parse_minimum
+
+# A PHP release line is major.minor: 8.2, 8.3. A minimum may keep a
+# Composer-style operator: ^8.1, ~8.1 and >=8.1 all mean 8.1.
+PHP = Runtime(
+    "PHP",
+    line_length=2,
+    forms="8.3, 8.3.14 or 8.4.0RC1",
+    normalize=lambda text: re.sub(r"^(?:\^|~|>=?|=)\s*", "", text),
+)
+
+
+def lowest_allowed(constraint):
+    """The lowest version a composer.json PHP constraint allows, or None.
+
+    Takes the first version in each || alternative: ^8.1, ~8.1.0, >=8.1 <9.0
+    and 8.1.* all allow 8.1, and ^7.4 || ^8.1 allows 7.4.
+    """
+    lowest = None
+    for part in str(constraint).split("||"):
+        m = re.search(r"\d+(?:\.\d+)*", part)
+        if m:
+            version = PHP.parse(m.group(0))
+            if lowest is None or compare_versions(version, lowest) < 0:
+                lowest = version
+    return lowest
 
 
 def check_min_version(min_version=None, node=None):
@@ -25,58 +53,30 @@ def check_min_version(min_version=None, node=None):
         if not constraint:
             c.skip("PHP version constraint is empty")
 
-        def parse_version(v):
-            """Parse a version string like '8.1' or '8.1.0' into a tuple."""
-            parts = re.findall(r'\d+', str(v))
-            return tuple(int(p) for p in parts)
-
-        def extract_min_from_constraint(constraint_str):
-            """Extract the minimum version from a PHP version constraint.
-
-            Handles common patterns:
-            - ^8.1 or ^8.1.0 (caret: >=8.1.0 <9.0.0)
-            - ~8.1 (tilde: >=8.1.0 <8.2.0)
-            - >=8.1
-            - 8.1.* or 8.*
-            - ^7.4 || ^8.1 (OR constraint: takes lowest)
-            - >=8.1 <9.0 (AND constraint: takes the lower bound)
-            """
-            # Handle OR constraints — split on || and take the lowest version
-            if "||" in constraint_str:
-                parts = constraint_str.split("||")
-                versions = []
-                for part in parts:
-                    v = extract_min_from_constraint(part.strip())
-                    if v is not None:
-                        versions.append(v)
-                return min(versions) if versions else None
-
-            # Strip leading operators and extract version number
-            cleaned = constraint_str.strip()
-
-            # Match version with optional operator prefix
-            match = re.search(r'[\^~>=<]*\s*(\d+(?:\.\d+)*)', cleaned)
-            if not match:
-                return None
-
-            return parse_version(match.group(1))
-
         try:
-            minimum = parse_version(min_version)
-            actual = extract_min_from_constraint(constraint)
+            minimum = parse_minimum(min_version, PHP)
+        except ValueError as e:
+            c.fail(f"min_version {e}")
+            return c
 
-            if actual is None:
-                c.fail(f"Could not parse PHP version constraint: {constraint}")
-                return c
-
-            # Compare only as many components as minimum specifies
-            c.assert_true(
-                actual[:len(minimum)] >= minimum,
-                f"PHP version {constraint} (min {'.'.join(str(p) for p in actual)}) "
-                f"is below minimum {min_version}. Update the PHP constraint in composer.json."
-            )
-        except (ValueError, TypeError):
+        lowest = lowest_allowed(constraint)
+        if lowest is None:
             c.fail(f"Could not parse PHP version constraint: {constraint}")
+            return c
+
+        floor, unlisted = minimum.match(lowest)
+        if unlisted:
+            c.fail(
+                f"PHP version {constraint} (min {lowest.text}) is on release line "
+                f"{minimum.line_text(lowest)}, which has no listed minimum ({minimum.text})."
+            )
+            return c
+        below = floor is not None and compare_versions(lowest, floor) < 0
+        c.assert_true(
+            not below,
+            f"PHP version {constraint} (min {lowest.text}) is below minimum {floor.text}. "
+            "Update the PHP constraint in composer.json." if below else "",
+        )
     return c
 
 

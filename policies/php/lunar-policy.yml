@@ -80,10 +80,10 @@ policies:
 
 inputs:
   min_version:
-    description: Minimum required PHP version (e.g., "8.1", "8.2")
+    description: Minimum PHP version ("8.1", "8.3.14") or one per release line ("8.2.29, 8.3.27, 8.4.14")
     default: "8.1"
   min_version_cicd:
-    description: Minimum required PHP CI runtime version (e.g., "8.1", "8.2")
+    description: Minimum PHP CI runtime version, in the same forms as min_version
     default: "8.1"
   min_composer_version:
     description: Minimum required Composer version (e.g., "2.6", "2.7")

@@ -68,8 +68,8 @@ inputs:
   min_sdk_version:
     type: str
     default: "8.0"
-    description: "Minimum .NET SDK version required for the project"
+    description: Minimum .NET SDK version ("8.0", "8.0.416") or one per feature band ("8.0.122, 8.0.416, 10.0.101")
   min_sdk_version_cicd:
     type: str
     default: "8.0"
-    description: "Minimum .NET SDK version required for CI/CD pipelines"
+    description: Minimum .NET SDK version for CI/CD pipelines, in the same forms as min_sdk_version

@@ -21,6 +21,23 @@ This plugin provides the following policies (use `include` to select a subset):
 | `test-module-exists` | Validates `src/test/scala` (or cross-version variant) exists | No test sources detected |
 | `scalafmt-configured` | Validates `.scalafmt.conf` is committed | scalafmt not configured (informational) |
 
+### Minimum per release line
+
+Scala 2.12, 2.13 and 3.3 LTS are maintained side by side, so `min_scala_version` takes one minimum, or one per release line (major.minor) separated by commas, spaces or newlines:
+
+```yaml
+with:
+  min_scala_version: "2.12.20, 2.13.16, 3.3.6"
+```
+
+| Version | Result |
+|---------|--------|
+| `2.12.20`, `3.3.6` | Passes: meets its line's minimum |
+| `2.13.14`, `2.13` | Fails: below its line's minimum; `2.13` counts as `2.13.0` |
+| `2.11.12`, `2.10.7` | Fails: older than every listed line |
+| `3.0.2`, `3.2.2` | Fails: no minimum is listed for its line, and a newer line is listed |
+| `3.7.3`, `3.8.0` | Passes: newer than every listed line, as with a single minimum |
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

@@ -17,6 +17,24 @@ This plugin provides the following policies (use `include` to select a subset):
 | `min-python-version` | Ensures minimum Python version | Python version too old |
 | `min-python-version-cicd` | Ensures minimum Python version in CI/CD | CI/CD Python version too old |
 
+### Minimum per release line
+
+`min-python-version` and `min-python-version-cicd` take one minimum, or one per release line (major.minor) separated by commas, spaces or newlines. A single minimum is one floor for every line: `3.11.14` passes a vulnerable `3.13.0`. With a list, each version is held to its own line's minimum:
+
+```yaml
+with:
+  min_python_version_cicd: "3.11.14, 3.12.12, 3.13.9"
+```
+
+| Version | Result |
+|---------|--------|
+| `3.12.12`, `3.13.10` | Passes: meets its line's minimum |
+| `3.13.0`, `3.13.0rc1` | Fails: below its line's minimum |
+| `3.10.19`, `3.9.25` | Fails: older than every listed line |
+| `3.14.0`, `3.15.0a1` | Passes: newer than every listed line, as with a single minimum |
+
+A line between two listed lines has no minimum and fails. `min-python-version` reads `.lang.python.version`, which the `python` collector takes from the Python installed where it runs, not from the project. Use `min-python-version-cicd` to check the Python your CI runs.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

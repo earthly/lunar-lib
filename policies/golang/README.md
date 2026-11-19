@@ -19,6 +19,25 @@ This plugin provides the following policies (use `include` to select a subset):
 | `tests-recursive` | Ensures tests run with `./...` | Tests may miss subpackages |
 | `vendoring` | Enforces vendoring policy | Vendor dir present/absent per policy |
 
+### Minimum per release line
+
+`min-go-version` and `min-go-version-cicd` take one minimum, or one per release line (major.minor) separated by commas, spaces or newlines. A single minimum is one floor for every line: `1.26.9` passes a vulnerable `1.27.3`. With a list, each version is held to its own line's minimum:
+
+```yaml
+with:
+  min_go_version: "1.26.9, 1.27.4"
+  min_go_version_cicd: "1.26.9, 1.27.4"
+```
+
+| Version | Result |
+|---------|--------|
+| `1.26.9`, `1.27.5` | Passes: meets its line's minimum |
+| `1.27.3`, `1.27rc2` | Fails: below its line's minimum |
+| `1.25.14`, `1.24.9` | Fails: older than every listed line |
+| `1.28.0`, `1.28rc1` | Passes: newer than every listed line, as with a single minimum |
+
+A line between two listed lines has no minimum and fails. `min-go-version` compares go.mod's `go` line in full, so `go 1.27`, the same as `1.27.0`, fails a `1.27.4` minimum: the `go` line is the oldest Go the module builds with. The `toolchain` line isn't read.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

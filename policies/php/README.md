@@ -21,6 +21,25 @@ This plugin provides the following policies (use `include` to select a subset):
 | `min-version-cicd` | Ensures minimum PHP runtime version in CI | CI PHP version too old |
 | `min-composer-version` | Ensures minimum Composer version in CI | Composer version too old |
 
+### Minimum per release line
+
+`min-version` and `min-version-cicd` take one minimum, or one per release line (major.minor) separated by commas, spaces or newlines. A single minimum is one floor for every line: `8.2.29` passes a vulnerable `8.4.1`. With a list, each version is held to its own line's minimum:
+
+```yaml
+with:
+  min_version: "8.2.29, 8.3.27, 8.4.14"
+  min_version_cicd: "8.2.29, 8.3.27, 8.4.14"
+```
+
+| Version | Result |
+|---------|--------|
+| `8.3.27`, `8.4.15` | Passes: meets its line's minimum |
+| `8.4.1`, `8.4.0RC1` | Fails: below its line's minimum |
+| `8.1.33`, `7.4.33` | Fails: older than every listed line |
+| `8.5.0`, `8.5.1` | Passes: newer than every listed line, as with a single minimum |
+
+A line between two listed lines has no minimum and fails. `min-version` compares the lowest version composer.json's `require.php` allows: `^8.3` allows 8.3.0 and fails, and `>=8.3.27` passes. A distribution build such as Ubuntu's `8.1.2-1ubuntu2.19` reports the upstream release it started from, so fixes it backported don't count.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

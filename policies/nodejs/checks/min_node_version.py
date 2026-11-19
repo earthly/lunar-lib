@@ -1,11 +1,10 @@
-"""Check that Node.js version meets minimum requirement."""
+"""Check that the Node.js version meets the minimum for its major release."""
 from lunar_policy import Check, variable_or_default
 
+from version_minimum import Runtime, check_build_version, parse_minimum
 
-def parse_major(v):
-    """Extract major version number from a version string."""
-    s = str(v).strip().lstrip("vV")
-    return int(s.split(".")[0])
+# A Node.js release line is a major: 20, 22.
+NODE = Runtime("Node.js", line_length=1, forms="20, 20.15.1 or v20.15.1")
 
 
 def check_min_node_version(min_version=None, node=None):
@@ -31,21 +30,11 @@ def check_min_node_version(min_version=None, node=None):
             c.skip("Node.js version not detected")
 
         try:
-            min_major = parse_major(min_version)
-        except (ValueError, TypeError):
-            raise ValueError(f"Invalid min_node_version input: {min_version}")
-
-        try:
-            actual_major = parse_major(actual_version)
-        except (ValueError, TypeError):
-            c.fail(f"Could not parse Node.js version: {actual_version}")
+            minimum = parse_minimum(min_version, NODE)
+        except ValueError as e:
+            c.fail(f"min_node_version {e}")
             return c
-
-        c.assert_true(
-            actual_major >= min_major,
-            f"Node.js version {actual_version} is below minimum {min_version}. "
-            f"Update to Node.js {min_version} or higher."
-        )
+        check_build_version(c, actual_version, minimum, " Update to Node.js {floor} or higher.")
     return c
 
 

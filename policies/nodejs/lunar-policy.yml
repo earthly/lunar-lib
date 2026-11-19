@@ -45,22 +45,22 @@ policies:
 
   - name: min-node-version
     description: |
-      Ensures the Node.js version detected in the project meets the minimum required version.
-      Helps maintain security and compatibility standards.
+      Ensures the Node.js version detected in the project meets the minimum for its
+      major release. Compares full versions, not just the major.
     mainPython: checks/min_node_version.py
     keywords: ["node version", "compatibility", "security"]
 
   - name: min-node-version-cicd
     description: |
-      Ensures the Node.js version used in CI/CD commands meets the minimum required version.
-      Helps maintain security and compatibility standards for build environments.
+      Ensures every Node.js version recorded for node commands in CI meets the minimum
+      for its major release. Compares full versions, not just the major.
     mainPython: checks/min_node_version_cicd.py
     keywords: ["node version", "ci/cd", "compatibility", "security"]
 
 inputs:
   min_node_version:
-    description: Minimum required Node.js major version (e.g., "18", "20")
+    description: Minimum Node.js version ("18", "20.15.1") or one per major release ("20.19.5, 22.20.0, 24.10.0")
     default: "18"
   min_node_version_cicd:
-    description: Minimum required Node.js major version for CI/CD commands (e.g., "18", "20")
+    description: Minimum Node.js version for node commands in CI, in the same forms as min_node_version
     default: "18"

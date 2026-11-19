@@ -65,10 +65,10 @@ policies:
 
 inputs:
   min_go_version:
-    description: Minimum required Go version (e.g., "1.21", "1.22")
+    description: Minimum Go version for go.mod ("1.21", "1.22.7") or one per release line ("1.26.9, 1.27.4")
     default: "1.21"
   min_go_version_cicd:
-    description: Minimum required Go version for CI/CD commands (e.g., "1.21", "1.22")
+    description: Minimum Go version for CI/CD commands, in the same forms as min_go_version
     default: "1.21"
   vendoring_mode:
     description: |

@@ -1,4 +1,8 @@
+"""Check that the Ruby version used in CI/CD meets the minimum for its release line."""
 from lunar_policy import Check, variable_or_default
+
+from min_ruby_version import RUBY
+from version_minimum import parse_minimum, report_ci_versions
 
 
 def check_min_ruby_version_cicd(min_version=None, node=None):
@@ -20,39 +24,12 @@ def check_min_ruby_version_cicd(min_version=None, node=None):
         if not cmds_node.exists():
             c.skip("No CI/CD Ruby commands recorded")
 
-        cmds = cmds_node.get_value()
-
-        def parse_version(v):
-            parts = str(v).strip().split(".")
-            return tuple(int(p) for p in parts)
-
         try:
-            minimum = parse_version(min_version)
-        except (ValueError, TypeError):
-            c.fail(f"Invalid minimum version format: {min_version}")
+            minimum = parse_minimum(min_version, RUBY)
+        except ValueError as e:
+            c.fail(f"min_ruby_version_cicd {e}")
             return c
-
-        violations = []
-        for cmd_info in cmds:
-            cmd_name = cmd_info.get("cmd", "unknown")
-            version = cmd_info.get("version")
-            if not version:
-                continue
-            try:
-                actual = parse_version(version)
-                cmp_len = max(len(actual), len(minimum))
-                actual_padded = actual + (0,) * (cmp_len - len(actual))
-                minimum_padded = minimum + (0,) * (cmp_len - len(minimum))
-                if actual_padded < minimum_padded:
-                    violations.append(f"'{cmd_name}' used Ruby {version}")
-            except (ValueError, TypeError):
-                violations.append(f"'{cmd_name}' has unparseable version '{version}'")
-
-        if violations:
-            c.fail(
-                f"CI/CD Ruby version issues (minimum: {min_version}):\n"
-                + "\n".join(f"  - {v}" for v in violations)
-            )
+        report_ci_versions(c, cmds_node.get_value(), minimum, skip_unrecorded=True)
     return c
 
 

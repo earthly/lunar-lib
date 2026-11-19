@@ -11,3 +11,5 @@ test:
     COPY --dir test .
     RUN python test/test_project_gating.py
     RUN python test/test_engines_pinned.py
+    RUN python test/test_min_node_version.py
+    RUN python test/test_version_minimum.py

@@ -20,6 +20,10 @@ This plugin provides the following policies (use `include` to select a subset):
 | `test-directory-exists` | Validates `src/test/kotlin` exists | No test sources detected |
 | `linter-configured` | Validates detekt or ktlint is configured | Neither detekt nor ktlint configured (informational) |
 
+### Minimum per release line
+
+`min_kotlin_version` takes one minimum, or one per release line (major.minor) separated by commas, spaces or newlines, such as `"2.1.21, 2.2.20"`. Each version is held to its own line's minimum, so `2.2.0` fails that list while it passes a single `2.1.21`. A line between two listed lines, or older than every listed line, fails; a line newer than every listed line passes, as with a single minimum. A pre-release sorts before its release: `2.2.0-RC` is below `2.2.0`.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

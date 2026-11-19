@@ -86,10 +86,10 @@ inputs:
     description: Maximum allowed known vulnerabilities from bundler-audit (0 = must be clean)
     default: "0"
   min_ruby_version:
-    description: Minimum required Ruby version (e.g., "3.0", "3.2")
+    description: Minimum Ruby version ("3.0", "3.3.6") or one per release line ("3.3.10, 3.4.7, 4.0.1")
     default: "3.0"
   min_ruby_version_cicd:
-    description: Minimum required Ruby version for CI/CD commands
+    description: Minimum Ruby version for CI/CD commands, in the same forms as min_ruby_version
     default: "3.0"
   min_bundler_version_cicd:
     description: Minimum required Bundler version for CI/CD commands
