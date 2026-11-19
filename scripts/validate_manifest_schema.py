@@ -124,6 +124,7 @@ ALLOWED_HOOK_KEYS = {
     "schedule",
     "repo",
     "clone-code",
+    "clone_depth",
     "binary",
     "args",
     "args_pattern",

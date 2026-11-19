@@ -62,6 +62,7 @@ collectors:
     mainBash: ai-authorship.sh
     hook:
       type: code
+      clone_depth: full
     keywords: ["ai authorship", "git ai", "code attribution", "ai tracking", "git notes"]
 
 inputs:

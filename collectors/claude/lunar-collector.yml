@@ -46,6 +46,7 @@ collectors:
     runs_on: [prs]
     hook:
       type: code
+      clone_depth: base
     keywords: ["claude", "code review", "ai review", "pull request", "claude cli"]
 
   - name: cicd
