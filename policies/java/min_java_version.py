@@ -87,6 +87,90 @@ def compare_java_versions(a, b):
     return _compare_pre(a.pre, b.pre)
 
 
+def feature_release(version):
+    """The feature release a version belongs to: 21 for 21.0.13.1, 8 for 1.8.0_202."""
+    return version.numbers[0]
+
+
+class JavaMinimum:
+    """A minimum Java version, or one minimum per feature release.
+
+    A version is held to the minimum listed for its feature release, or to the
+    lowest one if its release is older than every listed release. A release
+    between listed ones (23 when 21 and 25 are listed) has no minimum and fails.
+    A release newer than every listed one passes, so a single minimum such as
+    21.0.13.1 still passes any 25.
+    """
+
+    def __init__(self, floors):
+        self.floors = sorted(floors, key=feature_release)
+        self.text = ", ".join(f.text for f in self.floors)
+
+    def describe(self):
+        if len(self.floors) == 1:
+            return f"minimum {self.text}"
+        return f"the minimum for its feature release ({self.text})"
+
+    def unlisted(self, version):
+        """True when version's feature release falls between two listed releases."""
+        release = feature_release(version)
+        listed = [feature_release(f) for f in self.floors]
+        return listed[0] < release < listed[-1] and release not in listed
+
+    def floor_for(self, version):
+        """The minimum version is held to, or None if its release is newer than every listed one."""
+        return next((f for f in self.floors if feature_release(f) >= feature_release(version)), None)
+
+
+def _shown(value):
+    return f'"{value}"' if isinstance(value, str) else json.dumps(value, default=str)
+
+
+def parse_java_minimum(value):
+    """Parse a min_java_version input into a JavaMinimum; raise ValueError if unsupported.
+
+    The value is one version ("21.0.13.1") or one per feature release, separated
+    by commas, spaces or newlines ("21.0.13.1, 25.0.5.1, 27.0.1.1"), optionally
+    as a JSON-style array. A # comments out the rest of its line.
+    """
+    entries = [value]
+    if isinstance(value, str):
+        text = "\n".join(line.split("#", 1)[0] for line in value.splitlines()).strip()
+        bracketed = text.startswith("[") and text.endswith("]")
+        if bracketed:
+            text = text[1:-1]
+        entries = [e.strip("\"'") if bracketed else e for e in re.split(r"[\s,]+", text)]
+        entries = [e for e in entries if e] or [value]
+
+    if len(entries) == 1:
+        try:
+            return JavaMinimum([parse_java_version(entries[0])])
+        except ValueError as e:
+            raise ValueError(f"{_shown(value)} {e}") from None
+
+    floors = {}
+    for entry in entries:
+        try:
+            floor = parse_java_version(entry)
+        except ValueError as e:
+            raise ValueError(f'entry "{entry}" {e}') from None
+        release = feature_release(floor)
+        if release in floors:
+            raise ValueError(f"lists Java {release} twice: {floors[release].text} and {floor.text}")
+        floors[release] = floor
+    return JavaMinimum(floors.values())
+
+
+def version_problem(actual, minimum):
+    """Return why a complete version (one a JDK reported) misses the minimum, or None."""
+    if minimum.unlisted(actual):
+        return f"Java {actual.text} is on feature release {feature_release(actual)}, which has no listed minimum"
+    floor = minimum.floor_for(actual)
+    if floor is not None and compare_java_versions(actual, floor) < 0:
+        return f"Java {actual.text} is below minimum {floor.text}"
+    return None
+
+
 def omits_required_update(actual, minimum):
     """True when a build-file version names no update ("21", "21.0") but the minimum needs one.
 
@@ -113,11 +197,8 @@ def ci_version_problem(raw, minimum):
     try:
         actual = parse_java_version(raw)
     except ValueError as e:
-        shown = f'"{raw}"' if isinstance(raw, str) else json.dumps(raw, default=str)
-        return f"Java version {shown} {e}"
-    if compare_java_versions(actual, minimum) < 0:
-        return f"Java {actual.text} is below minimum {minimum.text}"
-    return None
+        return f"Java version {_shown(raw)} {e}"
+    return version_problem(actual, minimum)
 
 
 def report_ci_versions(c, cmds, minimum, summary):
@@ -138,24 +219,16 @@ def report_ci_versions(c, cmds, minimum, summary):
         c.fail(f"{problem} ({count} '{commands[0]}')")
 
 
-def _check_update_from_ci(c, target, minimum):
+def _check_update_from_ci(c, target, floor, minimum):
     """Take the update a feature-release build target can't show from the JDKs CI ran."""
     cmds_node = c.get_node(".lang.java.cicd.cmds")
     cmds = cmds_node.get_value() if cmds_node.exists() else None
     unknown = f"Java {target.text} in the build config doesn't show which update is in use"
     if not cmds:
         # Nothing ran in CI to compare, e.g. the CI/CD Tracer isn't installed.
-        c.skip(f"{unknown}, and CI recorded no java or javac commands to compare with minimum {minimum.text}")
+        c.skip(f"{unknown}, and CI recorded no java or javac commands to compare with minimum {floor.text}")
         return
-    report_ci_versions(c, cmds, minimum, f"{unknown}, and CI ran Java that does not meet minimum {minimum.text}")
-
-
-def _parse_or_error(value, label):
-    try:
-        return parse_java_version(value), None
-    except ValueError as e:
-        shown = f'"{value}"' if isinstance(value, str) else json.dumps(value, default=str)
-        return None, f"{label} {shown} {e}"
+    report_ci_versions(c, cmds, minimum, f"{unknown}, and CI ran Java that does not meet {minimum.describe()}")
 
 
 def check_min_java_version(min_version=None, node=None):
@@ -176,26 +249,34 @@ def check_min_java_version(min_version=None, node=None):
         if not version_node.exists():
             c.skip("Java version not detected in build config")
 
-        minimum, min_error = _parse_or_error(min_version, "min_java_version")
-        actual, actual_error = _parse_or_error(version_node.get_value(), "Java version")
+        try:
+            minimum = parse_java_minimum(min_version)
+        except ValueError as e:
+            c.fail(f"min_java_version {e}")
+            return c
+        try:
+            actual = parse_java_version(version_node.get_value())
+        except ValueError as e:
+            c.fail(f"Java version {_shown(version_node.get_value())} {e}")
+            return c
 
-        if min_error:
-            c.fail(min_error)
-        elif actual_error:
-            c.fail(actual_error)
-        elif omits_required_update(actual, minimum):
-            _check_update_from_ci(c, actual, minimum)
+        floor = minimum.floor_for(actual)
+        if minimum.unlisted(actual):
+            c.fail(
+                f"Java version {actual.text} is on feature release {feature_release(actual)}, "
+                f"which has no listed minimum ({minimum.text})."
+            )
+        elif floor is not None and omits_required_update(actual, floor):
+            _check_update_from_ci(c, actual, floor, minimum)
         else:
+            below = floor is not None and compare_java_versions(actual, floor) < 0
             # A build target takes a feature release, never an update like 21.0.13.1.
             advice = (
-                f" Update your build config to target Java {minimum.numbers[0]} or newer."
-                if actual.numbers[0] < minimum.numbers[0]
+                f" Update your build config to target Java {feature_release(floor)} or newer."
+                if below and feature_release(actual) < feature_release(floor)
                 else ""
             )
-            c.assert_true(
-                compare_java_versions(actual, minimum) >= 0,
-                f"Java version {actual.text} is below minimum {minimum.text}.{advice}",
-            )
+            c.assert_true(not below, f"Java version {actual.text} is below minimum {floor.text}.{advice}" if below else "")
     return c
 
 

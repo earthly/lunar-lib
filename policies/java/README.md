@@ -21,7 +21,7 @@ This plugin provides the following policies (use `include` to select a subset):
 
 ### Version comparison
 
-`min-java-version` and `min-java-version-cicd` compare full versions, so a minimum can be a feature release (`17`) or a specific update (`21.0.13.1`). `21.0.5` fails a `21.0.13.1` minimum and passes a `21` one.
+`min-java-version` and `min-java-version-cicd` compare full versions, so a minimum can be a feature release (`17`), a specific update (`21.0.13.1`) or [one minimum per feature release](#minimum-per-feature-release). `21.0.5` fails a `21.0.13.1` minimum and passes a `21` one.
 
 | Version | Compared as | Notes |
 |---------|-------------|-------|
@@ -34,11 +34,32 @@ Against a minimum with an update, such as `21.0.13.1`:
 
 - **A `21` build target** can't show which Java 21 update is in use, so `min-java-version` takes the update from the Java versions the `java` collector recorded in CI. It passes when every recorded version meets the minimum and fails when one doesn't, including a command whose version wasn't recorded. If CI recorded no java or javac commands, for example because the Lunar CI/CD Tracer isn't installed, it skips. A `17` target fails without CI, and a `25` target passes.
 - **A version recorded in CI** is complete, so `21` there is the 21 GA release and `21.0.13` is below `21.0.13.1`.
-- **One minimum is one floor across feature releases.** `21.0.13.1` passes any 25 or 27 build, whatever its update, and fails a patched 17.0.21.1. To require a fixed update on several releases, use one policy entry per release, each scoped with `on:` to the components that run it.
 - **Only build files and CI are checked.** `min-java-version-cicd` sees the JDKs CI ran, not the JDK in a deployed image or on a host.
 - **Gradle toolchains aren't read.** The `java` collector takes the build target from `<java.version>`, `<maven.compiler.source>`, `<maven.compiler.release>`, `sourceCompatibility` or `JavaVersion.VERSION_*`, so a project that declares only `JavaLanguageVersion.of(21)` skips `min-java-version`. `min-java-version-cicd` still checks its CI JDKs.
 
 Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
+
+### Minimum per feature release
+
+A single minimum is one floor for every feature release: `21.0.13.1` passes any 25 or 27 build, including a vulnerable `25.0.5`. To hold each release to its own fixed update, list one minimum per feature release, separated by commas, spaces or newlines:
+
+```yaml
+with:
+  min_java_version: "21.0.13.1, 25.0.5.1, 27.0.1.1"
+  min_java_version_cicd: "21.0.13.1, 25.0.5.1, 27.0.1.1"
+```
+
+| Version | Result |
+|---------|--------|
+| `21.0.13.1`, `25.0.6`, `27.0.1.1` | Passes: meets its release's minimum |
+| `21.0.13`, `25.0.5` | Fails: below its release's minimum |
+| `11.0.29`, `17.0.21.1` | Fails: older than every listed release |
+| `23.0.2`, `26.0.1` | Fails: no minimum is listed for its release, and a newer release is listed |
+| `28`, `28.0.1` | Passes: newer than every listed release, as with a single minimum |
+
+A `21` build target takes its update from CI as described above, and every Java version recorded in CI is held to the minimum for its own release.
+
+The check sees only the version `java -version` reports, not the vendor. Corretto, Zulu and Microsoft builds of the same update all report `21.0.13.1`, and build numbers such as `+2` are ignored. IBM Semeru reports its 21.0.13 builds as `21.0.13.0.x`, which sorts below `21.0.13.1`. To accept a vendor's own fix version, split the components that use it into a separate policy entry with `on:` and list that version there.
 
 ## Required Data
 
@@ -142,6 +163,7 @@ policies:
 ### min-java-version-cicd
 - Upgrade the JDK your CI runs, e.g. `java-version` in `actions/setup-java` or the build image's base, to the minimum or newer
 - **No Java version recorded:** the command's `java -version` or `javac -version` printed no version line, often because the JVM failed to start
+- **No listed minimum:** the JDK is on a feature release the minimum skips, such as 23 between 21 and 25; move to a listed release
 
 ### min-maven-version / min-gradle-version
 - Update your CI/CD pipeline or build tool wrapper to use a newer version
