@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from min_java_version import parse_java_version, report_ci_versions
+from min_java_version import parse_java_minimum, report_ci_versions
 
 
 def check_min_java_version_cicd(min_version=None, node=None):
@@ -18,12 +18,12 @@ def check_min_java_version_cicd(min_version=None, node=None):
             c.skip("No java or javac commands recorded in CI")
 
         try:
-            minimum = parse_java_version(min_version)
+            minimum = parse_java_minimum(min_version)
         except ValueError as e:
-            c.fail(f'min_java_version_cicd "{min_version}" {e}')
+            c.fail(f"min_java_version_cicd {e}")
             return c
 
-        report_ci_versions(c, cmds, minimum, f"CI ran Java that does not meet minimum {minimum.text}")
+        report_ci_versions(c, cmds, minimum, f"CI ran Java that does not meet {minimum.describe()}")
     return c
 
 

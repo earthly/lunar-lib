@@ -9,4 +9,4 @@ test:
     COPY requirements.txt .
     RUN pip install --no-cache-dir -r requirements.txt
     COPY *.py .
-    RUN python -m unittest test_min_java_version test_min_java_version_cicd -v
+    RUN python -m unittest test_min_java_version test_min_java_version_cicd test_min_java_version_per_release -v
