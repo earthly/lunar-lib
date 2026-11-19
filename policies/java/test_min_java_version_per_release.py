@@ -173,6 +173,22 @@ class PerReleaseCicdTest(unittest.TestCase):
         c = run_ci(java(ci_versions=["28", "28.0.1"]))
         self.assertEqual(outcome(c), CheckStatus.PASS, messages(c))
 
+    def test_minimum_release_with_a_fixed_update_on_every_release_since(self):
+        every = "21.0.13.1, 22.0.2, 23.0.2, 24.0.2, 25.0.5.1, 26.0.1, 27.0.1.1"
+        some = "21.0.13.1, 22, 23, 24, 25.0.5.1, 26, 27.0.1.1"  # bare releases take any update
+        for version, with_every, with_some in [
+            ("17.0.21.1", CheckStatus.FAIL, CheckStatus.FAIL),
+            ("21.0.13", CheckStatus.FAIL, CheckStatus.FAIL),
+            ("22.0.1", CheckStatus.FAIL, CheckStatus.PASS),
+            ("23.0.2", CheckStatus.PASS, CheckStatus.PASS),
+            ("25.0.5", CheckStatus.FAIL, CheckStatus.FAIL),
+            ("26.0.0", CheckStatus.FAIL, CheckStatus.PASS),
+            ("28.0.1", CheckStatus.PASS, CheckStatus.PASS),
+        ]:
+            with self.subTest(version=version):
+                data = java(ci_versions=[version])
+                self.assertEqual((outcome(run_ci(data, every)), outcome(run_ci(data, some))), (with_every, with_some))
+
     def test_mixed_patched_and_vulnerable_fails_only_the_vulnerable_versions(self):
         c = run_ci(java(ci_versions=["21.0.13.1", "25.0.5", "21.0.13.1", "25.0.5.1", "23.0.2", "25.0.5", "27.0.1.1"]))
         self.assertEqual(

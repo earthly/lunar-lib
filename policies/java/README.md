@@ -57,6 +57,8 @@ with:
 | `23.0.2`, `26.0.1` | Fails: no minimum is listed for its release, and a newer release is listed |
 | `28`, `28.0.1` | Passes: newer than every listed release, as with a single minimum |
 
+A bare release such as `23` accepts every update of it, so `21.0.13.1, 22, 23, 24, 25.0.5.1` requires Java 21 or newer and a fixed update only on 21 and 25.
+
 A `21` build target takes its update from CI as described above, and every Java version recorded in CI is held to the minimum for its own release.
 
 The check sees only the version `java -version` reports, not the vendor. Corretto, Zulu and Microsoft builds of the same update all report `21.0.13.1`, and build numbers such as `+2` are ignored. IBM Semeru reports its 21.0.13 builds as `21.0.13.0.x`, which sorts below `21.0.13.1`. To accept a vendor's own fix version, split the components that use it into a separate policy entry with `on:` and list that version there.
