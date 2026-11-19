@@ -31,6 +31,7 @@ TAG_PREFIX="${LUNAR_VAR_TAG_PREFIX-gl-}"
 DEFAULT_OWNER="${LUNAR_VAR_DEFAULT_OWNER:-}"
 DEFAULT_DOMAIN="${LUNAR_VAR_DEFAULT_DOMAIN:-}"
 DOMAIN_FROM_GROUP_PATH="${LUNAR_VAR_DOMAIN_FROM_GROUP_PATH:-false}"
+DEBUG_PROJECTS="${LUNAR_VAR_DEBUG_PROJECTS:-}"
 
 # Maintainer. Fixed, not an input: this is the Hub's own scope signal, and a
 # lower level would onboard groups whose webhooks can never be registered.
@@ -73,6 +74,7 @@ echo "Include personal namespaces: $INCLUDE_PERSONAL_NAMESPACES"
 [ -n "$DEFAULT_OWNER" ] && echo "Default owner: $DEFAULT_OWNER"
 [ -n "$DEFAULT_DOMAIN" ] && echo "Default domain: $DEFAULT_DOMAIN"
 [ "$DOMAIN_FROM_GROUP_PATH" = "true" ] && echo "Domain from group path: enabled"
+[ -n "$DEBUG_PROJECTS" ] && echo "Debug projects: $DEBUG_PROJECTS"
 
 # --- HTTP -------------------------------------------------------------------
 
@@ -243,6 +245,7 @@ EXCLUDE_GROUPS_JSON=$(jq -R -s 'split("\n") | map(select(length > 0))' "$WORK/ex
 
 INCLUDE_REGEX=$(patterns_to_regex "$INCLUDE_PROJECTS")
 EXCLUDE_REGEX=$(patterns_to_regex "$EXCLUDE_PROJECTS")
+DEBUG_REGEX=$(patterns_to_regex "$DEBUG_PROJECTS")
 
 VISIBILITIES=""
 [ "$INCLUDE_PUBLIC" = "true" ]   && VISIBILITIES="${VISIBILITIES}public "
@@ -253,6 +256,92 @@ if [ -z "$VISIBILITIES" ]; then
     exit 1
 fi
 echo "Visibilities: $VISIBILITIES"
+
+# --- debug_projects ---------------------------------------------------------
+
+# Logging only; the catalog is the same either way. Each listed project that
+# debug_projects matches gets the Hub's own reads of the project and its
+# webhooks, plus the token's membership and every group above it.
+
+# Identity, the token's role, and any field named for deletion, archiving,
+# hiding or a state, so one a later GitLab adds is logged without a change.
+# shellcheck disable=SC2016  # $base is a jq variable
+DEBUG_JQ='def state:
+    with_entries(select((.key | test("^(id|path_with_namespace|full_path|parent_id|visibility|created_at|last_activity_at|creator_id|empty_repo|repository_access_level|mirror|permissions|namespace|access_level|expires_at)$"))
+        or ((.key | test("delet|archiv|hidden|^state$|_state$|_status$")) and (.key | startswith("ci_") | not))))
+    | if (.namespace | type) == "object" then .namespace |= {id, kind, full_path, parent_id} else . end;
+def summary:
+    if type == "array" then "\(length) hook(s)"
+    elif type == "object" and (has("message") or has("error")) then (.message // .error | tostring)
+    elif type == "object" and $base != null then (state | with_entries(select(.value != $base[.key])) | "differs from the listing in \(tojson)")
+    elif type == "object" then (state | tojson)
+    else tojson end;'
+
+: > "$WORK/debug.ndjson"
+
+# debug_capture <page-file> <listed-under>
+debug_capture() {
+    jq -c --arg re "$DEBUG_REGEX" --arg under "$2" --argjson simple "$GL_SIMPLE" \
+        '.[] | select((.path_with_namespace // "") | test($re)) | {under: $under, simple: $simple, project: .}' \
+        "$1" >> "$WORK/debug.ndjson" \
+        || echo "Warning: debug_projects could not match a page of $2; the catalog is unaffected" >&2
+}
+
+# debug_get <path-with-query> [listing-state-json]
+# One request, never retried and never fatal: the response is the finding.
+# Given the listing's state, an entity is shown as its differences from it.
+debug_get() {
+    local code id summary base="${2:-null}" body="$WORK/debug-body" hdr="$WORK/debug-hdr" err="$WORK/debug-err"
+    : > "$body"; : > "$hdr"
+    code=$(curl -sS -o "$body" -D "$hdr" -w '%{http_code}' \
+        -H "PRIVATE-TOKEN: ${GL_TOKEN}" -H 'Accept: application/json' \
+        "${API_BASE}$1" 2>"$err") || code="000"
+    id=$(request_id "$hdr")
+    summary=$(jq -r --argjson base "$base" "$DEBUG_JQ summary" "$body" 2>/dev/null) || summary=$(head -c 200 "$body" | tr -d '\r\n')
+    [ "$code" = "000" ] && summary=$(tr -d '\r\n' < "$err")
+    printf 'HTTP %s%s: %s' "$code" "${id:+ (request $id)}" "$summary"
+}
+
+# Called after the transform, so it can say whether each project was cataloged.
+debug_report() {
+    local line path enc listed out uid n prefix seg
+    local -a segs
+    local -A group_out=()
+    n=$(jq -s 'unique_by(.project.id) | length' "$WORK/debug.ndjson")
+    if [ "$n" -eq 0 ]; then
+        echo "debug_projects: no listed project matches \"$DEBUG_PROJECTS\""
+        return 0
+    fi
+    echo "debug_projects: probing $n listed project(s)"
+    uid=$(curl -sS -H "PRIVATE-TOKEN: ${GL_TOKEN}" "${API_BASE}/user" 2>/dev/null | jq -r '.id // empty' 2>/dev/null)
+    [ -n "$uid" ] || echo "  GET /user returned no user, so the token's membership is not probed"
+    while IFS= read -r line; do
+        path=$(jq -r '.project.path_with_namespace' <<< "$line")
+        enc=$(urlenc_path "$path")
+        out=no
+        jq -e --arg k "${GITLAB_HOST}/${path}" 'any(.[]; .key == $k)' "$WORK/entries.json" >/dev/null && out=yes
+        echo "Debug ${path}: listed under $(jq -r '.under' <<< "$line"), cataloged: ${out}"
+        listed=$(jq -c --argjson base null "$DEBUG_JQ .project | state" <<< "$line")
+        echo "  listing$(jq -r 'if .simple then " (simple=true page, no archived or deletion fields)" else "" end' <<< "$line"): $listed"
+        out=$(debug_get "/projects/${enc}" "$listed")
+        echo "  GET /projects/:path: $out"
+        # Not found by path: whether the ID still resolves tells a rename from a delete.
+        [[ "$out" == "HTTP 2"* ]] || echo "  GET /projects/:id: $(debug_get "/projects/$(jq -r '.project.id' <<< "$line")" "$listed")"
+        echo "  GET /projects/:path/hooks: $(debug_get "/projects/${enc}/hooks?per_page=100")"
+        [ -n "$uid" ] && echo "  GET /projects/:path/members/all/:token_user: $(debug_get "/projects/${enc}/members/all/${uid}")"
+        if [ "$(jq -r '.project.namespace.kind // ""' <<< "$line")" = "user" ]; then
+            echo "  personal namespace, no groups above it"
+            continue
+        fi
+        prefix=""
+        IFS='/' read -ra segs <<< "${path%/*}"
+        for seg in "${segs[@]}"; do
+            prefix="${prefix:+${prefix}/}${seg}"
+            [ -n "${group_out[$prefix]:-}" ] || group_out[$prefix]=$(debug_get "/groups/$(urlenc_path "$prefix")?with_projects=false")
+            echo "  GET /groups/${prefix}: ${group_out[$prefix]}"
+        done
+    done < <(jq -s -c 'unique_by(.project.id) | .[]' "$WORK/debug.ndjson")
+}
 
 # --- group list -------------------------------------------------------------
 
@@ -345,6 +434,7 @@ while IFS= read -r group; do
         n=$(jq 'length' "$WORK/proj-page.json")
         [ "$n" -eq 0 ] && break
         [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
+        [ -n "$DEBUG_REGEX" ] && debug_capture "$WORK/proj-page.json" "$group"
         jq -c --arg g "$group" '.[] | {id, path_with_namespace, description, topics: (.topics // .tag_list // []), archived, visibility, default_branch, group: $g, namespace_kind: .namespace.kind, pending_deletion: ((.marked_for_deletion_on // .marked_for_deletion_at) != null), is_fork: has("forked_from_project"), forked_from: (.forked_from_project.path_with_namespace // null)}' \
             "$WORK/proj-page.json" >> "$WORK/projects.ndjson"
         cursor=$(jq -r '.[-1].id' "$WORK/proj-page.json")
@@ -376,6 +466,7 @@ if [ "$INCLUDE_PERSONAL_NAMESPACES" = "true" ]; then
         n=$(jq 'length' "$WORK/personal-page.json")
         [ "$n" -eq 0 ] && break
         [ "$GL_SIMPLE" = "true" ] && SIMPLE_PAGES=$((SIMPLE_PAGES + 1))
+        [ -n "$DEBUG_REGEX" ] && debug_capture "$WORK/personal-page.json" "personal namespaces"
         # Keep only user namespaces: the group projects in this listing are the
         # ones the group sweep already has, and re-adding them would duplicate.
         jq -c '.[] | select(.namespace.kind == "user")
@@ -495,6 +586,11 @@ jq -s \
 
 TOTAL=$(jq 'length' "$WORK/entries.json")
 echo "Components after filtering: $TOTAL"
+
+# A subshell on the left of ||, so nothing in the report can fail the run.
+if [ -n "$DEBUG_REGEX" ]; then
+    ( debug_report ) || echo "Warning: the debug_projects report failed; the catalog is unaffected" >&2
+fi
 
 if [ "$TOTAL" -eq 0 ]; then
     # Every project filtered out is a configuration answer, not an outage, so
