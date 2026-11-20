@@ -247,6 +247,22 @@ catalogers:
 
 Both lists compose with the visibility and path-pattern filters — a project must pass all of them.
 
+### Debugging specific projects
+
+Use `debug_projects` when the Hub reports a project as `insufficient_role` or `repo_not_found`. It takes glob patterns like `include_projects` and logs what GitLab returns for each listed project that matches:
+
+```yaml
+catalogers:
+  - uses: github://earthly/lunar-lib/catalogers/gitlab@v1.0.0
+    include: [groups]
+    with:
+      debug_projects: "acme/payments/payment-api,acme/legacy/*"
+```
+
+For each match the run logs whether it was cataloged, the project's state in the listing, the Hub's own reads of the project (`GET /projects/:path`) and of its webhooks (`GET /projects/:path/hooks`), the token's membership (`GET /projects/:path/members/all/:user`) and every group above the project (`GET /groups/:path`). Each probe line includes GitLab's request ID. Only identity and state fields are logged, never tokens or URLs. A project that returns `200`, is not archived and refuses the hooks call is what the Hub records as `insufficient_role`. The membership and group lines show whether that comes from the token's role or the project's state.
+
+Each match costs a few requests, so name the projects you are investigating rather than `*`. The catalog is the same with or without it.
+
 ## Source System
 
 This cataloger reads the GitLab REST API (`/api/v4`) with `curl`, authenticating with the `GL_TOKEN` secret sent as a `PRIVATE-TOKEN` header. The token needs the `api` scope and belongs to a service account that is a maintainer of each top-level group Lunar should serve — the same account and token the Hub itself uses for GitLab. Its group memberships are the cataloger's scope, so no group list is configured anywhere. The same token works for gitlab.com, self-managed and Dedicated instances; only `gitlab_host` changes.

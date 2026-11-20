@@ -222,6 +222,16 @@ inputs:
       lunar-config.yml still wins on merge.
     default: ""
 
+  debug_projects:
+    description: |
+      Comma-separated glob patterns, matched like include_projects, naming
+      projects to troubleshoot. For each listed project that matches, the run
+      logs what GitLab returns for it: its state in the listing, the project
+      and its webhooks as the Hub requests them, the token's membership, and
+      every group above it. Logging only: the catalog is unchanged. Empty
+      (the default) turns it off.
+    default: ""
+
 secrets:
   GL_TOKEN:
     description: |
