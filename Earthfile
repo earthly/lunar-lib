@@ -196,7 +196,7 @@ all:
     BUILD --pass-args ./policies/dependencies+image
 
 base-image:
-    ARG SCRIPTS_VERSION=1.1.16-alpine
+    ARG SCRIPTS_VERSION=1.1.18-alpine
     FROM earthly/lunar-scripts:$SCRIPTS_VERSION
     # Pull in every OS-package security fix Alpine has published for the pinned
     # base. lunar-scripts only ever `apk add`s on top of a pinned alpine:<ver>,
@@ -225,7 +225,8 @@ base-image:
 
 # syft for the syft and license-origins images, built from source: the 1.54.1
 # release ships go1.26.8, x/net 0.59.0 and brotli 1.2.0, all with fixable
-# criticals, and go-jose 4.1.5 and klauspost/compress 1.20.1, fixable Highs.
+# criticals, and go-jose 4.1.5, klauspost/compress 1.20.1 and containerd
+# 2.4.1 (CVE-2026-95839), fixable Highs.
 syft-bin:
     FROM golang:1.27-alpine
     RUN apk add --no-cache git
@@ -233,7 +234,8 @@ syft-bin:
     RUN git clone --quiet --depth 1 --branch "v${SYFT_VERSION}" https://github.com/anchore/syft /src
     WORKDIR /src
     RUN go get golang.org/x/net@latest github.com/go-jose/go-jose/v4@latest \
-            github.com/klauspost/compress@latest github.com/andybalholm/brotli@latest && \
+            github.com/klauspost/compress@latest github.com/andybalholm/brotli@latest \
+            github.com/containerd/containerd/v2@latest && \
         go mod tidy && \
         CGO_ENABLED=0 go build -trimpath -tags containers_image_openpgp,exclude_graphdriver_btrfs \
             -ldflags "-s -w -X main.version=${SYFT_VERSION} -X main.gitCommit=$(git rev-parse HEAD) -X main.buildDate=$(git log -1 --format=%cI) -X main.gitDescription=v${SYFT_VERSION}" \
