@@ -33,7 +33,7 @@ This plugin provides the following collectors (use `include` to select a subset)
 
 | Collector | Hook Type | Description |
 |-----------|-----------|-------------|
-| `project` | code | Detects Java project structure, build tools, Java version (not from Gradle toolchains), wrappers |
+| `project` | code | Detects Java project structure, build tools, Java version (including Gradle toolchains), wrappers |
 | `dependencies` | code | Extracts dependencies from pom.xml or gradle.lockfile |
 | `cicd` | ci-before-command | Tracks java/javac commands in CI with version |
 | `maven-cicd` | ci-before-command | Tracks Maven commands in CI with version |
