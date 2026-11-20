@@ -93,6 +93,7 @@ test:
     BUILD ./collectors/trivy+test
     BUILD ./collectors/grype+test
     BUILD ./collectors/docker+test
+    BUILD --pass-args ./collectors/docker+test-main
     BUILD ./collectors/codeql+test
     BUILD ./collectors/terraform+test
     BUILD ./collectors/java+test

@@ -18,7 +18,10 @@ landing_page:
     - slug: "java"
       type: "collector"
       reason: "Provides Java project metadata"
-  related: []
+  related:
+    - slug: "docker"
+      type: "collector"
+      reason: "Provides Dockerfile runtime base images for min-java-version-base-image"
 
 policies:
   - name: build-tool-wrapper-exists
@@ -43,6 +46,13 @@ policies:
       minimum. Compares full versions and doesn't need a build file.
     mainPython: ./min_java_version_cicd.py
     keywords: ["java version", "ci/cd", "jdk", "security", "patch level"]
+
+  - name: min-java-version-base-image
+    description: |
+      Ensures the Java base image of each Dockerfile's runtime (final) stage meets
+      the minimum. Floating, major-only or unrecognized tags skip as unknown.
+    mainPython: ./min_java_version_base_image.py
+    keywords: ["java version", "base image", "dockerfile", "jre", "runtime", "security"]
 
   - name: min-maven-version
     description: |
@@ -72,6 +82,12 @@ inputs:
   min_java_version_cicd:
     description: Minimum Java version for java/javac commands in CI, in the same forms as min_java_version
     default: "17"
+  min_java_version_base_image:
+    description: Minimum Java version for runtime base images in Dockerfiles, in the same forms as min_java_version
+    default: "17"
+  java_base_image_families:
+    description: Java base images to check, one per line as a repository pattern and a version scheme (temurin, version, chainguard or distro); a `defaults` line adds the built-in list. Empty uses the built-in list
+    default: ""
   min_maven_version:
     description: Minimum required Maven version (e.g., "3.9.0")
     default: "3.9.0"

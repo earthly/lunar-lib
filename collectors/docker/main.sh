@@ -34,6 +34,17 @@ process_file() {
     
     final_base_name=$(echo "$final_stage_ast" | jq -r '.BaseName // empty')
     final_base_image=$(echo "$final_stage_ast" | jq -r '.From.Image // empty')
+    # The image the final stage ultimately builds on, following FROM <stage>
+    # references (FROM base AS runtime ... FROM runtime). Empty for scratch.
+    final_resolved_base_image=$(echo "$ast" | jq -r '
+        (.Stages // []) as $s
+        | def resolve($i; $hops):
+            if $hops > ($s | length) then empty
+            elif ($s[$i].From.Image // "") != "" then $s[$i].From.Image
+            elif $s[$i].From.Stage.Index != null then resolve($s[$i].From.Stage.Index; $hops + 1)
+            else empty end;
+          if ($s | length) == 0 then empty else resolve(($s | length) - 1; 0) end
+    ')
     
     user=$(echo "$final_stage_ast" | jq -r '
         [(.Commands // [])[] | select(.Name == "USER") | .User] | last // empty
@@ -54,7 +65,8 @@ process_file() {
     ')
     
     # Output combined object with definition and native AST
-    local ast_file=$(mktemp)
+    local ast_file
+    ast_file=$(mktemp)
     echo "$ast" > "$ast_file"
     
     jq -n \
@@ -62,6 +74,7 @@ process_file() {
         --argjson base_images "$base_images" \
         --arg base_name "$final_base_name" \
         --arg base_image "$final_base_image" \
+        --arg resolved_base_image "$final_resolved_base_image" \
         --arg user "$user" \
         --argjson has_healthcheck "$has_healthcheck" \
         --argjson labels "$labels" \
@@ -73,6 +86,7 @@ process_file() {
             final_stage: {
                 base_name: (if $base_name == "" then null else $base_name end),
                 base_image: (if $base_image == "" then null else $base_image end),
+                resolved_base_image: (if $resolved_base_image == "" then null else $resolved_base_image end),
                 user: (if $user == "" then null else $user end),
                 has_healthcheck: $has_healthcheck
             },
