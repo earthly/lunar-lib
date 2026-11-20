@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
 # Check if this is a Java project
@@ -88,6 +89,11 @@ if [[ -z "$java_version" && "$gradle_exists" == true ]]; then
         java_version=$(grep -oE "sourceCompatibility\s*=\s*['\"]?[0-9]+(\.[0-9]+)*['\"]?" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -n1 || true)
         if [[ -z "$java_version" ]]; then
             java_version=$(grep -oE "JavaVersion\.VERSION_([0-9]+(_[0-9]+)*)" "$gradle_file" 2>/dev/null | sed 's/JavaVersion\.VERSION_//' | tr '_' '.' | head -n1 || true)
+        fi
+        # A toolchain names only the major: JavaLanguageVersion.of(21), Kotlin's jvmToolchain(21).
+        # Gradle defaults sourceCompatibility to it, so an explicit one above wins.
+        if [[ -z "$java_version" ]]; then
+            java_version=$(grep -oE "(JavaLanguageVersion\.of[[:space:]]*\([[:space:]]*['\"]?|jvmToolchain([[:space:]]*\([[:space:]]*|[[:space:]]+))[0-9]+" "$gradle_file" 2>/dev/null | grep -oE '[0-9]+$' | head -n1 || true)
         fi
     fi
 fi

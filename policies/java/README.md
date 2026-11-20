@@ -35,7 +35,7 @@ Against a minimum with an update, such as `21.0.13.1`:
 - **A `21` build target** can't show which Java 21 update is in use, so `min-java-version` takes the update from the Java versions the `java` collector recorded in CI. It passes when every recorded version meets the minimum and fails when one doesn't, including a command whose version wasn't recorded. If CI recorded no java or javac commands, for example because the Lunar CI/CD Tracer isn't installed, it skips. A `17` target fails without CI, and a `25` target passes.
 - **A version recorded in CI** is complete, so `21` there is the 21 GA release and `21.0.13` is below `21.0.13.1`.
 - **Only build files and CI are checked.** `min-java-version-cicd` sees the JDKs CI ran, not the JDK in a deployed image or on a host.
-- **Gradle toolchains aren't read.** The `java` collector takes the build target from `<java.version>`, `<maven.compiler.source>`, `<maven.compiler.release>`, `sourceCompatibility` or `JavaVersion.VERSION_*`, so a project that declares only `JavaLanguageVersion.of(21)` skips `min-java-version`. `min-java-version-cicd` still checks its CI JDKs.
+- **The build target comes from the top-level build file.** The `java` collector reads `<java.version>`, `<maven.compiler.source>` or `<maven.compiler.release>` from `pom.xml`, then `sourceCompatibility`, `JavaVersion.VERSION_*` or a toolchain's `JavaLanguageVersion.of(21)` / `jvmToolchain(21)` from `build.gradle` or `build.gradle.kts`, first match in that order. A version set elsewhere, such as in a convention plugin, skips `min-java-version`; `min-java-version-cicd` still checks its CI JDKs.
 
 Anything else, such as `17.x`, `latest` or an unresolved `${java.version}`, fails as unrecognized, and so does a minimum in an unrecognized format.
 
@@ -158,7 +158,7 @@ policies:
 
 ### min-java-version
 - **Maven:** Update `<java.version>` or `<maven.compiler.source>` in pom.xml
-- **Gradle:** Update `sourceCompatibility` in build.gradle
+- **Gradle:** Update `sourceCompatibility` or the toolchain version in build.gradle
 - **Minimum with an update, such as `21.0.13.1`:** keep the build file on the feature release and run CI on a JDK at or above the minimum, with the Lunar CI/CD Tracer installed so the `java` collector records it
 - **Unrecognized version:** Use a plain version such as `17`, `21.0.5` or `1.8` (see [Version comparison](#version-comparison))
 
