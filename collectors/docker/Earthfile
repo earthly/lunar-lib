@@ -8,7 +8,16 @@ test:
     WORKDIR /workspace
     COPY hadolint.sh .
     COPY --dir test .
-    RUN cd test && python -m unittest discover -v
+    RUN cd test && python -m unittest test_hadolint -v
+
+# main.sh needs dockerfile-json, jq and parallel, so its tests run on +image,
+# the collector's production runtime. Wired into the root +test target.
+test-main:
+    FROM --pass-args +image
+    WORKDIR /workspace
+    COPY main.sh .
+    COPY --dir test .
+    RUN cd test && python3 -m unittest test_main -v
 
 image:
     FROM --pass-args ../../+base-image

@@ -13,7 +13,7 @@ This collector writes to the following Component JSON paths:
 | Path | Type | Description |
 |------|------|-------------|
 | `.containers.source` | object | Tool metadata (tool name and version) |
-| `.containers.definitions[]` | array | Parsed Dockerfile definitions with base images, labels, and native AST |
+| `.containers.definitions[]` | array | Parsed Dockerfile definitions with base images, labels, and native AST. `final_stage.base_image` is the last `FROM` as written; `final_stage.resolved_base_image` is the image it builds on after following `FROM <stage>` references (null for `scratch`) |
 | `.containers.lint_results[]` | array | Normalized lint results per Dockerfile (rule, severity, message, line) |
 | `.containers.builds[]` | array | CI build metadata (image, tag, labels, platform) |
 | `.containers.native.docker.cicd` | object | Docker CI command tracking (commands + version) |
