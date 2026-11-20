@@ -67,10 +67,10 @@ policies:
 
 inputs:
   min_java_version:
-    description: Minimum Java version, either a feature release ("17") or a specific update ("21.0.13.1")
+    description: Minimum Java version, as a feature release ("17"), a specific update ("21.0.13.1") or one minimum per feature release ("21.0.13.1, 25.0.5.1, 27.0.1.1")
     default: "17"
   min_java_version_cicd:
-    description: Minimum Java version for java/javac commands in CI, either a feature release ("17") or a specific update ("21.0.13.1")
+    description: Minimum Java version for java/javac commands in CI, in the same forms as min_java_version
     default: "17"
   min_maven_version:
     description: Minimum required Maven version (e.g., "3.9.0")
