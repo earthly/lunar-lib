@@ -140,6 +140,15 @@ inputs:
       fetch the entity for a component with no catalog-info.yaml.
     default: "false"
 
+  include_host_org_tags:
+    description: |
+      When `true`, tags each component with its Git host and organization,
+      split from its `<host>/<org>/<repo>` id and lowercased: e.g.
+      `host:github.com` and `org:acme`. Target them with
+      `on: "host:github.com AND org:acme"`. `tag_prefix` doesn't apply to
+      them, so they match the same tags from the `github-org` cataloger.
+    default: "false"
+
   owner_format:
     description: |
       How to write `spec.owner` from Backstage into the Lunar `owner`

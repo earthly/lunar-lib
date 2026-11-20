@@ -303,6 +303,50 @@ else
     PASSED=$((PASSED + 1))
 fi
 
+# ── include_host_org_tags ─────────────────────────────────────────────────
+# Off (unset or "false") adds nothing. On, every repo gets host:<host> and
+# org:<org> from its id, lowercased, next to its existing tags.
+HO='[.[].tags[] | select(startswith("host:") or startswith("org:"))]'
+export LUNAR_VAR_TAG_PREFIX="gh-"
+unset LUNAR_VAR_INCLUDE_HOST_ORG_TAGS
+run_scenario "host_org_tags_off_by_default" "($HO | length) == 0"
+
+export LUNAR_VAR_INCLUDE_HOST_ORG_TAGS="false"
+run_scenario "host_org_tags_explicit_false" "($HO | length) == 0"
+
+export LUNAR_VAR_INCLUDE_HOST_ORG_TAGS="true"
+run_scenario "host_org_tags_on" \
+    "(($PA) == ([\"gh-backend\",\"gh-go\",\"github-visibility-public\",\"host:github.com\",\"org:acme\"] | sort))
+     and ([.[] | .tags | ((index(\"host:github.com\") != null) and (index(\"org:acme\") != null))] | all)
+     and (($HO | length) == (length * 2))"
+
+# A GHES repo whose org login is mixed case: the id keeps GitHub's casing, the
+# tags are lowercased.
+GHES_FIXTURE="$TEST_DIR/repos-ghes.json"
+cat > "$GHES_FIXTURE" << 'EOF'
+[
+  {
+    "name": "Billing",
+    "url": "https://ghes.acme.com/Acme-Corp/Billing",
+    "description": "Billing service",
+    "repositoryTopics": [],
+    "isArchived": false,
+    "isEmpty": false,
+    "visibility": "public"
+  }
+]
+EOF
+export MOCK_GH_REPOS_FILE="$GHES_FIXTURE"
+export LUNAR_VAR_GITHUB_HOST="ghes.acme.com"
+export LUNAR_VAR_ORG_NAME="Acme-Corp"
+run_scenario "host_org_tags_ghes_lowercased" \
+    '(keys == ["ghes.acme.com/Acme-Corp/Billing"])
+     and ((.["ghes.acme.com/Acme-Corp/Billing"].tags | sort) == ["github-visibility-public","host:ghes.acme.com","org:acme-corp"])'
+export MOCK_GH_REPOS_FILE="$REPOS_FIXTURE"
+export LUNAR_VAR_GITHUB_HOST="github.com"
+export LUNAR_VAR_ORG_NAME="acme"
+unset LUNAR_VAR_INCLUDE_HOST_ORG_TAGS
+
 echo ""
 echo "Offline scenarios: $PASSED passed, $FAILED failed"
 

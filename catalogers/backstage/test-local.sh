@@ -714,8 +714,65 @@ check_eq "on: owner, domain and tags are unchanged" "$(echo "$OFF" | jq -cS .)" 
     "$(echo "$ON" | jq -cS 'map_values(del(.meta))')"
 
 echo ""
+echo "=== include_host_org_tags ==="
+# tags_run <include_host_org_tags> <fixture> <component_id_prefix> -> the captured
+# .components, merged.
+tags_run() {
+    : > "$COMPONENTS_OUT"; : > "$DOMAINS_OUT"; : > "$CURL_CALLS"; : > "$CURL_URLS"
+    if ! env LUNAR_VAR_INCLUDE_HOST_ORG_TAGS="$1" MOCK_FIXTURE="$2" \
+            LUNAR_VAR_COMPONENT_ID_PREFIX="$3" \
+            "$SCRIPT_DIR/main.sh" > "$TEST_DIR/tags.out" 2>&1; then
+        echo '"__MAINSH_FAILED__"'; return
+    fi
+    jq -cs 'add // {}' "$COMPONENTS_OUT"
+}
+HOST_ORG='[.[].tags[] | select(startswith("host:") or startswith("org:"))]'
+OFF=$(tags_run "" "$FIXTURE" "github.com/")
+check_eq "off by default: no host or org tags" "0" "$(echo "$OFF" | jq "$HOST_ORG | length")"
+ON=$(tags_run true "$FIXTURE" "github.com/")
+check_eq "on: every component gets host:github.com and org:acme" "$(echo "$ON" | jq 'length')" \
+    "$(echo "$ON" | jq '[.[] | select((.tags | index("host:github.com")) and (.tags | index("org:acme")))] | length')"
+check_eq "on: exactly one host and one org tag each" "$(echo "$ON" | jq 'length * 2')" \
+    "$(echo "$ON" | jq "$HOST_ORG | length")"
+check_eq "on: owner, domain and other tags are unchanged" "$(echo "$OFF" | jq -cS .)" \
+    "$(echo "$ON" | jq -cS 'map_values(.tags |= map(select((startswith("host:") or startswith("org:")) | not)))')"
+MULTI_ON=$(tags_run true "$MULTI_FIXTURE" "")
+HO_ONLY='.tags | map(select(startswith("host:") or startswith("org:"))) | sort'
+check_eq "multi-host: a GHES component gets its own host and org" '["host:ghes.example.com","org:corp"]' \
+    "$(echo "$MULTI_ON" | jq -c ".[\"ghes.example.com/corp/billing\"] | $HO_ONLY")"
+check_eq "multi-host: a github.com component in the same run gets github.com's" '["host:github.com","org:acme"]' \
+    "$(echo "$MULTI_ON" | jq -c ".[\"github.com/acme/payments\"] | $HO_ONLY")"
+# Mixed case lowercases; a monorepo subdirectory id keeps its repo's host and
+# org; an id without a host segment gets neither tag.
+SHAPES_FIXTURE="$TEST_DIR/host-org-shapes.json"
+cat > "$SHAPES_FIXTURE" << 'EOF'
+{"items": [
+  {"apiVersion": "backstage.io/v1alpha1", "kind": "Component",
+   "metadata": {"name": "mixed-case", "namespace": "default",
+                "annotations": {"github.com/project-slug": "GHES.Example.com/Corp-Platform/Billing"}},
+   "spec": {"type": "service", "owner": "group:default/team-billing"}},
+  {"apiVersion": "backstage.io/v1alpha1", "kind": "Component",
+   "metadata": {"name": "subdir", "namespace": "default",
+                "annotations": {"github.com/project-slug": "github.com/acme/mono/services/api"}},
+   "spec": {"type": "service", "owner": "group:default/team-a"}},
+  {"apiVersion": "backstage.io/v1alpha1", "kind": "Component",
+   "metadata": {"name": "hostless", "namespace": "default",
+                "annotations": {"github.com/project-slug": "acme/hostless"}},
+   "spec": {"type": "service", "owner": "group:default/team-a"}}
+]}
+EOF
+SHAPES=$(tags_run true "$SHAPES_FIXTURE" "")
+host_org_of() { echo "$SHAPES" | jq -c --arg k "$1" '.[$k].tags // ["MISSING"] | map(select(startswith("host:") or startswith("org:") or . == "MISSING")) | sort'; }
+check_eq "mixed-case id: tags lowercased" '["host:ghes.example.com","org:corp-platform"]' \
+    "$(host_org_of "GHES.Example.com/Corp-Platform/Billing")"
+check_eq "subdirectory id: tagged with its repo's host and org" '["host:github.com","org:acme"]' \
+    "$(host_org_of "github.com/acme/mono/services/api")"
+check_eq "id without a host segment: no host or org tag" '[]' \
+    "$(host_org_of "acme/hostless")"
+
+echo ""
 if [ "$FAILED" -eq 0 ]; then
-    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), sigv4 + aws_assume_role_arns, and percent-encoded query values verified"
+    echo "PASS: 2-page cursor pagination, api_path_prefix='${NP:-<none>}', $COMPONENTS_GOT components + $DOMAINS_GOT domains, nested subdomainOf/system paths, include/exclude filters (type/lifecycle/domain/system), host/org tags, verify_repos (drop/keep, fail-open paths, GHES endpoint, batching), sigv4 + aws_assume_role_arns, and percent-encoded query values verified"
 else
     echo "TEST FAILED" >&2
     exit 1
