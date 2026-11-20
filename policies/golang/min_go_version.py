@@ -1,4 +1,10 @@
+"""Check that the go.mod Go version meets the minimum for its release line."""
 from lunar_policy import Check, variable_or_default
+
+from version_minimum import Runtime, check_build_version, parse_minimum
+
+# A Go release line is major.minor: 1.22, 1.23. Pre-releases look like 1.23rc1.
+GO = Runtime("Go", line_length=2, forms="1.22, 1.22.7 or 1.23rc1")
 
 
 def check_min_go_version(min_version=None, node=None):
@@ -19,25 +25,14 @@ def check_min_go_version(min_version=None, node=None):
         if not version_node.exists():
             c.skip("Go version not detected")
 
-        actual_version = version_node.get_value()
-
-        # Parse versions for comparison (e.g., "1.21" -> (1, 21))
-        def parse_version(v):
-            parts = str(v).split(".")
-            return tuple(int(p) for p in parts)
-
         try:
-            actual = parse_version(actual_version)
-            minimum = parse_version(min_version)
-
-            # Compare only as many components as minimum specifies
-            c.assert_true(
-                actual[:len(minimum)] >= minimum,
-                f"Go version {actual_version} is below minimum {min_version}. "
-                f"Update go.mod to require Go {min_version} or higher."
-            )
-        except (ValueError, TypeError):
-            c.fail(f"Could not parse Go version: {actual_version}")
+            minimum = parse_minimum(min_version, GO)
+        except ValueError as e:
+            c.fail(f"min_go_version {e}")
+            return c
+        # go.mod's go line is the oldest Go the module builds with (Go 1.21+
+        # enforces it), so "go 1.22" is held to the 1.22 minimum like 1.22.0.
+        check_build_version(c, version_node.get_value(), minimum, " Update go.mod to require Go {floor} or higher.")
     return c
 
 

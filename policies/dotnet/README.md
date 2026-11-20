@@ -19,6 +19,26 @@ This plugin provides the following policies (use `include` to select a subset):
 | `min-sdk-version` | Ensures SDK version meets minimum requirements | Warning | Using outdated SDK version |
 | `min-sdk-version-cicd` | Ensures CI/CD SDK version meets minimum requirements | Warning | CI/CD using outdated SDK version |
 
+### Minimum per feature band
+
+`min-sdk-version` and `min-sdk-version-cicd` take one minimum, or one per release line separated by commas, spaces or newlines. Microsoft ships each .NET patch as one SDK per supported feature band, such as 8.0.1xx and 8.0.4xx, so a release line is major.minor plus the band. A single `8.0.416` minimum fails the patched `8.0.122`; list one minimum per band you use:
+
+```yaml
+with:
+  min_sdk_version: "8.0.122, 8.0.416, 10.0.101"
+  min_sdk_version_cicd: "8.0.122, 8.0.416, 10.0.101"
+```
+
+| Version | Result |
+|---------|--------|
+| `8.0.122`, `8.0.416` | Passes: meets its band's minimum |
+| `8.0.415`, `8.0.121` | Fails: below its band's minimum |
+| `8.0.319`, `9.0.306` | Fails: no minimum is listed for its band or line, and a newer one is listed |
+| `6.0.428`, `7.0.410` | Fails: older than every listed line |
+| `10.0.200`, `11.0.100` | Passes: newer than every listed line, as with a single minimum |
+
+An entry without a band, such as `8.0` or `8.0.x`, covers every 8.0 band.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

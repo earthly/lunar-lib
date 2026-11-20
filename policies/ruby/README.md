@@ -21,6 +21,25 @@ This plugin provides the following policies (use `include` to select a subset):
 | `min-bundler-version-cicd` | Ensures Bundler version used in CI/CD meets the configured minimum |
 | `min-rake-version-cicd` | Ensures Rake version used in CI/CD meets the configured minimum |
 
+### Minimum per release line
+
+`min-ruby-version` and `min-ruby-version-cicd` take one minimum, or one per release line (major.minor) separated by commas, spaces or newlines. A single minimum is one floor for every line: `3.3.10` passes a vulnerable `3.4.1`. With a list, each version is held to its own line's minimum:
+
+```yaml
+with:
+  min_ruby_version: "3.3.10, 3.4.7, 4.0.1"
+  min_ruby_version_cicd: "3.3.10, 3.4.7, 4.0.1"
+```
+
+| Version | Result |
+|---------|--------|
+| `3.3.10`, `4.0.1` | Passes: meets its line's minimum |
+| `3.4.1`, `3.3` | Fails: below its line's minimum; `3.3` counts as `3.3.0` |
+| `3.2.9`, `2.7.8` | Fails: older than every listed line |
+| `4.1.0`, `5.0.0` | Passes: newer than every listed line, as with a single minimum |
+
+A line between two listed lines has no minimum and fails. JRuby and TruffleRuby number their releases differently. `min-ruby-version` fails a `.ruby-version` such as `jruby-9.4.8.0` as unrecognized, and `min-ruby-version-cicd` compares the first version `ruby --version` prints, so JRuby's `9.4.8` counts as Ruby 9.4.
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:

@@ -51,8 +51,8 @@ policies:
 
 inputs:
   min_python_version:
-    description: Minimum required Python version (e.g., "3.9", "3.11")
+    description: Minimum Python version ("3.9", "3.12.8") or one per release line ("3.11.14, 3.12.12, 3.13.9")
     default: "3.9"
   min_python_version_cicd:
-    description: Minimum required Python version for CI/CD commands
+    description: Minimum Python version for CI/CD commands, in the same forms as min_python_version
     default: "3.9"

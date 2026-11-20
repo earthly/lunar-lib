@@ -96,10 +96,7 @@ policies:
 
 inputs:
   min_scala_version:
-    description: |
-      Minimum required Scala compiler version (e.g., "2.12", "2.13", "3.3.1").
-      Compared with semantic-version semantics — "2.13" matches 2.13.x and 3.x,
-      but rejects 2.11.x.
+    description: Minimum Scala compiler version ("2.12", "3.3.1") or one per release line ("2.12.20, 2.13.16, 3.3.6")
     default: "2.12"
   min_sbt_version:
     description: |

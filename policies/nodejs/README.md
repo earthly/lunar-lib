@@ -18,6 +18,29 @@ This plugin provides the following policies (use `include` to select a subset):
 | `min-node-version` | Ensures minimum Node.js version |
 | `min-node-version-cicd` | Ensures minimum Node.js version in CI/CD |
 
+### Version comparison
+
+`min-node-version` and `min-node-version-cicd` compare full versions. Earlier releases compared only the major, so a patch-level minimum such as `20.15.1` passed `20.0.0`; it now fails. A major-only minimum such as `20` gives the same results as before, except that a pre-release sorts before its release: `22.0.0-rc.1` fails a `22` minimum.
+
+`min-node-version` reads `.lang.nodejs.version`, which the `nodejs` collector takes from the Node.js installed where it runs, not from the project. Use `min-node-version-cicd` to check the Node.js your CI runs.
+
+### Minimum per major release
+
+A single minimum is one floor for every major: `20.19.5` passes any 22, including a vulnerable `22.12.0`. To hold each major to its own patched release, list one minimum per major, separated by commas, spaces or newlines:
+
+```yaml
+with:
+  min_node_version_cicd: "20.19.5, 22.20.0, 24.10.0"
+```
+
+| Version | Result |
+|---------|--------|
+| `20.19.5`, `22.21.1` | Passes: meets its major's minimum |
+| `20.18.0`, `22.12.0` | Fails: below its major's minimum |
+| `18.20.8`, `16.20.2` | Fails: older than every listed major |
+| `21.7.3`, `23.11.1` | Fails: no minimum is listed for its major, and a newer major is listed |
+| `25.1.0`, `26.0.0` | Passes: newer than every listed major, as with a single minimum |
+
 ## Required Data
 
 This policy reads from the following Component JSON paths:
@@ -51,7 +74,7 @@ policies:
       - min-node-version
       - min-node-version-cicd
     with:
-      min_node_version: "18"       # Minimum required Node.js major version (default: "18")
+      min_node_version: "18"       # Minimum Node.js version, or one per major (default: "18")
       min_node_version_cicd: "18"  # Minimum Node.js version for CI/CD commands (default: "18")
 ```
 

@@ -1,33 +1,16 @@
-import re
+"""Check that the global.json .NET SDK version meets the minimum for its feature band."""
 from lunar_policy import Check, variable_or_default
 
+from version_minimum import Runtime, check_build_version, parse_minimum
 
-def _parse_dotnet_version(version_str):
-    """Extract .NET SDK version components from version string.
-
-    Handles: "8.0.100", "7.0.0", "6.0.400"
-    Returns tuple of (major, minor, patch) or None if invalid.
-    """
-    s = str(version_str).strip()
-    # Match pattern like 8.0.100 or 8.0
-    m = re.match(r"^(\d+)\.(\d+)(?:\.(\d+))?", s)
-    if m:
-        major = int(m.group(1))
-        minor = int(m.group(2))
-        patch = int(m.group(3)) if m.group(3) else 0
-        return (major, minor, patch)
-    return None
-
-
-def _compare_dotnet_versions(actual_str, min_str):
-    """Compare .NET SDK versions. Returns True if actual >= minimum."""
-    actual = _parse_dotnet_version(actual_str)
-    minimum = _parse_dotnet_version(min_str)
-
-    if actual is None or minimum is None:
-        return False
-
-    return actual >= minimum
+# Microsoft patches each SDK feature band separately (8.0.1xx, 8.0.4xx), so a
+# release line is major.minor plus the band: 8.0.404 is on 8.0.4xx.
+DOTNET = Runtime(
+    ".NET SDK",
+    line_length=3,
+    forms="8.0, 8.0.404 or 9.0.100-rc.2.24474.11",
+    feature_bands=True,
+)
 
 
 def check_min_sdk_version(min_version=None, node=None):
@@ -48,13 +31,17 @@ def check_min_sdk_version(min_version=None, node=None):
         if not sdk_version_node.exists():
             c.skip(".NET SDK version not detected in global.json")
 
-        actual_version = sdk_version_node.get_value()
-        if not _compare_dotnet_versions(actual_version, min_version):
-            c.fail(
-                f".NET SDK version {actual_version} is below minimum {min_version}. "
-                f"Update global.json to specify SDK version {min_version} or higher."
-            )
-
+        try:
+            minimum = parse_minimum(min_version, DOTNET)
+        except ValueError as e:
+            c.fail(f"min_sdk_version {e}")
+            return c
+        check_build_version(
+            c,
+            sdk_version_node.get_value(),
+            minimum,
+            " Update global.json to specify SDK version {floor} or higher.",
+        )
     return c
 
 

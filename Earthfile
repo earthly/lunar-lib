@@ -109,6 +109,13 @@ test:
     BUILD ./probes/pr-title-ticket-ref+test
     BUILD ./probes/python+test
     BUILD ./policies/nodejs+test
+    BUILD ./policies/python+test
+    BUILD ./policies/golang+test
+    BUILD ./policies/ruby+test
+    BUILD ./policies/php+test
+    BUILD ./policies/kotlin+test
+    BUILD ./policies/scala+test
+    BUILD ./policies/dotnet+test
     BUILD ./policies/ai+test
     BUILD ./policies/compliance-docs+test
     BUILD ./policies/git+test
@@ -152,6 +159,8 @@ lint:
     # Every lunar-lib import in the docs lists what it runs with include:
     RUN python scripts/validate_readme_includes.py --self-test
     RUN python scripts/validate_readme_includes.py
+    # Policies copy shared modules (the hub packages one plugin dir); copies must match
+    RUN python scripts/validate_shared_modules.py
 
 ai-context:
     COPY --dir ai-context .
