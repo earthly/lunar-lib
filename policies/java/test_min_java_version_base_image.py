@@ -160,6 +160,11 @@ class CheckTest(unittest.TestCase):
     def test_pinned_update_at_minimum_passes(self):
         self.assertEqual(outcome(run([dockerfile(f"eclipse-temurin:21.0.5_11-jre@{DIGEST}")], "21.0.5")), CheckStatus.PASS)
 
+    def test_four_part_update(self):
+        # Temurin 21.0.13+9 is below the 21.0.13.1 respin; 21.0.13.1+2 meets it.
+        self.assertEqual(outcome(run([dockerfile("eclipse-temurin:21.0.13_9-jre")], "21.0.13.1")), CheckStatus.FAIL)
+        self.assertEqual(outcome(run([dockerfile("eclipse-temurin:21.0.13.1_2-jre")], "21.0.13.1")), CheckStatus.PASS)
+
     def test_floating_major_is_unknown_not_a_pass(self):
         check = run([dockerfile("eclipse-temurin:21-jre")], "21.0.13.1")
         self.assertEqual(outcome(check), CheckStatus.SKIPPED)

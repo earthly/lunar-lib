@@ -92,7 +92,7 @@ What a result means:
 - **Skip as unknown:** a floating or major-only tag (`21-jre`, `latest`), a distro image (`java21`), a digest with no tag, or an ARG with no default. None of these shows an update, so they never pass a minimum that needs one. A release below or above every listed minimum is still decided.
 - **Skip:** no Dockerfile's runtime stage builds on a listed family, for example Java installed with `apt-get` onto `debian`.
 
-It doesn't see what ships. ARG defaults are read as written, so a `--build-arg` override is missed; a CI build that uses `--target` picks another stage; a floating tag resolves when the image is built; and distro and Chainguard packages carry vendor backports their tags don't show. For the runtime in a released image, check the scan of that image's digest.
+It doesn't see what ships. ARG defaults are read as written, so a `--build-arg` override is missed; a CI build that uses `--target` picks another stage; a floating tag resolves when the image is built; and distro and Chainguard packages carry vendor backports their tags don't show. Nor does a vulnerability scan of the released image fill the gap: `.container_scan` records findings, not the Java version, so a runtime with no matched CVE leaves no trace.
 
 ## Required Data
 
