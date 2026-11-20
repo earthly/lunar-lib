@@ -94,3 +94,6 @@ inputs:
   min_gradle_version:
     description: Minimum required Gradle version (e.g., "8.0.0")
     default: "8.0.0"
+  require_java_version_cicd:
+    description: Set to "true" to fail min-java-version-cicd, instead of skipping, when CI recorded no Java version for a Java project. Needs the java collector's project and cicd sub-collectors
+    default: "false"

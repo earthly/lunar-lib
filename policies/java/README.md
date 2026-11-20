@@ -14,7 +14,7 @@ This plugin provides the following policies (use `include` to select a subset):
 |--------|-------------|-----------------|
 | `build-tool-wrapper-exists` | Validates mvnw/gradlew exists | Missing build wrapper for reproducibility |
 | `min-java-version` | Ensures minimum Java version in build config | Java version below the minimum or not comparable to it, or CI ran Java below a minimum's update |
-| `min-java-version-cicd` | Ensures every Java version recorded in CI meets a minimum | CI ran a JDK below the minimum, or one whose version wasn't recorded |
+| `min-java-version-cicd` | Ensures every Java version recorded in CI meets a minimum | CI ran a JDK below the minimum or one whose version wasn't recorded, or (opt-in) recorded no Java for a Java project |
 | `min-java-version-base-image` | Ensures the Java base image of each Dockerfile's runtime stage meets a minimum | A runtime stage builds on a Java image whose tag names a version below the minimum |
 | `min-maven-version` | Ensures minimum Maven version in CI/CD | CI Maven version too old |
 | `min-gradle-version` | Ensures minimum Gradle version in CI/CD | CI Gradle version too old |
@@ -64,6 +64,31 @@ A `21` build target takes its update from CI as described above, and every Java 
 
 The check sees only the version `java -version` reports, not the vendor. Corretto, Zulu and Microsoft builds of the same update all report `21.0.13.1`, and build numbers such as `+2` are ignored. IBM Semeru reports its 21.0.13 builds as `21.0.13.0.x`, which sorts below `21.0.13.1`. To accept a vendor's own fix version, split the components that use it into a separate policy entry with `on:` and list that version there.
 
+### Requiring a Java version from CI
+
+By default `min-java-version-cicd` skips when CI recorded no java or javac commands, so a project whose CI isn't traced never fails it. With `require_java_version_cicd: "true"`, a Java project fails instead once collection has finished. Until then the check is pending.
+
+- **A Java project** has a `pom.xml`, `build.gradle` or `build.gradle.kts` at the component root, which the `java` collector's `project` sub-collector records as `.lang.java.project_exists`. Detection goes by build file, not source language, so a Kotlin-only Gradle build counts: Gradle runs on a JDK, and traced CI records it.
+- **Build files only in subdirectories aren't detected**, for example `services/*/pom.xml` with no root `pom.xml`, or a Gradle build with only `settings.gradle` at the root. Those components skip when nothing is recorded, as they do without the input.
+- **Recorded Java** is checked the same way with or without the input, and with or without a build file.
+- **It needs** the `java` collector's `project` and `cicd` sub-collectors, and the Lunar CI/CD Tracer on the runners that build the component. Without `project`, no project is detected and the check skips; without `cicd` or the tracer, every detected project fails. Use `on:` to scope the policy to components whose CI is traced, or to leave out projects such as Kotlin-only builds.
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/java@v1.0.0
+    on: ["domain:your-domain"]  # replace with your own domain or tags
+    include: [project, cicd]
+
+policies:
+  - uses: github://earthly/lunar-lib/policies/java@v1.0.0
+    on: ["domain:your-domain"]
+    enforcement: report-pr
+    include: [min-java-version-cicd]
+    with:
+      min_java_version_cicd: "21.0.13.1, 25.0.5.1"
+      require_java_version_cicd: "true"
+```
+
 ### Runtime base images
 
 `min-java-version-base-image` reads the image each Dockerfile's final stage builds on, following `FROM <stage>` references, from the [`docker`](https://github.com/earthly/lunar-lib/tree/main/collectors/docker) collector. Builder stages such as `FROM maven:3.9-eclipse-temurin-21 AS build` are not the runtime and aren't checked; the JDK that builds the code is `min-java-version-cicd`'s job.
@@ -101,6 +126,7 @@ This policy reads from the following Component JSON paths:
 | Path | Type | Provided By |
 |------|------|-------------|
 | `.lang.java` | object | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
+| `.lang.java.project_exists` | boolean | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.version` | string | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.build_systems` | array | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
 | `.lang.java.mvnw_exists` | boolean | [`java`](https://github.com/earthly/lunar-lib/tree/main/collectors/java) collector |
@@ -199,6 +225,7 @@ policies:
 ### min-java-version-cicd
 - Upgrade the JDK your CI runs, e.g. `java-version` in `actions/setup-java` or the build image's base, to the minimum or newer
 - **No Java version recorded:** the command's `java -version` or `javac -version` printed no version line, often because the JVM failed to start
+- **No Java version was recorded in CI for this Java project** (with `require_java_version_cicd`): run its CI build on runners with the Lunar CI/CD Tracer and enable the `java` collector's `cicd` sub-collector; see [Requiring a Java version from CI](#requiring-a-java-version-from-ci)
 - **No listed minimum:** the JDK is on a feature release the minimum skips, such as 23 between 21 and 25; move to a listed release
 
 ### min-java-version-base-image
