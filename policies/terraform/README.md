@@ -131,9 +131,12 @@ policies:
 `aws-s3-access-logging` ignores bucket and logging resources with a literal
 `count = 0` or empty literal `for_each` map. A logging resource must declare a
 nonempty `target_bucket` to provide structural coverage for an active source.
-Symbolic instance conditions are reported as `SKIPPED` with an `UNVERIFIED`
-message when there are no definite failures; they are not verified coverage.
-Known missing logging still fails even when another resource is unresolved.
+An unresolved bucket condition does not hide a definite result: missing logging
+still fails, and inline or unconditional logging provides structural coverage
+whenever the bucket exists. When coverage depends on a symbolic logging-instance
+condition, the check reports `SKIPPED` with an `UNVERIFIED` message if there are
+no definite failures. Known missing logging still fails even when another
+resource is unresolved.
 
 This is a source-HCL check, not a Terraform evaluator or proof of deployment.
 Making logging default does not resolve a conditional expression or account

@@ -40,9 +40,6 @@ def main(node=None):
             presence = resource_presence(cfg)
             if presence is False:
                 continue
-            if presence is None:
-                unverified.append("aws_s3_bucket.{} instance condition".format(bname))
-                continue
             active = True
             inline = any(b.get("target_bucket") for b in block(cfg, "logging"))
             candidates = [

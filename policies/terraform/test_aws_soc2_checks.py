@@ -357,8 +357,22 @@ class TestS3AccessLogging(unittest.TestCase):
                 n = node({"aws_s3_bucket": {"b": [condition]}})
                 self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.SKIPPED)
 
-    def test_symbolic_bucket_condition_is_unverified(self):
+    def test_symbolic_bucket_without_logging_fails(self):
         n = node({"aws_s3_bucket": {"b": [{"count": "${var.enabled ? 1 : 0}"}]}})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.FAIL)
+
+    def test_symbolic_bucket_with_inline_logging_passes(self):
+        n = node({"aws_s3_bucket": {"b": [{"count": "${var.enabled ? 1 : 0}",
+                                          "logging": [{"target_bucket": "destination"}]}]}})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.PASS)
+
+    def test_symbolic_bucket_with_unconditional_logging_passes(self):
+        n = self.logging_node({}, bucket={"count": "${var.enabled ? 1 : 0}"})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.PASS)
+
+    def test_symbolic_bucket_and_logging_conditions_are_unverified(self):
+        n = self.logging_node({"count": "${var.enabled ? 1 : 0}"},
+                              bucket={"count": "${var.enabled ? 1 : 0}"})
         self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.SKIPPED)
         self.assertIn("UNVERIFIED", failure_message(aws_s3_access_logging, n))
 
@@ -373,9 +387,12 @@ class TestS3AccessLogging(unittest.TestCase):
         for buckets in ({"bad": [{}], "unknown": [{"count": "${var.count}"}]},
                         {"unknown": [{"count": "${var.count}"}], "bad": [{}]}):
             with self.subTest(buckets=buckets):
-                n = node({"aws_s3_bucket": buckets})
+                n = node({"aws_s3_bucket": buckets, "aws_s3_bucket_logging": {
+                    "unknown": [{"count": "${var.count}", "bucket": "${aws_s3_bucket.unknown.id}",
+                                 "target_bucket": "destination"}]}})
                 self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.FAIL)
                 self.assertIn("aws_s3_bucket.bad", failure_message(aws_s3_access_logging, n))
+                self.assertIn("UNVERIFIED", failure_message(aws_s3_access_logging, n))
 
     def test_active_logger_is_sufficient_despite_optional_duplicate(self):
         n = node({"aws_s3_bucket": {"b": [{}]}, "aws_s3_bucket_logging": {
