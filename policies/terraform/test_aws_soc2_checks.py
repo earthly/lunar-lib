@@ -327,6 +327,67 @@ class TestS3PublicAccess(unittest.TestCase):
 
 
 class TestS3AccessLogging(unittest.TestCase):
+    def logging_node(self, logging, bucket=None):
+        return node({"aws_s3_bucket": {"b": [bucket if bucket is not None else {}]},
+                     "aws_s3_bucket_logging": {"lg": [dict(
+                         bucket="${aws_s3_bucket.b.id}", target_bucket="destination", **logging)]}})
+
+    def test_literal_logging_count_zero_fails(self):
+        self.assertEqual(status(aws_s3_access_logging, self.logging_node({"count": 0})), CheckStatus.FAIL)
+
+    def test_literal_positive_logging_count_passes(self):
+        self.assertEqual(status(aws_s3_access_logging, self.logging_node({"count": 1})), CheckStatus.PASS)
+
+    def test_empty_logging_for_each_fails(self):
+        self.assertEqual(status(aws_s3_access_logging, self.logging_node({"for_each": {}})), CheckStatus.FAIL)
+
+    def test_nonempty_literal_logging_for_each_passes(self):
+        self.assertEqual(status(aws_s3_access_logging, self.logging_node({"for_each": {"one": 1}})), CheckStatus.PASS)
+
+    def test_symbolic_logging_condition_is_unverified(self):
+        for condition in ({"count": "${var.enabled ? 1 : 0}"}, {"for_each": "${var.instances}"}):
+            with self.subTest(condition=condition):
+                n = self.logging_node(condition)
+                self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.SKIPPED)
+                self.assertIn("UNVERIFIED", failure_message(aws_s3_access_logging, n))
+
+    def test_literal_absent_bucket_is_not_required_to_log(self):
+        for condition in ({"count": 0}, {"for_each": {}}):
+            with self.subTest(condition=condition):
+                n = node({"aws_s3_bucket": {"b": [condition]}})
+                self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.SKIPPED)
+
+    def test_symbolic_bucket_condition_is_unverified(self):
+        n = node({"aws_s3_bucket": {"b": [{"count": "${var.enabled ? 1 : 0}"}]}})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.SKIPPED)
+        self.assertIn("UNVERIFIED", failure_message(aws_s3_access_logging, n))
+
+    def test_missing_or_empty_logging_target_fails(self):
+        for target in ({}, {"target_bucket": ""}, {"target_bucket": None}):
+            with self.subTest(target=target):
+                n = node({"aws_s3_bucket": {"b": [{}]}, "aws_s3_bucket_logging": {
+                    "lg": [dict(bucket="${aws_s3_bucket.b.id}", **target)]}})
+                self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.FAIL)
+
+    def test_known_failure_is_not_masked_by_unknown_condition(self):
+        for buckets in ({"bad": [{}], "unknown": [{"count": "${var.count}"}]},
+                        {"unknown": [{"count": "${var.count}"}], "bad": [{}]}):
+            with self.subTest(buckets=buckets):
+                n = node({"aws_s3_bucket": buckets})
+                self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.FAIL)
+                self.assertIn("aws_s3_bucket.bad", failure_message(aws_s3_access_logging, n))
+
+    def test_active_logger_is_sufficient_despite_optional_duplicate(self):
+        n = node({"aws_s3_bucket": {"b": [{}]}, "aws_s3_bucket_logging": {
+            "active": [{"bucket": "${aws_s3_bucket.b.id}", "target_bucket": "destination"}],
+            "optional": [{"count": "${var.count}", "bucket": "${aws_s3_bucket.b.id}",
+                          "target_bucket": "destination"}]}})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.PASS)
+
+    def test_inline_logging_target_passes(self):
+        n = node({"aws_s3_bucket": {"b": [{"logging": [{"target_bucket": "destination"}]}]}})
+        self.assertEqual(status(aws_s3_access_logging, n), CheckStatus.PASS)
+
     def test_pass_separate(self):
         n = node({"aws_s3_bucket": {"b": [{}]},
                   "aws_s3_bucket_logging": {"lg": [
