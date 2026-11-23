@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import REPOSITORY, with_hint
+
 
 def main(node=None):
     c = Check("require-private", "Repository must be private", node=node)
@@ -9,7 +11,9 @@ def main(node=None):
             return c
 
         visibility = c.get_value(".vcs.visibility")
-        c.assert_equals(visibility, "private", f"Repository visibility is '{visibility}', but policy requires 'private'")
+        c.assert_equals(visibility, "private", with_hint(
+            c, f"Repository visibility is '{visibility}', but policy requires 'private'",
+            REPOSITORY))
     return c
 
 

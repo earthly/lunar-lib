@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("require-status-checks", "Status checks should be required", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             require_status_checks = c.get_value(".vcs.branch_protection.require_status_checks")
-            c.assert_true(require_status_checks, "Branch protection does not require status checks to pass")
+            c.assert_true(require_status_checks, with_hint(
+                c, "Branch protection does not require status checks to pass",
+                BRANCH_PROTECTION))
     return c
 
 

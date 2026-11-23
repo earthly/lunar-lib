@@ -180,4 +180,7 @@ if [ "$SEEN" != "true" ]; then
     exit 1
 fi
 echo "sonarqube/github-app: no completed SonarQube check run for pull request ${LUNAR_COMPONENT_PR} on ${LUNAR_COMPONENT_GIT_SHA} within ${TIMEOUT}s (${STATE}) — writing status=pending" >&2
-echo '{"status":"pending"}' | lunar collect -j ".code_quality.native.sonarqube.github_app" -
+# analysis_status in .code_quality.source as well, like api and auto, so a
+# tool-agnostic policy can tell results still on their way from missing ones.
+echo '{"source":{"tool":"sonarqube","integration":"github_app","analysis_status":"pending"},"native":{"sonarqube":{"github_app":{"status":"pending"}}}}' \
+    | lunar collect -j ".code_quality" -

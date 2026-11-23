@@ -1,5 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None, min_approvals_override=None):
     c = Check("minimum-approvals", "Pull requests should require minimum number of approvals", node=node)
@@ -10,7 +12,7 @@ def main(node=None, min_approvals_override=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             min_approvals = min_approvals_override if min_approvals_override is not None else variable_or_default("min_approvals", None)
@@ -26,8 +28,8 @@ def main(node=None, min_approvals_override=None):
             c.assert_greater_or_equal(
                 required_approvals,
                 min_approvals,
-                f"Branch protection requires {required_approvals} approval(s), "
-                f"but policy requires at least {min_approvals}"
+                with_hint(c, f"Branch protection requires {required_approvals} approval(s), "
+                             f"but policy requires at least {min_approvals}", BRANCH_PROTECTION)
             )
     return c
 

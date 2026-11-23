@@ -1,5 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 MAX_LISTED = 10
 
 # Classic bypass allowances name users, teams and apps by login/slug; match them
@@ -55,7 +57,7 @@ def main(node=None, allowed_override=None):
             return c
 
         if not bp.get_value(".enabled"):
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
 
         violations = []

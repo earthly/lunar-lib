@@ -28,7 +28,7 @@ lives under `.code_quality.native.sonarqube` for SonarQube-aware policies.
 
 | Path | Type | Written by | Description |
 |------|------|-----------|-------------|
-| `.code_quality.source` | object | `api` / `auto` / `github-app` | Tool, integration (`api`, `auto` or `github_app`), project key, API URL, and (`api` / `auto`) `analysis_status` (`complete` or `pending`) |
+| `.code_quality.source` | object | `api` / `auto` / `github-app` | Tool, integration (`api`, `auto` or `github_app`), project key, API URL, and `analysis_status`: `complete` or `pending` from `api` / `auto`, `pending` from `github-app` |
 | `.code_quality.passing` | bool | `api` / `auto` / `github-app` | Overall pass/fail signal — derived from SonarQube's quality gate status |
 | `.code_quality.pr` | object | `github-app` | The pull request's new-code numbers from SonarQube's check: `new_issues`, `fixed_issues`, `accepted_issues`, `security_hotspots`, `coverage_percentage`, `duplication_percentage`. Only the numbers the check prints, so a missing key means no data, not 0 |
 | `.code_quality.coverage_percentage` | number | `api` / `auto` | Line coverage percentage (0–100), if measured |
@@ -153,8 +153,9 @@ than a fail.
 The same applies to `github-app`: SonarQube posts its check on a PR only
 after analyzing the commit, so the sub-collector polls the commit's check
 runs up to `github_app_poll_timeout_seconds` and writes
-`.code_quality.native.sonarqube.github_app.status = "pending"` if the check
-hasn't completed by then. When your scanner runs late in CI, raise the
+`.code_quality.native.sonarqube.github_app.status = "pending"`, with
+`.code_quality.source.analysis_status = "pending"`, if the check hasn't
+completed by then. When your scanner runs late in CI, raise the
 timeout to cover it.
 
 ### SonarQube's pull request check

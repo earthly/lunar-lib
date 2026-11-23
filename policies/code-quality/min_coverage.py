@@ -2,6 +2,8 @@
 
 from lunar_policy import Check, variable_or_default
 
+from pending_hint import with_pending_hint
+
 
 def main(node=None):
     c = Check("min-coverage", "Line coverage meets minimum threshold", node=node)
@@ -31,7 +33,8 @@ def main(node=None):
         coverage_node = cq_node.get_node(".coverage_percentage")
         if not coverage_node.exists():
             c.fail(
-                "Line coverage not reported. Ensure the scanner publishes .code_quality.coverage_percentage."
+                with_pending_hint(
+                    c, "Line coverage not reported. Ensure the scanner publishes .code_quality.coverage_percentage.")
             )
             return c
 

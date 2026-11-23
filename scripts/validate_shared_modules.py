@@ -12,7 +12,7 @@ Usage:
 import sys
 from pathlib import Path
 
-SHARED = ["version_minimum.py"]
+SHARED = ["version_minimum.py", "rerun_hint.py"]
 
 
 def main():

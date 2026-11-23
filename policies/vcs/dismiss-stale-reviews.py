@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("dismiss-stale-reviews", "Stale reviews should be dismissed", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             dismiss_stale_reviews = c.get_value(".vcs.branch_protection.dismiss_stale_reviews")
-            c.assert_true(dismiss_stale_reviews, "Branch protection does not dismiss stale reviews when new commits are pushed")
+            c.assert_true(dismiss_stale_reviews, with_hint(
+                c, "Branch protection does not dismiss stale reviews when new commits are pushed",
+                BRANCH_PROTECTION))
     return c
 
 

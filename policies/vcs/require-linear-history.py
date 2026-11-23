@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("require-linear-history", "Linear history should be required", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             require_linear_history = c.get_value(".vcs.branch_protection.require_linear_history")
-            c.assert_true(require_linear_history, "Branch protection does not require linear history")
+            c.assert_true(require_linear_history, with_hint(
+                c, "Branch protection does not require linear history",
+                BRANCH_PROTECTION))
     return c
 
 

@@ -1,22 +1,17 @@
 """Shared helpers for the ticket checks."""
 
 import json
-import re
-import sys
 
 from lunar_policy import variable_or_default
 from lunar_policy.nodepath import NodePath
+
+from rerun_hint import hint
 
 DEFAULT_TICKET_PATH = ".vcs.pr.ticket"
 AUTHOR_PATH = ".vcs.pr.author"
 # The jira collector under its own name. Matches the manifest default, which
 # `lunar policy dev` doesn't apply.
 DEFAULT_RERUN_COLLECTORS = "jira"
-
-# A name `/lunar rerun` accepts: a collector import's name, alone or with a
-# sub-collector ("jira", "jira.ticket"). The character set also keeps a name
-# inside the code span the hint renders it in.
-RERUN_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 # Jira returns a select-list option as {"value": ...}, a status, priority or
 # component as {"name": ...} and a user as {"displayName": ...}. A user can
@@ -74,23 +69,9 @@ def missing_ticket_message(path):
 
 
 def rerun_hint(sentence):
-    """`sentence` with {command} filled in by the `/lunar rerun` comment for the
-    collectors in `rerun_collectors`, led by a space so it can follow a failure
-    message. Empty when the input is set to "", for a Hub that doesn't accept
-    the comment.
-
-    The hint never changes a verdict: a malformed name leaves it out, with the
-    reason in the run log, rather than turning a failure into an error."""
-    raw = variable_or_default("rerun_collectors", DEFAULT_RERUN_COLLECTORS)
-    names = list(dict.fromkeys(n for n in re.split(r"[\s,]+", raw) if n))
-    bad = [n for n in names if not RERUN_NAME.fullmatch(n)]
-    if bad:
-        print(f"rerun_collectors: no rerun hint, not a collector name: {', '.join(bad)}",
-              file=sys.stderr)
-        return ""
-    if not names:
-        return ""
-    return " " + sentence.format(command=f"`/lunar rerun {','.join(names)}`")
+    """The `/lunar rerun` hint for the collectors that record the ticket, from
+    `rerun_collectors` (see rerun_hint.py)."""
+    return hint(sentence, DEFAULT_RERUN_COLLECTORS)
 
 
 def parse_list(name, raw):

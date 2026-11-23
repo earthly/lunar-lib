@@ -2,6 +2,8 @@
 
 from lunar_policy import Check, variable_or_default
 
+from pending_hint import with_pending_hint
+
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 
 
@@ -27,7 +29,8 @@ def main(node=None):
         issues_node = cq_node.get_node(".issues")
         if not issues_node.exists():
             c.fail(
-                "Issue counts not available. Ensure the scanner publishes .code_quality.issues."
+                with_pending_hint(
+                    c, "Issue counts not available. Ensure the scanner publishes .code_quality.issues.")
             )
             return c
 

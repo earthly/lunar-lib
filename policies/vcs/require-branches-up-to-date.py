@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("require-branches-up-to-date", "Branches should be required to be up to date", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             require_branches_up_to_date = c.get_value(".vcs.branch_protection.require_branches_up_to_date")
-            c.assert_true(require_branches_up_to_date, "Branch protection does not require branches to be up to date before merging")
+            c.assert_true(require_branches_up_to_date, with_hint(
+                c, "Branch protection does not require branches to be up to date before merging",
+                BRANCH_PROTECTION))
     return c
 
 

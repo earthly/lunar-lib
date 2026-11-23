@@ -2,6 +2,8 @@
 
 from lunar_policy import Check, variable_or_default
 
+from pending_hint import with_pending_hint
+
 
 def main(node=None):
     c = Check("max-duplication", "Duplication stays under maximum threshold", node=node)
@@ -31,7 +33,8 @@ def main(node=None):
         dup_node = cq_node.get_node(".duplication_percentage")
         if not dup_node.exists():
             c.fail(
-                "Duplication percentage not reported. Ensure the scanner publishes .code_quality.duplication_percentage."
+                with_pending_hint(
+                    c, "Duplication percentage not reported. Ensure the scanner publishes .code_quality.duplication_percentage.")
             )
             return c
 

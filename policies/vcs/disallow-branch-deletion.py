@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("disallow-branch-deletion", "Branch deletions should be disallowed", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             allow_deletions = c.get_value(".vcs.branch_protection.allow_deletions")
-            c.assert_false(allow_deletions, "Branch protection allows branch deletion, but policy requires it to be disabled")
+            c.assert_false(allow_deletions, with_hint(
+                c, "Branch protection allows branch deletion, but policy requires it to be disabled",
+                BRANCH_PROTECTION))
     return c
 
 

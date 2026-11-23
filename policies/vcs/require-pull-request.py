@@ -1,5 +1,7 @@
 from lunar_policy import Check
 
+from settings_hint import BRANCH_PROTECTION, with_hint
+
 
 def main(node=None):
     c = Check("require-pull-request", "Pull requests should be required", node=node)
@@ -10,11 +12,13 @@ def main(node=None):
 
         enabled = c.get_value(".vcs.branch_protection.enabled")
         if not enabled:
-            c.fail("Branch protection is not enabled")
+            c.fail(with_hint(c, "Branch protection is not enabled", BRANCH_PROTECTION))
             return c
         else:
             require_pr = c.get_value(".vcs.branch_protection.require_pr")
-            c.assert_true(require_pr, "Branch protection does not require pull requests before merging")
+            c.assert_true(require_pr, with_hint(
+                c, "Branch protection does not require pull requests before merging",
+                BRANCH_PROTECTION))
     return c
 
 
