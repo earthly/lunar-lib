@@ -88,22 +88,25 @@ policies:
       ticket_path: ".vcs.pr.architecture_review"
       allowed_statuses: "Approved"
       ticket_field: "native.jira.fields.customfield_10042"
+      rerun_collectors: "jira-architecture-review"   # the second jira import's name
 ```
 
 `ticket_field` is relative to the ticket. A Jira select-list option matches on its `value`, a status or component on its `name`, and a user on its `displayName`; a multi-value field passes when any of its values is allowed. Jira lists custom field IDs at `GET /rest/api/3/field`.
 
 ### Re-checking without a new commit
 
-These checks fail on the PR title or the ticket, so the fix needs no commit. Set `rerun_collectors` to the collectors that record the ticket, named as your configuration imports them, and the failure messages end with the comment that re-checks the PR:
-
-```yaml
-    with:
-      rerun_collectors: "jira"   # "github.pull-request,jira" when the ticket comes from ticket-from-json
-```
+These checks fail on the PR title or the ticket, so the fix needs no commit. Their failure messages end with the comment that re-checks the PR:
 
 > PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without a new commit.
 
-Name the whole plugin (`jira`, or the import's `name:`), not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled and ignores it otherwise, so leave `rerun_collectors` empty until they are.
+`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `jira`, fits the jira collector under its own name; set it for anything else:
+
+```yaml
+    with:
+      rerun_collectors: "linear"   # or "github.pull-request,jira" with ticket-from-json, or "" for no hint
+```
+
+Name the whole plugin or import, not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled and ignores it otherwise; set `rerun_collectors: ""` until they are.
 
 ## Examples
 
@@ -135,7 +138,7 @@ Name the whole plugin (`jira`, or the import's `name:`), not `jira.ticket`, so `
 {}
 ```
 
-**Failure message:** `"PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123])."`
+**Failure message:** `` "PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without a new commit." ``
 
 ## Remediation
 

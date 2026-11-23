@@ -9,6 +9,9 @@ from lunar_policy.nodepath import NodePath
 
 DEFAULT_TICKET_PATH = ".vcs.pr.ticket"
 AUTHOR_PATH = ".vcs.pr.author"
+# The jira collector under its own name. Matches the manifest default, which
+# `lunar policy dev` doesn't apply.
+DEFAULT_RERUN_COLLECTORS = "jira"
 
 # A name `/lunar rerun` accepts: a collector import's name, alone or with a
 # sub-collector ("jira", "jira.ticket"). The character set also keeps a name
@@ -73,12 +76,12 @@ def missing_ticket_message(path):
 def rerun_hint(sentence):
     """`sentence` with {command} filled in by the `/lunar rerun` comment for the
     collectors in `rerun_collectors`, led by a space so it can follow a failure
-    message. Empty when the input is unset, since only the deployment knows
-    whether its Hub accepts the comment and what it named the collectors.
+    message. Empty when the input is set to "", for a Hub that doesn't accept
+    the comment.
 
     The hint never changes a verdict: a malformed name leaves it out, with the
     reason in the run log, rather than turning a failure into an error."""
-    raw = variable_or_default("rerun_collectors", "")
+    raw = variable_or_default("rerun_collectors", DEFAULT_RERUN_COLLECTORS)
     names = list(dict.fromkeys(n for n in re.split(r"[\s,]+", raw) if n))
     bad = [n for n in names if not RERUN_NAME.fullmatch(n)]
     if bad:

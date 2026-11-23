@@ -126,6 +126,8 @@ class TestTicketField(unittest.TestCase):
     OPTION = "native.jira.fields.customfield_10042"
 
     def run_field(self, data, finished=True, **vars):
+        # These cases are about matching the field; TestRerunHint covers the hint.
+        vars.setdefault("rerun_collectors", "")
         with policy_vars(**vars):
             return ticket_field(node(data, finished))
 
@@ -285,7 +287,9 @@ class TestDefaultPath(unittest.TestCase):
         check = ticket_present(node(component()))
         self.assertEqual(outcome(check), "fail")
         self.assertEqual(message(check), "PR does not reference a ticket. "
-                                         "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+                                         "Include a ticket ID in the PR title (e.g. [ABC-123]). "
+                                         "Then comment `/lunar rerun jira` to re-check without "
+                                         "a new commit.")
         self.assertEqual(outcome(ticket_present(node(component(), finished=False))), "pending")
 
     def test_valid(self):
@@ -324,6 +328,8 @@ class TestSecondReference(unittest.TestCase):
     the delivery ticket next to it."""
 
     def run_check(self, check, data, **vars):
+        # As the README configures it: the second jira import, renamed.
+        vars.setdefault("rerun_collectors", "jira-architecture-review")
         with policy_vars(ticket_path=SECOND, **vars):
             return check(node(data))
 
@@ -334,7 +340,9 @@ class TestSecondReference(unittest.TestCase):
         self.assertEqual(outcome(check), "fail")
         self.assertEqual(message(check),
                          "PR does not reference a ticket for .vcs.pr.architecture_review. "
-                         "Include its key in the PR title or description.")
+                         "Include its key in the PR title or description. Then comment "
+                         "`/lunar rerun jira-architecture-review` to re-check without a new "
+                         "commit.")
 
     def test_valid(self):
         self.assertEqual(outcome(self.run_check(ticket_valid, component(record(TP), record(ARB)))),
@@ -525,15 +533,26 @@ class TestRerunHint(unittest.TestCase):
                  "Ticket ARB-56 field native.jira.fields.customfield_10042 is 'Payments', "
                  "which is not in the allowed list: 'Platform'." + update)):
             with self.subTest(check=check.__module__, vars=vars):
-                result = self.run_check(check, component(ticket), rerun_collectors="jira",
-                                        **vars)
+                result = self.run_check(check, component(ticket), **vars)
                 self.assertEqual(outcome(result), "fail")
                 self.assertEqual(message(result), expected)
-                # Unset, the same failure reads as it did before the input: the
+                # Set to "", the failure reads as it did before the input: the
                 # hinted message is that message plus the hint.
-                unset = self.run_check(check, component(ticket), **vars)
-                self.assertNotIn("/lunar rerun", message(unset))
-                self.assertTrue(expected.startswith(message(unset) + " "))
+                off = self.run_check(check, component(ticket), rerun_collectors="", **vars)
+                self.assertEqual(outcome(off), "fail")
+                self.assertNotIn("/lunar rerun", message(off))
+                self.assertTrue(expected.startswith(message(off) + " "))
+
+    def test_defaults_to_jira_and_empty_turns_it_off(self):
+        default = self.run_check(ticket_present, component())
+        self.assertIn("comment `/lunar rerun jira` to re-check", message(default))
+        self.assertEqual(message(self.run_check(ticket_present, component(),
+                                                rerun_collectors="jira")), message(default))
+        for off in ("", "  ", " , "):
+            with self.subTest(off=off):
+                result = self.run_check(ticket_present, component(), rerun_collectors=off)
+                self.assertEqual(message(result), "PR does not reference a ticket. "
+                                 "Include a ticket ID in the PR title (e.g. [ABC-123]).")
 
     def test_no_hint_where_a_rerun_cannot_fix_it(self):
         # tracker_error unset is also what a ticket reads when Jira validation
@@ -561,15 +580,15 @@ class TestRerunHint(unittest.TestCase):
         # This is the second-reference import from the README, with its own
         # renamed jira collector import.
         data = component(record(TP), {"id": "ARB-99", "tracker_error": "not_found"})
-        vars = dict(ticket_path=SECOND, rerun_collectors="architecture-review-jira")
+        vars = dict(ticket_path=SECOND, rerun_collectors="jira-architecture-review")
         present = self.run_check(ticket_present, component(record(TP)), **vars)
         self.assertEqual(message(present),
                          "PR does not reference a ticket for .vcs.pr.architecture_review. "
                          "Include its key in the PR title or description. Then comment "
-                         "`/lunar rerun architecture-review-jira` to re-check without a new "
+                         "`/lunar rerun jira-architecture-review` to re-check without a new "
                          "commit.")
         valid = self.run_check(ticket_valid, data, **vars)
-        self.assertIn("`/lunar rerun architecture-review-jira`", message(valid))
+        self.assertIn("`/lunar rerun jira-architecture-review`", message(valid))
         for result in (present, valid):
             for name in CHECK_NAMES + ("architecture-review.",):
                 self.assertNotIn(name, message(result))
