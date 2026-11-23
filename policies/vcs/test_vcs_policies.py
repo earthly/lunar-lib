@@ -47,6 +47,7 @@ check_allowed_merge_strategies = load_policy("allowed-merge-strategies")
 check_disallow_bypass_actors = load_policy("disallow-bypass-actors")
 check_pr_commits_signed = load_policy("pr-commits-signed")
 check_release_commits_merged_via_pr = load_policy("release-commits-merged-via-pr")
+check_require_job_token_allowlist = load_policy("require-job-token-allowlist")
 
 
 def make_branch_protection_data(
@@ -1065,6 +1066,65 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
         check = check_release_commits_merged_via_pr(finished(release_data(commits)))
         self.assertIn("12 commit(s)", check.failure_reasons[0])
         self.assertIn("+2 more", check.failure_reasons[0])
+
+
+class TestRequireJobTokenAllowlist(unittest.TestCase):
+    """require-job-token-allowlist: enabled passes, disabled fails, and anything
+    the collector couldn't read skips — never a pass or a fail."""
+
+    def run_check(self, scope, finished_=True):
+        data = {} if scope is None else {"vcs": {"job_token_allowlist": scope}}
+        return check_require_job_token_allowlist(
+            Node.from_component_json(data, bundle_info={"workflows_finished": finished_}))
+
+    def test_enabled_passes(self):
+        for scope in ({"enabled": True, "projects": 2, "groups": 1, "checked_at": "2026-11-23T14:02:11Z"},
+                      {"enabled": True, "projects": 0, "groups": 0},
+                      {"enabled": True}):  # counts unreadable: the setting is still known
+            with self.subTest(scope=scope):
+                check = self.run_check(scope)
+                self.assertEqual(check.status, CheckStatus.PASS)
+                self.assertIsNone(skip_reason(check))
+
+    def test_disabled_fails(self):
+        check = self.run_check({"enabled": False, "checked_at": "2026-11-23T14:02:11Z"})
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("allowlist is off", check.failure_reasons[0])
+        self.assertIn("Only this project and any groups and projects in the allowlist", check.failure_reasons[0])
+
+    def test_forbidden_skips_with_cause(self):
+        check = self.run_check({"error": "forbidden", "checked_at": "2026-11-23T14:02:11Z"})
+        self.assertIn("HTTP 403", skip_reason(check))
+        self.assertIn("Maintainers", skip_reason(check))
+
+    def test_not_found_skips_with_cause(self):
+        self.assertIn("404", skip_reason(self.run_check({"error": "not_found"})))
+
+    def test_unknown_error_skips(self):
+        self.assertIn("'rate_limited'", skip_reason(self.run_check({"error": "rate_limited"})))
+
+    def test_error_wins_over_enabled(self):
+        # Never look compliant when the collector also recorded a denied read.
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                check = self.run_check({"enabled": enabled, "error": "forbidden"})
+                self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_malformed_skips(self):
+        for scope in ({"enabled": "true"}, {"enabled": None}, {"enabled": 1}, {}, {"projects": 2},
+                      [], "enabled", True):
+            with self.subTest(scope=scope):
+                check = self.run_check(scope)
+                self.assertIn("unknown", skip_reason(check))
+
+    def test_absent_skips_once_collection_finished(self):
+        for data in ({}, {"vcs": {"provider": "github", "visibility": "private"}}):
+            with self.subTest(data=data):
+                check = check_require_job_token_allowlist(finished(data))
+                self.assertIn("No job token allowlist data", skip_reason(check))
+
+    def test_absent_pends_during_collection(self):
+        self.assertEqual(self.run_check(None, finished_=False).status, CheckStatus.PENDING)
 
 
 if __name__ == "__main__":

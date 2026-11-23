@@ -9,9 +9,9 @@ landing_page:
   display_name: "GitLab Collector"
   long_description: |
     Collect GitLab project settings, protected-branch and approval rules,
-    access permissions, and merge-request metadata. Populates the same
-    .vcs.* schema as the GitHub collector so VCS and ticket policies work
-    on GitLab-hosted repositories.
+    access permissions, CI/CD job token access, and merge-request metadata.
+    Populates the same .vcs.* schema as the GitHub collector so VCS and
+    ticket policies work on GitLab-hosted repositories.
   categories: ["vcs"]
   icon: "assets/gitlab.svg"
   status: "experimental"
@@ -74,6 +74,20 @@ collectors:
       type: code
     keywords: ["access control", "members", "groups", "audit", "least privilege"]
 
+  - name: job-token-allowlist
+    description: |
+      Reads whether the project limits which other projects' CI/CD job tokens
+      can access it (the CI/CD job token allowlist under Settings > CI/CD >
+      Job token permissions) and, when it does, how many projects and groups
+      the allowlist holds. Writes .vcs.job_token_allowlist. GitLab shows the
+      setting only to Maintainers: a 403 or 404 is recorded in .error, never
+      as enabled or disabled. Runs on the default branch.
+    mainBash: job_token_allowlist.sh
+    runs_on: [default-branch]
+    hook:
+      type: code
+    keywords: ["gitlab", "ci job token", "job token allowlist", "authorized groups and projects", "ci/cd security"]
+
 inputs:
   gitlab_host:
     description: GitLab host for self-managed instances (e.g. gitlab.example.com)
@@ -81,7 +95,7 @@ inputs:
 
 secrets:
   GL_TOKEN:
-    description: GitLab personal or project access token with `read_api` scope for API authentication
+    description: GitLab personal or project access token with `read_api` scope for API authentication. job-token-allowlist also needs the token's user to be a Maintainer of each project.
 
 example_component_json: |
   {
@@ -134,6 +148,12 @@ example_component_json: |
         "teams": [
           {"slug": "platform", "name": "Platform Team", "permission": "maintainer"}
         ]
+      },
+      "job_token_allowlist": {
+        "enabled": true,
+        "projects": 2,
+        "groups": 1,
+        "checked_at": "2026-11-23T14:02:11Z"
       }
     }
   }

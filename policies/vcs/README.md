@@ -47,6 +47,7 @@ A commit reached the default branch through merged pull requests when its own pu
 | `require-private` | Repository visibility must be private |
 | `require-default-branch` | Default branch must match required name (configurable via `required_default_branch` input, defaults to "main") |
 | `allowed-merge-strategies` | Merge strategies must match allowed list (configurable via `allowed_merge_strategies` input) |
+| `require-job-token-allowlist` | GitLab only: only projects and groups on the project's CI/CD job token allowlist can access it with a job token. Skips when GitLab didn't say (default branch only; needs the gitlab collector's `job-token-allowlist`) |
 
 ## Required Data
 
@@ -75,6 +76,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.branch_protection.bypass_pull_request_allowances` | object | Classic `users`, `teams`, `apps` allowed to skip the pull-request requirement |
 | `.vcs.pr.commits[]` | array | The PR's commits with `signature.verified` and `signature.reason` |
 | `.vcs.release_range` | object | Commits since the previous release tag, each with its merged `pull_request` when there is one |
+| `.vcs.job_token_allowlist` | object | GitLab's CI/CD job token allowlist: `enabled`, or `error` when GitLab didn't say |
 
 **Note:** This policy requires a VCS collector (such as `github` or `gitlab`) that populates the `.vcs` data.
 
@@ -106,6 +108,7 @@ policies:
       - require-private
       - require-default-branch
       - allowed-merge-strategies
+      - require-job-token-allowlist
     with:
       min_approvals: 2
       allowed_merge_strategies: "squash"
@@ -132,6 +135,13 @@ policies:
       - release-commits-merged-via-pr
     on: "domain:your-domain"
     enforcement: block-release
+
+  # GitLab: measure CI/CD job token allowlist use on the dashboard without blocking anything
+  - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
+    include:
+      - require-job-token-allowlist
+    on: "domain:your-domain"
+    enforcement: score
 
   # Run only repository settings policies
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
@@ -306,3 +316,5 @@ When repository settings policies fail, update repository settings:
      - Example: If policy specifies `"squash,rebase"`, enable those two and disable merge commits
 3. Save the changes
 4. Re-run the Lunar collector and policy to verify compliance
+
+**`require-job-token-allowlist`** (GitLab): in Settings → CI/CD → Job token permissions, add the groups and projects whose pipelines use this project (artifacts, packages, registry, API) to the CI/CD job token allowlist, then select **Only this project and any groups and projects in the allowlist**. Projects that aren't listed lose job token access; the authentication log on the same page (GitLab 17.6+) shows which projects have used one. A skip means the collector couldn't read the setting: its token needs the Maintainer role on the project.

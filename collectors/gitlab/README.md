@@ -1,6 +1,6 @@
 # GitLab Collector
 
-Collects GitLab project settings, protected-branch rules, access permissions, and merge-request metadata via the GitLab API.
+Collects GitLab project settings, protected-branch rules, access permissions, CI/CD job token access, and merge-request metadata via the GitLab API.
 
 ## Overview
 
@@ -19,6 +19,7 @@ This collector writes to the following Component JSON paths:
 | `.vcs.merge_strategies` | object | Allowed merge strategies, mapped from the GitLab merge method |
 | `.vcs.branch_protection` | object | Protected-branch and approval rules (`source: "gitlab"`) |
 | `.vcs.access` | object | Project members and shared groups |
+| `.vcs.job_token_allowlist` | object | Whether the project limits which projects' CI/CD job tokens can access it (default branch only) |
 | `.vcs.pr` | object | Merge-request metadata (populated only in MR context) |
 
 ### Merge-request fields (`.vcs.pr`)
@@ -36,6 +37,16 @@ This collector writes to the following Component JSON paths:
 | `.vcs.pr.draft` | boolean | Whether the MR is a draft |
 | `.vcs.pr.state` | string | MR state, normalized to the shared vocabulary (`open`, `closed`, `merged`) |
 
+### Job token allowlist fields (`.vcs.job_token_allowlist`)
+
+| Path | Type | Description |
+|------|------|-------------|
+| `.vcs.job_token_allowlist.enabled` | boolean | `true`: only projects and groups on the allowlist can access this project with a CI/CD job token. `false`: any project's job token can. GitLab's effective `inbound_enabled`, so also `true` when an administrator enforces the allowlist instance-wide |
+| `.vcs.job_token_allowlist.projects` | number | Other projects on the allowlist, not counting this one. Only when `enabled`, and left out when the list can't be read |
+| `.vcs.job_token_allowlist.groups` | number | Groups on the allowlist; each covers every project under it. Only when `enabled`, and left out when the list can't be read |
+| `.vcs.job_token_allowlist.error` | string | Present instead of `enabled` when GitLab didn't say: `forbidden` (HTTP 403, the token's user isn't a Maintainer) or `not_found` (HTTP 404) |
+| `.vcs.job_token_allowlist.checked_at` | string | When GitLab was asked (UTC). The setting can change without a commit |
+
 ## Collectors
 
 This integration provides the following collectors (use `include` to select a subset):
@@ -46,6 +57,7 @@ This integration provides the following collectors (use `include` to select a su
 | `repository`         | Collects basic project settings including visibility, default branch, topics, and the merge method mapped onto `.vcs.merge_strategies`.                               |
 | `branch-protection`  | Collects protected-branch config, MR approval rules, external status checks, and push rules for the default branch, normalized into `.vcs.branch_protection` with `source: "gitlab"`. |
 | `access-permissions` | Collects project members and shared groups (does not expand group memberships).                                                                                      |
+| `job-token-allowlist` | Reads whether the project limits which projects' CI/CD job tokens can access it, and how many projects and groups its allowlist holds. Default branch only; the token's user must be a Maintainer. |
 
 ## Installation
 
@@ -69,6 +81,31 @@ collectors:
 ### `GL_TOKEN`
 
 A GitLab personal or project access token with `read_api` scope. Used for all GitLab API calls (project settings, protected branches, approval rules, members, and merge-request metadata).
+
+### Job token allowlist
+
+`job-token-allowlist` makes one read per project, `GET /projects/:id/job_token_scope` (GitLab 16.0+), and reads the two allowlists only when it's on. It addresses the project by the gitlab cataloger's `meta.project_id` when there is one, so renamed projects still resolve. GitLab shows this setting only to Maintainers, so import it separately, scoped to the projects you want measured:
+
+```yaml
+collectors:
+  - uses: github://earthly/lunar-lib/collectors/gitlab@v1.0.0
+    name: gitlab-job-tokens
+    on: [tier-0]
+    include: [job-token-allowlist]
+    with:
+      gitlab_host: gitlab.example.com
+```
+
+Before rolling it out, run the same read with the collector's token against one project. `HTTP 200` with `inbound_enabled` in the body means it will work; `HTTP 403` means the token's user isn't a Maintainer there:
+
+```bash
+curl -s -w '\nHTTP %{http_code}\n' -H "PRIVATE-TOKEN: $GL_TOKEN" \
+  "https://gitlab.example.com/api/v4/projects/<project-id>/job_token_scope"
+```
+
+A `403` or `404` is recorded in `.error`. A `401`, `429`, `5xx`, network failure or unreadable answer records nothing and fails the run, so a bad token or an outage never replaces an earlier result. Code collectors run on push, so projects without recent commits need a one-off `lunar collector run --collector gitlab-job-tokens.job-token-allowlist --only-code`.
+
+The allowlist says who may reach a project, not what the project depends on. Where it's off, it says nothing about which projects use job tokens against the project, and those are the projects turning it on would break; the project's job token authentication log (GitLab 17.6+) shows them. Job tokens can still read some resources of public or internal projects that aren't on the list, and other token types aren't affected by it.
 
 ### Why `.vcs.pr.*` matters
 
