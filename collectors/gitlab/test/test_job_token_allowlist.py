@@ -26,8 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(os.path.dirname(HERE), "job_token_allowlist.sh")
 
 HOST = "gitlab.example.com"
-TOKEN = "glpat-test-only-not-a-real-token"
-SCOPE_TOKEN = "glpat-test-only-maintainer-token"
+TOKEN = "test-only-gl-token"
+SCOPE_TOKEN = "test-only-scope-token"
 SCOPE = "/api/v4/projects/42/job_token_scope"
 ALLOWLIST = SCOPE + "/allowlist"
 GROUPS = SCOPE + "/groups_allowlist"
