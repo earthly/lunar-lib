@@ -84,7 +84,7 @@ A GitLab personal or project access token with `read_api` scope. Used for all Gi
 
 ### Job token allowlist
 
-`job-token-allowlist` makes one read per project, `GET /projects/:id/job_token_scope` (GitLab 16.0+), and reads the two allowlists only when it's on. It addresses the project by the gitlab cataloger's `meta.project_id` when there is one, so renamed projects still resolve. GitLab shows this setting only to Maintainers, so import it separately, scoped to the projects you want measured:
+`job-token-allowlist` makes one read per project, `GET /projects/:id/job_token_scope` (GitLab 16.0+), and reads the two allowlists only when it's on. It addresses the project by the gitlab cataloger's `meta.project_id` when there is one, so renamed projects still resolve. GitLab shows this setting only to Maintainers. To keep that role off the identity behind `GL_TOKEN`, set `GL_JOB_TOKEN_SCOPE_TOKEN` (collector scope) to another `read_api` token; only this sub-collector uses it. Import it separately, scoped to the projects you want measured:
 
 ```yaml
 collectors:
@@ -96,7 +96,7 @@ collectors:
       gitlab_host: gitlab.example.com
 ```
 
-Before rolling it out, run the same read with the collector's token against one project. `HTTP 200` with `inbound_enabled` in the body means it will work; `HTTP 403` means the token's user isn't a Maintainer there:
+Before rolling it out, run the same read with that token against one project. `HTTP 200` with `inbound_enabled` in the body means it will work; `HTTP 403` means the token's user isn't a Maintainer there:
 
 ```bash
 curl -s -w '\nHTTP %{http_code}\n' -H "PRIVATE-TOKEN: $GL_TOKEN" \

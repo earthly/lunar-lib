@@ -95,7 +95,9 @@ inputs:
 
 secrets:
   GL_TOKEN:
-    description: GitLab personal or project access token with `read_api` scope for API authentication. job-token-allowlist also needs the token's user to be a Maintainer of each project.
+    description: GitLab personal or project access token with `read_api` scope for API authentication. job-token-allowlist also needs the token's user to be a Maintainer of each project, unless GL_JOB_TOKEN_SCOPE_TOKEN is set.
+  GL_JOB_TOKEN_SCOPE_TOKEN:
+    description: Optional. A `read_api` token that job-token-allowlist uses instead of GL_TOKEN, so the Maintainer role it needs can sit on a separate identity.
 
 example_component_json: |
   {

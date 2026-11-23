@@ -27,6 +27,7 @@ SCRIPT = os.path.join(os.path.dirname(HERE), "job_token_allowlist.sh")
 
 HOST = "gitlab.example.com"
 TOKEN = "glpat-test-only-not-a-real-token"
+SCOPE_TOKEN = "glpat-test-only-maintainer-token"
 SCOPE = "/api/v4/projects/42/job_token_scope"
 ALLOWLIST = SCOPE + "/allowlist"
 GROUPS = SCOPE + "/groups_allowlist"
@@ -160,7 +161,8 @@ class JobTokenAllowlistTest(unittest.TestCase):
         env = {k: v for k, v in env.items() if v is not None}
         result = subprocess.run(["bash", SCRIPT], env=env, stdin=subprocess.DEVNULL,
                                 capture_output=True, text=True, timeout=120)
-        self.assertNotIn(TOKEN, result.stdout + result.stderr, "the token leaked into the output")
+        for token in (TOKEN, SCOPE_TOKEN):
+            self.assertNotIn(token, result.stdout + result.stderr, "a token leaked into the output")
         return result
 
     def collected(self):
@@ -375,6 +377,23 @@ class JobTokenAllowlistTest(unittest.TestCase):
         result = self.run_script(meta='{"project_id": 42}')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.paths(), [SCOPE])
+
+    def test_dedicated_token_is_preferred(self):
+        for gl_token in (TOKEN, None):
+            with self.subTest(gl_token=gl_token):
+                self.reset()
+                self.route(SCOPE, ok({"inbound_enabled": False}))
+                result = self.run_script(LUNAR_SECRET_GL_TOKEN=gl_token,
+                                         LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN=SCOPE_TOKEN)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.written(), {"enabled": False})
+                self.assertEqual([r["token"] for r in self.server.requests], [SCOPE_TOKEN])
+
+    def test_denied_read_names_the_token_used(self):
+        self.route(SCOPE, (403, {"message": "403 Forbidden"}, {}))
+        result = self.run_script(LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN=SCOPE_TOKEN)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GL_JOB_TOKEN_SCOPE_TOKEN's user needs the Maintainer role", result.stderr)
 
     # --- not run -------------------------------------------------------------
 

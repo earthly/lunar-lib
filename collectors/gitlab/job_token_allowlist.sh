@@ -22,8 +22,16 @@ if [ "$HOST" != "$GITLAB_HOST" ]; then
   exit 0
 fi
 
-if [ -z "${LUNAR_SECRET_GL_TOKEN:-}" ]; then
-  echo "Error: LUNAR_SECRET_GL_TOKEN is not set. Configure the GL_TOKEN secret for this collector." >&2
+# GL_JOB_TOKEN_SCOPE_TOKEN, when set, keeps the Maintainer access these reads
+# need off the identity the other sub-collectors use.
+if [ -n "${LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN:-}" ]; then
+  TOKEN="$LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN"
+  TOKEN_NAME=GL_JOB_TOKEN_SCOPE_TOKEN
+elif [ -n "${LUNAR_SECRET_GL_TOKEN:-}" ]; then
+  TOKEN="$LUNAR_SECRET_GL_TOKEN"
+  TOKEN_NAME=GL_TOKEN
+else
+  echo "Error: LUNAR_SECRET_GL_TOKEN is not set. Configure the GL_TOKEN secret (or GL_JOB_TOKEN_SCOPE_TOKEN) for this collector." >&2
   exit 1
 fi
 
@@ -51,7 +59,7 @@ gl_get() {
     : > "$WORK/body"
     : > "$WORK/headers"
     GL_CODE=$(curl -sS --max-time 30 -o "$WORK/body" -D "$WORK/headers" -w '%{http_code}' \
-      -H "PRIVATE-TOKEN: ${LUNAR_SECRET_GL_TOKEN}" "${API_BASE}$1" 2> "$WORK/curl.err") || GL_CODE=000
+      -H "PRIVATE-TOKEN: ${TOKEN}" "${API_BASE}$1" 2> "$WORK/curl.err") || GL_CODE=000
     GL_BODY=$(cat "$WORK/body")
     case "$GL_CODE" in
       000 | 429 | 5[0-9][0-9])
@@ -99,7 +107,7 @@ CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 case "$GL_CODE" in
   200) ;;
   403)
-    echo "GitLab denied the job token scope read for ${PROJECT_PATH} (HTTP 403): it needs the Maintainer role. Recording it as unknown." >&2
+    echo "GitLab denied the job token scope read for ${PROJECT_PATH} (HTTP 403): ${TOKEN_NAME}'s user needs the Maintainer role. Recording it as unknown." >&2
     collect "$(jq -n --arg at "$CHECKED_AT" '{error: "forbidden", checked_at: $at}')"
     exit 0
     ;;
@@ -109,7 +117,7 @@ case "$GL_CODE" in
     exit 0
     ;;
   401)
-    echo "Error: GitLab rejected GL_TOKEN (HTTP 401). Nothing recorded. $(body_excerpt)" >&2
+    echo "Error: GitLab rejected ${TOKEN_NAME} (HTTP 401). Nothing recorded. $(body_excerpt)" >&2
     exit 1
     ;;
   000)
