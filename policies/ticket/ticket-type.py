@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import skip_listed_author, ticket_path
+from helpers import UPDATE_TICKET, rerun_hint, skip_listed_author, ticket_path
 
 
 def main(node=None):
@@ -26,7 +26,7 @@ def main(node=None):
 
         c.assert_true(issue_type in allowed,
                       f"Ticket {ticket_id} has type '{issue_type}' which is not in "
-                      f"the allowed list: {', '.join(allowed)}.")
+                      f"the allowed list: {', '.join(allowed)}." + rerun_hint(UPDATE_TICKET))
     return c
 
 

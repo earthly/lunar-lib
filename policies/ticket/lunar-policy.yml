@@ -118,3 +118,11 @@ inputs:
       matched exactly, ignoring case, so keep the [bot] suffix GitHub gives an
       app. Empty skips no one.
     default: ""
+  rerun_collectors:
+    description: |
+      Collectors a failure message tells the PR author to rerun with a
+      `/lunar rerun` comment once the PR title or the ticket is fixed, named as
+      your configuration imports them (e.g. jira, or github.pull-request,jira
+      when the ticket comes from ticket-from-json). Empty leaves the hint out.
+      Lunar accepts the comment from 4.15.0 when comment reruns are enabled.
+    default: ""

@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import skip_listed_author, ticket_path
+from helpers import rerun_hint, skip_listed_author, ticket_path
 
 
 def main(node=None):
@@ -27,7 +27,9 @@ def main(node=None):
         source_name = source if isinstance(source, str) else str(source)
         c.assert_true(source_name.lower() in allowed,
                       f"Ticket {ticket_id} comes from '{source_name}' which is not in "
-                      f"the allowed list: {', '.join(allowed)}.")
+                      f"the allowed list: {', '.join(allowed)}." + rerun_hint(
+                          "Reference a ticket from an allowed tracker, then comment "
+                          "{command} to re-check without a new commit."))
     return c
 
 

@@ -92,6 +92,19 @@ policies:
 
 `ticket_field` is relative to the ticket. A Jira select-list option matches on its `value`, a status or component on its `name`, and a user on its `displayName`; a multi-value field passes when any of its values is allowed. Jira lists custom field IDs at `GET /rest/api/3/field`.
 
+### Re-checking without a new commit
+
+These checks fail on the PR title or the ticket, so the fix needs no commit. Set `rerun_collectors` to the collectors that record the ticket, named as your configuration imports them, and the failure messages end with the comment that re-checks the PR:
+
+```yaml
+    with:
+      rerun_collectors: "jira"   # "github.pull-request,jira" when the ticket comes from ticket-from-json
+```
+
+> PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without a new commit.
+
+Name the whole plugin (`jira`, or the import's `name:`), not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled and ignores it otherwise, so leave `rerun_collectors` empty until they are.
+
 ## Examples
 
 ### Passing — Valid ticket with acceptable status
@@ -135,3 +148,5 @@ When this policy fails, you can resolve it by:
 5. **ticket-type**: Use an acceptable issue type (e.g. Story, Bug, Task)
 6. **ticket-reuse**: Create a new ticket for this work instead of reusing an existing one
 7. **ticket-field**: Set the field on the ticket to one of the allowed values
+
+None of these needs a new commit: once the title or the ticket is fixed, a [`/lunar rerun` comment](#re-checking-without-a-new-commit) re-checks the PR.

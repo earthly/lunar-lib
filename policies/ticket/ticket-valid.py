@@ -1,6 +1,6 @@
 from lunar_policy import Check
 
-from helpers import skip_listed_author, ticket_path
+from helpers import rerun_hint, skip_listed_author, ticket_path
 
 
 def main(node=None):
@@ -21,10 +21,15 @@ def main(node=None):
             # ticket. Trackers that do not report one leave it unset.
             tracker_error = c.get_value_or_default(f"{root}.tracker_error", None)
             if tracker_error == "not_found":
-                c.fail(f"Ticket {ticket_id} does not exist in Jira.")
+                c.fail(f"Ticket {ticket_id} does not exist in Jira." + rerun_hint(
+                    "Correct the key in the PR title or description, then comment "
+                    "{command} to re-check without a new commit."))
             elif tracker_error == "unreachable":
-                c.fail(f"Ticket {ticket_id} could not be validated: Jira was unreachable.")
+                c.fail(f"Ticket {ticket_id} could not be validated: Jira was unreachable."
+                       + rerun_hint("Comment {command} to retry once Jira is reachable."))
             else:
+                # No rerun hint: this is also what a ticket reads when Jira
+                # validation isn't configured, which a rerun can't fix.
                 c.fail(f"Ticket {ticket_id} could not be validated against Jira. "
                        "The ticket may not exist or the Jira API may be unreachable.")
             return c

@@ -8,11 +8,12 @@ paths run against the same structure a real import produces.
 """
 
 import importlib.util
+import io
 import json
 import os
 import sys
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr
 from pathlib import Path
 
 from lunar_policy import CheckStatus, Node
@@ -470,6 +471,148 @@ class TestSkipAuthors(unittest.TestCase):
         with policy_vars(skip_authors='["dependabot[bot]"'):
             with self.assertRaisesRegex(ValueError, "skip_authors: invalid JSON array"):
                 ticket_present(node(component(author=BOT)))
+
+
+CHECK_NAMES = ("ticket-present", "ticket-valid", "ticket-source", "ticket-status",
+               "ticket-type", "ticket-reuse", "ticket-field")
+
+
+class TestRerunHint(unittest.TestCase):
+    """rerun_collectors ends a failure the PR author can fix without a commit
+    with the `/lunar rerun` comment that re-checks it."""
+
+    def run_check(self, check, data, finished=True, **vars):
+        with policy_vars(**vars):
+            return check(node(data, finished))
+
+    def test_every_fixable_failure_ends_with_the_comment(self):
+        update = (" Update the ticket or the PR title, then comment `/lunar rerun jira` "
+                  "to re-check without a new commit.")
+        for check, ticket, vars, expected in (
+                (ticket_present, None, {},
+                 "PR does not reference a ticket. Include a ticket ID in the PR title "
+                 "(e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without "
+                 "a new commit."),
+                (ticket_valid, {"id": "TP-9", "tracker_error": "not_found"}, {},
+                 "Ticket TP-9 does not exist in Jira. Correct the key in the PR title or "
+                 "description, then comment `/lunar rerun jira` to re-check without a "
+                 "new commit."),
+                (ticket_valid, {"id": "TP-9", "tracker_error": "unreachable"}, {},
+                 "Ticket TP-9 could not be validated: Jira was unreachable. Comment "
+                 "`/lunar rerun jira` to retry once Jira is reachable."),
+                (ticket_status, record(TP), {"allowed_statuses": "Approved"},
+                 "Ticket TP-1 has status 'In Progress' which is not in the allowed list: "
+                 "Approved." + update),
+                (ticket_status, record(TP), {"disallowed_statuses": "In Progress"},
+                 "Ticket TP-1 has status 'In Progress' which is in the disallowed list: "
+                 "In Progress." + update),
+                (ticket_type, record(TP), {"allowed_types": "Bug"},
+                 "Ticket TP-1 has type 'Story' which is not in the allowed list: Bug."
+                 + update),
+                (ticket_source, record(TP), {"allowed_sources": "linear"},
+                 "Ticket TP-1 comes from 'jira' which is not in the allowed list: linear. "
+                 "Reference a ticket from an allowed tracker, then comment "
+                 "`/lunar rerun jira` to re-check without a new commit."),
+                (ticket_reuse, record(TP, reuse_count=4), {},
+                 "Ticket TP-1 has been used in 4 other PRs (max allowed: 3). Create a new "
+                 "ticket for this work. Reference it in the PR title, then comment "
+                 "`/lunar rerun jira` to re-check without a new commit."),
+                (ticket_field, record(TP), {"ticket_field": TestTicketField.OPTION},
+                 "Ticket TP-1 has no value for native.jira.fields.customfield_10042."
+                 + update),
+                (ticket_field, record(ARB), {"ticket_field": TestTicketField.OPTION,
+                                             "allowed_field_values": "Platform"},
+                 "Ticket ARB-56 field native.jira.fields.customfield_10042 is 'Payments', "
+                 "which is not in the allowed list: 'Platform'." + update)):
+            with self.subTest(check=check.__module__, vars=vars):
+                result = self.run_check(check, component(ticket), rerun_collectors="jira",
+                                        **vars)
+                self.assertEqual(outcome(result), "fail")
+                self.assertEqual(message(result), expected)
+                # Unset, the same failure reads as it did before the input: the
+                # hinted message is that message plus the hint.
+                unset = self.run_check(check, component(ticket), **vars)
+                self.assertNotIn("/lunar rerun", message(unset))
+                self.assertTrue(expected.startswith(message(unset) + " "))
+
+    def test_no_hint_where_a_rerun_cannot_fix_it(self):
+        # tracker_error unset is also what a ticket reads when Jira validation
+        # isn't configured, and a valid: false from another collector says
+        # nothing about the fix.
+        for ticket in ({"id": "TP-9"}, {"id": "TP-9", "valid": False}):
+            with self.subTest(ticket=ticket):
+                result = self.run_check(ticket_valid, component(ticket),
+                                        rerun_collectors="jira")
+                self.assertEqual(outcome(result), "fail")
+                self.assertNotIn("/lunar rerun", message(result))
+
+    def test_renamed_collector_import(self):
+        # A collector imported with `name: tickets` is `tickets.ticket` on the
+        # Hub, and `/lunar rerun` matches that name, so the hint takes whatever
+        # the deployment wrote and never falls back to the library's default.
+        result = self.run_check(ticket_present, component(), rerun_collectors="tickets")
+        self.assertIn("comment `/lunar rerun tickets` to re-check", message(result))
+        self.assertNotIn("jira", message(result))
+
+    def test_renamed_policy_import(self):
+        # The policy can't see the name its import gives it (the Hub passes it
+        # no name), so no message names a policy: the report's check header
+        # carries the effective name, e.g. `architecture-review.ticket-present`.
+        # This is the second-reference import from the README, with its own
+        # renamed jira collector import.
+        data = component(record(TP), {"id": "ARB-99", "tracker_error": "not_found"})
+        vars = dict(ticket_path=SECOND, rerun_collectors="architecture-review-jira")
+        present = self.run_check(ticket_present, component(record(TP)), **vars)
+        self.assertEqual(message(present),
+                         "PR does not reference a ticket for .vcs.pr.architecture_review. "
+                         "Include its key in the PR title or description. Then comment "
+                         "`/lunar rerun architecture-review-jira` to re-check without a new "
+                         "commit.")
+        valid = self.run_check(ticket_valid, data, **vars)
+        self.assertIn("`/lunar rerun architecture-review-jira`", message(valid))
+        for result in (present, valid):
+            for name in CHECK_NAMES + ("architecture-review.",):
+                self.assertNotIn(name, message(result))
+
+    def test_names_as_the_hub_parses_them(self):
+        # The Hub splits names on commas and whitespace; the hint joins them
+        # with commas, in the order given, without repeats.
+        both = "/lunar rerun github.pull-request,jira"
+        for raw, command in (("jira", "/lunar rerun jira"),
+                             ("github.pull-request,jira", both),
+                             (" github.pull-request, jira ", both),
+                             ("github.pull-request jira\njira", both),
+                             ("jira.ticket-from-json", "/lunar rerun jira.ticket-from-json")):
+            with self.subTest(raw=raw):
+                result = self.run_check(ticket_present, component(), rerun_collectors=raw)
+                self.assertIn(f"`{command}`", message(result))
+
+    def test_malformed_name_drops_the_hint_without_changing_the_verdict(self):
+        for raw in ("jira`", '["jira"]', "jira](https://example.com)", "-jira"):
+            with self.subTest(raw=raw):
+                log = io.StringIO()
+                with redirect_stderr(log):
+                    failing = self.run_check(ticket_present, component(), rerun_collectors=raw)
+                self.assertIn("rerun_collectors: no rerun hint", log.getvalue())
+                self.assertEqual(outcome(failing), "fail")
+                self.assertEqual(message(failing), "PR does not reference a ticket. "
+                                 "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+                with redirect_stderr(io.StringIO()):
+                    passing = self.run_check(ticket_type, component(record(TP)),
+                                             rerun_collectors=raw, allowed_types="Story")
+                self.assertEqual(outcome(passing), "pass")
+
+    def test_other_outcomes_are_unchanged(self):
+        vars = {"rerun_collectors": "jira"}
+        self.assertEqual(outcome(self.run_check(ticket_present, component(record(TP)),
+                                                **vars)), "pass")
+        self.assertEqual(outcome(self.run_check(ticket_present, component(), finished=False,
+                                                **vars)), "pending")
+        self.assertEqual(outcome(self.run_check(ticket_valid, component(), **vars)), "skip")
+        skipped = self.run_check(ticket_present, component(author=BOT), skip_authors=BOT,
+                                 **vars)
+        self.assertEqual(outcome(skipped), "skip")
+        self.assertEqual(message(skipped), "PR author dependabot[bot] is in skip_authors")
 
 
 if __name__ == "__main__":
