@@ -498,6 +498,7 @@ class TestS3TerminalLogDestinations(unittest.TestCase):
         for condition in ({"count": 0}, {"for_each": {}}):
             with self.subTest(condition=condition):
                 resources = self.resources()
+                resources["aws_s3_bucket"]["src"][0]["logging"] = [{"target_bucket": "external"}]
                 resources["aws_s3_bucket_logging"]["src"][0].update(condition)
                 self.assertEqual(self.evaluate(resources)[0], CheckStatus.FAIL)
 
