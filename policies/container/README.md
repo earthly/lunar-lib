@@ -16,6 +16,7 @@ This plugin provides the following policies (use `include` to select a subset):
 | `stable-tags` | Tags must be a digest or contain a full semver (e.g., `1.2.3`, `v4-bpl-3.24.0`, `9.6.1-jdk25-alpine`) | Image uses unstable tag (partial version, branch name, etc.) |
 | `digest-pinned` | Base images must be pinned by digest (e.g., `node:20@sha256:...`). Stricter than `stable-tags` | Image has no digest, whatever its tag |
 | `allowed-registries` | Images must come from allowed registries | Image pulled from registry not in allowlist |
+| `allowed-image-prefixes` | Images must come from allowed image paths, such as one project on a registry. Stricter than `allowed-registries`, which checks only the host | Image's repository is not under any allowed prefix |
 | `required-labels` | Required labels must be present (Dockerfile or build command) | Missing one or more required labels |
 | `healthcheck` | HEALTHCHECK instruction must be present | Final stage missing HEALTHCHECK instruction |
 | `user` | USER instruction must be present | Final stage missing USER instruction |
@@ -36,9 +37,11 @@ Each check **skips** when the data it reads is absent, rather than reporting a
 pass it didn't earn. On a repository with no Dockerfiles, the `docker` collector
 writes no `.containers` data at all, so every definition-based check
 (`no-latest`, `stable-tags`, `digest-pinned`, `allowed-registries`,
-`healthcheck`, `user`, `dockerfile-lint-clean`) skips; `build-tagged` skips
-independently when no container build ran in CI. `required-labels` also skips
-when its `required_labels` variable is unset, since there is nothing to require.
+`allowed-image-prefixes`, `healthcheck`, `user`, `dockerfile-lint-clean`) skips;
+`build-tagged` skips independently when no container build ran in CI.
+`required-labels` and `allowed-image-prefixes` also skip when their variable
+(`required_labels`, `allowed_image_prefixes`) is unset, since there is nothing
+to require.
 
 Note that an *empty* `.containers.lint_results` is not the same as an absent
 one: it means hadolint ran and found no issues, so `dockerfile-lint-clean`
@@ -58,6 +61,7 @@ policies:
       - stable-tags
       - digest-pinned
       - allowed-registries
+      - allowed-image-prefixes
       - required-labels
       - healthcheck
       - user
@@ -65,6 +69,7 @@ policies:
       - dockerfile-lint-clean
     # with:
     #   allowed_registries: "docker.io,gcr.io,ghcr.io"
+    #   allowed_image_prefixes: "registry.example.com/approved,docker.io/library"
     #   required_labels: "org.opencontainers.image.source,git_sha"
     #   hadolint_severity: "warning"  # error (default), warning, info, style
 ```
@@ -179,6 +184,32 @@ Renovate or Dependabot can keep pinned digests up to date.
 ### allowed-registries
 
 Use images from approved registries only. Update your Dockerfile or request the registry be added to the allowlist.
+
+This check compares only the registry host, port included: once
+`registry.example.com` is allowed, every project on it passes. To allow only
+some paths on a registry, use `allowed-image-prefixes`.
+
+### allowed-image-prefixes
+
+Pull base images from an approved path, e.g.
+`FROM registry.example.com/approved/python:3.13`, or ask for the path to be
+added to `allowed_image_prefixes`.
+
+How images are matched:
+
+- Each prefix starts with the registry host and matches whole path segments.
+  `registry.example.com/approved` allows `registry.example.com/approved/python`,
+  but not `registry.example.com/approved-other/python` or
+  `registry.example.com/library/python`.
+- Docker Hub shorthand is expanded first, so `python:3.13` is
+  `docker.io/library/python`.
+- Tags and digests don't affect the match. A port is part of the host: list
+  `registry.example.com:5000/approved` if images are pulled with the port.
+
+Base images supplied at build time aren't checked. With `ARG BASE` and no
+default, the docker collector can't resolve `FROM ${BASE}` and records no base
+image for it; an `ARG` default is resolved and checked. If none of a
+component's base images can be read, the check skips instead of passing.
 
 ### required-labels
 

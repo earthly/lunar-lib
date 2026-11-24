@@ -14,6 +14,7 @@ from contextlib import contextmanager
 
 from lunar_policy import Node, CheckStatus
 
+from allowed_image_prefixes import main as check_allowed_image_prefixes
 from allowed_registries import main as check_allowed_registries
 from build_tagged import main as check_build_tagged
 from digest_pinned import main as check_digest_pinned
@@ -26,6 +27,7 @@ from user import main as check_user
 
 
 ALL_CHECKS = [
+    check_allowed_image_prefixes,
     check_allowed_registries,
     check_build_tagged,
     check_digest_pinned,
@@ -90,13 +92,27 @@ def definition(path="Dockerfile", **overrides):
     return entry
 
 
+def images(*references):
+    """One valid Dockerfile whose stages use these base images, shaped like the docker collector's output."""
+    return {"containers": {"definitions": [definition(base_images=[
+        {"reference": ref, "image": ref.split(":")[0], "tag": (ref.split(":") + [None])[1]}
+        for ref in references
+    ])]}}
+
+
+APPROVED = "registry.example.com/approved"
+
+# Opt-in inputs set, so a skip on an empty component comes from the missing data, not the config.
+CONFIGURED = {"required_labels": "org.opencontainers.image.source", "allowed_image_prefixes": APPROVED}
+
+
 class TestNoContainersSkips(unittest.TestCase):
     """A component with no container data at all must skip every check."""
 
     def test_empty_component_json_skips_every_check(self):
         for check in ALL_CHECKS:
             with self.subTest(check=check.__module__):
-                with policy_vars(required_labels="org.opencontainers.image.source"):
+                with policy_vars(**CONFIGURED):
                     result = check(finished_node({}))
                 self.assertTrue(
                     is_skipped(result),
@@ -108,7 +124,7 @@ class TestNoContainersSkips(unittest.TestCase):
         node = finished_node({"lang": {"go": {"version": "1.22"}}})
         for check in ALL_CHECKS:
             with self.subTest(check=check.__module__):
-                with policy_vars(required_labels="org.opencontainers.image.source"):
+                with policy_vars(**CONFIGURED):
                     self.assertTrue(is_skipped(check(node)))
 
 
@@ -283,6 +299,102 @@ class TestRequiredLabels(unittest.TestCase):
             self.assertEqual(
                 check_required_labels(finished_node(data)).status, CheckStatus.PASS
             )
+
+
+class TestAllowedImagePrefixes(unittest.TestCase):
+    def run_check(self, data, prefixes=APPROVED):
+        with policy_vars(allowed_image_prefixes=prefixes):
+            return check_allowed_image_prefixes(finished_node(data))
+
+    def test_unconfigured_skips(self):
+        check = check_allowed_image_prefixes(finished_node(images("python:3.13")))
+        self.assertTrue(is_skipped(check))
+
+    def test_approved_path_passes(self):
+        check = self.run_check(images(f"{APPROVED}/python:3.13", f"{APPROVED}/team/app:1.0.0"))
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_other_project_on_the_same_host_fails(self):
+        check = self.run_check(images(
+            "registry.example.com/library/python:3.13",
+            "registry.example.com/other-team/app:1.0.0",
+        ))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 2)
+        self.assertIn("'registry.example.com/library/python:3.13'", check.failure_reasons[0])
+
+    def test_public_images_fail(self):
+        check = self.run_check(images("python:3.13", "cgr.dev/chainguard/python:latest"))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 2)
+
+    def test_similarly_named_path_fails(self):
+        for prefixes in (APPROVED, APPROVED + "/"):
+            with self.subTest(prefixes=prefixes):
+                check = self.run_check(images("registry.example.com/approved-evil/python:3.13"), prefixes)
+                self.assertEqual(check.status, CheckStatus.FAIL)
+
+    def test_prefix_can_name_one_repository(self):
+        prefix = f"{APPROVED}/python"
+        self.assertEqual(self.run_check(images(f"{APPROVED}/python:3.13"), prefix).status, CheckStatus.PASS)
+        self.assertEqual(self.run_check(images(f"{APPROVED}/python-slim:3.13"), prefix).status, CheckStatus.FAIL)
+
+    def test_digest_is_ignored_and_port_must_match(self):
+        self.assertEqual(self.run_check(images(f"{APPROVED}/python@{DIGEST}")).status, CheckStatus.PASS)
+        self.assertEqual(self.run_check(images(f"{APPROVED}/python:3.13@{DIGEST}")).status, CheckStatus.PASS)
+        self.assertEqual(
+            self.run_check(images(f"{APPROVED}/python@{DIGEST}"), f"{APPROVED}/python").status, CheckStatus.PASS
+        )
+        with_port = "registry.example.com:5000/approved/python:3.13"
+        self.assertEqual(self.run_check(images(with_port)).status, CheckStatus.FAIL)
+        self.assertEqual(
+            self.run_check(images(with_port), "registry.example.com:5000/approved").status, CheckStatus.PASS
+        )
+
+    def test_docker_hub_shorthand_is_expanded(self):
+        official = images("python:3.13", "docker.io/library/node:20.11.1", "index.docker.io/library/alpine:3.19.1")
+        self.assertEqual(self.run_check(official, "docker.io/library").status, CheckStatus.PASS)
+        self.assertEqual(self.run_check(images("acme/app:1.0.0"), "docker.io/library").status, CheckStatus.FAIL)
+
+    def test_prefixes_split_on_commas_and_whitespace(self):
+        prefixes = f"{APPROVED}, ghcr.io/acme\n  docker.io/library"
+        check = self.run_check(images(f"{APPROVED}/python:3.13", "ghcr.io/acme/app:1.0.0", "python:3.13"), prefixes)
+        self.assertEqual(check.status, CheckStatus.PASS)
+
+    def test_scratch_is_ignored(self):
+        self.assertEqual(self.run_check(images(f"{APPROVED}/golang:1.23.4", "scratch")).status, CheckStatus.PASS)
+
+    def test_no_readable_base_image_skips(self):
+        """ARG BASE with no default, then FROM ${BASE}: the collector records no base image."""
+        check = self.run_check({"containers": {"definitions": [definition(base_images=[])]}})
+        self.assertTrue(is_skipped(check))
+        self.assertIn("build time", check._results[0].failure_message)
+
+    def test_prefix_without_a_registry_host_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.run_check(images(f"{APPROVED}/python:3.13"), "approved/")
+
+
+class TestAllowedRegistriesHostOnly(unittest.TestCase):
+    """allowed-registries keeps matching the host only; path rules belong to allowed-image-prefixes."""
+
+    def run_check(self, data, registries="registry.example.com"):
+        with policy_vars(allowed_registries=registries):
+            return check_allowed_registries(finished_node(data))
+
+    def test_any_project_on_an_allowed_host_passes(self):
+        data = images(f"{APPROVED}/python:3.13", "registry.example.com/library/python:3.13")
+        self.assertEqual(self.run_check(data).status, CheckStatus.PASS)
+
+    def test_public_images_fail(self):
+        check = self.run_check(images("python:3.13", "cgr.dev/chainguard/python:latest"))
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertEqual(len(check.failure_reasons), 2)
+
+    def test_a_path_in_the_registry_list_matches_nothing(self):
+        check = self.run_check(images(f"{APPROVED}/python:3.13"), APPROVED)
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("from registry 'registry.example.com'", check.failure_reasons[0])
 
 
 if __name__ == "__main__":

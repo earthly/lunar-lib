@@ -65,3 +65,32 @@ def image_digest(reference: str) -> str | None:
     if tag and tag.startswith(("sha256:", "sha512:")):
         return tag
     return None
+
+
+def image_repository(reference: str) -> str:
+    """
+    Return the image's repository, fully qualified and without tag or digest.
+
+    Docker Hub shorthand is expanded, so the result always starts with a registry host.
+
+    Examples:
+    - python:3.13 -> docker.io/library/python
+    - acme/app:1.0.0 -> docker.io/acme/app
+    - registry.example.com:5000/team/app:1.0.0 -> registry.example.com:5000/team/app
+    - ghcr.io/acme/app:1.0.0@sha256:abc123 -> ghcr.io/acme/app
+    """
+    name = reference.strip().split("@", 1)[0]
+    parts = name.split("/")
+    parts[-1] = parts[-1].split(":", 1)[0]
+
+    first = parts[0]
+    if len(parts) > 1 and ("." in first or ":" in first or first == "localhost"):
+        registry, path = first, parts[1:]
+    else:
+        registry, path = "docker.io", parts
+
+    if registry == "index.docker.io":
+        registry = "docker.io"
+    if registry == "docker.io" and len(path) == 1:
+        path = ["library"] + path
+    return "/".join([registry] + path).lower()
