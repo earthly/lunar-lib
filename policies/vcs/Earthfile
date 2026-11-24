@@ -7,5 +7,6 @@ test:
     WORKDIR /workspace
     COPY requirements.txt .
     RUN pip install --no-cache-dir -r requirements.txt
-    COPY *.py .
+    # test_vcs_policies reads the manifest to model a broad import's input defaults.
+    COPY *.py lunar-policy.yml .
     RUN python -m unittest test_vcs_policies -v
