@@ -1,4 +1,4 @@
-from lunar_policy import Check
+from lunar_policy import Check, variable_or_default
 
 # Why the setting couldn't be read, by the gitlab collector's .error value.
 UNKNOWN_CAUSES = {
@@ -14,6 +14,11 @@ def main(node=None):
         node=node,
     )
     with c:
+        if variable_or_default("require_job_token_allowlist", "false").strip().lower() != "true":
+            # Opt-in, so a whole-policy import, at any enforcement level, doesn't
+            # start failing GitLab projects after an upgrade.
+            c.skip('Not enabled. Set the `require_job_token_allowlist` input to "true" to check the CI/CD job token allowlist.')
+
         node = c.get_node(".vcs.job_token_allowlist")
         if not node.exists():
             # A GitLab-only setting, read on the default branch only. Absent also

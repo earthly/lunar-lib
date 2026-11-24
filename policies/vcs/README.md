@@ -47,7 +47,9 @@ A commit reached the default branch through merged pull requests when its own pu
 | `require-private` | Repository visibility must be private |
 | `require-default-branch` | Default branch must match required name (configurable via `required_default_branch` input, defaults to "main") |
 | `allowed-merge-strategies` | Merge strategies must match allowed list (configurable via `allowed_merge_strategies` input) |
-| `require-job-token-allowlist` | GitLab only: only projects and groups on the project's CI/CD job token allowlist can access it with a job token. Skips when GitLab didn't say (default branch only; needs the gitlab collector's `job-token-allowlist`) |
+| `require-job-token-allowlist` | GitLab only: only projects and groups on the project's CI/CD job token allowlist can access it with a job token. Skips when GitLab didn't say (opt-in via the `require_job_token_allowlist` input; default branch only; needs the gitlab collector's `job-token-allowlist`) |
+
+`require-job-token-allowlist` is off until `require_job_token_allowlist` is `"true"`, so importing the whole policy, at any enforcement level, doesn't start failing GitLab projects after an upgrade. Until then it skips on every component.
 
 ## Required Data
 
@@ -113,6 +115,7 @@ policies:
       min_approvals: 2
       allowed_merge_strategies: "squash"
       # required_default_branch: "main"
+      require_job_token_allowlist: "true"  # opt-in, GitLab only
 
   # Use include to run only specific policies
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
@@ -142,6 +145,8 @@ policies:
       - require-job-token-allowlist
     on: "domain:your-domain"
     enforcement: score
+    with:
+      require_job_token_allowlist: "true"
 
   # Run only repository settings policies
   - uses: github://earthly/lunar-lib/policies/vcs@v1.0.0
@@ -317,4 +322,4 @@ When repository settings policies fail, update repository settings:
 3. Save the changes
 4. Re-run the Lunar collector and policy to verify compliance
 
-**`require-job-token-allowlist`** (GitLab): in Settings → CI/CD → Job token permissions, add the groups and projects whose pipelines use this project (artifacts, packages, registry, API) to the CI/CD job token allowlist, then select **Only this project and any groups and projects in the allowlist**. Projects that aren't listed lose job token access; the authentication log on the same page (GitLab 17.6+) shows which projects have used one. A skip means the collector couldn't read the setting: its token needs the Maintainer role on the project.
+**`require-job-token-allowlist`** (GitLab): in Settings → CI/CD → Job token permissions, add the groups and projects whose pipelines use this project (artifacts, packages, registry, API) to the CI/CD job token allowlist, then select **Only this project and any groups and projects in the allowlist**. Projects that aren't listed lose job token access; the authentication log on the same page (GitLab 17.6+) shows which projects have used one. A skip means the check isn't turned on (`require_job_token_allowlist`) or the collector couldn't read the setting: its token needs the Maintainer role on the project.
