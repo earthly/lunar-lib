@@ -8,8 +8,10 @@ check resolves to PASS / FAIL / SKIPPED.
 """
 
 import os
+import json
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -417,6 +419,148 @@ class TestS3AccessLogging(unittest.TestCase):
 
     def test_skip(self):
         self.assertEqual(status(aws_s3_access_logging, EMPTY), CheckStatus.SKIPPED)
+
+
+class TestS3TerminalLogDestinations(unittest.TestCase):
+    path = "modules/bootstrap/access-logs.tf"
+    identity = path + ":aws_s3_bucket.logs"
+
+    def resources(self):
+        return {
+            "aws_s3_bucket": {"src": [{}], "logs": [{}]},
+            "aws_s3_bucket_logging": {"src": [{
+                "bucket": "${aws_s3_bucket.src.id}",
+                "target_bucket": "${aws_s3_bucket.logs.id}",
+            }]},
+        }
+
+    def evaluate(self, resources, value=None, path=None, extra_files=()):
+        files = [{"path": path or self.path, "hcl": {"resource": resources}}, *extra_files]
+        n = Node.from_component_json({"iac": {"native": {"terraform": {"files": files}}}})
+        if value is None:
+            value = json.dumps({self.identity: "ENG-2400: approved terminal destination"})
+        with patch.dict(os.environ, {"LUNAR_VAR_s3_terminal_log_destinations": value}):
+            c = aws_s3_access_logging.main(n)
+        results = list(c._results)
+        outcome = CheckStatus.SKIPPED if any(r.result == CheckStatus.SKIPPED for r in results) else c.status
+        return outcome, " ".join(r.failure_message or "" for r in results)
+
+    def test_approved_destination_is_named_skip_not_pass(self):
+        outcome, message = self.evaluate(self.resources())
+        self.assertEqual(outcome, CheckStatus.SKIPPED)
+        self.assertIn(self.identity, message)
+
+    def test_no_exception_still_requires_destination_logging(self):
+        self.assertEqual(self.evaluate(self.resources(), "{}")[0], CheckStatus.FAIL)
+
+    def test_shared_input_does_not_fail_other_logged_component(self):
+        resources = self.resources()
+        del resources["aws_s3_bucket"]["logs"]
+        resources["aws_s3_bucket_logging"]["src"][0]["target_bucket"] = "external-destination"
+        self.assertEqual(self.evaluate(resources, path="other/main.tf")[0], CheckStatus.PASS)
+
+    def test_shared_input_does_not_fail_component_without_s3(self):
+        self.assertEqual(self.evaluate({})[0], CheckStatus.SKIPPED)
+
+    def test_unmatched_entry_does_not_hide_an_unlogged_bucket(self):
+        self.assertEqual(self.evaluate({"aws_s3_bucket": {"unlogged": [{}]}})[0], CheckStatus.FAIL)
+
+    def test_renamed_destination_loses_exception(self):
+        resources = self.resources()
+        resources["aws_s3_bucket"]["renamed"] = resources["aws_s3_bucket"].pop("logs")
+        resources["aws_s3_bucket_logging"]["src"][0]["target_bucket"] = "${aws_s3_bucket.renamed.id}"
+        outcome, message = self.evaluate(resources)
+        self.assertEqual(outcome, CheckStatus.FAIL)
+        self.assertIn("aws_s3_bucket.renamed", message)
+
+    def test_moved_destination_loses_exception(self):
+        self.assertEqual(self.evaluate(self.resources(), path="moved/main.tf")[0], CheckStatus.FAIL)
+
+    def test_invalid_configuration_fails_closed(self):
+        invalid = ["", "[]", "null", "{", json.dumps({"*:aws_s3_bucket.logs": "reason"}),
+                   json.dumps({self.identity: " "}), json.dumps({self.identity: 1}),
+                   json.dumps({"./" + self.identity: "reason"}),
+                   json.dumps({"../" + self.identity: "reason"})]
+        for value in invalid:
+            with self.subTest(value=value):
+                outcome, message = self.evaluate(self.resources(), value)
+                self.assertEqual(outcome, CheckStatus.FAIL)
+                self.assertIn("Invalid s3_terminal_log_destinations", message)
+
+    def test_exception_requires_incoming_reference(self):
+        resources = self.resources()
+        resources["aws_s3_bucket_logging"]["src"][0]["target_bucket"] = "external-destination"
+        outcome, message = self.evaluate(resources)
+        self.assertEqual(outcome, CheckStatus.FAIL)
+        self.assertIn("not a referenced terminal", message)
+
+    def test_disabled_incoming_logger_does_not_justify_exception(self):
+        for condition in ({"count": 0}, {"for_each": {}}):
+            with self.subTest(condition=condition):
+                resources = self.resources()
+                resources["aws_s3_bucket"]["src"][0]["logging"] = [{"target_bucket": "external"}]
+                resources["aws_s3_bucket_logging"]["src"][0].update(condition)
+                self.assertEqual(self.evaluate(resources)[0], CheckStatus.FAIL)
+
+    def test_self_logging_does_not_justify_exception(self):
+        resources = self.resources()
+        resources["aws_s3_bucket"]["src"][0]["logging"] = [{"target_bucket": "external"}]
+        resources["aws_s3_bucket_logging"]["src"][0]["bucket"] = "${aws_s3_bucket.logs.id}"
+        self.assertEqual(self.evaluate(resources)[0], CheckStatus.FAIL)
+
+    def test_inline_logging_can_feed_terminal_destination(self):
+        resources = self.resources()
+        del resources["aws_s3_bucket_logging"]
+        resources["aws_s3_bucket"]["src"][0]["logging"] = [{"target_bucket": "${aws_s3_bucket.logs.id}"}]
+        self.assertEqual(self.evaluate(resources)[0], CheckStatus.SKIPPED)
+
+    def test_disabled_inline_source_does_not_justify_exception(self):
+        resources = self.resources()
+        del resources["aws_s3_bucket_logging"]
+        resources["aws_s3_bucket"]["src"][0].update({
+            "count": 0, "logging": [{"target_bucket": "${aws_s3_bucket.logs.id}"}]})
+        self.assertEqual(self.evaluate(resources)[0], CheckStatus.FAIL)
+
+    def test_inline_self_logging_does_not_justify_exception(self):
+        resources = {"aws_s3_bucket": {"logs": [{"logging": [{"target_bucket": "${aws_s3_bucket.logs.id}"}]}]}}
+        self.assertEqual(self.evaluate(resources)[0], CheckStatus.FAIL)
+
+    def test_incoming_reference_must_be_in_same_module(self):
+        resources = self.resources()
+        logging = resources.pop("aws_s3_bucket_logging")
+        resources["aws_s3_bucket"]["src"][0]["logging"] = [{"target_bucket": "external"}]
+        other = {"path": "other/main.tf", "hcl": {"resource": {"aws_s3_bucket_logging": logging}}}
+        self.assertEqual(self.evaluate(resources, extra_files=[other])[0], CheckStatus.FAIL)
+
+    def test_exception_does_not_cover_same_name_in_other_module(self):
+        other = {"path": "other/main.tf", "hcl": {"resource": {"aws_s3_bucket": {"logs": [{}]}}}}
+        self.assertEqual(self.evaluate(self.resources(), extra_files=[other])[0], CheckStatus.FAIL)
+
+    def test_exception_does_not_clear_other_bucket_failure(self):
+        resources = self.resources()
+        resources["aws_s3_bucket"]["unlogged"] = [{}]
+        outcome, message = self.evaluate(resources)
+        self.assertEqual(outcome, CheckStatus.FAIL)
+        self.assertIn("aws_s3_bucket.unlogged", message)
+
+    def test_conditional_logging_remains_unverified_and_names_exception(self):
+        resources = self.resources()
+        resources["aws_s3_bucket_logging"]["src"][0]["count"] = "${var.enabled ? 1 : 0}"
+        outcome, message = self.evaluate(resources)
+        self.assertEqual(outcome, CheckStatus.SKIPPED)
+        self.assertIn("UNVERIFIED", message)
+        self.assertIn(self.identity, message)
+
+    def test_module_split_across_files_keeps_valid_coverage(self):
+        for directory in ("", "modules/bootstrap/"):
+            with self.subTest(directory=directory):
+                resources = self.resources()
+                logging = resources.pop("aws_s3_bucket_logging")
+                other = {"path": directory + "logging.tf", "hcl": {"resource": {"aws_s3_bucket_logging": logging}}}
+                key = directory + "buckets.tf:aws_s3_bucket.logs"
+                outcome, _ = self.evaluate(resources, json.dumps({key: "reason"}),
+                                           path=directory + "buckets.tf", extra_files=[other])
+                self.assertEqual(outcome, CheckStatus.SKIPPED)
 
 
 class TestVpcFlowLogs(unittest.TestCase):

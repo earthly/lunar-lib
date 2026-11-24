@@ -142,7 +142,31 @@ This is a source-HCL check, not a Terraform evaluator or proof of deployment.
 Making logging default does not resolve a conditional expression or account
 override for this check. Review evaluated plans and actual delivery separately.
 Terminal log destinations are not automatically exempted by name or by being
-another bucket's target; their exception treatment requires separate approval.
+another bucket's target. Configure an approved exception using
+`s3_terminal_log_destinations`, a JSON object mapping exact repository-relative
+`file:aws_s3_bucket.name` identities to approval reasons or references:
+
+```yaml
+with:
+  s3_terminal_log_destinations: >-
+    {"modules/bootstrap/access-logs.tf:aws_s3_bucket.access_logs": "ENG-2400: approved terminal S3 access-log destination"}
+```
+
+The default is `{}`. A matching bucket must be referenced by another source's
+separate or inline logging target in the same module. Wildcards, missing reasons
+and malformed configuration fail. Entries absent from a component are ignored,
+so a policy instance can cover multiple components. A renamed or moved bucket
+loses its exemption and is checked normally. Exception-dependent results are
+`SKIPPED` and name the selected identities; an exception never creates PASS or
+hides another bucket's failure. This exception affects only
+this check, not encryption, retention or public-access controls. Source logging
+is matched within its module; a similarly named resource elsewhere cannot
+provide coverage. Changing a declaration's path or name requires exception review.
+
+This source-level exception does not identify a deployed account or prove
+delivery. Retain deployment/control evidence separately. Conditional source
+logging still reports `SKIPPED` / `UNVERIFIED`; the exception does not turn it
+into a passing deployment check.
 
 ## Examples
 
