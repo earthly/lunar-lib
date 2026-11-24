@@ -345,8 +345,9 @@ inputs:
       JSON object mapping exact repository-relative file:aws_s3_bucket.name
       identities to approval reasons/references. Exempts only those explicitly
       approved terminal destinations from aws-s3-access-logging. Each must be
-      referenced by another source's logging in the same module. No wildcards;
-      source logging and unresolved-condition reporting remain unchanged.
+      referenced by another source's separate or inline logging in the same
+      module. Entries absent from a component are ignored. No wildcards;
+      exception-dependent results are SKIPPED and name the selected identities.
     default: "{}"
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)

@@ -66,21 +66,16 @@ def main(node=None):
 
         buckets = list(scoped_resources(native, "aws_s3_bucket"))
         if not buckets:
-            if exceptions:
-                c.fail("Terminal log destination exceptions did not match any S3 buckets.")
-                return c
             c.skip("No S3 buckets found")
 
         loggings = list(scoped_resources(native, "aws_s3_bucket_logging"))
         unverified = []
         failed = False
         active = False
-        matched = set()
+        exempted = set()
         for path, bname, cfg in buckets:
             identity = "{}:aws_s3_bucket.{}".format(path, bname)
             local_loggings = [lg for lg_path, _, lg in loggings if posixpath.dirname(lg_path) == posixpath.dirname(path)]
-            if identity in exceptions:
-                matched.add(identity)
             presence = resource_presence(cfg)
             if presence is False:
                 continue
@@ -92,7 +87,16 @@ def main(node=None):
                     and not references(lg.get("bucket"), "aws_s3_bucket", bname)
                     for lg in local_loggings
                 )
+                incoming = incoming or any(
+                    references(lg.get("target_bucket"), "aws_s3_bucket", bname)
+                    for source_path, source_name, source in buckets
+                    if posixpath.dirname(source_path) == posixpath.dirname(path)
+                    and source_name != bname
+                    and resource_presence(source) is not False
+                    for lg in block(source, "logging")
+                )
                 if incoming:
+                    exempted.add(identity)
                     continue
                 failed = True
                 c.fail("{} exception is not a referenced terminal log destination.".format(identity))
@@ -115,20 +119,19 @@ def main(node=None):
                     "aws_s3_bucket.{} has no active server access logging with a target "
                     "(inline logging block or an aws_s3_bucket_logging resource).".format(bname)
                 )
-        for identity in sorted(exceptions.keys() - matched):
-            failed = True
-            c.fail("Terminal log destination exception did not match {}.".format(identity))
         if unverified:
             message = "UNVERIFIED: source HCL cannot evaluate {}. Review the tenant plan and live delivery.".format(
                 "; ".join(unverified)
             )
-            if matched:
-                message += " Explicit terminal exceptions: {}.".format("; ".join(sorted(matched)))
+            if exempted:
+                message += " Explicit terminal exceptions: {}.".format("; ".join(sorted(exempted)))
             if failed:
                 # Check.skip clears earlier failures, so preserve known violations.
                 c.fail(message)
             else:
                 c.skip(message)
+        elif exempted and not failed:
+            c.skip("Explicit terminal log destination exceptions: {}.".format("; ".join(sorted(exempted))))
         elif not active and not failed:
             c.skip("No non-exempt active S3 buckets found")
     return c
