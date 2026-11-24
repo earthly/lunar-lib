@@ -49,6 +49,13 @@ policies:
     mainPython: allowed_registries.py
     keywords: ["container registry", "supply chain security", "registry policy"]
 
+  - name: allowed-image-prefixes
+    description: |
+      Restricts base images to approved image paths, such as one project on a registry.
+      Stricter than allowed-registries, which checks only the registry host.
+    mainPython: allowed_image_prefixes.py
+    keywords: ["container registry", "registry project", "image path", "supply chain security", "registry policy"]
+
   - name: required-labels
     description: |
       Ensures containers have required labels, checking both Dockerfile LABEL
@@ -90,6 +97,9 @@ inputs:
   allowed_registries:
     description: Comma-separated list of allowed registries
     default: "docker.io"
+  allowed_image_prefixes:
+    description: Comma-separated image path prefixes for allowed-image-prefixes, each starting with the registry host (e.g. "registry.example.com/approved"). Matches whole path segments. Leave empty to skip this check.
+    default: ""
   required_labels:
     description: Comma-separated list of required labels checked across Dockerfile and build commands. Leave empty to skip this check.
     default: ""
