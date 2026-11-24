@@ -340,6 +340,14 @@ policies:
     keywords: ["backup", "point in time recovery", "pitr", "rds retention", "efs backup", "disaster recovery", "resilience"]
 
 inputs:
+  s3_terminal_log_destinations:
+    description: |
+      JSON object mapping exact repository-relative file:aws_s3_bucket.name
+      identities to approval reasons/references. Exempts only those explicitly
+      approved terminal destinations from aws-s3-access-logging. Each must be
+      referenced by another source's logging in the same module. No wildcards;
+      source logging and unresolved-condition reporting remain unchanged.
+    default: "{}"
   required_backend_types:
     description: Comma-separated list of approved backend types (empty = any remote backend)
     default: ""
