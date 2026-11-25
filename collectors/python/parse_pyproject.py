@@ -20,7 +20,7 @@ with open("pyproject.toml", "rb") as f:
 project_deps = data.get("project", {}).get("dependencies", [])
 for dep in project_deps:
     m = re.match(
-        r"^([A-Za-z0-9_.-]+)(?:\[[^\]]+\])?\s*(?:@[^;]+)?\s*"
+        r"^([A-Za-z0-9_.-]+)\s*(?:\[[^\]]+\])?\s*(?:@[^;]+)?\s*"
         r"(?:[><=!~]+\s*(.+?))?(?:;.*)?$",
         dep.strip(),
     )
