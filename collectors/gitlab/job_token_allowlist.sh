@@ -22,8 +22,8 @@ if [ "$HOST" != "$GITLAB_HOST" ]; then
   exit 0
 fi
 
-# GL_JOB_TOKEN_SCOPE_TOKEN, when set, keeps the Maintainer access these reads
-# need off the identity the other sub-collectors use.
+# GL_JOB_TOKEN_SCOPE_TOKEN is for a fine-grained token limited to these reads; a
+# read_api token on a Maintainer could also read the project's CI/CD variables.
 if [ -n "${LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN:-}" ]; then
   TOKEN="$LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN"
   TOKEN_NAME=GL_JOB_TOKEN_SCOPE_TOKEN
@@ -107,7 +107,7 @@ CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 case "$GL_CODE" in
   200) ;;
   403)
-    echo "GitLab denied the job token scope read for ${PROJECT_PATH} (HTTP 403): ${TOKEN_NAME}'s user needs the Maintainer role. Recording it as unknown." >&2
+    echo "GitLab denied the job token scope read for ${PROJECT_PATH} (HTTP 403): ${TOKEN_NAME}'s user isn't a Maintainer. Recording it as unknown. If you grant the role, use a fine-grained token in GL_JOB_TOKEN_SCOPE_TOKEN: a read_api token on a Maintainer can also read CI/CD variables." >&2
     collect "$(jq -n --arg at "$CHECKED_AT" '{error: "forbidden", checked_at: $at}')"
     exit 0
     ;;

@@ -57,7 +57,7 @@ This integration provides the following collectors (use `include` to select a su
 | `repository`         | Collects basic project settings including visibility, default branch, topics, and the merge method mapped onto `.vcs.merge_strategies`.                               |
 | `branch-protection`  | Collects protected-branch config, MR approval rules, external status checks, and push rules for the default branch, normalized into `.vcs.branch_protection` with `source: "gitlab"`. |
 | `access-permissions` | Collects project members and shared groups (does not expand group memberships).                                                                                      |
-| `job-token-allowlist` | Reads whether the project limits which projects' CI/CD job tokens can access it, and how many projects and groups its allowlist holds. Default branch only; the token's user must be a Maintainer. |
+| `job-token-allowlist` | Reads whether the project limits which projects' CI/CD job tokens can access it, and how many projects and groups its allowlist holds. Default branch only; needs a Maintainer's token (see [Job token allowlist](#job-token-allowlist)). |
 
 ## Installation
 
@@ -84,7 +84,7 @@ A GitLab personal or project access token with `read_api` scope. Used for all Gi
 
 ### Job token allowlist
 
-`job-token-allowlist` makes one read per project, `GET /projects/:id/job_token_scope` (GitLab 16.0+), and reads the two allowlists only when it's on. It addresses the project by the gitlab cataloger's `meta.project_id` when there is one, so renamed projects still resolve. GitLab shows this setting only to Maintainers. To keep that role off the identity behind `GL_TOKEN`, set `GL_JOB_TOKEN_SCOPE_TOKEN` (collector scope) to another `read_api` token; only this sub-collector uses it. Import it separately, scoped to the projects you want measured:
+`job-token-allowlist` makes one read per project, `GET /projects/:id/job_token_scope` (GitLab 16.0+), and reads the two allowlists only when it's on. It addresses the project by the gitlab cataloger's `meta.project_id` when there is one, so renamed projects still resolve. Import it separately, scoped to the projects you want measured:
 
 ```yaml
 collectors:
@@ -96,14 +96,16 @@ collectors:
       gitlab_host: gitlab.example.com
 ```
 
-Before rolling it out, run the same read with that token against one project. `HTTP 200` with `inbound_enabled` in the body means it will work; `HTTP 403` means the token's user isn't a Maintainer there:
+GitLab shows this setting only to Maintainers, and a `read_api` token on a Maintainer can also read the project's CI/CD variables. On GitLab 19.2+, use a fine-grained personal access token from a Maintainer with only **Job Token Scope: Read** and **Job Token Scope Allowlist: Read**, which cover these three reads, and set it as `GL_JOB_TOKEN_SCOPE_TOKEN`; this sub-collector then uses it instead of `GL_TOKEN`. Every collector gets every collector secret, so the token's scope is what limits it, not the separate secret.
+
+Before rolling it out, run the same read against one project with the token the collector will use (`GL_JOB_TOKEN_SCOPE_TOKEN` if set, else `GL_TOKEN`). `HTTP 200` with `inbound_enabled` in the body means it will work; `HTTP 403` means the token's user isn't a Maintainer there:
 
 ```bash
-curl -s -w '\nHTTP %{http_code}\n' -H "PRIVATE-TOKEN: $GL_TOKEN" \
+curl -s -w '\nHTTP %{http_code}\n' -H "PRIVATE-TOKEN: $TOKEN" \
   "https://gitlab.example.com/api/v4/projects/<project-id>/job_token_scope"
 ```
 
-A `403` or `404` is recorded in `.error`. A `401`, `429`, `5xx`, network failure or unreadable answer records nothing and fails the run, so a bad token or an outage never replaces an earlier result. Code collectors run on push, so projects without recent commits need a one-off `lunar collector run --collector gitlab-job-tokens.job-token-allowlist --only-code`.
+A `403` or `404` is recorded in `.error`. A `401`, `429`, `5xx`, network failure or unreadable answer records nothing and fails the run, so a bad token or an outage never replaces an earlier result. Code collectors run on push, so projects without recent commits need a one-off `lunar collector run --all --collector gitlab-job-tokens.job-token-allowlist --only-code`.
 
 The allowlist says who may reach a project, not what the project depends on. Where it's off, it says nothing about which projects use job tokens against the project, and those are the projects turning it on would break; the project's job token authentication log (GitLab 17.6+) shows them. Job tokens can still read some resources of public or internal projects that aren't on the list, and other token types aren't affected by it.
 

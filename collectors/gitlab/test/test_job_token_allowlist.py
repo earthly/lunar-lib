@@ -393,7 +393,8 @@ class JobTokenAllowlistTest(unittest.TestCase):
         self.route(SCOPE, (403, {"message": "403 Forbidden"}, {}))
         result = self.run_script(LUNAR_SECRET_GL_JOB_TOKEN_SCOPE_TOKEN=SCOPE_TOKEN)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("GL_JOB_TOKEN_SCOPE_TOKEN's user needs the Maintainer role", result.stderr)
+        self.assertIn("GL_JOB_TOKEN_SCOPE_TOKEN's user isn't a Maintainer", result.stderr)
+        self.assertIn("read_api token on a Maintainer can also read CI/CD variables", result.stderr)
 
     # --- not run -------------------------------------------------------------
 
