@@ -59,11 +59,11 @@ policies:
       max_duplication_percentage: "5"       # Fail above 5% duplicated lines
 ```
 
-### Re-checking without a new commit
+### Re-checking with `/lunar rerun`
 
 A scanner that hasn't finished analyzing a pull request's commit when Lunar looks records its analysis as pending, and the checks fail for want of its results. On a pull request, those failures end with the comment that re-checks it once the scanner has reported:
 
-> Code-quality pass/fail signal not available. Ensure collector reports .code_quality.passing. The scanner hadn't reported on this commit when Lunar checked. Once it has, comment `/lunar rerun sonarqube` to re-check without a new commit.
+> Code-quality pass/fail signal not available. Ensure collector reports .code_quality.passing. The scanner hadn't reported on this commit when Lunar checked. Once it has, comment `/lunar rerun sonarqube`.
 
 `rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, uses the scanner's own name from `.code_quality.source.tool`. Set it for a renamed import, or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0.
 

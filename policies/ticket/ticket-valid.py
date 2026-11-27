@@ -22,8 +22,7 @@ def main(node=None):
             tracker_error = c.get_value_or_default(f"{root}.tracker_error", None)
             if tracker_error == "not_found":
                 c.fail(f"Ticket {ticket_id} does not exist in Jira." + rerun_hint(
-                    "Correct the key in the PR title or description, then comment "
-                    "{command} to re-check without a new commit."))
+                    "Correct the key in the PR title or description, then comment {command}."))
             elif tracker_error == "unreachable":
                 c.fail(f"Ticket {ticket_id} could not be validated: Jira was unreachable."
                        + rerun_hint("Comment {command} to retry once Jira is reachable."))

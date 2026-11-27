@@ -93,11 +93,11 @@ policies:
 
 `ticket_field` is relative to the ticket. A Jira select-list option matches on its `value`, a status or component on its `name`, and a user on its `displayName`; a multi-value field passes when any of its values is allowed. Jira lists custom field IDs at `GET /rest/api/3/field`.
 
-### Re-checking without a new commit
+### Re-checking with `/lunar rerun`
 
-These checks fail on the PR title or the ticket, so the fix needs no commit. Their failure messages end with the comment that re-checks the PR:
+These checks fail on the PR title or the ticket, not the code. Their failure messages end with the comment that re-checks the PR:
 
-> PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without a new commit.
+> PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira`.
 
 `rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `jira`, fits the jira collector under its own name; set it for anything else:
 
@@ -138,7 +138,7 @@ Name the whole plugin or import, not `jira.ticket`, so `ticket-history` reruns t
 {}
 ```
 
-**Failure message:** `` "PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without a new commit." ``
+**Failure message:** `` "PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira`." ``
 
 ## Remediation
 
@@ -152,4 +152,4 @@ When this policy fails, you can resolve it by:
 6. **ticket-reuse**: Create a new ticket for this work instead of reusing an existing one
 7. **ticket-field**: Set the field on the ticket to one of the allowed values
 
-None of these needs a new commit: once the title or the ticket is fixed, a [`/lunar rerun` comment](#re-checking-without-a-new-commit) re-checks the PR.
+Once the title or the ticket is fixed, the [`/lunar rerun` comment](#re-checking-with-lunar-rerun) in the failure message re-checks the PR.

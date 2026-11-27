@@ -7,7 +7,7 @@ from rerun_hint import hint, in_pull_request
 # Matches the manifest default, which `lunar policy dev` doesn't apply.
 DEFAULT_RERUN_COLLECTORS = "auto"
 SENTENCE = ("The scanner hadn't reported on this commit when Lunar checked. "
-            "Once it has, comment {command} to re-check without a new commit.")
+            "Once it has, comment {command}.")
 
 
 def with_pending_hint(c, message):

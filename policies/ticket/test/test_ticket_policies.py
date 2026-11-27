@@ -288,8 +288,7 @@ class TestDefaultPath(unittest.TestCase):
         self.assertEqual(outcome(check), "fail")
         self.assertEqual(message(check), "PR does not reference a ticket. "
                                          "Include a ticket ID in the PR title (e.g. [ABC-123]). "
-                                         "Then comment `/lunar rerun jira` to re-check without "
-                                         "a new commit.")
+                                         "Then comment `/lunar rerun jira`.")
         self.assertEqual(outcome(ticket_present(node(component(), finished=False))), "pending")
 
     def test_valid(self):
@@ -341,8 +340,7 @@ class TestSecondReference(unittest.TestCase):
         self.assertEqual(message(check),
                          "PR does not reference a ticket for .vcs.pr.architecture_review. "
                          "Include its key in the PR title or description. Then comment "
-                         "`/lunar rerun jira-architecture-review` to re-check without a new "
-                         "commit.")
+                         "`/lunar rerun jira-architecture-review`.")
 
     def test_valid(self):
         self.assertEqual(outcome(self.run_check(ticket_valid, component(record(TP), record(ARB)))),
@@ -494,17 +492,14 @@ class TestRerunHint(unittest.TestCase):
             return check(node(data, finished))
 
     def test_every_fixable_failure_ends_with_the_comment(self):
-        update = (" Update the ticket or the PR title, then comment `/lunar rerun jira` "
-                  "to re-check without a new commit.")
+        update = " Update the ticket or the PR title, then comment `/lunar rerun jira`."
         for check, ticket, vars, expected in (
                 (ticket_present, None, {},
                  "PR does not reference a ticket. Include a ticket ID in the PR title "
-                 "(e.g. [ABC-123]). Then comment `/lunar rerun jira` to re-check without "
-                 "a new commit."),
+                 "(e.g. [ABC-123]). Then comment `/lunar rerun jira`."),
                 (ticket_valid, {"id": "TP-9", "tracker_error": "not_found"}, {},
                  "Ticket TP-9 does not exist in Jira. Correct the key in the PR title or "
-                 "description, then comment `/lunar rerun jira` to re-check without a "
-                 "new commit."),
+                 "description, then comment `/lunar rerun jira`."),
                 (ticket_valid, {"id": "TP-9", "tracker_error": "unreachable"}, {},
                  "Ticket TP-9 could not be validated: Jira was unreachable. Comment "
                  "`/lunar rerun jira` to retry once Jira is reachable."),
@@ -520,11 +515,11 @@ class TestRerunHint(unittest.TestCase):
                 (ticket_source, record(TP), {"allowed_sources": "linear"},
                  "Ticket TP-1 comes from 'jira' which is not in the allowed list: linear. "
                  "Reference a ticket from an allowed tracker, then comment "
-                 "`/lunar rerun jira` to re-check without a new commit."),
+                 "`/lunar rerun jira`."),
                 (ticket_reuse, record(TP, reuse_count=4), {},
                  "Ticket TP-1 has been used in 4 other PRs (max allowed: 3). Create a new "
                  "ticket for this work. Reference it in the PR title, then comment "
-                 "`/lunar rerun jira` to re-check without a new commit."),
+                 "`/lunar rerun jira`."),
                 (ticket_field, record(TP), {"ticket_field": TestTicketField.OPTION},
                  "Ticket TP-1 has no value for native.jira.fields.customfield_10042."
                  + update),
@@ -545,7 +540,7 @@ class TestRerunHint(unittest.TestCase):
 
     def test_defaults_to_jira_and_empty_turns_it_off(self):
         default = self.run_check(ticket_present, component())
-        self.assertIn("comment `/lunar rerun jira` to re-check", message(default))
+        self.assertIn("Then comment `/lunar rerun jira`.", message(default))
         self.assertEqual(message(self.run_check(ticket_present, component(),
                                                 rerun_collectors="jira")), message(default))
         for off in ("", "  ", " , "):
@@ -570,7 +565,7 @@ class TestRerunHint(unittest.TestCase):
         # Hub, and `/lunar rerun` matches that name, so the hint takes whatever
         # the deployment wrote and never falls back to the library's default.
         result = self.run_check(ticket_present, component(), rerun_collectors="tickets")
-        self.assertIn("comment `/lunar rerun tickets` to re-check", message(result))
+        self.assertIn("Then comment `/lunar rerun tickets`.", message(result))
         self.assertNotIn("jira", message(result))
 
     def test_renamed_policy_import(self):
@@ -585,8 +580,7 @@ class TestRerunHint(unittest.TestCase):
         self.assertEqual(message(present),
                          "PR does not reference a ticket for .vcs.pr.architecture_review. "
                          "Include its key in the PR title or description. Then comment "
-                         "`/lunar rerun jira-architecture-review` to re-check without a new "
-                         "commit.")
+                         "`/lunar rerun jira-architecture-review`.")
         valid = self.run_check(ticket_valid, data, **vars)
         self.assertIn("`/lunar rerun jira-architecture-review`", message(valid))
         for result in (present, valid):

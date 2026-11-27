@@ -45,7 +45,7 @@ NOT_AVAILABLE = (
                 "Ensure the scanner publishes .code_quality.issues.total."),
 )
 HINT = ("The scanner hadn't reported on this commit when Lunar checked. Once it has, "
-        "comment `/lunar rerun {}` to re-check without a new commit.")
+        "comment `/lunar rerun {}`.")
 
 
 def pending(integration="github_app", tool="sonarqube"):

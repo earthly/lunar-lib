@@ -146,11 +146,11 @@ policies:
       allowed_merge_strategies: "squash,rebase"
 ```
 
-### Re-checking without a new commit
+### Re-checking with `/lunar rerun`
 
 A repository admin fixes the branch-protection and repository-settings checks in the repository's settings, not in code. On a pull request, their failure messages end with the comment that re-checks it once that's done:
 
-> Branch protection does not require pull requests before merging. Once a repository admin changes it, comment `/lunar rerun github.branch-protection` to re-check without a new commit.
+> Branch protection does not require pull requests before merging. Once a repository admin changes it, comment `/lunar rerun github.branch-protection`.
 
 `rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, picks `<provider>.branch-protection` or `<provider>.repository` from `.vcs.provider`, so GitLab repositories get `gitlab.*`. Set it for a renamed import (`rerun_collectors: "github-ghes"`), or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0.
 
@@ -288,7 +288,7 @@ When branch protection policies fail, configure branch protection rules in your 
    - **Require linear history** - Enable if required by policy
    - **Require signed commits** - Enable if required by policy
 4. Save the branch protection rule
-5. On an open pull request, comment the `/lunar rerun` command from the failure message to re-check it without a new commit
+5. On an open pull request, comment the `/lunar rerun` command from the failure message to re-check it
 
 ### Bypass and Change Evidence Policies
 

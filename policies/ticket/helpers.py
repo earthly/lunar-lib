@@ -55,12 +55,11 @@ def skip_listed_author(c):
 
 # For a check that fails on what the tracker says about the ticket: fixing the
 # ticket, or referencing another one, needs no commit.
-UPDATE_TICKET = ("Update the ticket or the PR title, then comment {command} to "
-                 "re-check without a new commit.")
+UPDATE_TICKET = "Update the ticket or the PR title, then comment {command}."
 
 
 def missing_ticket_message(path):
-    hint = rerun_hint("Then comment {command} to re-check without a new commit.")
+    hint = rerun_hint("Then comment {command}.")
     if path == DEFAULT_TICKET_PATH:
         return ("PR does not reference a ticket. "
                 "Include a ticket ID in the PR title (e.g. [ABC-123])." + hint)

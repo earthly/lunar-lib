@@ -28,8 +28,7 @@ def main(node=None):
         c.assert_true(source_name.lower() in allowed,
                       f"Ticket {ticket_id} comes from '{source_name}' which is not in "
                       f"the allowed list: {', '.join(allowed)}." + rerun_hint(
-                          "Reference a ticket from an allowed tracker, then comment "
-                          "{command} to re-check without a new commit."))
+                          "Reference a ticket from an allowed tracker, then comment {command}."))
     return c
 
 

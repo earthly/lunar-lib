@@ -9,8 +9,7 @@ REPOSITORY = "repository"
 
 # Matches the manifest default, which `lunar policy dev` doesn't apply.
 DEFAULT_RERUN_COLLECTORS = "auto"
-SENTENCE = ("Once a repository admin changes it, comment {command} to re-check "
-            "without a new commit.")
+SENTENCE = "Once a repository admin changes it, comment {command}."
 
 
 def with_hint(c, message, sub_collector):

@@ -1067,8 +1067,7 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
         self.assertIn("+2 more", check.failure_reasons[0])
 
 
-HINT = ("Once a repository admin changes it, comment `/lunar rerun {}` to re-check "
-        "without a new commit.")
+HINT = "Once a repository admin changes it, comment `/lunar rerun {}`."
 
 
 def evaluate(check, data, pr="8", finished=False, **env):

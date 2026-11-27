@@ -25,8 +25,7 @@ def main(node=None):
         c.assert_true(int(reuse_count) <= max_reuse,
                       f"Ticket {ticket_id} has been used in {reuse_count} other PRs "
                       f"(max allowed: {max_reuse}). Create a new ticket for this work."
-                      + rerun_hint("Reference it in the PR title, then comment {command} "
-                                   "to re-check without a new commit."))
+                      + rerun_hint("Reference it in the PR title, then comment {command}."))
     return c
 
 
