@@ -148,6 +148,15 @@ policies:
     mainPython: ./allowed-merge-strategies.py
     keywords: ["merge strategies", "squash merge", "rebase merge"]
 
+  - name: require-job-token-allowlist
+    description: |
+      Opt-in (`require_job_token_allowlist: "true"`). GitLab only: fails when
+      any project's CI/CD job token can access the project; skips when GitLab
+      didn't say.
+    mainPython: ./require-job-token-allowlist.py
+    runs_on: [default-branch]
+    keywords: ["gitlab", "ci job token", "job token allowlist", "authorized groups and projects", "ci/cd security"]
+
 inputs:
   min_approvals:
     description: Minimum number of required approvals (integer, or omit to skip check)
@@ -158,6 +167,12 @@ inputs:
   allowed_merge_strategies:
     description: Comma-separated list of allowed merge strategies for the allowed-merge-strategies policy (merge, squash, rebase). Only listed strategies will be allowed
     default: ""
+  require_job_token_allowlist:
+    description: |
+      Set to `"true"` to run `require-job-token-allowlist`. Off by default, so
+      importing the whole policy, at any enforcement level, doesn't start
+      failing GitLab projects whose job token allowlist is off.
+    default: "false"
   allowed_bypass_actors:
     description: |
       Bypass actors the disallow-bypass-actors check accepts, one per line or

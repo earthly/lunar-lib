@@ -4,8 +4,10 @@ test:
     FROM python:3.12-alpine
     # The collector scripts are bash and shell out to jq; the tests stub curl
     # and lunar on PATH and drive the real scripts as subprocesses.
-    RUN apk add --no-cache bash jq
+    # test_job_token_allowlist runs real curl against a local HTTPS mock of
+    # GitLab, with a throwaway certificate made by openssl.
+    RUN apk add --no-cache bash jq curl openssl
     WORKDIR /workspace
-    COPY merge_request.sh repository.sh branch_protection.sh access_permissions.sh .
+    COPY merge_request.sh repository.sh branch_protection.sh access_permissions.sh job_token_allowlist.sh .
     COPY --dir test .
     RUN cd test && python -m unittest discover -v

@@ -27,6 +27,12 @@ Version control settings (GitHub, GitLab, Bitbucket, etc.).
         }
       ]
     },
+    "job_token_allowlist": {
+      "enabled": true,
+      "projects": 2,
+      "groups": 1,
+      "checked_at": "2026-11-23T14:02:11Z"
+    },
     "pr": {
       "number": 123,
       "title": "[ABC-456] Add payment validation",
@@ -72,6 +78,8 @@ Version control settings (GitHub, GitLab, Bitbucket, etc.).
 
 A ruleset's `bypass_actors` is omitted when the collector's token can't see it (GitHub shows it only to callers with write access to the ruleset); `[]` means nobody can bypass.
 
+`.vcs.job_token_allowlist` is GitLab-only and default-branch only. `enabled` is GitLab's `inbound_enabled`; `projects` (excluding the project itself) and `groups` count the allowlist when it's on. GitLab shows the setting only to Maintainers, so when it didn't say, `error` (`forbidden` for 403, `not_found` for 404) appears instead of `enabled`. Treat that as unknown, never as on or off.
+
 ## Key Policy Paths
 
 - `.vcs.default_branch` — Default branch name
@@ -85,3 +93,4 @@ A ruleset's `bypass_actors` is omitted when the collector's token can't see it (
 - `.vcs.pr.reviews[]` — Reviews submitted before the last push (only in PR context)
 - `.vcs.pr.commits[].signature.verified` — GitHub verified the commit's signature (only in PR context)
 - `.vcs.release_range.commits[].pull_request` — The merged PR that brought a released commit in (default branch only)
+- `.vcs.job_token_allowlist.enabled` — GitLab project accepts CI/CD job tokens only from its allowlist (absent when `.error` is set)

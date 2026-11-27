@@ -8,6 +8,7 @@ settings and repository configuration. The tests help catch issues like:
 """
 
 import os
+import re
 import unittest
 from unittest import mock
 from lunar_policy import Node, CheckStatus
@@ -47,6 +48,7 @@ check_allowed_merge_strategies = load_policy("allowed-merge-strategies")
 check_disallow_bypass_actors = load_policy("disallow-bypass-actors")
 check_pr_commits_signed = load_policy("pr-commits-signed")
 check_release_commits_merged_via_pr = load_policy("release-commits-merged-via-pr")
+check_require_job_token_allowlist = load_policy("require-job-token-allowlist")
 
 
 def make_branch_protection_data(
@@ -1066,6 +1068,114 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
         self.assertIn("12 commit(s)", check.failure_reasons[0])
         self.assertIn("+2 more", check.failure_reasons[0])
 
+
+OPT_IN = "LUNAR_VAR_require_job_token_allowlist"
+MANIFEST = Path(__file__).parent / "lunar-policy.yml"
+
+
+def manifest_input_default(name):
+    """The default the hub passes for an input that an import's `with:` leaves out."""
+    block = re.search(rf"^  {re.escape(name)}:\n((?:    .*\n)+)", MANIFEST.read_text(), re.M)
+    return re.search(r'^    default: "?([^"\n]*)"?$', block.group(1), re.M).group(1)
+
+
+class TestRequireJobTokenAllowlist(unittest.TestCase):
+    """require-job-token-allowlist is opt-in. Once on, enabled passes, disabled
+    fails, and anything the collector couldn't read skips — never a pass or a fail."""
+
+    def run_check(self, scope=None, data=None, finished_=True, opt_in="true"):
+        if data is None:
+            data = {} if scope is None else {"vcs": {"job_token_allowlist": scope}}
+        with mock.patch.dict(os.environ):
+            os.environ.pop(OPT_IN, None)
+            if opt_in is not None:
+                os.environ[OPT_IN] = opt_in
+            return check_require_job_token_allowlist(
+                Node.from_component_json(data, bundle_info={"workflows_finished": finished_}))
+
+    def test_broad_blocking_import_stays_nonblocking_on_disabled_allowlist(self):
+        """Regression: an ordinary broad import (no include:, no with:) at block-release
+        or block-pr-and-release runs every check with the manifest's input defaults.
+        Those levels block only on a check that neither passes nor skips
+        (hub/rpc/status.go), so a disabled allowlist must come back SKIPPED."""
+        names = re.findall(r"^  - name: (\S+)$", MANIFEST.read_text(), re.M)
+        self.assertIn("require-job-token-allowlist", names)  # so a broad import runs it
+        default = manifest_input_default("require_job_token_allowlist")
+        self.assertEqual(default, "false")
+        for finished_ in (True, False):
+            with self.subTest(workflows_finished=finished_):
+                check = self.run_check({"enabled": False}, finished_=finished_, opt_in=default)
+                self.assertEqual([r.result for r in check._results], [CheckStatus.SKIPPED])
+                self.assertIn("require_job_token_allowlist", skip_reason(check))
+                # The script's own default (no LUNAR_VAR at all) is off too.
+                check = self.run_check({"enabled": False}, finished_=finished_, opt_in=None)
+                self.assertEqual([r.result for r in check._results], [CheckStatus.SKIPPED])
+
+    def test_off_by_default_for_every_state(self):
+        # Skips before reading any data, so it never pends during collection either.
+        for scope in ({"enabled": True}, {"enabled": False}, {"error": "forbidden"}, None):
+            for finished_ in (True, False):
+                with self.subTest(scope=scope, workflows_finished=finished_):
+                    check = self.run_check(scope, finished_=finished_, opt_in=None)
+                    self.assertIn('Set the `require_job_token_allowlist` input to "true"', skip_reason(check))
+
+    def test_opt_in_values(self):
+        for raw, on in (("true", True), (" TRUE ", True), ("false", False), ("yes", False),
+                        ("1", False), ("", False)):
+            with self.subTest(value=raw):
+                check = self.run_check({"enabled": False}, opt_in=raw)
+                self.assertEqual(check.status == CheckStatus.FAIL, on)
+                self.assertEqual(skip_reason(check) is not None, not on)
+
+    def test_enabled_passes(self):
+        for scope in ({"enabled": True, "projects": 2, "groups": 1, "checked_at": "2026-11-23T14:02:11Z"},
+                      {"enabled": True, "projects": 0, "groups": 0},
+                      {"enabled": True}):  # counts unreadable: the setting is still known
+            with self.subTest(scope=scope):
+                check = self.run_check(scope)
+                self.assertEqual(check.status, CheckStatus.PASS)
+                self.assertIsNone(skip_reason(check))
+
+    def test_disabled_fails_when_opted_in(self):
+        # The pilot: opted in at enforcement score, a disabled allowlist still counts against the score.
+        check = self.run_check({"enabled": False, "checked_at": "2026-11-23T14:02:11Z"})
+        self.assertEqual(check.status, CheckStatus.FAIL)
+        self.assertIn("allowlist is off", check.failure_reasons[0])
+        self.assertIn("Only this project and any groups and projects in the allowlist", check.failure_reasons[0])
+
+    def test_forbidden_skips_with_cause(self):
+        check = self.run_check({"error": "forbidden", "checked_at": "2026-11-23T14:02:11Z"})
+        self.assertIn("HTTP 403", skip_reason(check))
+        self.assertIn("Maintainers", skip_reason(check))
+
+    def test_not_found_skips_with_cause(self):
+        self.assertIn("404", skip_reason(self.run_check({"error": "not_found"})))
+
+    def test_unknown_error_skips(self):
+        self.assertIn("'rate_limited'", skip_reason(self.run_check({"error": "rate_limited"})))
+
+    def test_error_wins_over_enabled(self):
+        # Never look compliant when the collector also recorded a denied read.
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                check = self.run_check({"enabled": enabled, "error": "forbidden"})
+                self.assertIn("HTTP 403", skip_reason(check))
+
+    def test_malformed_skips(self):
+        for scope in ({"enabled": "true"}, {"enabled": None}, {"enabled": 1}, {}, {"projects": 2},
+                      [], "enabled", True):
+            with self.subTest(scope=scope):
+                check = self.run_check(scope)
+                self.assertIn("unknown", skip_reason(check))
+
+    def test_absent_skips_once_collection_finished(self):
+        for data in ({}, {"vcs": {"provider": "github", "visibility": "private"}}):
+            with self.subTest(data=data):
+                check = self.run_check(data=data)
+                self.assertIn("No job token allowlist data", skip_reason(check))
+
+    def test_absent_pends_during_collection(self):
+        self.assertEqual(self.run_check(None, finished_=False).status, CheckStatus.PENDING)
 
 if __name__ == "__main__":
     unittest.main()
