@@ -1,7 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import (checked, field_values, is_empty, parse_list, skip_listed_author,
-                     ticket_path)
+from helpers import (UPDATE_TICKET, checked, field_values, is_empty, parse_list,
+                     rerun_hint, skip_listed_author, ticket_path)
 
 
 def main(node=None):
@@ -30,14 +30,15 @@ def main(node=None):
         # missing now is missing from the ticket, not still on its way.
         value = c.get_value_or_default(path, None)
         if is_empty(value):
-            c.fail(f"Ticket {ticket_id} has no value for {field}.")
+            c.fail(f"Ticket {ticket_id} has no value for {field}." + rerun_hint(UPDATE_TICKET))
             return c
 
         if allowed:
             values = field_values(field, value)
             c.assert_true(any(v in allowed for v in values),
                           f"Ticket {ticket_id} field {field} is {quoted(values)}, "
-                          f"which is not in the allowed list: {quoted(allowed)}.")
+                          f"which is not in the allowed list: {quoted(allowed)}."
+                          + rerun_hint(UPDATE_TICKET))
     return c
 
 

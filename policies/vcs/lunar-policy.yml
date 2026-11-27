@@ -173,3 +173,14 @@ inputs:
           Integration:98765  # release app, tags after CI passes
       ```
     default: ""
+  rerun_collectors:
+    description: |
+      Collectors a failing branch-protection or repository-settings check tells
+      the PR author to rerun with a `/lunar rerun` comment once a repository
+      admin changes the setting, named as your configuration imports them.
+      The default, auto, picks the provider collector's sub-collector that
+      records the setting (e.g. github.branch-protection, gitlab.repository);
+      set it for a renamed import, or to "" to leave the hint out where the Hub
+      doesn't accept the comment: Lunar accepts it from 4.15.0 when comment
+      reruns are enabled, which they are by default from 5.2.0.
+    default: "auto"

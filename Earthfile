@@ -136,6 +136,7 @@ test:
     BUILD ./policies/oncall+test
     BUILD ./policies/ticket+test
     BUILD ./policies/sonarqube+test
+    BUILD ./policies/code-quality+test
 
 lint:
     FROM python:3.12-alpine

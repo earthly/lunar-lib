@@ -75,6 +75,7 @@ This policy reads from the following Component JSON paths:
 | `.vcs.branch_protection.bypass_pull_request_allowances` | object | Classic `users`, `teams`, `apps` allowed to skip the pull-request requirement |
 | `.vcs.pr.commits[]` | array | The PR's commits with `signature.verified` and `signature.reason` |
 | `.vcs.release_range` | object | Commits since the previous release tag, each with its merged `pull_request` when there is one |
+| `.vcs.provider` | string | `github` or `gitlab`, read only to name the collector in a rerun hint |
 
 **Note:** This policy requires a VCS collector (such as `github` or `gitlab`) that populates the `.vcs` data.
 
@@ -144,6 +145,14 @@ policies:
     with:
       allowed_merge_strategies: "squash,rebase"
 ```
+
+### Re-checking with `/lunar rerun`
+
+A repository admin fixes the branch-protection and repository-settings checks in the repository's settings, not in code. On a pull request, their failure messages end with the comment that re-checks it once that's done:
+
+> Branch protection does not require pull requests before merging. Once a repository admin changes it, comment `/lunar rerun github.branch-protection`.
+
+`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, picks `<provider>.branch-protection` or `<provider>.repository` from `.vcs.provider`, so GitLab repositories get `gitlab.*`. Set it for a renamed import (`rerun_collectors: "github-ghes"`), or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0.
 
 ## Examples
 
@@ -279,7 +288,7 @@ When branch protection policies fail, configure branch protection rules in your 
    - **Require linear history** - Enable if required by policy
    - **Require signed commits** - Enable if required by policy
 4. Save the branch protection rule
-5. Re-run the Lunar collector and policy to verify compliance
+5. On an open pull request, comment the `/lunar rerun` command from the failure message to re-check it
 
 ### Bypass and Change Evidence Policies
 

@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import skip_listed_author, ticket_path
+from helpers import rerun_hint, skip_listed_author, ticket_path
 
 
 def main(node=None):
@@ -24,7 +24,8 @@ def main(node=None):
 
         c.assert_true(int(reuse_count) <= max_reuse,
                       f"Ticket {ticket_id} has been used in {reuse_count} other PRs "
-                      f"(max allowed: {max_reuse}). Create a new ticket for this work.")
+                      f"(max allowed: {max_reuse}). Create a new ticket for this work."
+                      + rerun_hint("Reference it in the PR title, then comment {command}."))
     return c
 
 

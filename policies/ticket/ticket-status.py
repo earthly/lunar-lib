@@ -1,6 +1,6 @@
 from lunar_policy import Check, variable_or_default
 
-from helpers import skip_listed_author, ticket_path
+from helpers import UPDATE_TICKET, rerun_hint, skip_listed_author, ticket_path
 
 
 def main(node=None):
@@ -29,10 +29,10 @@ def main(node=None):
 
         if allowed and status not in allowed:
             c.fail(f"Ticket {ticket_id} has status '{status}' which is not in "
-                   f"the allowed list: {', '.join(allowed)}.")
+                   f"the allowed list: {', '.join(allowed)}." + rerun_hint(UPDATE_TICKET))
         elif disallowed and status in disallowed:
             c.fail(f"Ticket {ticket_id} has status '{status}' which is in "
-                   f"the disallowed list: {', '.join(disallowed)}.")
+                   f"the disallowed list: {', '.join(disallowed)}." + rerun_hint(UPDATE_TICKET))
         else:
             c.assert_true(True, "")
     return c

@@ -5,8 +5,13 @@ import json
 from lunar_policy import variable_or_default
 from lunar_policy.nodepath import NodePath
 
+from rerun_hint import hint
+
 DEFAULT_TICKET_PATH = ".vcs.pr.ticket"
 AUTHOR_PATH = ".vcs.pr.author"
+# The jira collector under its own name. Matches the manifest default, which
+# `lunar policy dev` doesn't apply.
+DEFAULT_RERUN_COLLECTORS = "jira"
 
 # Jira returns a select-list option as {"value": ...}, a status, priority or
 # component as {"name": ...} and a user as {"displayName": ...}. A user can
@@ -48,12 +53,24 @@ def skip_listed_author(c):
             c.skip(f"PR author {author} is in skip_authors")
 
 
+# For a check that fails on what the tracker says about the ticket: fixing the
+# ticket, or referencing another one, needs no commit.
+UPDATE_TICKET = "Update the ticket or the PR title, then comment {command}."
+
+
 def missing_ticket_message(path):
+    hint = rerun_hint("Then comment {command}.")
     if path == DEFAULT_TICKET_PATH:
         return ("PR does not reference a ticket. "
-                "Include a ticket ID in the PR title (e.g. [ABC-123]).")
+                "Include a ticket ID in the PR title (e.g. [ABC-123])." + hint)
     return (f"PR does not reference a ticket for {path}. "
-            "Include its key in the PR title or description.")
+            "Include its key in the PR title or description." + hint)
+
+
+def rerun_hint(sentence):
+    """The `/lunar rerun` hint for the collectors that record the ticket, from
+    `rerun_collectors` (see rerun_hint.py)."""
+    return hint(sentence, DEFAULT_RERUN_COLLECTORS)
 
 
 def parse_list(name, raw):

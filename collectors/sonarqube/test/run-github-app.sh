@@ -128,7 +128,7 @@ expect_complete() { # expect_complete <passing> <gate status>
 expect_pending() {
   expect "exits 0" test "$CODE" -eq 0
   expect "writes status pending and nothing else" \
-    cj '. == {code_quality: {native: {sonarqube: {github_app: {status: "pending"}}}}}'
+    cj '. == {code_quality: {source: {tool: "sonarqube", integration: "github_app", analysis_status: "pending"}, native: {sonarqube: {github_app: {status: "pending"}}}}}'
 }
 expect_error() {
   expect "exits 1" test "$CODE" -eq 1

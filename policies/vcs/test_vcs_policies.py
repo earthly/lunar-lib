@@ -1067,5 +1067,171 @@ class TestReleaseCommitsMergedViaPr(unittest.TestCase):
         self.assertIn("+2 more", check.failure_reasons[0])
 
 
+HINT = "Once a repository admin changes it, comment `/lunar rerun {}`."
+
+
+def evaluate(check, data, pr="8", finished=False, **env):
+    """Runs a check as on pull request `pr` ("" or "0" for the default branch),
+    with `LUNAR_VAR_<k>` set from `env`."""
+    values = {f"LUNAR_VAR_{k}": v for k, v in env.items()}
+    values["LUNAR_COMPONENT_PR"] = pr
+    node = Node.from_component_json(
+        data, bundle_info={"workflows_finished": True} if finished else {})
+    with mock.patch.dict(os.environ, values):
+        return check(node)
+
+
+def with_provider(data, provider="github"):
+    data["vcs"]["provider"] = provider
+    return data
+
+
+class TestRerunHint(unittest.TestCase):
+    """On a pull request, a failing repository setting ends with the
+    `/lunar rerun` comment that re-collects it once an admin changes it."""
+
+    # A failing case per check, with the sub-collector that records the setting.
+    SETTINGS = (
+        (check_branch_protection_enabled, make_disabled_protection_data(), "branch-protection",
+         "Branch protection is not enabled on main."),
+        (check_require_pull_request, make_branch_protection_data(require_pr=False),
+         "branch-protection", "Branch protection does not require pull requests before merging."),
+        (check_require_codeowner_review, make_branch_protection_data(require_codeowner_review=False),
+         "branch-protection", "Branch protection does not require code owner review."),
+        (check_dismiss_stale_reviews, make_branch_protection_data(dismiss_stale_reviews=False),
+         "branch-protection",
+         "Branch protection does not dismiss stale reviews when new commits are pushed."),
+        (check_require_status_checks, make_branch_protection_data(require_status_checks=False),
+         "branch-protection", "Branch protection does not require status checks to pass."),
+        (check_require_branches_up_to_date,
+         make_branch_protection_data(require_branches_up_to_date=False), "branch-protection",
+         "Branch protection does not require branches to be up to date before merging."),
+        (check_disallow_force_push, make_branch_protection_data(allow_force_push=True),
+         "branch-protection",
+         "Branch protection allows force pushes, but policy requires them to be disabled."),
+        (check_disallow_branch_deletion, make_branch_protection_data(allow_deletions=True),
+         "branch-protection",
+         "Branch protection allows branch deletion, but policy requires it to be disabled."),
+        (check_require_linear_history, make_branch_protection_data(require_linear_history=False),
+         "branch-protection", "Branch protection does not require linear history."),
+        (check_require_signed_commits, make_branch_protection_data(require_signed_commits=False),
+         "branch-protection", "Branch protection does not require signed commits."),
+        (check_minimum_approvals, make_branch_protection_data(required_approvals=0),
+         "branch-protection",
+         "Branch protection requires 0 approval(s), but policy requires at least 1."),
+        (check_require_private, {"vcs": {"visibility": "public"}}, "repository",
+         "Repository visibility is 'public', but policy requires 'private'."),
+        (check_require_default_branch, {"vcs": {"default_branch": "master"}}, "repository",
+         "Default branch is 'master', but policy requires 'main'."),
+    )
+    NOT_ENABLED = (check_require_pull_request, check_require_codeowner_review,
+                   check_dismiss_stale_reviews, check_require_status_checks,
+                   check_require_branches_up_to_date, check_disallow_force_push,
+                   check_disallow_branch_deletion, check_require_linear_history,
+                   check_require_signed_commits, check_minimum_approvals,
+                   check_disallow_bypass_actors)
+
+    def run_case(self, check, data, **kwargs):
+        if check is check_minimum_approvals:
+            kwargs.setdefault("min_approvals", "1")
+        return evaluate(check, data, **kwargs)
+
+    def test_every_setting_failure_ends_with_the_comment(self):
+        for provider in ("github", "gitlab"):
+            for check, data, sub, message in self.SETTINGS:
+                with self.subTest(check=check.__module__, provider=provider):
+                    result = self.run_case(check, with_provider(json_copy(data), provider))
+                    self.assertEqual(result.status, CheckStatus.FAIL)
+                    self.assertEqual(result.failure_reasons,
+                                     [message + " " + HINT.format(f"{provider}.{sub}")])
+
+    def test_not_enabled_ends_with_the_comment(self):
+        for check in self.NOT_ENABLED:
+            with self.subTest(check=check.__module__):
+                result = self.run_case(check, with_provider(make_disabled_protection_data()))
+                self.assertEqual(result.failure_reasons, [
+                    "Branch protection is not enabled. "
+                    + HINT.format("github.branch-protection")])
+
+    def test_merge_strategies(self):
+        data = with_provider({"vcs": {"merge_strategies": {
+            "allow_merge_commit": True, "allow_squash_merge": True, "allow_rebase_merge": False}}})
+        result = self.run_case(check_allowed_merge_strategies, data,
+                               allowed_merge_strategies="squash")
+        self.assertEqual(result.failure_reasons, [
+            "Merge commits are enabled, but policy does not allow them (should be disabled). "
+            + HINT.format("github.repository")])
+
+    def test_no_hint_off_a_pull_request(self):
+        # The default branch has no pull request to comment on, so the message
+        # reads exactly as it did before the hint.
+        for pr in ("", "0"):
+            for check, data, _, message in self.SETTINGS:
+                with self.subTest(check=check.__module__, pr=pr):
+                    result = self.run_case(check, with_provider(json_copy(data)), pr=pr)
+                    self.assertEqual(result.failure_reasons, [message.rstrip(".")])
+
+    def test_no_hint_without_the_provider(self):
+        # .vcs.provider comes from the repository sub-collector; without it
+        # `auto` can't name the collector to rerun.
+        result = self.run_case(check_require_pull_request,
+                               make_branch_protection_data(require_pr=False))
+        self.assertEqual(result.failure_reasons,
+                         ["Branch protection does not require pull requests before merging"])
+
+    def test_renamed_collector_import(self):
+        # A github collector imported with `name: github-ghes` registers
+        # `github-ghes.*`; the input is used as written, never the default name.
+        result = self.run_case(check_require_pull_request,
+                               with_provider(make_branch_protection_data(require_pr=False)),
+                               rerun_collectors="github-ghes")
+        self.assertEqual(result.failure_reasons, [
+            "Branch protection does not require pull requests before merging. "
+            + HINT.format("github-ghes")])
+        self.assertNotIn("require-pull-request", result.failure_reasons[0])
+
+    def test_empty_turns_it_off(self):
+        result = self.run_case(check_require_pull_request,
+                               with_provider(make_branch_protection_data(require_pr=False)),
+                               rerun_collectors="")
+        self.assertEqual(result.failure_reasons,
+                         ["Branch protection does not require pull requests before merging"])
+
+    def test_no_hint_when_the_fix_is_not_a_setting(self):
+        # Missing data says nothing about the fix, and a bypass actor can also be
+        # allowed in the policy config instead of removed from the ruleset.
+        # The provider is there, so a hint could only be missing on purpose.
+        missing = self.run_case(check_require_pull_request, with_provider({"vcs": {}}),
+                                finished=True)
+        self.assertEqual(missing.failure_reasons,
+                         ["VCS data not found. Ensure a VCS collector is configured and has run."])
+        data = with_provider(make_branch_protection_data(source="ruleset"))
+        data["vcs"]["branch_protection"]["rulesets"] = [{
+            "name": "main", "source": "repository",
+            "bypass_actors": [{"actor_type": "OrganizationAdmin", "actor_id": 1}]}]
+        bypass = self.run_case(check_disallow_bypass_actors, data)
+        self.assertEqual(bypass.status, CheckStatus.FAIL)
+        self.assertNotIn("/lunar rerun", bypass.failure_reasons[0])
+
+    def test_malformed_name_drops_the_hint_without_changing_the_verdict(self):
+        with mock.patch("sys.stderr"):
+            result = self.run_case(check_require_pull_request,
+                                   with_provider(make_branch_protection_data(require_pr=False)),
+                                   rerun_collectors="github`")
+        self.assertEqual(result.status, CheckStatus.FAIL)
+        self.assertEqual(result.failure_reasons,
+                         ["Branch protection does not require pull requests before merging"])
+
+    def test_passing_checks_are_unchanged(self):
+        result = self.run_case(check_require_pull_request,
+                               with_provider(make_branch_protection_data()))
+        self.assertEqual(result.status, CheckStatus.PASS)
+
+
+def json_copy(data):
+    import json
+    return json.loads(json.dumps(data))
+
+
 if __name__ == "__main__":
     unittest.main()

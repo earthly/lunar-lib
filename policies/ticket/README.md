@@ -88,9 +88,25 @@ policies:
       ticket_path: ".vcs.pr.architecture_review"
       allowed_statuses: "Approved"
       ticket_field: "native.jira.fields.customfield_10042"
+      rerun_collectors: "jira-architecture-review"   # the second jira import's name
 ```
 
 `ticket_field` is relative to the ticket. A Jira select-list option matches on its `value`, a status or component on its `name`, and a user on its `displayName`; a multi-value field passes when any of its values is allowed. Jira lists custom field IDs at `GET /rest/api/3/field`.
+
+### Re-checking with `/lunar rerun`
+
+These checks fail on the PR title or the ticket, not the code. Their failure messages end with the comment that re-checks the PR:
+
+> PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira`.
+
+`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `jira`, fits the jira collector under its own name; set it for anything else:
+
+```yaml
+    with:
+      rerun_collectors: "linear"   # or "github.pull-request,jira" with ticket-from-json, or "" for no hint
+```
+
+Name the whole plugin or import, not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0, and ignores it otherwise; set `rerun_collectors: ""` until they are.
 
 ## Examples
 
@@ -122,7 +138,7 @@ policies:
 {}
 ```
 
-**Failure message:** `"PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123])."`
+**Failure message:** `` "PR does not reference a ticket. Include a ticket ID in the PR title (e.g. [ABC-123]). Then comment `/lunar rerun jira`." ``
 
 ## Remediation
 
@@ -135,3 +151,5 @@ When this policy fails, you can resolve it by:
 5. **ticket-type**: Use an acceptable issue type (e.g. Story, Bug, Task)
 6. **ticket-reuse**: Create a new ticket for this work instead of reusing an existing one
 7. **ticket-field**: Set the field on the ticket to one of the allowed values
+
+Once the title or the ticket is fixed, the [`/lunar rerun` comment](#re-checking-with-lunar-rerun) in the failure message re-checks the PR.

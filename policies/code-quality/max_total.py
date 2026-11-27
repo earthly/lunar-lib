@@ -2,6 +2,8 @@
 
 from lunar_policy import Check, variable_or_default
 
+from pending_hint import with_pending_hint
+
 
 def main(node=None):
     c = Check("max-total", "Total code-quality issues within threshold", node=node)
@@ -31,7 +33,8 @@ def main(node=None):
         total_node = cq_node.get_node(".issues.total")
         if not total_node.exists():
             c.fail(
-                "Total issue count not available. Ensure the scanner publishes .code_quality.issues.total."
+                with_pending_hint(
+                    c, "Total issue count not available. Ensure the scanner publishes .code_quality.issues.total.")
             )
             return c
 

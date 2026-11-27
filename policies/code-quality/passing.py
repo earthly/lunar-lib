@@ -2,6 +2,8 @@
 
 from lunar_policy import Check
 
+from pending_hint import with_pending_hint
+
 
 def main(node=None):
     c = Check("passing", "Code-quality scan must be passing", node=node)
@@ -19,7 +21,8 @@ def main(node=None):
         passing_node = cq_node.get_node(".passing")
         if not passing_node.exists():
             c.fail(
-                "Code-quality pass/fail signal not available. Ensure collector reports .code_quality.passing."
+                with_pending_hint(
+                    c, "Code-quality pass/fail signal not available. Ensure collector reports .code_quality.passing.")
             )
             return c
 

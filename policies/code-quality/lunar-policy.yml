@@ -78,3 +78,13 @@ inputs:
   max_duplication_percentage:
     description: "Maximum duplicated-lines percentage (0-100)"
     default: "5"
+  rerun_collectors:
+    description: |
+      Collectors a check that fails because the scanner hadn't reported on the
+      commit yet tells the PR author to rerun with a `/lunar rerun` comment once
+      it has, named as your configuration imports them. The default, auto,
+      reruns the scanner's collector under its own name (e.g. sonarqube); set it
+      for a renamed import, or to "" to leave the hint out where the Hub doesn't
+      accept the comment: Lunar accepts it from 4.15.0 when comment reruns are
+      enabled, which they are by default from 5.2.0.
+    default: "auto"

@@ -1,5 +1,7 @@
 from lunar_policy import Check, variable_or_default
 
+from settings_hint import REPOSITORY, with_hint
+
 
 def main(node=None, allowed_strategies_override=None):
     c = Check("allowed-merge-strategies", "Merge strategies should match allowed list", node=node)
@@ -42,7 +44,9 @@ def main(node=None, allowed_strategies_override=None):
                     "rebase": "Rebase merges"
                 }[strategy_name]
 
-                c.assert_false(is_enabled, f"{strategy_display} are enabled, but policy does not allow them (should be disabled)")
+                c.assert_false(is_enabled, with_hint(
+                    c, f"{strategy_display} are enabled, but policy does not allow them (should be disabled)",
+                    REPOSITORY))
     return c
 
 
