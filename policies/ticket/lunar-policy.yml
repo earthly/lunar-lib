@@ -126,5 +126,6 @@ inputs:
       under its own name; set it for another tracker (linear), a renamed
       import, or ticket-from-json (github.pull-request,jira). Set it to "" to
       leave the hint out where the Hub doesn't accept the comment: Lunar
-      accepts it from 4.15.0 when comment reruns are enabled.
+      accepts it from 4.15.0 when comment reruns are enabled, which they are
+      by default from 5.2.0.
     default: "jira"

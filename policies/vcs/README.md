@@ -152,7 +152,7 @@ A repository admin fixes the branch-protection and repository-settings checks in
 
 > Branch protection does not require pull requests before merging. Once a repository admin changes it, comment `/lunar rerun github.branch-protection` to re-check without a new commit.
 
-`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, picks `<provider>.branch-protection` or `<provider>.repository` from `.vcs.provider`, so GitLab repositories get `gitlab.*`. Set it for a renamed import (`rerun_collectors: "github-ghes"`), or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled.
+`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, picks `<provider>.branch-protection` or `<provider>.repository` from `.vcs.provider`, so GitLab repositories get `gitlab.*`. Set it for a renamed import (`rerun_collectors: "github-ghes"`), or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0.
 
 ## Examples
 

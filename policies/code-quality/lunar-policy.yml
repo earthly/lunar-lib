@@ -86,5 +86,5 @@ inputs:
       reruns the scanner's collector under its own name (e.g. sonarqube); set it
       for a renamed import, or to "" to leave the hint out where the Hub doesn't
       accept the comment: Lunar accepts it from 4.15.0 when comment reruns are
-      enabled.
+      enabled, which they are by default from 5.2.0.
     default: "auto"

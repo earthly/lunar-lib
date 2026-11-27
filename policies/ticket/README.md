@@ -106,7 +106,7 @@ These checks fail on the PR title or the ticket, so the fix needs no commit. The
       rerun_collectors: "linear"   # or "github.pull-request,jira" with ticket-from-json, or "" for no hint
 ```
 
-Name the whole plugin or import, not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled and ignores it otherwise; set `rerun_collectors: ""` until they are.
+Name the whole plugin or import, not `jira.ticket`, so `ticket-history` reruns too and the reuse count follows the new ticket. Lunar accepts the comment from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0, and ignores it otherwise; set `rerun_collectors: ""` until they are.
 
 ## Examples
 

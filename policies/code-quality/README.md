@@ -65,7 +65,7 @@ A scanner that hasn't finished analyzing a pull request's commit when Lunar look
 
 > Code-quality pass/fail signal not available. Ensure collector reports .code_quality.passing. The scanner hadn't reported on this commit when Lunar checked. Once it has, comment `/lunar rerun sonarqube` to re-check without a new commit.
 
-`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, uses the scanner's own name from `.code_quality.source.tool`. Set it for a renamed import, or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled.
+`rerun_collectors` names the collectors to rerun, as your configuration imports them. The default, `auto`, uses the scanner's own name from `.code_quality.source.tool`. Set it for a renamed import, or to `""` until your Hub accepts the comment: Lunar accepts it from 4.15.0 when comment reruns are enabled, which they are by default from 5.2.0.
 
 ## Examples
 

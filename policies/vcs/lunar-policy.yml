@@ -182,5 +182,5 @@ inputs:
       records the setting (e.g. github.branch-protection, gitlab.repository);
       set it for a renamed import, or to "" to leave the hint out where the Hub
       doesn't accept the comment: Lunar accepts it from 4.15.0 when comment
-      reruns are enabled.
+      reruns are enabled, which they are by default from 5.2.0.
     default: "auto"
